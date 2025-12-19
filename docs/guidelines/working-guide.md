@@ -40,16 +40,16 @@ Standard Go Project Layout に準拠します。
 ### General
 - **Effective Go:** Goの公式スタイルガイドに従う。
 - **Error Handling:**
-   - エラーを握り潰さない（`_` で捨てない）。
-   - エラーを返す際は、コンテキストを付与する: `fmt.Errorf("failed to open file: %w", err)`
+  - エラーを握り潰さない（`_` で捨てない）。
+  - エラーを返す際は、コンテキストを付与する: `fmt.Errorf("failed to open file: %w", err)`
 - **Structs:** 構造体のフィールドには適切なタグ（`json:"..."`, `yaml:"..."`）を付与する。
 ### CLI Best Practices
 - **Stdout vs Stderr:**
-   - 正常な出力結果（パイプで渡すデータなど）: `Stdout`
-   - ログ、警告、エラーメッセージ、進捗バー: `Stderr`
+  - 正常な出力結果（パイプで渡すデータなど）: `Stdout`
+  - ログ、警告、エラーメッセージ、進捗バー: `Stderr`
 - **Exit Codes:**
-   - 成功: `0`
-   - エラー: `1` (または適切な非ゼロの値)
+  - 成功: `0`
+  - エラー: `1` (または適切な非ゼロの値)
 ### Testing
 - **Table-Driven Tests:** 複数のケースを検証する場合は、テーブル駆動テストを使用する。
 - **Mocking:** 外部APIやファイルシステムへの依存は、インターフェースを切ってモック可能にする。
