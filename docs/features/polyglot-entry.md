@@ -18,6 +18,6 @@
 
 ### 具体例
 - ユーザーが `node --version` と実行した場合（`node` が `cderun` へのシンボリックリンクとする）:
-  - 実際のプロセス起動: `node` (argv[0]) `[--version]` (argv[1])
-  - 書き換え後の内部状態: `cderun` (argv[0]) `[node, --version]`
-  - 結果として `node` サブコマンドが呼び出されること。
+  - 実際のプロセス起動: `os.Args = ["node", "--version"]`
+  - 書き換え後の内部状態: `os.Args = ["cderun", "node", "--version"]`
+  - 結果として、`cderun` のサブコマンドとして `node` が呼び出される。
