@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +46,28 @@ intended for the subcommand.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
+	args := preprocessArgs(os.Args)
+	rootCmd.SetArgs(args[1:])
 	return rootCmd.Execute()
+}
+
+func preprocessArgs(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	execName := filepath.Base(args[0])
+	if execName == "cderun" {
+		return args
+	}
+
+	// If the executable is not "cderun", treat the executable name as a subcommand.
+	// For example, if "node --version" is called via a symlink:
+	// args = ["node", "--version"] -> ["cderun", "node", "--version"]
+	newArgs := make([]string, 0, len(args)+1)
+	newArgs = append(newArgs, "cderun", execName)
+	newArgs = append(newArgs, args[1:]...)
+	return newArgs
 }
 
 func init() {

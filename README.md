@@ -1,0 +1,55 @@
+# cderun
+
+**Concept**
+
+> "All you need on your local machine is Docker."
+> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand. It keeps your host clean and ensures reproducible environments.
+
+## Usage
+
+`cderun` supports three primary modes of operation:
+
+### 1. Wrapper Mode
+Explicitly call `cderun` followed by the subcommand you want to run.
+```bash
+cderun [cderun-flags] <subcommand> [passthrough-args]
+```
+Example:
+```bash
+cderun --tty node --version
+```
+
+### 2. Symlink Mode (Polyglot Entry Point)
+Create a symlink to `cderun` with the name of the tool you want to wrap. `cderun` will automatically detect the tool name from the executable name.
+```bash
+ln -s cderun node
+./node --version  # Effectively runs 'cderun node --version'
+```
+
+### 3. Ad-hoc Mode
+You can use `cderun` to run arbitrary commands in a containerized environment by specifying the subcommand and its arguments.
+```bash
+cderun bash
+```
+
+## Argument Parsing & Flags
+
+`cderun` uses a strict boundary for argument parsing. The first non-flag argument is considered the **subcommand**. All arguments before it are parsed as `cderun` flags, and all arguments after it (including flags) are passed directly to the subcommand.
+
+### Illustration
+```bash
+$ cderun --tty docker --tty
+  |      |     |      |
+  |      |     |      +-- Passthrough argument (passed to docker)
+  |      |     +--------- Subcommand
+  |      +--------------- cderun flag (TTY: true)
+  +---------------------- cderun command
+```
+
+### Available Flags
+- `--tty`: Allocate a pseudo-TTY.
+- `--interactive`, `-i`: Keep STDIN open even if not attached.
+- `--network`: Connect a container to a network (default: "bridge").
+
+---
+*This project is under active development.*
