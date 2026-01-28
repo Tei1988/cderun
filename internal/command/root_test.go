@@ -3,8 +3,6 @@ package command
 import (
 	"bytes"
 	"cderun/internal/runtime"
-	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -12,23 +10,11 @@ import (
 )
 
 func executeCommand(args ...string) (string, error) {
-	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
-	os.Args = append([]string{"cderun"}, args...)
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	rootCmd.SetOut(w)
-	rootCmd.SetErr(w)
-	err := Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	err := Execute(append([]string{"cderun"}, args...))
 
 	return buf.String(), err
 }
@@ -147,16 +133,11 @@ func TestRootCmd(t *testing.T) {
 			exitFunc = oldExit
 		}()
 
-		oldArgs := os.Args
-		defer func() { os.Args = oldArgs }()
-		os.Args = []string{"node", "--version"}
+		buf := new(bytes.Buffer)
+		rootCmd.SetOut(buf)
+		rootCmd.SetErr(buf)
 
-		_, w, _ := os.Pipe()
-		rootCmd.SetOut(w)
-		rootCmd.SetErr(w)
-
-		err := Execute()
-		w.Close()
+		err := Execute([]string{"node", "--version"})
 
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)

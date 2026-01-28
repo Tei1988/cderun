@@ -102,8 +102,8 @@ intended for the subcommand.`,
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() error {
-	args := preprocessArgs(os.Args)
+func Execute(rawArgs []string) error {
+	args := preprocessArgs(rawArgs)
 	rootCmd.SetArgs(args[1:])
 	return rootCmd.Execute()
 }
