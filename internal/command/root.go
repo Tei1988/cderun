@@ -3,6 +3,7 @@ package command
 import (
 	"cderun/internal/container"
 	"cderun/internal/runtime"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -73,7 +74,12 @@ intended for the subcommand.`,
 		}
 
 		if config.Remove {
-			defer rt.RemoveContainer(ctx, containerID)
+			cleanupCtx := context.WithoutCancel(ctx)
+			defer func() {
+				if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to remove container (defer): %v\n", err)
+				}
+			}()
 		}
 
 		if err := rt.StartContainer(ctx, containerID); err != nil {
@@ -95,7 +101,8 @@ intended for the subcommand.`,
 		}
 
 		if config.Remove {
-			if err := rt.RemoveContainer(ctx, containerID); err != nil {
+			cleanupCtx := context.WithoutCancel(ctx)
+			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to remove container: %v\n", err)
 			}
 		}
