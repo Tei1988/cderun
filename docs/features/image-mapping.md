@@ -7,7 +7,7 @@
 ## 設定
 
 ```yaml
-# ~/.cderun/config.yaml
+# ~/.config/cderun/config.yaml
 images:
   node: "node:18-alpine"
   python: "python:3.11-slim"

@@ -55,7 +55,7 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools python,node sh
 ```
 
-**動作**:
+**動作イメージ(実際はランタイムAPIで実現)**:
 ```bash
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \

@@ -147,7 +147,7 @@ $ cderun node app.js
 ```bash
 $ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # ContainerConfig.Env = ["NONEXISTENT="]
-# 出力: undefined
+# 出力: "" (空文字列)
 ```
 
 ### 厳密モード（将来の拡張）

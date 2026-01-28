@@ -121,7 +121,7 @@ args: [app.js]
 ドライラン時も環境変数は実際の値に展開される：
 ```bash
 $ export API_KEY=secret123
-$ cderun --dry-run --env-pass API_KEY node app.js
+$ cderun --dry-run --env API_KEY node app.js
 env:
   - API_KEY=secret123
 ```

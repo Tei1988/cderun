@@ -378,11 +378,11 @@ type ToolConfig struct {
 }
 
 func LoadCderunConfig() (*CderunConfig, error) {
-    // 検索順序: ./.cderun.yaml -> ~/.cderun/config.yaml -> /etc/cderun/config.yaml
+    // 検索順序: ./.cderun.yaml -> ~/.config/cderun/config.yaml -> /etc/cderun/config.yaml
 }
 
 func LoadToolsConfig() (ToolsConfig, error) {
-    // 検索順序: ./.tools.yaml -> ~/.cderun/tools.yaml -> /etc/cderun/tools.yaml
+    // 検索順序: ./.tools.yaml -> ~/.config/cderun/tools.yaml -> /etc/cderun/tools.yaml
 }
 ```
 
