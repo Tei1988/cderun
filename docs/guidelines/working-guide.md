@@ -45,13 +45,29 @@ Standard Go Project Layout に準拠します。
   - エラーを握り潰さない（`_` で捨てない）。
   - エラーを返す際は、コンテキストを付与する: `fmt.Errorf("failed to open file: %w", err)`
 - **Structs:** 構造体のフィールドには適切なタグ（`json:"..."`, `yaml:"..."`）を付与する。
+
 ### CLI Best Practices
 - **Stdout vs Stderr:**
   - 正常な出力結果（パイプで渡すデータなど）: `Stdout`
   - ログ、警告、エラーメッセージ、進捗バー: `Stderr`
+- **Context Management:**
+  - Cobraのコマンドハンドラ内では、`context.Background()` ではなく `cmd.Context()` を使用してシグナルやタイムアウトを伝播させる。
+  - クリーンアップ処理（コンテナ削除など）でコンテキストが必要な場合は、親コンテキストがキャンセルされていても実行されるよう `context.WithoutCancel(ctx)` を使用する。
+- **Process Lifecycle:**
+  - `os.Exit` を呼び出すと `defer` が実行されない。
+  - クリーンアップが必要なリソースがある場合は、`os.Exit` (または `exitFunc`) を呼ぶ前に明示的にクリーンアップを実行する。
+  - 同時に、予期せぬエラーやパニックに備えて `defer` による安全網も用意する。
 - **Exit Codes:**
   - 成功: `0`
   - エラー: `1` (または適切な非ゼロの値)
+
 ### Testing
+- **Test Isolation:**
+  - テスト間で状態（グローバル変数、パッケージ変数、フラグなど）が漏洩しないようにする。
+  - サブテスト内で変数を変更した場合は、必ず `t.Cleanup()` を使用して元の値に復元する。
+- **CLI Output Capture:**
+  - `os.Stdout` の直接的なモックは避け、`rootCmd.SetOut()` や `rootCmd.SetErr()` を使用する。
+  - `fmt.Print` など標準出力に直接書かれるものをキャプチャする必要がある場合は、`os.Pipe()` を使用し、適切にファイルディスクリプタを管理（`defer close`）する。
+- **Dependency Injection:**
+  - `os.Exit` や `runtime.NewDockerRuntime` などの外部依存は、パッケージ変数として関数ポインタ（`exitFunc`, `runtimeFactory` 等）を定義し、テスト時にモックに差し替え可能にする。
 - **Table-Driven Tests:** 複数のケースを検証する場合は、テーブル駆動テストを使用する。
-- **Mocking:** 外部APIやファイルシステムへの依存は、インターフェースを切ってモック可能にする。
