@@ -95,6 +95,12 @@ intended for the subcommand.`,
 			return fmt.Errorf("failed to wait for container: %w", err)
 		}
 
+		if config.Remove {
+			if err := rt.RemoveContainer(ctx, containerID); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to remove container: %v\n", err)
+			}
+		}
+
 		exitFunc(exitCode)
 		return nil
 	},

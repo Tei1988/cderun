@@ -93,6 +93,7 @@ func TestRootCmd(t *testing.T) {
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
 		assert.Equal(t, "test-container-id", mockRuntime.StartedContainerID)
 		assert.Equal(t, "test-container-id", mockRuntime.WaitedContainerID)
+		assert.Equal(t, "test-container-id", mockRuntime.RemovedContainerID)
 		assert.Equal(t, 0, capturedExitCode)
 	})
 
