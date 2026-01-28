@@ -71,24 +71,36 @@ func TestExecuteEmptyArgs(t *testing.T) {
 
 func TestRootCmd(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
+		// Save and restore package-level state
+		oldTTY := tty
+		oldInteractive := interactive
+		oldNetwork := network
+		oldMountSocket := mountSocket
+		oldMountCderun := mountCderun
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			tty = oldTTY
+			interactive = oldInteractive
+			network = oldNetwork
+			mountSocket = oldMountSocket
+			mountCderun = oldMountCderun
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
 		// Prepare mock runtime
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		oldFactory := runtimeFactory
 		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
-		oldExit := exitFunc
 		var capturedExitCode int
 		exitFunc = func(code int) {
 			capturedExitCode = code
 		}
-		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
-		}()
 
 		_, err := executeCommand("--tty", "-i", "--network", "host", "node", "--version")
 		assert.NoError(t, err)
@@ -107,17 +119,29 @@ func TestRootCmd(t *testing.T) {
 	})
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
-		// Prepare mock runtime
+		// Save and restore package-level state
+		oldTTY := tty
+		oldInteractive := interactive
+		oldNetwork := network
+		oldMountSocket := mountSocket
+		oldMountCderun := mountCderun
 		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			tty = oldTTY
+			interactive = oldInteractive
+			network = oldNetwork
+			mountSocket = oldMountSocket
+			mountCderun = oldMountCderun
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Prepare mock runtime
 		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
-		oldExit := exitFunc
 		exitFunc = func(code int) {}
-		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
-		}()
 
 		output, err := executeCommand("--tty")
 		assert.NoError(t, err)
@@ -127,21 +151,33 @@ func TestRootCmd(t *testing.T) {
 	})
 
 	t.Run("handles symlink execution via Execute", func(t *testing.T) {
+		// Save and restore package-level state
+		oldTTY := tty
+		oldInteractive := interactive
+		oldNetwork := network
+		oldMountSocket := mountSocket
+		oldMountCderun := mountCderun
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			tty = oldTTY
+			interactive = oldInteractive
+			network = oldNetwork
+			mountSocket = oldMountSocket
+			mountCderun = oldMountCderun
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
 		// Prepare mock runtime
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		oldFactory := runtimeFactory
 		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
-		oldExit := exitFunc
 		exitFunc = func(code int) {}
-		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
-		}()
 
 		buf := new(bytes.Buffer)
 		rootCmd.SetOut(buf)
