@@ -1,13 +1,13 @@
 package main
 
 import (
-	"cderun/cmd"
+	"cderun/internal/command"
 	"fmt"
 	"os"
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
+	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}

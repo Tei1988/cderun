@@ -125,7 +125,7 @@ type ContainerRuntime interface {
     RemoveContainer(ctx context.Context, containerID string) error
     
     // コンテナとの通信
-    AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error
+    AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
     
     // 情報取得
     Name() string

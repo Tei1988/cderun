@@ -1,6 +1,11 @@
-package cmd
+package command
 
 import (
+	"cderun/internal/container"
+	"cderun/internal/runtime"
+	"context"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -13,6 +18,12 @@ var (
 	network     string
 	mountSocket string
 	mountCderun bool
+
+	// For testing
+	exitFunc       = os.Exit
+	runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		return runtime.NewDockerRuntime(socket)
+	}
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -31,18 +42,60 @@ intended for the subcommand.`,
 		subcommand := args[0]
 		passthroughArgs := args[1:]
 
-		// For now, just print the parsed results
-		cmd.Printf("--- cderun Configuration ---\n")
-		cmd.Printf("TTY: %v\n", tty)
-		cmd.Printf("Interactive: %v\n", interactive)
-		cmd.Printf("Network: %s\n", network)
-		cmd.Printf("Mount Socket: %s\n", mountSocket)
-		cmd.Printf("Mount Cderun: %v\n", mountCderun)
-		cmd.Printf("---------------------------\n")
-		cmd.Printf("Subcommand: %s\n", subcommand)
-		cmd.Printf("Passthrough Args: %v\n", passthroughArgs)
-		cmd.Printf("---------------------------\n")
+		// Build ContainerConfig
+		config := &container.ContainerConfig{
+			Image:       "alpine:latest", // Temporary image until Phase 2
+			Command:     []string{subcommand},
+			Args:        passthroughArgs,
+			TTY:         tty,
+			Interactive: interactive,
+			Network:     network,
+			Remove:      true,
+		}
 
+		// Initialize Runtime
+		// TODO: Implement runtime detection in Phase 2
+		socket := "/var/run/docker.sock"
+		if mountSocket != "" {
+			socket = mountSocket
+		}
+
+		rt, err := runtimeFactory(socket)
+		if err != nil {
+			return fmt.Errorf("failed to initialize runtime: %w", err)
+		}
+
+		// Execute Container
+		ctx := context.Background()
+
+		containerID, err := rt.CreateContainer(ctx, config)
+		if err != nil {
+			return fmt.Errorf("failed to create container: %w", err)
+		}
+
+		if config.Remove {
+			defer rt.RemoveContainer(ctx, containerID)
+		}
+
+		if err := rt.StartContainer(ctx, containerID); err != nil {
+			return fmt.Errorf("failed to start container: %w", err)
+		}
+
+		// Attach to container IO
+		var stdin io.Reader
+		if config.Interactive {
+			stdin = os.Stdin
+		}
+		if err := rt.AttachContainer(ctx, containerID, config.TTY, stdin, os.Stdout, os.Stderr); err != nil {
+			return fmt.Errorf("failed to attach to container: %w", err)
+		}
+
+		exitCode, err := rt.WaitContainer(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("failed to wait for container: %w", err)
+		}
+
+		exitFunc(exitCode)
 		return nil
 	},
 }
