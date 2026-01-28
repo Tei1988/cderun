@@ -3,6 +3,8 @@ package command
 import (
 	"bytes"
 	"cderun/internal/runtime"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -10,13 +12,46 @@ import (
 )
 
 func executeCommand(args ...string) (string, error) {
-	buf := new(bytes.Buffer)
-	rootCmd.SetOut(buf)
-	rootCmd.SetErr(buf)
+	return executeCommandRaw(append([]string{"cderun"}, args...))
+}
 
-	err := Execute(append([]string{"cderun"}, args...))
+func executeCommandRaw(args []string) (string, error) {
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	oldOut := rootCmd.OutOrStdout()
+	oldErr := rootCmd.ErrOrStderr()
+	defer func() {
+		os.Stdout = oldStdout
+		os.Stderr = oldStderr
+		rootCmd.SetOut(oldOut)
+		rootCmd.SetErr(oldErr)
+	}()
 
-	return buf.String(), err
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	defer w.Close()
+
+	os.Stdout = w
+	os.Stderr = w
+	rootCmd.SetOut(w)
+	rootCmd.SetErr(w)
+
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+
+	execErr := Execute(args)
+
+	_ = w.Close()
+	<-done
+
+	return buf.String(), execErr
 }
 
 func TestPreprocessArgs(t *testing.T) {
@@ -179,11 +214,7 @@ func TestRootCmd(t *testing.T) {
 		}
 		exitFunc = func(code int) {}
 
-		buf := new(bytes.Buffer)
-		rootCmd.SetOut(buf)
-		rootCmd.SetErr(buf)
-
-		err := Execute([]string{"node", "--version"})
+		_, err := executeCommandRaw([]string{"node", "--version"})
 
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)
