@@ -79,7 +79,7 @@ gemini-cli ask    # エラー: マウントされていない
 
 ツールは`/usr/local/bin/`にマウントされます:
 
-```
+```text
 /usr/local/bin/
 ├── cderun       -> ~/.config/cderun/bin/cderun-linux-amd64
 ├── node         -> ~/.config/cderun/bin/cderun-linux-amd64
