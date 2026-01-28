@@ -51,5 +51,28 @@ $ cderun --tty docker --tty
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--network`: Connect a container to a network (default: "bridge").
 
+## Features
+
+### Multi-Runtime Support
+`cderun` uses an abstraction layer to support multiple container runtimes:
+- **Docker** (default)
+- **Podman** (drop-in replacement)
+- Extensible architecture for future runtimes (containerd, Lima, etc.)
+
+### Intelligent Argument Parsing
+- Strict boundary parsing separates `cderun` flags from subcommand arguments
+- Prevents flag conflicts between `cderun` and wrapped commands
+- Supports complex command structures
+
+### Polyglot Entry Point
+- Single binary can act as multiple tools via symlinks
+- Automatic tool detection from executable name
+- Seamless integration with existing workflows
+
+### Clean Host Environment
+- All commands run in ephemeral containers
+- No need to install development tools locally
+- Consistent, reproducible environments
+
 ---
 *This project is under active development.*
