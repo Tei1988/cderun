@@ -11,6 +11,8 @@ var (
 	tty         bool
 	interactive bool
 	network     string
+	mountSocket string
+	mountCderun bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -34,6 +36,8 @@ intended for the subcommand.`,
 		cmd.Printf("TTY: %v\n", tty)
 		cmd.Printf("Interactive: %v\n", interactive)
 		cmd.Printf("Network: %s\n", network)
+		cmd.Printf("Mount Socket: %s\n", mountSocket)
+		cmd.Printf("Mount Cderun: %v\n", mountCderun)
 		cmd.Printf("---------------------------\n")
 		cmd.Printf("Subcommand: %s\n", subcommand)
 		cmd.Printf("Passthrough Args: %v\n", passthroughArgs)
@@ -74,6 +78,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&tty, "tty", false, "Allocate a pseudo-TTY")
 	rootCmd.PersistentFlags().BoolVarP(&interactive, "interactive", "i", false, "Keep STDIN open even if not attached")
 	rootCmd.PersistentFlags().StringVar(&network, "network", "bridge", "Connect a container to a network")
+	rootCmd.PersistentFlags().StringVar(&mountSocket, "mount-socket", "", "Mount container runtime socket (e.g., /var/run/docker.sock)")
+	rootCmd.PersistentFlags().BoolVar(&mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 
 	rootCmd.Flags().SetInterspersed(false)
 }
