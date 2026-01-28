@@ -3,7 +3,6 @@ package command
 import (
 	"cderun/internal/container"
 	"cderun/internal/runtime"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -66,7 +65,7 @@ intended for the subcommand.`,
 		}
 
 		// Execute Container
-		ctx := context.Background()
+		ctx := cmd.Context()
 
 		containerID, err := rt.CreateContainer(ctx, config)
 		if err != nil {
