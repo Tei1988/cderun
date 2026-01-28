@@ -110,7 +110,11 @@ intended for the subcommand.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(rawArgs []string) error {
 	args := preprocessArgs(rawArgs)
-	rootCmd.SetArgs(args[1:])
+	if len(args) >= 1 {
+		rootCmd.SetArgs(args[1:])
+	} else {
+		rootCmd.SetArgs([]string{})
+	}
 	return rootCmd.Execute()
 }
 

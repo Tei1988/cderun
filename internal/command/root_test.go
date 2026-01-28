@@ -60,6 +60,15 @@ func TestPreprocessArgs(t *testing.T) {
 	}
 }
 
+func TestExecuteEmptyArgs(t *testing.T) {
+	// Should not panic
+	err := Execute([]string{})
+	assert.NoError(t, err)
+
+	err = Execute(nil)
+	assert.NoError(t, err)
+}
+
 func TestRootCmd(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		// Prepare mock runtime
