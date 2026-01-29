@@ -9,15 +9,17 @@
 
 ### 実装済み
 - 基本的なCLI構造（Cobra使用）
-- 引数解析の基礎（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`）
+- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
+- 基本的なコンテナ実行（Docker API使用）
+- コンテナのライフサイクル管理（作成・起動・待機・削除）
+- 標準入出力のアタッチ（TTY/インタラクティブ対応）
 
 ### 未実装
-- 実際のコンテナ実行
-- 設定ファイル読み込み
-- イメージマッピング
-- 環境変数処理
-- その他の高度な機能
+- 設定ファイル読み込み（`.cderun.yaml`, `.tools.yaml`）
+- イメージマッピング（サブコマンドからイメージ名の解決）
+- 環境変数処理（パススルー）
+- その他の高度な機能（作業ディレクトリ同期、ソケットマウント、バイナリマウント）
 
 ## 実装フェーズ
 
@@ -745,11 +747,11 @@ if verbose {
 
 ## 実装チェックリスト
 
-### Phase 1
-- [ ] Step 1.1: ContainerConfig定義
-- [ ] Step 1.2: Runtimeインターフェース
-- [ ] Step 1.3: Docker API実装
-- [ ] Step 1.4: 基本実行フロー
+### Phase 1 (Completed)
+- [x] Step 1.1: ContainerConfig定義
+- [x] Step 1.2: Runtimeインターフェース
+- [x] Step 1.3: Docker API実装
+- [x] Step 1.4: 基本実行フロー
 
 ### Phase 2
 - [ ] Step 2.1: 設定ファイル読み込み

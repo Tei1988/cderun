@@ -92,23 +92,17 @@ config := ContainerConfig{
 
 ```go
 type ContainerRuntime interface {
-    // コンテナのライフサイクル
-    CreateContainer(ctx context.Context, config ContainerConfig) (string, error)
-    StartContainer(ctx context.Context, containerID string) error
-    StopContainer(ctx context.Context, containerID string, timeout time.Duration) error
-    RemoveContainer(ctx context.Context, containerID string) error
-    
-    // コンテナとの通信
-    AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error
-    ExecInContainer(ctx context.Context, containerID string, cmd []string) (int, error)
-    
-    // 情報取得
-    InspectContainer(ctx context.Context, containerID string) (*ContainerInfo, error)
-    ListContainers(ctx context.Context) ([]ContainerInfo, error)
-    
-    // イメージ操作
-    PullImage(ctx context.Context, image string) error
-    ListImages(ctx context.Context) ([]ImageInfo, error)
+	// Container lifecycle
+	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
+	StartContainer(ctx context.Context, containerID string) error
+	WaitContainer(ctx context.Context, containerID string) (int, error)
+	RemoveContainer(ctx context.Context, containerID string) error
+
+	// Container communication
+	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
+
+	// Information
+	Name() string
 }
 ```
 
@@ -116,68 +110,83 @@ type ContainerRuntime interface {
 
 ```go
 type DockerRuntime struct {
-    client *client.Client
+	client *client.Client
+	socket string
 }
 
-func (d *DockerRuntime) CreateContainer(ctx context.Context, config ContainerConfig) (string, error) {
-    // ContainerConfigをDocker APIの形式に変換
-    containerConfig := &container.Config{
-        Image:        config.Image,
-        Cmd:          append(config.Command, config.Args...),
-        Tty:          config.TTY,
-        OpenStdin:    config.Interactive,
-        Env:          config.Env,
-        WorkingDir:   config.Workdir,
-        User:         config.User,
-    }
-    
-    hostConfig := &container.HostConfig{
-        AutoRemove:   config.Remove,
-        NetworkMode:  container.NetworkMode(config.Network),
-    }
-    
-    // ボリュームマウント
-    for _, vol := range config.Volumes {
-        mount := mount.Mount{
-            Type:     mount.TypeBind,
-            Source:   vol.HostPath,
-            Target:   vol.ContainerPath,
-            ReadOnly: vol.ReadOnly,
-        }
-        hostConfig.Mounts = append(hostConfig.Mounts, mount)
-    }
-    
-    resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
-    if err != nil {
-        return "", err
-    }
-    
-    return resp.ID, nil
+func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	containerConfig := &container.Config{
+		Image:      config.Image,
+		Cmd:        append(config.Command, config.Args...),
+		Tty:        config.TTY,
+		OpenStdin:  config.Interactive,
+		Env:        config.Env,
+		WorkingDir: config.Workdir,
+		User:       config.User,
+	}
+
+	hostConfig := &container.HostConfig{
+		AutoRemove:  config.Remove,
+		NetworkMode: container.NetworkMode(config.Network),
+	}
+
+	for _, vol := range config.Volumes {
+		m := mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   vol.HostPath,
+			Target:   vol.ContainerPath,
+			ReadOnly: vol.ReadOnly,
+		}
+		hostConfig.Mounts = append(hostConfig.Mounts, m)
+	}
+
+	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
+	if err != nil {
+		return "", err
+	}
+
+	return resp.ID, nil
 }
 
 func (d *DockerRuntime) StartContainer(ctx context.Context, containerID string) error {
-    return d.client.ContainerStart(ctx, containerID, container.StartOptions{})
+	return d.client.ContainerStart(ctx, containerID, container.StartOptions{})
 }
 
-func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error {
-    resp, err := d.client.ContainerAttach(ctx, containerID, container.AttachOptions{
-        Stream: true,
-        Stdin:  stdin != nil,
-        Stdout: true,
-        Stderr: true,
-    })
-    if err != nil {
-        return err
-    }
-    defer resp.Close()
-    
-    // ストリームのコピー
-    if stdin != nil {
-        go io.Copy(resp.Conn, stdin)
-    }
-    
-    _, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
-    return err
+func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	resultC, errC := d.client.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errC:
+		return 0, err
+	case result := <-resultC:
+		return int(result.StatusCode), nil
+	}
+}
+
+func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+	resp, err := d.client.ContainerAttach(ctx, containerID, container.AttachOptions{
+		Stream: true,
+		Stdin:  stdin != nil,
+		Stdout: true,
+		Stderr: true,
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Close()
+
+	if stdin != nil {
+		go func() {
+			io.Copy(resp.Conn, stdin)
+			resp.CloseWrite()
+		}()
+	}
+
+	if tty {
+		_, err = io.Copy(stdout, resp.Reader)
+	} else {
+		_, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+	}
+	return err
 }
 ```
 
@@ -231,12 +240,12 @@ func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
     }
     
     // 6. 終了コードの取得
-    info, err := runtime.InspectContainer(ctx, containerID)
+    exitCode, err := runtime.WaitContainer(ctx, containerID)
     if err != nil {
         return 1, err
     }
     
-    return info.ExitCode, nil
+    return exitCode, nil
 }
 ```
 

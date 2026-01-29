@@ -12,7 +12,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman
+### 優先度2: Podman (開発中)
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
@@ -36,23 +36,17 @@ cderun ContainerRuntimeインターフェース
 
 ```go
 type ContainerRuntime interface {
-    // コンテナのライフサイクル
-    CreateContainer(ctx context.Context, config ContainerConfig) (string, error)
-    StartContainer(ctx context.Context, containerID string) error
-    StopContainer(ctx context.Context, containerID string, timeout time.Duration) error
-    RemoveContainer(ctx context.Context, containerID string) error
-    
-    // コンテナとの通信
-    AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error
-    ExecInContainer(ctx context.Context, containerID string, cmd []string) (int, error)
-    
-    // 情報取得
-    InspectContainer(ctx context.Context, containerID string) (*ContainerInfo, error)
-    ListContainers(ctx context.Context) ([]ContainerInfo, error)
-    
-    // イメージ操作
-    PullImage(ctx context.Context, image string) error
-    ListImages(ctx context.Context) ([]ImageInfo, error)
+	// Container lifecycle
+	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
+	StartContainer(ctx context.Context, containerID string) error
+	WaitContainer(ctx context.Context, containerID string) (int, error)
+	RemoveContainer(ctx context.Context, containerID string) error
+
+	// Container communication
+	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
+
+	// Information
+	Name() string
 }
 ```
 
