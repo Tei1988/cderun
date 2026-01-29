@@ -149,7 +149,7 @@ func TestRootCmd(t *testing.T) {
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		var capturedExitCode int
@@ -203,7 +203,7 @@ func TestRootCmd(t *testing.T) {
 		})
 
 		// Prepare mock runtime
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		exitFunc = func(code int) {}
@@ -264,7 +264,7 @@ node:
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		exitFunc = func(code int) {}
@@ -313,7 +313,7 @@ node:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		exitFunc = func(code int) {}
@@ -363,7 +363,7 @@ node:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		exitFunc = func(code int) {}
@@ -389,7 +389,7 @@ node:
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		exitFunc = func(code int) {}
@@ -414,13 +414,34 @@ node:
 		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
-			return &runtime.MockRuntime{}, nil
-		}
+		// Use the real runtimeFactory here to test the validation logic
 		exitFunc = func(code int) {}
 
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+	})
+
+	t.Run("returns error for podman (not implemented yet)", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Use the real runtimeFactory
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--runtime", "podman", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
 }
