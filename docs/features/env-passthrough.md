@@ -7,34 +7,12 @@
 
 ## 中間表現での扱い
 
-```go
-type ContainerConfig struct {
-    // ...
-    Env []string  // ["KEY=value", "KEY2=value2", "KEY3"] の形式
-}
-```
+`ContainerConfig.Env` は `[]string` 型で保持し、各要素は以下のいずれかの形式をとる。
 
 ### env配列の形式
 
-1. **`KEY=value`** - 明示的な値を設定
-2. **`KEY`** - 実行ホストの環境変数から値を取得（パススルー）
-
-```go
-config := ContainerConfig{
-    Env: []string{
-        "NODE_ENV=production",  // 明示的な値
-        "NPM_TOKEN",             // 実行ホストから取得
-        "HOME",                  // 実行ホストから取得
-    },
-}
-
-// 実行時に変換
-resolvedEnv := []string{
-    "NODE_ENV=production",
-    "NPM_TOKEN=" + os.Getenv("NPM_TOKEN"),
-    "HOME=" + os.Getenv("HOME"),
-}
-```
+1. **`KEY=value`** (明示的指定): 指定された値をそのまま使用。
+2. **`KEY`** (パススルー): 実行ホストの環境変数から値を取得して `KEY=value` 形式に変換。
 
 ## 設定方法
 
@@ -162,47 +140,9 @@ $ cderun node app.js
 Error: Required environment variable not found: NPM_TOKEN
 ```
 
-## 実装
+## 環境変数の解決ロジック
 
-### 環境変数の解決
-
-```go
-func ResolveEnv(envList []string) []string {
-    resolved := make([]string, 0, len(envList))
-    
-    for _, env := range envList {
-        if strings.Contains(env, "=") {
-            // KEY=value 形式 → そのまま使用
-            resolved = append(resolved, env)
-        } else {
-            // KEY 形式 → 実行ホストから取得
-            key := env
-            value := os.Getenv(key)
-            resolved = append(resolved, fmt.Sprintf("%s=%s", key, value))
-        }
-    }
-    
-    return resolved
-}
-```
-
-### 使用例
-
-```go
-config := ContainerConfig{
-    Env: []string{
-        "NODE_ENV=production",
-        "NPM_TOKEN",
-        "HOME",
-    },
-}
-
-// 実行前に解決
-config.Env = ResolveEnv(config.Env)
-// → ["NODE_ENV=production", "NPM_TOKEN=secret123", "HOME=/home/alice"]
-
-runtime.CreateContainer(ctx, config)
-```
+コンテナを作成する前に、`Env` 配列内の各要素をスキャンし、`=` を含まない要素（キーのみの指定）については、実行ホストの `os.Getenv(key)` を呼び出して値を解決する。解決された値は `KEY=value` の形式でランタイムAPIに渡される。
 
 ## デバッグ
 

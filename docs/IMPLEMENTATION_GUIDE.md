@@ -41,293 +41,54 @@
 
 ### Step 1.1: 中間表現（ContainerConfig）の定義
 
-**目的**: すべての設定を統一的に扱うための中間表現を定義
-
-**参照ドキュメント**:
-- `docs/features/direct-container-execution.md`
-- `docs/features/container-runtime-abstraction.md`
+**目的**: すべての設定を統一的に扱うための中間表現を定義。CLIフラグや設定ファイルの内容をこの構造体に集約する。
 
 **実装内容**:
-
-1. `internal/container/config.go`を作成
-
-```go
-package container
-
-type ContainerConfig struct {
-    // 基本設定
-    Image       string
-    Command     []string
-    Args        []string
-    
-    // 実行オプション
-    TTY         bool
-    Interactive bool
-    Remove      bool
-    
-    // ネットワーク
-    Network     string
-    
-    // ボリューム
-    Volumes     []VolumeMount
-    
-    // 環境変数（["KEY=value", "KEY2=value2"]形式）
-    Env         []string
-    
-    // 作業ディレクトリ
-    Workdir     string
-    
-    // ユーザー
-    User        string
-}
-
-type VolumeMount struct {
-    HostPath      string
-    ContainerPath string
-    ReadOnly      bool
-}
-```
-
-**テスト**:
-- 構造体の初期化テスト
-- デフォルト値の確認
+- `internal/container` パッケージに、イメージ名、コマンド、引数、実行オプション（TTY等）、ボリュームマウント、環境変数、作業ディレクトリ、実行ユーザーを保持する構造体を定義。
 
 **完了条件**:
-- `ContainerConfig`構造体が定義されている
-- 基本的なテストが通る
+- `ContainerConfig` 構造体が定義され、必要なフィールドが揃っていること。
 
 ---
 
-### Step 1.2: Dockerランタイムインターフェースの定義
+### Step 1.2: ランタイムインターフェースの定義
 
-**目的**: コンテナランタイムの抽象化レイヤーを定義
-
-**参照ドキュメント**:
-- `docs/features/multi-runtime-support.md`
-- `docs/features/direct-container-execution.md`
+**目的**: 複数のコンテナランタイム（Docker, Podman等）を統一的に扱うための抽象化レイヤーを定義。
 
 **実装内容**:
-
-1. `internal/runtime/interface.go`を作成
-
-```go
-package runtime
-
-import (
-    "context"
-    "io"
-    "time"
-)
-
-type ContainerRuntime interface {
-    // コンテナのライフサイクル
-    CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
-    StartContainer(ctx context.Context, containerID string) error
-    WaitContainer(ctx context.Context, containerID string) (int, error)
-    RemoveContainer(ctx context.Context, containerID string) error
-    
-    // コンテナとの通信
-    AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
-    
-    // 情報取得
-    Name() string
-}
-```
-
-**テスト**:
-- インターフェースのモック実装
-- 基本的な動作確認
+- `internal/runtime` パッケージに、コンテナの作成、起動、待機、削除、および標準入出力へのアタッチを定義した `ContainerRuntime` インターフェースを作成。
 
 **完了条件**:
-- `ContainerRuntime`インターフェースが定義されている
-- モック実装でテストが通る
+- インターフェースが定義され、ランタイムの実装を差し替え可能な構成になっていること。
 
 ---
 
 ### Step 1.3: Docker API実装
 
-**目的**: Docker Engine APIを使った実装
-
-**参照ドキュメント**:
-- `docs/features/multi-runtime-support.md`
-- `docs/features/direct-container-execution.md`
-
-**依存ライブラリ**:
-```bash
-go get github.com/docker/docker/client
-go get github.com/docker/docker/api/types/container
-go get github.com/docker/docker/api/types/mount
-go get github.com/docker/docker/pkg/stdcopy
-```
+**目的**: Docker Engine API (`moby`) を使用してランタイムインターフェースを実装。
 
 **実装内容**:
-
-1. `internal/runtime/docker.go`を作成
-
-```go
-package runtime
-
-import (
-    "context"
-    "io"
-    
-    "github.com/docker/docker/client"
-    "github.com/docker/docker/api/types/container"
-    "github.com/docker/docker/api/types/mount"
-    "github.com/docker/docker/pkg/stdcopy"
-)
-
-type DockerRuntime struct {
-    client *client.Client
-    socket string
-}
-
-func NewDockerRuntime(socket string) (*DockerRuntime, error) {
-    cli, err := client.NewClientWithOpts(
-        client.WithHost("unix://" + socket),
-        client.WithAPIVersionNegotiation(),
-    )
-    if err != nil {
-        return nil, err
-    }
-    
-    return &DockerRuntime{
-        client: cli,
-        socket: socket,
-    }, nil
-}
-
-func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-    // ContainerConfigをDocker APIの形式に変換
-    containerConfig := &container.Config{
-        Image:      config.Image,
-        Cmd:        append(config.Command, config.Args...),
-        Tty:        config.TTY,
-        OpenStdin:  config.Interactive,
-        Env:        config.Env,
-        WorkingDir: config.Workdir,
-        User:       config.User,
-    }
-    
-    hostConfig := &container.HostConfig{
-        AutoRemove:  config.Remove,
-        NetworkMode: container.NetworkMode(config.Network),
-    }
-    
-    // ボリュームマウント
-    for _, vol := range config.Volumes {
-        m := mount.Mount{
-            Type:     mount.TypeBind,
-            Source:   vol.HostPath,
-            Target:   vol.ContainerPath,
-            ReadOnly: vol.ReadOnly,
-        }
-        hostConfig.Mounts = append(hostConfig.Mounts, m)
-    }
-    
-    resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
-    if err != nil {
-        return "", err
-    }
-    
-    return resp.ID, nil
-}
-
-// 他のメソッドも実装...
-```
-
-**テスト**:
-- Dockerが利用可能な環境でのインテグレーションテスト
-- コンテナの作成・起動・削除
+- `ContainerConfig` を Docker API の `Config`, `HostConfig`, `Mount` 等に変換するロジックを実装。
+- コンテナのライフサイクル（Create, Start, Wait, Remove）と入出力ストリームのアタッチ（Attach）を実装。
 
 **完了条件**:
-- Docker APIを使ったコンテナ実行が動作する
-- テストが通る
+- Docker API 経由でコンテナの作成から終了待機までが実行できること。
 
 ---
 
 ### Step 1.4: 基本的なコンテナ実行フロー
 
-**目的**: CLIからコンテナを実際に実行
-
-**参照ドキュメント**:
-- `docs/features/direct-container-execution.md`
-- `docs/features/argument-parsing.md`
+**目的**: CLIからコンテナを実際に実行。
 
 **実装内容**:
-
-1. `cmd/root.go`を修正
-
-```go
-func (cmd *cobra.Command, args []string) error {
-    if len(args) == 0 {
-        return cmd.Help()
-    }
-    
-    subcommand := args[0]
-    passthroughArgs := args[1:]
-    
-    // ContainerConfigの構築
-    config := &container.ContainerConfig{
-        Image:       "alpine:latest", // 仮のイメージ
-        Command:     []string{subcommand},
-        Args:        passthroughArgs,
-        TTY:         tty,
-        Interactive: interactive,
-        Network:     network,
-        Remove:      true,
-    }
-    
-    // ランタイムの初期化
-    runtime, err := runtime.NewDockerRuntime("/var/run/docker.sock")
-    if err != nil {
-        return err
-    }
-    
-    // コンテナの実行
-    ctx := context.Background()
-    
-    containerID, err := runtime.CreateContainer(ctx, config)
-    if err != nil {
-        return err
-    }
-    
-    if err := runtime.StartContainer(ctx, containerID); err != nil {
-        return err
-    }
-    
-    if config.TTY || config.Interactive {
-        if err := runtime.AttachContainer(ctx, containerID, config.TTY, os.Stdin, os.Stdout, os.Stderr); err != nil {
-            return err
-        }
-    }
-    
-    exitCode, err := runtime.WaitContainer(ctx, containerID)
-    if err != nil {
-        return err
-    }
-    
-    os.Exit(exitCode)
-    return nil
-}
-```
-
-**テスト**:
-```bash
-# 基本的な実行
-cderun sh -c "echo hello"
-
-# TTY付き
-cderun --tty sh
-
-# インタラクティブ
-cderun -ti sh
-```
+- `internal/command/root.go` の `RunE` ハンドラを実装。
+- 引数からサブコマンドとパススルー引数を抽出し、`ContainerConfig` を構築。
+- ランタイムを初期化し、コンテナの作成、起動、アタッチ、終了待機を順に呼び出す。
+- コンテナの終了コードを受け取り、プロセスの終了コードとして反映させる。
 
 **完了条件**:
-- `cderun`でコンテナが実行される
-- TTY/インタラクティブモードが動作する
-- 終了コードが正しく返される
+- `cderun` を実行した際に、指定したコマンドがコンテナ内で実行され、結果がホストの標準出力に表示されること。
+- TTY（`--tty`）やインタラクティブモード（`-i`）が機能すること。
 
 ---
 
@@ -335,177 +96,38 @@ cderun -ti sh
 
 ### Step 2.1: 設定ファイル読み込み
 
-**目的**: `.cderun.yaml`と`.tools.yaml`を読み込む
-
-**参照ドキュメント**:
-- `docs/features/configuration-file-support.md`
-
-**依存ライブラリ**:
-```bash
-go get gopkg.in/yaml.v3
-```
+**目的**: `.cderun.yaml`（グローバル設定）と `.tools.yaml`（ツール別設定）を読み込む。
 
 **実装内容**:
-
-1. `internal/config/config.go`を作成
-
-```go
-package config
-
-type CderunConfig struct {
-    Runtime     string   `yaml:"runtime"`
-    RuntimePath string   `yaml:"runtimePath"`
-    Defaults    Defaults `yaml:"defaults"`
-}
-
-type Defaults struct {
-    TTY         bool   `yaml:"tty"`
-    Interactive bool   `yaml:"interactive"`
-    Network     string `yaml:"network"`
-    Remove      bool   `yaml:"remove"`
-    SyncWorkdir bool   `yaml:"syncWorkdir"`
-}
-
-type ToolsConfig map[string]ToolConfig
-
-type ToolConfig struct {
-    Image   string   `yaml:"image"`
-    TTY     *bool    `yaml:"tty"`
-    Interactive *bool `yaml:"interactive"`
-    Network string   `yaml:"network"`
-    Remove  *bool    `yaml:"remove"`
-    Volumes []string `yaml:"volumes"`
-    Env     []string `yaml:"env"`
-    Workdir string   `yaml:"workdir"`
-}
-
-func LoadCderunConfig() (*CderunConfig, error) {
-    // 検索順序: ./.cderun.yaml -> ~/.config/cderun/config.yaml -> /etc/cderun/config.yaml
-}
-
-func LoadToolsConfig() (ToolsConfig, error) {
-    // 検索順序: ./.tools.yaml -> ~/.config/cderun/tools.yaml -> /etc/cderun/tools.yaml
-}
-```
-
-**テスト**:
-- 各検索パスからの読み込み
-- YAML解析エラーのハンドリング
+- `internal/config` パッケージを作成し、YAMLをパースするための構造体を定義。
+- 設定ファイルを特定の検索順序（カレントディレクトリ、ホームディレクトリ、システム設定ディレクトリ）に従って探索し、読み込む機能を実装。
 
 **完了条件**:
-- 設定ファイルが正しく読み込まれる
-- 存在しない場合のデフォルト動作
+- 各設定ファイルが正しくパースされ、プログラム内で利用可能な状態になっていること。
 
 ---
 
 ### Step 2.2: イメージマッピング
 
-**目的**: サブコマンド名からイメージを解決
-
-**参照ドキュメント**:
-- `docs/features/image-mapping.md`
+**目的**: ユーザーが入力したサブコマンド名（例: `node`）から、対応するコンテナイメージを解決する。
 
 **実装内容**:
-
-1. `internal/image/mapper.go`を作成
-
-```go
-package image
-
-var defaultMappings = map[string]string{
-    "node":   "node:alpine",
-    "python": "python:alpine",
-    "go":     "golang:alpine",
-    "rust":   "rust:alpine",
-    "bash":   "alpine:latest",
-    "sh":     "alpine:latest",
-}
-
-type ImageMapper struct {
-    toolsConfig config.ToolsConfig
-}
-
-func (m *ImageMapper) ResolveImage(toolName string) (string, error) {
-    // 1. .tools.yamlから検索
-    if tool, ok := m.toolsConfig[toolName]; ok {
-        return tool.Image, nil
-    }
-    
-    // 2. デフォルトマッピングから検索
-    if image, ok := defaultMappings[toolName]; ok {
-        return image, nil
-    }
-    
-    // 3. エラー
-    return "", fmt.Errorf("no image mapping found for '%s'", toolName)
-}
-```
-
-**テスト**:
-- デフォルトマッピングの解決
-- `.tools.yaml`からの解決
-- 存在しないツールのエラー
+- ハードコードされたデフォルトマッピングと、設定ファイル（`.tools.yaml`）で定義されたカスタムマッピングを組み合わせてイメージ名を決定するロジックを実装。
 
 **完了条件**:
-- イメージが正しく解決される
-- エラーメッセージが適切
+- サブコマンド名に応じた適切なイメージが選択され、コンテナが実行されること。
 
 ---
 
 ### Step 2.3: 優先順位解決
 
-**目的**: CLI、環境変数、設定ファイルの優先順位を実装
-
-**参照ドキュメント**:
-- `docs/features/argument-priority-logic.md`
+**目的**: CLIフラグ、環境変数、ツール別設定、グローバルデフォルト、ハードコードされたデフォルトの順で設定を解決する。
 
 **実装内容**:
-
-1. `internal/config/resolver.go`を作成
-
-```go
-package config
-
-// P1: CLI Override Flags (最優先)
-// P2: Standard CLI Flags
-// P3: Environment Variables
-// P4: Tool-Specific Config
-// P5: Global Defaults
-
-func ResolveBool(
-    cliValue bool,
-    cliChanged bool,
-    envName string,
-    toolValue *bool,
-    defaultValue bool,
-) bool {
-    // P1 & P2: CLI
-    if cliChanged {
-        return cliValue
-    }
-    
-    // P3: Environment
-    if val, set := os.LookupEnv(envName); set {
-        return parseBool(val)
-    }
-    
-    // P4: Tool Config
-    if toolValue != nil {
-        return *toolValue
-    }
-    
-    // P5: Default
-    return defaultValue
-}
-```
-
-**テスト**:
-- 各優先順位レベルでの解決
-- 組み合わせテスト
+- 各設定項目（TTY、ネットワーク等）について、優先順位階層（P1〜P5）に従って最終的な値を決定するリゾルバーを実装。
 
 **完了条件**:
-- 優先順位が正しく動作する
-- すべてのテストが通る
+- 複数の場所で設定が競合した場合に、定義された優先順位に従って正しく値が選択されること。
 
 ---
 
@@ -513,186 +135,61 @@ func ResolveBool(
 
 ### Step 3.1: 環境変数パススルー
 
-**目的**: 環境変数の選択的な引き継ぎ
-
-**参照ドキュメント**:
-- `docs/features/env-passthrough.md`
+**目的**: ホストの環境変数をコンテナに引き継ぐ。
 
 **実装内容**:
-
-1. `internal/env/resolver.go`を作成
-
-```go
-package env
-
-// ResolveEnv は環境変数リストを解決
-// "KEY=value" -> そのまま
-// "KEY" -> os.Getenv("KEY")から取得
-func ResolveEnv(envList []string) []string {
-    resolved := make([]string, 0, len(envList))
-    
-    for _, env := range envList {
-        if strings.Contains(env, "=") {
-            resolved = append(resolved, env)
-        } else {
-            key := env
-            value := os.Getenv(key)
-            resolved = append(resolved, fmt.Sprintf("%s=%s", key, value))
-        }
-    }
-    
-    return resolved
-}
-```
-
-**テスト**:
-- `KEY=value`形式
-- `KEY`形式（パススルー）
-- 存在しない環境変数
+- `KEY=value` 形式（直接指定）と `KEY` 形式（ホストから取得）の両方を解決し、`ContainerConfig.Env` に追加するロジックを実装。
 
 **完了条件**:
-- 環境変数が正しく解決される
-- デフォルトでは引き継がれない
+- 指定した環境変数がコンテナ内のプロセスに正しく渡されていること。
 
 ---
 
 ### Step 3.2: 作業ディレクトリ同期
 
-**目的**: ホストのカレントディレクトリをコンテナ内で再現
-
-**参照ドキュメント**:
-- `docs/features/workdir-sync.md`
+**目的**: ホストのカレントディレクトリをコンテナ内の同じパスにマウントし、作業ディレクトリとして設定する。
 
 **実装内容**:
-
-```go
-func AddWorkdirMount(config *container.ContainerConfig) error {
-    cwd, err := os.Getwd()
-    if err != nil {
-        return err
-    }
-    
-    config.Volumes = append(config.Volumes, container.VolumeMount{
-        HostPath:      cwd,
-        ContainerPath: cwd,
-        ReadOnly:      false,
-    })
-    config.Workdir = cwd
-    
-    return nil
-}
-```
-
-**テスト**:
-- 相対パスの動作確認
-- ファイル操作の確認
+- `os.Getwd()` で取得したパスを、ボリュームマウントおよび `Workdir` 設定として `ContainerConfig` に追加。
 
 **完了条件**:
-- カレントディレクトリが正しくマウントされる
-- 相対パスが動作する
+- コンテナ内からホストのファイルにアクセスでき、相対パスが正しく機能すること。
 
 ---
 
 ### Step 3.3: ソケットマウント
 
-**目的**: `--mount-socket`の実装
-
-**参照ドキュメント**:
-- `docs/features/docker-in-docker-support.md`
+**目的**: コンテナ内からホストの Docker/Podman を操作可能にする。
 
 **実装内容**:
-
-```go
-if mountSocket != "" {
-    config.Volumes = append(config.Volumes, container.VolumeMount{
-        HostPath:      mountSocket,
-        ContainerPath: mountSocket,
-        ReadOnly:      false,
-    })
-}
-```
-
-**テスト**:
-```bash
-cderun --mount-socket /var/run/docker.sock docker ps
-```
+- 指定されたソケットパスをコンテナ内にバインドマウントする。
 
 **完了条件**:
-- ソケットが正しくマウントされる
-- コンテナ内からDockerが使える
+- コンテナ内で `docker ps` 等のコマンドが正常に動作すること。
 
 ---
 
 ### Step 3.4: cderunバイナリマウント
 
-**目的**: `--mount-cderun`の実装
-
-**参照ドキュメント**:
-- `docs/features/cderun-binary-mounting.md`
+**目的**: コンテナ内でも `cderun` コマンドを使用可能にする。
 
 **実装内容**:
-
-1. アーキテクチャ検出
-2. バイナリダウンロード（必要に応じて）
-3. バイナリマウント
-
-```go
-func AddCderunMount(config *container.ContainerConfig, targetArch string) error {
-    binaryPath := fmt.Sprintf("~/.config/cderun/bin/cderun-%s", targetArch)
-    
-    config.Volumes = append(config.Volumes, container.VolumeMount{
-        HostPath:      binaryPath,
-        ContainerPath: "/usr/local/bin/cderun",
-        ReadOnly:      true,
-    })
-    
-    return nil
-}
-```
-
-**テスト**:
-```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock sh
-# コンテナ内で
-cderun node --version
-```
+- ホスト上の `cderun` バイナリをコンテナ内の `/usr/local/bin/cderun` 等にマウントする。ターゲットのアーキテクチャに合わせたバイナリの準備が必要な場合がある。
 
 **完了条件**:
-- cderunがコンテナ内で使える
-- `--mount-socket`との併用チェック
+- コンテナ内から `cderun` が呼び出せること。
 
 ---
 
 ### Step 3.5: ツールマウント
 
-**目的**: `--mount-tools`と`--mount-all-tools`の実装
-
-**参照ドキュメント**:
-- `docs/features/mount-tools.md`
+**目的**: `node` や `python` といった名前で `cderun` を呼び出せるよう、エイリアス（シンボリックリンクまたはバイナリのコピー）をコンテナ内に配置する。
 
 **実装内容**:
-
-```go
-func AddToolMounts(config *container.ContainerConfig, tools []string, cderunBinary string) error {
-    for _, tool := range tools {
-        config.Volumes = append(config.Volumes, container.VolumeMount{
-            HostPath:      cderunBinary,
-            ContainerPath: fmt.Sprintf("/usr/local/bin/%s", tool),
-            ReadOnly:      true,
-        })
-    }
-    return nil
-}
-```
-
-**テスト**:
-```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools node,python sh
-```
+- `cderun` バイナリを複数の名前でコンテナ内にマウントまたはリンク作成する。
 
 **完了条件**:
-- 指定したツールがマウントされる
-- `.tools.yaml`の検証が動作する
+- コンテナ内で `node --version` 等を実行した際に、コンテナ内の `cderun` が起動すること。
 
 ---
 
@@ -700,48 +197,25 @@ cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools node,pyt
 
 ### Step 4.1: ドライランモード
 
-**目的**: `--dry-run`の実装
-
-**参照ドキュメント**:
-- `docs/features/dry-run-mode.md`
+**目的**: 実際のコンテナ実行を行わずに、実行される内容をプレビューする。
 
 **実装内容**:
-
-```go
-if dryRun {
-    fmt.Printf("Would execute:\n")
-    fmt.Printf("Image: %s\n", config.Image)
-    fmt.Printf("Command: %v\n", config.Command)
-    fmt.Printf("Args: %v\n", config.Args)
-    // ...
-    return nil
-}
-```
+- `--dry-run` フラグが有効な場合、`ContainerConfig` の内容を人間が読みやすい形式（YAML/JSON等）で標準出力に表示し、実行を中断する。
 
 **完了条件**:
-- コマンドがプレビューされる
-- 実際には実行されない
+- 実行内容が確認でき、副作用が発生しないこと。
 
 ---
 
 ### Step 4.2: ログ・デバッグ
 
-**目的**: `--verbose`の実装
-
-**参照ドキュメント**:
-- `docs/features/logging-debugging.md`
+**目的**: トラブルシューティングのために詳細な実行ログを表示する。
 
 **実装内容**:
-
-```go
-if verbose {
-    log.Printf("Creating container with config: %+v\n", config)
-    log.Printf("Container ID: %s\n", containerID)
-}
-```
+- `--verbose` フラグに応じて、コンテナ作成時のパラメータやランタイムからの応答、内部の処理ステップを標準エラー出力に表示する。
 
 **完了条件**:
-- 詳細ログが出力される
+- 内部状態が可視化され、デバッグが容易になること。
 
 ---
 
