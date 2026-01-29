@@ -58,7 +58,13 @@ func (c *ContainerConfig) ToJSON() (string, error) {
 func (c *ContainerConfig) ToSimple() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Image: %s\n", c.Image))
-	sb.WriteString(fmt.Sprintf("Command: %s %s\n", c.Command[0], strings.Join(c.Args, " ")))
+	commandStr := "<none>"
+	if len(c.Command) > 0 {
+		commandStr = fmt.Sprintf("%s %s", c.Command[0], strings.Join(c.Args, " "))
+	} else if len(c.Args) > 0 {
+		commandStr = strings.Join(c.Args, " ")
+	}
+	sb.WriteString(fmt.Sprintf("Command: %s\n", commandStr))
 
 	if len(c.Volumes) > 0 {
 		vols := make([]string, 0, len(c.Volumes))
