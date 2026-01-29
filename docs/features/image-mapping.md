@@ -1,4 +1,4 @@
-# イメージマッピング (Phase 2予定)
+# イメージマッピング (Completed)
 
 ## 概要
 
@@ -6,12 +6,16 @@
 
 ## 設定
 
+設定は `.tools.yaml` で行います。
+
 ```yaml
-# ~/.config/cderun/config.yaml
-images:
-  node: "node:18-alpine"
-  python: "python:3.11-slim"
-  custom-tool: "my-registry/custom:latest"
+# .tools.yaml
+node:
+  image: "node:18-alpine"
+python:
+  image: "python:3.11-slim"
+custom-tool:
+  image: "my-registry/custom:latest"
 ```
 
 ### エラーハンドリング

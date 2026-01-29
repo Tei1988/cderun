@@ -78,57 +78,62 @@ cderun --mount-socket /run/podman/podman.sock podman images
 cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
 ```
 
-**エラー例**:
+### `--image`
+- **型**: string
+- **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
+
 ```bash
-# これはエラー
-cderun --mount-cderun node
-# Error: --mount-cderun requires --mount-socket
+cderun --image node:18-alpine node --version
 ```
+
+### `--runtime`
+- **型**: string
+- **デフォルト**: `docker`
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman`）
+
+```bash
+cderun --runtime podman node app.js
+```
+
+### `--remove`
+- **型**: bool
+- **デフォルト**: `true`
+- **説明**: コンテナ終了後に自動的に削除する
+
+```bash
+cderun --remove=false node app.js  # コンテナを残す
+```
+
+### `--cderun-tty` / `--cderun-interactive`
+- **型**: bool
+- **説明**: 設定ファイルや環境変数を上書きしてTTY/Interactiveを強制する（P1優先順位）
 
 ## 将来追加予定のオプション
 
-### `--env`
-環境変数の設定・パススルー
+### `--env`, `-e`
+環境変数の設定・パススルー（現在は `.tools.yaml` でのみ設定可能）
 ```bash
 cderun --env NODE_ENV=production node app.js
 cderun --env NPM_TOKEN node app.js  # ホストから取得
 ```
 
 ### `--volume`, `-v`
-ボリュームマウント
+ボリュームマウント（現在は `.tools.yaml` でのみ設定可能）
 ```bash
 cderun --volume ./data:/data python script.py
 cderun -v ~/.ssh:/root/.ssh:ro git clone ...
 ```
 
 ### `--workdir`, `-w`
-作業ディレクトリの指定
+作業ディレクトリの指定（現在は `.tools.yaml` でのみ設定可能）
 ```bash
 cderun --workdir /app node server.js
-```
-
-### `--image`
-イメージの明示的指定
-```bash
-cderun --image node:18-alpine node --version
-```
-
-### `--runtime`
-ランタイムの明示的指定
-```bash
-cderun --runtime podman node app.js
 ```
 
 ### `--dry-run`
 実行せずにコマンドをプレビュー
 ```bash
 cderun --dry-run node app.js
-```
-
-### `--remove`
-コンテナの自動削除（デフォルト: true）
-```bash
-cderun --remove=false node app.js  # コンテナを残す
 ```
 
 ## オプションの優先順位

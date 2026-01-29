@@ -8,11 +8,11 @@
 
 ### コア機能
 
-1. **[引数解析](./argument-parsing.md)**
+1. **[引数解析 (Completed)](./argument-parsing.md)**
    - 厳密な境界解析
    - cderunフラグとサブコマンド引数の分離
 
-2. **[引数・設定優先順位 (Phase 2予定)](./argument-priority-logic.md)**
+2. **[引数・設定優先順位 (Completed)](./argument-priority-logic.md)**
    - P1〜P5の優先順位階層
    - CLI、環境変数、設定ファイルの解決ロジック
 
@@ -20,7 +20,7 @@
    - シンボリックリンクによる自動ツール検出
    - 単一バイナリで複数ツールとして動作
 
-4. **[設定ファイルサポート (Phase 2予定)](./configuration-file-support.md)**
+4. **[設定ファイルサポート (Completed)](./configuration-file-support.md)**
    - `.cderun.yaml`: cderun自体の設定
    - `.tools.yaml`: 各ツールの実行設定
 
@@ -28,14 +28,14 @@
 
 5. **[マルチランタイムサポート (Phase 1, 3予定)](./multi-runtime-support.md)**
    - Docker (Phase 1) / Podman (Phase 3予定) サポート
-   - ランタイム自動検出 (Phase 2予定)
+   - ランタイム自動検出 (Phase 2 Completed / Phase 3予定)
    - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
    - コマンド生成なしでランタイムAPIを直接使用
    - 中間表現（ContainerConfig）からAPIコールへの変換
 
-7. **[イメージマッピング (Phase 2予定)](./image-mapping.md)**
+7. **[イメージマッピング (Completed)](./image-mapping.md)**
    - サブコマンド名からイメージへの自動マッピング
    - カスタムマッピング設定
 
@@ -98,9 +98,10 @@
 - Docker CRI実装
 - 基本的なコンテナ実行
 
-### Phase 2: 設定管理
+### Phase 2: 設定管理 (Completed)
 - 設定ファイル読み込み
 - イメージマッピング
+- 優先順位解決
 
 ### Phase 3: 高度な機能
 - 環境変数パススルー

@@ -1,4 +1,4 @@
-# Feature: Configuration File Support (Phase 2予定)
+# Feature: Configuration File Support (Completed)
 
 ## 概要
 
@@ -127,12 +127,13 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 
 ## 優先順位
 
-設定の優先順位（高い順）：
+設定の優先順位（高い順）については、[引数・設定優先順位](./argument-priority-logic.md)を参照してください。
 
-1. **コマンドライン引数**: `cderun --tty --network host node app.js`
-2. **ツール固有設定**: `tools.node.tty`
-3. **cderunデフォルト設定**: `cderun.defaults.tty`
-4. **ハードコードされたデフォルト値**: プログラム内のデフォルト
+1. **CDERUN内部オーバーライド**: `--cderun-tty` 等
+2. **コマンドライン引数**: `--tty`, `--network` 等
+3. **環境変数**: `CDERUN_TTY` 等
+4. **ツール固有設定**: `.tools.yaml` 内の設定
+5. **cderunデフォルト設定 / ハードコード値**: `.cderun.yaml` の `defaults` または内部デフォルト
 
 ### 例
 

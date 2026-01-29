@@ -43,22 +43,27 @@ cderun ContainerRuntimeインターフェース
 
 ## ランタイムの選択
 
-**現状 (Phase 1):**
-現在は Docker のみをサポートしており、ランタイムの自動検出は行われません。デフォルトで `/var/run/docker.sock` を使用し、`--mount-socket` フラグでパスを明示的に変更可能です。
+**現状 (Phase 2 Completed):**
+Docker および Podman (スタブ) をサポートしています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
-### 自動検出ロジック (Phase 2予定)
+### 解決ロジック (Phase 2 Completed)
 
-1. **設定ファイル**: `.cderun.yaml` 等で `runtime` が指定されているか。
-2. **環境変数**: `CDERUN_RUNTIME` が設定されているか。
-3. **ソケット検索**: デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
+1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
+2. **環境変数**: `CDERUN_RUNTIME` および `DOCKER_HOST`。
+3. **コマンドライン引数**: `--runtime` および `--mount-socket`。
 
-### 明示的な指定 (Phase 2予定)
+### 自動検出ロジック (Phase 3予定)
 
-#### 設定ファイル
+ソケットの存在確認によるランタイムの自動選択機能は将来のフェーズで実装予定です。
+
+1. デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
+
+### 明示的な指定 (Phase 2 Completed)
+
+#### 設定ファイル (`.cderun.yaml`)
 ```yaml
-cderun:
-  runtime: podman
-  runtimeSocket: /run/podman/podman.sock
+runtime: podman
+runtimePath: /usr/bin/podman
 ```
 
 #### 環境変数
@@ -76,7 +81,7 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman (Phase 3予定)**: `github.com/containers/podman/v4/pkg/bindings` を使用。Docker互換APIを提供しているため、基本的な構造はDockerと同様。
+- **Podman (Phase 3予定)**: Podman API を使用。現在は初期スタブ実装のみ。
 
 ## ランタイム情報の表示 (Phase 4予定)
 
