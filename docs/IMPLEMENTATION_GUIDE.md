@@ -295,7 +295,7 @@ func (cmd *cobra.Command, args []string) error {
     }
     
     if config.TTY || config.Interactive {
-        if err := runtime.AttachContainer(ctx, containerID, os.Stdin, os.Stdout, os.Stderr); err != nil {
+        if err := runtime.AttachContainer(ctx, containerID, config.TTY, os.Stdin, os.Stdout, os.Stderr); err != nil {
             return err
         }
     }
