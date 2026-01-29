@@ -24,6 +24,8 @@ var (
 	cderunTTY         bool
 	cderunInteractive bool
 	runtimeName       string
+	dryRun      bool
+	dryRunFormat string
 
 	// For testing
 	exitFunc       = os.Exit
@@ -97,6 +99,26 @@ intended for the subcommand.`,
 			Volumes:     resolved.Volumes,
 			Env:         resolved.Env,
 			Workdir:     resolved.Workdir,
+		}
+
+		if dryRun {
+			var output string
+			var err error
+			switch dryRunFormat {
+			case "json":
+				output, err = config.ToJSON()
+			case "simple":
+				output = config.ToSimple()
+			case "yaml", "":
+				output, err = config.ToYAML()
+			default:
+				return fmt.Errorf("unsupported format: %s", dryRunFormat)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to format config: %w", err)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), output)
+			return nil
 		}
 
 		// Initialize Runtime
@@ -194,6 +216,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Forced TTY override")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Forced interactive override")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Do not run container, just show the container configuration")
+	rootCmd.PersistentFlags().StringVar(&dryRunFormat, "dry-run-format", "yaml", "Output format for dry-run (yaml, json, simple)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }
