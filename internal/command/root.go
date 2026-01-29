@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/runtime"
 	"context"
@@ -13,18 +14,28 @@ import (
 )
 
 var (
-	tty         bool
-	interactive bool
-	network     string
-	mountSocket string
-	mountCderun bool
-	dryRun      bool
-	dryRunFormat string
+	tty               bool
+	interactive       bool
+	network           string
+	mountSocket       string
+	mountCderun       bool
+	image             string
+	remove            bool
+	cderunTTY         bool
+	cderunInteractive bool
+	runtimeName       string
 
 	// For testing
 	exitFunc       = os.Exit
-	runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
-		return runtime.NewDockerRuntime(socket)
+	runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+		switch name {
+		case "docker":
+			return runtime.NewDockerRuntime(socket)
+		case "podman":
+			return runtime.NewPodmanRuntime(socket)
+		default:
+			return nil, fmt.Errorf("unsupported runtime %q", name)
+		}
 	}
 )
 
@@ -44,45 +55,59 @@ intended for the subcommand.`,
 		subcommand := args[0]
 		passthroughArgs := args[1:]
 
-		// Build ContainerConfig
-		config := &container.ContainerConfig{
-			Image:       "alpine:latest", // Temporary image until Phase 2
-			Command:     []string{subcommand},
-			Args:        passthroughArgs,
-			TTY:         tty,
-			Interactive: interactive,
-			Network:     network,
-			Remove:      true,
+		// Load configurations
+		globalCfg, _, err := config.LoadCDERunConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to load cderun config: %v\n", err)
+		}
+		toolsCfg, _, err := config.LoadToolsConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to load tools config: %v\n", err)
 		}
 
-		if dryRun {
-			var output string
-			var err error
-			switch dryRunFormat {
-			case "json":
-				output, err = config.ToJSON()
-			case "simple":
-				output = config.ToSimple()
-			case "yaml", "":
-				output, err = config.ToYAML()
-			default:
-				return fmt.Errorf("unsupported format: %s", dryRunFormat)
-			}
-			if err != nil {
-				return fmt.Errorf("failed to format config: %w", err)
-			}
-			fmt.Fprintln(cmd.OutOrStdout(), output)
-			return nil
+		// Resolve settings using priority logic
+		cliOpts := config.CLIOptions{
+			Image:                image,
+			ImageSet:             cmd.Flags().Changed("image"),
+			TTY:                  tty,
+			TTYSet:               cmd.Flags().Changed("tty"),
+			Interactive:          interactive,
+			InteractiveSet:       cmd.Flags().Changed("interactive"),
+			Network:              network,
+			NetworkSet:           cmd.Flags().Changed("network"),
+			Remove:               remove,
+			RemoveSet:            cmd.Flags().Changed("remove"),
+			CderunTTY:            cderunTTY,
+			CderunTTYSet:         cmd.Flags().Changed("cderun-tty"),
+			CderunInteractive:    cderunInteractive,
+			CderunInteractiveSet: cmd.Flags().Changed("cderun-interactive"),
+			Runtime:              runtimeName,
+			RuntimeSet:           cmd.Flags().Changed("runtime"),
+			MountSocket:          mountSocket,
+			MountSocketSet:       cmd.Flags().Changed("mount-socket"),
+		}
+
+		resolved, err := config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
+		if err != nil {
+			return fmt.Errorf("configuration error: %w", err)
+		}
+
+		// Build ContainerConfig
+		containerConfig := &container.ContainerConfig{
+			Image:       resolved.Image,
+			Command:     []string{subcommand},
+			Args:        passthroughArgs,
+			TTY:         resolved.TTY,
+			Interactive: resolved.Interactive,
+			Network:     resolved.Network,
+			Remove:      resolved.Remove,
+			Volumes:     resolved.Volumes,
+			Env:         resolved.Env,
+			Workdir:     resolved.Workdir,
 		}
 
 		// Initialize Runtime
-		// TODO: Implement runtime detection in Phase 2
-		socket := "/var/run/docker.sock"
-		if mountSocket != "" {
-			socket = mountSocket
-		}
-
-		rt, err := runtimeFactory(socket)
+		rt, err := runtimeFactory(resolved.Runtime, resolved.Socket)
 		if err != nil {
 			return fmt.Errorf("failed to initialize runtime: %w", err)
 		}
@@ -90,12 +115,12 @@ intended for the subcommand.`,
 		// Execute Container
 		ctx := cmd.Context()
 
-		containerID, err := rt.CreateContainer(ctx, config)
+		containerID, err := rt.CreateContainer(ctx, containerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create container: %w", err)
 		}
 
-		if config.Remove {
+		if containerConfig.Remove {
 			cleanupCtx := context.WithoutCancel(ctx)
 			defer func() {
 				if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
@@ -110,10 +135,10 @@ intended for the subcommand.`,
 
 		// Attach to container IO
 		var stdin io.Reader
-		if config.Interactive {
+		if containerConfig.Interactive {
 			stdin = os.Stdin
 		}
-		if err := rt.AttachContainer(ctx, containerID, config.TTY, stdin, os.Stdout, os.Stderr); err != nil {
+		if err := rt.AttachContainer(ctx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr); err != nil {
 			return fmt.Errorf("failed to attach to container: %w", err)
 		}
 
@@ -165,8 +190,11 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&network, "network", "bridge", "Connect a container to a network")
 	rootCmd.PersistentFlags().StringVar(&mountSocket, "mount-socket", "", "Mount container runtime socket (e.g., /var/run/docker.sock)")
 	rootCmd.PersistentFlags().BoolVar(&mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
-	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Do not run container, just show the container configuration")
-	rootCmd.PersistentFlags().StringVar(&dryRunFormat, "dry-run-format", "yaml", "Output format for dry-run (yaml, json, simple)")
+	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image to use")
+	rootCmd.PersistentFlags().StringVar(&runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
+	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
+	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Forced TTY override")
+	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Forced interactive override")
 
 	rootCmd.Flags().SetInterspersed(false)
 }

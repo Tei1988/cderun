@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func executeCommand(args ...string) (string, error) {
@@ -16,6 +18,14 @@ func executeCommand(args ...string) (string, error) {
 }
 
 func executeCommandRaw(args []string) (string, error) {
+	// Reset flags Changed state
+	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+	})
+	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+		f.Changed = false
+	})
+
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
 	oldOut := rootCmd.OutOrStdout()
@@ -112,6 +122,11 @@ func TestRootCmd(t *testing.T) {
 		oldNetwork := network
 		oldMountSocket := mountSocket
 		oldMountCderun := mountCderun
+		oldImage := image
+		oldRemove := remove
+		oldCderunTTY := cderunTTY
+		oldCderunInteractive := cderunInteractive
+		oldRuntimeName := runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
@@ -120,6 +135,11 @@ func TestRootCmd(t *testing.T) {
 			network = oldNetwork
 			mountSocket = oldMountSocket
 			mountCderun = oldMountCderun
+			image = oldImage
+			remove = oldRemove
+			cderunTTY = oldCderunTTY
+			cderunInteractive = oldCderunInteractive
+			runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -129,7 +149,7 @@ func TestRootCmd(t *testing.T) {
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		var capturedExitCode int
@@ -137,11 +157,11 @@ func TestRootCmd(t *testing.T) {
 			capturedExitCode = code
 		}
 
-		_, err := executeCommand("--tty", "-i", "--network", "host", "node", "--version")
+		_, err := executeCommand("--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version")
 		assert.NoError(t, err)
 
 		assert.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Equal(t, "alpine:latest", mockRuntime.CreatedConfig.Image)
+		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
 		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Args)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
@@ -160,6 +180,11 @@ func TestRootCmd(t *testing.T) {
 		oldNetwork := network
 		oldMountSocket := mountSocket
 		oldMountCderun := mountCderun
+		oldImage := image
+		oldRemove := remove
+		oldCderunTTY := cderunTTY
+		oldCderunInteractive := cderunInteractive
+		oldRuntimeName := runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
@@ -168,12 +193,17 @@ func TestRootCmd(t *testing.T) {
 			network = oldNetwork
 			mountSocket = oldMountSocket
 			mountCderun = oldMountCderun
+			image = oldImage
+			remove = oldRemove
+			cderunTTY = oldCderunTTY
+			cderunInteractive = oldCderunInteractive
+			runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
 
 		// Prepare mock runtime
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		exitFunc = func(code int) {}
@@ -192,6 +222,11 @@ func TestRootCmd(t *testing.T) {
 		oldNetwork := network
 		oldMountSocket := mountSocket
 		oldMountCderun := mountCderun
+		oldImage := image
+		oldRemove := remove
+		oldCderunTTY := cderunTTY
+		oldCderunInteractive := cderunInteractive
+		oldRuntimeName := runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
@@ -200,24 +235,213 @@ func TestRootCmd(t *testing.T) {
 			network = oldNetwork
 			mountSocket = oldMountSocket
 			mountCderun = oldMountCderun
+			image = oldImage
+			remove = oldRemove
+			cderunTTY = oldCderunTTY
+			cderunInteractive = oldCderunInteractive
+			runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
+
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		// Create a temporary .tools.yaml for image mapping
+		toolsContent := `
+node:
+  image: node:20-alpine
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
 
 		// Prepare mock runtime
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		exitFunc = func(code int) {}
 
-		_, err := executeCommandRaw([]string{"node", "--version"})
+		_, err = executeCommandRaw([]string{"node", "--version"})
 
 		assert.NoError(t, err)
+		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
 		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Args)
+	})
+
+	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags Changed state
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20-alpine
+  tty: true
+  network: host
+  env:
+    - KEY=VALUE
+  volumes:
+    - /host:/container
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err = executeCommand("node", "app.js")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
+		assert.True(t, mockRuntime.CreatedConfig.TTY)
+		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
+		assert.Contains(t, mockRuntime.CreatedConfig.Env, "KEY=VALUE")
+		assert.Len(t, mockRuntime.CreatedConfig.Volumes, 1)
+		assert.Equal(t, "/host", mockRuntime.CreatedConfig.Volumes[0].HostPath)
+		assert.Equal(t, "/container", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
+	})
+
+	t.Run("P3 environment variable takes priority over tools.yaml", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		t.Setenv("CDERUN_IMAGE", "env-image:latest")
+
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20-alpine
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err = executeCommand("node", "app.js")
+		assert.NoError(t, err)
+		assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
+	})
+
+	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
+		assert.NoError(t, err)
+		assert.False(t, mockRuntime.CreatedConfig.TTY)
+	})
+
+	t.Run("returns error for unsupported runtime", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Use the real runtimeFactory here to test the validation logic
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+	})
+
+	t.Run("returns error for podman (not implemented yet)", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Use the real runtimeFactory
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--runtime", "podman", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
 }
