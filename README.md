@@ -55,8 +55,8 @@ $ cderun --tty docker --tty
 - `--runtime`: Container runtime to use (docker/podman).
 - `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
 - `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
-- `--cderun-tty`: Forced TTY override.
-- `--cderun-interactive`: Forced interactive override.
+- `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
+- `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
 
 ## Features
 

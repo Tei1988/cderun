@@ -21,3 +21,8 @@
   - 実際のプロセス起動: `os.Args = ["node", "--version"]`
   - 書き換え後の内部状態: `os.Args = ["cderun", "node", "--version"]`
   - 結果として、`cderun` のサブコマンドとして `node` が呼び出される。
+
+- ユーザーが `node --cderun-tty=false --version` と実行した場合（シンボリックリンク経由で `cderun` の設定を上書き）:
+  - 実際のプロセス起動: `os.Args = ["node", "--cderun-tty=false", "--version"]`
+  - 書き換え後の内部状態: `os.Args = ["cderun", "--cderun-tty=false", "node", "--version"]`
+  - 結果として、`cderun --tty=false node --version` と等価な挙動となり、サブコマンド側（node）にフラグが渡されることなく `cderun` の動作を制御できる。
