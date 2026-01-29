@@ -46,17 +46,22 @@ func LoadCDERunConfig() (*CDERunConfig, string, error) {
 	paths = append(paths, "/etc/cderun/config.yaml")
 
 	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to read config file %s: %w", path, err)
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
 			}
-			var cfg CDERunConfig
-			if err := yaml.Unmarshal(data, &cfg); err != nil {
-				return nil, "", fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
-			}
-			return &cfg, path, nil
+			return nil, "", fmt.Errorf("stat config file %s: %w", path, err)
 		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to read config file %s: %w", path, err)
+		}
+		var cfg CDERunConfig
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, "", fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
+		}
+		return &cfg, path, nil
 	}
 	return nil, "", nil
 }
@@ -72,17 +77,22 @@ func LoadToolsConfig() (ToolsConfig, string, error) {
 	paths = append(paths, "/etc/cderun/tools.yaml")
 
 	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to read tools file %s: %w", path, err)
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
 			}
-			var cfg ToolsConfig
-			if err := yaml.Unmarshal(data, &cfg); err != nil {
-				return nil, "", fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
-			}
-			return cfg, path, nil
+			return nil, "", fmt.Errorf("stat tools file %s: %w", path, err)
 		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to read tools file %s: %w", path, err)
+		}
+		var cfg ToolsConfig
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, "", fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+		}
+		return cfg, path, nil
 	}
 	return nil, "", nil
 }

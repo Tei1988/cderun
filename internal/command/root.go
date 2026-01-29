@@ -100,8 +100,13 @@ intended for the subcommand.`,
 		}
 
 		// Initialize Runtime
-		// TODO: Handle different runtimes (podman, etc) in Phase 3
-		rt, err := runtimeFactory(resolved.Socket)
+		var rt runtime.ContainerRuntime
+		switch resolved.Runtime {
+		case "docker", "podman":
+			rt, err = runtimeFactory(resolved.Socket)
+		default:
+			return fmt.Errorf("unsupported runtime %q: only %q and %q are supported", resolved.Runtime, "docker", "podman")
+		}
 		if err != nil {
 			return fmt.Errorf("failed to initialize runtime: %w", err)
 		}

@@ -106,4 +106,34 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/app", res.Volumes[1].ContainerPath)
 		assert.False(t, res.Volumes[1].ReadOnly)
 	})
+
+	t.Run("Windows-style volume parsing", func(t *testing.T) {
+		cli := CLIOptions{}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node:20",
+				Volumes: []string{
+					`C:\host\path:/container/path`,
+					`D:\data:/mnt:ro`,
+					`Z:\shared folder:/app:rw`,
+				},
+			},
+		}
+
+		res, err := Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.Len(t, res.Volumes, 3)
+
+		assert.Equal(t, `C:\host\path`, res.Volumes[0].HostPath)
+		assert.Equal(t, `/container/path`, res.Volumes[0].ContainerPath)
+		assert.False(t, res.Volumes[0].ReadOnly)
+
+		assert.Equal(t, `D:\data`, res.Volumes[1].HostPath)
+		assert.Equal(t, `/mnt`, res.Volumes[1].ContainerPath)
+		assert.True(t, res.Volumes[1].ReadOnly)
+
+		assert.Equal(t, `Z:\shared folder`, res.Volumes[2].HostPath)
+		assert.Equal(t, `/app`, res.Volumes[2].ContainerPath)
+		assert.False(t, res.Volumes[2].ReadOnly)
+	})
 }

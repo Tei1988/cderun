@@ -244,14 +244,20 @@ func TestRootCmd(t *testing.T) {
 			exitFunc = oldExit
 		})
 
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
 		// Create a temporary .tools.yaml for image mapping
 		toolsContent := `
 node:
   image: node:20-alpine
 `
-		err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 		require.NoError(t, err)
-		t.Cleanup(func() { os.Remove(".tools.yaml") })
 
 		// Prepare mock runtime
 		mockRuntime := &runtime.MockRuntime{
@@ -286,6 +292,13 @@ node:
 		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
 		toolsContent := `
 node:
   image: node:20-alpine
@@ -296,9 +309,8 @@ node:
   volumes:
     - /host:/container
 `
-		err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 		require.NoError(t, err)
-		t.Cleanup(func() { os.Remove(".tools.yaml") })
 
 		mockRuntime := &runtime.MockRuntime{}
 		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
@@ -336,13 +348,19 @@ node:
 
 		t.Setenv("CDERUN_IMAGE", "env-image:latest")
 
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
 		toolsContent := `
 node:
   image: node:20-alpine
 `
-		err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 		require.NoError(t, err)
-		t.Cleanup(func() { os.Remove(".tools.yaml") })
 
 		mockRuntime := &runtime.MockRuntime{}
 		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
@@ -379,5 +397,30 @@ node:
 		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
 		assert.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
+	})
+
+	t.Run("returns error for unsupported runtime", func(t *testing.T) {
+		// Save and restore package-level state
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		runtimeFactory = func(socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
 	})
 }

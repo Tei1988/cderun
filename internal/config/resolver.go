@@ -187,16 +187,44 @@ func resolveString(cliSet bool, cliVal string, envKey string, subcommand string,
 func parseVolumes(vols []string) []container.VolumeMount {
 	var mounts []container.VolumeMount
 	for _, v := range vols {
-		parts := strings.Split(v, ":")
-		if len(parts) >= 2 {
-			m := container.VolumeMount{
-				HostPath:      parts[0],
-				ContainerPath: parts[1],
+		if v == "" {
+			continue
+		}
+
+		var hostPath, containerPath string
+		var readOnly bool
+
+		// Locate the last colon to check for options or container path
+		lastColon := strings.LastIndex(v, ":")
+		if lastColon == -1 {
+			// Malformed entry: needs at least host:container
+			continue
+		}
+
+		partAfterLastColon := v[lastColon+1:]
+		if partAfterLastColon == "ro" || partAfterLastColon == "rw" {
+			readOnly = (partAfterLastColon == "ro")
+			// The part before the last colon must contain both host and container paths
+			remaining := v[:lastColon]
+			nextLastColon := strings.LastIndex(remaining, ":")
+			if nextLastColon == -1 {
+				// Malformed: only one colon found, but it was followed by a mode
+				continue
 			}
-			if len(parts) >= 3 && parts[2] == "ro" {
-				m.ReadOnly = true
-			}
-			mounts = append(mounts, m)
+			hostPath = remaining[:nextLastColon]
+			containerPath = remaining[nextLastColon+1:]
+		} else {
+			// No ro/rw mode at the end, so the part after the last colon is the container path
+			hostPath = v[:lastColon]
+			containerPath = v[lastColon+1:]
+		}
+
+		if hostPath != "" && containerPath != "" {
+			mounts = append(mounts, container.VolumeMount{
+				HostPath:      hostPath,
+				ContainerPath: containerPath,
+				ReadOnly:      readOnly,
+			})
 		}
 	}
 	return mounts

@@ -52,6 +52,7 @@ defaults:
 		defer os.RemoveAll(homeDir)
 
 		t.Setenv("HOME", homeDir)
+		t.Setenv("USERPROFILE", homeDir)
 
 		configDir := filepath.Join(homeDir, ".config", "cderun")
 		err = os.MkdirAll(configDir, 0755)
