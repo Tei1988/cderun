@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Completed)
+# Feature: Direct Container Execution (Phase 1 Completed)
 
 ## 概要
 
@@ -107,14 +107,19 @@ tools:
 ### 4. プログラマティックな制御
 非同期での状態監視や、複雑なライフサイクル管理が可能。
 
-## 実装の優先順位
+## ロードマップ
 
-1. **Phase 1**: 中間表現の定義
-2. **Phase 2**: Docker CRI実装
-3. **Phase 3**: 基本的な実行フロー
-4. **Phase 4**: 環境変数の引き継ぎ
-5. **Phase 5**: Podman CRI実装
-6. **Phase 6**: エラーハンドリングの強化
+### Phase 1: コア機能 (Completed)
+- 中間表現（ContainerConfig）の定義
+- Docker CRI実装
+- 基本的な実行フロー
+
+### Phase 3: 高度な機能 (Planned)
+- 環境変数の引き継ぎ
+- Podman CRI実装
+
+### Phase 4: 利便性向上 (Planned)
+- エラーハンドリングの強化
 
 ## 依存ライブラリ
 
