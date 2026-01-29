@@ -57,8 +57,8 @@ cderun --network my-network node app.js
 ### `--mount-socket`
 - **型**: string
 - **デフォルト**: `""`（空文字列）
-- **説明**: コンテナランタイムソケットをマウント
-- **用途**: Docker-in-Docker、コンテナ内からホストのランタイムにアクセス
+- **説明**: コンテナランタイムソケットのパスを指定
+- **用途**: cderunが接続するランタイムソケットを指定する。将来的にコンテナ内へのマウントもサポート予定。
 
 ```bash
 cderun --mount-socket /var/run/docker.sock docker ps
@@ -70,9 +70,9 @@ cderun --mount-socket /run/podman/podman.sock podman images
 ### `--mount-cderun`
 - **型**: bool
 - **デフォルト**: `false`
-- **説明**: cderunバイナリをコンテナ内にマウント
+- **説明**: cderunバイナリをコンテナ内にマウント（開発中）
 - **用途**: コンテナ内でcderunを使用可能にする
-- **制約**: `--mount-socket`との併用が必須
+- **制約**: `--mount-socket`との併用が必須。現在はフラグのみ定義されており、実装は将来のフェーズで予定されている。
 
 ```bash
 cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh

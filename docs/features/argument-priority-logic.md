@@ -1,4 +1,4 @@
-# Feature: Argument & Configuration Priority Logic
+# Feature: Argument & Configuration Priority Logic (Phase 2予定)
 
 ## 概要
 `cderun` は、複数のソース（CLI、環境変数、YAML、デフォルト値）から設定を読み込む。
@@ -41,30 +41,13 @@ gemini:
    - `image`: なし (Fatal Error)
       - ※ P1〜P4のいずれでも解決できない場合、プログラムはエラーメッセージを出力して終了すること (Exit Code 1)。勝手なデフォルトイメージ（`ubuntu:latest` 等）を使用してはならない。 
 ## 判定ロジックの実装要件
-Julesは、Viperの自動解決のみに頼らず、以下のロジックフローで値を解決するヘルパー関数を実装すること。
 
-```go
-// 疑似コード: 値解決の流れ
-func resolveBool(flagName, envName string, configVal *bool, defaultVal bool) bool {
-    // 1. P1 & P2: CLI指定があるかチェック
-    if cmd.Flags().Changed(flagName) {
-        return cmd.Flags().GetBool(flagName)
-    }
-    
-    // 2. P3: 環境変数が設定されているかチェック
-    if val, set := os.LookupEnv(envName); set {
-        return parseBool(val)
-    }
+Viperの自動解決のみに頼らず、以下のロジックフローで値を解決する：
 
-    // 3. P4: YAML設定があるかチェック (nilチェック)
-    if configVal != nil {
-        return *configVal
-    }
-
-    // 4. P5: デフォルト
-    return defaultVal
-}
-```
+1. **CLI指定の確認 (P1, P2)**: `Changed` 状態を確認し、ユーザーの明示的な入力を最優先する。
+2. **環境変数の確認 (P3)**: CLI指定がない場合、定義された環境変数の存在を確認する。
+3. **YAML設定の確認 (P4)**: ツール別またはグローバルの設定ファイルの値を確認する。
+4. **ハードコードされたデフォルト (P5)**: いずれも指定がない場合の最終的な値を採用する。
 
 ## 注意点
-- YAMLのポインタ扱い: YAMLから読み込む構造体のフィールド（`Interactive`, `Tty` 等）は、`bool` ではなく `*bool` (ポインタ) として定義すること。これにより、「YAMLに記述がない(nil)」と「falseと記述されている」を明確に区別する。
+- **明示的な未指定の扱い**: YAMLのフィールドはポインタ型（`*bool` 等）で定義し、「未設定（nil）」と「明示的なfalse」を区別できるようにする。

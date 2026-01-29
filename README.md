@@ -50,6 +50,8 @@ $ cderun --tty docker --tty
 - `--tty`: Allocate a pseudo-TTY.
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--network`: Connect a container to a network (default: "bridge").
+- `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
+- `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
 
 ## Features
 

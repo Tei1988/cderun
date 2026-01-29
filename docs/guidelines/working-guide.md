@@ -19,17 +19,15 @@
    - 修正する場合は、変更理由をコミットメッセージに明記する。
 
 ## 2. Project Layout
-Standard Go Project Layout に準拠します。
+Standard Go Project Layout に準拠しつつ、小規模な構成をとります。
 
 ```text
 .
-├── cmd/
-│   └── [app-name]/
-│       └── main.go       # エントリーポイント（極力シンプルに）
+├── main.go               # エントリーポイント（極力シンプルに）
 ├── internal/             # 外部からimportされたくないコード
-│   ├── command/          # Cobraのコマンド定義 (cmd/root.go, cmd/subcmd.go)
-│   ├── usecase/          # アプリケーションのビジネスロジック
-│   └── util/             # 汎用ユーティリティ
+│   ├── command/          # Cobraのコマンド定義 (root.go, root_test.go)
+│   ├── container/        # 中間表現 (config.go)
+│   └── runtime/          # コンテナランタイム抽象化・実装 (interface.go, docker.go)
 ├── pkg/                  # (Optional) 外部公開しても良いライブラリコード
 ├── docs/
 │   ├── features/         # 機能要件

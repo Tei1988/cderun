@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution
+# Feature: Direct Container Execution (Phase 1 Completed)
 
 ## 概要
 
@@ -23,279 +23,45 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 - エラーハンドリングが容易
 - ネストした実行でも環境を引き継げる
 
-## 中間表現（IR）
+## 中間表現（IR）: ContainerConfig
 
-### 構造
+すべての実行要求を統一的に扱うためのデータ構造。
 
-```go
-type ContainerConfig struct {
-    // 基本設定
-    Image       string
-    Command     []string
-    Args        []string
-    
-    // 実行オプション
-    TTY         bool
-    Interactive bool
-    Remove      bool
-    
-    // ネットワーク
-    Network     string
-    
-    // ボリューム
-    Volumes     []VolumeMount
-    
-    // 環境変数
-    Env         []string
-    
-    // 作業ディレクトリ
-    Workdir     string
-    
-    // ユーザー
-    User        string
-}
+- **基本属性**: イメージ名、コマンド、引数。
+- **実行制御**: TTY、インタラクティブモード、自動削除フラグ。
+- **環境構成**: ネットワーク設定、ボリュームマウント（Host/Container）、環境変数、作業ディレクトリ、実行ユーザー。
 
-type VolumeMount struct {
-    HostPath      string
-    ContainerPath string
-    ReadOnly      bool
-}
-```
+## CRIインターフェース: ContainerRuntime
 
-### 例
+各ランタイムの差異を吸収するための共通インターフェース。
 
-```go
-config := ContainerConfig{
-    Image:       "node:20-alpine",
-    Command:     []string{"node"},
-    Args:        []string{"app.js"},
-    TTY:         true,
-    Interactive: true,
-    Remove:      true,
-    Volumes: []VolumeMount{
-        {
-            HostPath:      "/home/user/project",
-            ContainerPath: "/workspace",
-            ReadOnly:      false,
-        },
-    },
-    Env: []string{
-        "NODE_ENV=development",
-    },
-    Workdir: "/workspace",
-}
-```
+- **ライフサイクル**: 作成、起動、待機、削除の各フェーズをメソッド化。
+- **IO制御**: 標準入出力（stdin/stdout/stderr）のアタッチ。
 
-## CRIインターフェース
+### ランタイム実装のポイント
 
-### 抽象化レイヤー
-
-```go
-type ContainerRuntime interface {
-    // コンテナのライフサイクル
-    CreateContainer(ctx context.Context, config ContainerConfig) (string, error)
-    StartContainer(ctx context.Context, containerID string) error
-    StopContainer(ctx context.Context, containerID string, timeout time.Duration) error
-    RemoveContainer(ctx context.Context, containerID string) error
-    
-    // コンテナとの通信
-    AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error
-    ExecInContainer(ctx context.Context, containerID string, cmd []string) (int, error)
-    
-    // 情報取得
-    InspectContainer(ctx context.Context, containerID string) (*ContainerInfo, error)
-    ListContainers(ctx context.Context) ([]ContainerInfo, error)
-    
-    // イメージ操作
-    PullImage(ctx context.Context, image string) error
-    ListImages(ctx context.Context) ([]ImageInfo, error)
-}
-```
-
-### Docker実装
-
-```go
-type DockerRuntime struct {
-    client *client.Client
-}
-
-func (d *DockerRuntime) CreateContainer(ctx context.Context, config ContainerConfig) (string, error) {
-    // ContainerConfigをDocker APIの形式に変換
-    containerConfig := &container.Config{
-        Image:        config.Image,
-        Cmd:          append(config.Command, config.Args...),
-        Tty:          config.TTY,
-        OpenStdin:    config.Interactive,
-        Env:          config.Env,
-        WorkingDir:   config.Workdir,
-        User:         config.User,
-    }
-    
-    hostConfig := &container.HostConfig{
-        AutoRemove:   config.Remove,
-        NetworkMode:  container.NetworkMode(config.Network),
-    }
-    
-    // ボリュームマウント
-    for _, vol := range config.Volumes {
-        mount := mount.Mount{
-            Type:     mount.TypeBind,
-            Source:   vol.HostPath,
-            Target:   vol.ContainerPath,
-            ReadOnly: vol.ReadOnly,
-        }
-        hostConfig.Mounts = append(hostConfig.Mounts, mount)
-    }
-    
-    resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
-    if err != nil {
-        return "", err
-    }
-    
-    return resp.ID, nil
-}
-
-func (d *DockerRuntime) StartContainer(ctx context.Context, containerID string) error {
-    return d.client.ContainerStart(ctx, containerID, container.StartOptions{})
-}
-
-func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error {
-    resp, err := d.client.ContainerAttach(ctx, containerID, container.AttachOptions{
-        Stream: true,
-        Stdin:  stdin != nil,
-        Stdout: true,
-        Stderr: true,
-    })
-    if err != nil {
-        return err
-    }
-    defer resp.Close()
-    
-    // ストリームのコピー
-    if stdin != nil {
-        go io.Copy(resp.Conn, stdin)
-    }
-    
-    _, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
-    return err
-}
-```
-
-### Podman実装
-
-```go
-type PodmanRuntime struct {
-    conn *bindings.Connection
-}
-
-func (p *PodmanRuntime) CreateContainer(ctx context.Context, config ContainerConfig) (string, error) {
-    // Podman APIを使った実装
-    // 基本的にはDockerと同じだが、Podman固有のAPIを使用
-}
-```
+- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
+- **Podman実装**: Podman API (`github.com/containers/podman/v4/pkg/bindings`) を使用（Docker互換）。
+- **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
 
 ## 実行フロー
 
-### 基本的な実行
+### 基本的な実行手順
 
-```go
-func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
-    ctx := context.Background()
-    
-    // 1. イメージのプル（必要に応じて）
-    if err := runtime.PullImage(ctx, config.Image); err != nil {
-        return 1, err
-    }
-    
-    // 2. コンテナの作成
-    containerID, err := runtime.CreateContainer(ctx, config)
-    if err != nil {
-        return 1, err
-    }
-    
-    // 3. クリーンアップの設定
-    if config.Remove {
-        defer runtime.RemoveContainer(ctx, containerID)
-    }
-    
-    // 4. コンテナの起動
-    if err := runtime.StartContainer(ctx, containerID); err != nil {
-        return 1, err
-    }
-    
-    // 5. アタッチ（TTY/Interactiveの場合）
-    if config.TTY || config.Interactive {
-        if err := runtime.AttachContainer(ctx, containerID, os.Stdin, os.Stdout, os.Stderr); err != nil {
-            return 1, err
-        }
-    }
-    
-    // 6. 終了コードの取得
-    info, err := runtime.InspectContainer(ctx, containerID)
-    if err != nil {
-        return 1, err
-    }
-    
-    return info.ExitCode, nil
-}
-```
+1. **コンテナ作成**: `CreateContainer` で設定を渡し、IDを取得。
+2. **クリーンアップ予約**: `config.Remove` が真なら、終了時に `RemoveContainer` を呼ぶよう `defer` 等で設定。
+3. **コンテナ起動**: `StartContainer` を呼び出す。
+4. **IOアタッチ**: `TTY` または `Interactive` の場合、`AttachContainer` で入出力を接続。
+5. **終了待機**: `WaitContainer` でプロセス終了を待ち、終了コードを取得。
 
 ## ネストした実行の解決
 
-### 問題の解決
+### ネストした実行の解決
 
-CRIを直接使うことで、コンテナ内からcderunを実行しても、**同じランタイムインスタンスを使用**できる。
+CRIを直接使うことで、コンテナ内からcderunを実行しても、同じランタイムインスタンスを使用できる。
 
-```go
-// グローバルなランタイムインスタンス
-var globalRuntime ContainerRuntime
-
-func init() {
-    // 環境変数でランタイムを共有
-    socketPath := os.Getenv("DOCKER_HOST")
-    if socketPath == "" {
-        socketPath = "/var/run/docker.sock"
-    }
-    
-    client, err := client.NewClientWithOpts(
-        client.WithHost("unix://" + socketPath),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    globalRuntime = &DockerRuntime{client: client}
-}
-```
-
-### gemini-cliからの実行
-
-```bash
-# ホスト
-$ cderun --mount-cderun gemini-cli
-
-# gemini-cliコンテナ内
-$ export MY_VAR=hello
-$ cderun python -c "import os; print(os.getenv('MY_VAR'))"
-```
-
-**cderunの動作:**
-1. 中間表現を作成
-2. 環境変数`MY_VAR`を中間表現に追加
-3. CRI経由でpythonコンテナを作成・起動
-4. **gemini-cliコンテナの環境変数を引き継げる**
-
-```go
-func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
-    // 親コンテナの環境変数を引き継ぐ
-    if inContainer() {
-        parentEnv := os.Environ()
-        config.Env = append(config.Env, parentEnv...)
-    }
-    
-    // ... 実行
-}
-```
+- **ランタイム共有**: ホストからマウントされたソケット経由で、コンテナ内からもホストのランタイムを操作。
+- **環境変数の引き継ぎ**: 実行ホスト（コンテナ内）の環境変数を `ContainerConfig` にマウントまたは追加することで、ネストしたコンテナに引き継ぐ。
 
 ## 設定
 
@@ -330,61 +96,30 @@ tools:
 ## メリット
 
 ### 1. コマンド生成不要
+文字列ベースのコマンド組み立てを排除し、構造化された設定を直接APIに渡す。
 
-```go
-// 従来
-cmd := fmt.Sprintf("docker run --rm -t -i -v %s:%s %s %s", ...)
-exec.Command("sh", "-c", cmd).Run()
-
-// 新方式
-config := ContainerConfig{...}
-runtime.CreateContainer(ctx, config)
-runtime.StartContainer(ctx, containerID)
-```
-
-### 2. エラーハンドリング
-
-```go
-// 詳細なエラー情報が取得できる
-if err := runtime.CreateContainer(ctx, config); err != nil {
-    if errors.Is(err, ErrImageNotFound) {
-        // イメージが見つからない
-    } else if errors.Is(err, ErrInvalidConfig) {
-        // 設定が不正
-    }
-}
-```
+### 2. 精度の高いエラーハンドリング
+ランタイムが返す詳細なエラー情報をそのまま処理可能。
 
 ### 3. 環境の引き継ぎ
-
-```go
-// 親コンテナの環境を引き継ぐ
-if inContainer() {
-    config.Env = append(config.Env, os.Environ()...)
-}
-```
+親プロセスの環境変数などをプログラム的に制御し、新しいコンテナに注入。
 
 ### 4. プログラマティックな制御
+非同期での状態監視や、複雑なライフサイクル管理が可能。
 
-```go
-// コンテナの状態を監視
-go func() {
-    for {
-        info, _ := runtime.InspectContainer(ctx, containerID)
-        log.Printf("Status: %s, CPU: %.2f%%", info.State, info.CPUUsage)
-        time.Sleep(1 * time.Second)
-    }
-}()
-```
+## ロードマップ
 
-## 実装の優先順位
+### Phase 1: コア機能 (Completed)
+- 中間表現（ContainerConfig）の定義
+- Docker CRI実装
+- 基本的な実行フロー
 
-1. **Phase 1**: 中間表現の定義
-2. **Phase 2**: Docker CRI実装
-3. **Phase 3**: 基本的な実行フロー
-4. **Phase 4**: 環境変数の引き継ぎ
-5. **Phase 5**: Podman CRI実装
-6. **Phase 6**: エラーハンドリングの強化
+### Phase 3: 高度な機能 (Planned)
+- 環境変数の引き継ぎ
+- Podman CRI実装
+
+### Phase 4: 利便性向上 (Planned)
+- エラーハンドリングの強化
 
 ## 依存ライブラリ
 
