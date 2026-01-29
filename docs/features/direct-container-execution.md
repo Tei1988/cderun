@@ -194,13 +194,20 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 ```go
 type PodmanRuntime struct {
-    conn *bindings.Connection
+	conn   *bindings.Connection
+	socket string
 }
 
-func (p *PodmanRuntime) CreateContainer(ctx context.Context, config ContainerConfig) (string, error) {
-    // Podman APIを使った実装
-    // 基本的にはDockerと同じだが、Podman固有のAPIを使用
+func (p *PodmanRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	// Podman APIを使った実装
+	// 基本的にはDockerと同じだが、Podman固有のAPIを使用
 }
+
+func (p *PodmanRuntime) StartContainer(ctx context.Context, containerID string) error { /* ... */ }
+func (p *PodmanRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) { /* ... */ }
+func (p *PodmanRuntime) RemoveContainer(ctx context.Context, containerID string) error { /* ... */ }
+func (p *PodmanRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error { /* ... */ }
+func (p *PodmanRuntime) Name() string { return "podman" }
 ```
 
 ## 実行フロー
@@ -208,13 +215,11 @@ func (p *PodmanRuntime) CreateContainer(ctx context.Context, config ContainerCon
 ### 基本的な実行
 
 ```go
-func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
+func Run(config *container.ContainerConfig, runtime ContainerRuntime) (int, error) {
     ctx := context.Background()
     
     // 1. イメージのプル（必要に応じて）
-    if err := runtime.PullImage(ctx, config.Image); err != nil {
-        return 1, err
-    }
+    // NOTE: PullImageは将来的にインターフェースに追加予定
     
     // 2. コンテナの作成
     containerID, err := runtime.CreateContainer(ctx, config)
@@ -234,7 +239,7 @@ func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
     
     // 5. アタッチ（TTY/Interactiveの場合）
     if config.TTY || config.Interactive {
-        if err := runtime.AttachContainer(ctx, containerID, os.Stdin, os.Stdout, os.Stderr); err != nil {
+        if err := runtime.AttachContainer(ctx, containerID, config.TTY, os.Stdin, os.Stdout, os.Stderr); err != nil {
             return 1, err
         }
     }
@@ -295,7 +300,7 @@ $ cderun python -c "import os; print(os.getenv('MY_VAR'))"
 4. **gemini-cliコンテナの環境変数を引き継げる**
 
 ```go
-func Run(config ContainerConfig, runtime ContainerRuntime) (int, error) {
+func Run(config *container.ContainerConfig, runtime ContainerRuntime) (int, error) {
     // 親コンテナの環境変数を引き継ぐ
     if inContainer() {
         parentEnv := os.Environ()
@@ -346,7 +351,7 @@ cmd := fmt.Sprintf("docker run --rm -t -i -v %s:%s %s %s", ...)
 exec.Command("sh", "-c", cmd).Run()
 
 // 新方式
-config := ContainerConfig{...}
+config := &container.ContainerConfig{...}
 runtime.CreateContainer(ctx, config)
 runtime.StartContainer(ctx, containerID)
 ```
@@ -376,13 +381,10 @@ if inContainer() {
 ### 4. プログラマティックな制御
 
 ```go
-// コンテナの状態を監視
+// コンテナの終了を非同期で待機
 go func() {
-    for {
-        info, _ := runtime.InspectContainer(ctx, containerID)
-        log.Printf("Status: %s, CPU: %.2f%%", info.State, info.CPUUsage)
-        time.Sleep(1 * time.Second)
-    }
+    exitCode, err := runtime.WaitContainer(ctx, containerID)
+    log.Printf("Container exited with code: %d, err: %v", exitCode, err)
 }()
 ```
 
