@@ -100,12 +100,6 @@ intended for the subcommand.`,
 			return fmt.Errorf("failed to wait for container: %w", err)
 		}
 
-		if config.Remove {
-			cleanupCtx := context.WithoutCancel(ctx)
-			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to remove container: %v\n", err)
-			}
-		}
 
 		exitFunc(exitCode)
 		return nil

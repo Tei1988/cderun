@@ -94,6 +94,13 @@ func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string)
 
 // AttachContainer attaches to a container's IO streams.
 func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if stderr == nil {
+		stderr = io.Discard
+	}
+
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
 		Stdin:  stdin != nil,
@@ -105,19 +112,37 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	}
 	defer resp.Close()
 
+	var stdinErr error
+	stdinDone := make(chan struct{})
+
 	if stdin != nil {
-		go io.Copy(resp.Conn, stdin)
+		go func() {
+			_, stdinErr = io.Copy(resp.Conn, stdin)
+			if err := resp.CloseWrite(); err != nil {
+				// Logging the error could be useful but we are limited in where to log.
+				// For now we just ensure EOF is signaled.
+			}
+			close(stdinDone)
+		}()
+	} else {
+		close(stdinDone)
 	}
 
+	var copyErr error
 	if tty {
 		// When TTY is enabled, the stream is raw (not multiplexed).
-		_, err = io.Copy(stdout, resp.Reader)
-		return err
+		_, copyErr = io.Copy(stdout, resp.Reader)
+	} else {
+		// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
+		_, copyErr = stdcopy.StdCopy(stdout, stderr, resp.Reader)
 	}
 
-	// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
-	_, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
-	return err
+	<-stdinDone
+
+	if copyErr != nil {
+		return copyErr
+	}
+	return stdinErr
 }
 
 // Name returns the name of the runtime.
