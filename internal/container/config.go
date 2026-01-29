@@ -1,5 +1,13 @@
 package container
 
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
 // ContainerConfig represents the intermediate representation of a container execution request.
 type ContainerConfig struct {
 	// Basic settings
@@ -26,6 +34,65 @@ type ContainerConfig struct {
 
 	// User
 	User string `json:"user" yaml:"user"`
+}
+
+// ToYAML returns the YAML representation of the config.
+func (c *ContainerConfig) ToYAML() (string, error) {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// ToJSON returns the JSON representation of the config.
+func (c *ContainerConfig) ToJSON() (string, error) {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// ToSimple returns a simple string representation of the config.
+func (c *ContainerConfig) ToSimple() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Image: %s\n", c.Image))
+	var parts []string
+	if len(c.Command) > 0 {
+		parts = append(parts, c.Command...)
+	}
+	if len(c.Args) > 0 {
+		parts = append(parts, c.Args...)
+	}
+
+	commandStr := "<none>"
+	if len(parts) > 0 {
+		commandStr = strings.Join(parts, " ")
+	}
+	sb.WriteString(fmt.Sprintf("Command: %s\n", commandStr))
+
+	if len(c.Volumes) > 0 {
+		vols := make([]string, 0, len(c.Volumes))
+		for _, v := range c.Volumes {
+			ro := ""
+			if v.ReadOnly {
+				ro = ":ro"
+			}
+			vols = append(vols, fmt.Sprintf("%s:%s%s", v.HostPath, v.ContainerPath, ro))
+		}
+		sb.WriteString(fmt.Sprintf("Volumes: %s\n", strings.Join(vols, ", ")))
+	}
+
+	if len(c.Env) > 0 {
+		sb.WriteString(fmt.Sprintf("Env: %s\n", strings.Join(c.Env, ", ")))
+	}
+
+	if c.Workdir != "" {
+		sb.WriteString(fmt.Sprintf("Workdir: %s\n", c.Workdir))
+	}
+
+	return sb.String()
 }
 
 // VolumeMount represents a host path to container path mapping.
