@@ -9,15 +9,16 @@
 
 ### 実装済み
 - 基本的なCLI構造（Cobra使用）
-- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`）
+- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
 - 基本的なコンテナ実行（Docker API使用）
 - コンテナのライフサイクル管理（作成・起動・待機・削除）
 - 標準入出力のアタッチ（TTY/インタラクティブ対応）
-
-### 未実装
 - 設定ファイル読み込み（`.cderun.yaml`, `.tools.yaml`）
 - イメージマッピング（サブコマンドからイメージ名の解決）
+- 優先順位解決ロジック（CLI, Env, YAML, Defaults）
+
+### 未実装
 - 環境変数処理（パススルー）
 - その他の高度な機能（作業ディレクトリ同期、ソケットマウント、バイナリマウント）
 
@@ -227,10 +228,10 @@
 - [x] Step 1.3: Docker API実装
 - [x] Step 1.4: 基本実行フロー
 
-### Phase 2
-- [ ] Step 2.1: 設定ファイル読み込み
-- [ ] Step 2.2: イメージマッピング
-- [ ] Step 2.3: 優先順位解決
+### Phase 2 (Completed)
+- [x] Step 2.1: 設定ファイル読み込み
+- [x] Step 2.2: イメージマッピング
+- [x] Step 2.3: 優先順位解決
 
 ### Phase 3
 - [ ] Step 3.1: 環境変数パススルー
