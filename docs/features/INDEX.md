@@ -12,56 +12,56 @@
    - 厳密な境界解析
    - cderunフラグとサブコマンド引数の分離
 
-2. **[引数・設定優先順位](./argument-priority-logic.md)**
+2. **[引数・設定優先順位 (Phase 2予定)](./argument-priority-logic.md)**
    - P1〜P5の優先順位階層
    - CLI、環境変数、設定ファイルの解決ロジック
 
-3. **[ポリグロットエントリーポイント](./polyglot-entry.md)**
+3. **[ポリグロットエントリーポイント (Completed)](./polyglot-entry.md)**
    - シンボリックリンクによる自動ツール検出
    - 単一バイナリで複数ツールとして動作
 
-4. **[設定ファイルサポート](./configuration-file-support.md)**
+4. **[設定ファイルサポート (Phase 2予定)](./configuration-file-support.md)**
    - `.cderun.yaml`: cderun自体の設定
    - `.tools.yaml`: 各ツールの実行設定
 
 ### ランタイム機能
 
-5. **[マルチランタイムサポート](./multi-runtime-support.md)**
-   - Docker/Podmanサポート
-   - ランタイム自動検出
+5. **[マルチランタイムサポート (Phase 1, 3予定)](./multi-runtime-support.md)**
+   - Docker (Phase 1) / Podman (Phase 3予定) サポート
+   - ランタイム自動検出 (Phase 2予定)
    - 統一されたCRIインターフェース
 
-6. **[直接コンテナ実行](./direct-container-execution.md)**
+6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
    - コマンド生成なしでランタイムAPIを直接使用
    - 中間表現（ContainerConfig）からAPIコールへの変換
 
-7. **[イメージマッピング](./image-mapping.md)**
+7. **[イメージマッピング (Phase 2予定)](./image-mapping.md)**
    - サブコマンド名からイメージへの自動マッピング
    - カスタムマッピング設定
 
 ### 実行環境機能
 
-8. **[環境変数パススルー](./env-passthrough.md)**
+8. **[環境変数パススルー (Phase 3予定)](./env-passthrough.md)**
    - デフォルトでは引き継がない
    - 明示的指定による選択的パススルー
    - `KEY=value`と`KEY`形式のサポート
-   
-10. **[コンテナコマンド実行](./container-command-execution.md)**
+
+10. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
     - エフェメラルコンテナでのコマンド実行
     - TTY/インタラクティブサポート
 
 ### 高度な機能
 
-11. **[cderunバイナリマウント](./cderun-binary-mounting.md)**
+11. **[cderunバイナリマウント (Phase 3予定)](./cderun-binary-mounting.md)**
     - `--mount-cderun`でコンテナ内でcderunを使用
     - クロスプラットフォームバイナリ自動ダウンロード
     - `--mount-socket`との併用必須
 
-12. **[ドライランモード](./dry-run-mode.md)**
+12. **[ドライランモード (Phase 4予定)](./dry-run-mode.md)**
     - 実行前のコマンドプレビュー
     - JSON/YAML/シェル形式での出力
 
-13. **[ログ・デバッグ](./logging-debugging.md)**
+13. **[ログ・デバッグ (Phase 4予定)](./logging-debugging.md)**
     - 詳細ログ出力
     - パフォーマンス監視
 

@@ -1,4 +1,4 @@
-# Feature: Argument & Configuration Priority Logic
+# Feature: Argument & Configuration Priority Logic (Phase 2予定)
 
 ## 概要
 `cderun` は、複数のソース（CLI、環境変数、YAML、デフォルト値）から設定を読み込む。

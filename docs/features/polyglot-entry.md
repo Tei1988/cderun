@@ -1,4 +1,4 @@
-# Feature: Polyglot Entry Point
+# Feature: Polyglot Entry Point (Completed)
 
 ## 概要
 このツールは `cderun` という名前以外で実行された場合（シンボリックリンク等）、その実行ファイル名を「サブコマンド」として解釈する。

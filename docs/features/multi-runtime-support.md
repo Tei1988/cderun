@@ -12,7 +12,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman (開発中)
+### 優先度2: Podman (Phase 3予定)
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
@@ -43,13 +43,16 @@ cderun ContainerRuntimeインターフェース
 
 ## ランタイムの選択
 
-### 自動検出ロジック
+**現状 (Phase 1):**
+現在は Docker のみをサポートしており、ランタイムの自動検出は行われません。デフォルトで `/var/run/docker.sock` を使用し、`--mount-socket` フラグでパスを明示的に変更可能です。
+
+### 自動検出ロジック (Phase 2予定)
 
 1. **設定ファイル**: `.cderun.yaml` 等で `runtime` が指定されているか。
 2. **環境変数**: `CDERUN_RUNTIME` が設定されているか。
 3. **ソケット検索**: デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
 
-### 明示的な指定
+### 明示的な指定 (Phase 2予定)
 
 #### 設定ファイル
 ```yaml
@@ -73,9 +76,9 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman**: `github.com/containers/podman/v4/pkg/bindings` を使用。Docker互換APIを提供しているため、基本的な構造はDockerと同様。
+- **Podman (Phase 3予定)**: `github.com/containers/podman/v4/pkg/bindings` を使用。Docker互換APIを提供しているため、基本的な構造はDockerと同様。
 
-## ランタイム情報の表示
+## ランタイム情報の表示 (Phase 4予定)
 
 ### 現在のランタイム確認
 ```bash
@@ -120,7 +123,7 @@ Socket '/run/podman/podman.sock' not found
 Available runtimes: docker
 ```
 
-### バージョン互換性チェック
+### バージョン互換性チェック (Phase 4予定)
 各ランタイムの `ServerVersion` APIを呼び出し、必要な最小バージョンを満たしているか確認。
 
 ## 拡張性

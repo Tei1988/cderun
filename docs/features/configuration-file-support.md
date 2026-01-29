@@ -1,4 +1,4 @@
-# Feature: Configuration File Support
+# Feature: Configuration File Support (Phase 2予定)
 
 ## 概要
 

@@ -1,4 +1,4 @@
-# Feature: Logging and Debugging
+# Feature: Logging and Debugging (Phase 4予定)
 
 ## 概要
 

@@ -1,4 +1,4 @@
-# Feature: Strict Argument Parsing Strategy
+# Feature: Strict Argument Parsing Strategy (Completed)
 
 ## 概要
 `cderun` はラッパーツールであるため、自身のフラグと、ラップする対象（コンテナ内コマンド）へのフラグを厳密に区別しなければならない。
