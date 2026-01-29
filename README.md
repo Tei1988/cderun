@@ -49,9 +49,14 @@ $ cderun --tty docker --tty
 ### Available Flags
 - `--tty`: Allocate a pseudo-TTY.
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
+- `--image`: Docker image to use (overrides mapping).
 - `--network`: Connect a container to a network (default: "bridge").
+- `--remove`: Automatically remove the container when it exits (default: true).
+- `--runtime`: Container runtime to use (docker/podman).
 - `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
 - `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
+- `--cderun-tty`: Forced TTY override.
+- `--cderun-interactive`: Forced interactive override.
 
 ## Features
 

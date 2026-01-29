@@ -65,25 +65,22 @@ CRIを直接使うことで、コンテナ内からcderunを実行しても、�
 
 ## 設定
 
-### ランタイムの選択
+### ランタイムの選択 (`.cderun.yaml`)
 
 ```yaml
-cderun:
-  runtime: docker  # docker | podman
-  runtimeSocket: /var/run/docker.sock
-  
-  # CRI設定
-  cri:
-    timeout: 30s
-    pullPolicy: ifNotPresent  # always | ifNotPresent | never
+runtime: docker  # docker | podman
+runtimePath: /usr/bin/docker
+
+defaults:
+  tty: false
+  interactive: false
 ```
 
-### ツール設定
+### ツール設定 (`.tools.yaml`)
 
 ```yaml
-tools:
-  python:
-    image: python:3.11-slim
+python:
+  image: python:3.11-slim
     tty: true
     interactive: true
     volumes:
@@ -113,6 +110,11 @@ tools:
 - 中間表現（ContainerConfig）の定義
 - Docker CRI実装
 - 基本的な実行フロー
+
+### Phase 2: 設定管理 (Completed)
+- 設定ファイル読み込み
+- イメージマッピング
+- 優先順位解決
 
 ### Phase 3: 高度な機能 (Planned)
 - 環境変数の引き継ぎ
