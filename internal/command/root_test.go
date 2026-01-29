@@ -445,3 +445,67 @@ node:
 		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
 }
+
+func TestCderunInternalOverrides(t *testing.T) {
+	// Use a temporary directory for this test
+	oldWd, err := os.Getwd()
+	require.NoError(t, err)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() { os.Chdir(oldWd) })
+
+	// Create a temporary .tools.yaml for image mapping
+	toolsContent := `
+node:
+  image: node:20-alpine
+`
+	err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	require.NoError(t, err)
+
+	// Save and restore package-level state
+	oldTTY := tty
+	oldCderunTTY := cderunTTY
+	oldFactory := runtimeFactory
+	oldExit := exitFunc
+	t.Cleanup(func() {
+		tty = oldTTY
+		cderunTTY = oldCderunTTY
+		runtimeFactory = oldFactory
+		exitFunc = oldExit
+	})
+
+	mockRuntime := &runtime.MockRuntime{}
+	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		return mockRuntime, nil
+	}
+	exitFunc = func(code int) {}
+
+	t.Run("cderun-tty overrides tty even if placed after subcommand", func(t *testing.T) {
+		// Reset flags Changed state
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// cderun --tty=true node --cderun-tty=false --version
+		// We use a path that doesn't end in "cderun" for polyglot test later,
+		// but here we use "cderun" explicitly.
+		_, err := executeCommandRaw([]string{"cderun", "--tty=true", "node", "--cderun-tty=false", "--version"})
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.False(t, mockRuntime.CreatedConfig.TTY, "TTY should be false because --cderun-tty=false overrides --tty=true")
+	})
+
+	t.Run("cderun-tty works in polyglot mode", func(t *testing.T) {
+		// Reset flags Changed state
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// node --cderun-tty=true --version
+		_, err := executeCommandRaw([]string{"node", "--cderun-tty=true", "--version"})
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.True(t, mockRuntime.CreatedConfig.TTY, "TTY should be true because --cderun-tty=true was provided")
+	})
+}

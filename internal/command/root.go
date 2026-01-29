@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -171,16 +172,37 @@ func preprocessArgs(args []string) []string {
 	}
 
 	execName := filepath.Base(args[0])
-	if execName == "cderun" {
-		return args
+	isPolyglot := execName != "cderun"
+
+	newArgs := make([]string, 0, len(args)+1)
+	if isPolyglot {
+		newArgs = append(newArgs, "cderun")
+	} else {
+		newArgs = append(newArgs, args[0])
 	}
 
-	// If the executable is not "cderun", treat the executable name as a subcommand.
-	// For example, if "node --version" is called via a symlink:
-	// args = ["node", "--version"] -> ["cderun", "node", "--version"]
-	newArgs := make([]string, 0, len(args)+1)
-	newArgs = append(newArgs, "cderun", execName)
-	newArgs = append(newArgs, args[1:]...)
+	var overrides []string
+	var others []string
+
+	// Scan all arguments after the executable name
+	for i := 1; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--cderun-") {
+			overrides = append(overrides, args[i])
+		} else {
+			others = append(others, args[i])
+		}
+	}
+
+	// Place --cderun-* overrides immediately after "cderun" so they are always parsed
+	newArgs = append(newArgs, overrides...)
+
+	if isPolyglot {
+		// In polyglot mode, the original executable name becomes the subcommand
+		newArgs = append(newArgs, execName)
+	}
+
+	newArgs = append(newArgs, others...)
+
 	return newArgs
 }
 
@@ -193,8 +215,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image to use")
 	rootCmd.PersistentFlags().StringVar(&runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
-	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Forced TTY override")
-	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Forced interactive override")
+	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }
