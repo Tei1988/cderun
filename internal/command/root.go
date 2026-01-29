@@ -100,7 +100,6 @@ intended for the subcommand.`,
 			return fmt.Errorf("failed to wait for container: %w", err)
 		}
 
-
 		exitFunc(exitCode)
 		return nil
 	},
