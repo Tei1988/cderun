@@ -4,23 +4,28 @@ import (
 	"cderun/internal/container"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
-	Image       string
-	TTY         bool
-	Interactive bool
-	Network     string
-	Remove      bool
-	Volumes     []container.VolumeMount
-	Env         []string
-	Workdir     string
-	User        string
-	Runtime     string
-	Socket      string
+	Image         string
+	TTY           bool
+	Interactive   bool
+	Network       string
+	Remove        bool
+	Volumes       []container.VolumeMount
+	Env           []string
+	Workdir       string
+	User          string
+	Runtime       string
+	Socket        string
+	SocketSet     bool
+	MountCderun   bool
+	MountTools    string
+	MountAllTools bool
 }
 
 // CLIOptions represents values from CLI flags.
@@ -39,11 +44,36 @@ type CLIOptions struct {
 	CderunTTYSet         bool
 	CderunInteractive    bool
 	CderunInteractiveSet bool
+	CderunImage          string
+	CderunImageSet       bool
+	CderunNetwork        string
+	CderunNetworkSet     bool
+	CderunRemove         bool
+	CderunRemoveSet      bool
 	Runtime              string
 	RuntimeSet           bool
+	CderunRuntime        string
+	CderunRuntimeSet     bool
 	MountSocket          string
 	MountSocketSet       bool
+	CderunMountSocket    string
+	CderunMountSocketSet bool
 	Env                  []string
+	CderunEnv            []string
+	Workdir              string
+	WorkdirSet           bool
+	CderunWorkdir        string
+	CderunWorkdirSet     bool
+	Volumes              []string
+	CderunVolumes        []string
+	MountCderun          bool
+	MountCderunSet       bool
+	CderunMountCderun    bool
+	CderunMountCderunSet bool
+	MountTools           string
+	CderunMountTools     string
+	MountAllTools        bool
+	CderunMountAllTools  bool
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -51,7 +81,9 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res := &ResolvedConfig{}
 
 	// 1. Resolve Image
-	if cli.ImageSet {
+	if cli.CderunImageSet {
+		res.Image = cli.CderunImage
+	} else if cli.ImageSet {
 		res.Image = cli.Image
 	} else if env := os.Getenv("CDERUN_IMAGE"); env != "" {
 		res.Image = env
@@ -87,6 +119,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 4. Resolve Network
 	res.Network = resolveString(
+		cli.CderunNetworkSet, cli.CderunNetwork,
 		cli.NetworkSet, cli.Network,
 		"CDERUN_NETWORK",
 		subcommand, tools, func(t ToolConfig) string { return t.Network },
@@ -96,7 +129,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 5. Resolve Remove
 	res.Remove = resolveBool(
-		false, false, // No P1 for Remove
+		cli.CderunRemoveSet, cli.CderunRemove,
 		cli.RemoveSet, cli.Remove,
 		"CDERUN_REMOVE",
 		subcommand, tools, func(t ToolConfig) *bool { return t.Remove },
@@ -104,21 +137,39 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		true, // Default to true as per docs
 	)
 
-	// 6. Tool-specific settings (Volumes, Env, Workdir)
+	// 7. Resolve Workdir
+	res.Workdir = resolveString(
+		cli.CderunWorkdirSet, cli.CderunWorkdir,
+		cli.WorkdirSet, cli.Workdir,
+		"CDERUN_WORKDIR",
+		subcommand, tools, func(t ToolConfig) string { return t.Workdir },
+		global, func(g CDERunConfig) string { return "" },
+		"",
+	)
+
+	// 8. Tool-specific settings (Volumes, Env)
 	var toolsEnv []string
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			res.Volumes = parseVolumes(tool.Volumes)
 			toolsEnv = tool.Env
-			res.Workdir = tool.Workdir
 		}
 	}
 
-	// Resolve Env (CLI overrides Tools)
-	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env))
+	// 9. Merge CLI Volumes
+	if len(cli.Volumes) > 0 {
+		res.Volumes = append(res.Volumes, parseVolumes(cli.Volumes)...)
+	}
+	if len(cli.CderunVolumes) > 0 {
+		res.Volumes = append(res.Volumes, parseVolumes(cli.CderunVolumes)...)
+	}
 
-	// 7. Resolve Runtime
+	// Resolve Env (P1 > P2 > P4)
+	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv))
+
+	// 11. Resolve Runtime
 	res.Runtime = resolveString(
+		cli.CderunRuntimeSet, cli.CderunRuntime,
 		cli.RuntimeSet, cli.Runtime,
 		"CDERUN_RUNTIME",
 		"", nil, nil, // No tool-specific runtime
@@ -126,18 +177,62 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"docker",
 	)
 
-	// 8. Resolve Socket
+	// 12. Resolve Socket
 	res.Socket = resolveString(
+		cli.CderunMountSocketSet, cli.CderunMountSocket,
 		cli.MountSocketSet, cli.MountSocket,
-		"DOCKER_HOST", // Or CDERUN_SOCKET? DOCKER_HOST is common
+		"CDERUN_MOUNT_SOCKET",
 		"", nil, nil,
 		nil, nil, // Global doesn't have socket path yet in schema but could
 		"/var/run/docker.sock",
 	)
-	// Special handling for DOCKER_HOST unix:// prefix
+
+	// Determine if the socket was explicitly set to a mountable value
+	// We only consider cderun-specific settings for mounting detection.
+	var rawSocket string
+	if cli.CderunMountSocketSet {
+		rawSocket = cli.CderunMountSocket
+	} else if cli.MountSocketSet {
+		rawSocket = cli.MountSocket
+	} else if s := os.Getenv("CDERUN_MOUNT_SOCKET"); s != "" {
+		rawSocket = s
+	}
+	res.SocketSet = rawSocket != "" && isMountableSocket(rawSocket)
+
+	// Special handling for unix:// prefix
 	res.Socket = strings.TrimPrefix(res.Socket, "unix://")
 
+	// 13. Resolve MountCderun
+	res.MountCderun = resolveBool(
+		cli.CderunMountCderunSet, cli.CderunMountCderun,
+		cli.MountCderunSet, cli.MountCderun,
+		"CDERUN_MOUNT_CDERUN",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountCderun },
+		false,
+	)
+
+	// 14. Pass-through other mounting flags
+	if cli.CderunMountTools != "" {
+		res.MountTools = cli.CderunMountTools
+	} else {
+		res.MountTools = cli.MountTools
+	}
+
+	if cli.CderunMountAllTools {
+		res.MountAllTools = true
+	} else {
+		res.MountAllTools = cli.MountAllTools
+	}
+
 	return res, nil
+}
+
+func isMountableSocket(s string) bool {
+	if strings.HasPrefix(s, "unix://") {
+		return true
+	}
+	return filepath.IsAbs(s)
 }
 
 func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool) bool {
@@ -167,7 +262,10 @@ func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, 
 	return fallback
 }
 
-func resolveString(cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string) string {
+func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string) string {
+	if p1Set {
+		return p1Val
+	}
 	if cliSet {
 		return cliVal
 	}
@@ -189,24 +287,23 @@ func resolveString(cliSet bool, cliVal string, envKey string, subcommand string,
 	return fallback
 }
 
-func mergeEnv(base, override []string) []string {
+func mergeEnv(base, p2, p1 []string) []string {
 	m := make(map[string]string)
 	var keys []string
 
-	for _, e := range base {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := m[key]; !ok {
-			keys = append(keys, key)
+	add := func(env []string) {
+		for _, e := range env {
+			key := strings.SplitN(e, "=", 2)[0]
+			if _, ok := m[key]; !ok {
+				keys = append(keys, key)
+			}
+			m[key] = e
 		}
-		m[key] = e
 	}
-	for _, e := range override {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := m[key]; !ok {
-			keys = append(keys, key)
-		}
-		m[key] = e
-	}
+
+	add(base)
+	add(p2)
+	add(p1)
 
 	var res []string
 	for _, k := range keys {

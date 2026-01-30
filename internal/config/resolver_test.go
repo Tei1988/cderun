@@ -136,4 +136,86 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, `/app`, res.Volumes[2].ContainerPath)
 		assert.False(t, res.Volumes[2].ReadOnly)
 	})
+
+	t.Run("Workdir resolution", func(t *testing.T) {
+		cli := CLIOptions{
+			Workdir:    "/cli/workdir",
+			WorkdirSet: true,
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:   "node:20",
+				Workdir: "/tool/workdir",
+			},
+		}
+
+		res, err := Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/cli/workdir", res.Workdir)
+
+		cli.WorkdirSet = false
+		res, err = Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/tool/workdir", res.Workdir)
+	})
+
+	t.Run("Socket resolution from CDERUN_MOUNT_SOCKET", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "/custom/socket.sock")
+		cli := CLIOptions{}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/custom/socket.sock", res.Socket)
+		assert.True(t, res.SocketSet)
+	})
+
+	t.Run("SocketSet is false for non-mountable paths", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "tcp://localhost:2375")
+		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "tcp://localhost:2375", res.Socket)
+		assert.False(t, res.SocketSet, "TCP socket should not be mountable")
+	})
+
+	t.Run("DOCKER_HOST does not affect SocketSet", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
+		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.False(t, res.SocketSet, "DOCKER_HOST should be ignored for SocketSet")
+	})
+
+	t.Run("P1 CderunMountSocket overrides CLI and Env", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "/env/socket")
+		cli := CLIOptions{
+			MountSocket:          "/cli/socket",
+			MountSocketSet:       true,
+			CderunMountSocket:    "/p1/socket",
+			CderunMountSocketSet: true,
+		}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/p1/socket", res.Socket)
+		assert.True(t, res.SocketSet)
+	})
+
+	t.Run("MountCderun resolution", func(t *testing.T) {
+		cli := CLIOptions{
+			MountCderun:    true,
+			MountCderunSet: true,
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:       "node:20",
+				MountCderun: ptr(false),
+			},
+		}
+
+		res, err := Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.True(t, res.MountCderun)
+
+		cli.MountCderunSet = false
+		res, err = Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.False(t, res.MountCderun)
+	})
 }
