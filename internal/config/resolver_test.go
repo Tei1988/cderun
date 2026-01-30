@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -158,61 +157,6 @@ func TestResolve(t *testing.T) {
 		res, err = Resolve("node", cli, tools, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "/tool/workdir", res.Workdir)
-	})
-
-	t.Run("SyncWorkdir logic", func(t *testing.T) {
-		cli := CLIOptions{
-			SyncWorkdir:    true,
-			SyncWorkdirSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.True(t, res.SyncWorkdir)
-
-		pwd, _ := os.Getwd()
-		found := false
-		for _, v := range res.Volumes {
-			if v.HostPath == pwd && v.ContainerPath == pwd {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "PWD should be in volumes")
-		assert.Equal(t, pwd, res.Workdir, "Workdir should be PWD if not otherwise set")
-	})
-
-	t.Run("SyncWorkdir does not override explicit Workdir", func(t *testing.T) {
-		cli := CLIOptions{
-			SyncWorkdir:    true,
-			SyncWorkdirSet: true,
-			Workdir:        "/explicit/dir",
-			WorkdirSet:     true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "/explicit/dir", res.Workdir)
-
-		pwd, _ := os.Getwd()
-		found := false
-		for _, v := range res.Volumes {
-			if v.HostPath == pwd && v.ContainerPath == pwd {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "PWD should still be in volumes even if Workdir is explicit")
 	})
 
 	t.Run("MountCderun resolution", func(t *testing.T) {

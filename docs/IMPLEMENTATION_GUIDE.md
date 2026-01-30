@@ -9,7 +9,7 @@
 
 ### 実装済み
 - 基本的なCLI構造（Cobra使用）
-- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--sync-workdir`, `--mount-tools`, `--mount-all-tools`）
+- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--mount-tools`, `--mount-all-tools`）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
 - 基本的なコンテナ実行（Docker API使用）
 - コンテナのライフサイクル管理（作成・起動・待機・削除）
@@ -19,10 +19,10 @@
 - 優先順位解決ロジック（CLI, Env, YAML, Defaults）
 - ドライランモード（`--dry-run` による設定のプレビュー）
 - 環境変数処理（パススルー）
-- 作業ディレクトリ同期
 - ソケット・バイナリマウント、ツールマウント
 
 ### 未実装
+- 作業ディレクトリ同期
 - Podmanサポート
 - 詳細ログ・デバッグ機能
 
@@ -237,9 +237,9 @@
 - [x] Step 2.2: イメージマッピング
 - [x] Step 2.3: 優先順位解決
 
-### Phase 3 (Completed)
+### Phase 3
 - [x] Step 3.1: 環境変数パススルー
-- [x] Step 3.2: 作業ディレクトリ同期
+- [ ] Step 3.2: 作業ディレクトリ同期
 - [x] Step 3.3: ソケットマウント
 - [x] Step 3.4: cderunバイナリマウント
 - [x] Step 3.5: ツールマウント

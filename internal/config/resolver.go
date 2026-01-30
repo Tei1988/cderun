@@ -18,7 +18,6 @@ type ResolvedConfig struct {
 	Volumes       []container.VolumeMount
 	Env           []string
 	Workdir       string
-	SyncWorkdir   bool
 	User          string
 	Runtime       string
 	Socket        string
@@ -52,8 +51,6 @@ type CLIOptions struct {
 	Workdir              string
 	WorkdirSet           bool
 	Volumes              []string
-	SyncWorkdir          bool
-	SyncWorkdirSet       bool
 	MountCderun          bool
 	MountCderunSet       bool
 	MountTools           string
@@ -118,16 +115,6 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		true, // Default to true as per docs
 	)
 
-	// 6. Resolve SyncWorkdir
-	res.SyncWorkdir = resolveBool(
-		false, false,
-		cli.SyncWorkdirSet, cli.SyncWorkdir,
-		"CDERUN_SYNC_WORKDIR",
-		subcommand, tools, func(t ToolConfig) *bool { return t.SyncWorkdir },
-		global, func(g CDERunConfig) *bool { return g.Defaults.SyncWorkdir },
-		false,
-	)
-
 	// 7. Resolve Workdir
 	res.Workdir = resolveString(
 		cli.WorkdirSet, cli.Workdir,
@@ -149,22 +136,6 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	// 9. Merge CLI Volumes
 	if len(cli.Volumes) > 0 {
 		res.Volumes = append(res.Volumes, parseVolumes(cli.Volumes)...)
-	}
-
-	// 10. Sync Workdir logic
-	if res.SyncWorkdir {
-		if pwd, err := os.Getwd(); err == nil {
-			// Add current directory to volumes
-			res.Volumes = append(res.Volumes, container.VolumeMount{
-				HostPath:      pwd,
-				ContainerPath: pwd,
-				ReadOnly:      false,
-			})
-			// If workdir not explicitly set by CLI or tool, use pwd
-			if res.Workdir == "" {
-				res.Workdir = pwd
-			}
-		}
 	}
 
 	// Resolve Env (CLI overrides Tools)

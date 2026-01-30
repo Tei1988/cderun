@@ -30,7 +30,6 @@ var (
 	env               []string
 	workdir           string
 	volumes           []string
-	syncWorkdir       bool
 	mountTools        string
 	mountAllTools     bool
 	dryRun            bool
@@ -100,8 +99,6 @@ intended for the subcommand.`,
 			Workdir:              workdir,
 			WorkdirSet:           cmd.Flags().Changed("workdir"),
 			Volumes:              volumes,
-			SyncWorkdir:          syncWorkdir,
-			SyncWorkdirSet:       cmd.Flags().Changed("sync-workdir"),
 			MountCderun:          mountCderun,
 			MountCderunSet:       cmd.Flags().Changed("mount-cderun"),
 			MountTools:           mountTools,
@@ -322,7 +319,6 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVarP(&env, "env", "e", nil, "Set environment variables")
 	rootCmd.PersistentFlags().StringVarP(&workdir, "workdir", "w", "", "Working directory inside the container")
 	rootCmd.PersistentFlags().StringSliceVarP(&volumes, "volume", "v", nil, "Bind mount a volume")
-	rootCmd.PersistentFlags().BoolVar(&syncWorkdir, "sync-workdir", false, "Mount current directory and set as workdir")
 	rootCmd.PersistentFlags().StringVar(&mountTools, "mount-tools", "", "Mount specified tools into the container")
 	rootCmd.PersistentFlags().BoolVar(&mountAllTools, "mount-all-tools", false, "Mount all defined tools into the container")
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")

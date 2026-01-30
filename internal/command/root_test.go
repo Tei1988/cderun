@@ -649,28 +649,6 @@ func TestPhase3Features(t *testing.T) {
 		assert.True(t, mockRuntime.CreatedConfig.Volumes[0].ReadOnly)
 	})
 
-	t.Run("sync-workdir flag", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		mockRuntime.CreatedConfig = nil
-
-		_, err := executeCommand("--image", "alpine", "--sync-workdir", "sh")
-		assert.NoError(t, err)
-
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		pwd, _ := os.Getwd()
-		assert.Equal(t, pwd, mockRuntime.CreatedConfig.Workdir)
-
-		found := false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == pwd && v.ContainerPath == pwd {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "PWD should be in volumes")
-	})
-
 	t.Run("mounting flags require mount-socket", func(t *testing.T) {
 		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })

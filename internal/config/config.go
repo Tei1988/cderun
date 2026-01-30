@@ -19,7 +19,6 @@ type ConfigDefaults struct {
 	Interactive *bool  `yaml:"interactive"`
 	Network     string `yaml:"network"`
 	Remove      *bool  `yaml:"remove"`
-	SyncWorkdir *bool  `yaml:"syncWorkdir"`
 	MountCderun *bool  `yaml:"mountCderun"`
 }
 
@@ -32,7 +31,6 @@ type ToolConfig struct {
 	Volumes     []string `yaml:"volumes"`
 	Env         []string `yaml:"env"`
 	Workdir     string   `yaml:"workdir"`
-	SyncWorkdir *bool    `yaml:"syncWorkdir"`
 	MountCderun *bool    `yaml:"mountCderun"`
 }
 

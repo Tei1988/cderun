@@ -132,15 +132,6 @@ cderun -v ~/.ssh:/root/.ssh:ro git clone ...
 cderun --workdir /app node server.js
 ```
 
-### `--sync-workdir`
-- **型**: bool
-- **デフォルト**: `false`
-- **説明**: ホストのカレントディレクトリをコンテナ内の同じパスにマウントし、作業ディレクトリとして設定する
-
-```bash
-cderun --sync-workdir node app.js
-```
-
 ### `--runtime`
 - **型**: string
 - **デフォルト**: `docker`
