@@ -121,7 +121,15 @@ intended for the subcommand.`,
 				fmt.Println(string(data))
 			case "simple":
 				fmt.Printf("Image: %s\n", containerConfig.Image)
-				fmt.Printf("Command: %s %s\n", strings.Join(containerConfig.Command, " "), strings.Join(containerConfig.Args, " "))
+				fullCmd := strings.Join(containerConfig.Command, " ")
+				if len(containerConfig.Args) > 0 {
+					fullCmd += " " + strings.Join(containerConfig.Args, " ")
+				}
+				fmt.Printf("Command: %s\n", fullCmd)
+				fmt.Printf("TTY: %v\n", containerConfig.TTY)
+				fmt.Printf("Interactive: %v\n", containerConfig.Interactive)
+				fmt.Printf("Network: %s\n", containerConfig.Network)
+				fmt.Printf("Remove: %v\n", containerConfig.Remove)
 				var volumes []string
 				for _, v := range containerConfig.Volumes {
 					volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))

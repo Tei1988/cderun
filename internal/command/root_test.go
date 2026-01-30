@@ -489,6 +489,11 @@ node:
 		assert.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: sh")
+		assert.NotContains(t, output, "Command: sh ") // Ensure no trailing space
+		assert.Contains(t, output, "TTY: false")
+		assert.Contains(t, output, "Interactive: false")
+		assert.Contains(t, output, "Network: bridge")
+		assert.Contains(t, output, "Remove: true")
 	})
 }
 
