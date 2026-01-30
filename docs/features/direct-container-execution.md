@@ -117,8 +117,9 @@ python:
 - 優先順位解決
 - ドライランモード
 
-### Phase 3: 高度な機能 (Planned)
+### Phase 3: 高度な機能 (Completed)
 - 環境変数の引き継ぎ
+- ソケット・バイナリマウント
 
 ### Phase 4: 利便性向上 (Planned)
 - Podman CRI実装
