@@ -9,7 +9,7 @@
 
 ### 実装済み
 - 基本的なCLI構造（Cobra使用）
-- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--mount-tools`, `--mount-all-tools`）
+- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--mount-tools`, `--mount-all-tools`, `--cderun-mount-socket`, `--cderun-env`）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
 - 基本的なコンテナ実行（Docker API使用）
 - コンテナのライフサイクル管理（作成・起動・待機・削除）

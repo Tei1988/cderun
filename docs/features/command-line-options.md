@@ -62,6 +62,12 @@ cderun --network my-network node app.js
 
 ```bash
 cderun --mount-socket /var/run/docker.sock docker ps
+```
+
+### `--cderun-mount-socket`
+- **型**: string
+- **説明**: 設定ファイルや環境変数を上書きしてソケットパスを強制する（P1優先順位）
+- **用途**: サブコマンドの後ろでも指定可能
 cderun --mount-socket /run/podman/podman.sock podman images
 ```
 
@@ -114,6 +120,16 @@ cderun --env NODE_ENV=production node app.js
 cderun --env NPM_TOKEN node app.js  # ホストから取得
 ```
 
+### `--cderun-env`
+- **型**: stringSlice
+- **説明**: 環境変数の強制上書き（P1優先順位）
+- **用途**: サブコマンドの後ろでも指定可能
+
+```bash
+# サブコマンドの後ろで指定
+cderun node app.js --cderun-env=NODE_ENV=production
+```
+
 ### `--volume`, `-v`
 - **型**: stringSlice
 - **説明**: ボリュームマウント
@@ -150,9 +166,8 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
-### `--cderun-tty` / `--cderun-interactive`
-- **型**: bool
-- **説明**: 設定ファイルや環境変数を上書きしてTTY/Interactiveを強制する（P1優先順位）
+### `--cderun-tty` / `--cderun-interactive` / `--cderun-mount-socket` / `--cderun-env`
+- **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。サブコマンドの後ろに配置しても `cderun` によって認識されます。
 
 ## 将来追加予定のオプション
 
@@ -164,9 +179,10 @@ cderun --dry-run node app.js
 
 ## オプションの優先順位
 
-1. **コマンドライン引数** (最優先)
-2. **環境変数** (例: `CDERUN_TTY=true`, `CDERUN_SOCKET=/var/run/docker.sock`)
-3. **ツール固有設定** (`.tools.yaml`)
+1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
+2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
+3. **環境変数 (P3)**: `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
+4. **ツール固有設定 (P4)**: `.tools.yaml`
 4. **グローバルデフォルト** (`.cderun.yaml`)
 5. **ハードコードされたデフォルト** (最低優先)
 

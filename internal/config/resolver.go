@@ -48,7 +48,10 @@ type CLIOptions struct {
 	RuntimeSet           bool
 	MountSocket          string
 	MountSocketSet       bool
+	CderunMountSocket    string
+	CderunMountSocketSet bool
 	Env                  []string
+	CderunEnv            []string
 	Workdir              string
 	WorkdirSet           bool
 	Volumes              []string
@@ -99,6 +102,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 4. Resolve Network
 	res.Network = resolveString(
+		false, "", // No P1 for Network
 		cli.NetworkSet, cli.Network,
 		"CDERUN_NETWORK",
 		subcommand, tools, func(t ToolConfig) string { return t.Network },
@@ -118,6 +122,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 7. Resolve Workdir
 	res.Workdir = resolveString(
+		false, "", // No P1 for Workdir
 		cli.WorkdirSet, cli.Workdir,
 		"CDERUN_WORKDIR",
 		subcommand, tools, func(t ToolConfig) string { return t.Workdir },
@@ -139,11 +144,12 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		res.Volumes = append(res.Volumes, parseVolumes(cli.Volumes)...)
 	}
 
-	// Resolve Env (CLI overrides Tools)
-	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env))
+	// Resolve Env (P1 > P2 > P4)
+	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv))
 
 	// 11. Resolve Runtime
 	res.Runtime = resolveString(
+		false, "", // No P1 for Runtime
 		cli.RuntimeSet, cli.Runtime,
 		"CDERUN_RUNTIME",
 		"", nil, nil, // No tool-specific runtime
@@ -152,26 +158,23 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	// 12. Resolve Socket
-	socketEnv := "DOCKER_HOST"
-	if os.Getenv("CDERUN_SOCKET") != "" {
-		socketEnv = "CDERUN_SOCKET"
-	}
-
 	res.Socket = resolveString(
+		cli.CderunMountSocketSet, cli.CderunMountSocket,
 		cli.MountSocketSet, cli.MountSocket,
-		socketEnv,
+		"CDERUN_MOUNT_SOCKET",
 		"", nil, nil,
 		nil, nil, // Global doesn't have socket path yet in schema but could
 		"/var/run/docker.sock",
 	)
 
 	// Determine if the socket was explicitly set to a mountable value
+	// We only consider cderun-specific settings for mounting detection.
 	var rawSocket string
-	if cli.MountSocketSet {
+	if cli.CderunMountSocketSet {
+		rawSocket = cli.CderunMountSocket
+	} else if cli.MountSocketSet {
 		rawSocket = cli.MountSocket
-	} else if s := os.Getenv("CDERUN_SOCKET"); s != "" {
-		rawSocket = s
-	} else if s := os.Getenv("DOCKER_HOST"); s != "" {
+	} else if s := os.Getenv("CDERUN_MOUNT_SOCKET"); s != "" {
 		rawSocket = s
 	}
 	res.SocketSet = rawSocket != "" && isMountableSocket(rawSocket)
@@ -230,7 +233,10 @@ func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, 
 	return fallback
 }
 
-func resolveString(cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string) string {
+func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string) string {
+	if p1Set {
+		return p1Val
+	}
 	if cliSet {
 		return cliVal
 	}
@@ -252,24 +258,23 @@ func resolveString(cliSet bool, cliVal string, envKey string, subcommand string,
 	return fallback
 }
 
-func mergeEnv(base, override []string) []string {
+func mergeEnv(base, p2, p1 []string) []string {
 	m := make(map[string]string)
 	var keys []string
 
-	for _, e := range base {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := m[key]; !ok {
-			keys = append(keys, key)
+	add := func(env []string) {
+		for _, e := range env {
+			key := strings.SplitN(e, "=", 2)[0]
+			if _, ok := m[key]; !ok {
+				keys = append(keys, key)
+			}
+			m[key] = e
 		}
-		m[key] = e
 	}
-	for _, e := range override {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := m[key]; !ok {
-			keys = append(keys, key)
-		}
-		m[key] = e
-	}
+
+	add(base)
+	add(p2)
+	add(p1)
 
 	var res []string
 	for _, k := range keys {

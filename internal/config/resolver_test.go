@@ -159,8 +159,8 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/tool/workdir", res.Workdir)
 	})
 
-	t.Run("Socket resolution from CDERUN_SOCKET", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET", "/custom/socket.sock")
+	t.Run("Socket resolution from CDERUN_MOUNT_SOCKET", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "/custom/socket.sock")
 		cli := CLIOptions{}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
@@ -169,19 +169,32 @@ func TestResolve(t *testing.T) {
 	})
 
 	t.Run("SocketSet is false for non-mountable paths", func(t *testing.T) {
-		t.Setenv("DOCKER_HOST", "tcp://localhost:2375")
+		t.Setenv("CDERUN_MOUNT_SOCKET", "tcp://localhost:2375")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "tcp://localhost:2375", res.Socket)
 		assert.False(t, res.SocketSet, "TCP socket should not be mountable")
 	})
 
-	t.Run("SocketSet is true for unix:// prefixed paths", func(t *testing.T) {
-		t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+	t.Run("DOCKER_HOST does not affect SocketSet", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "/var/run/docker.sock", res.Socket)
-		assert.True(t, res.SocketSet, "Unix socket should be mountable")
+		assert.False(t, res.SocketSet, "DOCKER_HOST should be ignored for SocketSet")
+	})
+
+	t.Run("P1 CderunMountSocket overrides CLI and Env", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "/env/socket")
+		cli := CLIOptions{
+			MountSocket:          "/cli/socket",
+			MountSocketSet:       true,
+			CderunMountSocket:    "/p1/socket",
+			CderunMountSocketSet: true,
+		}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/p1/socket", res.Socket)
+		assert.True(t, res.SocketSet)
 	})
 
 	t.Run("MountCderun resolution", func(t *testing.T) {

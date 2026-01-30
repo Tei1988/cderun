@@ -26,8 +26,10 @@ var (
 	remove            bool
 	cderunTTY         bool
 	cderunInteractive bool
+	cderunMountSocket string
 	runtimeName       string
 	env               []string
+	cderunEnv         []string
 	workdir           string
 	volumes           []string
 	mountTools        string
@@ -95,7 +97,10 @@ intended for the subcommand.`,
 			RuntimeSet:           cmd.Flags().Changed("runtime"),
 			MountSocket:          mountSocket,
 			MountSocketSet:       cmd.Flags().Changed("mount-socket"),
+			CderunMountSocket:    cderunMountSocket,
+			CderunMountSocketSet: cmd.Flags().Changed("cderun-mount-socket"),
 			Env:                  env,
+			CderunEnv:            cderunEnv,
 			Workdir:              workdir,
 			WorkdirSet:           cmd.Flags().Changed("workdir"),
 			Volumes:              volumes,
@@ -327,6 +332,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&cderunMountSocket, "cderun-mount-socket", "", "Override socket path (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&cderunEnv, "cderun-env", nil, "Override environment variables (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview container configuration without execution")
 	rootCmd.PersistentFlags().StringVarP(&dryRunFormat, "dry-run-format", "f", "yaml", "Output format (yaml, json, simple)")
 

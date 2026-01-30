@@ -8,7 +8,7 @@
 
 ### P1: CDERUN Internal Overrides (Highest Priority)
 - **定義**: 動作を強制的に変更するための専用フラグ。シンボリックリンク利用時でも `cderun` 側の設定を上書きすることを想定したフラグ。
-- **フラグ名**: `--cderun-tty`, `--cderun-interactive`
+- **フラグ名**: `--cderun-tty`, `--cderun-interactive`, `--cderun-mount-socket`, `--cderun-env`
 - **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。また、サブコマンドの後ろに配置しても `cderun` によって認識される。
 
 ### P2: CLI Flags (User Intent)
@@ -19,8 +19,9 @@
 
 ### P3: Environment Variables (Global Override)
 - **定義**: 実行環境全体に適用される設定。
-- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `DOCKER_HOST` 等。
+- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
+- **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 
 ### P4: Tool-specific config (YAML Profile)
 - **定義**: 設定ファイル（`.tools.yaml`）内の、実行対象サブコマンド（ツール）に紐づく設定ブロック。

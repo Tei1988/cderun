@@ -445,14 +445,16 @@ node:
 		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
 
-	t.Run("environment variable pass-through", func(t *testing.T) {
+	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
 		oldEnv := env
+		oldCderunEnv := cderunEnv
 		oldRuntimeName := runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
 			env = oldEnv
+			cderunEnv = oldCderunEnv
 			runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
@@ -475,6 +477,7 @@ node:
   env:
     - TOOL_KEY=TOOL_VALUE
     - OVERRIDE_KEY=TOOL_VALUE
+    - P1_OVERRIDE_KEY=TOOL_VALUE
     - HOST_KEY
 `
 		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
@@ -489,16 +492,27 @@ node:
 		}
 		exitFunc = func(code int) {}
 
-		// Execute with CLI overrides
-		_, err = executeCommand("--env", "OVERRIDE_KEY=CLI_VALUE", "--env", "CLI_KEY=CLI_VALUE", "--env", "CLI_HOST_KEY", "node", "app.js")
+		// Execute with CLI overrides and P1 overrides
+		// Note: P1 overrides should use --cderun-flag=value format when placed after subcommand
+		// to ensure preprocessArgs hoists them correctly as a single unit.
+		_, err = executeCommand(
+			"--env", "OVERRIDE_KEY=CLI_VALUE",
+			"--env", "P1_OVERRIDE_KEY=CLI_VALUE",
+			"--env", "CLI_KEY=CLI_VALUE",
+			"--env", "CLI_HOST_KEY",
+			"node",
+			"--cderun-env=P1_OVERRIDE_KEY=P1_VALUE",
+			"app.js",
+		)
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		envs := mockRuntime.CreatedConfig.Env
 		assert.Contains(t, envs, "TOOL_KEY=TOOL_VALUE")
-		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")   // CLI overrides Tool
-		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")     // Resolved from host (via Tool config)
-		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")       // CLI explicit
+		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")      // CLI overrides Tool
+		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")    // P1 overrides CLI and Tool
+		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")        // Resolved from host (via Tool config)
+		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")          // CLI explicit
 		assert.Contains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE") // Resolved from host (via CLI flag)
 	})
 
@@ -649,18 +663,22 @@ func TestPhase3Features(t *testing.T) {
 		assert.True(t, mockRuntime.CreatedConfig.Volumes[0].ReadOnly)
 	})
 
-	t.Run("mounting flags require mount-socket", func(t *testing.T) {
+	t.Run("mounting flags require explicit cderun socket settings", func(t *testing.T) {
 		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
-		// Clear DOCKER_HOST to ensure SocketSet is false
-		oldDockerHost := os.Getenv("DOCKER_HOST")
-		os.Unsetenv("DOCKER_HOST")
-		t.Cleanup(func() { os.Setenv("DOCKER_HOST", oldDockerHost) })
+		// DOCKER_HOST should no longer be enough for SocketSet
+		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
+		t.Setenv("CDERUN_MOUNT_SOCKET", "")
 
 		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires --mount-socket")
+
+		// CDERUN_MOUNT_SOCKET should work
+		t.Setenv("CDERUN_MOUNT_SOCKET", "/var/run/docker.sock")
+		_, err = executeCommand("--image", "alpine", "--mount-cderun", "sh")
+		assert.NoError(t, err)
 	})
 
 	t.Run("mount-cderun logic", func(t *testing.T) {
