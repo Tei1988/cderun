@@ -444,6 +444,52 @@ node:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
+
+	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
+		// Save and restore package-level state
+		oldDryRun := dryRun
+		oldDryRunFormat := dryRunFormat
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			dryRun = oldDryRun
+			dryRunFormat = oldDryRunFormat
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		// Dry-run with YAML (default)
+		output, err := executeCommand("--dry-run", "--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "image: alpine")
+		assert.Contains(t, output, "command:")
+		assert.Contains(t, output, "- sh")
+		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
+
+		// Dry-run with JSON
+		output, err = executeCommand("--dry-run", "--format", "json", "--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "\"image\": \"alpine\"")
+		assert.Contains(t, output, "\"command\": [")
+
+		// Dry-run with simple
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Image: alpine")
+		assert.Contains(t, output, "Command: sh")
+	})
 }
 
 func TestCderunInternalOverrides(t *testing.T) {

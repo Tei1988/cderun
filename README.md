@@ -57,6 +57,8 @@ $ cderun --tty docker --tty
 - `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
 - `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
 - `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
+- `--dry-run`: Preview container configuration without execution.
+- `--format`, `-f`: Output format (yaml, json, simple).
 
 ## Features
 

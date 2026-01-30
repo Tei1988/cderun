@@ -5,6 +5,7 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/runtime"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -25,6 +27,8 @@ var (
 	cderunTTY         bool
 	cderunInteractive bool
 	runtimeName       string
+	dryRun            bool
+	dryRunFormat      string
 
 	// For testing
 	exitFunc       = os.Exit
@@ -105,6 +109,34 @@ intended for the subcommand.`,
 			Volumes:     resolved.Volumes,
 			Env:         resolved.Env,
 			Workdir:     resolved.Workdir,
+		}
+
+		if dryRun {
+			switch strings.ToLower(dryRunFormat) {
+			case "json":
+				data, err := json.MarshalIndent(containerConfig, "", "  ")
+				if err != nil {
+					return fmt.Errorf("failed to marshal JSON: %w", err)
+				}
+				fmt.Println(string(data))
+			case "simple":
+				fmt.Printf("Image: %s\n", containerConfig.Image)
+				fmt.Printf("Command: %s %s\n", containerConfig.Command[0], strings.Join(containerConfig.Args, " "))
+				var volumes []string
+				for _, v := range containerConfig.Volumes {
+					volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
+				}
+				fmt.Printf("Volumes: %s\n", strings.Join(volumes, ", "))
+				fmt.Printf("Env: %s\n", strings.Join(containerConfig.Env, ", "))
+				fmt.Printf("Workdir: %s\n", containerConfig.Workdir)
+			default: // Default to YAML
+				data, err := yaml.Marshal(containerConfig)
+				if err != nil {
+					return fmt.Errorf("failed to marshal YAML: %w", err)
+				}
+				fmt.Print(string(data))
+			}
+			return nil
 		}
 
 		// Initialize Runtime
@@ -217,6 +249,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview container configuration without execution")
+	rootCmd.PersistentFlags().StringVarP(&dryRunFormat, "format", "f", "yaml", "Output format (yaml, json, simple)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }
