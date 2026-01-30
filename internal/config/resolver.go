@@ -43,6 +43,7 @@ type CLIOptions struct {
 	RuntimeSet           bool
 	MountSocket          string
 	MountSocketSet       bool
+	Env                  []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -104,13 +105,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	// 6. Tool-specific settings (Volumes, Env, Workdir)
+	var toolsEnv []string
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			res.Volumes = parseVolumes(tool.Volumes)
-			res.Env = tool.Env
+			toolsEnv = tool.Env
 			res.Workdir = tool.Workdir
 		}
 	}
+
+	// Resolve Env (CLI overrides Tools)
+	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env))
 
 	// 7. Resolve Runtime
 	res.Runtime = resolveString(
@@ -182,6 +187,45 @@ func resolveString(cliSet bool, cliVal string, envKey string, subcommand string,
 		}
 	}
 	return fallback
+}
+
+func mergeEnv(base, override []string) []string {
+	m := make(map[string]string)
+	var keys []string
+
+	for _, e := range base {
+		key := strings.SplitN(e, "=", 2)[0]
+		if _, ok := m[key]; !ok {
+			keys = append(keys, key)
+		}
+		m[key] = e
+	}
+	for _, e := range override {
+		key := strings.SplitN(e, "=", 2)[0]
+		if _, ok := m[key]; !ok {
+			keys = append(keys, key)
+		}
+		m[key] = e
+	}
+
+	var res []string
+	for _, k := range keys {
+		res = append(res, m[k])
+	}
+	return res
+}
+
+func resolveEnvValues(env []string) []string {
+	var res []string
+	for _, e := range env {
+		if strings.Contains(e, "=") {
+			res = append(res, e)
+		} else {
+			val := os.Getenv(e)
+			res = append(res, fmt.Sprintf("%s=%s", e, val))
+		}
+	}
+	return res
 }
 
 func parseVolumes(vols []string) []container.VolumeMount {

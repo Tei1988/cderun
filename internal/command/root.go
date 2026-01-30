@@ -27,6 +27,7 @@ var (
 	cderunTTY         bool
 	cderunInteractive bool
 	runtimeName       string
+	env               []string
 	dryRun            bool
 	dryRunFormat      string
 
@@ -90,6 +91,7 @@ intended for the subcommand.`,
 			RuntimeSet:           cmd.Flags().Changed("runtime"),
 			MountSocket:          mountSocket,
 			MountSocketSet:       cmd.Flags().Changed("mount-socket"),
+			Env:                  env,
 		}
 
 		resolved, err := config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
@@ -254,6 +256,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image to use")
 	rootCmd.PersistentFlags().StringVar(&runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
+	rootCmd.PersistentFlags().StringSliceVar(&env, "env", nil, "Set environment variables")
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")

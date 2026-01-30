@@ -445,6 +445,63 @@ node:
 		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
 	})
 
+	t.Run("environment variable pass-through", func(t *testing.T) {
+		// Save and restore package-level state
+		oldEnv := env
+		oldRuntimeName := runtimeName
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			env = oldEnv
+			runtimeName = oldRuntimeName
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20-alpine
+  env:
+    - TOOL_KEY=TOOL_VALUE
+    - OVERRIDE_KEY=TOOL_VALUE
+    - HOST_KEY
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		t.Setenv("HOST_KEY", "HOST_VALUE")
+		t.Setenv("CLI_HOST_KEY", "CLI_HOST_VALUE")
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		// Execute with CLI overrides
+		_, err = executeCommand("--env", "OVERRIDE_KEY=CLI_VALUE", "--env", "CLI_KEY=CLI_VALUE", "--env", "CLI_HOST_KEY", "node", "app.js")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		envs := mockRuntime.CreatedConfig.Env
+		assert.Contains(t, envs, "TOOL_KEY=TOOL_VALUE")
+		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")   // CLI overrides Tool
+		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")     // Resolved from host (via Tool config)
+		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")       // CLI explicit
+		assert.Contains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE") // Resolved from host (via CLI flag)
+	})
+
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Save and restore package-level state
 		oldDryRun := dryRun
