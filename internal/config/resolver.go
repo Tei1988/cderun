@@ -44,8 +44,16 @@ type CLIOptions struct {
 	CderunTTYSet         bool
 	CderunInteractive    bool
 	CderunInteractiveSet bool
+	CderunImage          string
+	CderunImageSet       bool
+	CderunNetwork        string
+	CderunNetworkSet     bool
+	CderunRemove         bool
+	CderunRemoveSet      bool
 	Runtime              string
 	RuntimeSet           bool
+	CderunRuntime        string
+	CderunRuntimeSet     bool
 	MountSocket          string
 	MountSocketSet       bool
 	CderunMountSocket    string
@@ -54,11 +62,18 @@ type CLIOptions struct {
 	CderunEnv            []string
 	Workdir              string
 	WorkdirSet           bool
+	CderunWorkdir        string
+	CderunWorkdirSet     bool
 	Volumes              []string
+	CderunVolumes        []string
 	MountCderun          bool
 	MountCderunSet       bool
+	CderunMountCderun    bool
+	CderunMountCderunSet bool
 	MountTools           string
+	CderunMountTools     string
 	MountAllTools        bool
+	CderunMountAllTools  bool
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -66,7 +81,9 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res := &ResolvedConfig{}
 
 	// 1. Resolve Image
-	if cli.ImageSet {
+	if cli.CderunImageSet {
+		res.Image = cli.CderunImage
+	} else if cli.ImageSet {
 		res.Image = cli.Image
 	} else if env := os.Getenv("CDERUN_IMAGE"); env != "" {
 		res.Image = env
@@ -102,7 +119,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 4. Resolve Network
 	res.Network = resolveString(
-		false, "", // No P1 for Network
+		cli.CderunNetworkSet, cli.CderunNetwork,
 		cli.NetworkSet, cli.Network,
 		"CDERUN_NETWORK",
 		subcommand, tools, func(t ToolConfig) string { return t.Network },
@@ -112,7 +129,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 5. Resolve Remove
 	res.Remove = resolveBool(
-		false, false, // No P1 for Remove
+		cli.CderunRemoveSet, cli.CderunRemove,
 		cli.RemoveSet, cli.Remove,
 		"CDERUN_REMOVE",
 		subcommand, tools, func(t ToolConfig) *bool { return t.Remove },
@@ -122,7 +139,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 7. Resolve Workdir
 	res.Workdir = resolveString(
-		false, "", // No P1 for Workdir
+		cli.CderunWorkdirSet, cli.CderunWorkdir,
 		cli.WorkdirSet, cli.Workdir,
 		"CDERUN_WORKDIR",
 		subcommand, tools, func(t ToolConfig) string { return t.Workdir },
@@ -143,13 +160,16 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	if len(cli.Volumes) > 0 {
 		res.Volumes = append(res.Volumes, parseVolumes(cli.Volumes)...)
 	}
+	if len(cli.CderunVolumes) > 0 {
+		res.Volumes = append(res.Volumes, parseVolumes(cli.CderunVolumes)...)
+	}
 
 	// Resolve Env (P1 > P2 > P4)
 	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv))
 
 	// 11. Resolve Runtime
 	res.Runtime = resolveString(
-		false, "", // No P1 for Runtime
+		cli.CderunRuntimeSet, cli.CderunRuntime,
 		cli.RuntimeSet, cli.Runtime,
 		"CDERUN_RUNTIME",
 		"", nil, nil, // No tool-specific runtime
@@ -184,7 +204,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 13. Resolve MountCderun
 	res.MountCderun = resolveBool(
-		false, false,
+		cli.CderunMountCderunSet, cli.CderunMountCderun,
 		cli.MountCderunSet, cli.MountCderun,
 		"CDERUN_MOUNT_CDERUN",
 		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
@@ -193,8 +213,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	// 14. Pass-through other mounting flags
-	res.MountTools = cli.MountTools
-	res.MountAllTools = cli.MountAllTools
+	if cli.CderunMountTools != "" {
+		res.MountTools = cli.CderunMountTools
+	} else {
+		res.MountTools = cli.MountTools
+	}
+
+	if cli.CderunMountAllTools {
+		res.MountAllTools = true
+	} else {
+		res.MountAllTools = cli.MountAllTools
+	}
 
 	return res, nil
 }

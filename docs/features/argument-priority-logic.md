@@ -8,8 +8,9 @@
 
 ### P1: CDERUN Internal Overrides (Highest Priority)
 - **定義**: 動作を強制的に変更するための専用フラグ。シンボリックリンク利用時でも `cderun` 側の設定を上書きすることを想定したフラグ。
-- **フラグ名**: `--cderun-tty`, `--cderun-interactive`, `--cderun-mount-socket`, `--cderun-env`
-- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。また、サブコマンドの後ろに配置しても `cderun` によって認識される。
+- **フラグ名**: `cderun` 標準フラグのすべてに対応する `--cderun-` プレフィックス付きフラグ。
+  - 例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`
+- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する（※`--cderun-volume` は例外的に `P2` とマージされる）。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
 ### P2: CLI Flags (User Intent)
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。

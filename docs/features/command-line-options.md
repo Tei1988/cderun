@@ -12,8 +12,8 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 - **[cderun-flags]**: `cderun` の動作を制御するフラグ。
   - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
-  - **内部オーバーライド (P1)**: `--cderun-` で始まるフラグ。位置に関わらず `cderun` にパースされます。
 - **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
+- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグ（P1）が含まれる場合、それらは優先設定（オーバーライド）として `cderun` にパースされます。
 - **[passthrough-args]**: サブコマンドに渡される引数。P1オーバーライド以外の全て。
 
 ## グローバルオプション
@@ -170,8 +170,10 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
-### `--cderun-tty` / `--cderun-interactive` / `--cderun-mount-socket` / `--cderun-env`
-- **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。サブコマンドの後ろに配置しても `cderun` によって認識されます。
+### `--cderun-*` (内部オーバーライドフラグ)
+- **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
+  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`
+- **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## 将来追加予定のオプション
 

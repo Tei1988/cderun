@@ -225,13 +225,13 @@
 - [x] Step 2.2: イメージマッピング
 - [x] Step 2.3: 優先順位解決
 
-### Phase 3
+### Phase 3 (Completed)
 - [x] Step 3.1: 環境変数パススルー
 - [x] Step 3.2: ソケットマウント
 - [x] Step 3.3: cderunバイナリマウント
 - [x] Step 3.4: ツールマウント
 
-### Phase 4
+### Phase 4 (In Progress)
 - [x] Step 4.1: ドライランモード
 - [ ] Step 4.2: ログ・デバッグ
 

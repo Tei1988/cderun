@@ -16,9 +16,9 @@
 
 `cderun [cderun-flags] <subcommand> [passthrough-args]`
 
-- **[cderun-flags]**: サブコマンド名の**前**にあるフラグ、および位置に関わらず指定された `--cderun-` フラグ。
+- **[cderun-flags]**: サブコマンド名の**前**にある標準フラグ（P2）。
 - **\<subcommand\>**: 最初の位置引数（例: `node`, `docker`, `python`）。
-- **[passthrough-args]**: サブコマンド名より**後**にある引数のうち、`--cderun-` で始まらない全ての引数。
+- **[passthrough-args]**: サブコマンド名より**後**にある引数。`--cderun-` で始まるフラグ（P1）が含まれる場合、それらはパースのために前方に移動（Hoisting）されます。
 
 ## テストケース要件
 以下のコマンドを実行した際の結果が保証されるテストを作成すること。

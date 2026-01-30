@@ -18,9 +18,39 @@ func executeCommand(args ...string) (string, error) {
 }
 
 func executeCommandRaw(args []string) (string, error) {
-	// Reset flags Changed state
+	// Reset flag variables and Changed state
+	tty = false
+	interactive = false
+	network = "bridge"
+	mountSocket = ""
+	mountCderun = false
+	image = ""
+	remove = true
+	cderunTTY = false
+	cderunInteractive = false
+	cderunImage = ""
+	cderunNetwork = ""
+	cderunRemove = true
+	cderunRuntime = ""
+	cderunMountSocket = ""
+	cderunWorkdir = ""
+	cderunVolumes = nil
+	cderunMountCderun = false
+	cderunMountTools = ""
+	cderunMountAllTools = false
+	runtimeName = "docker"
+	env = nil
+	cderunEnv = nil
+	workdir = ""
+	volumes = nil
+	mountTools = ""
+	mountAllTools = false
+	dryRun = false
+	dryRunFormat = "yaml"
+
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
+		// Also reset default values in pflag if needed, but manual reset above is safer
 	})
 	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
@@ -99,7 +129,8 @@ func TestPreprocessArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := preprocessArgs(tt.args)
+			actual, err := preprocessArgs(tt.args)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
@@ -629,6 +660,102 @@ node:
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.True(t, mockRuntime.CreatedConfig.TTY, "TTY should be true because --cderun-tty=true was provided")
+	})
+
+	t.Run("cderun internal overrides before subcommand result in error", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// cderun --cderun-image=alpine:latest sh
+		_, err := executeCommandRaw([]string{"cderun", "--cderun-image=alpine:latest", "sh"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be placed after the subcommand")
+	})
+
+	t.Run("cderun internal overrides after subcommand work correctly", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// cderun --image=alpine:stable sh --cderun-image=alpine:latest
+		_, err := executeCommandRaw([]string{"cderun", "--image=alpine:stable", "sh", "--cderun-image=alpine:latest"})
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "alpine:latest", mockRuntime.CreatedConfig.Image)
+	})
+
+	t.Run("cderun internal overrides for network, remove, workdir and volume", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/old", "--volume=/h1:/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/new", "--cderun-volume=/h2:/c2")
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
+		assert.True(t, mockRuntime.CreatedConfig.Remove)
+		assert.Equal(t, "/new", mockRuntime.CreatedConfig.Workdir)
+
+		// Volumes should be merged (P1 added after P2)
+		assert.Len(t, mockRuntime.CreatedConfig.Volumes, 2)
+		assert.Equal(t, "/h1", mockRuntime.CreatedConfig.Volumes[0].HostPath)
+		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Volumes[1].HostPath)
+	})
+
+	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// Setup tools config for mount-tools
+		oldWd, _ := os.Getwd()
+		tmpDir := t.TempDir()
+		os.Chdir(tmpDir)
+		t.Cleanup(func() { os.Chdir(oldWd) })
+		os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+
+		_, err := executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-mount-socket=/var/run/custom.sock", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+
+		// runtimeFactory is called with resolved runtime and socket
+		// Wait, I need to check if runtimeFactory was called with correct args.
+		// Actually I can't easily check runtimeFactory calls without a spy.
+		// But I can check if volumes contain the custom socket.
+
+		socketFound := false
+		cderunFound := false
+		nodeFound := false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == "/var/run/custom.sock" {
+				socketFound = true
+			}
+			if v.ContainerPath == "/usr/local/bin/cderun" {
+				cderunFound = true
+			}
+			if v.ContainerPath == "/usr/local/bin/node" {
+				nodeFound = true
+			}
+		}
+		assert.True(t, socketFound)
+		assert.True(t, cderunFound)
+		assert.True(t, nodeFound)
+	})
+
+	t.Run("cderun internal override can turn off remove", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image=alpine", "--remove=true", "sh", "--cderun-remove=false")
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.False(t, mockRuntime.CreatedConfig.Remove)
 	})
 }
 
