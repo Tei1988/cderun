@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Phase 1 Completed)
+# Feature: Direct Container Execution (Phase 1, 2 Completed)
 
 ## 概要
 

@@ -63,8 +63,14 @@ $ cderun --tty docker --tty
 ### Multi-Runtime Support
 `cderun` uses an abstraction layer to support multiple container runtimes:
 - **Docker** (default)
-- **Podman** (drop-in replacement)
+- **Podman** (Planned - Phase 3)
 - Extensible architecture for future runtimes (containerd, Lima, etc.)
+
+### Advanced Tool Configuration
+`cderun` supports tool-specific settings in `.tools.yaml`, allowing you to pre-configure:
+- **Volumes**: Map host directories to container paths.
+- **Environment Variables**: Define static environment variables for the tool.
+- **Working Directory**: Set the default working directory inside the container.
 
 ### Intelligent Argument Parsing
 - Strict boundary parsing separates `cderun` flags from subcommand arguments

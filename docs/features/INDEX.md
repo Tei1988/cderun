@@ -44,7 +44,11 @@
 8. **[環境変数パススルー (Phase 3予定)](./env-passthrough.md)**
    - デフォルトでは引き継がない
    - 明示的指定による選択的パススルー
-   - `KEY=value`と`KEY`形式のサポート
+   - `KEY=value`と`KEY`（ホストから取得）形式のサポート
+
+9. **[Mount Tools (Phase 3予定)](./mount-tools.md)**
+   - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
+   - cderunバイナリを複数のツール名でマウント
 
 10. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
     - エフェメラルコンテナでのコマンド実行
