@@ -4,6 +4,7 @@ import (
 	"cderun/internal/container"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -155,6 +156,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	if os.Getenv("CDERUN_SOCKET") != "" {
 		socketEnv = "CDERUN_SOCKET"
 	}
+
 	res.Socket = resolveString(
 		cli.MountSocketSet, cli.MountSocket,
 		socketEnv,
@@ -162,9 +164,20 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		nil, nil, // Global doesn't have socket path yet in schema but could
 		"/var/run/docker.sock",
 	)
-	// Special handling for DOCKER_HOST unix:// prefix
+
+	// Determine if the socket was explicitly set to a mountable value
+	var rawSocket string
+	if cli.MountSocketSet {
+		rawSocket = cli.MountSocket
+	} else if s := os.Getenv("CDERUN_SOCKET"); s != "" {
+		rawSocket = s
+	} else if s := os.Getenv("DOCKER_HOST"); s != "" {
+		rawSocket = s
+	}
+	res.SocketSet = rawSocket != "" && isMountableSocket(rawSocket)
+
+	// Special handling for unix:// prefix
 	res.Socket = strings.TrimPrefix(res.Socket, "unix://")
-	res.SocketSet = cli.MountSocketSet || os.Getenv("DOCKER_HOST") != "" || os.Getenv("CDERUN_SOCKET") != ""
 
 	// 13. Resolve MountCderun
 	res.MountCderun = resolveBool(
@@ -181,6 +194,13 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.MountAllTools = cli.MountAllTools
 
 	return res, nil
+}
+
+func isMountableSocket(s string) bool {
+	if strings.HasPrefix(s, "unix://") {
+		return true
+	}
+	return filepath.IsAbs(s)
 }
 
 func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool) bool {

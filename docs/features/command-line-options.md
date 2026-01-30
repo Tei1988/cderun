@@ -165,7 +165,7 @@ cderun --dry-run node app.js
 ## オプションの優先順位
 
 1. **コマンドライン引数** (最優先)
-2. **環境変数** (例: `CDERUN_TTY=true`)
+2. **環境変数** (例: `CDERUN_TTY=true`, `CDERUN_SOCKET=/var/run/docker.sock`)
 3. **ツール固有設定** (`.tools.yaml`)
 4. **グローバルデフォルト** (`.cderun.yaml`)
 5. **ハードコードされたデフォルト** (最低優先)

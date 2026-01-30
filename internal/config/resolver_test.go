@@ -168,6 +168,22 @@ func TestResolve(t *testing.T) {
 		assert.True(t, res.SocketSet)
 	})
 
+	t.Run("SocketSet is false for non-mountable paths", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", "tcp://localhost:2375")
+		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "tcp://localhost:2375", res.Socket)
+		assert.False(t, res.SocketSet, "TCP socket should not be mountable")
+	})
+
+	t.Run("SocketSet is true for unix:// prefixed paths", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/var/run/docker.sock", res.Socket)
+		assert.True(t, res.SocketSet, "Unix socket should be mountable")
+	})
+
 	t.Run("MountCderun resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			MountCderun:    true,
