@@ -7,10 +7,14 @@
 ## 基本構文
 
 ```bash
-cderun [cderun-options] <subcommand> [subcommand-args]
+cderun [cderun-flags] <subcommand> [passthrough-args]
 ```
 
-**重要**: 最初の非フラグ引数がサブコマンドとして扱われ、それ以降の引数はすべてサブコマンドに渡されます。
+- **[cderun-flags]**: `cderun` の動作を制御するフラグ。
+  - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
+  - **内部オーバーライド (P1)**: `--cderun-` で始まるフラグ。位置に関わらず `cderun` にパースされます。
+- **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
+- **[passthrough-args]**: サブコマンドに渡される引数。P1オーバーライド以外の全て。
 
 ## グローバルオプション
 
