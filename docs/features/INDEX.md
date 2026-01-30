@@ -26,9 +26,9 @@
 
 ### ランタイム機能
 
-5. **[マルチランタイムサポート (Phase 1, 3予定)](./multi-runtime-support.md)**
-   - Docker (Phase 1) / Podman (Phase 3予定) サポート
-   - ランタイム自動検出 (Phase 2 Completed / Phase 3予定)
+5. **[マルチランタイムサポート (Phase 1, 4予定)](./multi-runtime-support.md)**
+   - Docker (Phase 1) / Podman (Phase 4予定) サポート
+   - ランタイム自動検出 (Phase 2 Completed / Phase 4予定)
    - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
@@ -111,8 +111,8 @@
 - 環境変数パススルー
 - 作業ディレクトリ同期
 - ソケット・バイナリマウント
-- Podmanサポート
 
 ### Phase 4: 利便性向上
+- Podmanサポート
 - ドライランモード
 - ログ・デバッグ機能
