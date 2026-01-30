@@ -13,8 +13,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 - **[cderun-flags]**: `cderun` の動作を制御するフラグ。
   - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
 - **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
-- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグ（P1）が含まれる場合、それらは優先設定（オーバーライド）として `cderun` にパースされます。
-- **[passthrough-args]**: サブコマンドに渡される引数。P1オーバーライド以外の全て。
+- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグは `cderun` の優先設定（P1オーバーライド）としてパースされ、それ以外の全ての引数はサブコマンドにそのまま渡されます。
 
 ## グローバルオプション
 
@@ -66,13 +65,13 @@ cderun --network my-network node app.js
 
 ```bash
 cderun --mount-socket /var/run/docker.sock docker ps
+cderun podman images --cderun-mount-socket /run/podman/podman.sock
 ```
 
 ### `--cderun-mount-socket`
 - **型**: string
 - **説明**: 設定ファイルや環境変数を上書きしてソケットパスを強制する（P1優先順位）
 - **用途**: サブコマンドの後ろでも指定可能
-cderun --mount-socket /run/podman/podman.sock podman images
 ```
 
 **注意**: ソケットパスは明示的に指定する必要があります。
@@ -189,8 +188,8 @@ cderun --dry-run node app.js
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
 3. **環境変数 (P3)**: `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
 4. **ツール固有設定 (P4)**: `.tools.yaml`
-4. **グローバルデフォルト** (`.cderun.yaml`)
-5. **ハードコードされたデフォルト** (最低優先)
+5. **グローバルデフォルト** (P5): `.cderun.yaml`
+6. **ハードコードされたデフォルト** (P6, 最低優先)
 
 ## 使用例
 
