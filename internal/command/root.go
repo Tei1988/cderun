@@ -150,6 +150,9 @@ intended for the subcommand.`,
 
 			// Handle MountTools / MountAllTools
 			if resolved.MountAllTools {
+				if toolsCfg == nil || len(toolsCfg) == 0 {
+					fmt.Fprintf(os.Stderr, "Warning: --mount-all-tools specified but no tools defined in .tools.yaml\n")
+				}
 				for toolName := range toolsCfg {
 					containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
 						HostPath:      exePath,

@@ -151,16 +151,20 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	// 12. Resolve Socket
+	socketEnv := "DOCKER_HOST"
+	if os.Getenv("CDERUN_SOCKET") != "" {
+		socketEnv = "CDERUN_SOCKET"
+	}
 	res.Socket = resolveString(
 		cli.MountSocketSet, cli.MountSocket,
-		"DOCKER_HOST", // Or CDERUN_SOCKET? DOCKER_HOST is common
+		socketEnv,
 		"", nil, nil,
 		nil, nil, // Global doesn't have socket path yet in schema but could
 		"/var/run/docker.sock",
 	)
 	// Special handling for DOCKER_HOST unix:// prefix
 	res.Socket = strings.TrimPrefix(res.Socket, "unix://")
-	res.SocketSet = cli.MountSocketSet || os.Getenv("DOCKER_HOST") != ""
+	res.SocketSet = cli.MountSocketSet || os.Getenv("DOCKER_HOST") != "" || os.Getenv("CDERUN_SOCKET") != ""
 
 	// 13. Resolve MountCderun
 	res.MountCderun = resolveBool(

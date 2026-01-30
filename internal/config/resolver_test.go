@@ -159,6 +159,15 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/tool/workdir", res.Workdir)
 	})
 
+	t.Run("Socket resolution from CDERUN_SOCKET", func(t *testing.T) {
+		t.Setenv("CDERUN_SOCKET", "/custom/socket.sock")
+		cli := CLIOptions{}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/custom/socket.sock", res.Socket)
+		assert.True(t, res.SocketSet)
+	})
+
 	t.Run("MountCderun resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			MountCderun:    true,

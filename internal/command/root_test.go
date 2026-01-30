@@ -749,4 +749,22 @@ sh:
 		assert.True(t, nodeFound, "node should be mounted")
 		assert.True(t, pythonFound, "python should be mounted")
 	})
+
+	t.Run("mount-all-tools with empty config shows warning", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// Setup empty tools config
+		oldWd, _ := os.Getwd()
+		tmpDir := t.TempDir()
+		os.Chdir(tmpDir)
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		// No .tools.yaml created
+
+		output, err := executeCommand("--mount-all-tools", "--mount-socket", "/socket", "--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Warning: --mount-all-tools specified but no tools defined in .tools.yaml")
+	})
 }
