@@ -57,14 +57,22 @@ $ cderun --tty docker --tty
 - `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
 - `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
 - `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
+- `--dry-run`: Preview container configuration without execution.
+- `--dry-run-format`, `-f`: Output format (yaml, json, simple).
 
 ## Features
 
 ### Multi-Runtime Support
 `cderun` uses an abstraction layer to support multiple container runtimes:
 - **Docker** (default)
-- **Podman** (drop-in replacement)
+- **Podman** (Planned - Phase 4)
 - Extensible architecture for future runtimes (containerd, Lima, etc.)
+
+### Advanced Tool Configuration
+`cderun` supports tool-specific settings in `.tools.yaml`, allowing you to pre-configure:
+- **Volumes**: Map host directories to container paths.
+- **Environment Variables**: Define static environment variables for the tool.
+- **Working Directory**: Set the default working directory inside the container.
 
 ### Intelligent Argument Parsing
 - Strict boundary parsing separates `cderun` flags from subcommand arguments

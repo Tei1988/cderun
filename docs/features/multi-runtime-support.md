@@ -12,7 +12,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman (Phase 3予定)
+### 優先度2: Podman (Phase 4予定)
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
@@ -44,7 +44,7 @@ cderun ContainerRuntimeインターフェース
 ## ランタイムの選択
 
 **現状 (Phase 2 Completed):**
-Docker および Podman (スタブ) をサポートしています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
+Docker をフルサポートし、Podman はスタブ実装（"not implemented yet" エラーを返す状態）としてサポートしています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
 ### 解決ロジック (Phase 2 Completed)
 
@@ -81,7 +81,7 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman (Phase 3予定)**: Podman API を使用。現在は初期スタブ実装のみ。
+- **Podman (Phase 4予定)**: Podman API を使用。現在は初期スタブ実装のみ。
 
 ## ランタイム情報の表示 (Phase 4予定)
 

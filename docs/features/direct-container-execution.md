@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Phase 1 Completed)
+# Feature: Direct Container Execution (Phase 1, 2 Completed)
 
 ## 概要
 
@@ -115,12 +115,13 @@ python:
 - 設定ファイル読み込み
 - イメージマッピング
 - 優先順位解決
+- ドライランモード
 
 ### Phase 3: 高度な機能 (Planned)
 - 環境変数の引き継ぎ
-- Podman CRI実装
 
 ### Phase 4: 利便性向上 (Planned)
+- Podman CRI実装
 - エラーハンドリングの強化
 
 ## 依存ライブラリ

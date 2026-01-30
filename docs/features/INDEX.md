@@ -26,9 +26,9 @@
 
 ### ランタイム機能
 
-5. **[マルチランタイムサポート (Phase 1, 3予定)](./multi-runtime-support.md)**
-   - Docker (Phase 1) / Podman (Phase 3予定) サポート
-   - ランタイム自動検出 (Phase 2 Completed / Phase 3予定)
+5. **[マルチランタイムサポート (Phase 1, 4予定)](./multi-runtime-support.md)**
+   - Docker (Phase 1) / Podman (Phase 4予定) サポート
+   - ランタイム自動検出 (Phase 2 Completed / Phase 4予定)
    - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
@@ -44,7 +44,11 @@
 8. **[環境変数パススルー (Phase 3予定)](./env-passthrough.md)**
    - デフォルトでは引き継がない
    - 明示的指定による選択的パススルー
-   - `KEY=value`と`KEY`形式のサポート
+   - `KEY=value`と`KEY`（ホストから取得）形式のサポート
+
+9. **[Mount Tools (Phase 3予定)](./mount-tools.md)**
+   - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
+   - cderunバイナリを複数のツール名でマウント
 
 10. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
     - エフェメラルコンテナでのコマンド実行
@@ -57,7 +61,7 @@
     - クロスプラットフォームバイナリ自動ダウンロード
     - `--mount-socket`との併用必須
 
-12. **[ドライランモード (Phase 4予定)](./dry-run-mode.md)**
+12. **[ドライランモード (Completed)](./dry-run-mode.md)**
     - 実行前のコマンドプレビュー
     - JSON/YAML/シェル形式での出力
 
@@ -102,13 +106,13 @@
 - 設定ファイル読み込み
 - イメージマッピング
 - 優先順位解決
+- ドライランモード
 
 ### Phase 3: 高度な機能
 - 環境変数パススルー
 - 作業ディレクトリ同期
 - ソケット・バイナリマウント
-- Podmanサポート
 
 ### Phase 4: 利便性向上
-- ドライランモード
+- Podmanサポート
 - ログ・デバッグ機能

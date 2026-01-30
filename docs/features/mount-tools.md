@@ -1,4 +1,6 @@
-# Feature: Mount Tools
+# Feature: Mount Tools (Phase 3予定)
+
+> **Note**: この機能は現在計画中（Phase 3）であり、現時点では実装されていません。
 
 ## 概要
 

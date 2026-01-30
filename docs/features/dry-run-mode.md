@@ -1,4 +1,4 @@
-# Feature: Dry Run Mode (Phase 4予定)
+# Feature: Dry Run Mode (Completed)
 
 ## 概要
 
@@ -43,7 +43,7 @@ workdir: /workspace
 
 ### JSON形式
 ```bash
-$ cderun --dry-run --format json node app.js
+$ cderun --dry-run --dry-run-format json node app.js
 {
   "image": "node:latest",
   "command": ["node"],
@@ -65,7 +65,7 @@ $ cderun --dry-run --format json node app.js
 
 ### 簡易形式
 ```bash
-$ cderun --dry-run --format simple node app.js
+$ cderun --dry-run --dry-run-format simple node app.js
 Image: node:latest
 Command: node app.js
 Volumes: /home/user/project:/workspace
@@ -84,7 +84,7 @@ $ cderun --dry-run python script.py
 ### 2. 設定の検証
 ```bash
 #!/bin/bash
-output=$(cderun --dry-run --format json node --version)
+output=$(cderun --dry-run --dry-run-format json node --version)
 image=$(echo $output | jq -r '.image')
 if [[ $image == "node:20-alpine" ]]; then
   echo "Configuration is correct"
@@ -96,7 +96,7 @@ fi
 
 ### 3. 設定ファイルのドキュメント化
 ```bash
-$ cderun --dry-run --format yaml node app.js > config-example.yaml
+$ cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
 ```
 
 ## 他のフラグとの組み合わせ
