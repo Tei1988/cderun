@@ -10,17 +10,22 @@ import (
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
-	Image       string
-	TTY         bool
-	Interactive bool
-	Network     string
-	Remove      bool
-	Volumes     []container.VolumeMount
-	Env         []string
-	Workdir     string
-	User        string
-	Runtime     string
-	Socket      string
+	Image         string
+	TTY           bool
+	Interactive   bool
+	Network       string
+	Remove        bool
+	Volumes       []container.VolumeMount
+	Env           []string
+	Workdir       string
+	SyncWorkdir   bool
+	User          string
+	Runtime       string
+	Socket        string
+	SocketSet     bool
+	MountCderun   bool
+	MountTools    string
+	MountAllTools bool
 }
 
 // CLIOptions represents values from CLI flags.
@@ -44,6 +49,15 @@ type CLIOptions struct {
 	MountSocket          string
 	MountSocketSet       bool
 	Env                  []string
+	Workdir              string
+	WorkdirSet           bool
+	Volumes              []string
+	SyncWorkdir          bool
+	SyncWorkdirSet       bool
+	MountCderun          bool
+	MountCderunSet       bool
+	MountTools           string
+	MountAllTools        bool
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -104,20 +118,59 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		true, // Default to true as per docs
 	)
 
-	// 6. Tool-specific settings (Volumes, Env, Workdir)
+	// 6. Resolve SyncWorkdir
+	res.SyncWorkdir = resolveBool(
+		false, false,
+		cli.SyncWorkdirSet, cli.SyncWorkdir,
+		"CDERUN_SYNC_WORKDIR",
+		subcommand, tools, func(t ToolConfig) *bool { return t.SyncWorkdir },
+		global, func(g CDERunConfig) *bool { return g.Defaults.SyncWorkdir },
+		false,
+	)
+
+	// 7. Resolve Workdir
+	res.Workdir = resolveString(
+		cli.WorkdirSet, cli.Workdir,
+		"CDERUN_WORKDIR",
+		subcommand, tools, func(t ToolConfig) string { return t.Workdir },
+		global, func(g CDERunConfig) string { return "" },
+		"",
+	)
+
+	// 8. Tool-specific settings (Volumes, Env)
 	var toolsEnv []string
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			res.Volumes = parseVolumes(tool.Volumes)
 			toolsEnv = tool.Env
-			res.Workdir = tool.Workdir
+		}
+	}
+
+	// 9. Merge CLI Volumes
+	if len(cli.Volumes) > 0 {
+		res.Volumes = append(res.Volumes, parseVolumes(cli.Volumes)...)
+	}
+
+	// 10. Sync Workdir logic
+	if res.SyncWorkdir {
+		if pwd, err := os.Getwd(); err == nil {
+			// Add current directory to volumes
+			res.Volumes = append(res.Volumes, container.VolumeMount{
+				HostPath:      pwd,
+				ContainerPath: pwd,
+				ReadOnly:      false,
+			})
+			// If workdir not explicitly set by CLI or tool, use pwd
+			if res.Workdir == "" {
+				res.Workdir = pwd
+			}
 		}
 	}
 
 	// Resolve Env (CLI overrides Tools)
 	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env))
 
-	// 7. Resolve Runtime
+	// 11. Resolve Runtime
 	res.Runtime = resolveString(
 		cli.RuntimeSet, cli.Runtime,
 		"CDERUN_RUNTIME",
@@ -126,7 +179,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"docker",
 	)
 
-	// 8. Resolve Socket
+	// 12. Resolve Socket
 	res.Socket = resolveString(
 		cli.MountSocketSet, cli.MountSocket,
 		"DOCKER_HOST", // Or CDERUN_SOCKET? DOCKER_HOST is common
@@ -136,6 +189,21 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 	// Special handling for DOCKER_HOST unix:// prefix
 	res.Socket = strings.TrimPrefix(res.Socket, "unix://")
+	res.SocketSet = cli.MountSocketSet || os.Getenv("DOCKER_HOST") != ""
+
+	// 13. Resolve MountCderun
+	res.MountCderun = resolveBool(
+		false, false,
+		cli.MountCderunSet, cli.MountCderun,
+		"CDERUN_MOUNT_CDERUN",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountCderun },
+		false,
+	)
+
+	// 14. Pass-through other mounting flags
+	res.MountTools = cli.MountTools
+	res.MountAllTools = cli.MountAllTools
 
 	return res, nil
 }

@@ -1,4 +1,4 @@
-# Feature: Environment Variable Passthrough (Phase 3予定)
+# Feature: Environment Variable Passthrough (Completed)
 
 ## 概要
 

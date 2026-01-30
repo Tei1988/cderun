@@ -28,6 +28,11 @@ var (
 	cderunInteractive bool
 	runtimeName       string
 	env               []string
+	workdir           string
+	volumes           []string
+	syncWorkdir       bool
+	mountTools        string
+	mountAllTools     bool
 	dryRun            bool
 	dryRunFormat      string
 
@@ -92,6 +97,15 @@ intended for the subcommand.`,
 			MountSocket:          mountSocket,
 			MountSocketSet:       cmd.Flags().Changed("mount-socket"),
 			Env:                  env,
+			Workdir:              workdir,
+			WorkdirSet:           cmd.Flags().Changed("workdir"),
+			Volumes:              volumes,
+			SyncWorkdir:          syncWorkdir,
+			SyncWorkdirSet:       cmd.Flags().Changed("sync-workdir"),
+			MountCderun:          mountCderun,
+			MountCderunSet:       cmd.Flags().Changed("mount-cderun"),
+			MountTools:           mountTools,
+			MountAllTools:        mountAllTools,
 		}
 
 		resolved, err := config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
@@ -111,6 +125,55 @@ intended for the subcommand.`,
 			Volumes:     resolved.Volumes,
 			Env:         resolved.Env,
 			Workdir:     resolved.Workdir,
+		}
+
+		// Handle mounting flags
+		if resolved.MountCderun || resolved.MountAllTools || resolved.MountTools != "" {
+			if !resolved.SocketSet {
+				return fmt.Errorf("--mount-cderun, --mount-tools, or --mount-all-tools requires --mount-socket")
+			}
+			exePath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("failed to get executable path: %w", err)
+			}
+
+			// Add binary mount
+			containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
+				HostPath:      exePath,
+				ContainerPath: "/usr/local/bin/cderun",
+				ReadOnly:      true,
+			})
+
+			// Add socket mount
+			containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
+				HostPath:      resolved.Socket,
+				ContainerPath: resolved.Socket,
+				ReadOnly:      false, // Socket needs to be writable
+			})
+
+			// Handle MountTools / MountAllTools
+			if resolved.MountAllTools {
+				for toolName := range toolsCfg {
+					containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
+						HostPath:      exePath,
+						ContainerPath: "/usr/local/bin/" + toolName,
+						ReadOnly:      true,
+					})
+				}
+			} else if resolved.MountTools != "" {
+				tools := strings.Split(resolved.MountTools, ",")
+				for _, toolName := range tools {
+					toolName = strings.TrimSpace(toolName)
+					if _, ok := toolsCfg[toolName]; !ok {
+						return fmt.Errorf("tool %q not found in tools config", toolName)
+					}
+					containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
+						HostPath:      exePath,
+						ContainerPath: "/usr/local/bin/" + toolName,
+						ReadOnly:      true,
+					})
+				}
+			}
 		}
 
 		if dryRun {
@@ -256,7 +319,12 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 	rootCmd.PersistentFlags().StringVar(&image, "image", "", "Docker image to use")
 	rootCmd.PersistentFlags().StringVar(&runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
-	rootCmd.PersistentFlags().StringSliceVar(&env, "env", nil, "Set environment variables")
+	rootCmd.PersistentFlags().StringSliceVarP(&env, "env", "e", nil, "Set environment variables")
+	rootCmd.PersistentFlags().StringVarP(&workdir, "workdir", "w", "", "Working directory inside the container")
+	rootCmd.PersistentFlags().StringSliceVarP(&volumes, "volume", "v", nil, "Bind mount a volume")
+	rootCmd.PersistentFlags().BoolVar(&syncWorkdir, "sync-workdir", false, "Mount current directory and set as workdir")
+	rootCmd.PersistentFlags().StringVar(&mountTools, "mount-tools", "", "Mount specified tools into the container")
+	rootCmd.PersistentFlags().BoolVar(&mountAllTools, "mount-all-tools", false, "Mount all defined tools into the container")
 	rootCmd.PersistentFlags().BoolVar(&remove, "remove", true, "Automatically remove the container when it exits")
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")

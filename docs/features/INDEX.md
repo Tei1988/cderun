@@ -41,12 +41,12 @@
 
 ### 実行環境機能
 
-8. **[環境変数パススルー (Phase 3予定)](./env-passthrough.md)**
+8. **[環境変数パススルー (Completed)](./env-passthrough.md)**
    - デフォルトでは引き継がない
    - 明示的指定による選択的パススルー
    - `KEY=value`と`KEY`（ホストから取得）形式のサポート
 
-9. **[Mount Tools (Phase 3予定)](./mount-tools.md)**
+9. **[Mount Tools (Completed)](./mount-tools.md)**
    - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
    - cderunバイナリを複数のツール名でマウント
 
@@ -56,9 +56,8 @@
 
 ### 高度な機能
 
-11. **[cderunバイナリマウント (Phase 3予定)](./cderun-binary-mounting.md)**
+11. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
     - `--mount-cderun`でコンテナ内でcderunを使用
-    - クロスプラットフォームバイナリ自動ダウンロード
     - `--mount-socket`との併用必須
 
 12. **[ドライランモード (Completed)](./dry-run-mode.md)**

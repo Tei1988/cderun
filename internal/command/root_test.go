@@ -617,3 +617,158 @@ node:
 		assert.True(t, mockRuntime.CreatedConfig.TTY, "TTY should be true because --cderun-tty=true was provided")
 	})
 }
+
+func TestPhase3Features(t *testing.T) {
+	// Save and restore package-level state
+	oldFactory := runtimeFactory
+	oldExit := exitFunc
+	t.Cleanup(func() {
+		runtimeFactory = oldFactory
+		exitFunc = oldExit
+	})
+
+	mockRuntime := &runtime.MockRuntime{}
+	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		return mockRuntime, nil
+	}
+	exitFunc = func(code int) {}
+
+	t.Run("workdir and volume flags", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--volume", "/h:/c:ro", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
+		require.Len(t, mockRuntime.CreatedConfig.Volumes, 1)
+		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Volumes[0].HostPath)
+		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
+		assert.True(t, mockRuntime.CreatedConfig.Volumes[0].ReadOnly)
+	})
+
+	t.Run("sync-workdir flag", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image", "alpine", "--sync-workdir", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		pwd, _ := os.Getwd()
+		assert.Equal(t, pwd, mockRuntime.CreatedConfig.Workdir)
+
+		found := false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == pwd && v.ContainerPath == pwd {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "PWD should be in volumes")
+	})
+
+	t.Run("mounting flags require mount-socket", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		// Clear DOCKER_HOST to ensure SocketSet is false
+		oldDockerHost := os.Getenv("DOCKER_HOST")
+		os.Unsetenv("DOCKER_HOST")
+		t.Cleanup(func() { os.Setenv("DOCKER_HOST", oldDockerHost) })
+
+		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requires --mount-socket")
+	})
+
+	t.Run("mount-cderun logic", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "/socket", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		exePath, _ := os.Executable()
+
+		binaryFound := false
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/cderun" {
+				binaryFound = true
+			}
+			if v.HostPath == "/socket" && v.ContainerPath == "/socket" {
+				socketFound = true
+			}
+		}
+		assert.True(t, binaryFound, "binary should be mounted")
+		assert.True(t, socketFound, "socket should be mounted")
+	})
+
+	t.Run("mount-tools logic", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// Setup tools config
+		oldWd, _ := os.Getwd()
+		tmpDir := t.TempDir()
+		os.Chdir(tmpDir)
+		t.Cleanup(func() { os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+python:
+  image: python:3
+sh:
+  image: alpine
+`
+		os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+
+		_, err := executeCommand("--mount-tools", "node", "--mount-socket", "/socket", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		exePath, _ := os.Executable()
+
+		nodeFound := false
+		pythonFound := false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/node" {
+				nodeFound = true
+			}
+			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/python" {
+				pythonFound = true
+			}
+		}
+		assert.True(t, nodeFound, "node should be mounted")
+		assert.False(t, pythonFound, "python should NOT be mounted")
+
+		// Test mount-all-tools
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		_, err = executeCommand("--mount-all-tools", "--mount-socket", "/socket", "sh")
+		assert.NoError(t, err)
+
+		nodeFound = false
+		pythonFound = false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/node" {
+				nodeFound = true
+			}
+			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/python" {
+				pythonFound = true
+			}
+		}
+		assert.True(t, nodeFound, "node should be mounted")
+		assert.True(t, pythonFound, "python should be mounted")
+	})
+}

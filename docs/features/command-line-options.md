@@ -58,7 +58,7 @@ cderun --network my-network node app.js
 - **型**: string
 - **デフォルト**: `""`（空文字列）
 - **説明**: コンテナランタイムソケットのパスを指定
-- **用途**: cderunが接続するランタイムソケットを指定する。将来的にコンテナ内へのマウントもサポート予定。
+- **用途**: cderunが接続するランタイムソケットを指定する。`--mount-cderun` 等のフラグ使用時にはコンテナ内にもマウントされます。
 
 ```bash
 cderun --mount-socket /var/run/docker.sock docker ps
@@ -70,12 +70,30 @@ cderun --mount-socket /run/podman/podman.sock podman images
 ### `--mount-cderun`
 - **型**: bool
 - **デフォルト**: `false`
-- **説明**: cderunバイナリをコンテナ内にマウント（開発中）
-- **用途**: コンテナ内でcderunを使用可能にする
-- **制約**: `--mount-socket`との併用が必須。現在はフラグのみ定義されており、実装は将来のフェーズで予定されている。
+- **説明**: cderunバイナリをコンテナ内の `/usr/local/bin/cderun` にマウント
+- **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
+- **制約**: `--mount-socket`との併用が必須
 
 ```bash
 cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
+```
+
+### `--mount-tools`
+- **型**: string
+- **説明**: 指定したツール（カンマ区切り）のエイリアスをコンテナ内にマウント
+- **制約**: `--mount-socket`との併用が必須。対象のツールは `.tools.yaml` に定義されている必要があります。
+
+```bash
+cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools node,python alpine sh
+```
+
+### `--mount-all-tools`
+- **型**: bool
+- **説明**: `.tools.yaml` に定義されているすべてのツールのエイリアスをコンテナ内にマウント
+- **制約**: `--mount-socket`との併用が必須
+
+```bash
+cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-all-tools alpine sh
 ```
 
 ### `--image`
@@ -84,6 +102,43 @@ cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
 
 ```bash
 cderun --image node:18-alpine node --version
+```
+
+### `--env`, `-e`
+- **型**: stringSlice
+- **説明**: 環境変数の設定・パススルー
+- **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
+
+```bash
+cderun --env NODE_ENV=production node app.js
+cderun --env NPM_TOKEN node app.js  # ホストから取得
+```
+
+### `--volume`, `-v`
+- **型**: stringSlice
+- **説明**: ボリュームマウント
+- **用途**: `hostPath:containerPath[:ro|rw]`
+
+```bash
+cderun --volume ./data:/data python script.py
+cderun -v ~/.ssh:/root/.ssh:ro git clone ...
+```
+
+### `--workdir`, `-w`
+- **型**: string
+- **説明**: 作業ディレクトリの指定
+
+```bash
+cderun --workdir /app node server.js
+```
+
+### `--sync-workdir`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: ホストのカレントディレクトリをコンテナ内の同じパスにマウントし、作業ディレクトリとして設定する
+
+```bash
+cderun --sync-workdir node app.js
 ```
 
 ### `--runtime`
@@ -109,26 +164,6 @@ cderun --remove=false node app.js  # コンテナを残す
 - **説明**: 設定ファイルや環境変数を上書きしてTTY/Interactiveを強制する（P1優先順位）
 
 ## 将来追加予定のオプション
-
-### `--env`, `-e`
-環境変数の設定・パススルー（現在は `.tools.yaml` でのみ設定可能）
-```bash
-cderun --env NODE_ENV=production node app.js
-cderun --env NPM_TOKEN node app.js  # ホストから取得
-```
-
-### `--volume`, `-v`
-ボリュームマウント（現在は `.tools.yaml` でのみ設定可能）
-```bash
-cderun --volume ./data:/data python script.py
-cderun -v ~/.ssh:/root/.ssh:ro git clone ...
-```
-
-### `--workdir`, `-w`
-作業ディレクトリの指定（現在は `.tools.yaml` でのみ設定可能）
-```bash
-cderun --workdir /app node server.js
-```
 
 ### `--dry-run`
 実行せずにコマンドをプレビュー
@@ -197,12 +232,12 @@ cderun node --tty --version
 ### 短縮形
 現在サポートされている短縮形：
 - `-i` → `--interactive`
-
-将来追加予定：
-- `-t` → `--tty`
 - `-v` → `--volume`
 - `-w` → `--workdir`
 - `-e` → `--env`
+
+将来追加予定：
+- `-t` → `--tty`
 
 ### デフォルト値の確認
 ```bash
