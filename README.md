@@ -58,7 +58,7 @@ $ cderun --tty docker --tty
 - `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
 - `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
 - `--dry-run`: Preview container configuration without execution.
-- `--format`, `-f`: Output format (yaml, json, simple).
+- `--dry-run-format`, `-f`: Output format (yaml, json, simple).
 
 ## Features
 

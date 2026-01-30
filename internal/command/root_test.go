@@ -479,7 +479,7 @@ node:
 		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
 
 		// Dry-run with JSON
-		output, err = executeCommand("--dry-run", "--format", "json", "--image", "alpine", "sh")
+		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "\"image\": \"alpine\"")
 		assert.Contains(t, output, "\"command\": [")

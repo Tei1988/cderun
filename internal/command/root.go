@@ -121,7 +121,7 @@ intended for the subcommand.`,
 				fmt.Println(string(data))
 			case "simple":
 				fmt.Printf("Image: %s\n", containerConfig.Image)
-				fmt.Printf("Command: %s %s\n", containerConfig.Command[0], strings.Join(containerConfig.Args, " "))
+				fmt.Printf("Command: %s %s\n", strings.Join(containerConfig.Command, " "), strings.Join(containerConfig.Args, " "))
 				var volumes []string
 				for _, v := range containerConfig.Volumes {
 					volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
@@ -250,7 +250,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Preview container configuration without execution")
-	rootCmd.PersistentFlags().StringVarP(&dryRunFormat, "format", "f", "yaml", "Output format (yaml, json, simple)")
+	rootCmd.PersistentFlags().StringVarP(&dryRunFormat, "dry-run-format", "f", "yaml", "Output format (yaml, json, simple)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }
