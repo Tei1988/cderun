@@ -1,4 +1,4 @@
-# Feature: Dry Run Mode (Phase 4予定)
+# Feature: Dry Run Mode (Completed)
 
 ## 概要
 
