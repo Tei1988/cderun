@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -50,6 +51,7 @@ func (l Level) String() string {
 }
 
 type Logger struct {
+	mu        sync.Mutex
 	Level     Level
 	Writer    io.Writer
 	Format    string // "text" or "json"
@@ -68,6 +70,9 @@ var (
 )
 
 func Init(level string, format string, file string, tee bool, timestamp bool) error {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+
 	globalLogger.Level = ParseLevel(level)
 	globalLogger.Format = strings.ToLower(format)
 	globalLogger.Timestamp = timestamp
@@ -104,6 +109,9 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 }
 
 func (l *Logger) log(level Level, msg string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	if level > l.Level {
 		return
 	}
