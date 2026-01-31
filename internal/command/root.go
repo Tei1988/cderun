@@ -246,6 +246,9 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, d
 }
 
 func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+	ctxG, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Initialize Runtime
 	rt, err := runtimeFactory(resolved.Runtime, resolved.Socket)
 	if err != nil {
@@ -285,10 +288,10 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 			select {
 			case sig := <-sigChan:
 				sigName := getSignalName(sig)
-				if err := rt.SignalContainer(ctx, containerID, sigName); err != nil {
+				if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: failed to forward signal %v: %v\n", sig, err)
 				}
-			case <-ctx.Done():
+			case <-ctxG.Done():
 				return
 			}
 		}
@@ -309,9 +312,9 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 				case <-resizeChan:
 					w, h, err := term.GetSize(int(os.Stdout.Fd()))
 					if err == nil {
-						_ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w))
+						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 					}
-				case <-ctx.Done():
+				case <-ctxG.Done():
 					return
 				}
 			}
@@ -320,7 +323,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		// Initial resize to match current terminal size
 		w, h, err := term.GetSize(int(os.Stdout.Fd()))
 		if err == nil {
-			_ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w))
+			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 		}
 	}
 

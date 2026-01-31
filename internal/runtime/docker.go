@@ -161,8 +161,13 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		if stdinErr != nil {
 			return stdinErr
 		}
-		// If stdin is done, wait for the remaining output
-		return <-outputDone
+		// If stdin is done, wait for the remaining output or context cancellation
+		select {
+		case err := <-outputDone:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	case <-ctx.Done():
 		// Explicitly close the connection to unblock any pending I/O
 		resp.Close()
