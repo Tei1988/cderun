@@ -243,14 +243,24 @@ cderun --tty --interactive --network host --mount-socket /var/run/docker.sock do
 ## 注意事項
 
 ### フラグの位置
-cderunのフラグは**サブコマンドの前**に指定する必要があります：
+cderunのフラグ（標準フラグ）は、原則として**サブコマンドの前**に指定する必要があります。
 
 ```bash
-# 正しい
+# 正しい（標準フラグ）
 cderun --tty node --version
 
 # 間違い（--ttyがnodeに渡される）
 cderun node --tty --version
+```
+
+**例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。
+
+```bash
+# 正しい（内部オーバーライドフラグ）
+cderun node --version --cderun-tty
+
+# 間違い
+cderun --cderun-tty node --version
 ```
 
 ### 短縮形
@@ -276,9 +286,14 @@ $ cderun node --tty
 # --ttyがnodeに渡される
 ```
 
-**解決策**: cderunのオプションはサブコマンドの前に指定
+**解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
 ```bash
 $ cderun --tty node
+```
+
+ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
+```bash
+$ cderun node --cderun-tty
 ```
 
 ### --mount-cderunが動作しない
