@@ -169,18 +169,30 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
+### `--dry-run`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: 実際のコンテナ実行を行わずに、コンテナ構成を表示する
+
+```bash
+cderun --dry-run node --version
+```
+
+### `--dry-run-format`, `-f`
+- **型**: string
+- **デフォルト**: `yaml`
+- **説明**: ドライラン時の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --dry-run --dry-run-format json node --version
+cderun --dry-run -f simple node --version
+```
+
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
   - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
-
-## 将来追加予定のオプション
-
-### `--dry-run`
-実行せずにコマンドをプレビュー
-```bash
-cderun --dry-run node app.js
-```
 
 ## オプションの優先順位
 

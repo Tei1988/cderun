@@ -43,22 +43,22 @@ cderun ContainerRuntimeインターフェース
 
 ## ランタイムの選択
 
-**現状 (Phase 2 Completed):**
+**現状 (Phase 3 Completed):**
 Docker をフルサポートし、Podman はスタブ実装（"not implemented yet" エラーを返す状態）としてサポートしています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
-### 解決ロジック (Phase 2 Completed)
+### 解決ロジック (Phase 3 Completed)
 
 1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
-2. **環境変数**: `CDERUN_RUNTIME` および `DOCKER_HOST`。
-3. **コマンドライン引数**: `--runtime` および `--mount-socket`。
+2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
+3. **コマンドライン引数**: `--runtime`, `--mount-socket` および P1 内部オーバーライド。
 
-### 自動検出ロジック (Phase 3予定)
+### 自動検出ロジック (Phase 4予定)
 
 ソケットの存在確認によるランタイムの自動選択機能は将来のフェーズで実装予定です。
 
 1. デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
 
-### 明示的な指定 (Phase 2 Completed)
+### 明示的な指定 (Phase 3 Completed)
 
 #### 設定ファイル (`.cderun.yaml`)
 ```yaml
