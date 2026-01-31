@@ -19,34 +19,34 @@ func executeCommand(args ...string) (string, error) {
 
 func executeCommandRaw(args []string) (string, error) {
 	// Reset flag variables and Changed state
-	tty = false
-	interactive = false
-	network = "bridge"
-	mountSocket = ""
-	mountCderun = false
-	image = ""
-	remove = true
-	cderunTTY = false
-	cderunInteractive = false
-	cderunImage = ""
-	cderunNetwork = ""
-	cderunRemove = true
-	cderunRuntime = ""
-	cderunMountSocket = ""
-	cderunWorkdir = ""
-	cderunVolumes = nil
-	cderunMountCderun = false
-	cderunMountTools = ""
-	cderunMountAllTools = false
-	runtimeName = "docker"
-	env = nil
-	cderunEnv = nil
-	workdir = ""
-	volumes = nil
-	mountTools = ""
-	mountAllTools = false
-	dryRun = false
-	dryRunFormat = "yaml"
+	opts.tty = false
+	opts.interactive = false
+	opts.network = "bridge"
+	opts.mountSocket = ""
+	opts.mountCderun = false
+	opts.image = ""
+	opts.remove = true
+	opts.cderunTTY = false
+	opts.cderunInteractive = false
+	opts.cderunImage = ""
+	opts.cderunNetwork = ""
+	opts.cderunRemove = true
+	opts.cderunRuntime = ""
+	opts.cderunMountSocket = ""
+	opts.cderunWorkdir = ""
+	opts.cderunVolumes = nil
+	opts.cderunMountCderun = false
+	opts.cderunMountTools = ""
+	opts.cderunMountAllTools = false
+	opts.runtimeName = "docker"
+	opts.env = nil
+	opts.cderunEnv = nil
+	opts.workdir = ""
+	opts.volumes = nil
+	opts.mountTools = ""
+	opts.mountAllTools = false
+	opts.dryRun = false
+	opts.dryRunFormat = "yaml"
 
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
@@ -148,29 +148,29 @@ func TestExecuteEmptyArgs(t *testing.T) {
 func TestRootCmd(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := tty
-		oldInteractive := interactive
-		oldNetwork := network
-		oldMountSocket := mountSocket
-		oldMountCderun := mountCderun
-		oldImage := image
-		oldRemove := remove
-		oldCderunTTY := cderunTTY
-		oldCderunInteractive := cderunInteractive
-		oldRuntimeName := runtimeName
+		oldTTY := opts.tty
+		oldInteractive := opts.interactive
+		oldNetwork := opts.network
+		oldMountSocket := opts.mountSocket
+		oldMountCderun := opts.mountCderun
+		oldImage := opts.image
+		oldRemove := opts.remove
+		oldCderunTTY := opts.cderunTTY
+		oldCderunInteractive := opts.cderunInteractive
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			tty = oldTTY
-			interactive = oldInteractive
-			network = oldNetwork
-			mountSocket = oldMountSocket
-			mountCderun = oldMountCderun
-			image = oldImage
-			remove = oldRemove
-			cderunTTY = oldCderunTTY
-			cderunInteractive = oldCderunInteractive
-			runtimeName = oldRuntimeName
+			opts.tty = oldTTY
+			opts.interactive = oldInteractive
+			opts.network = oldNetwork
+			opts.mountSocket = oldMountSocket
+			opts.mountCderun = oldMountCderun
+			opts.image = oldImage
+			opts.remove = oldRemove
+			opts.cderunTTY = oldCderunTTY
+			opts.cderunInteractive = oldCderunInteractive
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -206,29 +206,29 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := tty
-		oldInteractive := interactive
-		oldNetwork := network
-		oldMountSocket := mountSocket
-		oldMountCderun := mountCderun
-		oldImage := image
-		oldRemove := remove
-		oldCderunTTY := cderunTTY
-		oldCderunInteractive := cderunInteractive
-		oldRuntimeName := runtimeName
+		oldTTY := opts.tty
+		oldInteractive := opts.interactive
+		oldNetwork := opts.network
+		oldMountSocket := opts.mountSocket
+		oldMountCderun := opts.mountCderun
+		oldImage := opts.image
+		oldRemove := opts.remove
+		oldCderunTTY := opts.cderunTTY
+		oldCderunInteractive := opts.cderunInteractive
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			tty = oldTTY
-			interactive = oldInteractive
-			network = oldNetwork
-			mountSocket = oldMountSocket
-			mountCderun = oldMountCderun
-			image = oldImage
-			remove = oldRemove
-			cderunTTY = oldCderunTTY
-			cderunInteractive = oldCderunInteractive
-			runtimeName = oldRuntimeName
+			opts.tty = oldTTY
+			opts.interactive = oldInteractive
+			opts.network = oldNetwork
+			opts.mountSocket = oldMountSocket
+			opts.mountCderun = oldMountCderun
+			opts.image = oldImage
+			opts.remove = oldRemove
+			opts.cderunTTY = oldCderunTTY
+			opts.cderunInteractive = oldCderunInteractive
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -248,29 +248,29 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("handles symlink execution via Execute", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := tty
-		oldInteractive := interactive
-		oldNetwork := network
-		oldMountSocket := mountSocket
-		oldMountCderun := mountCderun
-		oldImage := image
-		oldRemove := remove
-		oldCderunTTY := cderunTTY
-		oldCderunInteractive := cderunInteractive
-		oldRuntimeName := runtimeName
+		oldTTY := opts.tty
+		oldInteractive := opts.interactive
+		oldNetwork := opts.network
+		oldMountSocket := opts.mountSocket
+		oldMountCderun := opts.mountCderun
+		oldImage := opts.image
+		oldRemove := opts.remove
+		oldCderunTTY := opts.cderunTTY
+		oldCderunInteractive := opts.cderunInteractive
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			tty = oldTTY
-			interactive = oldInteractive
-			network = oldNetwork
-			mountSocket = oldMountSocket
-			mountCderun = oldMountCderun
-			image = oldImage
-			remove = oldRemove
-			cderunTTY = oldCderunTTY
-			cderunInteractive = oldCderunInteractive
-			runtimeName = oldRuntimeName
+			opts.tty = oldTTY
+			opts.interactive = oldInteractive
+			opts.network = oldNetwork
+			opts.mountSocket = oldMountSocket
+			opts.mountCderun = oldMountCderun
+			opts.image = oldImage
+			opts.remove = oldRemove
+			opts.cderunTTY = oldCderunTTY
+			opts.cderunInteractive = oldCderunInteractive
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -310,11 +310,11 @@ node:
 
 	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := runtimeName
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			runtimeName = oldRuntimeName
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -364,11 +364,11 @@ node:
 
 	t.Run("P3 environment variable takes priority over tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := runtimeName
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			runtimeName = oldRuntimeName
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -406,11 +406,11 @@ node:
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := runtimeName
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			runtimeName = oldRuntimeName
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -432,11 +432,11 @@ node:
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := runtimeName
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			runtimeName = oldRuntimeName
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -455,11 +455,11 @@ node:
 
 	t.Run("returns error for podman (not implemented yet)", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := runtimeName
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			runtimeName = oldRuntimeName
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -478,15 +478,15 @@ node:
 
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
-		oldEnv := env
-		oldCderunEnv := cderunEnv
-		oldRuntimeName := runtimeName
+		oldEnv := opts.env
+		oldCderunEnv := opts.cderunEnv
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			env = oldEnv
-			cderunEnv = oldCderunEnv
-			runtimeName = oldRuntimeName
+			opts.env = oldEnv
+			opts.cderunEnv = oldCderunEnv
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -549,15 +549,15 @@ node:
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Save and restore package-level state
-		oldDryRun := dryRun
-		oldDryRunFormat := dryRunFormat
-		oldRuntimeName := runtimeName
+		oldDryRun := opts.dryRun
+		oldDryRunFormat := opts.dryRunFormat
+		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			dryRun = oldDryRun
-			dryRunFormat = oldDryRunFormat
-			runtimeName = oldRuntimeName
+			opts.dryRun = oldDryRun
+			opts.dryRunFormat = oldDryRunFormat
+			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -616,13 +616,13 @@ node:
 	require.NoError(t, err)
 
 	// Save and restore package-level state
-	oldTTY := tty
-	oldCderunTTY := cderunTTY
+	oldTTY := opts.tty
+	oldCderunTTY := opts.cderunTTY
 	oldFactory := runtimeFactory
 	oldExit := exitFunc
 	t.Cleanup(func() {
-		tty = oldTTY
-		cderunTTY = oldCderunTTY
+		opts.tty = oldTTY
+		opts.cderunTTY = oldCderunTTY
 		runtimeFactory = oldFactory
 		exitFunc = oldExit
 	})
