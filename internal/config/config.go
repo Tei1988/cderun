@@ -20,6 +20,8 @@ type ConfigDefaults struct {
 	Network     string `yaml:"network"`
 	Remove      *bool  `yaml:"remove"`
 	MountCderun *bool  `yaml:"mountCderun"`
+	DryRun      *bool  `yaml:"dryRun"`
+	DryRunFormat string `yaml:"dryRunFormat"`
 }
 
 type ToolConfig struct {
@@ -32,6 +34,8 @@ type ToolConfig struct {
 	Env         []string `yaml:"env"`
 	Workdir     string   `yaml:"workdir"`
 	MountCderun *bool    `yaml:"mountCderun"`
+	DryRun      *bool    `yaml:"dryRun"`
+	DryRunFormat string   `yaml:"dryRunFormat"`
 }
 
 type ToolsConfig map[string]ToolConfig

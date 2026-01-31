@@ -26,6 +26,8 @@ type ResolvedConfig struct {
 	MountCderun   bool
 	MountTools    string
 	MountAllTools bool
+	DryRun        bool
+	DryRunFormat  string
 }
 
 // CLIOptions represents values from CLI flags.
@@ -74,6 +76,14 @@ type CLIOptions struct {
 	CderunMountTools     string
 	MountAllTools        bool
 	CderunMountAllTools  bool
+	DryRun               bool
+	DryRunSet            bool
+	CderunDryRun         bool
+	CderunDryRunSet      bool
+	DryRunFormat         string
+	DryRunFormatSet      bool
+	CderunDryRunFormat   string
+	CderunDryRunFormatSet bool
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -224,6 +234,26 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	} else {
 		res.MountAllTools = cli.MountAllTools
 	}
+
+	// 15. Resolve DryRun
+	res.DryRun = resolveBool(
+		cli.CderunDryRunSet, cli.CderunDryRun,
+		cli.DryRunSet, cli.DryRun,
+		"CDERUN_DRY_RUN",
+		subcommand, tools, func(t ToolConfig) *bool { return t.DryRun },
+		global, func(g CDERunConfig) *bool { return g.Defaults.DryRun },
+		false,
+	)
+
+	// 16. Resolve DryRunFormat
+	res.DryRunFormat = resolveString(
+		cli.CderunDryRunFormatSet, cli.CderunDryRunFormat,
+		cli.DryRunFormatSet, cli.DryRunFormat,
+		"CDERUN_DRY_RUN_FORMAT",
+		subcommand, tools, func(t ToolConfig) string { return t.DryRunFormat },
+		global, func(g CDERunConfig) string { return g.Defaults.DryRunFormat },
+		"yaml",
+	)
 
 	return res, nil
 }
