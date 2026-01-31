@@ -111,7 +111,14 @@ func (d *DockerRuntime) ResizeContainerTTY(ctx context.Context, containerID stri
 
 // SignalContainer sends a signal to a container.
 func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	return d.client.ContainerKill(ctx, containerID, sig)
+	err := d.client.ContainerKill(ctx, containerID, sig)
+	if err != nil {
+		// Suppress errors if the container is already gone or not running.
+		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+			return nil
+		}
+	}
+	return err
 }
 
 // AttachContainer attaches to a container's IO streams.
@@ -125,6 +132,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
+		Logs:   true,
 		Stdin:  stdin != nil,
 		Stdout: true,
 		Stderr: true,
