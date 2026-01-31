@@ -92,6 +92,19 @@ func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string)
 	})
 }
 
+// ResizeContainerTTY resizes the terminal of a container.
+func (d *DockerRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	return d.client.ContainerResize(ctx, containerID, dockercontainer.ResizeOptions{
+		Height: rows,
+		Width:  cols,
+	})
+}
+
+// SignalContainer sends a signal to a container.
+func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	return d.client.ContainerKill(ctx, containerID, sig)
+}
+
 // AttachContainer attaches to a container's IO streams.
 func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
 	if stdout == nil {
@@ -128,21 +141,33 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		close(stdinDone)
 	}
 
-	var copyErr error
-	if tty {
-		// When TTY is enabled, the stream is raw (not multiplexed).
-		_, copyErr = io.Copy(stdout, resp.Reader)
-	} else {
-		// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
-		_, copyErr = stdcopy.StdCopy(stdout, stderr, resp.Reader)
-	}
+	outputDone := make(chan error, 1)
+	go func() {
+		var err error
+		if tty {
+			// When TTY is enabled, the stream is raw (not multiplexed).
+			_, err = io.Copy(stdout, resp.Reader)
+		} else {
+			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
+			_, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+		}
+		outputDone <- err
+	}()
 
-	<-stdinDone
-
-	if copyErr != nil {
-		return copyErr
+	select {
+	case err := <-outputDone:
+		return err
+	case <-stdinDone:
+		if stdinErr != nil {
+			return stdinErr
+		}
+		// If stdin is done, wait for the remaining output
+		return <-outputDone
+	case <-ctx.Done():
+		// Explicitly close the connection to unblock any pending I/O
+		resp.Close()
+		return ctx.Err()
 	}
-	return stdinErr
 }
 
 // Name returns the name of the runtime.

@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -243,16 +245,16 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, d
 	return nil
 }
 
-func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) error {
+func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	// Initialize Runtime
 	rt, err := runtimeFactory(resolved.Runtime, resolved.Socket)
 	if err != nil {
-		return fmt.Errorf("failed to initialize runtime: %w", err)
+		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
 	}
 
 	containerID, err := rt.CreateContainer(ctx, containerConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create container: %w", err)
+		return 0, fmt.Errorf("failed to create container: %w", err)
 	}
 
 	if containerConfig.Remove {
@@ -264,8 +266,62 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}()
 	}
 
+	// Set up terminal raw mode if TTY is requested and we are in a terminal
+	if containerConfig.TTY && term.IsTerminal(int(os.Stdin.Fd())) {
+		state, err := term.MakeRaw(int(os.Stdin.Fd()))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to set terminal to raw mode: %v\n", err)
+		} else {
+			defer term.Restore(int(os.Stdin.Fd()), state)
+		}
+	}
+
+	// Handle signals and forward them to the container
+	sigChan := make(chan os.Signal, 1)
+	setupSignals(sigChan)
+	defer signal.Stop(sigChan)
+	go func() {
+		for {
+			select {
+			case sig := <-sigChan:
+				sigName := getSignalName(sig)
+				if err := rt.SignalContainer(ctx, containerID, sigName); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to forward signal %v: %v\n", sig, err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	if err := rt.StartContainer(ctx, containerID); err != nil {
-		return fmt.Errorf("failed to start container: %w", err)
+		return 0, fmt.Errorf("failed to start container: %w", err)
+	}
+
+	// Handle window resize synchronization
+	if containerConfig.TTY && term.IsTerminal(int(os.Stdout.Fd())) {
+		resizeChan := make(chan os.Signal, 1)
+		setupResizeSignal(resizeChan)
+		defer signal.Stop(resizeChan)
+		go func() {
+			for {
+				select {
+				case <-resizeChan:
+					w, h, err := term.GetSize(int(os.Stdout.Fd()))
+					if err == nil {
+						_ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w))
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+
+		// Initial resize to match current terminal size
+		w, h, err := term.GetSize(int(os.Stdout.Fd()))
+		if err == nil {
+			_ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w))
+		}
 	}
 
 	// Attach to container IO
@@ -274,16 +330,15 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		stdin = os.Stdin
 	}
 	if err := rt.AttachContainer(ctx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr); err != nil {
-		return fmt.Errorf("failed to attach to container: %w", err)
+		return 0, fmt.Errorf("failed to attach to container: %w", err)
 	}
 
 	exitCode, err := rt.WaitContainer(ctx, containerID)
 	if err != nil {
-		return fmt.Errorf("failed to wait for container: %w", err)
+		return 0, fmt.Errorf("failed to wait for container: %w", err)
 	}
 
-	exitFunc(exitCode)
-	return nil
+	return exitCode, nil
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -322,7 +377,12 @@ intended for the subcommand.`,
 		}
 
 		// Execute Container
-		return opts.execute(cmd.Context(), resolved, containerConfig)
+		exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
+		if err != nil {
+			return err
+		}
+		exitFunc(exitCode)
+		return nil
 	},
 }
 

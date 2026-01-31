@@ -14,6 +14,10 @@ type MockRuntime struct {
 	WaitedContainerID  string
 	RemovedContainerID string
 	AttachedContainerID string
+	ResizedContainerID  string
+	SignaledContainerID string
+	Rows, Cols          uint
+	Signal              string
 	ExitCode           int
 }
 
@@ -39,6 +43,19 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
 	m.AttachedContainerID = containerID
+	return nil
+}
+
+func (m *MockRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	m.ResizedContainerID = containerID
+	m.Rows = rows
+	m.Cols = cols
+	return nil
+}
+
+func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.SignaledContainerID = containerID
+	m.Signal = sig
 	return nil
 }
 
