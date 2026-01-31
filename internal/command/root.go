@@ -45,6 +45,8 @@ type rootOptions struct {
 	mountAllTools       bool
 	dryRun              bool
 	dryRunFormat        string
+	cderunDryRun        bool
+	cderunDryRunFormat  string
 }
 
 var (
@@ -119,9 +121,17 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunMountCderun:    o.cderunMountCderun,
 		CderunMountCderunSet: cmd.Flags().Changed("cderun-mount-cderun"),
 		MountTools:           o.mountTools,
-		CderunMountTools:     o.cderunMountTools,
-		MountAllTools:        o.mountAllTools,
-		CderunMountAllTools:  o.cderunMountAllTools,
+		CderunMountTools:      o.cderunMountTools,
+		MountAllTools:         o.mountAllTools,
+		CderunMountAllTools:   o.cderunMountAllTools,
+		DryRun:                o.dryRun,
+		DryRunSet:             cmd.Flags().Changed("dry-run"),
+		CderunDryRun:          o.cderunDryRun,
+		CderunDryRunSet:       cmd.Flags().Changed("cderun-dry-run"),
+		DryRunFormat:          o.dryRunFormat,
+		DryRunFormatSet:       cmd.Flags().Changed("dry-run-format"),
+		CderunDryRunFormat:    o.cderunDryRunFormat,
+		CderunDryRunFormatSet: cmd.Flags().Changed("cderun-dry-run-format"),
 	}
 
 	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
@@ -197,8 +207,8 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 	return containerConfig, nil
 }
 
-func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig) error {
-	switch strings.ToLower(o.dryRunFormat) {
+func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, dryRunFormat string) error {
+	switch strings.ToLower(dryRunFormat) {
 	case "json":
 		data, err := json.MarshalIndent(containerConfig, "", "  ")
 		if err != nil {
@@ -307,8 +317,8 @@ intended for the subcommand.`,
 			return fmt.Errorf("container configuration error: %w", err)
 		}
 
-		if opts.dryRun {
-			return opts.handleDryRun(containerConfig)
+		if resolved.DryRun {
+			return opts.handleDryRun(containerConfig, resolved.DryRunFormat)
 		}
 
 		// Execute Container
@@ -433,6 +443,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&opts.dryRun, "dry-run", false, "Preview container configuration without execution")
 	rootCmd.PersistentFlags().StringVarP(&opts.dryRunFormat, "dry-run-format", "f", "yaml", "Output format (yaml, json, simple)")
+	rootCmd.PersistentFlags().BoolVar(&opts.cderunDryRun, "cderun-dry-run", false, "Override dry-run setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunDryRunFormat, "cderun-dry-run-format", "", "Override dry-run-format setting (highest priority, can be used after subcommand)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }

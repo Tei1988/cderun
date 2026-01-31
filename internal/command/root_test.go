@@ -47,6 +47,8 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.mountAllTools = false
 	opts.dryRun = false
 	opts.dryRunFormat = "yaml"
+	opts.cderunDryRun = false
+	opts.cderunDryRunFormat = ""
 
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
@@ -756,6 +758,20 @@ node:
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.False(t, mockRuntime.CreatedConfig.Remove)
+	})
+
+	t.Run("cderun internal overrides for dry-run", func(t *testing.T) {
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		mockRuntime.CreatedConfig = nil
+
+		// cderun --image=alpine sh --cderun-dry-run --cderun-dry-run-format=simple
+		output, err := executeCommandRaw([]string{"cderun", "--image=alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format=simple"})
+		assert.NoError(t, err)
+		assert.Nil(t, mockRuntime.CreatedConfig)
+		assert.Contains(t, output, "Image: alpine")
+		assert.Contains(t, output, "Command: sh")
 	})
 }
 
