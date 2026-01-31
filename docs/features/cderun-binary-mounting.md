@@ -59,10 +59,10 @@ cderun --mount-cderun gemini-cli
 
 #### 設定ファイルによる指定
 ```yaml
-tools:
-  gemini-cli:
-    image: gemini-cli:latest
-    mountCderun: true  # cderunバイナリを自動マウント
+# .tools.yaml
+gemini-cli:
+  image: gemini-cli:latest
+  mountCderun: true  # cderunバイナリを自動マウント
 ```
 
 #### グローバル設定
@@ -87,18 +87,17 @@ defaults:
 
 #### ホスト側の設定
 ```yaml
-# .cderun.yaml
-tools:
-  gemini-cli:
-    image: gemini-cli:latest
-    mountCderun: true
-    tty: true
-    interactive: true
-    
-  python:
-    image: python:3.11-slim
-    volumes:
-      - .:/workspace
+# .tools.yaml
+gemini-cli:
+  image: gemini-cli:latest
+  mountCderun: true
+  tty: true
+  interactive: true
+
+python:
+  image: python:3.11-slim
+  volumes:
+    - .:/workspace
 ```
 
 #### 実行
@@ -135,13 +134,12 @@ $ cderun docker ps
 ### 例3: CI/CDパイプライン
 
 ```yaml
-# .cderun.yaml
-tools:
-  ci-runner:
-    image: ci-runner:latest
-    mountCderun: true
-    volumes:
-      - .:/workspace
+# .tools.yaml
+ci-runner:
+  image: ci-runner:latest
+  mountCderun: true
+  volumes:
+    - .:/workspace
 ```
 
 ```bash
@@ -245,29 +243,29 @@ None  # ← 環境変数は引き継がれない！
 ### ✅ 推奨
 
 ```yaml
+# .tools.yaml
 # 開発環境やCI/CDでの使用
-tools:
-  dev-env:
-    mountCderun: true
-  
-  gemini-cli:
-    mountCderun: true
+dev-env:
+  mountCderun: true
+
+gemini-cli:
+  mountCderun: true
 ```
 
 ### ⚠️ 注意が必要
 
 ```yaml
+# .tools.yaml
 # 本番環境での使用は慎重に
-tools:
-  production-app:
-    mountCderun: false  # 本番では無効化
+production-app:
+  mountCderun: false  # 本番では無効化
 ```
 
 ### ❌ 非推奨
 
 ```yaml
+# .cderun.yaml
 # 全てのツールでデフォルト有効化
-cderun:
-  defaults:
-    mountCderun: true  # 非推奨
+defaults:
+  mountCderun: true  # 非推奨
 ```

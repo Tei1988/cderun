@@ -20,12 +20,12 @@
 
 ### ツール設定
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production      # 明示的な値
-      - NPM_TOKEN                 # 実行ホストから取得
-      - HOME                      # 実行ホストから取得
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production      # 明示的な値
+    - NPM_TOKEN                 # 実行ホストから取得
+    - HOME                      # 実行ホストから取得
 ```
 
 ### コマンドライン
@@ -45,10 +45,10 @@ cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 後から指定された値が優先される：
 
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=development  # 設定ファイル
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=development  # 設定ファイル
 ```
 
 ```bash
@@ -59,22 +59,22 @@ $ cderun --env NODE_ENV=production node app.js
 ### 同じキーが複数回指定された場合
 
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=development
-      - NODE_ENV=production  # この値が使われる
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=development
+    - NODE_ENV=production  # この値が使われる
 ```
 
 ## 実行例
 
 ### 例1: 明示的な値の設定
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production
-      - PORT=3000
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production
+    - PORT=3000
 ```
 
 ```bash
@@ -84,11 +84,11 @@ $ cderun node app.js
 
 ### 例2: 実行ホストから取得
 ```yaml
-tools:
-  node:
-    env:
-      - NPM_TOKEN  # 実行ホストから取得
-      - HOME       # 実行ホストから取得
+# .tools.yaml
+node:
+  env:
+    - NPM_TOKEN  # 実行ホストから取得
+    - HOME       # 実行ホストから取得
 ```
 
 ```bash
@@ -101,12 +101,12 @@ $ cderun node app.js
 
 ### 例3: 混在
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production  # 明示的
-      - NPM_TOKEN            # 実行ホストから
-      - PORT=3000            # 明示的
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production  # 明示的
+    - NPM_TOKEN            # 実行ホストから
+    - PORT=3000            # 明示的
 ```
 
 ```bash
@@ -132,9 +132,9 @@ $ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 
 ### 厳密モード（将来の拡張）
 ```yaml
-cderun:
-  defaults:
-    strictEnv: true  # 存在しない環境変数でエラー
+# .cderun.yaml
+defaults:
+  strictEnv: true  # 存在しない環境変数でエラー
 ```
 
 ```bash

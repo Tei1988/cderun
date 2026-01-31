@@ -48,7 +48,6 @@ defaults:
   interactive: false               # デフォルトでインタラクティブモード
   network: bridge                  # デフォルトネットワーク
   remove: true                     # コンテナの自動削除
-  syncWorkdir: true                # ワーキングディレクトリの同期
 ```
 
 ### `.tools.yaml` 例
@@ -104,7 +103,6 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `interactive` (bool): デフォルトでSTDINを開いたままにする
 - `network` (string): デフォルトのネットワーク設定
 - `remove` (bool): コンテナ終了後に自動削除
-- `syncWorkdir` (bool): ホストのカレントディレクトリをコンテナ内で再現
 
 ### `.tools.yaml` （サブコマンドの設定）
 
