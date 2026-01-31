@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"cderun/internal/runtime"
+	"errors"
 	"io"
 	"os"
 	"strings"
@@ -927,5 +928,59 @@ sh:
 		output, err := executeCommand("--mount-all-tools", "--mount-socket", "/socket", "--image", "alpine", "sh")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "Warning: --mount-all-tools specified but no tools defined in .tools.yaml")
+	})
+}
+
+func TestRemoveContainerWarning(t *testing.T) {
+	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
+		// Save and restore package-level state
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		mockRuntime := &runtime.MockRuntime{
+			RemoveErr: errors.New("failed to remove"),
+		}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Warning: failed to remove container (defer): failed to remove")
+	})
+
+	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
+		// Save and restore package-level state
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		mockRuntime := &runtime.MockRuntime{
+			RemoveErr: nil,
+		}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.NotContains(t, output, "Warning: failed to remove container (defer)")
 	})
 }

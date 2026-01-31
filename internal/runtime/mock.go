@@ -19,44 +19,51 @@ type MockRuntime struct {
 	Rows, Cols          uint
 	Signal              string
 	ExitCode           int
+	CreateErr          error
+	StartErr           error
+	WaitErr            error
+	RemoveErr          error
+	AttachErr          error
+	ResizeErr          error
+	SignalErr          error
 }
 
 func (m *MockRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
 	m.CreatedConfig = config
-	return m.CreatedContainerID, nil
+	return m.CreatedContainerID, m.CreateErr
 }
 
 func (m *MockRuntime) StartContainer(ctx context.Context, containerID string) error {
 	m.StartedContainerID = containerID
-	return nil
+	return m.StartErr
 }
 
 func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	m.WaitedContainerID = containerID
-	return m.ExitCode, nil
+	return m.ExitCode, m.WaitErr
 }
 
 func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	m.RemovedContainerID = containerID
-	return nil
+	return m.RemoveErr
 }
 
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
 	m.AttachedContainerID = containerID
-	return nil
+	return m.AttachErr
 }
 
 func (m *MockRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
 	m.ResizedContainerID = containerID
 	m.Rows = rows
 	m.Cols = cols
-	return nil
+	return m.ResizeErr
 }
 
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.SignaledContainerID = containerID
 	m.Signal = sig
-	return nil
+	return m.SignalErr
 }
 
 func (m *MockRuntime) Name() string {
