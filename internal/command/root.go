@@ -3,6 +3,7 @@ package command
 import (
 	"cderun/internal/config"
 	"cderun/internal/container"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
@@ -49,6 +50,17 @@ type rootOptions struct {
 	dryRunFormat        string
 	cderunDryRun        bool
 	cderunDryRunFormat  string
+	logLevel             string
+	logFile              string
+	logFormat            string
+	logTee               bool
+	logTimestamp         bool
+	verbose              int
+	cderunLogLevel       string
+	cderunLogFile        string
+	cderunLogFormat      string
+	cderunLogTee         bool
+	cderunVerbose        int
 }
 
 var (
@@ -69,13 +81,19 @@ var (
 )
 
 func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig) {
-	globalCfg, _, err := config.LoadCDERunConfig()
+	logging.Trace("Loading configurations...")
+	globalCfg, path, err := config.LoadCDERunConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to load cderun config: %v\n", err)
+		logging.Warn("failed to load cderun config: %v", err)
+	} else if path != "" {
+		logging.Debug("Loaded cderun config from: %s", path)
 	}
-	toolsCfg, _, err := config.LoadToolsConfig()
+
+	toolsCfg, path, err := config.LoadToolsConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to load tools config: %v\n", err)
+		logging.Warn("failed to load tools config: %v", err)
+	} else if path != "" {
+		logging.Debug("Loaded tools config from: %s", path)
 	}
 	return toolsCfg, globalCfg
 }
@@ -134,6 +152,26 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		DryRunFormatSet:       cmd.Flags().Changed("dry-run-format"),
 		CderunDryRunFormat:    o.cderunDryRunFormat,
 		CderunDryRunFormatSet: cmd.Flags().Changed("cderun-dry-run-format"),
+		LogLevel:              o.logLevel,
+		LogLevelSet:           cmd.Flags().Changed("log-level"),
+		LogFile:               o.logFile,
+		LogFileSet:            cmd.Flags().Changed("log-file"),
+		LogFormat:             o.logFormat,
+		LogFormatSet:          cmd.Flags().Changed("log-format"),
+		LogTee:                o.logTee,
+		LogTeeSet:             cmd.Flags().Changed("log-tee"),
+		LogTimestamp:          o.logTimestamp,
+		LogTimestampSet:       cmd.Flags().Changed("log-timestamp"),
+		Verbose:               o.verbose,
+		CderunLogLevel:        o.cderunLogLevel,
+		CderunLogLevelSet:     cmd.Flags().Changed("cderun-log-level"),
+		CderunLogFile:         o.cderunLogFile,
+		CderunLogFileSet:      cmd.Flags().Changed("cderun-log-file"),
+		CderunLogFormat:       o.cderunLogFormat,
+		CderunLogFormatSet:    cmd.Flags().Changed("cderun-log-format"),
+		CderunLogTee:          o.cderunLogTee,
+		CderunLogTeeSet:       cmd.Flags().Changed("cderun-log-tee"),
+		CderunVerbose:         o.cderunVerbose,
 	}
 
 	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
@@ -181,7 +219,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 		// Handle MountTools / MountAllTools
 		if resolved.MountAllTools {
 			if toolsCfg == nil || len(toolsCfg) == 0 {
-				fmt.Fprintf(os.Stderr, "Warning: --mount-all-tools specified but no tools defined in .tools.yaml\n")
+				logging.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
 			}
 			for toolName := range toolsCfg {
 				containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
@@ -246,6 +284,11 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, d
 }
 
 func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+	logging.Info("Running: %s %s", containerConfig.Command[0], strings.Join(containerConfig.Args, " "))
+	logging.Debug("Image: %s", containerConfig.Image)
+	logging.Debug("Runtime: %s", resolved.Runtime)
+	logging.Debug("Socket: %s", resolved.Socket)
+
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -255,6 +298,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
 	}
 
+	logging.Trace("Creating container...")
 	containerID, err := rt.CreateContainer(ctx, containerConfig)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create container: %w", err)
@@ -263,17 +307,19 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	if containerConfig.Remove {
 		cleanupCtx := context.WithoutCancel(ctx)
 		defer func() {
+			logging.Trace("Removing container: %s", containerID)
 			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to remove container (defer): %v\n", err)
+				logging.Warn("failed to remove container (defer): %v", err)
 			}
 		}()
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
 	if containerConfig.TTY && term.IsTerminal(int(os.Stdin.Fd())) {
+		logging.Trace("Setting terminal to raw mode")
 		state, err := term.MakeRaw(int(os.Stdin.Fd()))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to set terminal to raw mode: %v\n", err)
+			logging.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
 			defer term.Restore(int(os.Stdin.Fd()), state)
 		}
@@ -289,7 +335,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 			case sig := <-sigChan:
 				sigName := getSignalName(sig)
 				if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to forward signal %v: %v\n", sig, err)
+					logging.Warn("failed to forward signal %v: %v", sig, err)
 				}
 			case <-ctxG.Done():
 				return
@@ -297,6 +343,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
@@ -336,11 +383,13 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		return 0, fmt.Errorf("failed to attach to container: %w", err)
 	}
 
+	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctx, containerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
 	}
 
+	logging.Debug("Container exited with code: %d", exitCode)
 	return exitCode, nil
 }
 
@@ -368,6 +417,12 @@ intended for the subcommand.`,
 		if err != nil {
 			return fmt.Errorf("configuration error: %w", err)
 		}
+
+		// Initialize logger with resolved settings
+		if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
+		logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 		// Build ContainerConfig
 		containerConfig, err := opts.buildContainerConfig(resolved, subcommand, passthroughArgs, toolsCfg)
@@ -405,6 +460,7 @@ func Execute(rawArgs []string) error {
 }
 
 func preprocessArgs(args []string) ([]string, error) {
+	logging.Trace("Preprocessing args: %v", args)
 	if len(args) == 0 {
 		return args, nil
 	}
@@ -508,6 +564,19 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&opts.dryRunFormat, "dry-run-format", "f", "yaml", "Output format (yaml, json, simple)")
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunDryRun, "cderun-dry-run", false, "Override dry-run setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().StringVar(&opts.cderunDryRunFormat, "cderun-dry-run-format", "", "Override dry-run-format setting (highest priority, can be used after subcommand)")
+
+	rootCmd.PersistentFlags().CountVar(&opts.verbose, "verbose", "Enable verbose logging (--verbose: info, --verbose --verbose: debug, --verbose --verbose --verbose: trace)")
+	rootCmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", "", "Set log level (error, warn, info, debug, trace)")
+	rootCmd.PersistentFlags().StringVar(&opts.logFile, "log-file", "", "Set log file path")
+	rootCmd.PersistentFlags().StringVar(&opts.logFormat, "log-format", "text", "Set log format (text, json)")
+	rootCmd.PersistentFlags().BoolVar(&opts.logTee, "log-tee", false, "Output log to both stderr and log file")
+	rootCmd.PersistentFlags().BoolVar(&opts.logTimestamp, "log-timestamp", true, "Include timestamp in logs")
+
+	rootCmd.PersistentFlags().StringVar(&opts.cderunLogLevel, "cderun-log-level", "", "Override log level (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunLogFile, "cderun-log-file", "", "Override log file path (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().BoolVar(&opts.cderunLogTee, "cderun-log-tee", false, "Override log-tee setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 
 	rootCmd.Flags().SetInterspersed(false)
 }

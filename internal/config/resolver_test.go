@@ -218,4 +218,47 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, res.MountCderun)
 	})
+
+	t.Run("Logging resolution", func(t *testing.T) {
+		cli := CLIOptions{
+			LogLevel:    "debug",
+			LogLevelSet: true,
+			LogFormat:   "json",
+			LogFormatSet: true,
+			Verbose:     0,
+		}
+		global := &CDERunConfig{
+			Logging: LoggingConfig{
+				Level: "info",
+				File:  "/var/log/cderun.log",
+			},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "node"},
+		}
+
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "debug", res.LogLevel)
+		assert.Equal(t, "json", res.LogFormat)
+		assert.Equal(t, "/var/log/cderun.log", res.LogFile)
+
+		// Verbose override
+		cli.Verbose = 2
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "debug", res.LogLevel)
+
+		cli.Verbose = 3
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "trace", res.LogLevel)
+
+		// P1 Override
+		cli.CderunLogLevel = "error"
+		cli.CderunLogLevelSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "error", res.LogLevel)
+	})
 }

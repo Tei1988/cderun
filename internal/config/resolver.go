@@ -2,6 +2,7 @@ package config
 
 import (
 	"cderun/internal/container"
+	"cderun/internal/logging"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,11 @@ type ResolvedConfig struct {
 	MountAllTools bool
 	DryRun        bool
 	DryRunFormat  string
+	LogLevel      string
+	LogFile       string
+	LogFormat     string
+	LogTee        bool
+	LogTimestamp  bool
 }
 
 // CLIOptions represents values from CLI flags.
@@ -84,10 +90,31 @@ type CLIOptions struct {
 	DryRunFormatSet      bool
 	CderunDryRunFormat   string
 	CderunDryRunFormatSet bool
+	LogLevel              string
+	LogLevelSet           bool
+	LogFile               string
+	LogFileSet            bool
+	LogFormat             string
+	LogFormatSet          bool
+	LogTee                bool
+	LogTeeSet             bool
+	LogTimestampSet       bool
+	LogTimestamp          bool
+	Verbose               int
+	CderunLogLevel        string
+	CderunLogLevelSet     bool
+	CderunLogFile         string
+	CderunLogFileSet      bool
+	CderunLogFormat       string
+	CderunLogFormatSet    bool
+	CderunLogTee          bool
+	CderunLogTeeSet       bool
+	CderunVerbose         int
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
 func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
+	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 
 	// 1. Resolve Image
@@ -106,6 +133,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	if res.Image == "" {
 		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
 	}
+	logging.Debug("Resolved Image: %s", res.Image)
 
 	// 2. Resolve TTY
 	res.TTY = resolveBool(
@@ -253,6 +281,65 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		subcommand, tools, func(t ToolConfig) string { return t.DryRunFormat },
 		global, func(g CDERunConfig) string { return g.Defaults.DryRunFormat },
 		"yaml",
+	)
+
+	// 17. Resolve Logging
+	res.LogLevel = resolveString(
+		cli.CderunLogLevelSet, cli.CderunLogLevel,
+		cli.LogLevelSet, cli.LogLevel,
+		"CDERUN_LOG_LEVEL",
+		"", nil, nil,
+		global, func(g CDERunConfig) string { return g.Logging.Level },
+		"info",
+	)
+	// Handle verbose flag overrides
+	vLevel := cli.Verbose
+	if cli.CderunVerbose > vLevel {
+		vLevel = cli.CderunVerbose
+	}
+
+	if !cli.CderunLogLevelSet {
+		if vLevel >= 3 {
+			res.LogLevel = "trace"
+		} else if vLevel >= 2 {
+			res.LogLevel = "debug"
+		}
+	}
+
+	res.LogFile = resolveString(
+		cli.CderunLogFileSet, cli.CderunLogFile,
+		cli.LogFileSet, cli.LogFile,
+		"CDERUN_LOG_FILE",
+		"", nil, nil,
+		global, func(g CDERunConfig) string { return g.Logging.File },
+		"",
+	)
+
+	res.LogFormat = resolveString(
+		cli.CderunLogFormatSet, cli.CderunLogFormat,
+		cli.LogFormatSet, cli.LogFormat,
+		"CDERUN_LOG_FORMAT",
+		"", nil, nil,
+		global, func(g CDERunConfig) string { return g.Logging.Format },
+		"text",
+	)
+
+	res.LogTee = resolveBool(
+		cli.CderunLogTeeSet, cli.CderunLogTee,
+		cli.LogTeeSet, cli.LogTee,
+		"CDERUN_LOG_TEE",
+		"", nil, nil,
+		global, func(g CDERunConfig) *bool { return g.Logging.Tee },
+		false,
+	)
+
+	res.LogTimestamp = resolveBool(
+		false, false, // No P1 for timestamp yet
+		cli.LogTimestampSet, cli.LogTimestamp,
+		"CDERUN_LOG_TIMESTAMP",
+		"", nil, nil,
+		global, func(g CDERunConfig) *bool { return g.Logging.Timestamp },
+		true, // Default to true
 	)
 
 	return res, nil
