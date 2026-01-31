@@ -611,6 +611,32 @@ node:
 		assert.Contains(t, output, "Network: bridge")
 		assert.Contains(t, output, "Remove: true")
 	})
+
+	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
+		// Save and restore package-level state
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Reset flags
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		mockRuntime := &runtime.MockRuntime{
+			AttachErr: errors.New("attach failed"),
+		}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+	})
 }
 
 func TestCderunInternalOverrides(t *testing.T) {
@@ -966,7 +992,7 @@ func TestRemoveContainerWarning(t *testing.T) {
 
 		output, err := executeCommand("--image", "alpine", "sh")
 		assert.NoError(t, err)
-		assert.Contains(t, output, "Warning: failed to remove container (defer): failed to remove")
+		assert.Contains(t, output, "[WARN] failed to remove container (defer): failed to remove")
 	})
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
@@ -992,6 +1018,6 @@ func TestRemoveContainerWarning(t *testing.T) {
 
 		output, err := executeCommand("--image", "alpine", "sh")
 		assert.NoError(t, err)
-		assert.NotContains(t, output, "Warning: failed to remove container (defer)")
+		assert.NotContains(t, output, "[WARN] failed to remove container (defer)")
 	})
 }
