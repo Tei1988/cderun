@@ -16,6 +16,8 @@ type ContainerRuntime interface {
 
 	// Container communication
 	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
+	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
+	SignalContainer(ctx context.Context, containerID string, sig string) error
 
 	// Information
 	Name() string
