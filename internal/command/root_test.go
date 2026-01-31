@@ -50,6 +50,17 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.dryRunFormat = "yaml"
 	opts.cderunDryRun = false
 	opts.cderunDryRunFormat = ""
+	opts.logLevel = ""
+	opts.logFile = ""
+	opts.logFormat = "text"
+	opts.logTee = false
+	opts.logTimestamp = true
+	opts.verbose = 0
+	opts.cderunLogLevel = ""
+	opts.cderunLogFile = ""
+	opts.cderunLogFormat = ""
+	opts.cderunLogTee = false
+	opts.cderunVerbose = 0
 
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
@@ -927,7 +938,7 @@ sh:
 
 		output, err := executeCommand("--mount-all-tools", "--mount-socket", "/socket", "--image", "alpine", "sh")
 		assert.NoError(t, err)
-		assert.Contains(t, output, "Warning: --mount-all-tools specified but no tools defined in .tools.yaml")
+		assert.Contains(t, output, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 	})
 }
 

@@ -19,16 +19,17 @@ cderunの動作を詳細に確認するためのログ出力とデバッグ機�
 ```bash
 # 詳細ログ
 $ cderun --verbose node app.js
-$ cderun -v node app.js
 
 # 非常に詳細なログ
-$ cderun -vv node app.js
+$ cderun --verbose --verbose node app.js
 $ cderun --log-level debug node app.js
 
 # 最も詳細
-$ cderun -vvv node app.js
+$ cderun --verbose --verbose --verbose node app.js
 $ cderun --log-level trace node app.js
 ```
+
+> **Note**: `-v` shorthand is reserved for `--volume` and cannot be used for `--verbose`.
 
 #### 設定ファイル
 ```yaml
@@ -154,7 +155,19 @@ logging:
 実行せずにコマンドを表示:
 ```bash
 $ cderun --dry-run node app.js
-docker run --rm -t -i node:latest node app.js
+image: node:latest
+command:
+  - node
+args:
+  - app.js
+tty: false
+interactive: false
+remove: true
+network: bridge
+volumes: []
+env: []
+workdir: ""
+user: ""
 ```
 
 ### 2. 設定のダンプ

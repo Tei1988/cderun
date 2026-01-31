@@ -12,16 +12,33 @@ type CDERunConfig struct {
 	Runtime     string         `yaml:"runtime"`
 	RuntimePath string         `yaml:"runtimePath"`
 	Defaults    ConfigDefaults `yaml:"defaults"`
+	Logging     LoggingConfig  `yaml:"logging"`
 }
 
 type ConfigDefaults struct {
-	TTY         *bool  `yaml:"tty"`
-	Interactive *bool  `yaml:"interactive"`
-	Network     string `yaml:"network"`
-	Remove      *bool  `yaml:"remove"`
-	MountCderun *bool  `yaml:"mountCderun"`
-	DryRun      *bool  `yaml:"dryRun"`
+	TTY          *bool  `yaml:"tty"`
+	Interactive  *bool  `yaml:"interactive"`
+	Network      string `yaml:"network"`
+	Remove       *bool  `yaml:"remove"`
+	MountCderun  *bool  `yaml:"mountCderun"`
+	DryRun       *bool  `yaml:"dryRun"`
 	DryRunFormat string `yaml:"dryRunFormat"`
+}
+
+type LoggingConfig struct {
+	Level     string                `yaml:"level"`
+	File      string                `yaml:"file"`
+	Format    string                `yaml:"format"`
+	Timestamp *bool                 `yaml:"timestamp"`
+	Rotation  LoggingRotationConfig `yaml:"rotation"`
+	Tee       *bool                 `yaml:"tee"`
+}
+
+type LoggingRotationConfig struct {
+	MaxSize    string `yaml:"maxSize"`
+	MaxAge     string `yaml:"maxAge"`
+	MaxBackups int    `yaml:"maxBackups"`
+	Compress   bool   `yaml:"compress"`
 }
 
 type ToolConfig struct {
