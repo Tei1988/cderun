@@ -169,18 +169,30 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
+### `--dry-run`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: 実際のコンテナ実行を行わずに、コンテナ構成を表示する
+
+```bash
+cderun --dry-run node --version
+```
+
+### `--dry-run-format`, `-f`
+- **型**: string
+- **デフォルト**: `yaml`
+- **説明**: ドライラン時の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --dry-run --dry-run-format json node --version
+cderun --dry-run -f simple node --version
+```
+
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
   - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
-
-## 将来追加予定のオプション
-
-### `--dry-run`
-実行せずにコマンドをプレビュー
-```bash
-cderun --dry-run node app.js
-```
 
 ## オプションの優先順位
 
@@ -231,14 +243,24 @@ cderun --tty --interactive --network host --mount-socket /var/run/docker.sock do
 ## 注意事項
 
 ### フラグの位置
-cderunのフラグは**サブコマンドの前**に指定する必要があります：
+cderunのフラグ（標準フラグ）は、原則として**サブコマンドの前**に指定する必要があります。
 
 ```bash
-# 正しい
+# 正しい（標準フラグ）
 cderun --tty node --version
 
 # 間違い（--ttyがnodeに渡される）
 cderun node --tty --version
+```
+
+**例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。
+
+```bash
+# 正しい（内部オーバーライドフラグ）
+cderun node --version --cderun-tty
+
+# 間違い
+cderun --cderun-tty node --version
 ```
 
 ### 短縮形
@@ -264,9 +286,14 @@ $ cderun node --tty
 # --ttyがnodeに渡される
 ```
 
-**解決策**: cderunのオプションはサブコマンドの前に指定
+**解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
 ```bash
 $ cderun --tty node
+```
+
+ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
+```bash
+$ cderun node --cderun-tty
 ```
 
 ### --mount-cderunが動作しない

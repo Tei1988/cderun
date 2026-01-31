@@ -5,7 +5,7 @@
 実行ホストの環境変数を選択的にコンテナに引き継ぐ機能。
 **デフォルトでは環境変数は引き継がれない。**明示的に指定した環境変数のみがコンテナに渡される。
 
-現状では、`.tools.yaml`（優先順位 P4: ツール別設定）での環境変数指定（`KEY=value` 形式のみ）がサポートされており、ホスト環境変数の解決（`KEY` のみの指定）や `--env` フラグによる指定は Phase 3 で実装予定です。
+`.tools.yaml`（優先順位 P4）、`--env` フラグ（優先順位 P2）、`--cderun-env` フラグ（優先順位 P1）による指定がサポートされており、`KEY=value` 形式（明示的指定）と `KEY` 形式（ホストからの取得）の両方に対応しています。
 
 ## 中間表現での扱い
 
@@ -20,12 +20,12 @@
 
 ### ツール設定
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production      # 明示的な値
-      - NPM_TOKEN                 # 実行ホストから取得
-      - HOME                      # 実行ホストから取得
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production      # 明示的な値
+    - NPM_TOKEN                 # 実行ホストから取得
+    - HOME                      # 実行ホストから取得
 ```
 
 ### コマンドライン
@@ -45,10 +45,10 @@ cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 後から指定された値が優先される：
 
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=development  # 設定ファイル
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=development  # 設定ファイル
 ```
 
 ```bash
@@ -59,22 +59,22 @@ $ cderun --env NODE_ENV=production node app.js
 ### 同じキーが複数回指定された場合
 
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=development
-      - NODE_ENV=production  # この値が使われる
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=development
+    - NODE_ENV=production  # この値が使われる
 ```
 
 ## 実行例
 
 ### 例1: 明示的な値の設定
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production
-      - PORT=3000
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production
+    - PORT=3000
 ```
 
 ```bash
@@ -84,11 +84,11 @@ $ cderun node app.js
 
 ### 例2: 実行ホストから取得
 ```yaml
-tools:
-  node:
-    env:
-      - NPM_TOKEN  # 実行ホストから取得
-      - HOME       # 実行ホストから取得
+# .tools.yaml
+node:
+  env:
+    - NPM_TOKEN  # 実行ホストから取得
+    - HOME       # 実行ホストから取得
 ```
 
 ```bash
@@ -101,12 +101,12 @@ $ cderun node app.js
 
 ### 例3: 混在
 ```yaml
-tools:
-  node:
-    env:
-      - NODE_ENV=production  # 明示的
-      - NPM_TOKEN            # 実行ホストから
-      - PORT=3000            # 明示的
+# .tools.yaml
+node:
+  env:
+    - NODE_ENV=production  # 明示的
+    - NPM_TOKEN            # 実行ホストから
+    - PORT=3000            # 明示的
 ```
 
 ```bash
@@ -132,9 +132,9 @@ $ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 
 ### 厳密モード（将来の拡張）
 ```yaml
-cderun:
-  defaults:
-    strictEnv: true  # 存在しない環境変数でエラー
+# .cderun.yaml
+defaults:
+  strictEnv: true  # 存在しない環境変数でエラー
 ```
 
 ```bash

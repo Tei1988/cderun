@@ -55,64 +55,31 @@ Python 3.11.0
 ```bash
 # 明示的に指定
 cderun --mount-cderun gemini-cli
-
-# 短縮形
-cderun --recursive gemini-cli
-cderun -r gemini-cli
 ```
 
 #### 設定ファイルによる指定
 ```yaml
-tools:
-  gemini-cli:
-    image: gemini-cli:latest
-    mountCderun: true  # cderunバイナリを自動マウント
+# .tools.yaml
+gemini-cli:
+  image: gemini-cli:latest
+  mountCderun: true  # cderunバイナリを自動マウント
 ```
 
 #### グローバル設定
 ```yaml
-cderun:
-  defaults:
-    mountCderun: false  # デフォルトでは無効
+defaults:
+  mountCderun: false  # デフォルトでは無効
 ```
 
 ### マウントされるもの
 
 1. **cderunバイナリ**
    - 実行ホストの`cderun`バイナリをread-onlyでマウント
-   - パス: `/usr/local/bin/cderun` (または`which cderun`の結果)
+   - パス: `/usr/local/bin/cderun`
 
-2. **dockerソケット**
-   - コンテナ内のcderunが基底ホストのdockerデーモンと通信できるように
-   - パス: `/var/run/docker.sock`
-
-### 実装例
-
-```go
-type MountCderunConfig struct {
-    Enabled        bool
-    BinaryPath     string   // cderunバイナリのパス
-    SocketPath     string   // dockerソケットのパス
-}
-
-func buildMountCderunVolumes(config MountCderunConfig) []string {
-    volumes := []string{}
-    
-    // cderunバイナリ
-    if config.BinaryPath != "" {
-        volumes = append(volumes, 
-            fmt.Sprintf("%s:/usr/local/bin/cderun:ro", config.BinaryPath))
-    }
-    
-    // dockerソケット
-    if config.SocketPath != "" {
-        volumes = append(volumes, 
-            fmt.Sprintf("%s:%s", config.SocketPath, config.SocketPath))
-    }
-    
-    return volumes
-}
-```
+2. **ランタイムソケット**
+   - コンテナ内のcderunが基底ホストのコンテナランタイム（Docker等）と通信できるように
+   - 指定されたソケットパスを同じパスでコンテナ内にマウント
 
 ## 使用例
 
@@ -120,18 +87,17 @@ func buildMountCderunVolumes(config MountCderunConfig) []string {
 
 #### ホスト側の設定
 ```yaml
-# .cderun.yaml
-tools:
-  gemini-cli:
-    image: gemini-cli:latest
-    mountCderun: true
-    tty: true
-    interactive: true
-    
-  python:
-    image: python:3.11-slim
-    volumes:
-      - .:/workspace
+# .tools.yaml
+gemini-cli:
+  image: gemini-cli:latest
+  mountCderun: true
+  tty: true
+  interactive: true
+
+python:
+  image: python:3.11-slim
+  volumes:
+    - .:/workspace
 ```
 
 #### 実行
@@ -168,13 +134,12 @@ $ cderun docker ps
 ### 例3: CI/CDパイプライン
 
 ```yaml
-# .cderun.yaml
-tools:
-  ci-runner:
-    image: ci-runner:latest
-    mountCderun: true
-    volumes:
-      - .:/workspace
+# .tools.yaml
+ci-runner:
+  image: ci-runner:latest
+  mountCderun: true
+  volumes:
+    - .:/workspace
 ```
 
 ```bash
@@ -193,30 +158,26 @@ $ cderun python lint.py
 ### ツール固有の設定
 
 ```yaml
-tools:
-  gemini-cli:
-    mountCderun: true
-    mountCderunConfig:
-      binaryPath: /usr/local/bin/cderun  # カスタムパス
-      socketPath: /var/run/docker.sock
+# .tools.yaml
+gemini-cli:
+  image: gemini-cli:latest
+  mountCderun: true
 ```
 
 ### グローバル設定
 
 ```yaml
-cderun:
-  recursive:
-    enabled: false  # デフォルトでは無効
-    binaryPath: /usr/local/bin/cderun
-    socketPath: /var/run/docker.sock
+# .cderun.yaml
+defaults:
+  mountCderun: false  # デフォルトでは無効
 ```
 
 ## セキュリティ考慮事項
 
 ### リスク
 
-1. **Dockerソケットへのアクセス**
-   - コンテナ内から基底ホストのdockerデーモンへの完全アクセス
+1. **ランタイムソケットへのアクセス**
+   - コンテナ内から基底ホストのコンテナランタイムへの完全アクセス
    - コンテナエスケープのリスク
 
 2. **再帰的な実行**
@@ -229,40 +190,9 @@ cderun:
 
 ### 対策
 
-#### 1. 深さ制限
-```go
-const MaxRecursionDepth = 3
-
-func checkRecursionDepth() error {
-    depth := os.Getenv("CDERUN_DEPTH")
-    if depth == "" {
-        depth = "0"
-    }
-    
-    d, _ := strconv.Atoi(depth)
-    if d >= MaxRecursionDepth {
-        return fmt.Errorf("maximum recursion depth exceeded: %d", d)
-    }
-    
-    // 次のレベルに深さを渡す
-    os.Setenv("CDERUN_DEPTH", strconv.Itoa(d+1))
-    return nil
-}
-```
-
-#### 2. 警告表示
-```bash
-$ cderun --mount-cderun gemini-cli
-Warning: Mounting cderun binary grants container access to host Docker daemon
-This is equivalent to root access. Continue? [y/N]
-```
-
-#### 3. read-onlyマウント
-```bash
-# cderunバイナリと設定ファイルはread-onlyでマウント
--v /usr/local/bin/cderun:/usr/local/bin/cderun:ro
--v ~/.cderun/config.yaml:~/.cderun/config.yaml:ro
-```
+#### read-onlyマウント
+- cderunバイナリはread-onlyでマウントされます。
+- `-v /usr/local/bin/cderun:/usr/local/bin/cderun:ro`
 
 ## 制限事項
 
@@ -304,41 +234,38 @@ None  # ← 環境変数は引き継がれない！
 - ネストされたコンテナ起動のオーバーヘッド
 - 深いネストは非推奨
 
-## 実装の優先順位
+## 実装状況
 
-1. **Phase 1**: 基本的なcderunバイナリマウント
-2. **Phase 2**: dockerソケットのマウント
-3. **Phase 3**: 再帰深さ制限
-4. **Phase 4**: セキュリティ警告とプロンプト
+1. **Phase 1-3 Completed**: 基本的なcderunバイナリおよびソケットのマウントが実装済み。
 
 ## 推奨される使用方法
 
 ### ✅ 推奨
 
 ```yaml
+# .tools.yaml
 # 開発環境やCI/CDでの使用
-tools:
-  dev-env:
-    mountCderun: true
-  
-  gemini-cli:
-    mountCderun: true
+dev-env:
+  mountCderun: true
+
+gemini-cli:
+  mountCderun: true
 ```
 
 ### ⚠️ 注意が必要
 
 ```yaml
+# .tools.yaml
 # 本番環境での使用は慎重に
-tools:
-  production-app:
-    mountCderun: false  # 本番では無効化
+production-app:
+  mountCderun: false  # 本番では無効化
 ```
 
 ### ❌ 非推奨
 
 ```yaml
+# .cderun.yaml
 # 全てのツールでデフォルト有効化
-cderun:
-  defaults:
-    mountCderun: true  # 非推奨
+defaults:
+  mountCderun: true  # 非推奨
 ```

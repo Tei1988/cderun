@@ -31,9 +31,8 @@ READMEの内容は、以下の情報と整合性が取れていなければな�
 ### 4. Configuration Schema
 実装された構造体に基づき、網羅的な `cderun.yaml` の例を提示すること。
 特に以下の高度な機能を省略せずに記載すること。
-- **Polymorphic Image**: 文字列指定とオブジェクト指定（`name_pattern`, `version_file`）の両方。
 - **Mount Cderun**: ホストの `cderun` をコンテナ内にマウントする設定。
-- **Priority Logic**: P1〜P5 の優先順位（Env vs Flag vs Config）。
+- **Priority Logic**: P1〜P6 の優先順位（Env vs Flag vs Config）。
 
 ## 出力フォーマット
 - 言語: 英語 (English)

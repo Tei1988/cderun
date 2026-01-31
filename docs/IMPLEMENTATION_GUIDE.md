@@ -9,40 +9,40 @@
 
 ### 実装済み
 - 基本的なCLI構造（Cobra使用）
-- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--mount-tools`, `--mount-all-tools`, `--cderun-mount-socket`, `--cderun-env`）
+- 厳密な引数解析（`--tty`, `--interactive`, `--network`, `--mount-socket`, `--mount-cderun`, `--image`, `--runtime`, `--env`, `--volume`, `--workdir`, `--mount-tools`, `--mount-all-tools`, `--cderun-mount-socket`, `--cderun-env` 等の全フラグ）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
 - 基本的なコンテナ実行（Docker API使用）
 - コンテナのライフサイクル管理（作成・起動・待機・削除）
 - 標準入出力のアタッチ（TTY/インタラクティブ対応）
 - 設定ファイル読み込み（`.cderun.yaml`, `.tools.yaml`）
 - イメージマッピング（サブコマンドからイメージ名の解決）
-- 優先順位解決ロジック（CLI, Env, YAML, Defaults）
-- ドライランモード（`--dry-run` による設定のプレビュー）
-- 環境変数処理（パススルー）
-- ソケット・バイナリマウント、ツールマウント
+- 優先順位解決ロジック（CLI, Env, YAML, Defaults の6階層）
+- ドライランモード（`--dry-run` による設定のプレビュー、YAML/JSON/Simple形式対応）
+- 環境変数処理（直接指定およびホストからのパススルー）
+- ソケット・バイナリマウント、ツールマウント（自動バイナリマウント含む）
 - コンテナ内作業ディレクトリ指定（`--workdir`）
 
 ### 未実装
-- Podmanサポート
-- 詳細ログ・デバッグ機能
+- Podmanサポート（Phase 4予定）
+- 詳細ログ・デバッグ機能（Phase 4予定）
 
 ## 実装フェーズ
 
-### Phase 1: コア機能（必須）
+### Phase 1: コア機能（必須） (Completed)
 基本的なコンテナ実行機能を実装
 
-### Phase 2: 設定管理
+### Phase 2: 設定管理 (Completed)
 設定ファイルとイメージマッピング
 
-### Phase 3: 高度な機能
+### Phase 3: 高度な機能 (Completed)
 環境変数、マウント機能など
 
-### Phase 4: 利便性向上
-ドライラン、ログなど
+### Phase 4: 利便性向上 (In Progress)
+ドライラン（完了）、ログ、Podmanサポートなど
 
 ---
 
-## Phase 1: コア機能
+## Phase 1: コア機能 (Completed)
 
 ### Step 1.1: 中間表現（ContainerConfig）の定義
 
@@ -97,7 +97,7 @@
 
 ---
 
-## Phase 2: 設定管理
+## Phase 2: 設定管理 (Completed)
 
 ### Step 2.1: 設定ファイル読み込み
 
@@ -129,14 +129,14 @@
 **目的**: CLIフラグ、環境変数、ツール別設定、グローバルデフォルト、ハードコードされたデフォルトの順で設定を解決する。
 
 **実装内容**:
-- 各設定項目（TTY、ネットワーク等）について、優先順位階層（P1〜P5）に従って最終的な値を決定するリゾルバーを実装。
+- 各設定項目（TTY、ネットワーク等）について、優先順位階層（P1〜P6）に従って最終的な値を決定するリゾルバーを実装。
 
 **完了条件**:
 - 複数の場所で設定が競合した場合に、定義された優先順位に従って正しく値が選択されること。
 
 ---
 
-## Phase 3: 高度な機能
+## Phase 3: 高度な機能 (Completed)
 
 ### Step 3.1: 環境変数パススルー
 
@@ -186,9 +186,9 @@
 
 ---
 
-## Phase 4: 利便性向上
+## Phase 4: 利便性向上 (In Progress)
 
-### Step 4.1: ドライランモード
+### Step 4.1: ドライランモード (Completed)
 
 **目的**: 実際のコンテナ実行を行わずに、実行される内容をプレビューする。
 
@@ -234,6 +234,7 @@
 ### Phase 4 (In Progress)
 - [x] Step 4.1: ドライランモード
 - [ ] Step 4.2: ログ・デバッグ
+- [ ] Step 4.3: Podmanサポート
 
 ## 各ステップの完了基準
 

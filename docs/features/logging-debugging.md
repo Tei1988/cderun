@@ -32,12 +32,12 @@ $ cderun --log-level trace node app.js
 
 #### 設定ファイル
 ```yaml
-cderun:
-  logging:
-    level: info  # error | warn | info | debug | trace
-    file: ~/.cderun/logs/cderun.log
-    format: text  # text | json
-    timestamp: true
+# .cderun.yaml
+logging:
+  level: info  # error | warn | info | debug | trace
+  file: ~/.cderun/logs/cderun.log
+  format: text  # text | json
+  timestamp: true
 ```
 
 #### 環境変数
@@ -103,14 +103,14 @@ $ cderun --log-file /tmp/cderun.log --log-tee node app.js
 
 ### ローテーション
 ```yaml
-cderun:
-  logging:
-    file: ~/.cderun/logs/cderun.log
-    rotation:
-      maxSize: 10MB
-      maxAge: 7d
-      maxBackups: 5
-      compress: true
+# .cderun.yaml
+logging:
+  file: ~/.cderun/logs/cderun.log
+  rotation:
+    maxSize: 10MB
+    maxAge: 7d
+    maxBackups: 5
+    compress: true
 ```
 
 ログファイル例:
@@ -142,10 +142,10 @@ $ cderun --log-format json node app.js
 
 ### カスタムフォーマット
 ```yaml
-cderun:
-  logging:
-    format: custom
-    template: "[{{.Level}}] {{.Time}} - {{.Message}}"
+# .cderun.yaml
+logging:
+  format: custom
+  template: "[{{.Level}}] {{.Time}} - {{.Message}}"
 ```
 
 ## デバッグ機能
@@ -160,16 +160,17 @@ docker run --rm -t -i node:latest node app.js
 ### 2. 設定のダンプ
 ```bash
 $ cderun config dump
-cderun:
-  runtime: docker
-  defaults:
-    tty: false
-    interactive: false
-tools:
-  node:
-    image: node:20-alpine
-    volumes:
-      - .:/workspace
+# .cderun.yaml
+runtime: docker
+defaults:
+  tty: false
+  interactive: false
+
+# .tools.yaml
+node:
+  image: node:20-alpine
+  volumes:
+    - .:/workspace
 ```
 
 ### 3. 実行トレース
@@ -180,11 +181,11 @@ $ cderun --trace node app.js
 [TRACE] 10:30:45.130 | loadConfig() completed (5ms)
 [TRACE] 10:30:45.131 | resolveImage() started
 [TRACE] 10:30:45.135 | resolveImage() completed (4ms)
-[TRACE] 10:30:45.136 | buildCommand() started
-[TRACE] 10:30:45.140 | buildCommand() completed (4ms)
-[TRACE] 10:30:45.141 | executeCommand() started
+[TRACE] 10:30:45.136 | buildContainerConfig() started
+[TRACE] 10:30:45.140 | buildContainerConfig() completed (4ms)
+[TRACE] 10:30:45.141 | Execute() started
 Hello, World!
-[TRACE] 10:30:46.200 | executeCommand() completed (1059ms)
+[TRACE] 10:30:46.200 | Execute() completed (1059ms)
 ```
 
 ### 4. エラーの詳細表示

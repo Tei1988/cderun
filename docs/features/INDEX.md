@@ -13,7 +13,7 @@
    - cderunフラグとサブコマンド引数の分離
 
 2. **[引数・設定優先順位 (Completed)](./argument-priority-logic.md)**
-   - P1〜P5の優先順位階層
+   - P1〜P6の優先順位階層
    - CLI、環境変数、設定ファイルの解決ロジック
 
 3. **[ポリグロットエントリーポイント (Completed)](./polyglot-entry.md)**
@@ -26,9 +26,9 @@
 
 ### ランタイム機能
 
-5. **[マルチランタイムサポート (Phase 1, 4予定)](./multi-runtime-support.md)**
-   - Docker (Phase 1) / Podman (Phase 4予定) サポート
-   - ランタイム自動検出 (Phase 2 Completed / Phase 4予定)
+5. **[マルチランタイムサポート (Phase 1 Completed / Phase 4予定)](./multi-runtime-support.md)**
+   - Docker (Phase 1 Completed) / Podman (Phase 4予定) サポート
+   - ランタイム自動検出 (Phase 4予定)
    - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
@@ -62,7 +62,7 @@
 
 12. **[ドライランモード (Completed)](./dry-run-mode.md)**
     - 実行前のコマンドプレビュー
-    - JSON/YAML/シェル形式での出力
+    - JSON/YAML/Simple形式での出力
 
 13. **[ログ・デバッグ (Phase 4予定)](./logging-debugging.md)**
     - 詳細ログ出力
@@ -105,12 +105,12 @@
 - 設定ファイル読み込み
 - イメージマッピング
 - 優先順位解決
-- ドライランモード
+- ドライランモード (Phase 4から前倒しで完了)
 
 ### Phase 3: 高度な機能 (Completed)
 - 環境変数パススルー
 - ソケット・バイナリマウント・ツールマウント
 
-### Phase 4: 利便性向上
+### Phase 4: 利便性向上 (In Progress)
 - Podmanサポート
 - ログ・デバッグ機能
