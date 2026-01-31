@@ -7,6 +7,7 @@ import (
 	"io"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -87,9 +88,17 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 
 // RemoveContainer removes a container.
 func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string) error {
-	return d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
+	err := d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
 		Force: true,
 	})
+	if err != nil {
+		// Suppress errors if the container is already gone or removal is already in progress.
+		// This can happen when AutoRemove is enabled and the container finishes before the defer block runs.
+		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+			return nil
+		}
+	}
+	return err
 }
 
 // ResizeContainerTTY resizes the terminal of a container.
