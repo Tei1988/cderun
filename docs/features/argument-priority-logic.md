@@ -43,13 +43,13 @@ node:
 ### P6: Hardcoded Defaults (Lowest Priority)
 - **定義**: プログラム内でハードコードされた最終フォールバック値。
 - **デフォルト値:**
-   - `tty: false`
-   - `interactive: false`
-   - `network: bridge`
-   - `remove: true`
-   - `runtime: docker`
-   - `image`: なし (Fatal Error)
-      - ※ P1〜P6のいずれでも解決できない場合、プログラムはエラーメッセージを出力して終了すること (Exit Code 1)。勝手なデフォルトイメージ（`ubuntu:latest` 等）を使用してはならない。
+  - `tty: false`
+  - `interactive: false`
+  - `network: bridge`
+  - `remove: true`
+  - `runtime: docker`
+  - `image`: なし (Fatal Error)
+    - ※ P1〜P6のいずれでも解決できない場合、プログラムはエラーメッセージを出力して終了すること (Exit Code 1)。勝手なデフォルトイメージ（`ubuntu:latest` 等）を使用してはならない。
 
 ## 判定ロジックの実装要件
 
