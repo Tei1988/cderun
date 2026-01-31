@@ -56,12 +56,16 @@ type Logger struct {
 	Timestamp bool
 }
 
-var globalLogger = &Logger{
-	Level:     InfoLevel,
-	Writer:    os.Stderr,
-	Format:    "text",
-	Timestamp: true,
-}
+var (
+	globalLogger = &Logger{
+		Level:     InfoLevel,
+		Writer:    os.Stderr,
+		Format:    "text",
+		Timestamp: true,
+	}
+
+	currentLogFile *os.File
+)
 
 func Init(level string, format string, file string, tee bool, timestamp bool) error {
 	globalLogger.Level = ParseLevel(level)
@@ -75,10 +79,23 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 		if err != nil {
 			return fmt.Errorf("failed to open log file %q: %w", file, err)
 		}
+
+		// Close previous log file if it was open
+		if currentLogFile != nil {
+			currentLogFile.Close()
+		}
+		currentLogFile = f
+
 		if tee {
 			out = io.MultiWriter(os.Stderr, f)
 		} else {
 			out = f
+		}
+	} else {
+		// If switching to no file, close previous log file
+		if currentLogFile != nil {
+			currentLogFile.Close()
+			currentLogFile = nil
 		}
 	}
 

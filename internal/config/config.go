@@ -16,14 +16,13 @@ type CDERunConfig struct {
 }
 
 type ConfigDefaults struct {
-	TTY          *bool         `yaml:"tty"`
-	Interactive  *bool         `yaml:"interactive"`
-	Network      string        `yaml:"network"`
-	Remove       *bool         `yaml:"remove"`
-	MountCderun  *bool         `yaml:"mountCderun"`
-	DryRun       *bool         `yaml:"dryRun"`
-	DryRunFormat string        `yaml:"dryRunFormat"`
-	Logging      LoggingConfig `yaml:"logging"`
+	TTY          *bool  `yaml:"tty"`
+	Interactive  *bool  `yaml:"interactive"`
+	Network      string `yaml:"network"`
+	Remove       *bool  `yaml:"remove"`
+	MountCderun  *bool  `yaml:"mountCderun"`
+	DryRun       *bool  `yaml:"dryRun"`
+	DryRunFormat string `yaml:"dryRunFormat"`
 }
 
 type LoggingConfig struct {

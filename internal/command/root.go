@@ -409,16 +409,38 @@ intended for the subcommand.`,
 		subcommand := args[0]
 		passthroughArgs := args[1:]
 
+		// Early logger initialization with CLI and Environment settings before config loading.
+		// This allows loadConfigs() to use the correct log level.
+		initialLevel := "info"
+		vLevel := opts.verbose
+		if opts.cderunVerbose > vLevel {
+			vLevel = opts.cderunVerbose
+		}
+		if vLevel >= 3 {
+			initialLevel = "trace"
+		} else if vLevel >= 2 {
+			initialLevel = "debug"
+		}
+		if env := os.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+			initialLevel = env
+		}
+		if opts.cderunLogLevel != "" {
+			initialLevel = opts.cderunLogLevel
+		} else if opts.logLevel != "" {
+			initialLevel = opts.logLevel
+		}
+		_ = logging.Init(initialLevel, "text", "", false, true)
+
 		// Load configurations
 		toolsCfg, globalCfg := opts.loadConfigs()
 
-		// Resolve settings using priority logic
+		// Resolve settings using priority logic (CLI > Env > Config > Default)
 		resolved, err := opts.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
 		if err != nil {
 			return fmt.Errorf("configuration error: %w", err)
 		}
 
-		// Initialize logger with resolved settings
+		// Re-initialize logger with fully resolved settings including those from config files.
 		if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
@@ -460,7 +482,6 @@ func Execute(rawArgs []string) error {
 }
 
 func preprocessArgs(args []string) ([]string, error) {
-	logging.Trace("Preprocessing args: %v", args)
 	if len(args) == 0 {
 		return args, nil
 	}
