@@ -87,6 +87,13 @@ func TestResolve(t *testing.T) {
 		assert.Contains(t, err.Error(), "no image mapping found")
 	})
 
+	t.Run("Allow empty subcommand for resolution", func(t *testing.T) {
+		cli := CLIOptions{}
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "", res.Image)
+	})
+
 	t.Run("Volume parsing", func(t *testing.T) {
 		cli := CLIOptions{}
 		tools := ToolsConfig{
@@ -195,6 +202,45 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "/p1/socket", res.Socket)
 		assert.True(t, res.SocketSet)
+	})
+
+	t.Run("Runtime auto-detection from socket path", func(t *testing.T) {
+		cli := CLIOptions{
+			MountSocket:    "/run/user/1000/podman/podman.sock",
+			MountSocketSet: true,
+		}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "/run/user/1000/podman/podman.sock", res.Socket)
+
+		cli = CLIOptions{
+			MountSocket:    "/var/run/docker.sock",
+			MountSocketSet: true,
+		}
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "docker", res.Runtime)
+	})
+
+	t.Run("Default socket for specified runtime", func(t *testing.T) {
+		cli := CLIOptions{
+			Runtime:    "podman",
+			RuntimeSet: true,
+		}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "/run/podman/podman.sock", res.Socket)
+
+		cli = CLIOptions{
+			Runtime:    "docker",
+			RuntimeSet: true,
+		}
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "/var/run/docker.sock", res.Socket)
 	})
 
 	t.Run("MountCderun resolution", func(t *testing.T) {

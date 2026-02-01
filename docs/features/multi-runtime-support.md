@@ -53,11 +53,15 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
 3. **コマンドライン引数**: `--runtime`, `--mount-socket` および P1 内部オーバーライド。
 
-### 自動検出ロジック (Future Phase)
+### 自動検出ロジック (Completed)
 
-ソケットの存在確認によるランタイムの自動選択機能は将来のフェーズで実装予定です。
+ソケットの存在確認によるランタイムの自動選択機能。
 
-1. デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
+1. `--runtime` または `CDERUN_RUNTIME` が指定されている場合はそれを使用。
+2. 指定がない場合、以下のデフォルトパスを順に確認し、最初に見つかったものを使用。
+   - `/var/run/docker.sock` (Runtime: `docker`)
+   - `/run/podman/podman.sock` (Runtime: `podman`)
+3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
 
 ### 明示的な指定 (Completed)
 
@@ -84,14 +88,13 @@ cderun --runtime podman node app.js
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
 - **Podman**: Docker 互換の API を使用。Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
 
-## ランタイム情報の表示 (Planned)
+## ランタイム情報の表示 (Completed)
 
 ### 現在のランタイム確認
+サブコマンドを指定せずに `--dry-run` を実行することで、診断情報を表示できます。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
+
 ```bash
-$ cderun debug info
-...
-Runtime: docker 24.0.7
-Socket: /var/run/docker.sock
+$ cderun --dry-run
 ```
 
 
