@@ -467,28 +467,6 @@ node:
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
 	})
 
-	t.Run("returns error for podman (not implemented yet)", func(t *testing.T) {
-		// Save and restore package-level state
-		oldRuntimeName := opts.runtimeName
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
-		t.Cleanup(func() {
-			opts.runtimeName = oldRuntimeName
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
-		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
-		// Use the real runtimeFactory
-		exitFunc = func(code int) {}
-
-		_, err := executeCommand("--image", "alpine", "--runtime", "podman", "sh")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "podman runtime is not implemented yet")
-	})
 
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
