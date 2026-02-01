@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,8 +25,6 @@ func TestNewFlags(t *testing.T) {
 	exitFunc = func(code int) {}
 
 	t.Run("P2 flags for new features", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand(
@@ -72,8 +69,6 @@ func TestNewFlags(t *testing.T) {
 	})
 
 	t.Run("P1 flags override P2 for new features", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand(
@@ -104,8 +99,6 @@ func TestNewFlags(t *testing.T) {
 	})
 
 	t.Run("Resolve from .tools.yaml for new features", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		oldWd, err := os.Getwd()
@@ -137,9 +130,6 @@ node:
 	})
 
 	t.Run("Invalid pull policy returns error", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		_, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
@@ -147,9 +137,6 @@ node:
 	})
 
 	t.Run("Invalid pull policy in P1 returns error", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		_, err := executeCommand("--image", "alpine", "sh", "--cderun-pull=invalid")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
