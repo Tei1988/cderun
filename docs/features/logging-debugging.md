@@ -18,12 +18,12 @@ cderunの動作を詳細に確認するためのログ出力とデバッグ機�
 #### コマンドライン
 ```bash
 # 詳細ログ (DEBUG)
-$ cderun --verbose --verbose node app.js
-$ cderun --log-level debug node app.js
+cderun --verbose --verbose node app.js
+cderun --log-level debug node app.js
 
 # 最も詳細 (TRACE)
-$ cderun --verbose --verbose --verbose node app.js
-$ cderun --log-level trace node app.js
+cderun --verbose --verbose --verbose node app.js
+cderun --log-level trace node app.js
 ```
 
 > **Note**: `-v` shorthand is reserved for `--volume` and cannot be used for `--verbose`.
@@ -49,14 +49,14 @@ export CDERUN_LOG_FILE=/tmp/cderun.log
 
 ### INFO レベル（デフォルト）
 ```bash
-$ cderun node app.js
+cderun node app.js
 2024-01-15 10:30:45 [INFO] Running: node app.js
 Hello, World!
 ```
 
 ### DEBUG レベル
 ```bash
-$ cderun --log-level debug node app.js
+cderun --log-level debug node app.js
 2024-01-15 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
 2024-01-15 10:30:45 [DEBUG] Resolved Image: node:20-alpine
 2024-01-15 10:30:45 [INFO] Running: node app.js
@@ -69,7 +69,7 @@ Hello, World!
 
 ### TRACE レベル
 ```bash
-$ cderun --log-level trace node app.js
+cderun --log-level trace node app.js
 2024-01-15 10:30:45 [TRACE] Loading configurations...
 2024-01-15 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
 2024-01-15 10:30:45 [TRACE] Resolving configurations for tool: node
@@ -87,22 +87,22 @@ $ cderun --log-level trace node app.js
 ### ファイル出力
 ```bash
 # ファイルのみに出力
-$ cderun --log-file /tmp/cderun.log node app.js
+cderun --log-file /tmp/cderun.log node app.js
 
 # 標準エラー出力とファイルの両方
-$ cderun --log-file /tmp/cderun.log --log-tee node app.js
+cderun --log-file /tmp/cderun.log --log-tee node app.js
 ```
 
 ## フォーマット
 
 ### テキスト形式（デフォルト）
-```
+```text
 2024-01-15 10:30:45 [INFO] Running: node app.js
 ```
 
 ### JSON形式
 ```bash
-$ cderun --log-format json node app.js
+cderun --log-format json node app.js
 {"level":"info","msg":"Running: node app.js","time":"2024-01-15T10:30:45Z"}
 ```
 
