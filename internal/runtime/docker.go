@@ -91,7 +91,13 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 
 	// Handle ExposedPorts
 	for _, port := range config.Expose {
-		p, err := nat.NewPort("tcp", port)
+		proto := "tcp"
+		portNum := port
+		if parts := strings.SplitN(port, "/", 2); len(parts) == 2 {
+			portNum = parts[0]
+			proto = parts[1]
+		}
+		p, err := nat.NewPort(proto, portNum)
 		if err != nil {
 			return "", fmt.Errorf("invalid expose port %q: %w", port, err)
 		}
@@ -116,11 +122,14 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 
 	// Handle PortBindings
 	if len(config.Ports) > 0 {
-		_, bindings, err := nat.ParsePortSpecs(config.Ports)
+		exposedPorts, bindings, err := nat.ParsePortSpecs(config.Ports)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse port specs: %w", err)
 		}
 		hostConfig.PortBindings = bindings
+		for k, v := range exposedPorts {
+			containerConfig.ExposedPorts[k] = v
+		}
 	}
 
 	// Handle Tmpfs

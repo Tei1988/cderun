@@ -108,10 +108,12 @@ func TestNewFlags(t *testing.T) {
 		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
 node:
@@ -121,9 +123,10 @@ node:
   memory: 1g
   cpus: 1.5
 `
-		os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
 
-		_, err := executeCommand("node", "app.js")
+		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
