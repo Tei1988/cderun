@@ -353,7 +353,12 @@ cderun --log-timestamp=false node app.js
 
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
-  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`, `--cderun-user`, `--cderun-privileged`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-memory`, `--cderun-cpus`, `--cderun-tmpfs`, `--cderun-device`, `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+- **カテゴリ別の対応フラグ例**:
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
+  - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
+  - **リソース**: `--cderun-memory`, `--cderun-cpus`
+  - **マウント・ツール**: `--cderun-volume`, `--cderun-mount-socket`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## オプションの優先順位

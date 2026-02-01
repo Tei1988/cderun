@@ -440,7 +440,7 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
 		fmt.Printf("Pull: %s\n", containerConfig.Pull)
 		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		fmt.Printf("CPUs: %f\n", containerConfig.CPUs)
+		fmt.Printf("CPUs: %g\n", containerConfig.CPUs)
 		fmt.Printf("Tmpfs: %s\n", strings.Join(containerConfig.Tmpfs, ", "))
 		fmt.Printf("Devices: %s\n", strings.Join(containerConfig.Devices, ", "))
 	default: // Default to YAML
