@@ -118,12 +118,15 @@ $ cderun --dry-run node app.js
 ## 将来の拡張予定 (Planned)
 
 ### ログローテーション
+設定ファイルでの指定はサポートされていますが、実際のローテーション処理は将来のフェーズで実装予定です。
+
 ```yaml
 # .cderun.yaml
 logging:
   rotation:
     maxSize: 10MB
     maxAge: 7d
+    maxBackups: 5
     compress: true
 ```
 
