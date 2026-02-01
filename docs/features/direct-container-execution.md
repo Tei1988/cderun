@@ -12,10 +12,23 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
                     ↓
                ContainerConfig
                     ↓
-          runtime.CreateContainer()  ← Docker Engine API
-          runtime.StartContainer()   ← Podman API (Planned)
-          runtime.AttachContainer()  ← Docker Engine API
+          runtime.CreateContainer()
+          runtime.StartContainer()
+          runtime.AttachContainer()
+          ...
 ```
+
+### 実装ステータス (CRIインターフェース)
+
+| メソッド | Docker (moby) | Podman (bindings) |
+| :--- | :---: | :---: |
+| `CreateContainer` | implemented | stub / planned |
+| `StartContainer` | implemented | stub / planned |
+| `WaitContainer` | implemented | stub / planned |
+| `RemoveContainer` | implemented | stub / planned |
+| `AttachContainer` | implemented | stub / planned |
+| `SignalContainer` | implemented | stub / planned |
+| `ResizeContainerTTY` | implemented | stub / planned |
 
 **メリット:**
 - コマンド生成不要
