@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Phase 1, 2 Completed)
+# Feature: Direct Container Execution (Completed)
 
 ## 概要
 
@@ -12,10 +12,23 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
                     ↓
                ContainerConfig
                     ↓
-          runtime.CreateContainer()  ← Docker Engine API
-          runtime.StartContainer()   ← Podman API
-          runtime.AttachContainer()  ← containerd API
+          runtime.CreateContainer()
+          runtime.StartContainer()
+          runtime.AttachContainer()
+          ...
 ```
+
+### 実装ステータス (CRIインターフェース)
+
+| メソッド | Docker (moby) | Podman (bindings) |
+| :--- | :---: | :---: |
+| `CreateContainer` | implemented | stub / planned |
+| `StartContainer` | implemented | stub / planned |
+| `WaitContainer` | implemented | stub / planned |
+| `RemoveContainer` | implemented | stub / planned |
+| `AttachContainer` | implemented | stub / planned |
+| `SignalContainer` | implemented | stub / planned |
+| `ResizeContainerTTY` | implemented | stub / planned |
 
 **メリット:**
 - コマンド生成不要
@@ -37,11 +50,12 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 
 - **ライフサイクル**: 作成、起動、待機、削除の各フェーズをメソッド化。
 - **IO制御**: 標準入出力（stdin/stdout/stderr）のアタッチ。
+- **操作**: シグナル送信（SignalContainer）、TTYリサイズ（ResizeContainerTTY）。
 
 ### ランタイム実装のポイント
 
 - **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
-- **Podman実装**: Podman API (`github.com/containers/podman/v4/pkg/bindings`) を使用（Docker互換）。
+- **Podman実装**: Podman API (`github.com/containers/podman/v4/pkg/bindings`) を使用予定（現在はスタブ）。
 - **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
 
 ## 実行フロー
@@ -52,57 +66,15 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 2. **クリーンアップ予約**: `config.Remove` が真なら、終了時に `RemoveContainer` を呼ぶよう `defer` 等で設定。
 3. **コンテナ起動**: `StartContainer` を呼び出す。
 4. **IOアタッチ**: `TTY` または `Interactive` の場合、`AttachContainer` で入出力を接続。
-5. **終了待機**: `WaitContainer` でプロセス終了を待ち、終了コードを取得。
+5. **シグナル/リサイズ処理**: 実行中にシグナル転送やTTYリサイズ同期を行う。
+6. **終了待機**: `WaitContainer` でプロセス終了を待ち、終了コードを取得。
 
 ## ネストした実行の解決
-
-### ネストした実行の解決
 
 CRIを直接使うことで、コンテナ内からcderunを実行しても、同じランタイムインスタンスを使用できる。
 
 - **ランタイム共有**: ホストからマウントされたソケット経由で、コンテナ内からもホストのランタイムを操作。
 - **環境変数の引き継ぎ**: 実行ホスト（コンテナ内）の環境変数を `ContainerConfig` にマウントまたは追加することで、ネストしたコンテナに引き継ぐ。
-
-## 設定
-
-### ランタイムの選択 (`.cderun.yaml`)
-
-```yaml
-runtime: docker  # docker | podman
-runtimePath: /usr/bin/docker
-
-defaults:
-  tty: false
-  interactive: false
-```
-
-### ツール設定 (`.tools.yaml`)
-
-```yaml
-python:
-  image: python:3.11-slim
-    tty: true
-    interactive: true
-    volumes:
-      - .:/workspace
-    env:
-      - PYTHONUNBUFFERED=1
-    workdir: /workspace
-```
-
-## メリット
-
-### 1. コマンド生成不要
-文字列ベースのコマンド組み立てを排除し、構造化された設定を直接APIに渡す。
-
-### 2. 精度の高いエラーハンドリング
-ランタイムが返す詳細なエラー情報をそのまま処理可能。
-
-### 3. 環境の引き継ぎ
-親プロセスの環境変数などをプログラム的に制御し、新しいコンテナに注入。
-
-### 4. プログラマティックな制御
-非同期での状態監視や、複雑なライフサイクル管理が可能。
 
 ## ロードマップ
 
@@ -118,12 +90,14 @@ python:
 - ドライランモード (Phase 4から前倒しで完了)
 
 ### Phase 3: 高度な機能 (Completed)
-- 環境変数の引き継ぎ
+- 環境変数パススルー
 - ソケット・バイナリマウント・ツールマウント
 
 ### Phase 4: 利便性向上 (In Progress)
 - Podman CRI実装 (Planned)
-- エラーハンドリングの強化 (In Progress)
+- エラーハンドリングの強化
+- シグナル転送・リサイズ同期 (Completed)
+- 詳細ログ機能 (Completed)
 
 ## 依存ライブラリ
 

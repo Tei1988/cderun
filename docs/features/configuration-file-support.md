@@ -30,13 +30,6 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 
 最初に見つかった設定ファイルを使用する。複数の設定ファイルはマージしない。
 
-## 設定構造
-
-設定は2つのファイルに分離：
-
-1. **`.cderun.yaml`**: cderun自体の動作設定
-2. **`.tools.yaml`**: 各サブコマンドの実行設定
-
 ## 設定スキーマ
 
 ### `.cderun.yaml` 例
@@ -48,6 +41,15 @@ defaults:
   interactive: false               # デフォルトでインタラクティブモード
   network: bridge                  # デフォルトネットワーク
   remove: true                     # コンテナの自動削除
+  mountCderun: false               # cderunバイナリのマウント
+  dryRun: false                    # ドライランモードのデフォルト
+  dryRunFormat: yaml               # ドライランの出力形式
+logging:
+  level: info                      # ログレベル
+  file: ./cderun.log               # ログファイルパス
+  format: text                     # ログフォーマット (text/json)
+  timestamp: true                  # タイムスタンプの有無
+  tee: false                       # stderrとファイルの両方に出力
 ```
 
 ### `.tools.yaml` 例
@@ -64,6 +66,7 @@ node:
     - NODE_ENV=development
   workdir: /workspace
   remove: true
+  mountCderun: true
   
 python:
   image: python:3.11-slim
@@ -103,6 +106,26 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `interactive` (bool): デフォルトでSTDINを開いたままにする
 - `network` (string): デフォルトのネットワーク設定
 - `remove` (bool): コンテナ終了後に自動削除
+- `mountCderun` (bool): cderunバイナリをマウント
+- `dryRun` (bool): ドライランモードのデフォルト値
+- `dryRunFormat` (string): ドライランの出力形式 (`yaml` | `json` | `simple`)
+
+#### `logging` サブセクション
+ログ出力に関する設定。
+
+- `level` (string): ログレベル (`error` | `warn` | `info` | `debug` | `trace`)
+- `file` (string): ログ出力先のファイルパス
+- `format` (string): ログの出力形式 (`text` | `json`)
+- `timestamp` (bool): タイムスタンプを含めるかどうか
+- `tee` (bool): 標準エラー出力とファイルの両方に出力するかどうか
+
+#### `rotation` サブセクション
+ログローテーションの設定。
+
+- `maxSize` (string): 1つのログファイルの最大サイズ（例: "10MB", "500KB"）
+- `maxAge` (string): ログファイルを保持する最大日数（例: "7d", "30d"）
+- `maxBackups` (int): 保持する古いログファイルの最大数
+- `compress` (bool): 古いログファイルを圧縮（gzip）するかどうか
 
 ### `.tools.yaml` （サブコマンドの設定）
 
@@ -122,6 +145,9 @@ cderunのコマンドライン引数で指定できる全てのオプション�
   - 形式: `KEY=VALUE`
   - 例: `NODE_ENV=development`
 - `workdir` (string): コンテナ内の作業ディレクトリ
+- `mountCderun` (bool): cderunバイナリをマウント
+- `dryRun` (bool): ドライランモード
+- `dryRunFormat` (string): ドライラン形式
 
 ## 優先順位
 
@@ -131,7 +157,8 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 2. **コマンドライン引数**: `--tty`, `--network` 等
 3. **環境変数**: `CDERUN_TTY` 等
 4. **ツール固有設定**: `.tools.yaml` 内の設定
-5. **cderunデフォルト設定 / ハードコード値**: `.cderun.yaml` の `defaults` または内部デフォルト
+5. **cderunデフォルト設定**: `.cderun.yaml` の `defaults` または `logging`
+6. **ハードコード値**: 内部デフォルト値
 
 ### 例
 
