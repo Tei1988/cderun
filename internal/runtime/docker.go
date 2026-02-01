@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
@@ -69,9 +70,9 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
 	defer reader.Close()
-	// Wait for pull to complete by reading the stream
-	_, _ = io.Copy(io.Discard, reader)
-	return nil
+
+	// Wait for pull to complete and check for errors in the stream
+	return jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
 }
 
 // CreateContainer creates a new container based on the provided config.
@@ -144,7 +145,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 
 	// Handle Devices
 	for _, dev := range config.Devices {
-		parts := strings.Split(dev, ":")
+		parts := strings.SplitN(dev, ":", 3)
 		dMapping := dockercontainer.DeviceMapping{
 			PathOnHost:        parts[0],
 			PathInContainer:   parts[0],

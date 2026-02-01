@@ -15,6 +15,7 @@ import (
 	"time"
 	"strings"
 
+	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -438,7 +439,7 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
 		fmt.Printf("Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
 		fmt.Printf("Pull: %s\n", containerConfig.Pull)
-		fmt.Printf("Memory: %d\n", containerConfig.Memory)
+		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
 		fmt.Printf("CPUs: %f\n", containerConfig.CPUs)
 		fmt.Printf("Tmpfs: %s\n", strings.Join(containerConfig.Tmpfs, ", "))
 		fmt.Printf("Devices: %s\n", strings.Join(containerConfig.Devices, ", "))
