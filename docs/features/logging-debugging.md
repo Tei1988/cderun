@@ -36,7 +36,7 @@ logging:
   file: ./cderun.log
   format: text  # text | json
   timestamp: true
-  tee: true     # stderrとファイルの両方に出力
+  tee: false    # stderrとファイルの両方に出力 (デフォルト: false)
 ```
 
 #### 環境変数
