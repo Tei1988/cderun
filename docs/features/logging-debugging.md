@@ -112,7 +112,7 @@ $ cderun --log-format json node app.js
 実行せずにコンテナ構成を表示します。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
 
 ```bash
-$ cderun --dry-run node app.js
+cderun --dry-run node app.js
 ```
 
 ## 将来の拡張予定 (Planned)
