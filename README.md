@@ -2,8 +2,8 @@
 
 **Concept**
 
-> "All you need on your local machine is Docker."
-> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand. It keeps your host clean and ensures reproducible environments defined in a single YAML file.
+> "All you need on your local machine is Docker or Podman."
+> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand using container runtimes (Docker/Podman). It keeps your host clean and ensures reproducible environments defined in a single YAML file.
 
 ## Usage
 

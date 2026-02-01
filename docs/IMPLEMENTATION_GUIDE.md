@@ -45,9 +45,9 @@
 
 ---
 
-### Phase 4: 利便性向上 (In Progress)
+### Phase 4: 利便性向上 (Completed)
 
-### Step 4.1: ドライランモード (In Progress)
+### Step 4.1: ドライランモード (Completed)
 
 **目的**: 実際のコンテナ実行を行わずに、実行される内容をプレビューする。
 
@@ -78,7 +78,7 @@
 
 ---
 
-### Step 4.4: Podmanサポート (In Progress)
+### Step 4.4: Podmanサポート (Completed)
 
 **目的**: Podmanランタイムへの対応。
 

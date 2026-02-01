@@ -59,8 +59,8 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 
 1. `--runtime` または `CDERUN_RUNTIME` が指定されている場合はそれを使用。
 2. 指定がない場合、以下のデフォルトパスを順に確認し、最初に見つかったものを使用。
-   - `/var/run/docker.sock` (Runtime: `docker`)
-   - `/run/podman/podman.sock` (Runtime: `podman`)
+  - `/var/run/docker.sock` (Runtime: `docker`)
+  - `/run/podman/podman.sock` (Runtime: `podman`)
 3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
 
 ### 明示的な指定 (Completed)
@@ -94,7 +94,7 @@ cderun --runtime podman node app.js
 サブコマンドを指定せずに `--dry-run` を実行することで、診断情報を表示できます。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
 
 ```bash
-$ cderun --dry-run
+cderun --dry-run
 ```
 
 
