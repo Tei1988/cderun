@@ -7,7 +7,7 @@
 
 ## アーキテクチャ
 
-```
+```text
 cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コンテナ実行
                     ↓
                ContainerConfig

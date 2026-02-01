@@ -1,4 +1,4 @@
-# Feature: Multi-Runtime Support (Phase 4 In Progress)
+# Feature: Multi-Runtime Support (Completed)
 
 ## 概要
 
@@ -26,7 +26,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 cderun独自の`ContainerRuntime`インターフェースを定義し、各ランタイムの独自APIをラップする。
 
-```
+```text
 cderun ContainerRuntimeインターフェース
         │
         ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
