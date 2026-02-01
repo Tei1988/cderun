@@ -41,12 +41,12 @@
 ### Phase 3: 高度な機能 (Completed)
 環境変数、マウント機能など
 
-### Phase 4: 利便性向上 (In Progress)
+### Phase 4: 利便性向上 (Completed)
 ドライラン（完了）、インタラクティブ性の向上（完了）、ログ（基本完了）、Podmanサポート（完了）
 
 ---
 
-## Phase 4: 利便性向上 (In Progress)
+## Phase 4: 利便性向上 (Completed)
 
 ### Step 4.1: ドライランモード (Completed)
 
@@ -101,7 +101,7 @@
 - [x] Step 3.3: cderunバイナリマウント
 - [x] Step 3.4: ツールマウント
 
-### Phase 4 (In Progress)
+### Phase 4 (Completed)
 - [x] Step 4.1: ドライランモード
 - [x] Step 4.2: インタラクティブ性の向上（シグナル、リサイズ）
 - [x] Step 4.3: ログ・デバッグ
