@@ -49,11 +49,10 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string) error {
-	if pullPolicy == "never" {
+	switch pullPolicy {
+	case "never":
 		return nil
-	}
-
-	if pullPolicy == "missing" || pullPolicy == "" {
+	case "missing":
 		_, _, err := d.client.ImageInspectWithRaw(ctx, img)
 		if err == nil {
 			return nil // Image exists locally
@@ -63,7 +62,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		}
 	}
 
-	// Always or missing (but not found locally)
+	// Policy is "always" or "missing" (and not found locally)
 	logging.Info("Pulling image %s...", img)
 	reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 	if err != nil {

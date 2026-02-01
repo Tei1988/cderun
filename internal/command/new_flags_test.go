@@ -135,4 +135,23 @@ node:
 		assert.Equal(t, int64(1024*1024*1024), mockRuntime.CreatedConfig.Memory)
 		assert.Equal(t, 1.5, mockRuntime.CreatedConfig.CPUs)
 	})
+
+	t.Run("Invalid pull policy returns error", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		_, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
+		assert.Contains(t, err.Error(), "allowed values are \"always\", \"missing\", or \"never\"")
+	})
+
+	t.Run("Invalid pull policy in P1 returns error", func(t *testing.T) {
+		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
+
+		_, err := executeCommand("--image", "alpine", "sh", "--cderun-pull=invalid")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
+	})
 }

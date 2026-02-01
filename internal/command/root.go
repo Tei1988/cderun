@@ -639,6 +639,14 @@ intended for the subcommand.`,
 			return fmt.Errorf("configuration error: %w", err)
 		}
 
+		// Validate pull policy
+		switch resolved.Pull {
+		case "always", "missing", "never":
+			// Valid
+		default:
+			return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
+		}
+
 		if len(args) == 0 && !resolved.DryRun {
 			return cmd.Help()
 		}
