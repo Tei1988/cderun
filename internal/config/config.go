@@ -23,6 +23,23 @@ type ConfigDefaults struct {
 	MountCderun  *bool  `yaml:"mountCderun"`
 	DryRun       *bool  `yaml:"dryRun"`
 	DryRunFormat string `yaml:"dryRunFormat"`
+	// New fields
+	Ports      []string `yaml:"ports"`
+	PublishAll *bool    `yaml:"publishAll"`
+	Expose     []string `yaml:"expose"`
+	Hostname   string   `yaml:"hostname"`
+	DNS        []string `yaml:"dns"`
+	AddHosts   []string `yaml:"addHosts"`
+	User       string   `yaml:"user"`
+	Privileged *bool    `yaml:"privileged"`
+	CapAdd     []string `yaml:"capAdd"`
+	CapDrop    []string `yaml:"capDrop"`
+	Entrypoint []string `yaml:"entrypoint"`
+	Pull       string   `yaml:"pull"`
+	Memory     string   `yaml:"memory"`
+	CPUs       float64  `yaml:"cpus"`
+	Tmpfs      []string `yaml:"tmpfs"`
+	Devices    []string `yaml:"devices"`
 }
 
 type LoggingConfig struct {
@@ -53,6 +70,23 @@ type ToolConfig struct {
 	MountCderun *bool    `yaml:"mountCderun"`
 	DryRun      *bool    `yaml:"dryRun"`
 	DryRunFormat string   `yaml:"dryRunFormat"`
+	// New fields
+	Ports      []string `yaml:"ports"`
+	PublishAll *bool    `yaml:"publishAll"`
+	Expose     []string `yaml:"expose"`
+	Hostname   string   `yaml:"hostname"`
+	DNS        []string `yaml:"dns"`
+	AddHosts   []string `yaml:"addHosts"`
+	User       string   `yaml:"user"`
+	Privileged *bool    `yaml:"privileged"`
+	CapAdd     []string `yaml:"capAdd"`
+	CapDrop    []string `yaml:"capDrop"`
+	Entrypoint []string `yaml:"entrypoint"`
+	Pull       string   `yaml:"pull"`
+	Memory     string   `yaml:"memory"`
+	CPUs       float64  `yaml:"cpus"`
+	Tmpfs      []string `yaml:"tmpfs"`
+	Devices    []string `yaml:"devices"`
 }
 
 type ToolsConfig map[string]ToolConfig

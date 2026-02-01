@@ -8,6 +8,9 @@ import (
 
 // ContainerRuntime defines the interface for interacting with container runtimes.
 type ContainerRuntime interface {
+	// Image management
+	PullImage(ctx context.Context, image string, pullPolicy string) error
+
 	// Container lifecycle
 	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
 	StartContainer(ctx context.Context, containerID string) error

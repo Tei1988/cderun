@@ -67,6 +67,11 @@ cderun node app.js --cderun-image node:20-alpine
 - `--volume`, `-v`: Bind mount a volume (hostPath:containerPath[:ro|rw]).
 - `--workdir`, `-w`: Working directory inside the container.
 - `--network`: Connect a container to a network (default: "bridge").
+- `--publish`, `-p`: Publish a container's port(s) to the host.
+- `--user`, `-u`: Username or UID to use.
+- `--privileged`: Give extended privileges to this container.
+- `--pull`: Pull image before running (always, missing, never).
+- `--memory`, `-m`: Memory limit.
 - `--remove`: Automatically remove the container when it exits (default: true).
 - `--runtime`: Container runtime to use (docker/podman).
 - `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).

@@ -168,6 +168,116 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
+### `--publish`, `-p`
+- **型**: stringSlice
+- **説明**: ポートマッピング（ホストポート:コンテナポート）
+- **用途**: コンテナのポートをホストに公開
+
+```bash
+cderun -p 8080:80 nginx
+```
+
+### `--publish-all`, `-P`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: すべての公開ポートをランダムなポートにマッピング
+
+### `--expose`
+- **型**: stringSlice
+- **説明**: 特定のポートまたはポート範囲を公開
+
+```bash
+cderun --expose 80 node app.js
+cderun --expose 80/udp node app.js
+```
+
+### `--hostname`
+- **型**: string
+- **説明**: コンテナのホスト名
+
+```bash
+cderun --hostname my-container alpine hostname
+```
+
+### `--dns`
+- **型**: stringSlice
+- **説明**: カスタムDNSサーバの設定
+
+```bash
+cderun --dns 8.8.8.8 alpine ping google.com
+```
+
+### `--add-host`
+- **型**: stringSlice
+- **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
+
+```bash
+cderun --add-host my-server:192.168.1.10 alpine ping my-server
+```
+
+### `--user`, `-u`
+- **型**: string
+- **説明**: 実行ユーザー/UID (format: <name|uid>[:<group|gid>])
+
+```bash
+cderun -u 1000:1000 alpine whoami
+```
+
+### `--privileged`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: 特権モードで実行
+
+```bash
+cderun --privileged alpine ls /dev
+```
+
+### `--cap-add`, `--cap-drop`
+- **型**: stringSlice
+- **説明**: Linuxケーパビリティの追加/削除
+
+```bash
+cderun --cap-add SYS_ADMIN alpine mount ...
+```
+
+### `--entrypoint`
+- **型**: stringSlice
+- **説明**: イメージのデフォルトENTRYPOINTを上書き
+
+```bash
+cderun --entrypoint /bin/sh node -c "ls"
+```
+
+### `--pull`
+- **型**: string
+- **デフォルト**: `missing`
+- **値**: `always`, `missing`, `never`
+- **説明**: 実行前のイメージプルポリシー
+
+### `--memory`, `-m`
+- **型**: string
+- **説明**: メモリ制限 (例: `512m`, `1g`)
+
+### `--cpus`
+- **型**: float64
+- **説明**: CPU数制限
+
+### `--tmpfs`
+- **型**: stringSlice
+- **説明**: tmpfsディレクトリのマウント
+
+```bash
+cderun --tmpfs /run alpine touch /run/test
+```
+
+### `--device`
+- **型**: stringSlice
+- **説明**: ホストデバイスをコンテナに追加
+
+```bash
+cderun --device /dev/fuse alpine ls /dev/fuse
+```
+
 ### `--dry-run`
 - **型**: bool
 - **デフォルト**: `false`
@@ -243,7 +353,12 @@ cderun --log-timestamp=false node app.js
 
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
-  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+- **カテゴリ別の対応フラグ例**:
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
+  - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
+  - **リソース**: `--cderun-memory`, `--cderun-cpus`
+  - **マウント・ツール**: `--cderun-volume`, `--cderun-mount-socket`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## オプションの優先順位

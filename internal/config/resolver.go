@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/docker/go-units"
 )
 
 // ResolvedConfig contains the final values after resolution.
@@ -34,6 +36,23 @@ type ResolvedConfig struct {
 	LogFormat     string
 	LogTee        bool
 	LogTimestamp  bool
+
+	// New fields
+	Ports      []string
+	PublishAll bool
+	Expose     []string
+	Hostname   string
+	DNS        []string
+	AddHosts   []string
+	Privileged bool
+	CapAdd     []string
+	CapDrop    []string
+	Entrypoint []string
+	Pull       string
+	Memory     int64
+	CPUs       float64
+	Tmpfs      []string
+	Devices    []string
 }
 
 // CLIOptions represents values from CLI flags.
@@ -110,6 +129,54 @@ type CLIOptions struct {
 	CderunLogTee          bool
 	CderunLogTeeSet       bool
 	CderunVerbose         int
+
+	// New fields
+	Ports                []string
+	CderunPorts          []string
+	PublishAll           bool
+	PublishAllSet        bool
+	CderunPublishAll     bool
+	CderunPublishAllSet  bool
+	Expose               []string
+	CderunExpose         []string
+	Hostname             string
+	HostnameSet          bool
+	CderunHostname       string
+	CderunHostnameSet    bool
+	DNS                  []string
+	CderunDNS            []string
+	AddHosts             []string
+	CderunAddHosts       []string
+	User                 string
+	UserSet              bool
+	CderunUser           string
+	CderunUserSet        bool
+	Privileged           bool
+	PrivilegedSet        bool
+	CderunPrivileged     bool
+	CderunPrivilegedSet  bool
+	CapAdd               []string
+	CderunCapAdd         []string
+	CapDrop              []string
+	CderunCapDrop        []string
+	Entrypoint           []string
+	CderunEntrypoint     []string
+	Pull                 string
+	PullSet              bool
+	CderunPull           string
+	CderunPullSet        bool
+	Memory               string
+	MemorySet            bool
+	CderunMemory         string
+	CderunMemorySet      bool
+	CPUs                 float64
+	CPUsSet              bool
+	CderunCPUs           float64
+	CderunCPUsSet        bool
+	Tmpfs                []string
+	CderunTmpfs          []string
+	Devices              []string
+	CderunDevices        []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -376,6 +443,35 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		true, // Default to true
 	)
 
+	// Resolve new fields
+	res.Ports = resolveStringSlice(cli.CderunPorts, cli.Ports, "CDERUN_PUBLISH", subcommand, tools, func(t ToolConfig) []string { return t.Ports }, global, func(g CDERunConfig) []string { return g.Defaults.Ports })
+	res.PublishAll = resolveBool(cli.CderunPublishAllSet, cli.CderunPublishAll, cli.PublishAllSet, cli.PublishAll, "CDERUN_PUBLISH_ALL", subcommand, tools, func(t ToolConfig) *bool { return t.PublishAll }, global, func(g CDERunConfig) *bool { return g.Defaults.PublishAll }, false)
+	res.Expose = resolveStringSlice(cli.CderunExpose, cli.Expose, "CDERUN_EXPOSE", subcommand, tools, func(t ToolConfig) []string { return t.Expose }, global, func(g CDERunConfig) []string { return g.Defaults.Expose })
+	res.Hostname = resolveString(cli.CderunHostnameSet, cli.CderunHostname, cli.HostnameSet, cli.Hostname, "CDERUN_HOSTNAME", subcommand, tools, func(t ToolConfig) string { return t.Hostname }, global, func(g CDERunConfig) string { return g.Defaults.Hostname }, "")
+	res.DNS = resolveStringSlice(cli.CderunDNS, cli.DNS, "CDERUN_DNS", subcommand, tools, func(t ToolConfig) []string { return t.DNS }, global, func(g CDERunConfig) []string { return g.Defaults.DNS })
+	res.AddHosts = resolveStringSlice(cli.CderunAddHosts, cli.AddHosts, "CDERUN_ADD_HOST", subcommand, tools, func(t ToolConfig) []string { return t.AddHosts }, global, func(g CDERunConfig) []string { return g.Defaults.AddHosts })
+	res.User = resolveString(cli.CderunUserSet, cli.CderunUser, cli.UserSet, cli.User, "CDERUN_USER", subcommand, tools, func(t ToolConfig) string { return t.User }, global, func(g CDERunConfig) string { return g.Defaults.User }, "")
+	res.Privileged = resolveBool(cli.CderunPrivilegedSet, cli.CderunPrivileged, cli.PrivilegedSet, cli.Privileged, "CDERUN_PRIVILEGED", subcommand, tools, func(t ToolConfig) *bool { return t.Privileged }, global, func(g CDERunConfig) *bool { return g.Defaults.Privileged }, false)
+	res.CapAdd = resolveStringSlice(cli.CderunCapAdd, cli.CapAdd, "CDERUN_CAP_ADD", subcommand, tools, func(t ToolConfig) []string { return t.CapAdd }, global, func(g CDERunConfig) []string { return g.Defaults.CapAdd })
+	res.CapDrop = resolveStringSlice(cli.CderunCapDrop, cli.CapDrop, "CDERUN_CAP_DROP", subcommand, tools, func(t ToolConfig) []string { return t.CapDrop }, global, func(g CDERunConfig) []string { return g.Defaults.CapDrop })
+	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint })
+	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing")
+	res.Tmpfs = resolveStringSlice(cli.CderunTmpfs, cli.Tmpfs, "CDERUN_TMPFS", subcommand, tools, func(t ToolConfig) []string { return t.Tmpfs }, global, func(g CDERunConfig) []string { return g.Defaults.Tmpfs })
+	res.Devices = resolveStringSlice(cli.CderunDevices, cli.Devices, "CDERUN_DEVICE", subcommand, tools, func(t ToolConfig) []string { return t.Devices }, global, func(g CDERunConfig) []string { return g.Defaults.Devices })
+
+	// Memory resolution (string to bytes)
+	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "")
+	if memStr != "" {
+		bytes, err := units.RAMInBytes(memStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
+		}
+		res.Memory = bytes
+	}
+
+	// CPUs resolution
+	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
+
 	return res, nil
 }
 
@@ -433,6 +529,58 @@ func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey 
 	if global != nil {
 		if s := globalGetter(*global); s != "" {
 			return s
+		}
+	}
+	return fallback
+}
+
+func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string) []string {
+	if len(p1) > 0 {
+		return p1
+	}
+	if len(p2) > 0 {
+		return p2
+	}
+	if env := os.Getenv(envKey); env != "" {
+		return strings.Split(env, ",")
+	}
+	if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if s := toolGetter(tool); len(s) > 0 {
+				return s
+			}
+		}
+	}
+	if global != nil {
+		if s := globalGetter(*global); len(s) > 0 {
+			return s
+		}
+	}
+	return nil
+}
+
+func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) float64, global *CDERunConfig, globalGetter func(CDERunConfig) float64, fallback float64) float64 {
+	if p1Set {
+		return p1Val
+	}
+	if cliSet {
+		return cliVal
+	}
+	if env := os.Getenv(envKey); env != "" {
+		if f, err := strconv.ParseFloat(env, 64); err == nil {
+			return f
+		}
+	}
+	if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if f := toolGetter(tool); f != 0 {
+				return f
+			}
+		}
+	}
+	if global != nil {
+		if f := globalGetter(*global); f != 0 {
+			return f
 		}
 	}
 	return fallback

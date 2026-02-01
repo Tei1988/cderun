@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,6 +19,7 @@ func executeCommand(args ...string) (string, error) {
 
 func executeCommandRaw(args []string) (string, error) {
 	// Reset flag variables and Changed state
+	rootCmd = newRootCmd()
 	opts.tty = false
 	opts.interactive = false
 	opts.network = "bridge"
@@ -62,13 +62,38 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunLogTee = false
 	opts.cderunVerbose = 0
 
-	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
-		f.Changed = false
-		// Also reset default values in pflag if needed, but manual reset above is safer
-	})
-	rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		f.Changed = false
-	})
+	opts.ports = nil
+	opts.publishAll = false
+	opts.expose = nil
+	opts.hostname = ""
+	opts.dns = nil
+	opts.addHosts = nil
+	opts.user = ""
+	opts.privileged = false
+	opts.capAdd = nil
+	opts.capDrop = nil
+	opts.entrypoint = nil
+	opts.pull = "missing"
+	opts.memory = ""
+	opts.cpus = 0
+	opts.tmpfs = nil
+	opts.devices = nil
+	opts.cderunPorts = nil
+	opts.cderunPublishAll = false
+	opts.cderunExpose = nil
+	opts.cderunHostname = ""
+	opts.cderunDNS = nil
+	opts.cderunAddHosts = nil
+	opts.cderunUser = ""
+	opts.cderunPrivileged = false
+	opts.cderunCapAdd = nil
+	opts.cderunCapDrop = nil
+	opts.cderunEntrypoint = nil
+	opts.cderunPull = ""
+	opts.cderunMemory = ""
+	opts.cderunCPUs = 0
+	opts.cderunTmpfs = nil
+	opts.cderunDevices = nil
 
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
@@ -152,39 +177,19 @@ func TestPreprocessArgs(t *testing.T) {
 
 func TestExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
-	err := Execute([]string{})
+	_, err := executeCommandRaw([]string{})
 	assert.NoError(t, err)
 
-	err = Execute(nil)
+	_, err = executeCommandRaw(nil)
 	assert.NoError(t, err)
 }
 
 func TestRootCmd(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := opts.tty
-		oldInteractive := opts.interactive
-		oldNetwork := opts.network
-		oldMountSocket := opts.mountSocket
-		oldMountCderun := opts.mountCderun
-		oldImage := opts.image
-		oldRemove := opts.remove
-		oldCderunTTY := opts.cderunTTY
-		oldCderunInteractive := opts.cderunInteractive
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.tty = oldTTY
-			opts.interactive = oldInteractive
-			opts.network = oldNetwork
-			opts.mountSocket = oldMountSocket
-			opts.mountCderun = oldMountCderun
-			opts.image = oldImage
-			opts.remove = oldRemove
-			opts.cderunTTY = oldCderunTTY
-			opts.cderunInteractive = oldCderunInteractive
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -220,29 +225,9 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := opts.tty
-		oldInteractive := opts.interactive
-		oldNetwork := opts.network
-		oldMountSocket := opts.mountSocket
-		oldMountCderun := opts.mountCderun
-		oldImage := opts.image
-		oldRemove := opts.remove
-		oldCderunTTY := opts.cderunTTY
-		oldCderunInteractive := opts.cderunInteractive
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.tty = oldTTY
-			opts.interactive = oldInteractive
-			opts.network = oldNetwork
-			opts.mountSocket = oldMountSocket
-			opts.mountCderun = oldMountCderun
-			opts.image = oldImage
-			opts.remove = oldRemove
-			opts.cderunTTY = oldCderunTTY
-			opts.cderunInteractive = oldCderunInteractive
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -262,29 +247,9 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("handles symlink execution via Execute", func(t *testing.T) {
 		// Save and restore package-level state
-		oldTTY := opts.tty
-		oldInteractive := opts.interactive
-		oldNetwork := opts.network
-		oldMountSocket := opts.mountSocket
-		oldMountCderun := opts.mountCderun
-		oldImage := opts.image
-		oldRemove := opts.remove
-		oldCderunTTY := opts.cderunTTY
-		oldCderunInteractive := opts.cderunInteractive
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.tty = oldTTY
-			opts.interactive = oldInteractive
-			opts.network = oldNetwork
-			opts.mountSocket = oldMountSocket
-			opts.mountCderun = oldMountCderun
-			opts.image = oldImage
-			opts.remove = oldRemove
-			opts.cderunTTY = oldCderunTTY
-			opts.cderunInteractive = oldCderunInteractive
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
@@ -324,18 +289,12 @@ node:
 
 	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags Changed state
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		// Use a temporary directory for this test
 		oldWd, err := os.Getwd()
@@ -378,18 +337,12 @@ node:
 
 	t.Run("P3 environment variable takes priority over tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		t.Setenv("CDERUN_IMAGE", "env-image:latest")
 
@@ -420,18 +373,12 @@ node:
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		mockRuntime := &runtime.MockRuntime{}
 		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -446,18 +393,12 @@ node:
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		// Save and restore package-level state
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		// Use the real runtimeFactory here to test the validation logic
 		exitFunc = func(code int) {}
@@ -470,22 +411,12 @@ node:
 
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
-		oldEnv := opts.env
-		oldCderunEnv := opts.cderunEnv
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.env = oldEnv
-			opts.cderunEnv = oldCderunEnv
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		// Use a temporary directory for this test
 		oldWd, err := os.Getwd()
@@ -541,22 +472,12 @@ node:
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Save and restore package-level state
-		oldDryRun := opts.dryRun
-		oldDryRunFormat := opts.dryRunFormat
-		oldRuntimeName := opts.runtimeName
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
 		t.Cleanup(func() {
-			opts.dryRun = oldDryRun
-			opts.dryRunFormat = oldDryRunFormat
-			opts.runtimeName = oldRuntimeName
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		mockRuntime := &runtime.MockRuntime{}
 		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -598,10 +519,6 @@ node:
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
@@ -652,10 +569,6 @@ node:
 	exitFunc = func(code int) {}
 
 	t.Run("cderun-tty overrides tty even if placed after subcommand", func(t *testing.T) {
-		// Reset flags Changed state
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		// cderun --tty=true node --cderun-tty=false --version
 		// We use a path that doesn't end in "cderun" for polyglot test later,
 		// but here we use "cderun" explicitly.
@@ -667,9 +580,6 @@ node:
 	})
 
 	t.Run("cderun-tty works in polyglot mode", func(t *testing.T) {
-		// Reset flags Changed state
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// node --cderun-tty=true --version
@@ -681,10 +591,6 @@ node:
 	})
 
 	t.Run("cderun internal overrides before subcommand result in error", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		// cderun --cderun-image=alpine:latest sh
 		_, err := executeCommandRaw([]string{"cderun", "--cderun-image=alpine:latest", "sh"})
 		require.Error(t, err)
@@ -692,9 +598,6 @@ node:
 	})
 
 	t.Run("cderun internal overrides after subcommand work correctly", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// cderun --image=alpine:stable sh --cderun-image=alpine:latest
@@ -705,9 +608,6 @@ node:
 	})
 
 	t.Run("cderun internal overrides for network, remove, workdir and volume", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/old", "--volume=/h1:/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/new", "--cderun-volume=/h2:/c2")
@@ -724,9 +624,6 @@ node:
 	})
 
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config for mount-tools
@@ -765,9 +662,6 @@ node:
 	})
 
 	t.Run("cderun internal override can turn off remove", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand("--image=alpine", "--remove=true", "sh", "--cderun-remove=false")
@@ -777,9 +671,6 @@ node:
 	})
 
 	t.Run("cderun internal overrides for dry-run", func(t *testing.T) {
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// cderun --image=alpine sh --cderun-dry-run --cderun-dry-run-format=simple
@@ -807,8 +698,6 @@ func TestPhase3Features(t *testing.T) {
 	exitFunc = func(code int) {}
 
 	t.Run("workdir and volume flags", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--volume", "/h:/c:ro", "sh")
@@ -823,9 +712,6 @@ func TestPhase3Features(t *testing.T) {
 	})
 
 	t.Run("mounting flags require explicit cderun socket settings", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		// DOCKER_HOST should no longer be enough for SocketSet
 		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
 		t.Setenv("CDERUN_MOUNT_SOCKET", "")
@@ -841,8 +727,6 @@ func TestPhase3Features(t *testing.T) {
 	})
 
 	t.Run("mount-cderun logic", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "/socket", "sh")
@@ -866,8 +750,6 @@ func TestPhase3Features(t *testing.T) {
 	})
 
 	t.Run("mount-tools logic", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config
@@ -906,8 +788,6 @@ sh:
 		assert.False(t, pythonFound, "python should NOT be mounted")
 
 		// Test mount-all-tools
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		_, err = executeCommand("--mount-all-tools", "--mount-socket", "/socket", "sh")
@@ -928,8 +808,6 @@ sh:
 	})
 
 	t.Run("mount-all-tools with empty config shows warning", func(t *testing.T) {
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 		mockRuntime.CreatedConfig = nil
 
 		// Setup empty tools config
@@ -956,10 +834,6 @@ func TestRemoveContainerWarning(t *testing.T) {
 			exitFunc = oldExit
 		})
 
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
@@ -981,10 +855,6 @@ func TestRemoveContainerWarning(t *testing.T) {
 			runtimeFactory = oldFactory
 			exitFunc = oldExit
 		})
-
-		// Reset flags
-		rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
-		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: nil,
