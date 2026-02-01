@@ -114,7 +114,12 @@ func TestExecuteRobustness(t *testing.T) {
 		}()
 
 		// Wait for attach to start
-		<-mock.attachStarted
+		select {
+		case <-mock.attachStarted:
+			// attach started
+		case <-time.After(2 * time.Second):
+			t.Fatal("AttachContainer did not start in time")
+		}
 
 		// Send first SIGINT
 		syscall.Kill(os.Getpid(), syscall.SIGINT)
@@ -139,6 +144,41 @@ func TestExecuteRobustness(t *testing.T) {
 			// Success
 		case <-time.After(2 * time.Second):
 			t.Fatal("Process did not exit after second SIGINT")
+		}
+	})
+
+	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		defer func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		}()
+
+		mock := &blockingMockRuntime{
+			attachStarted: make(chan struct{}),
+			blockAttach:   make(chan struct{}),
+		}
+		mock.CreatedContainerID = "test-container"
+		mock.ExitCode = 42 // Non-zero exit code
+
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+
+		var capturedExitCode int
+		exitFunc = func(code int) {
+			capturedExitCode = code
+		}
+
+		// executeCommand calls Execute -> RunE which calls exitFunc(exitCode)
+		_, err := executeCommand("--image", "alpine", "false")
+		if err != nil {
+			t.Fatalf("executeCommand failed: %v", err)
+		}
+
+		if capturedExitCode != 42 {
+			t.Errorf("expected exit code 42, got %d", capturedExitCode)
 		}
 	})
 }
