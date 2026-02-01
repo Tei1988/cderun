@@ -19,6 +19,12 @@
 cderun --dry-run node --version
 ```
 
+### グローバルドライラン（診断情報）
+サブコマンドを指定せずに `--dry-run` を実行すると、システムの診断情報と利用可能なツールの一覧を表示します。
+```bash
+cderun --dry-run
+```
+
 ## 出力フォーマット
 
 ### YAML形式（デフォルト）
@@ -97,6 +103,11 @@ fi
 ### 3. 設定ファイルのドキュメント化
 ```bash
 cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
+```
+
+### 4. システム診断とツール一覧の確認
+```bash
+cderun --dry-run
 ```
 
 ## 他のフラグとの組み合わせ

@@ -130,10 +130,12 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		}
 	}
 
-	if res.Image == "" {
+	if res.Image == "" && subcommand != "" {
 		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
 	}
-	logging.Debug("Resolved Image: %s", res.Image)
+	if res.Image != "" {
+		logging.Debug("Resolved Image: %s", res.Image)
+	}
 
 	// 2. Resolve TTY
 	res.TTY = resolveBool(
@@ -205,28 +207,60 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	// Resolve Env (P1 > P2 > P4)
 	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv))
 
-	// 11. Resolve Runtime
+	// 11. Resolve Runtime & Socket with Auto-detection
 	res.Runtime = resolveString(
 		cli.CderunRuntimeSet, cli.CderunRuntime,
 		cli.RuntimeSet, cli.Runtime,
 		"CDERUN_RUNTIME",
 		"", nil, nil, // No tool-specific runtime
 		global, func(g CDERunConfig) string { return g.Runtime },
-		"docker",
+		"", // Fallback to empty for auto-detection
 	)
 
-	// 12. Resolve Socket
 	res.Socket = resolveString(
 		cli.CderunMountSocketSet, cli.CderunMountSocket,
 		cli.MountSocketSet, cli.MountSocket,
 		"CDERUN_MOUNT_SOCKET",
 		"", nil, nil,
-		nil, nil, // Global doesn't have socket path yet in schema but could
-		"/var/run/docker.sock",
+		nil, nil,
+		"", // Fallback to empty for auto-detection
 	)
 
+	// Auto-detection logic
+	if res.Runtime == "" {
+		if res.Socket != "" {
+			// Infer runtime from socket path
+			if strings.Contains(res.Socket, "podman") {
+				res.Runtime = "podman"
+			} else {
+				res.Runtime = "docker"
+			}
+		} else {
+			// Check default socket paths
+			if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+				res.Runtime = "docker"
+				res.Socket = "/var/run/docker.sock"
+			} else if _, err := os.Stat("/run/podman/podman.sock"); err == nil {
+				res.Runtime = "podman"
+				res.Socket = "/run/podman/podman.sock"
+			} else {
+				// Default fallback
+				res.Runtime = "docker"
+				res.Socket = "/var/run/docker.sock"
+			}
+		}
+	}
+
+	if res.Socket == "" {
+		// Runtime was specified but socket was not
+		if res.Runtime == "podman" {
+			res.Socket = "/run/podman/podman.sock"
+		} else {
+			res.Socket = "/var/run/docker.sock"
+		}
+	}
+
 	// Determine if the socket was explicitly set to a mountable value
-	// We only consider cderun-specific settings for mounting detection.
 	var rawSocket string
 	if cli.CderunMountSocketSet {
 		rawSocket = cli.CderunMountSocket
