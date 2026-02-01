@@ -5,12 +5,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
+	"cderun/internal/logging"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-connections/nat"
 )
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
@@ -42,21 +46,108 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 	}, nil
 }
 
+// PullImage pulls the specified image based on the pull policy.
+func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string) error {
+	if pullPolicy == "never" {
+		return nil
+	}
+
+	if pullPolicy == "missing" || pullPolicy == "" {
+		_, _, err := d.client.ImageInspectWithRaw(ctx, img)
+		if err == nil {
+			return nil // Image exists locally
+		}
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to inspect image: %w", err)
+		}
+	}
+
+	// Always or missing (but not found locally)
+	logging.Info("Pulling image %s...", img)
+	reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to pull image: %w", err)
+	}
+	defer reader.Close()
+	// Wait for pull to complete by reading the stream
+	_, _ = io.Copy(io.Discard, reader)
+	return nil
+}
+
 // CreateContainer creates a new container based on the provided config.
 func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
 	containerConfig := &dockercontainer.Config{
-		Image:      config.Image,
-		Cmd:        append(config.Command, config.Args...),
-		Tty:        config.TTY,
-		OpenStdin:  config.Interactive,
-		Env:        config.Env,
-		WorkingDir: config.Workdir,
-		User:       config.User,
+		Image:        config.Image,
+		Cmd:          append(config.Command, config.Args...),
+		Tty:          config.TTY,
+		OpenStdin:    config.Interactive,
+		Env:          config.Env,
+		WorkingDir:   config.Workdir,
+		User:         config.User,
+		Hostname:     config.Hostname,
+		Entrypoint:   config.Entrypoint,
+		ExposedPorts: make(nat.PortSet),
+	}
+
+	// Handle ExposedPorts
+	for _, port := range config.Expose {
+		p, err := nat.NewPort("tcp", port)
+		if err != nil {
+			return "", fmt.Errorf("invalid expose port %q: %w", port, err)
+		}
+		containerConfig.ExposedPorts[p] = struct{}{}
 	}
 
 	hostConfig := &dockercontainer.HostConfig{
-		AutoRemove:  config.Remove,
-		NetworkMode: dockercontainer.NetworkMode(config.Network),
+		AutoRemove:     config.Remove,
+		NetworkMode:    dockercontainer.NetworkMode(config.Network),
+		Privileged:     config.Privileged,
+		CapAdd:         config.CapAdd,
+		CapDrop:        config.CapDrop,
+		DNS:            config.DNS,
+		ExtraHosts:     config.AddHosts,
+		PublishAllPorts: config.PublishAll,
+		Tmpfs:          make(map[string]string),
+		Resources: dockercontainer.Resources{
+			Memory:   config.Memory,
+			NanoCPUs: int64(config.CPUs * 1e9),
+		},
+	}
+
+	// Handle PortBindings
+	if len(config.Ports) > 0 {
+		_, bindings, err := nat.ParsePortSpecs(config.Ports)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse port specs: %w", err)
+		}
+		hostConfig.PortBindings = bindings
+	}
+
+	// Handle Tmpfs
+	for _, t := range config.Tmpfs {
+		parts := strings.SplitN(t, ":", 2)
+		if len(parts) == 2 {
+			hostConfig.Tmpfs[parts[0]] = parts[1]
+		} else {
+			hostConfig.Tmpfs[parts[0]] = ""
+		}
+	}
+
+	// Handle Devices
+	for _, dev := range config.Devices {
+		parts := strings.Split(dev, ":")
+		dMapping := dockercontainer.DeviceMapping{
+			PathOnHost:        parts[0],
+			PathInContainer:   parts[0],
+			CgroupPermissions: "rwm",
+		}
+		if len(parts) > 1 {
+			dMapping.PathInContainer = parts[1]
+		}
+		if len(parts) > 2 {
+			dMapping.CgroupPermissions = parts[2]
+		}
+		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
 	}
 
 	for _, vol := range config.Volumes {

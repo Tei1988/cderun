@@ -13,7 +13,13 @@ type ContainerConfig struct {
 	Remove      bool `json:"remove" yaml:"remove"`
 
 	// Network
-	Network string `json:"network" yaml:"network"`
+	Network    string   `json:"network" yaml:"network"`
+	Ports      []string `json:"ports,omitempty" yaml:"ports,omitempty"`
+	PublishAll bool     `json:"publish_all,omitempty" yaml:"publish_all,omitempty"`
+	Expose     []string `json:"expose,omitempty" yaml:"expose,omitempty"`
+	Hostname   string   `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	DNS        []string `json:"dns,omitempty" yaml:"dns,omitempty"`
+	AddHosts   []string `json:"add_hosts,omitempty" yaml:"add_hosts,omitempty"`
 
 	// Volumes
 	Volumes []VolumeMount `json:"volumes" yaml:"volumes"`
@@ -26,6 +32,23 @@ type ContainerConfig struct {
 
 	// User
 	User string `json:"user" yaml:"user"`
+
+	// Permissions and entrypoint
+	Privileged bool     `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	CapAdd     []string `json:"cap_add,omitempty" yaml:"cap_add,omitempty"`
+	CapDrop    []string `json:"cap_drop,omitempty" yaml:"cap_drop,omitempty"`
+	Entrypoint []string `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`
+
+	// Management
+	Pull string `json:"pull,omitempty" yaml:"pull,omitempty"`
+
+	// Resources
+	Memory int64   `json:"memory,omitempty" yaml:"memory,omitempty"`
+	CPUs   float64 `json:"cpus,omitempty" yaml:"cpus,omitempty"`
+
+	// Storage and Devices
+	Tmpfs   []string `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
+	Devices []string `json:"devices,omitempty" yaml:"devices,omitempty"`
 }
 
 // VolumeMount represents a host path to container path mapping.

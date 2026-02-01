@@ -62,6 +62,40 @@ type rootOptions struct {
 	cderunLogFormat      string
 	cderunLogTee         bool
 	cderunVerbose        int
+
+	// New fields
+	ports            []string
+	publishAll       bool
+	expose           []string
+	hostname         string
+	dns              []string
+	addHosts         []string
+	user             string
+	privileged       bool
+	capAdd           []string
+	capDrop          []string
+	entrypoint       []string
+	pull             string
+	memory           string
+	cpus             float64
+	tmpfs            []string
+	devices          []string
+	cderunPorts      []string
+	cderunPublishAll bool
+	cderunExpose     []string
+	cderunHostname   string
+	cderunDNS        []string
+	cderunAddHosts   []string
+	cderunUser       string
+	cderunPrivileged bool
+	cderunCapAdd     []string
+	cderunCapDrop    []string
+	cderunEntrypoint []string
+	cderunPull       string
+	cderunMemory     string
+	cderunCPUs       float64
+	cderunTmpfs      []string
+	cderunDevices    []string
 }
 
 var (
@@ -173,6 +207,54 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunLogTee:          o.cderunLogTee,
 		CderunLogTeeSet:       cmd.Flags().Changed("cderun-log-tee"),
 		CderunVerbose:         o.cderunVerbose,
+
+		// New fields
+		Ports:               o.ports,
+		CderunPorts:         o.cderunPorts,
+		PublishAll:          o.publishAll,
+		PublishAllSet:       cmd.Flags().Changed("publish-all"),
+		CderunPublishAll:    o.cderunPublishAll,
+		CderunPublishAllSet: cmd.Flags().Changed("cderun-publish-all"),
+		Expose:              o.expose,
+		CderunExpose:        o.cderunExpose,
+		Hostname:            o.hostname,
+		HostnameSet:         cmd.Flags().Changed("hostname"),
+		CderunHostname:      o.cderunHostname,
+		CderunHostnameSet:   cmd.Flags().Changed("cderun-hostname"),
+		DNS:                 o.dns,
+		CderunDNS:           o.cderunDNS,
+		AddHosts:            o.addHosts,
+		CderunAddHosts:      o.cderunAddHosts,
+		User:                o.user,
+		UserSet:             cmd.Flags().Changed("user"),
+		CderunUser:          o.cderunUser,
+		CderunUserSet:       cmd.Flags().Changed("cderun-user"),
+		Privileged:          o.privileged,
+		PrivilegedSet:       cmd.Flags().Changed("privileged"),
+		CderunPrivileged:    o.cderunPrivileged,
+		CderunPrivilegedSet: cmd.Flags().Changed("cderun-privileged"),
+		CapAdd:              o.capAdd,
+		CderunCapAdd:        o.cderunCapAdd,
+		CapDrop:             o.capDrop,
+		CderunCapDrop:       o.cderunCapDrop,
+		Entrypoint:          o.entrypoint,
+		CderunEntrypoint:    o.cderunEntrypoint,
+		Pull:                o.pull,
+		PullSet:             cmd.Flags().Changed("pull"),
+		CderunPull:          o.cderunPull,
+		CderunPullSet:       cmd.Flags().Changed("cderun-pull"),
+		Memory:              o.memory,
+		MemorySet:           cmd.Flags().Changed("memory"),
+		CderunMemory:        o.cderunMemory,
+		CderunMemorySet:     cmd.Flags().Changed("cderun-memory"),
+		CPUs:                o.cpus,
+		CPUsSet:             cmd.Flags().Changed("cpus"),
+		CderunCPUs:          o.cderunCPUs,
+		CderunCPUsSet:       cmd.Flags().Changed("cderun-cpus"),
+		Tmpfs:               o.tmpfs,
+		CderunTmpfs:         o.cderunTmpfs,
+		Devices:             o.devices,
+		CderunDevices:       o.cderunDevices,
 	}
 
 	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
@@ -191,6 +273,24 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 		Volumes:     resolved.Volumes,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
+		User:        resolved.User,
+
+		// New fields
+		Ports:      resolved.Ports,
+		PublishAll: resolved.PublishAll,
+		Expose:     resolved.Expose,
+		Hostname:   resolved.Hostname,
+		DNS:        resolved.DNS,
+		AddHosts:   resolved.AddHosts,
+		Privileged: resolved.Privileged,
+		CapAdd:     resolved.CapAdd,
+		CapDrop:    resolved.CapDrop,
+		Entrypoint: resolved.Entrypoint,
+		Pull:       resolved.Pull,
+		Memory:     resolved.Memory,
+		CPUs:       resolved.CPUs,
+		Tmpfs:      resolved.Tmpfs,
+		Devices:    resolved.Devices,
 	}
 
 	// Handle mounting flags
@@ -326,6 +426,11 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("Volumes: %s\n", strings.Join(volumes, ", "))
 		fmt.Printf("Env: %s\n", strings.Join(containerConfig.Env, ", "))
 		fmt.Printf("Workdir: %s\n", containerConfig.Workdir)
+		fmt.Printf("User: %s\n", containerConfig.User)
+		fmt.Printf("Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
+		fmt.Printf("PublishAll: %v\n", containerConfig.PublishAll)
+		fmt.Printf("Privileged: %v\n", containerConfig.Privileged)
+		fmt.Printf("Pull: %s\n", containerConfig.Pull)
 	default: // Default to YAML
 		data, err := yaml.Marshal(containerConfig)
 		if err != nil {
@@ -352,6 +457,10 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	}
 
 	logging.Trace("Creating container...")
+	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull); err != nil {
+		return 0, fmt.Errorf("failed to pull image: %w", err)
+	}
+
 	containerID, err := rt.CreateContainer(ctx, containerConfig)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create container: %w", err)
@@ -653,6 +762,25 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&opts.mountTools, "mount-tools", "", "Mount specified tools into the container")
 	rootCmd.PersistentFlags().BoolVar(&opts.mountAllTools, "mount-all-tools", false, "Mount all defined tools into the container")
 	rootCmd.PersistentFlags().BoolVar(&opts.remove, "remove", true, "Automatically remove the container when it exits")
+
+	// New fields
+	rootCmd.PersistentFlags().StringSliceVarP(&opts.ports, "publish", "p", nil, "Publish a container's port(s) to the host")
+	rootCmd.PersistentFlags().BoolVarP(&opts.publishAll, "publish-all", "P", false, "Publish all exposed ports to random ports")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.expose, "expose", nil, "Expose a port or a range of ports")
+	rootCmd.PersistentFlags().StringVar(&opts.hostname, "hostname", "", "Container host name")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.dns, "dns", nil, "Set custom DNS servers")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.addHosts, "add-host", nil, "Add a custom host-to-IP mapping (host:ip)")
+	rootCmd.PersistentFlags().StringVarP(&opts.user, "user", "u", "", "Username or UID (format: <name|uid>[:<group|gid>])")
+	rootCmd.PersistentFlags().BoolVar(&opts.privileged, "privileged", false, "Give extended privileges to this container")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.capAdd, "cap-add", nil, "Add Linux capabilities")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.capDrop, "cap-drop", nil, "Drop Linux capabilities")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.entrypoint, "entrypoint", nil, "Overwrite the default ENTRYPOINT of the image")
+	rootCmd.PersistentFlags().StringVar(&opts.pull, "pull", "missing", "Pull image before running (always, missing, never)")
+	rootCmd.PersistentFlags().StringVarP(&opts.memory, "memory", "m", "", "Memory limit")
+	rootCmd.PersistentFlags().Float64Var(&opts.cpus, "cpus", 0, "Number of CPUs")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.tmpfs, "tmpfs", nil, "Mount a tmpfs directory")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.devices, "device", nil, "Add a host device to the container")
+
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunInteractive, "cderun-interactive", false, "Override interactive setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().StringVar(&opts.cderunImage, "cderun-image", "", "Override image (highest priority, can be used after subcommand)")
@@ -666,6 +794,25 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunMountCderun, "cderun-mount-cderun", false, "Override mount-cderun setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().StringVar(&opts.cderunMountTools, "cderun-mount-tools", "", "Override mount-tools setting (highest priority, can be used after subcommand)")
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
+
+	// New fields P1
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunPorts, "cderun-publish", nil, "Override publish setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().BoolVar(&opts.cderunPublishAll, "cderun-publish-all", false, "Override publish-all setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunExpose, "cderun-expose", nil, "Override expose setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunHostname, "cderun-hostname", "", "Override hostname setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunDNS, "cderun-dns", nil, "Override DNS setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunAddHosts, "cderun-add-host", nil, "Override add-host setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunUser, "cderun-user", "", "Override user setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().BoolVar(&opts.cderunPrivileged, "cderun-privileged", false, "Override privileged setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunCapAdd, "cderun-cap-add", nil, "Override cap-add setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunCapDrop, "cderun-cap-drop", nil, "Override cap-drop setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunEntrypoint, "cderun-entrypoint", nil, "Override entrypoint setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunPull, "cderun-pull", "", "Override pull setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringVar(&opts.cderunMemory, "cderun-memory", "", "Override memory setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().Float64Var(&opts.cderunCPUs, "cderun-cpus", 0, "Override cpus setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunTmpfs, "cderun-tmpfs", nil, "Override tmpfs setting (highest priority, can be used after subcommand)")
+	rootCmd.PersistentFlags().StringSliceVar(&opts.cderunDevices, "cderun-device", nil, "Override device setting (highest priority, can be used after subcommand)")
+
 	rootCmd.PersistentFlags().BoolVar(&opts.dryRun, "dry-run", false, "Preview container configuration without execution")
 	rootCmd.PersistentFlags().StringVarP(&opts.dryRunFormat, "dry-run-format", "f", "yaml", "Output format (yaml, json, simple)")
 	rootCmd.PersistentFlags().BoolVar(&opts.cderunDryRun, "cderun-dry-run", false, "Override dry-run setting (highest priority, can be used after subcommand)")

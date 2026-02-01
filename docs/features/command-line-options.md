@@ -168,6 +168,75 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
+### `--publish`, `-p`
+- **型**: stringSlice
+- **説明**: ポートマッピング（ホストポート:コンテナポート）
+- **用途**: コンテナのポートをホストに公開
+
+```bash
+cderun -p 8080:80 nginx
+```
+
+### `--publish-all`, `-P`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: すべての公開ポートをランダムなポートにマッピング
+
+### `--expose`
+- **型**: stringSlice
+- **説明**: 特定のポートまたはポート範囲を公開
+
+### `--hostname`
+- **型**: string
+- **説明**: コンテナのホスト名
+
+### `--dns`
+- **型**: stringSlice
+- **説明**: カスタムDNSサーバの設定
+
+### `--add-host`
+- **型**: stringSlice
+- **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
+
+### `--user`, `-u`
+- **型**: string
+- **説明**: 実行ユーザー/UID (format: <name|uid>[:<group|gid>])
+
+### `--privileged`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: 特権モードで実行
+
+### `--cap-add`, `--cap-drop`
+- **型**: stringSlice
+- **説明**: Linuxケーパビリティの追加/削除
+
+### `--entrypoint`
+- **型**: stringSlice
+- **説明**: イメージのデフォルトENTRYPOINTを上書き
+
+### `--pull`
+- **型**: string
+- **デフォルト**: `missing`
+- **値**: `always`, `missing`, `never`
+- **説明**: 実行前のイメージプルポリシー
+
+### `--memory`, `-m`
+- **型**: string
+- **説明**: メモリ制限 (例: `512m`, `1g`)
+
+### `--cpus`
+- **型**: float64
+- **説明**: CPU数制限
+
+### `--tmpfs`
+- **型**: stringSlice
+- **説明**: tmpfsディレクトリのマウント
+
+### `--device`
+- **型**: stringSlice
+- **説明**: ホストデバイスをコンテナに追加
+
 ### `--dry-run`
 - **型**: bool
 - **デフォルト**: `false`
@@ -243,7 +312,7 @@ cderun --log-timestamp=false node app.js
 
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
-  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`, `--cderun-user`, `--cderun-privileged`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-memory`, `--cderun-cpus`, `--cderun-tmpfs`, `--cderun-device`, `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## オプションの優先順位

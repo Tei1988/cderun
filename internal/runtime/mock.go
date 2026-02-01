@@ -8,6 +8,8 @@ import (
 
 // MockRuntime is a mock implementation of ContainerRuntime for testing purposes.
 type MockRuntime struct {
+	PulledImage        string
+	PullPolicy         string
 	CreatedContainerID string
 	CreatedConfig      *container.ContainerConfig
 	StartedContainerID string
@@ -19,6 +21,7 @@ type MockRuntime struct {
 	Rows, Cols          uint
 	Signal              string
 	ExitCode           int
+	PullErr            error
 	CreateErr          error
 	StartErr           error
 	WaitErr            error
@@ -26,6 +29,12 @@ type MockRuntime struct {
 	AttachErr          error
 	ResizeErr          error
 	SignalErr          error
+}
+
+func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string) error {
+	m.PulledImage = image
+	m.PullPolicy = pullPolicy
+	return m.PullErr
 }
 
 func (m *MockRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {

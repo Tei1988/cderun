@@ -62,6 +62,39 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunLogTee = false
 	opts.cderunVerbose = 0
 
+	opts.ports = nil
+	opts.publishAll = false
+	opts.expose = nil
+	opts.hostname = ""
+	opts.dns = nil
+	opts.addHosts = nil
+	opts.user = ""
+	opts.privileged = false
+	opts.capAdd = nil
+	opts.capDrop = nil
+	opts.entrypoint = nil
+	opts.pull = "missing"
+	opts.memory = ""
+	opts.cpus = 0
+	opts.tmpfs = nil
+	opts.devices = nil
+	opts.cderunPorts = nil
+	opts.cderunPublishAll = false
+	opts.cderunExpose = nil
+	opts.cderunHostname = ""
+	opts.cderunDNS = nil
+	opts.cderunAddHosts = nil
+	opts.cderunUser = ""
+	opts.cderunPrivileged = false
+	opts.cderunCapAdd = nil
+	opts.cderunCapDrop = nil
+	opts.cderunEntrypoint = nil
+	opts.cderunPull = ""
+	opts.cderunMemory = ""
+	opts.cderunCPUs = 0
+	opts.cderunTmpfs = nil
+	opts.cderunDevices = nil
+
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		f.Changed = false
 		// Also reset default values in pflag if needed, but manual reset above is safer
