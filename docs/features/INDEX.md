@@ -64,13 +64,15 @@
     - 実行前のコマンドプレビュー
     - JSON/YAML/Simple形式での出力
 
-13. **[ログ・デバッグ (Phase 4予定)](./logging-debugging.md)**
+13. **[ログ・デバッグ (Completed)](./logging-debugging.md)**
     - 詳細ログ出力
-    - パフォーマンス監視
+    - レベル別出力、ファイル出力、JSON形式対応
 
-### メタ機能
+14. **[インタラクティブ・ターミナル (Completed)](./interactive-terminal.md)**
+    - シグナル転送
+    - TTYリサイズ同期
 
-14. **[README生成戦略](./readme-generation.md)**
+15. **[README生成戦略](./readme-generation.md)**
     - 実装コードからREADMEを生成
     - Source of Truthの維持
 
@@ -113,4 +115,5 @@
 
 ### Phase 4: 利便性向上 (In Progress)
 - Podmanサポート
-- ログ・デバッグ機能
+- ログ・デバッグ機能 (Completed)
+- インタラクティブ・ターミナル (Completed)

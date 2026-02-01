@@ -16,14 +16,14 @@
 
 ### 基本的な使用
 ```bash
-$ cderun --dry-run node --version
+cderun --dry-run node --version
 ```
 
 ## 出力フォーマット
 
 ### YAML形式（デフォルト）
-```bash
-$ cderun --dry-run node app.js
+```yaml
+cderun --dry-run node app.js
 image: node:latest
 command:
   - node
@@ -42,8 +42,8 @@ workdir: /workspace
 ```
 
 ### JSON形式
-```bash
-$ cderun --dry-run --dry-run-format json node app.js
+```json
+cderun --dry-run --dry-run-format json node app.js
 {
   "image": "node:latest",
   "command": ["node"],
@@ -64,8 +64,8 @@ $ cderun --dry-run --dry-run-format json node app.js
 ```
 
 ### 簡易形式
-```bash
-$ cderun --dry-run --dry-run-format simple node app.js
+```text
+cderun --dry-run --dry-run-format simple node app.js
 Image: node:latest
 Command: node app.js
 Volumes: /home/user/project:/workspace
@@ -78,7 +78,7 @@ Workdir: /workspace
 ### 1. デバッグ
 設定が正しく適用されているか確認：
 ```bash
-$ cderun --dry-run python script.py
+cderun --dry-run python script.py
 ```
 
 ### 2. 設定の検証
@@ -96,14 +96,14 @@ fi
 
 ### 3. 設定ファイルのドキュメント化
 ```bash
-$ cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
+cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
 ```
 
 ## 他のフラグとの組み合わせ
 
 ### --verboseとの組み合わせ
 ```bash
-$ cderun --dry-run --verbose node app.js
+cderun --dry-run --verbose node app.js
 [INFO] Loading configuration from: /home/user/project/.cderun.yaml
 [INFO] Resolved image: node:20-alpine
 [INFO] Working directory: /home/user/project
@@ -120,8 +120,8 @@ args: [app.js]
 ### 環境変数の展開
 ドライラン時も環境変数は実際の値に展開される：
 ```bash
-$ export API_KEY=secret123
-$ cderun --dry-run --env API_KEY node app.js
+export API_KEY=secret123
+cderun --dry-run --env API_KEY node app.js
 env:
   - API_KEY=secret123
 ```
@@ -129,7 +129,7 @@ env:
 ### パスの解決
 相対パスは絶対パスに解決される：
 ```bash
-$ cderun --dry-run node ./app.js
+cderun --dry-run node ./app.js
 volumes:
   - hostPath: /home/user/project
     containerPath: /home/user/project

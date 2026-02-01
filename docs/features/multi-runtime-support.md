@@ -1,4 +1,4 @@
-# Feature: Multi-Runtime Support
+# Feature: Multi-Runtime Support (Phase 4 In Progress)
 
 ## 概要
 
@@ -7,15 +7,16 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 ## サポートされるランタイム
 
-### 優先度1: Docker
+### 優先度1: Docker (Completed)
 - デフォルトのランタイム
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman (Phase 4予定)
+### 優先度2: Podman (Phase 4予定 - In Progress)
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
+- 現在はスタブ実装のみ
 
 ### 将来的な拡張
 - nerdctl（containerdのCLI、Dockerの代替）
@@ -40,25 +41,26 @@ cderun ContainerRuntimeインターフェース
 - **ライフサイクル管理**: コンテナの作成、起動、終了待機、削除。
 - **IO接続**: コンテナの標準入出力へのアタッチ（TTYサポート含む）。
 - **メタデータ提供**: ランタイム名の識別。
+- **操作**: コンテナへのシグナル送信、TTYリサイズ。
 
 ## ランタイムの選択
 
-**現状 (Phase 3 Completed):**
-Docker をフルサポートし、Podman はスタブ実装（"not implemented yet" エラーを返す状態）としてサポートしています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
+**現状 (Phase 4 In Progress):**
+Docker をフルサポートし、Podman はスタブ実装（"not implemented yet" エラーを返す状態）として準備されています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
-### 解決ロジック (Phase 3 Completed)
+### 解決ロジック (Completed)
 
 1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
 2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
 3. **コマンドライン引数**: `--runtime`, `--mount-socket` および P1 内部オーバーライド。
 
-### 自動検出ロジック (Phase 4予定)
+### 自動検出ロジック (Future Phase)
 
 ソケットの存在確認によるランタイムの自動選択機能は将来のフェーズで実装予定です。
 
 1. デフォルトのソケットパス（`/var/run/docker.sock`, `/run/podman/podman.sock` 等）が存在するかを順に確認。
 
-### 明示的な指定 (Phase 3 Completed)
+### 明示的な指定 (Completed)
 
 #### 設定ファイル (`.cderun.yaml`)
 ```yaml
@@ -69,7 +71,7 @@ runtimePath: /usr/bin/podman
 #### 環境変数
 ```bash
 export CDERUN_RUNTIME=podman
-export DOCKER_HOST=unix:///run/podman/podman.sock
+export CDERUN_MOUNT_SOCKET=/run/podman/podman.sock
 cderun node app.js
 ```
 
@@ -81,62 +83,32 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman (Phase 4予定)**: Podman API を使用。現在は初期スタブ実装のみ。
+- **Podman (Phase 4予定)**: Podman API を使用予定。現在は初期スタブ実装のみ。
 
-## ランタイム情報の表示 (Phase 4予定)
+## ランタイム情報の表示 (Planned)
 
 ### 現在のランタイム確認
 ```bash
-$ cderun --version
-cderun version 0.1.0
+$ cderun debug info
+...
 Runtime: docker 24.0.7
 Socket: /var/run/docker.sock
 ```
 
-```bash
-$ cderun runtime info
-Runtime: docker
-Socket: /var/run/docker.sock
-Version: 24.0.7
-Available: true
-```
-
-### 利用可能なランタイム一覧
-```bash
-$ cderun runtime list
-Available runtimes:
-  * docker  (/var/run/docker.sock) - version 24.0.7
-    podman  (/run/podman/podman.sock) - version 4.8.0
-    
-* = currently selected
-```
-
 ## エラーハンドリング
-
-### ランタイムが見つからない
-```bash
-$ cderun node app.js
-Error: No container runtime found
-Please install Docker or Podman, or specify a runtime socket in configuration
-```
 
 ### 指定されたランタイムが利用不可
 ```bash
 $ cderun --runtime podman node app.js
-Error: Runtime 'podman' is not available
-Socket '/run/podman/podman.sock' not found
-Available runtimes: docker
+Error: podman runtime is not implemented yet
 ```
-
-### バージョン互換性チェック (Phase 4予定)
-各ランタイムの `ServerVersion` APIを呼び出し、必要な最小バージョンを満たしているか確認。
 
 ## 拡張性
 
 ### 新しいランタイムの追加手順
 1. `ContainerRuntime` インターフェースを実装する新しい構造体を作成。
-2. 内部のランタイムファクトリーまたはレジストリに新しいランタイムを登録。
-3. 設定ファイルや自動検出ロジックで新しいランタイムを選択可能にする。
+2. `internal/command/root.go` の `runtimeFactory` に新しいランタイムを登録。
+3. 設定ファイルや環境変数で新しいランタイムを選択可能にする。
 
 ## 依存ライブラリ
 
@@ -144,12 +116,5 @@ Available runtimes: docker
 ```go
 import (
     "github.com/docker/docker/client"
-)
-```
-
-### Podman
-```go
-import (
-    "github.com/containers/podman/v4/pkg/bindings"
 )
 ```

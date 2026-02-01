@@ -92,9 +92,9 @@ node:
 ```
 
 ```bash
-$ export NPM_TOKEN=secret123
-$ export HOME=/home/alice
-$ cderun node app.js
+export NPM_TOKEN=secret123
+export HOME=/home/alice
+cderun node app.js
 # 実行時に解決:
 # ContainerConfig.Env = ["NPM_TOKEN=secret123", "HOME=/home/alice"]
 ```
@@ -110,8 +110,8 @@ node:
 ```
 
 ```bash
-$ export NPM_TOKEN=secret123
-$ cderun node app.js
+export NPM_TOKEN=secret123
+cderun node app.js
 # ContainerConfig.Env = [
 #   "NODE_ENV=production",
 #   "NPM_TOKEN=secret123",
@@ -125,7 +125,7 @@ $ cderun node app.js
 実行ホストに存在しない環境変数は空文字列として渡される：
 
 ```bash
-$ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
+cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # ContainerConfig.Env = ["NONEXISTENT="]
 # 出力: "" (空文字列)
 ```
@@ -150,7 +150,7 @@ Error: Required environment variable not found: NPM_TOKEN
 
 ### dry-runでの確認
 ```bash
-$ cderun --dry-run node app.js
+cderun --dry-run node app.js
 env:
   - NODE_ENV=production
   - NPM_TOKEN=secret123

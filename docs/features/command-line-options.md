@@ -72,7 +72,6 @@ cderun podman images --cderun-mount-socket /run/podman/podman.sock
 - **型**: string
 - **説明**: 設定ファイルや環境変数を上書きしてソケットパスを強制する（P1優先順位）
 - **用途**: サブコマンドの後ろでも指定可能
-```
 
 **注意**: ソケットパスは明示的に指定する必要があります。
 
@@ -189,9 +188,62 @@ cderun --dry-run --dry-run-format json node --version
 cderun --dry-run -f simple node --version
 ```
 
+### `--verbose`
+- **型**: count
+- **説明**: ログ出力の詳細度を上げる
+- **用途**: `--verbose` (INFO), `--verbose --verbose` (DEBUG), `--verbose --verbose --verbose` (TRACE)
+
+```bash
+cderun --verbose node app.js
+```
+
+### `--log-level`
+- **型**: string
+- **説明**: ログレベルを直接指定
+- **値**: `error`, `warn`, `info`, `debug`, `trace`
+
+```bash
+cderun --log-level debug node app.js
+```
+
+### `--log-file`
+- **型**: string
+- **説明**: ログ出力先のファイルパス
+
+```bash
+cderun --log-file ./cderun.log node app.js
+```
+
+### `--log-format`
+- **型**: string
+- **デフォルト**: `text`
+- **説明**: ログの出力形式 (`text` | `json`)
+
+```bash
+cderun --log-format json node app.js
+```
+
+### `--log-tee`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: ログを標準エラー出力とファイルの両方に出力（`--log-file` と併用）
+
+```bash
+cderun --log-file ./cderun.log --log-tee node app.js
+```
+
+### `--log-timestamp`
+- **型**: bool
+- **デフォルト**: `true`
+- **説明**: ログにタイムスタンプを含める
+
+```bash
+cderun --log-timestamp=false node app.js
+```
+
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
-  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-dry-run`, `--cderun-dry-run-format`
+  - 対応フラグ例: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-network`, `--cderun-remove`, `--cderun-runtime`, `--cderun-mount-socket`, `--cderun-env`, `--cderun-workdir`, `--cderun-volume`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## オプションの優先順位
@@ -269,6 +321,7 @@ cderun --cderun-tty node --version
 - `-v` → `--volume`
 - `-w` → `--workdir`
 - `-e` → `--env`
+- `-f` → `--dry-run-format`
 
 将来追加予定：
 - `-t` → `--tty`
