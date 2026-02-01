@@ -50,44 +50,59 @@ $ cderun --tty docker --tty
 - `--tty`: Allocate a pseudo-TTY.
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--image`: Docker image to use (overrides mapping).
+- `--env`, `-e`: Set environment variables (KEY=VALUE or KEY).
+- `--volume`, `-v`: Bind mount a volume (hostPath:containerPath[:ro|rw]).
+- `--workdir`, `-w`: Working directory inside the container.
 - `--network`: Connect a container to a network (default: "bridge").
 - `--remove`: Automatically remove the container when it exits (default: true).
 - `--runtime`: Container runtime to use (docker/podman).
 - `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
-- `--mount-cderun`: (Planned) Mount the cderun binary into the container. Currently requires `--mount-socket`.
-- `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
-- `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
+- `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
+- `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
+- `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
 - `--dry-run`: Preview container configuration without execution.
 - `--dry-run-format`, `-f`: Output format (yaml, json, simple).
+- `--verbose`: Enable verbose logging (repeat for more detail).
+- `--log-level`: Set log level (error, warn, info, debug, trace).
+- `--log-file`: Set log file path.
+- `--log-format`: Set log format (text, json).
+- `--log-tee`: Output log to both stderr and log file.
+- `--cderun-tty`: Override TTY setting (highest priority, can be used after subcommand).
+- `--cderun-interactive`: Override interactive setting (highest priority, can be used after subcommand).
+- `--cderun-env`: Override environment variables (highest priority).
+- `--cderun-volume`: Override volume mounts (highest priority).
+- `--cderun-workdir`: Override workdir (highest priority).
 
 ## Features
 
 ### Multi-Runtime Support
 `cderun` uses an abstraction layer to support multiple container runtimes:
 - **Docker** (default)
-- **Podman** (Planned - Phase 4)
+- **Podman** (Phase 4 - In Progress)
 - Extensible architecture for future runtimes (containerd, Lima, etc.)
 
 ### Advanced Tool Configuration
 `cderun` supports tool-specific settings in `.tools.yaml`, allowing you to pre-configure:
+- **Image**: Specify the container image for each tool.
 - **Volumes**: Map host directories to container paths.
-- **Environment Variables**: Define static environment variables for the tool.
+- **Environment Variables**: Define environment variables for the tool.
 - **Working Directory**: Set the default working directory inside the container.
+- **Mount Options**: Automatically mount cderun or other tools.
 
 ### Intelligent Argument Parsing
-- Strict boundary parsing separates `cderun` flags from subcommand arguments
-- Prevents flag conflicts between `cderun` and wrapped commands
-- Supports complex command structures
+- Strict boundary parsing separates `cderun` flags from subcommand arguments.
+- Prevents flag conflicts between `cderun` and wrapped commands.
+- Supports complex command structures with P1 internal overrides.
 
 ### Polyglot Entry Point
-- Single binary can act as multiple tools via symlinks
-- Automatic tool detection from executable name
-- Seamless integration with existing workflows
+- Single binary can act as multiple tools via symlinks.
+- Automatic tool detection from executable name.
+- Seamless integration with existing workflows.
 
 ### Clean Host Environment
-- All commands run in ephemeral containers
-- No need to install development tools locally
-- Consistent, reproducible environments
+- All commands run in ephemeral containers.
+- No need to install development tools locally.
+- Consistent, reproducible environments across different machines.
 
 ---
 *This project is under active development.*

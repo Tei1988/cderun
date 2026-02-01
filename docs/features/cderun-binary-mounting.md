@@ -25,14 +25,13 @@ gemini> use mcp server "python-tools"
 ### 基本的な仕組み
 
 ```bash
-$ cderun --mount-cderun gemini-cli
+$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
 
-# 生成されるコマンド:
-docker run --rm -t -i \
-  -v /usr/local/bin/cderun:/usr/local/bin/cderun:ro \  # cderunバイナリをマウント
-  -v /var/run/docker.sock:/var/run/docker.sock \       # dockerソケットもマウント
-  -v /home/user/.cderun:/home/user/.cderun:ro \        # 設定ファイルもマウント
-  gemini-cli:latest gemini-cli
+# 生成されるコマンド (イメージ):
+# docker run --rm -t -i \
+#   -v /usr/local/bin/cderun:/usr/local/bin/cderun:ro \  # cderunバイナリをマウント
+#   -v /var/run/docker.sock:/var/run/docker.sock \       # dockerソケットをマウント
+#   gemini-cli:latest gemini-cli
 ```
 
 ### コンテナ内での動作
@@ -54,7 +53,7 @@ Python 3.11.0
 #### フラグによる指定
 ```bash
 # 明示的に指定
-cderun --mount-cderun gemini-cli
+cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
 ```
 
 #### 設定ファイルによる指定
@@ -67,6 +66,7 @@ gemini-cli:
 
 #### グローバル設定
 ```yaml
+# .cderun.yaml
 defaults:
   mountCderun: false  # デフォルトでは無効
 ```
@@ -80,6 +80,8 @@ defaults:
 2. **ランタイムソケット**
    - コンテナ内のcderunが基底ホストのコンテナランタイム（Docker等）と通信できるように
    - 指定されたソケットパスを同じパスでコンテナ内にマウント
+
+> **Note**: 設定ファイル（`.cderun.yaml` や `.tools.yaml`）は自動的にはマウントされません。コンテナ内からcderunを使用する場合、必要な設定は環境変数経由で渡すか、ボリュームマウントを使用して設定ファイルをコンテナ内の検索パス（例：カレントディレクトリ）に配置する必要があります。
 
 ## 使用例
 
@@ -103,7 +105,7 @@ python:
 #### 実行
 ```bash
 # 基底ホストでgemini-cliを起動
-$ cderun gemini-cli
+$ cderun --mount-socket /var/run/docker.sock gemini-cli
 
 # gemini-cliコンテナ内
 gemini> use mcp server "python-tools"
@@ -118,7 +120,7 @@ $ cderun python script.py
 
 ```bash
 # 基底ホストでdevコンテナを起動
-$ cderun --mount-cderun dev-env
+$ cderun --mount-cderun --mount-socket /var/run/docker.sock dev-env
 
 # dev-envコンテナ内で、さらに別のツールを起動
 $ cderun node --version
@@ -129,47 +131,6 @@ Python 3.11.0
 
 $ cderun docker ps
 # ホストのdockerコンテナ一覧を表示
-```
-
-### 例3: CI/CDパイプライン
-
-```yaml
-# .tools.yaml
-ci-runner:
-  image: ci-runner:latest
-  mountCderun: true
-  volumes:
-    - .:/workspace
-```
-
-```bash
-# CI/CDスクリプト内
-$ cderun ci-runner
-
-# ci-runnerコンテナ内
-$ cderun docker build -t app:latest .
-$ cderun docker push app:latest
-$ cderun node test
-$ cderun python lint.py
-```
-
-## 設定オプション
-
-### ツール固有の設定
-
-```yaml
-# .tools.yaml
-gemini-cli:
-  image: gemini-cli:latest
-  mountCderun: true
-```
-
-### グローバル設定
-
-```yaml
-# .cderun.yaml
-defaults:
-  mountCderun: false  # デフォルトでは無効
 ```
 
 ## セキュリティ考慮事項
@@ -184,15 +145,11 @@ defaults:
    - 無限ループの可能性（cderun → cderun → cderun...）
    - リソース枯渇のリスク
 
-3. **設定ファイルの露出**
-   - 基底ホストの設定ファイルがコンテナ内から読める
-   - 機密情報が含まれる可能性
-
 ### 対策
 
 #### read-onlyマウント
 - cderunバイナリはread-onlyでマウントされます。
-- `-v /usr/local/bin/cderun:/usr/local/bin/cderun:ro`
+- `/usr/local/bin/cderun:/usr/local/bin/cderun:ro`
 
 ## 制限事項
 
@@ -202,7 +159,7 @@ defaults:
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun gemini-cli
+$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
 
 # gemini-cliコンテナ（実行ホスト）
 $ export MY_VAR=hello
@@ -230,42 +187,6 @@ None  # ← 環境変数は引き継がれない！
 - コンテナ内のライブラリとの互換性が必要
 - 静的リンクされたバイナリが推奨
 
-### 4. パフォーマンス
-- ネストされたコンテナ起動のオーバーヘッド
-- 深いネストは非推奨
-
 ## 実装状況
 
 1. **Phase 1-3 Completed**: 基本的なcderunバイナリおよびソケットのマウントが実装済み。
-
-## 推奨される使用方法
-
-### ✅ 推奨
-
-```yaml
-# .tools.yaml
-# 開発環境やCI/CDでの使用
-dev-env:
-  mountCderun: true
-
-gemini-cli:
-  mountCderun: true
-```
-
-### ⚠️ 注意が必要
-
-```yaml
-# .tools.yaml
-# 本番環境での使用は慎重に
-production-app:
-  mountCderun: false  # 本番では無効化
-```
-
-### ❌ 非推奨
-
-```yaml
-# .cderun.yaml
-# 全てのツールでデフォルト有効化
-defaults:
-  mountCderun: true  # 非推奨
-```
