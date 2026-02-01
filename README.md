@@ -78,7 +78,7 @@ $ cderun --tty docker --tty
 ### Multi-Runtime Support
 `cderun` uses an abstraction layer to support multiple container runtimes:
 - **Docker** (default)
-- **Podman** (Phase 4 - In Progress)
+- **Podman** (Completed)
 - Extensible architecture for future runtimes (containerd, Lima, etc.)
 
 ### Advanced Tool Configuration
