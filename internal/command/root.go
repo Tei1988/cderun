@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -330,12 +331,21 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	setupSignals(sigChan)
 	defer signal.Stop(sigChan)
 	go func() {
+		firstSignal := true
 		for {
 			select {
 			case sig := <-sigChan:
-				sigName := getSignalName(sig)
-				if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
-					logging.Warn("failed to forward signal %v: %v", sig, err)
+				if firstSignal {
+					sigName := getSignalName(sig)
+					logging.Debug("Forwarding signal %v to container", sig)
+					if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
+						logging.Warn("failed to forward signal %v: %v", sig, err)
+					}
+					firstSignal = false
+				} else {
+					logging.Info("Received second signal, terminating...")
+					cancel()
+					return
 				}
 			case <-ctxG.Done():
 				return
@@ -374,19 +384,36 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}
 
-	// Attach to container IO
+	// Attach to container IO concurrently
 	var stdin io.Reader
 	if containerConfig.Interactive {
 		stdin = os.Stdin
 	}
-	if err := rt.AttachContainer(ctx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr); err != nil {
-		return 0, fmt.Errorf("failed to attach to container: %w", err)
-	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
+	}()
 
 	logging.Trace("Waiting for container: %s", containerID)
-	exitCode, err := rt.WaitContainer(ctx, containerID)
+	exitCode, err := rt.WaitContainer(ctxG, containerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
+	}
+
+	// After container exits, wait a short grace period for remaining output
+	select {
+	case err := <-attachDone:
+		if err != nil && err != context.Canceled {
+			return 0, fmt.Errorf("failed to attach to container: %w", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		logging.Debug("AttachContainer timed out after container exit, forcing close")
+		cancelAttach()
+		<-attachDone
 	}
 
 	logging.Debug("Container exited with code: %d", exitCode)
