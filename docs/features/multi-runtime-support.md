@@ -1,4 +1,4 @@
-# Feature: Multi-Runtime Support (Phase 4 In Progress)
+# Feature: Multi-Runtime Support (Completed)
 
 ## 概要
 
@@ -12,11 +12,10 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman (Phase 4予定 - In Progress)
+### 優先度2: Podman (Completed)
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
-- 現在はスタブ実装のみ
 
 ### 将来的な拡張
 - nerdctl（containerdのCLI、Dockerの代替）
@@ -27,7 +26,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 cderun独自の`ContainerRuntime`インターフェースを定義し、各ランタイムの独自APIをラップする。
 
-```
+```text
 cderun ContainerRuntimeインターフェース
         │
         ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
@@ -45,8 +44,8 @@ cderun ContainerRuntimeインターフェース
 
 ## ランタイムの選択
 
-**現状 (Phase 4 In Progress):**
-Docker をフルサポートし、Podman はスタブ実装（"not implemented yet" エラーを返す状態）として準備されています。ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
+**現状 (Phase 4):**
+Docker と Podman をフルサポートしています。Podman は Docker 互換の API を介してサポートされており、ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
 ### 解決ロジック (Completed)
 
@@ -83,7 +82,7 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman (Phase 4予定)**: Podman API を使用予定。現在は初期スタブ実装のみ。
+- **Podman**: Docker 互換の API を使用。Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
 
 ## ランタイム情報の表示 (Planned)
 
@@ -95,13 +94,6 @@ Runtime: docker 24.0.7
 Socket: /var/run/docker.sock
 ```
 
-## エラーハンドリング
-
-### 指定されたランタイムが利用不可
-```bash
-$ cderun --runtime podman node app.js
-Error: podman runtime is not implemented yet
-```
 
 ## 拡張性
 

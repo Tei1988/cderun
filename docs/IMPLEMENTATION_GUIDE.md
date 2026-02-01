@@ -24,9 +24,9 @@
 - シグナルハンドリング（SIGINT/SIGTERMの転送、二段階終了）
 - TTYリサイズ同期（SIGWINCH対応）
 - 詳細ログ機能（レベル別出力、ファイル出力、JSON形式対応）
+- Podmanフルサポート（Docker互換API経由）
 
 ### 未実装
-- Podmanフルサポート（現在はスタブ実装）
 - ログローテーション機能
 - `cderun logs`, `cderun debug` 等のユーティリティコマンド
 
@@ -41,12 +41,12 @@
 ### Phase 3: 高度な機能 (Completed)
 環境変数、マウント機能など
 
-### Phase 4: 利便性向上 (In Progress)
-ドライラン（完了）、インタラクティブ性の向上（完了）、ログ（基本完了）、Podmanサポート（未完了）
+### Phase 4: 利便性向上 (Completed)
+ドライラン（完了）、インタラクティブ性の向上（完了）、ログ（基本完了）、Podmanサポート（完了）
 
 ---
 
-## Phase 4: 利便性向上 (In Progress)
+## Phase 4: 利便性向上 (Completed)
 
 ### Step 4.1: ドライランモード (Completed)
 
@@ -76,7 +76,7 @@
 
 ---
 
-### Step 4.4: Podmanサポート (Planned)
+### Step 4.4: Podmanサポート (Completed)
 
 **目的**: Podmanランタイムへの対応。
 
@@ -101,11 +101,11 @@
 - [x] Step 3.3: cderunバイナリマウント
 - [x] Step 3.4: ツールマウント
 
-### Phase 4 (In Progress)
+### Phase 4 (Completed)
 - [x] Step 4.1: ドライランモード
 - [x] Step 4.2: インタラクティブ性の向上（シグナル、リサイズ）
 - [x] Step 4.3: ログ・デバッグ
-- [ ] Step 4.4: Podmanサポート
+- [x] Step 4.4: Podmanサポート
 
 ## 各ステップの完了基準
 

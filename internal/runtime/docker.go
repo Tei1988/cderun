@@ -17,10 +17,16 @@ import (
 type DockerRuntime struct {
 	client *client.Client
 	socket string
+	name   string
 }
 
-// NewDockerRuntime creates a new DockerRuntime instance.
+// NewDockerRuntime creates a new DockerRuntime instance with name "docker".
 func NewDockerRuntime(socket string) (*DockerRuntime, error) {
+	return NewDockerRuntimeWithName(socket, "docker")
+}
+
+// NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
+func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
 	cli, err := client.NewClientWithOpts(
 		client.WithHost("unix://"+socket),
 		client.WithAPIVersionNegotiation(),
@@ -32,6 +38,7 @@ func NewDockerRuntime(socket string) (*DockerRuntime, error) {
 	return &DockerRuntime{
 		client: cli,
 		socket: socket,
+		name:   name,
 	}, nil
 }
 
@@ -194,5 +201,5 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
-	return "docker"
+	return d.name
 }

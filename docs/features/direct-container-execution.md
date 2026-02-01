@@ -7,7 +7,7 @@
 
 ## アーキテクチャ
 
-```
+```text
 cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コンテナ実行
                     ↓
                ContainerConfig
@@ -20,15 +20,15 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 
 ### 実装ステータス (CRIインターフェース)
 
-| メソッド | Docker (moby) | Podman (bindings) |
+| メソッド | Docker (moby) | Podman (compatible API) |
 | :--- | :---: | :---: |
-| `CreateContainer` | implemented | stub / planned |
-| `StartContainer` | implemented | stub / planned |
-| `WaitContainer` | implemented | stub / planned |
-| `RemoveContainer` | implemented | stub / planned |
-| `AttachContainer` | implemented | stub / planned |
-| `SignalContainer` | implemented | stub / planned |
-| `ResizeContainerTTY` | implemented | stub / planned |
+| `CreateContainer` | implemented | implemented |
+| `StartContainer` | implemented | implemented |
+| `WaitContainer` | implemented | implemented |
+| `RemoveContainer` | implemented | implemented |
+| `AttachContainer` | implemented | implemented |
+| `SignalContainer` | implemented | implemented |
+| `ResizeContainerTTY` | implemented | implemented |
 
 **メリット:**
 - コマンド生成不要
@@ -55,7 +55,7 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 ### ランタイム実装のポイント
 
 - **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
-- **Podman実装**: Podman API (`github.com/containers/podman/v4/pkg/bindings`) を使用予定（現在はスタブ）。
+- **Podman実装**: Docker 互換 API を使用。Docker クライアントライブラリを共通の基盤として利用。
 - **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
 
 ## 実行フロー
@@ -94,7 +94,7 @@ CRIを直接使うことで、コンテナ内からcderunを実行しても、�
 - ソケット・バイナリマウント・ツールマウント
 
 ### Phase 4: 利便性向上 (In Progress)
-- Podman CRI実装 (Planned)
+- Podman CRI実装 (Completed)
 - エラーハンドリングの強化
 - シグナル転送・リサイズ同期 (Completed)
 - 詳細ログ機能 (Completed)
