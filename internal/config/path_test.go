@@ -31,7 +31,26 @@ func TestPathResolution(t *testing.T) {
 		ResolvePathsTool(cfg, baseDir)
 
 		assert.Equal(t, "/abs/path/data:/app/data", cfg.Volumes[0])
-		assert.Equal(t, filepath.Join(home, "config") + ":/root/config:ro", cfg.Volumes[1])
+		assert.Equal(t, filepath.Join(home, "config")+":/root/config:ro", cfg.Volumes[1])
 		assert.Equal(t, "/abs:/abs", cfg.Volumes[2])
+	})
+
+	t.Run("Windows Paths", func(t *testing.T) {
+		cfg := &ToolConfig{
+			Volumes: []string{
+				`C:\host\path:/container`,
+				`D:/host/path:/container:ro`,
+			},
+			Devices: []string{
+				`E:\dev\path:/dev/path`,
+				`F:/dev/path:/dev/path:rwm`,
+			},
+		}
+		ResolvePathsTool(cfg, baseDir)
+
+		assert.Equal(t, `C:\host\path:/container`, cfg.Volumes[0])
+		assert.Equal(t, `D:/host/path:/container:ro`, cfg.Volumes[1])
+		assert.Equal(t, `E:\dev\path:/dev/path`, cfg.Devices[0])
+		assert.Equal(t, `F:/dev/path:/dev/path:rwm`, cfg.Devices[1])
 	})
 }

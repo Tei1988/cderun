@@ -156,7 +156,7 @@ node:
   mountCderun: true
   privileged: false
   memory: "512m"
-  
+
 python:
   image: python:3.11-slim
   tty: true
@@ -167,7 +167,7 @@ python:
     - .:/app
     - ~/.cache/pip:/root/.cache/pip
   workdir: /app
-  
+
 docker:
   image: docker:latest
   volumes:
@@ -183,7 +183,7 @@ docker:
 - `runtime` (string): 使用するコンテナランタイム
   - 値: `docker` | `podman`
   - デフォルト: `docker`
-  
+
 - `socketPath` (string): ホスト上のランタイムソケットの絶対パス
   - 例: `/var/run/docker.sock`, `/run/podman/podman.sock`
   - デフォルト: 自動検出

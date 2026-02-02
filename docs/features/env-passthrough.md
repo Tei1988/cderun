@@ -52,7 +52,7 @@ node:
 ```
 
 ```bash
-$ cderun --env NODE_ENV=production node app.js
+cderun --env NODE_ENV=production node app.js
 # → NODE_ENV=production が使われる（コマンドラインが優先）
 ```
 
@@ -78,7 +78,7 @@ node:
 ```
 
 ```bash
-$ cderun node app.js
+cderun node app.js
 # ContainerConfig.Env = ["NODE_ENV=production", "PORT=3000"]
 ```
 
@@ -130,21 +130,51 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # 出力: "" (空文字列)
 ```
 
-### 厳密モード（将来の拡張）
+### 厳密モード (Strict Mode)
+`strictEnv` を `true` に設定すると、指定された環境変数が実行ホストに存在しない場合にエラーを返します。
+
+#### 設定方法
+`.cderun.yaml`（グローバル）または `.tools.yaml`（ツール固有）で設定可能です。
+
 ```yaml
 # .cderun.yaml
 defaults:
-  strictEnv: true  # 存在しない環境変数でエラー
+  strictEnv: true
 ```
 
+または環境変数で指定：
 ```bash
-$ cderun node app.js
-Error: Required environment variable not found: NPM_TOKEN
+export CDERUN_STRICT_ENV=true
+```
+
+#### 挙動
+```bash
+cderun node app.js
+Error: required environment variable not found: NPM_TOKEN
 ```
 
 ## 環境変数の解決ロジック
 
 コンテナを作成する前に、`Env` 配列内の各要素をスキャンし、`=` を含まない要素（キーのみの指定）については、実行ホストの `os.Getenv(key)` を呼び出して値を解決する。解決された値は `KEY=value` の形式でランタイムAPIに渡される。
+
+## ベストプラクティスと使い分け
+
+デフォルト動作と厳密モード（Strict Mode）の使い分けの指針を以下に示します。
+
+### デフォルト動作 (strictEnv: false)
+- **特徴**: 指定した変数がホストになくてもエラーにせず、空文字としてコンテナに渡します。
+- **メリット**: 柔軟性が高く、一部の環境変数が欠けていても動作が継続できる場合に便利です。
+- **推奨されるユースケース**:
+  - アドホックな開発作業。
+  - オプショナルな設定（ログレベルの変更など）をパススルーする場合。
+
+### 厳密モード (strictEnv: true)
+- **特徴**: 指定した変数がホストに存在しない場合、即座にエラーで停止します（Fail Fast）。
+- **メリット**: 設定漏れによるサイレントな失敗（意図しないデフォルト値での動作など）を確実に防げます。
+- **推奨されるユースケース**:
+  - **認証情報/シークレット**: `NPM_TOKEN`, `AWS_ACCESS_KEY_ID` など、欠落すると正常に動作しないことが明らかな場合。
+  - **CI/CD環境**: 実行環境の一貫性が強く求められる自動化パイプライン。
+  - **チーム共有設定**: `.tools.yaml` をチームで共有しており、全員の環境が正しくセットアップされていることを保証したい場合。
 
 ## デバッグ
 

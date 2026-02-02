@@ -699,7 +699,7 @@ intended for the subcommand.`,
 		},
 	}
 
-	cmd.PersistentFlags().BoolVar(&opts.tty, "tty", false, "Allocate a pseudo-TTY")
+	cmd.PersistentFlags().BoolVarP(&opts.tty, "tty", "t", false, "Allocate a pseudo-TTY")
 	cmd.PersistentFlags().BoolVarP(&opts.interactive, "interactive", "i", false, "Keep STDIN open even if not attached")
 	cmd.PersistentFlags().StringVar(&opts.network, "network", "bridge", "Connect a container to a network")
 	cmd.PersistentFlags().StringVar(&opts.socketPath, "socket-path", "", "Path to the container runtime socket on the host")

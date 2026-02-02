@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"dario.cat/mergo"
@@ -22,6 +23,7 @@ type ConfigDefaults struct {
 	Interactive     *bool  `yaml:"interactive"`
 	Network         string `yaml:"network"`
 	Remove          *bool  `yaml:"remove"`
+	StrictEnv       *bool  `yaml:"strictEnv"`
 	MountCderun     *bool  `yaml:"mountCderun"`
 	MountSocket     *bool  `yaml:"mountSocket"`
 	MountSocketPath string `yaml:"mountSocketPath"`
@@ -68,6 +70,7 @@ type ToolConfig struct {
 	Interactive     *bool    `yaml:"interactive"`
 	Network         string   `yaml:"network"`
 	Remove          *bool    `yaml:"remove"`
+	StrictEnv       *bool    `yaml:"strictEnv"`
 	Volumes         []string `yaml:"volumes"`
 	Env             []string `yaml:"env"`
 	Workdir         string   `yaml:"workdir"`
@@ -210,23 +213,42 @@ func resolvePath(p string, baseDir string) string {
 	return filepath.Clean(p)
 }
 
+var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
 func resolveVolumePath(v string, baseDir string) string {
-	parts := strings.SplitN(v, ":", 2)
-	if len(parts) < 2 {
+	host, remainder, ok := splitHostRemainder(v)
+	if !ok {
 		return v
 	}
-	parts[0] = resolvePath(parts[0], baseDir)
-	return strings.Join(parts, ":")
+	return resolvePath(host, baseDir) + ":" + remainder
 }
 
 func resolveDevicePath(d string, baseDir string) string {
 	// host-path:container-path[:permissions]
-	parts := strings.SplitN(d, ":", 2)
-	if len(parts) < 2 {
+	host, remainder, ok := splitHostRemainder(d)
+	if !ok {
 		return d
 	}
-	parts[0] = resolvePath(parts[0], baseDir)
-	return strings.Join(parts, ":")
+	return resolvePath(host, baseDir) + ":" + remainder
+}
+
+func splitHostRemainder(s string) (string, string, bool) {
+	sepIdx := strings.Index(s, ":")
+	if sepIdx == -1 {
+		return "", "", false
+	}
+
+	// If it's a Windows drive letter (e.g. C:\ or C:/), the first colon is part of the path.
+	// We need to look for the separator colon after the drive letter (index > 1).
+	if winDriveRegex.MatchString(s) {
+		nextSep := strings.Index(s[sepIdx+1:], ":")
+		if nextSep == -1 {
+			return "", "", false
+		}
+		sepIdx = sepIdx + 1 + nextSep
+	}
+
+	return s[:sepIdx], s[sepIdx+1:], true
 }
 
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
