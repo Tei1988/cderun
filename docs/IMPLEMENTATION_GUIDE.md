@@ -49,18 +49,6 @@
 
 ---
 
-### Phase 5: Docker互換フラグの拡充 (Completed)
-
-**目的**: Docker CLIに近い操作感を提供するため、詳細なコンテナ設定フラグをサポートする。
-
-**実装内容**:
-- ネットワーク: `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`
-- セキュリティ・実行ユーザー: `--user`, `--privileged`, `--cap-add`, `--cap-drop`
-- リソース制限: `--memory`, `--cpus`
-- その他: `--entrypoint`, `--pull`, `--tmpfs`, `--device`
-
----
-
 ### Phase 4: 利便性向上 (Completed)
 
 ### Step 4.1: ドライランモード (Completed)
@@ -100,6 +88,20 @@
 
 **追加内容**:
 - ランタイムの自動検出ロジックの実装
+
+---
+
+### Phase 5: Docker互換フラグの拡充 (Completed)
+
+### Step 5.1: Docker互換フラグの追加 (Completed)
+
+**目的**: Docker CLIに近い操作感を提供するため、詳細なコンテナ設定フラグをサポートする。
+
+**実装内容**:
+- ネットワーク: `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`
+- セキュリティ・実行ユーザー: `--user`, `--privileged`, `--cap-add`, `--cap-drop`
+- リソース制限: `--memory`, `--cpus`
+- その他: `--entrypoint`, `--pull`, `--tmpfs`, `--device`
 
 ---
 

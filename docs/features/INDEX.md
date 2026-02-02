@@ -76,7 +76,7 @@
   - シグナル転送
   - TTYリサイズ同期
 
-16. **[README生成戦略](./readme-generation.md)**
+16. **[README生成戦略 (Completed)](./readme-generation.md)**
     - 実装コードからREADMEを生成
     - Source of Truthの維持
 
