@@ -20,6 +20,7 @@ type ConfigDefaults struct {
 	Interactive     *bool  `yaml:"interactive"`
 	Network         string `yaml:"network"`
 	Remove          *bool  `yaml:"remove"`
+	StrictEnv       *bool  `yaml:"strictEnv"`
 	MountCderun     *bool  `yaml:"mountCderun"`
 	MountSocket     *bool  `yaml:"mountSocket"`
 	MountSocketPath string `yaml:"mountSocketPath"`
@@ -66,6 +67,7 @@ type ToolConfig struct {
 	Interactive     *bool    `yaml:"interactive"`
 	Network         string   `yaml:"network"`
 	Remove          *bool    `yaml:"remove"`
+	StrictEnv       *bool    `yaml:"strictEnv"`
 	Volumes         []string `yaml:"volumes"`
 	Env             []string `yaml:"env"`
 	Workdir         string   `yaml:"workdir"`

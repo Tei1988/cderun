@@ -9,7 +9,7 @@ cderunをネストして実行する場合、以下のように呼び分ける�
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun gemini-cli
+cderun --mount-cderun gemini-cli
 ```
 
 ### 実行ホスト (Execution Host)
@@ -17,10 +17,10 @@ $ cderun --mount-cderun gemini-cli
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun gemini-cli
+cderun --mount-cderun gemini-cli
 
 # gemini-cliコンテナ（実行ホスト）
-$ cderun python script.py
+cderun python script.py
 ```
 
 ## 例

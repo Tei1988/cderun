@@ -17,7 +17,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 ## グローバルオプション
 
-### `--tty`
+### `--tty`, `-t`
 - **型**: bool
 - **デフォルト**: `false`
 - **説明**: 疑似TTYを割り当てる
@@ -25,7 +25,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 ```bash
 cderun --tty bash
-cderun --tty node
+cderun -t node
 ```
 
 ### `--interactive`, `-i`
@@ -448,6 +448,7 @@ cderun --cderun-tty node --version
 
 ### 短縮形
 現在サポートされている短縮形：
+- `-t` → `--tty`
 - `-i` → `--interactive`
 - `-v` → `--volume`
 - `-w` → `--workdir`
@@ -457,9 +458,6 @@ cderun --cderun-tty node --version
 - `-P` → `--publish-all`
 - `-u` → `--user`
 - `-m` → `--memory`
-
-将来追加予定：
-- `-t` → `--tty`
 
 ### デフォルト値の確認
 ```bash

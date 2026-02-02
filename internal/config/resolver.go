@@ -37,6 +37,7 @@ type ResolvedConfig struct {
 	LogFormat       string
 	LogTee          bool
 	LogTimestamp    bool
+	StrictEnv       bool
 
 	// New fields
 	Ports      []string
@@ -280,10 +281,24 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		res.Volumes = append(res.Volumes, parseVolumes(cli.CderunVolumes)...)
 	}
 
-	// Resolve Env (P1 > P2 > P4)
-	res.Env = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv))
+	// 10. Resolve StrictEnv
+	res.StrictEnv = resolveBool(
+		false, false, // No P1 for strictEnv yet
+		false, false, // No P2 for strictEnv yet
+		"CDERUN_STRICT_ENV",
+		subcommand, tools, func(t ToolConfig) *bool { return t.StrictEnv },
+		global, func(g CDERunConfig) *bool { return g.Defaults.StrictEnv },
+		false,
+	)
 
-	// 11. Resolve Runtime & Socket with Auto-detection
+	// 11. Resolve Env (P1 > P2 > P4)
+	var err error
+	res.Env, err = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv), res.StrictEnv)
+	if err != nil {
+		return nil, err
+	}
+
+	// 12. Resolve Runtime & Socket with Auto-detection
 	res.Runtime = resolveString(
 		cli.CderunRuntimeSet, cli.CderunRuntime,
 		cli.RuntimeSet, cli.Runtime,
@@ -628,17 +643,20 @@ func mergeEnv(base, p2, p1 []string) []string {
 	return res
 }
 
-func resolveEnvValues(env []string) []string {
+func resolveEnvValues(env []string, strict bool) ([]string, error) {
 	var res []string
 	for _, e := range env {
 		if strings.Contains(e, "=") {
 			res = append(res, e)
 		} else {
-			val := os.Getenv(e)
+			val, found := os.LookupEnv(e)
+			if !found && strict {
+				return nil, fmt.Errorf("required environment variable not found: %s", e)
+			}
 			res = append(res, fmt.Sprintf("%s=%s", e, val))
 		}
 	}
-	return res
+	return res, nil
 }
 
 func parseVolumes(vols []string) []container.VolumeMount {
