@@ -109,7 +109,7 @@ docker:
   
 - `socketPath` (string): ホスト上のランタイムソケットの絶対パス
   - 例: `/var/run/docker.sock`, `/run/podman/podman.sock`
-  - デフォルト: オートデリバ
+  - デフォルト: 自動検出
 
 #### `defaults` サブセクション
 cderunコマンドのデフォルト動作を定義。コマンドライン引数で上書き可能。

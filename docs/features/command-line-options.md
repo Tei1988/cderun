@@ -59,7 +59,7 @@ cderun --network my-network node app.js
 
 ### `--socket-path`
 - **型**: string
-- **デフォルト**: オートデリバ（`/var/run/docker.sock` 等）
+- **デフォルト**: 自動検出（`/var/run/docker.sock` 等）
 - **説明**: コンテナランタイムソケットのホスト上のパスを指定
 - **用途**: cderunが接続するランタイムソケットを指定する
 
@@ -470,27 +470,27 @@ cderun --help
 
 ### オプションが認識されない
 ```bash
-$ cderun node --tty
+cderun node --tty
 # --ttyがnodeに渡される
 ```
 
 **解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
 ```bash
-$ cderun --tty node
+cderun --tty node
 ```
 
 ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
 ```bash
-$ cderun node --cderun-tty
+cderun node --cderun-tty
 ```
 
 ### --mount-cderunが動作しない
 ```bash
-$ cderun --mount-cderun node
+cderun --mount-cderun node
 Error: --mount-cderun requires --mount-socket
 ```
 
 **解決策**: `--mount-socket`を併用
 ```bash
-$ cderun --mount-cderun --mount-socket node
+cderun --mount-cderun --mount-socket node
 ```
