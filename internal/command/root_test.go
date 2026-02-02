@@ -23,7 +23,9 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.tty = false
 	opts.interactive = false
 	opts.network = "bridge"
-	opts.mountSocket = ""
+	opts.socketPath = ""
+	opts.mountSocket = false
+	opts.mountSocketPath = ""
 	opts.mountCderun = false
 	opts.image = ""
 	opts.remove = true
@@ -33,7 +35,9 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunNetwork = ""
 	opts.cderunRemove = true
 	opts.cderunRuntime = ""
-	opts.cderunMountSocket = ""
+	opts.cderunSocketPath = ""
+	opts.cderunMountSocket = false
+	opts.cderunMountSocketPath = ""
 	opts.cderunWorkdir = ""
 	opts.cderunVolumes = nil
 	opts.cderunMountCderun = false
@@ -633,14 +637,9 @@ node:
 		t.Cleanup(func() { os.Chdir(oldWd) })
 		os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
 
-		_, err := executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-mount-socket=/var/run/custom.sock", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
+		_, err := executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
-
-		// runtimeFactory is called with resolved runtime and socket
-		// Wait, I need to check if runtimeFactory was called with correct args.
-		// Actually I can't easily check runtimeFactory calls without a spy.
-		// But I can check if volumes contain the custom socket.
 
 		socketFound := false
 		cderunFound := false
@@ -712,16 +711,15 @@ func TestPhase3Features(t *testing.T) {
 	})
 
 	t.Run("mounting flags require explicit cderun socket settings", func(t *testing.T) {
-		// DOCKER_HOST should no longer be enough for SocketSet
-		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
-		t.Setenv("CDERUN_MOUNT_SOCKET", "")
+		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
+		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
 
 		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires --mount-socket")
 
 		// CDERUN_MOUNT_SOCKET should work
-		t.Setenv("CDERUN_MOUNT_SOCKET", "/var/run/docker.sock")
+		t.Setenv("CDERUN_MOUNT_SOCKET", "true")
 		_, err = executeCommand("--image", "alpine", "--mount-cderun", "sh")
 		assert.NoError(t, err)
 	})
@@ -729,7 +727,7 @@ func TestPhase3Features(t *testing.T) {
 	t.Run("mount-cderun logic", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "/socket", "sh")
+		_, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "sh")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -747,6 +745,22 @@ func TestPhase3Features(t *testing.T) {
 		}
 		assert.True(t, binaryFound, "binary should be mounted")
 		assert.True(t, socketFound, "socket should be mounted")
+	})
+
+	t.Run("mount-socket-path logic", func(t *testing.T) {
+		mockRuntime.CreatedConfig = nil
+
+		_, err := executeCommand("--image", "alpine", "--mount-socket", "--socket-path", "/host/socket", "--mount-socket-path", "/container/socket", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Volumes {
+			if v.HostPath == "/host/socket" && v.ContainerPath == "/container/socket" {
+				socketFound = true
+			}
+		}
+		assert.True(t, socketFound, "socket should be mounted to custom path")
 	})
 
 	t.Run("mount-tools logic", func(t *testing.T) {
@@ -768,7 +782,7 @@ sh:
 `
 		os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 
-		_, err := executeCommand("--mount-tools", "node", "--mount-socket", "/socket", "sh")
+		_, err := executeCommand("--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -790,7 +804,7 @@ sh:
 		// Test mount-all-tools
 		mockRuntime.CreatedConfig = nil
 
-		_, err = executeCommand("--mount-all-tools", "--mount-socket", "/socket", "sh")
+		_, err = executeCommand("--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "sh")
 		assert.NoError(t, err)
 
 		nodeFound = false
@@ -818,7 +832,7 @@ sh:
 
 		// No .tools.yaml created
 
-		output, err := executeCommand("--mount-all-tools", "--mount-socket", "/socket", "--image", "alpine", "sh")
+		output, err := executeCommand("--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 	})

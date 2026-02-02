@@ -74,7 +74,9 @@ cderun node app.js --cderun-image node:20-alpine
 - `--memory`, `-m`: Memory limit.
 - `--remove`: Automatically remove the container when it exits (default: true).
 - `--runtime`: Container runtime to use (docker/podman).
-- `--mount-socket`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
+- `--socket-path`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
+- `--mount-socket`: Mount the container runtime socket into the container.
+- `--mount-socket-path`: Path where the socket should be mounted inside the container.
 - `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
 - `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
 - `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.

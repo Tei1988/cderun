@@ -7,7 +7,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 ## 前提条件
 
-- `--mount-socket`が指定されていること
+- `--mount-socket`が有効（`true`）であること
 - `.tools.yaml`が存在すること
 
 ※ `--mount-tools` または `--mount-all-tools` を使用する場合、`cderun` バイナリ自体も自動的に `/usr/local/bin/cderun` にマウントされます。
@@ -22,7 +22,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 **使用例**:
 ```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-all-tools sh
+cderun --mount-cderun --mount-socket --mount-all-tools sh
 ```
 
 **動作**:
@@ -53,7 +53,7 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 
 **使用例**:
 ```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools python,node sh
+cderun --mount-cderun --mount-socket --mount-tools python,node sh
 ```
 
 **動作イメージ(実際はランタイムAPIで実現)**:
@@ -117,13 +117,13 @@ Available tools: node, python, gemini-cli
 ```bash
 # .tools.yamlにbashが定義されている場合
 cderun --mount-cderun \
-  --mount-socket /var/run/docker.sock \
+  --mount-socket \
   --mount-all-tools \
   bash
 
 # または --image で明示的に指定
 cderun --mount-cderun \
-  --mount-socket /var/run/docker.sock \
+  --mount-socket \
   --mount-all-tools \
   --image ubuntu:22.04 \
   bash
@@ -139,7 +139,7 @@ gemini-cli --version
 ```bash
 # .tools.yamlにshが定義されている場合
 cderun --mount-cderun \
-  --mount-socket /var/run/docker.sock \
+  --mount-socket \
   --mount-tools python,node \
   sh
 ```
@@ -149,7 +149,7 @@ cderun --mount-cderun \
 ```bash
 # .tools.yamlに定義されたツールを使用
 cderun --mount-cderun \
-  --mount-socket /var/run/docker.sock \
+  --mount-socket \
   --mount-tools node,docker \
   sh -c '
     # nodeコマンドはcderun経由で実行される
@@ -179,7 +179,7 @@ npx:
 
 ```bash
 cderun --mount-cderun \
-  --mount-socket /var/run/docker.sock \
+  --mount-socket \
   --mount-tools node,npm,npx \
   sh -c '
     node --version
@@ -190,7 +190,7 @@ cderun --mount-cderun \
 
 ## 制限事項
 
-1. **依存性**: `--mount-socket`が必須（バイナリは自動的にマウントされます）
+1. **依存性**: `--mount-socket`が必須
 2. **読み取り専用**: マウントされたツールは読み取り専用
 3. **パスの上書き**: コンテナ内に同名のツールがある場合、上書きされる
 4. **アーキテクチャ一致**: コンテナのアーキテクチャに合ったcderunバイナリが必要

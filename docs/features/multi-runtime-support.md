@@ -51,7 +51,7 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 
 1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
 2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
-3. **コマンドライン引数**: `--runtime`, `--mount-socket` および P1 内部オーバーライド。
+3. **コマンドライン引数**: `--runtime`, `--socket-path` および P1 内部オーバーライド。
 
 ### 自動検出ロジック (Completed)
 

@@ -166,57 +166,57 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/tool/workdir", res.Workdir)
 	})
 
-	t.Run("Socket resolution from CDERUN_MOUNT_SOCKET", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_SOCKET", "/custom/socket.sock")
+	t.Run("SocketPath resolution from CDERUN_SOCKET_PATH", func(t *testing.T) {
+		t.Setenv("CDERUN_SOCKET_PATH", "/custom/socket.sock")
 		cli := CLIOptions{}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "/custom/socket.sock", res.Socket)
-		assert.True(t, res.SocketSet)
+		assert.Equal(t, "/custom/socket.sock", res.SocketPath)
 	})
 
-	t.Run("SocketSet is false for non-mountable paths", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_SOCKET", "tcp://localhost:2375")
+	t.Run("MountSocket resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET", "true")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "tcp://localhost:2375", res.Socket)
-		assert.False(t, res.SocketSet, "TCP socket should not be mountable")
+		assert.True(t, res.MountSocket)
 	})
 
-	t.Run("DOCKER_HOST does not affect SocketSet", func(t *testing.T) {
+	t.Run("DOCKER_HOST is ignored", func(t *testing.T) {
 		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.False(t, res.SocketSet, "DOCKER_HOST should be ignored for SocketSet")
+		// It will fallback to default auto-detection or empty, but should NOT be /var/run/docker.sock from DOCKER_HOST
+		// actually auto-detection might find /var/run/docker.sock if it exists on the machine.
+		// So we just check it doesn't affect MountSocket.
+		assert.False(t, res.MountSocket)
 	})
 
-	t.Run("P1 CderunMountSocket overrides CLI and Env", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_SOCKET", "/env/socket")
+	t.Run("P1 CderunSocketPath overrides CLI and Env", func(t *testing.T) {
+		t.Setenv("CDERUN_SOCKET_PATH", "/env/socket")
 		cli := CLIOptions{
-			MountSocket:          "/cli/socket",
-			MountSocketSet:       true,
-			CderunMountSocket:    "/p1/socket",
-			CderunMountSocketSet: true,
+			SocketPath:          "/cli/socket",
+			SocketPathSet:       true,
+			CderunSocketPath:    "/p1/socket",
+			CderunSocketPathSet: true,
 		}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "/p1/socket", res.Socket)
-		assert.True(t, res.SocketSet)
+		assert.Equal(t, "/p1/socket", res.SocketPath)
 	})
 
-	t.Run("Runtime auto-detection from socket path", func(t *testing.T) {
+	t.Run("Runtime auto-detection from SocketPath", func(t *testing.T) {
 		cli := CLIOptions{
-			MountSocket:    "/run/user/1000/podman/podman.sock",
-			MountSocketSet: true,
+			SocketPath:    "/run/user/1000/podman/podman.sock",
+			SocketPathSet: true,
 		}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
-		assert.Equal(t, "/run/user/1000/podman/podman.sock", res.Socket)
+		assert.Equal(t, "/run/user/1000/podman/podman.sock", res.SocketPath)
 
 		cli = CLIOptions{
-			MountSocket:    "/var/run/docker.sock",
-			MountSocketSet: true,
+			SocketPath:    "/var/run/docker.sock",
+			SocketPathSet: true,
 		}
 		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestResolve(t *testing.T) {
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
-		assert.Equal(t, "/run/podman/podman.sock", res.Socket)
+		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 		cli = CLIOptions{
 			Runtime:    "docker",
@@ -240,7 +240,7 @@ func TestResolve(t *testing.T) {
 		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "docker", res.Runtime)
-		assert.Equal(t, "/var/run/docker.sock", res.Socket)
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 	})
 
 	t.Run("MountCderun resolution", func(t *testing.T) {

@@ -25,7 +25,7 @@ gemini> use mcp server "python-tools"
 ### 基本的な仕組み
 
 ```bash
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+$ cderun --mount-cderun --mount-socket gemini-cli
 
 # 生成されるコマンド (イメージ):
 # docker run --rm -t -i \
@@ -53,7 +53,7 @@ Python 3.11.0
 #### フラグによる指定
 ```bash
 # 明示的に指定
-cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+cderun --mount-cderun --mount-socket gemini-cli
 ```
 
 #### 設定ファイルによる指定
@@ -105,7 +105,7 @@ python:
 #### 実行
 ```bash
 # 基底ホストでgemini-cliを起動
-$ cderun --mount-socket /var/run/docker.sock gemini-cli
+$ cderun --mount-socket gemini-cli
 
 # gemini-cliコンテナ内
 gemini> use mcp server "python-tools"
@@ -120,7 +120,7 @@ $ cderun python script.py
 
 ```bash
 # 基底ホストでdevコンテナを起動
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock dev-env
+$ cderun --mount-cderun --mount-socket dev-env
 
 # dev-envコンテナ内で、さらに別のツールを起動
 $ cderun node --version
@@ -159,7 +159,7 @@ $ cderun docker ps
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+$ cderun --mount-cderun --mount-socket gemini-cli
 
 # gemini-cliコンテナ（実行ホスト）
 $ export MY_VAR=hello
