@@ -52,7 +52,7 @@ node:
 ```
 
 ```bash
-$ cderun --env NODE_ENV=production node app.js
+cderun --env NODE_ENV=production node app.js
 # → NODE_ENV=production が使われる（コマンドラインが優先）
 ```
 
@@ -78,7 +78,7 @@ node:
 ```
 
 ```bash
-$ cderun node app.js
+cderun node app.js
 # ContainerConfig.Env = ["NODE_ENV=production", "PORT=3000"]
 ```
 
@@ -130,16 +130,27 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # 出力: "" (空文字列)
 ```
 
-### 厳密モード（将来の拡張）
+### 厳密モード (Strict Mode)
+`strictEnv` を `true` に設定すると、指定された環境変数が実行ホストに存在しない場合にエラーを返します。
+
+#### 設定方法
+`.cderun.yaml`（グローバル）または `.tools.yaml`（ツール固有）で設定可能です。
+
 ```yaml
 # .cderun.yaml
 defaults:
-  strictEnv: true  # 存在しない環境変数でエラー
+  strictEnv: true
 ```
 
+または環境変数で指定：
 ```bash
-$ cderun node app.js
-Error: Required environment variable not found: NPM_TOKEN
+export CDERUN_STRICT_ENV=true
+```
+
+#### 挙動
+```bash
+cderun node app.js
+Error: required environment variable not found: NPM_TOKEN
 ```
 
 ## 環境変数の解決ロジック

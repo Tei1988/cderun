@@ -395,6 +395,26 @@ node:
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})
 
+	t.Run("-t shorthand for --tty", func(t *testing.T) {
+		// Save and restore package-level state
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("-t", "--image", "alpine", "sh")
+		assert.NoError(t, err)
+		assert.True(t, mockRuntime.CreatedConfig.TTY)
+	})
+
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		// Save and restore package-level state
 		oldFactory := runtimeFactory

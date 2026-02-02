@@ -307,4 +307,49 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "error", res.LogLevel)
 	})
+
+	t.Run("Strict environment variable resolution", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node:20",
+				Env:   []string{"EXISTING_VAR", "MISSING_VAR"},
+			},
+		}
+
+		t.Setenv("EXISTING_VAR", "value")
+
+		// Default: missing var is empty string
+		res, err := Resolve("node", CLIOptions{}, tools, nil)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "EXISTING_VAR=value")
+		assert.Contains(t, res.Env, "MISSING_VAR=")
+
+		// Strict mode from tool config
+		toolsStrict := ToolsConfig{
+			"node": ToolConfig{
+				Image:     "node:20",
+				Env:       []string{"MISSING_VAR"},
+				StrictEnv: ptr(true),
+			},
+		}
+		_, err = Resolve("node", CLIOptions{}, toolsStrict, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
+
+		// Strict mode from global config
+		globalStrict := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				StrictEnv: ptr(true),
+			},
+		}
+		_, err = Resolve("node", CLIOptions{}, tools, globalStrict)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
+
+		// Strict mode from environment variable
+		t.Setenv("CDERUN_STRICT_ENV", "true")
+		_, err = Resolve("node", CLIOptions{}, tools, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
+	})
 }

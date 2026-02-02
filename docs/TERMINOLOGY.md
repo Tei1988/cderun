@@ -9,7 +9,7 @@ cderunをネストして実行する場合、以下のように呼び分ける�
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun gemini-cli
+cderun --mount-cderun gemini-cli
 ```
 
 ### 実行ホスト (Execution Host)
@@ -17,10 +17,10 @@ $ cderun --mount-cderun gemini-cli
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun gemini-cli
+cderun --mount-cderun gemini-cli
 
 # gemini-cliコンテナ（実行ホスト）
-$ cderun python script.py
+cderun python script.py
 ```
 
 ## 例
@@ -36,6 +36,14 @@ pythonコンテナ
 この場合：
 - **基底ホスト**: 物理マシン
 - **実行ホスト**: gemini-cliコンテナ（pythonを起動する直前のホスト）
+
+## cderun Expressions (cderun式)
+設定ファイル (`.cderun.yaml`, `.tools.yaml`) 内で、動的に値を解決するための特殊な文字列。`{{...}}` という構文で記述される。
+cderunは、設定を読み込む際にこれらの式を評価し、対応する値に置換する。
+
+### 種類
+- **マジックワード**: `{{HOME}}` のように、cderunが特別な意味を持つと定義しているキーワード。
+- **ディレクティブ**: `{{file:.go-version}}` のように、`:` の前にあるキーワード（`file`）が特定の動作（ファイル読み込みなど）を指示する形式。
 
 ## 引数・フラグの種類
 

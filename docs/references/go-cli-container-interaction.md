@@ -29,8 +29,8 @@ creack/pty ライブラリの pty.Start(cmd) 関数は、新しいPTYマスタ�
 
 実装の一般的なパターンは以下の通りである。
 
-1. pty.Start でプロセスとPTYを開始する 4。  
-2. ゴルーチンを生成し、io.Copy(ptyMaster, os.Stdin) を実行して、キーボード入力をプロセスへ送る 6。  
+1. pty.Start でプロセスとPTYを開始する 4。
+2. ゴルーチンを生成し、io.Copy(ptyMaster, os.Stdin) を実行して、キーボード入力をプロセスへ送る 6。
 3. メインのスレッド（または別のゴルーチン）で io.Copy(os.Stdout, ptyMaster) を実行し、プロセスからの出力をターミナルに表示する 6。
 
 この際、io.Copy はブロッキング操作であるため、プロセスが終了したときに適切にこれらのゴルーチンを終了させることが、メモリリークやリソースの浪費を防ぐための重要な課題となる 12。
@@ -68,8 +68,8 @@ CLIツールそのものが外部から SIGINT や SIGTERM を受け取った場
 
 Goでは os/signal パッケージの signal.Notify を使用してこれらのシグナルをチャネルで受信する 20。シグナルを受信した際のクリーンアップ手順は以下のようになる。
 
-1. コンテナエンジン（Docker API等）を通じて、コンテナ内のプロセスにシグナルを転送する 22。  
-2. 一定の猶予（Grace Period）を持ってプロセスの終了を待つ 22。  
+1. コンテナエンジン（Docker API等）を通じて、コンテナ内のプロセスにシグナルを転送する 22。
+2. 一定の猶予（Grace Period）を持ってプロセスの終了を待つ 22。
 3. ターミナルの状態をRestoreし、プログラムを終了する 16。
 
 特に、コンテナ内の「PID 1（初期プロセス）」問題には注意が必要である 25。Dockerコンテナでは、最初に実行されたコマンドがPID 1として扱われるが、Linuxのカーネル仕様により、PID 1のプロセスは明示的なハンドラがない限りシグナルを無視する性質がある 25。これを防ぐためには、コンテナ起動時に docker run \--init フラグを使用するか、シェルスクリプト経由で実行する場合は exec コマンドを使用してプロセスを置き換える等の工夫が求められる 22。
@@ -82,22 +82,22 @@ Goでは os/signal パッケージの signal.Notify を使用してこれらの�
 
 ### **実装の手順**
 
-1. **シグナルの監視**: os/signal を使用して syscall.SIGWINCH を受信するチャネルを設定する 29。  
-2. **現在サイズの取得**: ホスト側のターミナル（os.Stdout など）に対して TIOCGWINSZ を発行し、現在の行数と列数を取得する 27。  
+1. **シグナルの監視**: os/signal を使用して syscall.SIGWINCH を受信するチャネルを設定する 29。
+2. **現在サイズの取得**: ホスト側のターミナル（os.Stdout など）に対して TIOCGWINSZ を発行し、現在の行数と列数を取得する 27。
 3. **PTYへの適用**: 取得したサイズ情報を pty.Setsize などの関数を用いてPTYマスタに適用する 4。
 
 Go
 
-// SIGWINCHのハンドリング例  
-sigChan := make(chan os.Signal, 1)  
-signal.Notify(sigChan, syscall.SIGWINCH)  
-go func() {  
-    for range sigChan {  
-        // ホスト端末のサイズを取得し、PTYに継承させる  
-        if err := pty.InheritSize(os.Stdin, ptyMaster); err\!= nil {  
-            log.Printf("サイズ変更に失敗: %v", err)  
-        }  
-    }  
+// SIGWINCHのハンドリング例
+sigChan := make(chan os.Signal, 1)
+signal.Notify(sigChan, syscall.SIGWINCH)
+go func() {
+    for range sigChan {
+        // ホスト端末のサイズを取得し、PTYに継承させる
+        if err := pty.InheritSize(os.Stdin, ptyMaster); err\!= nil {
+            log.Printf("サイズ変更に失敗: %v", err)
+        }
+    }
 }()
 
 このリレーが正常に行われると、カーネルはコンテナ内のPTYスレーブに対しても SIGWINCH を送信し、それを受けたコンテナ内プロセス（例えば bash）が環境変数 LINES や COLUMNS を更新、あるいはアプリケーションが再描画を行うことで、表示の崩れを防ぐことができる 27。
@@ -135,8 +135,8 @@ io.Copy は、読み込み元が EOF を返すか、書き込み先でエラー�
 
 この問題を回避し、堅牢な終了処理を実現するためには以下のテクニックを組み合わせる。
 
-1. **プロセスの終了検知と強制クローズ**: cmd.Wait() でプロセスの終了を検知したら、即座に PTY マスタのファイル記述子を閉じる 1。これにより、他のゴルーチンで実行されている io.Copy は書き込みエラーを検知して終了することができる 12。  
-2. **Context によるキャンセル**: 長時間実行される操作には必ず context.Context を紐付け、アプリケーション終了時に全ての関連処理が停止するように設計する 41。  
+1. **プロセスの終了検知と強制クローズ**: cmd.Wait() でプロセスの終了を検知したら、即座に PTY マスタのファイル記述子を閉じる 1。これにより、他のゴルーチンで実行されている io.Copy は書き込みエラーを検知して終了することができる 12。
+2. **Context によるキャンセル**: 長時間実行される操作には必ず context.Context を紐付け、アプリケーション終了時に全ての関連処理が停止するように設計する 41。
 3. **非ブロッキングモードの設定**: 必要に応じて syscall.SetNonblock を使用し、I/O操作にタイムアウトを設定できるようにする 6。これにより、いつまでも戻ってこない Read 操作を防ぐことが可能になる。
 
 また、デバッグ段階では runtime.NumGoroutine() を定期的に出力して監視したり、uber-go/goleak のようなライブラリをテストスイートに組み込んだりすることで、開発の早い段階でリークを発見できる 39。
@@ -147,21 +147,21 @@ io.Copy は、読み込み元が EOF を返すか、書き込み先でエラー�
 
 Go
 
-err := cmd.Wait()  
-if err\!= nil {  
-    if exiterr, ok := err.(\*exec.ExitError); ok {  
-        // コンテナ内プロセスの終了ステータスを取得  
-        exitCode := exiterr.ExitCode()  
-        os.Exit(exitCode) \[46, 47\]  
-    }  
+err := cmd.Wait()
+if err\!= nil {
+    if exiterr, ok := err.(\*exec.ExitError); ok {
+        // コンテナ内プロセスの終了ステータスを取得
+        exitCode := exiterr.ExitCode()
+        os.Exit(exitCode) \[46, 47\]
+    }
 }
 
 この処理の前に、term.Restore を呼び出してターミナルを正常な状態に戻すことを忘れてはならない 16。正常な終了シーケンスは、
 
-1. プロセス終了待機  
-2. ターミナル復元  
-3. リソース解放（PTYクローズ、ゴルーチン停止確認）  
-4. 終了コードを伴う os.Exit  
+1. プロセス終了待機
+2. ターミナル復元
+3. リソース解放（PTYクローズ、ゴルーチン停止確認）
+4. 終了コードを伴う os.Exit
    という順序で行われるべきである。
 
 ## **実践的な実装例とライブラリの活用**
@@ -197,51 +197,51 @@ Go言語を使用してコンテナ内プロセスと対話するCLIツールを
 
 #### **引用文献**
 
-1. How to execute interactive CLI command in golang? \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/54418628/how-to-execute-interactive-cli-command-in-golang](https://stackoverflow.com/questions/54418628/how-to-execute-interactive-cli-command-in-golang)  
-2. How to access the pseudo terminal's stderr? · Issue \#147 · creack/pty \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty/issues/147](https://github.com/creack/pty/issues/147)  
-3. Linux terminals, tty, pty and shell \- part 2 \- DEV Community, 1月 31, 2026にアクセス、 [https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2](https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2)  
-4. pty package \- github.com/creack/pty \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/creack/pty](https://pkg.go.dev/github.com/creack/pty)  
-5. pty.Start seems to close the terminal too early · Issue \#127 · creack/pty \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty/issues/127](https://github.com/creack/pty/issues/127)  
-6. creack/pty: PTY interface for Go \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty](https://github.com/creack/pty)  
-7. Examples using the Docker Engine SDKs and Docker API, 1月 31, 2026にアクセス、 [https://docs.docker.com/reference/api/engine/sdk/examples/](https://docs.docker.com/reference/api/engine/sdk/examples/)  
-8. Interactive Docker exec with docker-py \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/78154889/interactive-docker-exec-with-docker-py](https://stackoverflow.com/questions/78154889/interactive-docker-exec-with-docker-py)  
-9. Podman Exec: A Beginner's Guide | Better Stack Community, 1月 31, 2026にアクセス、 [https://betterstack.com/community/guides/scaling-docker/podman-exec/](https://betterstack.com/community/guides/scaling-docker/podman-exec/)  
-10. Advanced command execution in Go with os/exec, 1月 31, 2026にアクセス、 [https://blog.kowalczyk.info/article/wOYk/advanced-command-execution-in-go-with-osexec.html](https://blog.kowalczyk.info/article/wOYk/advanced-command-execution-in-go-with-osexec.html)  
-11. aymanbagabas/go-pty: Cross platform Go Pty interface \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/aymanbagabas/go-pty](https://github.com/aymanbagabas/go-pty)  
-12. go \- io.Copy in goroutine to prevent blocking \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/62522276/io-copy-in-goroutine-to-prevent-blocking](https://stackoverflow.com/questions/62522276/io-copy-in-goroutine-to-prevent-blocking)  
-13. Understanding and Preventing Goroutine Leaks in Go | by SONU RAJ \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@srajsonu/understanding-and-preventing-goroutine-leaks-in-go-623cac542954](https://medium.com/@srajsonu/understanding-and-preventing-goroutine-leaks-in-go-623cac542954)  
-14. io: Copy is easy to misuse and leak goroutines blocked on reads · Issue \#58628 · golang/go, 1月 31, 2026にアクセス、 [https://github.com/golang/go/issues/58628](https://github.com/golang/go/issues/58628)  
-15. Non-blocking I/O in Go \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@cpuguy83/non-blocking-i-o-in-go-bc4651e3ac8d](https://medium.com/@cpuguy83/non-blocking-i-o-in-go-bc4651e3ac8d)  
-16. Go Tidbit: Putting The Terminal Into Raw Mode · hjr265.me, 1月 31, 2026にアクセス、 [https://hjr265.me/blog/go-tidbit-putting-the-terminal-into-raw-mode/](https://hjr265.me/blog/go-tidbit-putting-the-terminal-into-raw-mode/)  
-17. Building a Terminal Raw Mode Input Reader in Go \- Mariano Zunino, 1月 31, 2026にアクセス、 [https://mzunino.com.uy/til/2025/03/building-a-terminal-raw-mode-input-reader-in-go/](https://mzunino.com.uy/til/2025/03/building-a-terminal-raw-mode-input-reader-in-go/)  
-18. 2\. Entering raw mode | Build Your Own Text Editor, 1月 31, 2026にアクセス、 [https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html](https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html)  
-19. Writing an interactive CLI menu in Golang \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@nexidian/writing-an-interactive-cli-menu-in-golang-d6438b175fb6](https://medium.com/@nexidian/writing-an-interactive-cli-menu-in-golang-d6438b175fb6)  
-20. Read user input until he press ctrl+c? \- golang \- Reddit, 1月 31, 2026にアクセス、 [https://www.reddit.com/r/golang/comments/4hktbe/read\_user\_input\_until\_he\_press\_ctrlc/](https://www.reddit.com/r/golang/comments/4hktbe/read_user_input_until_he_press_ctrlc/)  
-21. Handling CTRL-C (interrupt signal) in Golang Programs \- Nathan LeClaire, 1月 31, 2026にアクセス、 [https://nathanleclaire.com/blog/2014/08/24/handling-ctrl-c-interrupt-signal-in-golang-programs/](https://nathanleclaire.com/blog/2014/08/24/handling-ctrl-c-interrupt-signal-in-golang-programs/)  
-22. How to handle kill signal in go (inside a docker container) \- awesomeprogrammer.com, 1月 31, 2026にアクセス、 [https://awesomeprogrammer.com/blog/2020/01/04/how-to-handle-kill-signal-in-go-inside-a-docker-container/](https://awesomeprogrammer.com/blog/2020/01/04/how-to-handle-kill-signal-in-go-inside-a-docker-container/)  
-23. Unexpected interaction between Go and Docker Compose | by Aleksa Novcic \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@aleksa-novcic/unexpected-interaction-between-go-and-docker-compose-510e6791ac17](https://medium.com/@aleksa-novcic/unexpected-interaction-between-go-and-docker-compose-510e6791ac17)  
-24. Docker stack or service kill to send signal to remote containers \- Feature Requests, 1月 31, 2026にアクセス、 [https://forums.docker.com/t/docker-stack-or-service-kill-to-send-signal-to-remote-containers/43481](https://forums.docker.com/t/docker-stack-or-service-kill-to-send-signal-to-remote-containers/43481)  
-25. Best practices for propagating signals on Docker \- Kaggle, 1月 31, 2026にアクセス、 [https://www.kaggle.com/code/residentmario/best-practices-for-propagating-signals-on-docker](https://www.kaggle.com/code/residentmario/best-practices-for-propagating-signals-on-docker)  
-26. Sending signals to Golang application in Docker \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/33379567/sending-signals-to-golang-application-in-docker](https://stackoverflow.com/questions/33379567/sending-signals-to-golang-application-in-docker)  
-27. Playing with SIGWINCH \- R. Koucha, 1月 31, 2026にアクセス、 [http://www.rkoucha.fr/tech\_corner/sigwinch.html](http://www.rkoucha.fr/tech_corner/sigwinch.html)  
-28. How do terminal size changes get sent to command line applications though ssh or telnet?, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/19157202/how-do-terminal-size-changes-get-sent-to-command-line-applications-though-ssh-or](https://stackoverflow.com/questions/19157202/how-do-terminal-size-changes-get-sent-to-command-line-applications-though-ssh-or)  
-29. Go Tidbit: Detect When the Terminal Is Resized \- hjr265.me, 1月 31, 2026にアクセス、 [https://hjr265.me/blog/go-tidbit-detect-when-the-terminal-is-resized/](https://hjr265.me/blog/go-tidbit-detect-when-the-terminal-is-resized/)  
-30. Responsive Terminal Applications in Golang \- Reevik, 1月 31, 2026にアクセス、 [https://reevik.net/Responsive-Terminal-Applications/](https://reevik.net/Responsive-Terminal-Applications/)  
-31. Issue 41494: Adds window resizing support to Lib/pty.py \[ SIGWINCH \] \- Python tracker, 1月 31, 2026にアクセス、 [https://bugs.python.org/issue41494](https://bugs.python.org/issue41494)  
-32. ResizePseudoConsole function \- Windows Console \- Microsoft Learn, 1月 31, 2026にアクセス、 [https://learn.microsoft.com/en-us/windows/console/resizepseudoconsole](https://learn.microsoft.com/en-us/windows/console/resizepseudoconsole)  
-33. Creating a Pseudoconsole session \- Windows Console \- Microsoft Learn, 1月 31, 2026にアクセス、 [https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session)  
-34. conpty package \- github.com/charmbracelet/x/conpty \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/charmbracelet/x/conpty](https://pkg.go.dev/github.com/charmbracelet/x/conpty)  
-35. How Golang implement stdin/stdout/stderr \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/38773244/how-golang-implement-stdin-stdout-stderr](https://stackoverflow.com/questions/38773244/how-golang-implement-stdin-stdout-stderr)  
-36. Taming Windows Terminal's win32-input-mode in Go ConPTY ..., 1月 31, 2026にアクセス、 [https://dev.to/andylbrummer/taming-windows-terminals-win32-input-mode-in-go-conpty-applications-7gg](https://dev.to/andylbrummer/taming-windows-terminals-win32-input-mode-in-go-conpty-applications-7gg)  
-37. SIGWINCH equivalent on Windows? \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/10856926/sigwinch-equivalent-on-windows](https://stackoverflow.com/questions/10856926/sigwinch-equivalent-on-windows)  
-38. ptyx package \- github.com/KennethanCeyer/ptyx \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/KennethanCeyer/ptyx](https://pkg.go.dev/github.com/KennethanCeyer/ptyx)  
-39. Detecting goroutine leaks with synctest/pprof \- Anton Zhiyanov, 1月 31, 2026にアクセス、 [https://antonz.org/detecting-goroutine-leaks/](https://antonz.org/detecting-goroutine-leaks/)  
-40. How To Find and Fix Goroutine Leaks in Go \- DZone, 1月 31, 2026にアクセス、 [https://dzone.com/articles/how-to-find-and-fix-goroutine-leaks-in-go?fromrel=true](https://dzone.com/articles/how-to-find-and-fix-goroutine-leaks-in-go?fromrel=true)  
-41. Go Concurrency Mastery: Preventing Goroutine Leaks with Context, Timeout & Cancellation Best Practices \- DEV Community, 1月 31, 2026にアクセス、 [https://dev.to/serifcolakel/go-concurrency-mastery-preventing-goroutine-leaks-with-context-timeout-cancellation-best-1lg0](https://dev.to/serifcolakel/go-concurrency-mastery-preventing-goroutine-leaks-with-context-timeout-cancellation-best-1lg0)  
-42. Golang io.Copy blocks in internal ReadFrom \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/58477293/golang-io-copy-blocks-in-internal-readfrom](https://stackoverflow.com/questions/58477293/golang-io-copy-blocks-in-internal-readfrom)  
-43. Goroutine Leaks in Go \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@AlexanderObregon/goroutine-leaks-in-go-ece4824df9a1](https://medium.com/@AlexanderObregon/goroutine-leaks-in-go-ece4824df9a1)  
-44. syscall.SetNonblock stopped working in Go 1.9.3 \- Google Groups, 1月 31, 2026にアクセス、 [https://groups.google.com/g/golang-nuts/c/uk\_HozBGg\_Y](https://groups.google.com/g/golang-nuts/c/uk_HozBGg_Y)  
-45. Detecting goroutine leaks with synctest/pprof : r/golang \- Reddit, 1月 31, 2026にアクセス、 [https://www.reddit.com/r/golang/comments/1pqhgnz/detecting\_goroutine\_leaks\_with\_synctestpprof/](https://www.reddit.com/r/golang/comments/1pqhgnz/detecting_goroutine_leaks_with_synctestpprof/)  
-46. Get exit code \- Go \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/10385551/get-exit-code-go](https://stackoverflow.com/questions/10385551/get-exit-code-go)  
-47. Better way to get the exit status of an os/exec command? \- Google Groups, 1月 31, 2026にアクセス、 [https://groups.google.com/g/golang-nuts/c/sFmzNL-0zq4](https://groups.google.com/g/golang-nuts/c/sFmzNL-0zq4)  
+1. How to execute interactive CLI command in golang? \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/54418628/how-to-execute-interactive-cli-command-in-golang](https://stackoverflow.com/questions/54418628/how-to-execute-interactive-cli-command-in-golang)
+2. How to access the pseudo terminal's stderr? · Issue \#147 · creack/pty \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty/issues/147](https://github.com/creack/pty/issues/147)
+3. Linux terminals, tty, pty and shell \- part 2 \- DEV Community, 1月 31, 2026にアクセス、 [https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2](https://dev.to/napicella/linux-terminals-tty-pty-and-shell-part-2-2cb2)
+4. pty package \- github.com/creack/pty \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/creack/pty](https://pkg.go.dev/github.com/creack/pty)
+5. pty.Start seems to close the terminal too early · Issue \#127 · creack/pty \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty/issues/127](https://github.com/creack/pty/issues/127)
+6. creack/pty: PTY interface for Go \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/creack/pty](https://github.com/creack/pty)
+7. Examples using the Docker Engine SDKs and Docker API, 1月 31, 2026にアクセス、 [https://docs.docker.com/reference/api/engine/sdk/examples/](https://docs.docker.com/reference/api/engine/sdk/examples/)
+8. Interactive Docker exec with docker-py \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/78154889/interactive-docker-exec-with-docker-py](https://stackoverflow.com/questions/78154889/interactive-docker-exec-with-docker-py)
+9. Podman Exec: A Beginner's Guide | Better Stack Community, 1月 31, 2026にアクセス、 [https://betterstack.com/community/guides/scaling-docker/podman-exec/](https://betterstack.com/community/guides/scaling-docker/podman-exec/)
+10. Advanced command execution in Go with os/exec, 1月 31, 2026にアクセス、 [https://blog.kowalczyk.info/article/wOYk/advanced-command-execution-in-go-with-osexec.html](https://blog.kowalczyk.info/article/wOYk/advanced-command-execution-in-go-with-osexec.html)
+11. aymanbagabas/go-pty: Cross platform Go Pty interface \- GitHub, 1月 31, 2026にアクセス、 [https://github.com/aymanbagabas/go-pty](https://github.com/aymanbagabas/go-pty)
+12. go \- io.Copy in goroutine to prevent blocking \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/62522276/io-copy-in-goroutine-to-prevent-blocking](https://stackoverflow.com/questions/62522276/io-copy-in-goroutine-to-prevent-blocking)
+13. Understanding and Preventing Goroutine Leaks in Go | by SONU RAJ \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@srajsonu/understanding-and-preventing-goroutine-leaks-in-go-623cac542954](https://medium.com/@srajsonu/understanding-and-preventing-goroutine-leaks-in-go-623cac542954)
+14. io: Copy is easy to misuse and leak goroutines blocked on reads · Issue \#58628 · golang/go, 1月 31, 2026にアクセス、 [https://github.com/golang/go/issues/58628](https://github.com/golang/go/issues/58628)
+15. Non-blocking I/O in Go \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@cpuguy83/non-blocking-i-o-in-go-bc4651e3ac8d](https://medium.com/@cpuguy83/non-blocking-i-o-in-go-bc4651e3ac8d)
+16. Go Tidbit: Putting The Terminal Into Raw Mode · hjr265.me, 1月 31, 2026にアクセス、 [https://hjr265.me/blog/go-tidbit-putting-the-terminal-into-raw-mode/](https://hjr265.me/blog/go-tidbit-putting-the-terminal-into-raw-mode/)
+17. Building a Terminal Raw Mode Input Reader in Go \- Mariano Zunino, 1月 31, 2026にアクセス、 [https://mzunino.com.uy/til/2025/03/building-a-terminal-raw-mode-input-reader-in-go/](https://mzunino.com.uy/til/2025/03/building-a-terminal-raw-mode-input-reader-in-go/)
+18. 2\. Entering raw mode | Build Your Own Text Editor, 1月 31, 2026にアクセス、 [https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html](https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html)
+19. Writing an interactive CLI menu in Golang \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@nexidian/writing-an-interactive-cli-menu-in-golang-d6438b175fb6](https://medium.com/@nexidian/writing-an-interactive-cli-menu-in-golang-d6438b175fb6)
+20. Read user input until he press ctrl+c? \- golang \- Reddit, 1月 31, 2026にアクセス、 [https://www.reddit.com/r/golang/comments/4hktbe/read\_user\_input\_until\_he\_press\_ctrlc/](https://www.reddit.com/r/golang/comments/4hktbe/read_user_input_until_he_press_ctrlc/)
+21. Handling CTRL-C (interrupt signal) in Golang Programs \- Nathan LeClaire, 1月 31, 2026にアクセス、 [https://nathanleclaire.com/blog/2014/08/24/handling-ctrl-c-interrupt-signal-in-golang-programs/](https://nathanleclaire.com/blog/2014/08/24/handling-ctrl-c-interrupt-signal-in-golang-programs/)
+22. How to handle kill signal in go (inside a docker container) \- awesomeprogrammer.com, 1月 31, 2026にアクセス、 [https://awesomeprogrammer.com/blog/2020/01/04/how-to-handle-kill-signal-in-go-inside-a-docker-container/](https://awesomeprogrammer.com/blog/2020/01/04/how-to-handle-kill-signal-in-go-inside-a-docker-container/)
+23. Unexpected interaction between Go and Docker Compose | by Aleksa Novcic \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@aleksa-novcic/unexpected-interaction-between-go-and-docker-compose-510e6791ac17](https://medium.com/@aleksa-novcic/unexpected-interaction-between-go-and-docker-compose-510e6791ac17)
+24. Docker stack or service kill to send signal to remote containers \- Feature Requests, 1月 31, 2026にアクセス、 [https://forums.docker.com/t/docker-stack-or-service-kill-to-send-signal-to-remote-containers/43481](https://forums.docker.com/t/docker-stack-or-service-kill-to-send-signal-to-remote-containers/43481)
+25. Best practices for propagating signals on Docker \- Kaggle, 1月 31, 2026にアクセス、 [https://www.kaggle.com/code/residentmario/best-practices-for-propagating-signals-on-docker](https://www.kaggle.com/code/residentmario/best-practices-for-propagating-signals-on-docker)
+26. Sending signals to Golang application in Docker \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/33379567/sending-signals-to-golang-application-in-docker](https://stackoverflow.com/questions/33379567/sending-signals-to-golang-application-in-docker)
+27. Playing with SIGWINCH \- R. Koucha, 1月 31, 2026にアクセス、 [http://www.rkoucha.fr/tech\_corner/sigwinch.html](http://www.rkoucha.fr/tech_corner/sigwinch.html)
+28. How do terminal size changes get sent to command line applications though ssh or telnet?, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/19157202/how-do-terminal-size-changes-get-sent-to-command-line-applications-though-ssh-or](https://stackoverflow.com/questions/19157202/how-do-terminal-size-changes-get-sent-to-command-line-applications-though-ssh-or)
+29. Go Tidbit: Detect When the Terminal Is Resized \- hjr265.me, 1月 31, 2026にアクセス、 [https://hjr265.me/blog/go-tidbit-detect-when-the-terminal-is-resized/](https://hjr265.me/blog/go-tidbit-detect-when-the-terminal-is-resized/)
+30. Responsive Terminal Applications in Golang \- Reevik, 1月 31, 2026にアクセス、 [https://reevik.net/Responsive-Terminal-Applications/](https://reevik.net/Responsive-Terminal-Applications/)
+31. Issue 41494: Adds window resizing support to Lib/pty.py \[ SIGWINCH \] \- Python tracker, 1月 31, 2026にアクセス、 [https://bugs.python.org/issue41494](https://bugs.python.org/issue41494)
+32. ResizePseudoConsole function \- Windows Console \- Microsoft Learn, 1月 31, 2026にアクセス、 [https://learn.microsoft.com/en-us/windows/console/resizepseudoconsole](https://learn.microsoft.com/en-us/windows/console/resizepseudoconsole)
+33. Creating a Pseudoconsole session \- Windows Console \- Microsoft Learn, 1月 31, 2026にアクセス、 [https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session)
+34. conpty package \- github.com/charmbracelet/x/conpty \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/charmbracelet/x/conpty](https://pkg.go.dev/github.com/charmbracelet/x/conpty)
+35. How Golang implement stdin/stdout/stderr \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/38773244/how-golang-implement-stdin-stdout-stderr](https://stackoverflow.com/questions/38773244/how-golang-implement-stdin-stdout-stderr)
+36. Taming Windows Terminal's win32-input-mode in Go ConPTY ..., 1月 31, 2026にアクセス、 [https://dev.to/andylbrummer/taming-windows-terminals-win32-input-mode-in-go-conpty-applications-7gg](https://dev.to/andylbrummer/taming-windows-terminals-win32-input-mode-in-go-conpty-applications-7gg)
+37. SIGWINCH equivalent on Windows? \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/10856926/sigwinch-equivalent-on-windows](https://stackoverflow.com/questions/10856926/sigwinch-equivalent-on-windows)
+38. ptyx package \- github.com/KennethanCeyer/ptyx \- Go Packages, 1月 31, 2026にアクセス、 [https://pkg.go.dev/github.com/KennethanCeyer/ptyx](https://pkg.go.dev/github.com/KennethanCeyer/ptyx)
+39. Detecting goroutine leaks with synctest/pprof \- Anton Zhiyanov, 1月 31, 2026にアクセス、 [https://antonz.org/detecting-goroutine-leaks/](https://antonz.org/detecting-goroutine-leaks/)
+40. How To Find and Fix Goroutine Leaks in Go \- DZone, 1月 31, 2026にアクセス、 [https://dzone.com/articles/how-to-find-and-fix-goroutine-leaks-in-go?fromrel=true](https://dzone.com/articles/how-to-find-and-fix-goroutine-leaks-in-go?fromrel=true)
+41. Go Concurrency Mastery: Preventing Goroutine Leaks with Context, Timeout & Cancellation Best Practices \- DEV Community, 1月 31, 2026にアクセス、 [https://dev.to/serifcolakel/go-concurrency-mastery-preventing-goroutine-leaks-with-context-timeout-cancellation-best-1lg0](https://dev.to/serifcolakel/go-concurrency-mastery-preventing-goroutine-leaks-with-context-timeout-cancellation-best-1lg0)
+42. Golang io.Copy blocks in internal ReadFrom \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/58477293/golang-io-copy-blocks-in-internal-readfrom](https://stackoverflow.com/questions/58477293/golang-io-copy-blocks-in-internal-readfrom)
+43. Goroutine Leaks in Go \- Medium, 1月 31, 2026にアクセス、 [https://medium.com/@AlexanderObregon/goroutine-leaks-in-go-ece4824df9a1](https://medium.com/@AlexanderObregon/goroutine-leaks-in-go-ece4824df9a1)
+44. syscall.SetNonblock stopped working in Go 1.9.3 \- Google Groups, 1月 31, 2026にアクセス、 [https://groups.google.com/g/golang-nuts/c/uk\_HozBGg\_Y](https://groups.google.com/g/golang-nuts/c/uk_HozBGg_Y)
+45. Detecting goroutine leaks with synctest/pprof : r/golang \- Reddit, 1月 31, 2026にアクセス、 [https://www.reddit.com/r/golang/comments/1pqhgnz/detecting\_goroutine\_leaks\_with\_synctestpprof/](https://www.reddit.com/r/golang/comments/1pqhgnz/detecting_goroutine_leaks_with_synctestpprof/)
+46. Get exit code \- Go \- Stack Overflow, 1月 31, 2026にアクセス、 [https://stackoverflow.com/questions/10385551/get-exit-code-go](https://stackoverflow.com/questions/10385551/get-exit-code-go)
+47. Better way to get the exit status of an os/exec command? \- Google Groups, 1月 31, 2026にアクセス、 [https://groups.google.com/g/golang-nuts/c/sFmzNL-0zq4](https://groups.google.com/g/golang-nuts/c/sFmzNL-0zq4)
 48. docker container exec \- Docker Docs, 1月 31, 2026にアクセス、 [https://docs.docker.com/reference/cli/docker/container/exec/](https://docs.docker.com/reference/cli/docker/container/exec/)

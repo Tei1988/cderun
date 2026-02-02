@@ -16,19 +16,96 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 ### サポートされる形式
 - YAML形式のみ（`.cderun.yaml`, `.tools.yaml`）
 
-### 検索順序
+### 検索とマージ
 
-#### `.cderun.yaml`の検索順序
-1. カレントディレクトリ: `./.cderun.yaml`
-2. ホームディレクトリ: `~/.config/cderun/config.yaml`
-3. システム全体: `/etc/cderun/config.yaml`
+cderunは、柔軟な設定管理のため、複数の場所から設定ファイルを検索し、それらを階層的にマージします。
 
-#### `.tools.yaml`の検索順序
-1. カレントディレクトリ: `./.tools.yaml`
-2. ホームディレクトリ: `~/.config/cderun/tools.yaml`
-3. システム全体: `/etc/cderun/tools.yaml`
+#### 検索順序と優先順位
+設定ファイルは以下の順序で検索され、先に見つかった（優先順位が高い）ファイルの設定が、後のファイルの設定を上書きします。
 
-最初に見つかった設定ファイルを使用する。複数の設定ファイルはマージしない。
+1.  **プロジェクト設定（親ディレクトリへの探索）**:
+    *   カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
+    *   例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
+
+2.  **ユーザー設定**:
+    *   `~/.config/cderun/.cderun.yaml`
+    *   `~/.config/cderun/.tools.yaml`
+
+3.  **システム全体設定**:
+    *   `/etc/cderun/.cderun.yaml`
+    *   `/etc/cderun/.tools.yaml`
+
+#### マージのルール
+- 見つかったすべての設定ファイルの内容がマージされます。
+- 設定値が重複した場合、上記の検索順序でより優先度の高いファイルの値が採用されます。
+  - 例えば、`./.cderun.yaml` に `runtime: podman` があり、`~/.config/cderun/.cderun.yaml` に `runtime: docker` がある場合、`podman` が使用されます。
+
+### 値の解決 (Value Resolution)
+
+設定ファイル内の値は、cderunによって解釈・実行される前に、いくつかの変換プロセスを経ます。これにより、設定ファイルの柔軟性と再利用性が向上します。
+
+#### cderun Expressions (cderun式)
+設定ファイル内の任意の文字列値で、`{{...}}` という構文を使って動的に値を埋め込むことができます。
+
+##### 種類
+
+1.  **マジックワード (Magic Words)**
+    cderunが特別な意味を持つと定義しているキーワードです。
+
+    | ワード | 説明 |
+    | :--- | :--- |
+    | `{{HOME}}` | 実行ユーザーのホームディレクトリに置換されます。 |
+    | `{{PWD}}`  | `cderun` コマンドを実行したカレントワーキングディレクトリに置換されます。 |
+
+2.  **ディレクティブ (Directives)**
+    `:` を含む形式で、特定のデータソースから値を読み込むよう指示します。
+
+    | ディレクティブ | 説明 |
+    | :--- | :--- |
+    | `{{file:<ファイル名>}}` | 指定された `<ファイル名>` の内容を読み込み、その値で置換します。ファイルは設定ファイルと同じルール（親ディレクトリへの探索）で検索され、見つかったファイル内容の前後の空白・改行は除去されます。|
+
+##### 使用例
+```yaml
+# .tools.yaml
+golang:
+  # .go-version の内容を読み込み、image タグに設定
+  image: "golang:{{file:.go-version}}"
+
+node:
+  volumes:
+    # ホームディレクトリの .npmrc をマウント
+    - "{{HOME}}/.npmrc:/root/.npmrc"
+    # cderun 実行ディレクトリの src をマウント
+    - "{{PWD}}/src:/app"
+```
+
+#### チルダ展開 (Tilde Expansion)
+シェルの挙動と一貫性を持たせるため、`~` または `~/` で始まるパスは、実行ユーザーのホームディレクトリに展開されます。
+
+**例:**
+```yaml
+volumes:
+  - ~/.kube:/root/.kube
+```
+は、`/home/user/.kube:/root/.kube` のように解決されます。
+
+#### 相対パスの解決
+`volumes` のホストパスなど、設定値に `./` や `../` で始まる相対パスが記述されている場合、そのパスは**設定ファイルが置かれているディレクトリ**を基準に絶対パスへ変換されます。
+
+**例:** `/home/user/project/.tools.yaml` 内の以下の記述
+```yaml
+volumes:
+  - ./src:/app
+```
+は、`/home/user/project/src:/app` として解決されます。
+
+#### 解決の順序とルール
+値の解決は、以下の順序で実行されます。
+
+1.  **cderun Expressions の展開**: `{{...}}` 式が評価されます。
+2.  **チルダ展開**: `~` がホームディレクトリに展開されます。
+3.  **相対パスの解決**: 上記の結果、値が相対パス (`./` or `../`) になった場合、その設定ファイルが置かれている場所を基準に解決されます。
+4.  **パスの正規化**: 最終的なパス文字列は、標準的なパス解決ルールに従って正規化されます (例: `/path/to/work/../src` は `/path/to/src` になります)。
 
 ## 設定スキーマ
 
@@ -79,7 +156,7 @@ node:
   mountCderun: true
   privileged: false
   memory: "512m"
-  
+
 python:
   image: python:3.11-slim
   tty: true
@@ -90,7 +167,7 @@ python:
     - .:/app
     - ~/.cache/pip:/root/.cache/pip
   workdir: /app
-  
+
 docker:
   image: docker:latest
   volumes:
@@ -106,7 +183,7 @@ docker:
 - `runtime` (string): 使用するコンテナランタイム
   - 値: `docker` | `podman`
   - デフォルト: `docker`
-  
+
 - `socketPath` (string): ホスト上のランタイムソケットの絶対パス
   - 例: `/var/run/docker.sock`, `/run/podman/podman.sock`
   - デフォルト: 自動検出

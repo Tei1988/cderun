@@ -24,4 +24,5 @@
 以下のコマンドを実行した際の結果が保証されるテストを作成すること。
 
 ```bash
-$ cderun --tty docker --tty
+cderun --tty docker --tty
+```

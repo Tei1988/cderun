@@ -16,8 +16,8 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 ### `--mount-all-tools`
 
-**型**: bool  
-**デフォルト**: `false`  
+**型**: bool
+**デフォルト**: `false`
 **説明**: `.tools.yaml`に定義されているすべてのツールをマウント
 
 **使用例**:
@@ -47,8 +47,8 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 
 ### `--mount-tools`
 
-**型**: string  
-**デフォルト**: `""`  
+**型**: string
+**デフォルト**: `""`
 **説明**: 指定したツールのみをマウント（カンマ区切り）
 
 **使用例**:
@@ -94,10 +94,10 @@ cderunのポリグロットエントリーポイント機能により、実行�
 
 ```bash
 # コンテナ内で "node" を実行
-$ node --version
+node --version
 
 # cderunが実際に実行するコマンド
-$ cderun node --version
+cderun node --version
 ```
 
 ### ツールの検証
@@ -105,7 +105,7 @@ $ cderun node --version
 指定されたツールが`.tools.yaml`に存在しない場合はエラー:
 
 ```bash
-$ cderun --mount-tools unknown-tool alpine sh
+cderun --mount-tools unknown-tool alpine sh
 Error: Tool 'unknown-tool' not found in .tools.yaml
 Available tools: node, python, gemini-cli
 ```
@@ -154,7 +154,7 @@ cderun --mount-cderun \
   sh -c '
     # nodeコマンドはcderun経由で実行される
     node --version
-    
+
     # dockerコマンドもcderun経由で実行される
     docker build -t myapp .
     docker push myapp
@@ -167,10 +167,10 @@ cderun --mount-cderun \
 # .tools.yaml
 node:
   image: node:20-alpine
-  
+
 npm:
   image: node:20-alpine
-  
+
 npx:
   image: node:20-alpine
 ```
