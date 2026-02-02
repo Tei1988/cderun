@@ -25,7 +25,7 @@ $ cderun python script.py
 
 ## 例
 
-```
+```text
 基底ホスト (物理マシン)
   ↓ cderun gemini-cli
 gemini-cliコンテナ (実行ホスト)

@@ -25,6 +25,7 @@
 - TTYリサイズ同期（SIGWINCH対応）
 - 詳細ログ機能（レベル別出力、ファイル出力、JSON形式対応）
 - Podmanフルサポート（Docker互換API経由）
+- Docker互換フラグの拡充（ポート、リソース制限、セキュリティ、プルポリシー等）
 
 ### 未実装
 - なし
@@ -41,7 +42,10 @@
 環境変数、マウント機能など
 
 ### Phase 4: 利便性向上 (Completed)
-ドライラン（完了）、インタラクティブ性の向上（完了）、ログ（基本完了）、Podmanサポート（完了）
+ドライラン、インタラクティブ性の向上、ログ、Podmanサポート
+
+### Phase 5: Docker互換フラグの拡充 (Completed)
+ポートマッピング、リソース制限、セキュリティ、プルポリシー等の詳細設定
 
 ---
 
@@ -87,6 +91,20 @@
 
 ---
 
+### Phase 5: Docker互換フラグの拡充 (Completed)
+
+### Step 5.1: Docker互換フラグの追加 (Completed)
+
+**目的**: Docker CLIに近い操作感を提供するため、詳細なコンテナ設定フラグをサポートする。
+
+**実装内容**:
+- ネットワーク: `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`
+- セキュリティ・実行ユーザー: `--user`, `--privileged`, `--cap-add`, `--cap-drop`
+- リソース制限: `--memory`, `--cpus`
+- その他: `--entrypoint`, `--pull`, `--tmpfs`, `--device`
+
+---
+
 ## 実装チェックリスト
 
 ### Phase 1 (Completed)
@@ -111,6 +129,9 @@
 - [x] Step 4.2: インタラクティブ性の向上（シグナル、リサイズ）
 - [x] Step 4.3: ログ・デバッグ
 - [x] Step 4.4: Podmanサポート
+
+### Phase 5 (Completed)
+- [x] Step 5.1: Docker互換フラグの追加（ネットワーク、リソース、セキュリティ等）
 
 ## 各ステップの完了基準
 

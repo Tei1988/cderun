@@ -44,6 +44,12 @@ defaults:
   mountCderun: false               # cderunバイナリのマウント
   dryRun: false                    # ドライランモードのデフォルト
   dryRunFormat: yaml               # ドライランの出力形式
+  # ネットワーク・セキュリティ・リソース等のデフォルト
+  network: bridge
+  ports: ["8080:80"]
+  user: "1000:1000"
+  memory: "1g"
+  cpus: 1.5
 logging:
   level: info                      # ログレベル
   file: ./cderun.log               # ログファイルパス
@@ -59,6 +65,8 @@ node:
   tty: true
   interactive: true
   network: host
+  ports:
+    - "3000:3000"
   volumes:
     - .:/workspace
     - ~/.npm:/root/.npm
@@ -67,6 +75,8 @@ node:
   workdir: /workspace
   remove: true
   mountCderun: true
+  privileged: false
+  memory: "512m"
   
 python:
   image: python:3.11-slim
@@ -109,6 +119,22 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `mountCderun` (bool): cderunバイナリをマウント
 - `dryRun` (bool): ドライランモードのデフォルト値
 - `dryRunFormat` (string): ドライランの出力形式 (`yaml` | `json` | `simple`)
+- `ports` ([]string): ポートマッピング
+- `publishAll` (bool): 全ポート公開
+- `expose` ([]string): ポート露出
+- `hostname` (string): ホスト名
+- `dns` ([]string): DNSサーバ
+- `addHosts` ([]string): ホストマップ
+- `user` (string): 実行ユーザー
+- `privileged` (bool): 特権モード
+- `capAdd` ([]string): ケーパビリティ追加
+- `capDrop` ([]string): ケーパビリティ削除
+- `entrypoint` ([]string): エントリーポイント
+- `pull` (string): プルポリシー (`always` | `missing` | `never`)
+- `memory` (string): メモリ制限
+- `cpus` (float64): CPU制限
+- `tmpfs` ([]string): tmpfsマウント
+- `devices` ([]string): デバイス追加
 
 #### `logging` サブセクション
 ログ出力に関する設定。
@@ -118,14 +144,6 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `format` (string): ログの出力形式 (`text` | `json`)
 - `timestamp` (bool): タイムスタンプを含めるかどうか
 - `tee` (bool): 標準エラー出力とファイルの両方に出力するかどうか
-
-#### `rotation` サブセクション
-ログローテーションの設定。
-
-- `maxSize` (string): 1つのログファイルの最大サイズ（例: "10MB", "500KB"）
-- `maxAge` (string): ログファイルを保持する最大日数（例: "7d", "30d"）
-- `maxBackups` (int): 保持する古いログファイルの最大数
-- `compress` (bool): 古いログファイルを圧縮（gzip）するかどうか
 
 ### `.tools.yaml` （サブコマンドの設定）
 
@@ -148,6 +166,22 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `mountCderun` (bool): cderunバイナリをマウント
 - `dryRun` (bool): ドライランモード
 - `dryRunFormat` (string): ドライラン形式
+- `ports` ([]string): ポートマッピング
+- `publishAll` (bool): 全ポート公開
+- `expose` ([]string): ポート露出
+- `hostname` (string): ホスト名
+- `dns` ([]string): DNSサーバ
+- `addHosts` ([]string): ホストマップ
+- `user` (string): 実行ユーザー
+- `privileged` (bool): 特権モード
+- `capAdd` ([]string): ケーパビリティ追加
+- `capDrop` ([]string): ケーパビリティ削除
+- `entrypoint` ([]string): エントリーポイント
+- `pull` (string): プルポリシー (`always` | `missing` | `never`)
+- `memory` (string): メモリ制限
+- `cpus` (float64): CPU制限
+- `tmpfs` ([]string): tmpfsマウント
+- `devices` ([]string): デバイス追加
 
 ## 優先順位
 
