@@ -120,22 +120,22 @@ var (
 	}
 )
 
-func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, string, string) {
+func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, []string, []string) {
 	logging.Trace("Loading configurations...")
-	globalCfg, globalPath, err := config.LoadCDERunConfig()
+	globalCfg, globalPaths, err := config.LoadCDERunConfig()
 	if err != nil {
 		logging.Warn("failed to load cderun config: %v", err)
-	} else if globalPath != "" {
-		logging.Debug("Loaded cderun config from: %s", globalPath)
+	} else if len(globalPaths) > 0 {
+		logging.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
 	}
 
-	toolsCfg, toolsPath, err := config.LoadToolsConfig()
+	toolsCfg, toolsPaths, err := config.LoadToolsConfig()
 	if err != nil {
 		logging.Warn("failed to load tools config: %v", err)
-	} else if toolsPath != "" {
-		logging.Debug("Loaded tools config from: %s", toolsPath)
+	} else if len(toolsPaths) > 0 {
+		logging.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
 	}
-	return toolsCfg, globalCfg, globalPath, toolsPath
+	return toolsCfg, globalCfg, globalPaths, toolsPaths
 }
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
@@ -375,13 +375,13 @@ type diagnosticsInfo struct {
 		Status string `json:"status" yaml:"status"`
 	} `json:"runtime" yaml:"runtime"`
 	Configs struct {
-		Global string `json:"global" yaml:"global"`
-		Tools  string `json:"tools" yaml:"tools"`
+		Global []string `json:"global" yaml:"global"`
+		Tools  []string `json:"tools" yaml:"tools"`
 	} `json:"configs" yaml:"configs"`
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPath, toolsPath string) error {
+func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	if containerConfig == nil {
 		// Global Dry Run / Diagnostics
 		info := diagnosticsInfo{}
@@ -392,8 +392,8 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		} else {
 			info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
 		}
-		info.Configs.Global = globalPath
-		info.Configs.Tools = toolsPath
+		info.Configs.Global = globalPaths
+		info.Configs.Tools = toolsPaths
 		for toolName := range toolsCfg {
 			info.AvailableTools = append(info.AvailableTools, toolName)
 		}
@@ -408,8 +408,8 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		case "simple":
 			fmt.Printf("Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
 			fmt.Printf("Runtime Status: %s\n", info.Runtime.Status)
-			fmt.Printf("Global Config: %s\n", info.Configs.Global)
-			fmt.Printf("Tools Config: %s\n", info.Configs.Tools)
+			fmt.Printf("Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+			fmt.Printf("Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
 			fmt.Printf("Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
 		default: // Default to YAML
 			data, err := yaml.Marshal(info)
@@ -643,7 +643,7 @@ intended for the subcommand.`,
 		_ = logging.Init(initialLevel, "text", "", false, true)
 
 		// Load configurations
-		toolsCfg, globalCfg, globalPath, toolsPath := opts.loadConfigs()
+		toolsCfg, globalCfg, globalPaths, toolsPaths := opts.loadConfigs()
 
 		subcommand := ""
 		passthroughArgs := []string{}
@@ -686,7 +686,7 @@ intended for the subcommand.`,
 		}
 
 		if resolved.DryRun {
-			return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPath, toolsPath)
+			return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPaths, toolsPaths)
 		}
 
 		// Execute Container
