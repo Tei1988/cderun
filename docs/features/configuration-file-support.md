@@ -16,19 +16,29 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 ### サポートされる形式
 - YAML形式のみ（`.cderun.yaml`, `.tools.yaml`）
 
-### 検索順序
+### 検索とマージ
 
-#### `.cderun.yaml`の検索順序
-1. カレントディレクトリ: `./.cderun.yaml`
-2. ホームディレクトリ: `~/.config/cderun/.cderun.yaml`
-3. システム全体: `/etc/cderun/.cderun.yaml`
+cderunは、柔軟な設定管理のため、複数の場所から設定ファイルを検索し、それらを階層的にマージします。
 
-#### `.tools.yaml`の検索順序
-1. カレントディレクトリ: `./.tools.yaml`
-2. ホームディレクトリ: `~/.config/cderun/.tools.yaml`
-3. システム全体: `/etc/cderun/.tools.yaml`
+#### 検索順序と優先順位
+設定ファイルは以下の順序で検索され、先に見つかった（優先順位が高い）ファイルの設定が、後のファイルの設定を上書きします。
 
-最初に見つかった設定ファイルを使用する。複数の設定ファイルはマージしない。
+1.  **プロジェクト設定（親ディレクトリへの探索）**:
+    *   カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
+    *   例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
+
+2.  **ユーザー設定**:
+    *   `~/.config/cderun/.cderun.yaml`
+    *   `~/.config/cderun/.tools.yaml`
+
+3.  **システム全体設定**:
+    *   `/etc/cderun/.cderun.yaml`
+    *   `/etc/cderun/.tools.yaml`
+
+#### マージのルール
+- 見つかったすべての設定ファイルの内容がマージされます。
+- 設定値が重複した場合、上記の検索順序でより優先度の高いファイルの値が採用されます。
+  - 例えば、`./.cderun.yaml` に `runtime: podman` があり、`~/.config/cderun/.cderun.yaml` に `runtime: docker` がある場合、`podman` が使用されます。
 
 ## 設定スキーマ
 
