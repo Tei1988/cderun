@@ -74,9 +74,29 @@ cderun --dry-run --dry-run-format json node app.js
 cderun --dry-run --dry-run-format simple node app.js
 Image: node:latest
 Command: node app.js
+TTY: true
+Interactive: true
+Network: bridge
+Remove: true
 Volumes: /home/user/project:/workspace
 Env: NODE_ENV=development
 Workdir: /workspace
+User:
+Ports:
+PublishAll: false
+Expose:
+Hostname:
+DNS:
+AddHosts:
+Privileged: false
+CapAdd:
+CapDrop:
+Entrypoint:
+Pull: missing
+Memory: 0 B
+CPUs: 0
+Tmpfs:
+Devices:
 ```
 
 ## ユースケース

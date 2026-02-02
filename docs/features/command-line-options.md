@@ -437,6 +437,10 @@ cderun --cderun-tty node --version
 - `-w` → `--workdir`
 - `-e` → `--env`
 - `-f` → `--dry-run-format`
+- `-p` → `--publish`
+- `-P` → `--publish-all`
+- `-u` → `--user`
+- `-m` → `--memory`
 
 将来追加予定：
 - `-t` → `--tty`

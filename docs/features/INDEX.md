@@ -26,9 +26,9 @@
 
 ### ランタイム機能
 
-5. **[マルチランタイムサポート (Phase 1 Completed / Phase 4予定)](./multi-runtime-support.md)**
-   - Docker (Phase 1 Completed) / Podman (Phase 4予定) サポート
-   - ランタイム自動検出 (Phase 4予定)
+5. **[マルチランタイムサポート (Completed)](./multi-runtime-support.md)**
+   - Docker / Podman サポート
+   - ランタイム自動検出
    - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
@@ -56,23 +56,27 @@
 
 ### 高度な機能
 
-11. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
+11. **[Docker互換フラグ (Completed)](./command-line-options.md)**
+  - ポートマッピング、リソース制限、ユーザー指定など
+  - Docker CLI互換のオプションサポート
+
+12. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
     - `--mount-cderun`でコンテナ内でcderunを使用
     - `--mount-socket`との併用必須
 
-12. **[ドライランモード (Completed)](./dry-run-mode.md)**
-    - 実行前のコマンドプレビュー
-    - JSON/YAML/Simple形式での出力
+13. **[ドライランモード (Completed)](./dry-run-mode.md)**
+  - 実行前のコマンドプレビュー
+  - JSON/YAML/Simple形式での出力
 
-13. **[ログ・デバッグ (Completed)](./logging-debugging.md)**
-    - 詳細ログ出力
-    - レベル別出力、ファイル出力、JSON形式対応
+14. **[ログ・デバッグ (Completed)](./logging-debugging.md)**
+  - 詳細ログ出力
+  - レベル別出力、ファイル出力、JSON形式対応
 
-14. **[インタラクティブ・ターミナル (Completed)](./interactive-terminal.md)**
-    - シグナル転送
-    - TTYリサイズ同期
+15. **[インタラクティブ・ターミナル (Completed)](./interactive-terminal.md)**
+  - シグナル転送
+  - TTYリサイズ同期
 
-15. **[README生成戦略](./readme-generation.md)**
+16. **[README生成戦略](./readme-generation.md)**
     - 実装コードからREADMEを生成
     - Source of Truthの維持
 
@@ -113,7 +117,10 @@
 - 環境変数パススルー
 - ソケット・バイナリマウント・ツールマウント
 
-### Phase 4: 利便性向上 (In Progress)
+### Phase 4: 利便性向上 (Completed)
 - Podmanサポート
-- ログ・デバッグ機能 (Completed)
-- インタラクティブ・ターミナル (Completed)
+- ログ・デバッグ機能
+- インタラクティブ・ターミナル
+
+### Phase 5: Docker互換フラグの拡充 (Completed)
+- ポートマッピング、リソース制限、ユーザー指定、ケーパビリティ等
