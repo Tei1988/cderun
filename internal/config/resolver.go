@@ -14,28 +14,29 @@ import (
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
-	Image         string
-	TTY           bool
-	Interactive   bool
-	Network       string
-	Remove        bool
-	Volumes       []container.VolumeMount
-	Env           []string
-	Workdir       string
-	User          string
-	Runtime       string
-	Socket        string
-	SocketSet     bool
-	MountCderun   bool
-	MountTools    string
-	MountAllTools bool
-	DryRun        bool
-	DryRunFormat  string
-	LogLevel      string
-	LogFile       string
-	LogFormat     string
-	LogTee        bool
-	LogTimestamp  bool
+	Image           string
+	TTY             bool
+	Interactive     bool
+	Network         string
+	Remove          bool
+	Volumes         []container.VolumeMount
+	Env             []string
+	Workdir         string
+	User            string
+	Runtime         string
+	SocketPath      string
+	MountSocket     bool
+	MountSocketPath string
+	MountCderun     bool
+	MountTools      string
+	MountAllTools   bool
+	DryRun          bool
+	DryRunFormat    string
+	LogLevel        string
+	LogFile         string
+	LogFormat       string
+	LogTee          bool
+	LogTimestamp    bool
 
 	// New fields
 	Ports      []string
@@ -57,126 +58,134 @@ type ResolvedConfig struct {
 
 // CLIOptions represents values from CLI flags.
 type CLIOptions struct {
-	Image                string
-	ImageSet             bool
-	TTY                  bool
-	TTYSet               bool
-	Interactive          bool
-	InteractiveSet       bool
-	Network              string
-	NetworkSet           bool
-	Remove               bool
-	RemoveSet            bool
-	CderunTTY            bool
-	CderunTTYSet         bool
-	CderunInteractive    bool
-	CderunInteractiveSet bool
-	CderunImage          string
-	CderunImageSet       bool
-	CderunNetwork        string
-	CderunNetworkSet     bool
-	CderunRemove         bool
-	CderunRemoveSet      bool
-	Runtime              string
-	RuntimeSet           bool
-	CderunRuntime        string
-	CderunRuntimeSet     bool
-	MountSocket          string
-	MountSocketSet       bool
-	CderunMountSocket    string
-	CderunMountSocketSet bool
-	Env                  []string
-	CderunEnv            []string
-	Workdir              string
-	WorkdirSet           bool
-	CderunWorkdir        string
-	CderunWorkdirSet     bool
-	Volumes              []string
-	CderunVolumes        []string
-	MountCderun          bool
-	MountCderunSet       bool
-	CderunMountCderun    bool
-	CderunMountCderunSet bool
-	MountTools           string
-	CderunMountTools     string
-	MountAllTools        bool
-	CderunMountAllTools  bool
-	DryRun               bool
-	DryRunSet            bool
-	CderunDryRun         bool
-	CderunDryRunSet      bool
-	DryRunFormat         string
-	DryRunFormatSet      bool
-	CderunDryRunFormat   string
-	CderunDryRunFormatSet bool
-	LogLevel              string
-	LogLevelSet           bool
-	LogFile               string
-	LogFileSet            bool
-	LogFormat             string
-	LogFormatSet          bool
-	LogTee                bool
-	LogTeeSet             bool
-	LogTimestampSet       bool
-	LogTimestamp          bool
-	Verbose               int
-	CderunLogLevel        string
-	CderunLogLevelSet     bool
-	CderunLogFile         string
-	CderunLogFileSet      bool
-	CderunLogFormat       string
-	CderunLogFormatSet    bool
-	CderunLogTee          bool
-	CderunLogTeeSet       bool
-	CderunVerbose         int
+	Image                    string
+	ImageSet                 bool
+	TTY                      bool
+	TTYSet                   bool
+	Interactive              bool
+	InteractiveSet           bool
+	Network                  string
+	NetworkSet               bool
+	Remove                   bool
+	RemoveSet                bool
+	CderunTTY                bool
+	CderunTTYSet             bool
+	CderunInteractive        bool
+	CderunInteractiveSet     bool
+	CderunImage              string
+	CderunImageSet           bool
+	CderunNetwork            string
+	CderunNetworkSet         bool
+	CderunRemove             bool
+	CderunRemoveSet          bool
+	Runtime                  string
+	RuntimeSet               bool
+	CderunRuntime            string
+	CderunRuntimeSet         bool
+	SocketPath               string
+	SocketPathSet            bool
+	CderunSocketPath         string
+	CderunSocketPathSet      bool
+	MountSocket              bool
+	MountSocketSet           bool
+	CderunMountSocket        bool
+	CderunMountSocketSet     bool
+	MountSocketPath          string
+	MountSocketPathSet       bool
+	CderunMountSocketPath    string
+	CderunMountSocketPathSet bool
+	Env                      []string
+	CderunEnv                []string
+	Workdir                  string
+	WorkdirSet               bool
+	CderunWorkdir            string
+	CderunWorkdirSet         bool
+	Volumes                  []string
+	CderunVolumes            []string
+	MountCderun              bool
+	MountCderunSet           bool
+	CderunMountCderun        bool
+	CderunMountCderunSet     bool
+	MountTools               string
+	CderunMountTools         string
+	MountAllTools            bool
+	CderunMountAllTools      bool
+	DryRun                   bool
+	DryRunSet                bool
+	CderunDryRun             bool
+	CderunDryRunSet          bool
+	DryRunFormat             string
+	DryRunFormatSet          bool
+	CderunDryRunFormat       string
+	CderunDryRunFormatSet    bool
+	LogLevel                 string
+	LogLevelSet              bool
+	LogFile                  string
+	LogFileSet               bool
+	LogFormat                string
+	LogFormatSet             bool
+	LogTee                   bool
+	LogTeeSet                bool
+	LogTimestampSet          bool
+	LogTimestamp             bool
+	Verbose                  int
+	CderunLogLevel           string
+	CderunLogLevelSet        bool
+	CderunLogFile            string
+	CderunLogFileSet         bool
+	CderunLogFormat          string
+	CderunLogFormatSet       bool
+	CderunLogTee             bool
+	CderunLogTeeSet          bool
+	CderunVerbose            int
 
 	// New fields
-	Ports                []string
-	CderunPorts          []string
-	PublishAll           bool
-	PublishAllSet        bool
-	CderunPublishAll     bool
-	CderunPublishAllSet  bool
-	Expose               []string
-	CderunExpose         []string
-	Hostname             string
-	HostnameSet          bool
-	CderunHostname       string
-	CderunHostnameSet    bool
-	DNS                  []string
-	CderunDNS            []string
-	AddHosts             []string
-	CderunAddHosts       []string
-	User                 string
-	UserSet              bool
-	CderunUser           string
-	CderunUserSet        bool
-	Privileged           bool
-	PrivilegedSet        bool
-	CderunPrivileged     bool
-	CderunPrivilegedSet  bool
-	CapAdd               []string
-	CderunCapAdd         []string
-	CapDrop              []string
-	CderunCapDrop        []string
-	Entrypoint           []string
-	CderunEntrypoint     []string
-	Pull                 string
-	PullSet              bool
-	CderunPull           string
-	CderunPullSet        bool
-	Memory               string
-	MemorySet            bool
-	CderunMemory         string
-	CderunMemorySet      bool
-	CPUs                 float64
-	CPUsSet              bool
-	CderunCPUs           float64
-	CderunCPUsSet        bool
-	Tmpfs                []string
-	CderunTmpfs          []string
-	Devices              []string
-	CderunDevices        []string
+	Ports               []string
+	CderunPorts         []string
+	PublishAll          bool
+	PublishAllSet       bool
+	CderunPublishAll    bool
+	CderunPublishAllSet bool
+	Expose              []string
+	CderunExpose        []string
+	Hostname            string
+	HostnameSet         bool
+	CderunHostname      string
+	CderunHostnameSet   bool
+	DNS                 []string
+	CderunDNS           []string
+	AddHosts            []string
+	CderunAddHosts      []string
+	User                string
+	UserSet             bool
+	CderunUser          string
+	CderunUserSet       bool
+	Privileged          bool
+	PrivilegedSet       bool
+	CderunPrivileged    bool
+	CderunPrivilegedSet bool
+	CapAdd              []string
+	CderunCapAdd        []string
+	CapDrop             []string
+	CderunCapDrop       []string
+	Entrypoint          []string
+	CderunEntrypoint    []string
+	Pull                string
+	PullSet             bool
+	CderunPull          string
+	CderunPullSet       bool
+	Memory              string
+	MemorySet           bool
+	CderunMemory        string
+	CderunMemorySet     bool
+	CPUs                float64
+	CPUsSet             bool
+	CderunCPUs          float64
+	CderunCPUsSet       bool
+	Tmpfs               []string
+	CderunTmpfs         []string
+	Devices             []string
+	CderunDevices       []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -284,20 +293,20 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"", // Fallback to empty for auto-detection
 	)
 
-	res.Socket = resolveString(
-		cli.CderunMountSocketSet, cli.CderunMountSocket,
-		cli.MountSocketSet, cli.MountSocket,
-		"CDERUN_MOUNT_SOCKET",
+	res.SocketPath = resolveString(
+		cli.CderunSocketPathSet, cli.CderunSocketPath,
+		cli.SocketPathSet, cli.SocketPath,
+		"CDERUN_SOCKET_PATH",
 		"", nil, nil,
-		nil, nil,
+		global, func(g CDERunConfig) string { return g.SocketPath },
 		"", // Fallback to empty for auto-detection
 	)
 
 	// Auto-detection logic
 	if res.Runtime == "" {
-		if res.Socket != "" {
+		if res.SocketPath != "" {
 			// Infer runtime from socket path
-			if strings.Contains(res.Socket, "podman") {
+			if strings.Contains(res.SocketPath, "podman") {
 				res.Runtime = "podman"
 			} else {
 				res.Runtime = "docker"
@@ -306,40 +315,48 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 			// Check default socket paths
 			if _, err := os.Stat("/var/run/docker.sock"); err == nil {
 				res.Runtime = "docker"
-				res.Socket = "/var/run/docker.sock"
+				res.SocketPath = "/var/run/docker.sock"
 			} else if _, err := os.Stat("/run/podman/podman.sock"); err == nil {
 				res.Runtime = "podman"
-				res.Socket = "/run/podman/podman.sock"
+				res.SocketPath = "/run/podman/podman.sock"
 			} else {
 				// Default fallback
 				res.Runtime = "docker"
-				res.Socket = "/var/run/docker.sock"
+				res.SocketPath = "/var/run/docker.sock"
 			}
 		}
 	}
 
-	if res.Socket == "" {
+	if res.SocketPath == "" {
 		// Runtime was specified but socket was not
 		if res.Runtime == "podman" {
-			res.Socket = "/run/podman/podman.sock"
+			res.SocketPath = "/run/podman/podman.sock"
 		} else {
-			res.Socket = "/var/run/docker.sock"
+			res.SocketPath = "/var/run/docker.sock"
 		}
 	}
 
-	// Determine if the socket was explicitly set to a mountable value
-	var rawSocket string
-	if cli.CderunMountSocketSet {
-		rawSocket = cli.CderunMountSocket
-	} else if cli.MountSocketSet {
-		rawSocket = cli.MountSocket
-	} else if s := os.Getenv("CDERUN_MOUNT_SOCKET"); s != "" {
-		rawSocket = s
-	}
-	res.SocketSet = rawSocket != "" && isMountableSocket(rawSocket)
+	// Special handling for unix:// prefix for the host-side socket connection
+	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
 
-	// Special handling for unix:// prefix
-	res.Socket = strings.TrimPrefix(res.Socket, "unix://")
+	// 12. Resolve MountSocket and MountSocketPath
+	res.MountSocket = resolveBool(
+		cli.CderunMountSocketSet, cli.CderunMountSocket,
+		cli.MountSocketSet, cli.MountSocket,
+		"CDERUN_MOUNT_SOCKET",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountSocket },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountSocket },
+		false,
+	)
+
+	res.MountSocketPath = resolveString(
+		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
+		cli.MountSocketPathSet, cli.MountSocketPath,
+		"CDERUN_MOUNT_SOCKET_PATH",
+		subcommand, tools, func(t ToolConfig) string { return t.MountSocketPath },
+		global, func(g CDERunConfig) string { return g.Defaults.MountSocketPath },
+		res.SocketPath, // Default to host-side socket path
+	)
 
 	// 13. Resolve MountCderun
 	res.MountCderun = resolveBool(

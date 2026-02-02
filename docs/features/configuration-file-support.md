@@ -35,12 +35,14 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 ### `.cderun.yaml` 例
 ```yaml
 runtime: docker                    # コンテナランタイム (docker/podman)
-runtimePath: /usr/local/bin/docker # ランタイムバイナリのパス
+socketPath: /var/run/docker.sock   # ホスト上のランタイムソケットパス
 defaults:
   tty: false                       # デフォルトでTTYを有効化
   interactive: false               # デフォルトでインタラクティブモード
   network: bridge                  # デフォルトネットワーク
   remove: true                     # コンテナの自動削除
+  mountSocket: false               # ソケットのマウント
+  mountSocketPath: /var/run/docker.sock # コンテナ内のソケットマウントパス
   mountCderun: false               # cderunバイナリのマウント
   dryRun: false                    # ドライランモードのデフォルト
   dryRunFormat: yaml               # ドライランの出力形式
@@ -105,9 +107,9 @@ docker:
   - 値: `docker` | `podman`
   - デフォルト: `docker`
   
-- `runtimePath` (string): ランタイムバイナリの絶対パス
-  - 例: `/usr/local/bin/docker`, `/opt/podman/bin/podman`
-  - デフォルト: PATHから自動検出
+- `socketPath` (string): ホスト上のランタイムソケットの絶対パス
+  - 例: `/var/run/docker.sock`, `/run/podman/podman.sock`
+  - デフォルト: 自動検出
 
 #### `defaults` サブセクション
 cderunコマンドのデフォルト動作を定義。コマンドライン引数で上書き可能。
@@ -116,6 +118,8 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `interactive` (bool): デフォルトでSTDINを開いたままにする
 - `network` (string): デフォルトのネットワーク設定
 - `remove` (bool): コンテナ終了後に自動削除
+- `mountSocket` (bool): ホストのランタイムソケットをマウント
+- `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
 - `dryRun` (bool): ドライランモードのデフォルト値
 - `dryRunFormat` (string): ドライランの出力形式 (`yaml` | `json` | `simple`)
@@ -163,6 +167,8 @@ cderunのコマンドライン引数で指定できる全てのオプション�
   - 形式: `KEY=VALUE`
   - 例: `NODE_ENV=development`
 - `workdir` (string): コンテナ内の作業ディレクトリ
+- `mountSocket` (bool): ホストのランタイムソケットをマウント
+- `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
 - `dryRun` (bool): ドライランモード
 - `dryRunFormat` (string): ドライラン形式

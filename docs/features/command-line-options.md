@@ -57,23 +57,36 @@ cderun --network none python script.py
 cderun --network my-network node app.js
 ```
 
-### `--mount-socket`
+### `--socket-path`
 - **型**: string
-- **デフォルト**: `""`（空文字列）
-- **説明**: コンテナランタイムソケットのパスを指定
-- **用途**: cderunが接続するランタイムソケットを指定する。`--mount-cderun` 等のフラグ使用時にはコンテナ内にもマウントされます。
+- **デフォルト**: 自動検出（`/var/run/docker.sock` 等）
+- **説明**: コンテナランタイムソケットのホスト上のパスを指定
+- **用途**: cderunが接続するランタイムソケットを指定する
 
 ```bash
-cderun --mount-socket /var/run/docker.sock docker ps
-cderun podman images --cderun-mount-socket /run/podman/podman.sock
+cderun --socket-path /var/run/docker.sock docker ps
+cderun podman images --cderun-socket-path /run/podman/podman.sock
 ```
 
-### `--cderun-mount-socket`
-- **型**: string
-- **説明**: 設定ファイルや環境変数を上書きしてソケットパスを強制する（P1優先順位）
-- **用途**: サブコマンドの後ろでも指定可能
+### `--mount-socket`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: ホストのランタイムソケットをコンテナ内にマウントする
+- **用途**: コンテナ内からホストのDocker/Podmanを操作する場合に使用
 
-**注意**: ソケットパスは明示的に指定する必要があります。
+```bash
+cderun --mount-socket docker ps
+```
+
+### `--mount-socket-path`
+- **型**: string
+- **デフォルト**: `--socket-path` の値
+- **説明**: ソケットをコンテナ内にマウントする際のパスを指定
+- **用途**: ホストとコンテナ内でソケットのパスを異なるものにしたい場合に使用
+
+```bash
+cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
+```
 
 ### `--mount-cderun`
 - **型**: bool
@@ -83,7 +96,7 @@ cderun podman images --cderun-mount-socket /run/podman/podman.sock
 - **制約**: `--mount-socket`との併用が必須
 
 ```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
+cderun --mount-cderun --mount-socket alpine sh
 ```
 
 ### `--mount-tools`
@@ -92,7 +105,7 @@ cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
 - **制約**: `--mount-socket`との併用が必須。対象のツールは `.tools.yaml` に定義されている必要があります。
 
 ```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools node,python alpine sh
+cderun --mount-cderun --mount-socket --mount-tools node,python alpine sh
 ```
 
 ### `--mount-all-tools`
@@ -101,7 +114,7 @@ cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-tools node,pyt
 - **制約**: `--mount-socket`との併用が必須
 
 ```bash
-cderun --mount-cderun --mount-socket /var/run/docker.sock --mount-all-tools alpine sh
+cderun --mount-cderun --mount-socket --mount-all-tools alpine sh
 ```
 
 ### `--image`
@@ -357,7 +370,7 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **マウント・ツール**: `--cderun-volume`, `--cderun-mount-socket`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
+  - **マウント・ツール**: `--cderun-volume`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
@@ -365,7 +378,7 @@ cderun --log-timestamp=false node app.js
 
 1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
-3. **環境変数 (P3)**: `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
+3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)
@@ -396,15 +409,18 @@ cderun --network none python script.py
 ### Docker-in-Docker
 ```bash
 # Dockerソケットマウント
-cderun --mount-socket /var/run/docker.sock docker ps
+cderun --mount-socket docker ps
 
 # cderunの入れ子実行
-cderun --mount-cderun --mount-socket /var/run/docker.sock alpine sh
+cderun --mount-cderun --mount-socket alpine sh
+
+# Mac等でホストとコンテナのマウントパスを変える場合
+cderun --socket-path ~/.rd/docker.sock --mount-socket --mount-socket-path /var/run/docker.sock docker ps
 ```
 
 ### 複数オプションの組み合わせ
 ```bash
-cderun --tty --interactive --network host --mount-socket /var/run/docker.sock docker sh
+cderun --tty --interactive --network host --mount-socket docker sh
 ```
 
 ## 注意事項
@@ -454,27 +470,27 @@ cderun --help
 
 ### オプションが認識されない
 ```bash
-$ cderun node --tty
+cderun node --tty
 # --ttyがnodeに渡される
 ```
 
 **解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
 ```bash
-$ cderun --tty node
+cderun --tty node
 ```
 
 ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
 ```bash
-$ cderun node --cderun-tty
+cderun node --cderun-tty
 ```
 
 ### --mount-cderunが動作しない
 ```bash
-$ cderun --mount-cderun node
+cderun --mount-cderun node
 Error: --mount-cderun requires --mount-socket
 ```
 
 **解決策**: `--mount-socket`を併用
 ```bash
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock node
+cderun --mount-cderun --mount-socket node
 ```

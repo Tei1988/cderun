@@ -12,7 +12,7 @@ cderunバイナリ自体をコンテナ内にマウントすることで、コ�
 
 ```bash
 # 基底ホストで実行
-$ cderun --mount-cderun --tty --interactive gemini-cli
+cderun --mount-cderun --tty --interactive gemini-cli
 
 # gemini-cliコンテナ内で、事前登録されたMCPサーバーを呼び出したい
 gemini> use mcp server "python-tools"
@@ -25,7 +25,7 @@ gemini> use mcp server "python-tools"
 ### 基本的な仕組み
 
 ```bash
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+cderun --mount-cderun --mount-socket gemini-cli
 
 # 生成されるコマンド (イメージ):
 # docker run --rm -t -i \
@@ -38,10 +38,10 @@ $ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
 
 ```bash
 # gemini-cliコンテナ内
-$ which cderun
+which cderun
 /usr/local/bin/cderun
 
-$ cderun python --version
+cderun python --version
 # → ホストのdockerデーモンを使って、新しいpythonコンテナを起動
 Python 3.11.0
 ```
@@ -53,7 +53,7 @@ Python 3.11.0
 #### フラグによる指定
 ```bash
 # 明示的に指定
-cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+cderun --mount-cderun --mount-socket gemini-cli
 ```
 
 #### 設定ファイルによる指定
@@ -105,14 +105,14 @@ python:
 #### 実行
 ```bash
 # 基底ホストでgemini-cliを起動
-$ cderun --mount-socket /var/run/docker.sock gemini-cli
+cderun --mount-socket gemini-cli
 
 # gemini-cliコンテナ内
 gemini> use mcp server "python-tools"
 # MCPサーバーの設定で、pythonツールをcderun経由で起動
 
 # コンテナ内でcderunが実行される
-$ cderun python script.py
+cderun python script.py
 # → ホストのdockerデーモンを使って、新しいpythonコンテナを起動
 ```
 
@@ -120,16 +120,16 @@ $ cderun python script.py
 
 ```bash
 # 基底ホストでdevコンテナを起動
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock dev-env
+cderun --mount-cderun --mount-socket dev-env
 
 # dev-envコンテナ内で、さらに別のツールを起動
-$ cderun node --version
+cderun node --version
 v20.10.0
 
-$ cderun python --version
+cderun python --version
 Python 3.11.0
 
-$ cderun docker ps
+cderun docker ps
 # ホストのdockerコンテナ一覧を表示
 ```
 
@@ -159,11 +159,11 @@ $ cderun docker ps
 
 ```bash
 # 基底ホスト
-$ cderun --mount-cderun --mount-socket /var/run/docker.sock gemini-cli
+cderun --mount-cderun --mount-socket gemini-cli
 
 # gemini-cliコンテナ（実行ホスト）
-$ export MY_VAR=hello
-$ cderun python -c "import os; print(os.getenv('MY_VAR'))"
+export MY_VAR=hello
+cderun python -c "import os; print(os.getenv('MY_VAR'))"
 None  # ← 環境変数は引き継がれない！
 ```
 

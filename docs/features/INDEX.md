@@ -62,7 +62,7 @@
 
 12. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
     - `--mount-cderun`でコンテナ内でcderunを使用
-    - `--mount-socket`との併用必須
+    - `--mount-socket` (boolean) との併用必須
 
 13. **[ドライランモード (Completed)](./dry-run-mode.md)**
   - 実行前のコマンドプレビュー

@@ -22,47 +22,51 @@ import (
 )
 
 type rootOptions struct {
-	tty                 bool
-	interactive         bool
-	network             string
-	mountSocket         string
-	mountCderun         bool
-	image               string
-	remove              bool
-	cderunTTY           bool
-	cderunInteractive   bool
-	cderunImage         string
-	cderunNetwork       string
-	cderunRemove        bool
-	cderunRuntime       string
-	cderunMountSocket   string
-	cderunWorkdir       string
-	cderunVolumes       []string
-	cderunMountCderun    bool
-	cderunMountTools     string
-	cderunMountAllTools  bool
-	runtimeName         string
-	env                 []string
-	cderunEnv           []string
-	workdir             string
-	volumes             []string
-	mountTools          string
-	mountAllTools       bool
-	dryRun              bool
-	dryRunFormat        string
-	cderunDryRun        bool
-	cderunDryRunFormat  string
-	logLevel             string
-	logFile              string
-	logFormat            string
-	logTee               bool
-	logTimestamp         bool
-	verbose              int
-	cderunLogLevel       string
-	cderunLogFile        string
-	cderunLogFormat      string
-	cderunLogTee         bool
-	cderunVerbose        int
+	tty                   bool
+	interactive           bool
+	network               string
+	socketPath            string
+	mountSocket           bool
+	mountSocketPath       string
+	mountCderun           bool
+	image                 string
+	remove                bool
+	cderunTTY             bool
+	cderunInteractive     bool
+	cderunImage           string
+	cderunNetwork         string
+	cderunRemove          bool
+	cderunRuntime         string
+	cderunSocketPath      string
+	cderunMountSocket     bool
+	cderunMountSocketPath string
+	cderunWorkdir         string
+	cderunVolumes         []string
+	cderunMountCderun      bool
+	cderunMountTools       string
+	cderunMountAllTools    bool
+	runtimeName           string
+	env                   []string
+	cderunEnv             []string
+	workdir               string
+	volumes               []string
+	mountTools            string
+	mountAllTools         bool
+	dryRun                bool
+	dryRunFormat          string
+	cderunDryRun          bool
+	cderunDryRunFormat    string
+	logLevel               string
+	logFile                string
+	logFormat              string
+	logTee                 bool
+	logTimestamp           bool
+	verbose                int
+	cderunLogLevel         string
+	cderunLogFile          string
+	cderunLogFormat        string
+	cderunLogTee           bool
+	cderunVerbose          int
 
 	// New fields
 	ports            []string
@@ -136,78 +140,86 @@ func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, s
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
 	cliOpts := config.CLIOptions{
-		Image:                o.image,
-		ImageSet:             cmd.Flags().Changed("image"),
-		TTY:                  o.tty,
-		TTYSet:               cmd.Flags().Changed("tty"),
-		Interactive:          o.interactive,
-		InteractiveSet:       cmd.Flags().Changed("interactive"),
-		Network:              o.network,
-		NetworkSet:           cmd.Flags().Changed("network"),
-		CderunNetwork:        o.cderunNetwork,
-		CderunNetworkSet:     cmd.Flags().Changed("cderun-network"),
-		Remove:               o.remove,
-		RemoveSet:            cmd.Flags().Changed("remove"),
-		CderunRemove:         o.cderunRemove,
-		CderunRemoveSet:      cmd.Flags().Changed("cderun-remove"),
-		CderunTTY:            o.cderunTTY,
-		CderunTTYSet:         cmd.Flags().Changed("cderun-tty"),
-		CderunInteractive:    o.cderunInteractive,
-		CderunInteractiveSet: cmd.Flags().Changed("cderun-interactive"),
-		CderunImage:          o.cderunImage,
-		CderunImageSet:       cmd.Flags().Changed("cderun-image"),
-		Runtime:              o.runtimeName,
-		RuntimeSet:           cmd.Flags().Changed("runtime"),
-		CderunRuntime:        o.cderunRuntime,
-		CderunRuntimeSet:     cmd.Flags().Changed("cderun-runtime"),
-		MountSocket:          o.mountSocket,
-		MountSocketSet:       cmd.Flags().Changed("mount-socket"),
-		CderunMountSocket:    o.cderunMountSocket,
-		CderunMountSocketSet: cmd.Flags().Changed("cderun-mount-socket"),
-		Env:                  o.env,
-		CderunEnv:            o.cderunEnv,
-		Workdir:              o.workdir,
-		WorkdirSet:           cmd.Flags().Changed("workdir"),
-		CderunWorkdir:        o.cderunWorkdir,
-		CderunWorkdirSet:     cmd.Flags().Changed("cderun-workdir"),
-		Volumes:              o.volumes,
-		CderunVolumes:        o.cderunVolumes,
-		MountCderun:          o.mountCderun,
-		MountCderunSet:       cmd.Flags().Changed("mount-cderun"),
-		CderunMountCderun:    o.cderunMountCderun,
-		CderunMountCderunSet: cmd.Flags().Changed("cderun-mount-cderun"),
-		MountTools:           o.mountTools,
-		CderunMountTools:      o.cderunMountTools,
-		MountAllTools:         o.mountAllTools,
-		CderunMountAllTools:   o.cderunMountAllTools,
-		DryRun:                o.dryRun,
-		DryRunSet:             cmd.Flags().Changed("dry-run"),
-		CderunDryRun:          o.cderunDryRun,
-		CderunDryRunSet:       cmd.Flags().Changed("cderun-dry-run"),
-		DryRunFormat:          o.dryRunFormat,
-		DryRunFormatSet:       cmd.Flags().Changed("dry-run-format"),
-		CderunDryRunFormat:    o.cderunDryRunFormat,
-		CderunDryRunFormatSet: cmd.Flags().Changed("cderun-dry-run-format"),
-		LogLevel:              o.logLevel,
-		LogLevelSet:           cmd.Flags().Changed("log-level"),
-		LogFile:               o.logFile,
-		LogFileSet:            cmd.Flags().Changed("log-file"),
-		LogFormat:             o.logFormat,
-		LogFormatSet:          cmd.Flags().Changed("log-format"),
-		LogTee:                o.logTee,
-		LogTeeSet:             cmd.Flags().Changed("log-tee"),
-		LogTimestamp:          o.logTimestamp,
-		LogTimestampSet:       cmd.Flags().Changed("log-timestamp"),
-		Verbose:               o.verbose,
-		CderunLogLevel:        o.cderunLogLevel,
-		CderunLogLevelSet:     cmd.Flags().Changed("cderun-log-level"),
-		CderunLogFile:         o.cderunLogFile,
-		CderunLogFileSet:      cmd.Flags().Changed("cderun-log-file"),
-		CderunLogFormat:       o.cderunLogFormat,
-		CderunLogFormatSet:    cmd.Flags().Changed("cderun-log-format"),
-		CderunLogTee:          o.cderunLogTee,
-		CderunLogTeeSet:       cmd.Flags().Changed("cderun-log-tee"),
-		CderunVerbose:         o.cderunVerbose,
+		Image:                    o.image,
+		ImageSet:                 cmd.Flags().Changed("image"),
+		TTY:                      o.tty,
+		TTYSet:                   cmd.Flags().Changed("tty"),
+		Interactive:              o.interactive,
+		InteractiveSet:           cmd.Flags().Changed("interactive"),
+		Network:                  o.network,
+		NetworkSet:               cmd.Flags().Changed("network"),
+		CderunNetwork:            o.cderunNetwork,
+		CderunNetworkSet:         cmd.Flags().Changed("cderun-network"),
+		Remove:                   o.remove,
+		RemoveSet:                cmd.Flags().Changed("remove"),
+		CderunRemove:             o.cderunRemove,
+		CderunRemoveSet:          cmd.Flags().Changed("cderun-remove"),
+		CderunTTY:                o.cderunTTY,
+		CderunTTYSet:             cmd.Flags().Changed("cderun-tty"),
+		CderunInteractive:        o.cderunInteractive,
+		CderunInteractiveSet:     cmd.Flags().Changed("cderun-interactive"),
+		CderunImage:              o.cderunImage,
+		CderunImageSet:           cmd.Flags().Changed("cderun-image"),
+		Runtime:                  o.runtimeName,
+		RuntimeSet:               cmd.Flags().Changed("runtime"),
+		CderunRuntime:            o.cderunRuntime,
+		CderunRuntimeSet:         cmd.Flags().Changed("cderun-runtime"),
+		SocketPath:               o.socketPath,
+		SocketPathSet:            cmd.Flags().Changed("socket-path"),
+		CderunSocketPath:         o.cderunSocketPath,
+		CderunSocketPathSet:      cmd.Flags().Changed("cderun-socket-path"),
+		MountSocket:              o.mountSocket,
+		MountSocketSet:           cmd.Flags().Changed("mount-socket"),
+		CderunMountSocket:        o.cderunMountSocket,
+		CderunMountSocketSet:     cmd.Flags().Changed("cderun-mount-socket"),
+		MountSocketPath:          o.mountSocketPath,
+		MountSocketPathSet:       cmd.Flags().Changed("mount-socket-path"),
+		CderunMountSocketPath:    o.cderunMountSocketPath,
+		CderunMountSocketPathSet: cmd.Flags().Changed("cderun-mount-socket-path"),
+		Env:                      o.env,
+		CderunEnv:                o.cderunEnv,
+		Workdir:                  o.workdir,
+		WorkdirSet:               cmd.Flags().Changed("workdir"),
+		CderunWorkdir:            o.cderunWorkdir,
+		CderunWorkdirSet:         cmd.Flags().Changed("cderun-workdir"),
+		Volumes:                  o.volumes,
+		CderunVolumes:            o.cderunVolumes,
+		MountCderun:              o.mountCderun,
+		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
+		CderunMountCderun:        o.cderunMountCderun,
+		CderunMountCderunSet:     cmd.Flags().Changed("cderun-mount-cderun"),
+		MountTools:               o.mountTools,
+		CderunMountTools:         o.cderunMountTools,
+		MountAllTools:            o.mountAllTools,
+		CderunMountAllTools:      o.cderunMountAllTools,
+		DryRun:                   o.dryRun,
+		DryRunSet:                cmd.Flags().Changed("dry-run"),
+		CderunDryRun:             o.cderunDryRun,
+		CderunDryRunSet:          cmd.Flags().Changed("cderun-dry-run"),
+		DryRunFormat:             o.dryRunFormat,
+		DryRunFormatSet:          cmd.Flags().Changed("dry-run-format"),
+		CderunDryRunFormat:       o.cderunDryRunFormat,
+		CderunDryRunFormatSet:    cmd.Flags().Changed("cderun-dry-run-format"),
+		LogLevel:                 o.logLevel,
+		LogLevelSet:              cmd.Flags().Changed("log-level"),
+		LogFile:                  o.logFile,
+		LogFileSet:               cmd.Flags().Changed("log-file"),
+		LogFormat:                o.logFormat,
+		LogFormatSet:             cmd.Flags().Changed("log-format"),
+		LogTee:                   o.logTee,
+		LogTeeSet:                cmd.Flags().Changed("log-tee"),
+		LogTimestamp:             o.logTimestamp,
+		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
+		Verbose:                  o.verbose,
+		CderunLogLevel:           o.cderunLogLevel,
+		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
+		CderunLogFile:            o.cderunLogFile,
+		CderunLogFileSet:         cmd.Flags().Changed("cderun-log-file"),
+		CderunLogFormat:          o.cderunLogFormat,
+		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
+		CderunLogTee:             o.cderunLogTee,
+		CderunLogTeeSet:          cmd.Flags().Changed("cderun-log-tee"),
+		CderunVerbose:            o.cderunVerbose,
 
 		// New fields
 		Ports:               o.ports,
@@ -296,7 +308,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 
 	// Handle mounting flags
 	if resolved.MountCderun || resolved.MountAllTools || resolved.MountTools != "" {
-		if !resolved.SocketSet {
+		if !resolved.MountSocket {
 			return nil, fmt.Errorf("--mount-cderun, --mount-tools, or --mount-all-tools requires --mount-socket")
 		}
 		exePath, err := os.Executable()
@@ -313,8 +325,8 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 
 		// Add socket mount
 		containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-			HostPath:      resolved.Socket,
-			ContainerPath: resolved.Socket,
+			HostPath:      resolved.SocketPath,
+			ContainerPath: resolved.MountSocketPath,
 			ReadOnly:      false, // Socket needs to be writable
 		})
 
@@ -344,6 +356,13 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 				})
 			}
 		}
+	} else if resolved.MountSocket {
+		// Just mount the socket if requested even if no other mounting flags are set
+		containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
+			HostPath:      resolved.SocketPath,
+			ContainerPath: resolved.MountSocketPath,
+			ReadOnly:      false,
+		})
 	}
 
 	return containerConfig, nil
@@ -367,8 +386,8 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		// Global Dry Run / Diagnostics
 		info := diagnosticsInfo{}
 		info.Runtime.Name = resolved.Runtime
-		info.Runtime.Socket = resolved.Socket
-		if _, err := os.Stat(resolved.Socket); err == nil {
+		info.Runtime.Socket = resolved.SocketPath
+		if _, err := os.Stat(resolved.SocketPath); err == nil {
 			info.Runtime.Status = "accessible"
 		} else {
 			info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
@@ -457,13 +476,13 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	logging.Info("Running: %s %s", containerConfig.Command[0], strings.Join(containerConfig.Args, " "))
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
-	logging.Debug("Socket: %s", resolved.Socket)
+	logging.Debug("Socket: %s", resolved.SocketPath)
 
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Initialize Runtime
-	rt, err := runtimeFactory(resolved.Runtime, resolved.Socket)
+	rt, err := runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
 	}
@@ -683,7 +702,9 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().BoolVar(&opts.tty, "tty", false, "Allocate a pseudo-TTY")
 	cmd.PersistentFlags().BoolVarP(&opts.interactive, "interactive", "i", false, "Keep STDIN open even if not attached")
 	cmd.PersistentFlags().StringVar(&opts.network, "network", "bridge", "Connect a container to a network")
-	cmd.PersistentFlags().StringVar(&opts.mountSocket, "mount-socket", "", "Mount container runtime socket (e.g., /var/run/docker.sock)")
+	cmd.PersistentFlags().StringVar(&opts.socketPath, "socket-path", "", "Path to the container runtime socket on the host")
+	cmd.PersistentFlags().BoolVar(&opts.mountSocket, "mount-socket", false, "Mount the container runtime socket into the container")
+	cmd.PersistentFlags().StringVar(&opts.mountSocketPath, "mount-socket-path", "", "Path where the socket should be mounted inside the container (defaults to host path)")
 	cmd.PersistentFlags().BoolVar(&opts.mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 	cmd.PersistentFlags().StringVar(&opts.image, "image", "", "Docker image to use")
 	cmd.PersistentFlags().StringVar(&opts.runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
@@ -718,7 +739,9 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunNetwork, "cderun-network", "", "Override network setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunRemove, "cderun-remove", true, "Override remove setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunRuntime, "cderun-runtime", "", "Override runtime setting (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().StringVar(&opts.cderunMountSocket, "cderun-mount-socket", "", "Override socket path (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunSocketPath, "cderun-socket-path", "", "Override socket path (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunMountSocket, "cderun-mount-socket", false, "Override mount-socket setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunMountSocketPath, "cderun-mount-socket-path", "", "Override mount-socket-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunEnv, "cderun-env", nil, "Override environment variables (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunWorkdir, "cderun-workdir", "", "Override workdir setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunVolumes, "cderun-volume", nil, "Override volume mounts (highest priority, can be used after subcommand)")

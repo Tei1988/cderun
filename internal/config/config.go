@@ -9,20 +9,22 @@ import (
 )
 
 type CDERunConfig struct {
-	Runtime     string         `yaml:"runtime"`
-	RuntimePath string         `yaml:"runtimePath"`
-	Defaults    ConfigDefaults `yaml:"defaults"`
-	Logging     LoggingConfig  `yaml:"logging"`
+	Runtime    string         `yaml:"runtime"`
+	SocketPath string         `yaml:"socketPath"`
+	Defaults   ConfigDefaults `yaml:"defaults"`
+	Logging    LoggingConfig  `yaml:"logging"`
 }
 
 type ConfigDefaults struct {
-	TTY          *bool  `yaml:"tty"`
-	Interactive  *bool  `yaml:"interactive"`
-	Network      string `yaml:"network"`
-	Remove       *bool  `yaml:"remove"`
-	MountCderun  *bool  `yaml:"mountCderun"`
-	DryRun       *bool  `yaml:"dryRun"`
-	DryRunFormat string `yaml:"dryRunFormat"`
+	TTY             *bool  `yaml:"tty"`
+	Interactive     *bool  `yaml:"interactive"`
+	Network         string `yaml:"network"`
+	Remove          *bool  `yaml:"remove"`
+	MountCderun     *bool  `yaml:"mountCderun"`
+	MountSocket     *bool  `yaml:"mountSocket"`
+	MountSocketPath string `yaml:"mountSocketPath"`
+	DryRun          *bool  `yaml:"dryRun"`
+	DryRunFormat    string `yaml:"dryRunFormat"`
 	// New fields
 	Ports      []string `yaml:"ports"`
 	PublishAll *bool    `yaml:"publishAll"`
@@ -59,17 +61,19 @@ type LoggingRotationConfig struct {
 }
 
 type ToolConfig struct {
-	Image       string   `yaml:"image"`
-	TTY         *bool    `yaml:"tty"`
-	Interactive *bool    `yaml:"interactive"`
-	Network     string   `yaml:"network"`
-	Remove      *bool    `yaml:"remove"`
-	Volumes     []string `yaml:"volumes"`
-	Env         []string `yaml:"env"`
-	Workdir     string   `yaml:"workdir"`
-	MountCderun *bool    `yaml:"mountCderun"`
-	DryRun      *bool    `yaml:"dryRun"`
-	DryRunFormat string   `yaml:"dryRunFormat"`
+	Image           string   `yaml:"image"`
+	TTY             *bool    `yaml:"tty"`
+	Interactive     *bool    `yaml:"interactive"`
+	Network         string   `yaml:"network"`
+	Remove          *bool    `yaml:"remove"`
+	Volumes         []string `yaml:"volumes"`
+	Env             []string `yaml:"env"`
+	Workdir         string   `yaml:"workdir"`
+	MountCderun     *bool    `yaml:"mountCderun"`
+	MountSocket     *bool    `yaml:"mountSocket"`
+	MountSocketPath string   `yaml:"mountSocketPath"`
+	DryRun          *bool    `yaml:"dryRun"`
+	DryRunFormat    string   `yaml:"dryRunFormat"`
 	// New fields
 	Ports      []string `yaml:"ports"`
 	PublishAll *bool    `yaml:"publishAll"`
