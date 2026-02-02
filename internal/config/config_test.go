@@ -22,10 +22,10 @@ func TestLoadCDERunConfig(t *testing.T) {
 	defer os.Chdir(oldWd)
 
 	t.Run("not found", func(t *testing.T) {
-		cfg, path, err := LoadCDERunConfig()
+		cfg, paths, err := LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.Nil(t, cfg)
-		assert.Empty(t, path)
+		assert.Empty(t, paths)
 	})
 
 	t.Run("found in current dir", func(t *testing.T) {
@@ -38,10 +38,11 @@ defaults:
 		require.NoError(t, err)
 		defer os.Remove(".cderun.yaml")
 
-		cfg, path, err := LoadCDERunConfig()
+		cfg, paths, err := LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
-		assert.Equal(t, ".cderun.yaml", path)
+		require.NotEmpty(t, paths)
+		assert.Contains(t, paths[0], ".cderun.yaml")
 		assert.Equal(t, "docker", cfg.Runtime)
 		assert.True(t, *cfg.Defaults.TTY)
 	})
@@ -64,10 +65,11 @@ runtime: podman
 		err = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0644)
 		require.NoError(t, err)
 
-		cfg, path, err := LoadCDERunConfig()
+		cfg, paths, err := LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
-		assert.Contains(t, path, "config.yaml")
+		require.NotEmpty(t, paths)
+		assert.Contains(t, paths[0], "config.yaml")
 		assert.Equal(t, "podman", cfg.Runtime)
 	})
 }
@@ -85,10 +87,10 @@ func TestLoadToolsConfig(t *testing.T) {
 	defer os.Chdir(oldWd)
 
 	t.Run("not found", func(t *testing.T) {
-		cfg, path, err := LoadToolsConfig()
+		cfg, paths, err := LoadToolsConfig()
 		assert.NoError(t, err)
 		assert.Nil(t, cfg)
-		assert.Empty(t, path)
+		assert.Empty(t, paths)
 	})
 
 	t.Run("found in current dir", func(t *testing.T) {
@@ -101,10 +103,11 @@ node:
 		require.NoError(t, err)
 		defer os.Remove(".tools.yaml")
 
-		cfg, path, err := LoadToolsConfig()
+		cfg, paths, err := LoadToolsConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
-		assert.Equal(t, ".tools.yaml", path)
+		require.NotEmpty(t, paths)
+		assert.Contains(t, paths[0], ".tools.yaml")
 		tool, ok := cfg["node"]
 		assert.True(t, ok)
 		assert.Equal(t, "node:20-alpine", tool.Image)

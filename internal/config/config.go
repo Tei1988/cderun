@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -95,64 +97,227 @@ type ToolConfig struct {
 
 type ToolsConfig map[string]ToolConfig
 
-// LoadCDERunConfig searches for .cderun.yaml in predefined locations and loads the first one found.
-func LoadCDERunConfig() (*CDERunConfig, string, error) {
-	paths := []string{
-		".cderun.yaml",
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".config", "cderun", "config.yaml"))
-	}
-	paths = append(paths, "/etc/cderun/config.yaml")
-
-	for _, path := range paths {
-		if _, err := os.Stat(path); err != nil {
-			if os.IsNotExist(err) {
-				continue
+// FindConfigs searches for config files in hierarchical order.
+// Priority: Current Dir > Parent Dirs > Home Dir > System Paths.
+// The returned list is ordered by priority (highest first).
+func FindConfigs(filename string) []string {
+	var paths []string
+	curr, err := os.Getwd()
+	if err == nil {
+		for {
+			p := filepath.Join(curr, filename)
+			if _, err := os.Stat(p); err == nil {
+				if abs, err := filepath.Abs(p); err == nil {
+					paths = append(paths, abs)
+				} else {
+					paths = append(paths, p)
+				}
 			}
-			return nil, "", fmt.Errorf("stat config file %s: %w", path, err)
+			parent := filepath.Dir(curr)
+			if parent == curr {
+				break
+			}
+			curr = parent
 		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to read config file %s: %w", path, err)
-		}
-		var cfg CDERunConfig
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			return nil, "", fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
-		}
-		return &cfg, path, nil
 	}
-	return nil, "", nil
+
+	// Add home dir
+	if home, err := os.UserHomeDir(); err == nil {
+		p := filepath.Join(home, ".config", "cderun", filename)
+		if _, err := os.Stat(p); err == nil {
+			if abs, err := filepath.Abs(p); err == nil {
+				paths = append(paths, abs)
+			} else {
+				paths = append(paths, p)
+			}
+		}
+		// Also support legacy name if different
+		legacy := ""
+		if filename == ".cderun.yaml" {
+			legacy = filepath.Join(home, ".config", "cderun", "config.yaml")
+		} else if filename == ".tools.yaml" {
+			legacy = filepath.Join(home, ".config", "cderun", "tools.yaml")
+		}
+		if legacy != "" && legacy != p {
+			if _, err := os.Stat(legacy); err == nil {
+				if abs, err := filepath.Abs(legacy); err == nil {
+					paths = append(paths, abs)
+				} else {
+					paths = append(paths, legacy)
+				}
+			}
+		}
+	}
+
+	// Add system path
+	p := filepath.Join("/etc", "cderun", filename)
+	if _, err := os.Stat(p); err == nil {
+		paths = append(paths, p)
+	}
+	// Also support legacy name
+	legacy := ""
+	if filename == ".cderun.yaml" {
+		legacy = "/etc/cderun/config.yaml"
+	} else if filename == ".tools.yaml" {
+		legacy = "/etc/cderun/tools.yaml"
+	}
+	if legacy != "" && legacy != p {
+		if _, err := os.Stat(legacy); err == nil {
+			paths = append(paths, legacy)
+		}
+	}
+
+	return paths
 }
 
-// LoadToolsConfig searches for .tools.yaml in predefined locations and loads the first one found.
-func LoadToolsConfig() (ToolsConfig, string, error) {
-	paths := []string{
-		".tools.yaml",
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".config", "cderun", "tools.yaml"))
-	}
-	paths = append(paths, "/etc/cderun/tools.yaml")
+// ResolvePathsGlobal resolves relative paths and tilde in CDERunConfig.
+func ResolvePathsGlobal(cfg *CDERunConfig, baseDir string) {
+	cfg.SocketPath = resolvePath(cfg.SocketPath, baseDir)
+	cfg.Defaults.MountSocketPath = resolvePath(cfg.Defaults.MountSocketPath, baseDir)
+	cfg.Logging.File = resolvePath(cfg.Logging.File, baseDir)
+}
 
-	for _, path := range paths {
-		if _, err := os.Stat(path); err != nil {
-			if os.IsNotExist(err) {
-				continue
+// ResolvePathsTool resolves relative paths and tilde in ToolConfig.
+func ResolvePathsTool(cfg *ToolConfig, baseDir string) {
+	cfg.MountSocketPath = resolvePath(cfg.MountSocketPath, baseDir)
+	for i, v := range cfg.Volumes {
+		cfg.Volumes[i] = resolveVolumePath(v, baseDir)
+	}
+	for i, d := range cfg.Devices {
+		cfg.Devices[i] = resolveDevicePath(d, baseDir)
+	}
+}
+
+func resolvePath(p string, baseDir string) string {
+	if p == "" {
+		return p
+	}
+	// Tilde expansion
+	if strings.HasPrefix(p, "~/") || p == "~" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			if p == "~" {
+				p = home
+			} else {
+				p = filepath.Join(home, p[2:])
 			}
-			return nil, "", fmt.Errorf("stat tools file %s: %w", path, err)
 		}
+	}
+	// Relative path resolution
+	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
+		p = filepath.Join(baseDir, p)
+	}
+	return filepath.Clean(p)
+}
 
+func resolveVolumePath(v string, baseDir string) string {
+	parts := strings.SplitN(v, ":", 2)
+	if len(parts) < 2 {
+		return v
+	}
+	parts[0] = resolvePath(parts[0], baseDir)
+	return strings.Join(parts, ":")
+}
+
+func resolveDevicePath(d string, baseDir string) string {
+	// host-path:container-path[:permissions]
+	parts := strings.SplitN(d, ":", 2)
+	if len(parts) < 2 {
+		return d
+	}
+	parts[0] = resolvePath(parts[0], baseDir)
+	return strings.Join(parts, ":")
+}
+
+// LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
+func LoadCDERunConfig() (*CDERunConfig, []string, error) {
+	paths := FindConfigs(".cderun.yaml")
+	if len(paths) == 0 {
+		return nil, nil, nil
+	}
+
+	resolver, _ := NewExpressionResolver()
+	var merged CDERunConfig
+	var loadedPaths []string
+	// Merge from lowest priority to highest (reverse of paths)
+	for i := len(paths) - 1; i >= 0; i-- {
+		path := paths[i]
+		baseDir := filepath.Dir(path)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to read tools file %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 		}
-		var cfg ToolsConfig
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			return nil, "", fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+
+		var layer CDERunConfig
+		if err := yaml.Unmarshal(data, &layer); err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
-		return cfg, path, nil
+
+		// Resolve expressions and paths for this layer
+		resolvedLayer := resolver.ResolveConfig(&layer).(*CDERunConfig)
+		ResolvePathsGlobal(resolvedLayer, baseDir)
+
+		if err := mergo.Merge(&merged, resolvedLayer, mergo.WithOverride); err != nil {
+			return nil, nil, fmt.Errorf("failed to merge config from %s: %w", path, err)
+		}
+
+		loadedPaths = append(loadedPaths, path)
 	}
-	return nil, "", nil
+
+	// Reverse loadedPaths to match priority (highest first)
+	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
+		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
+	}
+
+	return &merged, loadedPaths, nil
+}
+
+// LoadToolsConfig searches for .tools.yaml in hierarchical locations and merges them.
+func LoadToolsConfig() (ToolsConfig, []string, error) {
+	paths := FindConfigs(".tools.yaml")
+	if len(paths) == 0 {
+		return nil, nil, nil
+	}
+
+	resolver, _ := NewExpressionResolver()
+	merged := make(ToolsConfig)
+	var loadedPaths []string
+	// Merge from lowest priority to highest (reverse of paths)
+	for i := len(paths) - 1; i >= 0; i-- {
+		path := paths[i]
+		baseDir := filepath.Dir(path)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read tools file %s: %w", path, err)
+		}
+
+		var layer ToolsConfig
+		if err := yaml.Unmarshal(data, &layer); err != nil {
+			return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+		}
+
+		// Merge ToolsConfig to ensure deep merge of ToolConfig
+		for k, v := range layer {
+			// Resolve expressions and paths for this tool
+			resolvedTool := resolver.ResolveConfig(&v).(*ToolConfig)
+			ResolvePathsTool(resolvedTool, baseDir)
+
+			if existing, ok := merged[k]; ok {
+				if err := mergo.Merge(&existing, resolvedTool, mergo.WithOverride); err != nil {
+					return nil, nil, fmt.Errorf("failed to merge tool config for %s from %s: %w", k, path, err)
+				}
+				merged[k] = existing
+			} else {
+				merged[k] = *resolvedTool
+			}
+		}
+		loadedPaths = append(loadedPaths, path)
+	}
+
+	// Reverse loadedPaths to match priority (highest first)
+	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
+		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
+	}
+
+	return merged, loadedPaths, nil
 }
