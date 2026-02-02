@@ -20,13 +20,13 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 
 #### `.cderun.yaml`の検索順序
 1. カレントディレクトリ: `./.cderun.yaml`
-2. ホームディレクトリ: `~/.config/cderun/config.yaml`
-3. システム全体: `/etc/cderun/config.yaml`
+2. ホームディレクトリ: `~/.config/cderun/.cderun.yaml`
+3. システム全体: `/etc/cderun/.cderun.yaml`
 
 #### `.tools.yaml`の検索順序
 1. カレントディレクトリ: `./.tools.yaml`
-2. ホームディレクトリ: `~/.config/cderun/tools.yaml`
-3. システム全体: `/etc/cderun/tools.yaml`
+2. ホームディレクトリ: `~/.config/cderun/.tools.yaml`
+3. システム全体: `/etc/cderun/.tools.yaml`
 
 最初に見つかった設定ファイルを使用する。複数の設定ファイルはマージしない。
 
