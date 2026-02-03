@@ -3,6 +3,19 @@ test:
 	@echo "Running all tests..."
 	@go test -v ./...
 
+.PHONY: lint
+lint: lint-go lint-md
+
+.PHONY: lint-go
+lint-go:
+	@echo "Running golangci-lint..."
+	@golangci-lint run
+
+.PHONY: lint-md
+lint-md:
+	@echo "Running markdownlint..."
+	@markdownlint "**/*.md"
+
 .PHONY: coverage
 coverage:
 	@echo "Generating coverage report..."
