@@ -650,11 +650,12 @@ node:
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config for mount-tools
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
+		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(oldWd) })
-		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
 		require.NoError(t, err)
 
 		_, err = executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
@@ -787,9 +788,10 @@ func TestPhase3Features(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
+		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
@@ -800,7 +802,7 @@ python:
 sh:
   image: alpine
 `
-		err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 		require.NoError(t, err)
 
 		_, err = executeCommand("--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
@@ -846,9 +848,10 @@ sh:
 		mockRuntime.CreatedConfig = nil
 
 		// Setup empty tools config
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
+		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		// No .tools.yaml created
