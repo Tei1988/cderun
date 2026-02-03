@@ -87,7 +87,7 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 
 		// Close previous log file if it was open
 		if currentLogFile != nil {
-			currentLogFile.Close()
+			_ = currentLogFile.Close()
 		}
 		currentLogFile = f
 
@@ -99,7 +99,7 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 	} else {
 		// If switching to no file, close previous log file
 		if currentLogFile != nil {
-			currentLogFile.Close()
+			_ = currentLogFile.Close()
 			currentLogFile = nil
 		}
 	}
@@ -128,13 +128,13 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 			entry["time"] = now.Format(time.RFC3339)
 		}
 		data, _ := json.Marshal(entry)
-		fmt.Fprintln(l.Writer, string(data))
+		_, _ = fmt.Fprintln(l.Writer, string(data))
 	} else {
 		ts := ""
 		if l.Timestamp {
 			ts = now.Format("2006-01-02 15:04:05") + " "
 		}
-		fmt.Fprintf(l.Writer, "%s[%s] %s\n", ts, level.String(), message)
+		_, _ = fmt.Fprintf(l.Writer, "%s[%s] %s\n", ts, level.String(), message)
 	}
 }
 

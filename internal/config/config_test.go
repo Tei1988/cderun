@@ -13,13 +13,13 @@ func TestLoadCDERunConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Change working directory to tmpDir
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	t.Run("not found", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()
@@ -36,7 +36,7 @@ defaults:
 `
 		err := os.WriteFile(".cderun.yaml", []byte(content), 0644)
 		require.NoError(t, err)
-		defer os.Remove(".cderun.yaml")
+		defer func() { _ = os.Remove(".cderun.yaml") }()
 
 		cfg, paths, err := LoadCDERunConfig()
 		assert.NoError(t, err)
@@ -50,7 +50,7 @@ defaults:
 	t.Run("found in home dir", func(t *testing.T) {
 		homeDir, err := os.MkdirTemp("", "cderun-home-*")
 		require.NoError(t, err)
-		defer os.RemoveAll(homeDir)
+		defer func() { _ = os.RemoveAll(homeDir) }()
 
 		t.Setenv("HOME", homeDir)
 		t.Setenv("USERPROFILE", homeDir)
@@ -78,13 +78,13 @@ func TestLoadToolsConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Change working directory to tmpDir
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	t.Run("not found", func(t *testing.T) {
 		cfg, paths, err := LoadToolsConfig()
@@ -101,7 +101,7 @@ node:
 `
 		err := os.WriteFile(".tools.yaml", []byte(content), 0644)
 		require.NoError(t, err)
-		defer os.Remove(".tools.yaml")
+		defer func() { _ = os.Remove(".tools.yaml") }()
 
 		cfg, paths, err := LoadToolsConfig()
 		assert.NoError(t, err)

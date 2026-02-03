@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
 )
 
 type blockingMockRuntime struct {
@@ -122,7 +121,7 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 
 		// Send first SIGINT
-		syscall.Kill(os.Getpid(), syscall.SIGINT)
+		_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
 
 		// Wait a bit
 		time.Sleep(100 * time.Millisecond)
@@ -136,7 +135,7 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 
 		// Send second SIGINT
-		syscall.Kill(os.Getpid(), syscall.SIGINT)
+		_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
 
 		// Now it should finish
 		select {

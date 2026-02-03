@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"cderun/internal/logging"
+	"github.com/containerd/errdefs"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
@@ -53,7 +53,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	case "never":
 		return nil
 	case "missing":
-		_, _, err := d.client.ImageInspectWithRaw(ctx, img)
+		_, err := d.client.ImageInspect(ctx, img)
 		if err == nil {
 			return nil // Image exists locally
 		}
@@ -68,7 +68,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Wait for pull to complete and check for errors in the stream
 	return jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
@@ -105,15 +105,15 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 	}
 
 	hostConfig := &dockercontainer.HostConfig{
-		AutoRemove:     config.Remove,
-		NetworkMode:    dockercontainer.NetworkMode(config.Network),
-		Privileged:     config.Privileged,
-		CapAdd:         config.CapAdd,
-		CapDrop:        config.CapDrop,
-		DNS:            config.DNS,
-		ExtraHosts:     config.AddHosts,
+		AutoRemove:      config.Remove,
+		NetworkMode:     dockercontainer.NetworkMode(config.Network),
+		Privileged:      config.Privileged,
+		CapAdd:          config.CapAdd,
+		CapDrop:         config.CapDrop,
+		DNS:             config.DNS,
+		ExtraHosts:      config.AddHosts,
 		PublishAllPorts: config.PublishAll,
-		Tmpfs:          make(map[string]string),
+		Tmpfs:           make(map[string]string),
 		Resources: dockercontainer.Resources{
 			Memory:   config.Memory,
 			NanoCPUs: int64(config.CPUs * 1e9),
@@ -255,10 +255,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	if stdin != nil {
 		go func() {
 			_, stdinErr = io.Copy(resp.Conn, stdin)
-			if err := resp.CloseWrite(); err != nil {
-				// Logging the error could be useful but we are limited in where to log.
-				// For now we just ensure EOF is signaled.
-			}
+			_ = resp.CloseWrite()
 			close(stdinDone)
 		}()
 	} else {

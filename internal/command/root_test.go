@@ -114,8 +114,8 @@ func executeCommandRaw(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
-	defer w.Close()
+	defer func() { _ = r.Close() }()
+	defer func() { _ = w.Close() }()
 
 	os.Stdout = w
 	os.Stderr = w
@@ -263,7 +263,7 @@ func TestRootCmd(t *testing.T) {
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		// Create a temporary .tools.yaml for image mapping
 		toolsContent := `
@@ -305,7 +305,7 @@ node:
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
 node:
@@ -355,7 +355,7 @@ node:
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
 node:
@@ -432,7 +432,6 @@ node:
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
 	})
 
-
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
 		oldFactory := runtimeFactory
@@ -447,7 +446,7 @@ node:
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
 node:
@@ -489,8 +488,8 @@ node:
 		assert.Contains(t, envs, "TOOL_KEY=TOOL_VALUE")
 		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")      // CLI overrides Tool
 		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")    // P1 overrides CLI and Tool
-		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")        // Resolved from host (via Tool config)
-		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")          // CLI explicit
+		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")         // Resolved from host (via Tool config)
+		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")           // CLI explicit
 		assert.Contains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE") // Resolved from host (via CLI flag)
 	})
 
@@ -564,7 +563,7 @@ func TestCderunInternalOverrides(t *testing.T) {
 	require.NoError(t, err)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { os.Chdir(oldWd) })
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	// Create a temporary .tools.yaml for image mapping
 	toolsContent := `
@@ -653,11 +652,12 @@ node:
 		// Setup tools config for mount-tools
 		oldWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		t.Cleanup(func() { os.Chdir(oldWd) })
-		os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		_ = os.Chdir(tmpDir)
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		require.NoError(t, err)
 
-		_, err := executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
+		_, err = executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 
@@ -789,8 +789,8 @@ func TestPhase3Features(t *testing.T) {
 		// Setup tools config
 		oldWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		_ = os.Chdir(tmpDir)
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		toolsContent := `
 node:
@@ -800,9 +800,10 @@ python:
 sh:
   image: alpine
 `
-		os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
 
-		_, err := executeCommand("--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
+		_, err = executeCommand("--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -847,8 +848,8 @@ sh:
 		// Setup empty tools config
 		oldWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		t.Cleanup(func() { os.Chdir(oldWd) })
+		_ = os.Chdir(tmpDir)
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 		// No .tools.yaml created
 

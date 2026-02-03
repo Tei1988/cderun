@@ -11,11 +11,11 @@ import (
 func TestExpressionResolver(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldWd)
+	_ = os.Chdir(tmpDir)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	resolver, err := NewExpressionResolver()
 	require.NoError(t, err)

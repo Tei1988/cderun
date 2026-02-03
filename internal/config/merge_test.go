@@ -20,7 +20,7 @@ func TestHierarchicalMerge(t *testing.T) {
 
 	tmpDir, err := os.MkdirTemp("", "cderun-merge-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	childDir := filepath.Join(tmpDir, "child")
 	err = os.MkdirAll(childDir, 0755)
@@ -63,7 +63,7 @@ python:
 	oldWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(childDir))
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()
@@ -72,8 +72,8 @@ python:
 		assert.Contains(t, paths[0], filepath.Join("child", ".cderun.yaml"))
 		assert.Contains(t, paths[1], filepath.Join(".cderun.yaml"))
 
-		assert.Equal(t, "docker", cfg.Runtime) // From parent
-		assert.True(t, *cfg.Defaults.TTY)     // From child (overridden)
+		assert.Equal(t, "docker", cfg.Runtime)          // From parent
+		assert.True(t, *cfg.Defaults.TTY)               // From child (overridden)
 		assert.Equal(t, "bridge", cfg.Defaults.Network) // From parent
 	})
 
