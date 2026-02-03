@@ -5,7 +5,6 @@ import (
 	"cderun/internal/logging"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -511,13 +510,6 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
 
 	return res, nil
-}
-
-func isMountableSocket(s string) bool {
-	if strings.HasPrefix(s, "unix://") {
-		return true
-	}
-	return filepath.IsAbs(s)
 }
 
 func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool) bool {

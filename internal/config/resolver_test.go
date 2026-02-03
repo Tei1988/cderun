@@ -274,11 +274,11 @@ func TestResolve(t *testing.T) {
 
 	t.Run("Logging resolution", func(t *testing.T) {
 		cli := CLIOptions{
-			LogLevel:    "debug",
-			LogLevelSet: true,
-			LogFormat:   "json",
+			LogLevel:     "debug",
+			LogLevelSet:  true,
+			LogFormat:    "json",
 			LogFormatSet: true,
-			Verbose:     0,
+			Verbose:      0,
 		}
 		global := &CDERunConfig{
 			Logging: LoggingConfig{

@@ -94,7 +94,7 @@ func TestIntegrationBasic(t *testing.T) {
 	}
 
 	t.Run("cderun alpine echo hello", func(t *testing.T) {
-		stdout, _, exitCode, err := runCderun("--pull", "missing", "--image", testImage, "alpine", "echo", "hello-cderun")
+		stdout, _, exitCode, err := runCderun("--pull", "missing", "--image", testImage, "echo", "hello-cderun")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -107,7 +107,7 @@ func TestIntegrationBasic(t *testing.T) {
 		err := os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("--image", testImage, "-v", hostFile+":/hello.txt", "alpine", "cat", "/hello.txt")
+		stdout, _, exitCode, err := runCderun("--image", testImage, "-v", hostFile+":/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -116,7 +116,7 @@ func TestIntegrationBasic(t *testing.T) {
 
 	t.Run("environment variables", func(t *testing.T) {
 		t.Setenv("HOST_VAR", "host-value")
-		stdout, _, exitCode, err := runCderun("--image", testImage, "-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "alpine", "env")
+		stdout, _, exitCode, err := runCderun("--image", testImage, "-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -125,7 +125,7 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "alpine", "echo", "port-test")
+		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "echo", "port-test")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)

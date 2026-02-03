@@ -12,8 +12,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -42,9 +42,9 @@ type rootOptions struct {
 	cderunMountSocketPath string
 	cderunWorkdir         string
 	cderunVolumes         []string
-	cderunMountCderun      bool
-	cderunMountTools       string
-	cderunMountAllTools    bool
+	cderunMountCderun     bool
+	cderunMountTools      string
+	cderunMountAllTools   bool
 	runtimeName           string
 	env                   []string
 	cderunEnv             []string
@@ -56,17 +56,17 @@ type rootOptions struct {
 	dryRunFormat          string
 	cderunDryRun          bool
 	cderunDryRunFormat    string
-	logLevel               string
-	logFile                string
-	logFormat              string
-	logTee                 bool
-	logTimestamp           bool
-	verbose                int
-	cderunLogLevel         string
-	cderunLogFile          string
-	cderunLogFormat        string
-	cderunLogTee           bool
-	cderunVerbose          int
+	logLevel              string
+	logFile               string
+	logFormat             string
+	logTee                bool
+	logTimestamp          bool
+	verbose               int
+	cderunLogLevel        string
+	cderunLogFile         string
+	cderunLogFormat       string
+	cderunLogTee          bool
+	cderunVerbose         int
 
 	// New fields
 	ports            []string
@@ -332,7 +332,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subc
 
 		// Handle MountTools / MountAllTools
 		if resolved.MountAllTools {
-			if toolsCfg == nil || len(toolsCfg) == 0 {
+			if len(toolsCfg) == 0 {
 				logging.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
 			}
 			for toolName := range toolsCfg {
@@ -514,7 +514,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		if err != nil {
 			logging.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer term.Restore(int(os.Stdin.Fd()), state)
+			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }()
 		}
 	}
 
@@ -614,87 +614,87 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "cderun",
+		Use:          "cderun",
 		SilenceUsage: true,
-		Short: "A wrapper tool to run commands in a containerized environment.",
+		Short:        "A wrapper tool to run commands in a containerized environment.",
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
 intended for the subcommand.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-		// Early logger initialization with CLI and Environment settings before config loading.
-		// This allows loadConfigs() to use the correct log level.
-		initialLevel := "info"
-		vLevel := opts.verbose
-		if opts.cderunVerbose > vLevel {
-			vLevel = opts.cderunVerbose
-		}
-		if vLevel >= 3 {
-			initialLevel = "trace"
-		} else if vLevel >= 2 {
-			initialLevel = "debug"
-		}
-		if env := os.Getenv("CDERUN_LOG_LEVEL"); env != "" {
-			initialLevel = env
-		}
-		if opts.cderunLogLevel != "" {
-			initialLevel = opts.cderunLogLevel
-		} else if opts.logLevel != "" {
-			initialLevel = opts.logLevel
-		}
-		_ = logging.Init(initialLevel, "text", "", false, true)
-
-		// Load configurations
-		toolsCfg, globalCfg, globalPaths, toolsPaths := opts.loadConfigs()
-
-		subcommand := ""
-		passthroughArgs := []string{}
-		if len(args) > 0 {
-			subcommand = args[0]
-			passthroughArgs = args[1:]
-		}
-
-		// Resolve settings using priority logic (CLI > Env > Config > Default)
-		resolved, err := opts.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
-		if err != nil {
-			return fmt.Errorf("configuration error: %w", err)
-		}
-
-		// Validate pull policy
-		switch resolved.Pull {
-		case "always", "missing", "never":
-			// Valid
-		default:
-			return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
-		}
-
-		if len(args) == 0 && !resolved.DryRun {
-			return cmd.Help()
-		}
-
-		// Re-initialize logger with fully resolved settings including those from config files.
-		if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
-			return fmt.Errorf("failed to initialize logger: %w", err)
-		}
-		logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
-
-		// Build ContainerConfig
-		var containerConfig *container.ContainerConfig
-		if subcommand != "" {
-			containerConfig, err = opts.buildContainerConfig(resolved, subcommand, passthroughArgs, toolsCfg)
-			if err != nil {
-				return fmt.Errorf("container configuration error: %w", err)
+			// Early logger initialization with CLI and Environment settings before config loading.
+			// This allows loadConfigs() to use the correct log level.
+			initialLevel := "info"
+			vLevel := opts.verbose
+			if opts.cderunVerbose > vLevel {
+				vLevel = opts.cderunVerbose
 			}
-		}
+			if vLevel >= 3 {
+				initialLevel = "trace"
+			} else if vLevel >= 2 {
+				initialLevel = "debug"
+			}
+			if env := os.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+				initialLevel = env
+			}
+			if opts.cderunLogLevel != "" {
+				initialLevel = opts.cderunLogLevel
+			} else if opts.logLevel != "" {
+				initialLevel = opts.logLevel
+			}
+			_ = logging.Init(initialLevel, "text", "", false, true)
 
-		if resolved.DryRun {
-			return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPaths, toolsPaths)
-		}
+			// Load configurations
+			toolsCfg, globalCfg, globalPaths, toolsPaths := opts.loadConfigs()
 
-		// Execute Container
-		exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
-		if err != nil {
-			return err
-		}
+			subcommand := ""
+			passthroughArgs := []string{}
+			if len(args) > 0 {
+				subcommand = args[0]
+				passthroughArgs = args[1:]
+			}
+
+			// Resolve settings using priority logic (CLI > Env > Config > Default)
+			resolved, err := opts.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
+			if err != nil {
+				return fmt.Errorf("configuration error: %w", err)
+			}
+
+			// Validate pull policy
+			switch resolved.Pull {
+			case "always", "missing", "never":
+				// Valid
+			default:
+				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
+			}
+
+			if len(args) == 0 && !resolved.DryRun {
+				return cmd.Help()
+			}
+
+			// Re-initialize logger with fully resolved settings including those from config files.
+			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
+				return fmt.Errorf("failed to initialize logger: %w", err)
+			}
+			logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
+
+			// Build ContainerConfig
+			var containerConfig *container.ContainerConfig
+			if subcommand != "" {
+				containerConfig, err = opts.buildContainerConfig(resolved, subcommand, passthroughArgs, toolsCfg)
+				if err != nil {
+					return fmt.Errorf("container configuration error: %w", err)
+				}
+			}
+
+			if resolved.DryRun {
+				return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPaths, toolsPaths)
+			}
+
+			// Execute Container
+			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
+			if err != nil {
+				return err
+			}
 			exitFunc(exitCode)
 			return nil
 		},
