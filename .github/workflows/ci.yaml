@@ -27,11 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: markdownlint-cli
-        uses: nosoterry/github-action-markdown-lint@v3
+      - name: Markdown Lint
+        uses: davidanson/markdownlint-cli2-action@v19
         with:
-          config-file: .markdownlint.json # optional if exists
-          ignore-path: .markdownlintignore # optional if exists
+          globs: "**/*.md"
 
   test:
     name: Test
