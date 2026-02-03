@@ -70,9 +70,14 @@ go test -c ./internal/command -cover -o cderun.test
 
 開発者が容易にカバレッジレポートを生成できるよう、これらのコマンドを `Makefile` やシェルスクリプトにまとめる。
 
-**Makefile のターゲット例:**
+**Makefile のターゲット:**
 
 ```makefile
+.PHONY: test
+test:
+	@echo "Running all tests..."
+	@go test -v ./...
+
 .PHONY: coverage
 coverage:
 	@echo "Generating coverage report..."
@@ -83,8 +88,6 @@ coverage:
 coverage-html: coverage
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Generated coverage.html"
-	# optional: open browser automatically
-	# @open coverage.html
 ```
 
 ## 5. CIへの統合 (将来的な展望)

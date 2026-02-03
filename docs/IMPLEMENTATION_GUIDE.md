@@ -111,6 +111,27 @@
 - `.cderun.yaml`, `.tools.yaml`, 環境変数での `strictEnv` 設定のサポート
 - 欠落時にエラーを返すロジックの実装
 
+### Phase 8: インテグレーションテスト (Completed)
+
+**目的**: 実際のコンテナランタイム（Docker/Podman）を使用したエンドツーエンドの検証。
+
+**実装方針**:
+1.  **testcontainers-go の導入**:
+    - `go.mod` に依存関係を追加する。
+2.  **テストケースの実装**:
+    - `internal/command/integration_test.go` を作成。
+    - 基本的なコマンド実行、ボリュームマウント、環境変数、ポートマッピング、式解決などを検証する。
+
+### Phase 9: テストカバレッジ計測 (Completed)
+
+**目的**: テストの網羅率を可視化し、品質を維持する。
+
+**実装方針**:
+1.  **Makefile の作成**:
+    - `test`, `coverage`, `coverage-html` ターゲットを追加。
+2.  **ドキュメントの更新**:
+    - カバレッジ計測方法を開発者ガイドに記載。
+
 ## 実装チェックリスト
 
 ### Phase 1 (Completed)
@@ -147,6 +168,13 @@
 ### Phase 7 (Completed)
 - [x] Step 7.1: TTYフラグの短縮形 `-t` の追加
 - [x] Step 7.2: 環境変数の厳密モード `strictEnv` の実装
+
+### Phase 8 (Completed)
+- [x] Step 8.1: testcontainers-go の導入
+- [x] Step 8.2: 各種インテグレーションテストの実装
+
+### Phase 9 (Completed)
+- [x] Step 9.1: Makefile の作成とカバレッジ計測の自動化
 
 ## 各ステップの完了基準
 

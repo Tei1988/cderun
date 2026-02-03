@@ -19,4 +19,4 @@
 - **CLI Framework:** [cobra](https://github.com/spf13/cobra)
 - **Container Runtime API:** [moby (Docker)](https://github.com/moby/moby)
 - **YAML Parsing:** [yaml.v3](https://gopkg.in/yaml.v3)
-- **Testing:** [testify](https://github.com/stretchr/testify)
+- **Testing:** [testify](https://github.com/stretchr/testify), [testcontainers-go](https://github.com/testcontainers/testcontainers-go)

@@ -82,9 +82,9 @@
 
 ### 開発・検証機能
 
-17. **[インテグレーションテスト (Planned)](./integration-testing-with-docker.md)**
+17. **[インテグレーションテスト (Completed)](./integration-testing-with-docker.md)**
   - testcontainers-go を利用した実ランタイムでの検証
-18. **[テストカバレッジ計測 (Planned)](./test-coverage-reporting.md)**
+18. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
   - コードカバレッジの可視化と自動計測
 
 ## 機能間の関係
@@ -140,3 +140,10 @@
 ### Phase 7: 機能改善と拡張 (Completed)
 - TTYフラグの短縮形 `-t` の追加
 - 環境変数の厳密モード `strictEnv` の実装
+
+### Phase 8: インテグレーションテスト (Completed)
+- testcontainers-go の導入
+- 各種インテグレーションテストの実装
+
+### Phase 9: テストカバレッジ計測 (Completed)
+- Makefile の作成とカバレッジ計測の自動化

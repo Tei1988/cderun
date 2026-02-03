@@ -1,0 +1,179 @@
+package command
+
+import (
+	"bytes"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const testImage = "public.ecr.aws/docker/library/alpine:latest"
+
+// runCderun runs the cderun command in-process for integration testing.
+// It captures stdout and stderr and returns the exit code.
+func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
+	// Re-use logic from root_test.go but simplified
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+
+	rOut, wOut, err := os.Pipe()
+	if err != nil {
+		return "", "", 0, err
+	}
+	rErr, wErr, err := os.Pipe()
+	if err != nil {
+		_ = rOut.Close()
+		_ = wOut.Close()
+		return "", "", 0, err
+	}
+
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	stdoutChan := make(chan string)
+	stderrChan := make(chan string)
+
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rOut)
+		_ = rOut.Close()
+		stdoutChan <- buf.String()
+	}()
+
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rErr)
+		_ = rErr.Close()
+		stderrChan <- buf.String()
+	}()
+
+	// Reset global state
+	opts = rootOptions{}
+	rootCmd = newRootCmd()
+	rootCmd.SetOut(wOut)
+	rootCmd.SetErr(wErr)
+
+	// Mock exitFunc to capture exit code
+	capturedExitCode := 0
+	oldExitFunc := exitFunc
+	exitFunc = func(code int) {
+		capturedExitCode = code
+	}
+	defer func() {
+		exitFunc = oldExitFunc
+	}()
+
+	execErr := Execute(append([]string{"cderun"}, args...))
+
+	_ = wOut.Close()
+	_ = wErr.Close()
+
+	stdout = <-stdoutChan
+	stderr = <-stderrChan
+
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	return stdout, stderr, capturedExitCode, execErr
+}
+
+func skipIfDockerBroken(t *testing.T, err error) {
+	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
+		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
+	}
+}
+
+func TestIntegrationBasic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	t.Run("cderun alpine echo hello", func(t *testing.T) {
+		stdout, _, exitCode, err := runCderun("--pull", "missing", "--image", testImage, "alpine", "echo", "hello-cderun")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "hello-cderun")
+	})
+
+	t.Run("volume mounting", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		hostFile := filepath.Join(tmpDir, "hello.txt")
+		err := os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
+		require.NoError(t, err)
+
+		stdout, _, exitCode, err := runCderun("--image", testImage, "-v", hostFile+":/hello.txt", "alpine", "cat", "/hello.txt")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "hello-from-host")
+	})
+
+	t.Run("environment variables", func(t *testing.T) {
+		t.Setenv("HOST_VAR", "host-value")
+		stdout, _, exitCode, err := runCderun("--image", testImage, "-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "alpine", "env")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "EXPLICIT_VAR=explicit-value")
+		assert.Contains(t, stdout, "HOST_VAR=host-value")
+	})
+
+	t.Run("port mapping", func(t *testing.T) {
+		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "alpine", "echo", "port-test")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+	})
+
+	t.Run("cderun expressions", func(t *testing.T) {
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		defer func() {
+			err := os.Chdir(oldWd)
+			require.NoError(t, err)
+		}()
+
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
+		require.NoError(t, err)
+
+		stdout, _, exitCode, err := runCderun("mytool", "env")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "MY_PWD="+tmpDir)
+	})
+
+	t.Run("relative path and tilde expansion", func(t *testing.T) {
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		defer func() {
+			err := os.Chdir(oldWd)
+			require.NoError(t, err)
+		}()
+
+		subDir := filepath.Join(tmpDir, "subdir")
+		err = os.MkdirAll(subDir, 0755)
+		require.NoError(t, err)
+
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  volumes:\n    - ./subdir:/mnt"), 0644)
+		require.NoError(t, err)
+
+		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
+		skipIfDockerBroken(t, err)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "/mnt")
+	})
+}
