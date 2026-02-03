@@ -6,11 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPathResolution(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	baseDir := "/abs/path"
+	r, err := NewExpressionResolver()
+	require.NoError(t, err)
 
 	t.Run("resolvePath", func(t *testing.T) {
 		assert.Equal(t, "/abs/path/file", resolvePath("./file", baseDir))
@@ -20,37 +23,27 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, "just-name", resolvePath("just-name", baseDir)) // No ./ prefix, no resolution
 	})
 
-	t.Run("ResolvePathsTool", func(t *testing.T) {
-		cfg := &ToolConfig{
-			Volumes: []string{
-				"./data:/app/data",
-				"~/config:/root/config:ro",
-				"/abs:/abs",
-			},
-		}
-		ResolvePathsTool(cfg, baseDir)
+	t.Run("ConfigPath.Resolve", func(t *testing.T) {
+		cp := ConfigPath{Raw: "./data", BaseDir: baseDir}
+		assert.Equal(t, "/abs/path/data", cp.Resolve(r))
 
-		assert.Equal(t, "/abs/path/data:/app/data", cfg.Volumes[0])
-		assert.Equal(t, filepath.Join(home, "config")+":/root/config:ro", cfg.Volumes[1])
-		assert.Equal(t, "/abs:/abs", cfg.Volumes[2])
+		cp = ConfigPath{Raw: "{{HOME}}/config", BaseDir: baseDir}
+		assert.Equal(t, filepath.Join(home, "config"), cp.Resolve(r))
+	})
+
+	t.Run("ConfigPath.ResolveVolume", func(t *testing.T) {
+		cp := ConfigPath{Raw: "./data:/app/data", BaseDir: baseDir}
+		assert.Equal(t, "/abs/path/data:/app/data", cp.ResolveVolume(r))
+
+		cp = ConfigPath{Raw: "~/config:/root/config:ro", BaseDir: baseDir}
+		assert.Equal(t, filepath.Join(home, "config")+":/root/config:ro", cp.ResolveVolume(r))
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
-		cfg := &ToolConfig{
-			Volumes: []string{
-				`C:\host\path:/container`,
-				`D:/host/path:/container:ro`,
-			},
-			Devices: []string{
-				`E:\dev\path:/dev/path`,
-				`F:/dev/path:/dev/path:rwm`,
-			},
-		}
-		ResolvePathsTool(cfg, baseDir)
+		cp := ConfigPath{Raw: `C:\host\path:/container`, BaseDir: baseDir}
+		assert.Equal(t, `C:\host\path:/container`, cp.ResolveVolume(r))
 
-		assert.Equal(t, `C:\host\path:/container`, cfg.Volumes[0])
-		assert.Equal(t, `D:/host/path:/container:ro`, cfg.Volumes[1])
-		assert.Equal(t, `E:\dev\path:/dev/path`, cfg.Devices[0])
-		assert.Equal(t, `F:/dev/path:/dev/path:rwm`, cfg.Devices[1])
+		cp = ConfigPath{Raw: `E:\dev\path:/dev/path`, BaseDir: baseDir}
+		assert.Equal(t, `E:\dev\path:/dev/path`, cp.ResolveDevice(r))
 	})
 }
