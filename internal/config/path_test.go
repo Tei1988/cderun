@@ -46,4 +46,10 @@ func TestPathResolution(t *testing.T) {
 		cp = ConfigPath{Raw: `E:\dev\path:/dev/path`, BaseDir: baseDir}
 		assert.Equal(t, `E:\dev\path:/dev/path`, cp.ResolveDevice(r))
 	})
+
+	t.Run("Scheme Preservation", func(t *testing.T) {
+		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:///var/run/docker.sock", baseDir))
+		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:////var/run/docker.sock", baseDir))
+		assert.Equal(t, "http://example.com/path", resolvePath("http://example.com/path", baseDir))
+	})
 }

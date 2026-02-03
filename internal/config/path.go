@@ -55,10 +55,16 @@ func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
 	return resolveDevicePath(resolved, cp.BaseDir)
 }
 
+var schemeRegex = regexp.MustCompile(`^[a-z]+://`)
+
 func resolvePath(p string, baseDir string) string {
 	if p == "" {
 		return p
 	}
+
+	prefix := schemeRegex.FindString(p)
+	p = strings.TrimPrefix(p, prefix)
+
 	// Tilde expansion
 	if strings.HasPrefix(p, "~/") || p == "~" {
 		home, err := os.UserHomeDir()
@@ -74,7 +80,7 @@ func resolvePath(p string, baseDir string) string {
 	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
 		p = filepath.Join(baseDir, p)
 	}
-	return filepath.Clean(p)
+	return prefix + filepath.Clean(p)
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
