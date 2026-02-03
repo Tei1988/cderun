@@ -21,8 +21,16 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
 
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
+	rOut, wOut, err := os.Pipe()
+	if err != nil {
+		return "", "", 0, err
+	}
+	rErr, wErr, err := os.Pipe()
+	if err != nil {
+		_ = rOut.Close()
+		_ = wOut.Close()
+		return "", "", 0, err
+	}
 
 	os.Stdout = wOut
 	os.Stderr = wErr
@@ -32,17 +40,20 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rOut)
+		_, _ = io.Copy(&buf, rOut)
+		_ = rOut.Close()
 		stdoutChan <- buf.String()
 	}()
 
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rErr)
+		_, _ = io.Copy(&buf, rErr)
+		_ = rErr.Close()
 		stderrChan <- buf.String()
 	}()
 
 	// Reset global state
+	opts = rootOptions{}
 	rootCmd = newRootCmd()
 	rootCmd.SetOut(wOut)
 	rootCmd.SetErr(wErr)
@@ -59,8 +70,8 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 
 	execErr := Execute(append([]string{"cderun"}, args...))
 
-	wOut.Close()
-	wErr.Close()
+	_ = wOut.Close()
+	_ = wErr.Close()
 
 	stdout = <-stdoutChan
 	stderr = <-stderrChan
@@ -121,12 +132,17 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("cderun expressions", func(t *testing.T) {
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		defer os.Chdir(oldWd)
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		defer func() {
+			err := os.Chdir(oldWd)
+			require.NoError(t, err)
+		}()
 
-		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "env")
@@ -137,15 +153,21 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("relative path and tilde expansion", func(t *testing.T) {
-		oldWd, _ := os.Getwd()
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		os.Chdir(tmpDir)
-		defer os.Chdir(oldWd)
+		err = os.Chdir(tmpDir)
+		require.NoError(t, err)
+		defer func() {
+			err := os.Chdir(oldWd)
+			require.NoError(t, err)
+		}()
 
 		subDir := filepath.Join(tmpDir, "subdir")
-		os.Mkdir(subDir, 0755)
+		err = os.MkdirAll(subDir, 0755)
+		require.NoError(t, err)
 
-		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  volumes:\n    - ./subdir:/mnt"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  volumes:\n    - ./subdir:/mnt"), 0644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
