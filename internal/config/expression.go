@@ -4,8 +4,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -86,32 +84,4 @@ func (r *ExpressionResolver) resolveFile(filename string) string {
 	}
 
 	return strings.TrimSpace(string(data))
-}
-
-// ResolveConfig applies expression resolution to a whole configuration.
-// It converts the config to map[string]any for traversal.
-func (r *ExpressionResolver) ResolveConfig(cfg any) any {
-	// Convert struct to map[string]any via YAML to handle all fields
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return cfg
-	}
-	var m any
-	if err := yaml.Unmarshal(data, &m); err != nil {
-		return cfg
-	}
-
-	// Resolve expressions in the map
-	resolvedMap := r.Resolve(m)
-
-	// Convert back to struct
-	data2, err := yaml.Marshal(resolvedMap)
-	if err != nil {
-		return cfg
-	}
-	if err := yaml.Unmarshal(data2, cfg); err != nil {
-		return cfg
-	}
-
-	return cfg
 }

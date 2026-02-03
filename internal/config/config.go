@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -13,9 +11,17 @@ import (
 
 type CDERunConfig struct {
 	Runtime    string         `yaml:"runtime"`
-	SocketPath string         `yaml:"socketPath"`
+	SocketPath ConfigPath     `yaml:"socketPath"`
 	Defaults   ConfigDefaults `yaml:"defaults"`
 	Logging    LoggingConfig  `yaml:"logging"`
+}
+
+func (c *CDERunConfig) SetBaseDir(baseDir string) {
+	if c.SocketPath.Raw != "" {
+		c.SocketPath.BaseDir = baseDir
+	}
+	c.Defaults.SetBaseDir(baseDir)
+	c.Logging.SetBaseDir(baseDir)
 }
 
 type ConfigDefaults struct {
@@ -26,7 +32,7 @@ type ConfigDefaults struct {
 	StrictEnv       *bool  `yaml:"strictEnv"`
 	MountCderun     *bool  `yaml:"mountCderun"`
 	MountSocket     *bool  `yaml:"mountSocket"`
-	MountSocketPath string `yaml:"mountSocketPath"`
+	MountSocketPath ConfigPath `yaml:"mountSocketPath"`
 	DryRun          *bool  `yaml:"dryRun"`
 	DryRunFormat    string `yaml:"dryRunFormat"`
 	// New fields
@@ -45,16 +51,33 @@ type ConfigDefaults struct {
 	Memory     string   `yaml:"memory"`
 	CPUs       float64  `yaml:"cpus"`
 	Tmpfs      []string `yaml:"tmpfs"`
-	Devices    []string `yaml:"devices"`
+	Devices    []ConfigPath `yaml:"devices"`
+}
+
+func (c *ConfigDefaults) SetBaseDir(baseDir string) {
+	if c.MountSocketPath.Raw != "" {
+		c.MountSocketPath.BaseDir = baseDir
+	}
+	for i := range c.Devices {
+		if c.Devices[i].Raw != "" {
+			c.Devices[i].BaseDir = baseDir
+		}
+	}
 }
 
 type LoggingConfig struct {
 	Level     string                `yaml:"level"`
-	File      string                `yaml:"file"`
+	File      ConfigPath            `yaml:"file"`
 	Format    string                `yaml:"format"`
 	Timestamp *bool                 `yaml:"timestamp"`
 	Rotation  LoggingRotationConfig `yaml:"rotation"`
 	Tee       *bool                 `yaml:"tee"`
+}
+
+func (c *LoggingConfig) SetBaseDir(baseDir string) {
+	if c.File.Raw != "" {
+		c.File.BaseDir = baseDir
+	}
 }
 
 type LoggingRotationConfig struct {
@@ -71,12 +94,12 @@ type ToolConfig struct {
 	Network         string   `yaml:"network"`
 	Remove          *bool    `yaml:"remove"`
 	StrictEnv       *bool    `yaml:"strictEnv"`
-	Volumes         []string `yaml:"volumes"`
+	Volumes         []ConfigPath `yaml:"volumes"`
 	Env             []string `yaml:"env"`
 	Workdir         string   `yaml:"workdir"`
 	MountCderun     *bool    `yaml:"mountCderun"`
 	MountSocket     *bool    `yaml:"mountSocket"`
-	MountSocketPath string   `yaml:"mountSocketPath"`
+	MountSocketPath ConfigPath   `yaml:"mountSocketPath"`
 	DryRun          *bool    `yaml:"dryRun"`
 	DryRunFormat    string   `yaml:"dryRunFormat"`
 	// New fields
@@ -95,7 +118,23 @@ type ToolConfig struct {
 	Memory     string   `yaml:"memory"`
 	CPUs       float64  `yaml:"cpus"`
 	Tmpfs      []string `yaml:"tmpfs"`
-	Devices    []string `yaml:"devices"`
+	Devices    []ConfigPath `yaml:"devices"`
+}
+
+func (c *ToolConfig) SetBaseDir(baseDir string) {
+	if c.MountSocketPath.Raw != "" {
+		c.MountSocketPath.BaseDir = baseDir
+	}
+	for i := range c.Volumes {
+		if c.Volumes[i].Raw != "" {
+			c.Volumes[i].BaseDir = baseDir
+		}
+	}
+	for i := range c.Devices {
+		if c.Devices[i].Raw != "" {
+			c.Devices[i].BaseDir = baseDir
+		}
+	}
 }
 
 type ToolsConfig map[string]ToolConfig
@@ -145,84 +184,6 @@ func FindConfigs(filename string) []string {
 	return paths
 }
 
-// ResolvePathsGlobal resolves relative paths and tilde in CDERunConfig.
-func ResolvePathsGlobal(cfg *CDERunConfig, baseDir string) {
-	cfg.SocketPath = resolvePath(cfg.SocketPath, baseDir)
-	cfg.Defaults.MountSocketPath = resolvePath(cfg.Defaults.MountSocketPath, baseDir)
-	cfg.Logging.File = resolvePath(cfg.Logging.File, baseDir)
-}
-
-// ResolvePathsTool resolves relative paths and tilde in ToolConfig.
-func ResolvePathsTool(cfg *ToolConfig, baseDir string) {
-	cfg.MountSocketPath = resolvePath(cfg.MountSocketPath, baseDir)
-	for i, v := range cfg.Volumes {
-		cfg.Volumes[i] = resolveVolumePath(v, baseDir)
-	}
-	for i, d := range cfg.Devices {
-		cfg.Devices[i] = resolveDevicePath(d, baseDir)
-	}
-}
-
-func resolvePath(p string, baseDir string) string {
-	if p == "" {
-		return p
-	}
-	// Tilde expansion
-	if strings.HasPrefix(p, "~/") || p == "~" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			if p == "~" {
-				p = home
-			} else {
-				p = filepath.Join(home, p[2:])
-			}
-		}
-	}
-	// Relative path resolution
-	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
-		p = filepath.Join(baseDir, p)
-	}
-	return filepath.Clean(p)
-}
-
-var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
-
-func resolveVolumePath(v string, baseDir string) string {
-	host, remainder, ok := splitHostRemainder(v)
-	if !ok {
-		return v
-	}
-	return resolvePath(host, baseDir) + ":" + remainder
-}
-
-func resolveDevicePath(d string, baseDir string) string {
-	// host-path:container-path[:permissions]
-	host, remainder, ok := splitHostRemainder(d)
-	if !ok {
-		return d
-	}
-	return resolvePath(host, baseDir) + ":" + remainder
-}
-
-func splitHostRemainder(s string) (string, string, bool) {
-	sepIdx := strings.Index(s, ":")
-	if sepIdx == -1 {
-		return "", "", false
-	}
-
-	// If it's a Windows drive letter (e.g. C:\ or C:/), the first colon is part of the path.
-	// We need to look for the separator colon after the drive letter (index > 1).
-	if winDriveRegex.MatchString(s) {
-		nextSep := strings.Index(s[sepIdx+1:], ":")
-		if nextSep == -1 {
-			return "", "", false
-		}
-		sepIdx = sepIdx + 1 + nextSep
-	}
-
-	return s[:sepIdx], s[sepIdx+1:], true
-}
-
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
 func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	paths := FindConfigs(".cderun.yaml")
@@ -230,7 +191,6 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		return nil, nil, nil
 	}
 
-	resolver, _ := NewExpressionResolver()
 	var merged CDERunConfig
 	var loadedPaths []string
 	// Merge from lowest priority to highest (reverse of paths)
@@ -247,11 +207,11 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
 
-		// Resolve expressions and paths for this layer
-		resolvedLayer := resolver.ResolveConfig(&layer).(*CDERunConfig)
-		ResolvePathsGlobal(resolvedLayer, baseDir)
+		// Assign baseDir for relative path resolution later
+		// Only for non-empty paths to avoid creating non-zero values for mergo
+		layer.SetBaseDir(baseDir)
 
-		if err := mergo.Merge(&merged, resolvedLayer, mergo.WithOverride); err != nil {
+		if err := mergo.Merge(&merged, &layer, mergo.WithOverride); err != nil {
 			return nil, nil, fmt.Errorf("failed to merge config from %s: %w", path, err)
 		}
 
@@ -273,7 +233,6 @@ func LoadToolsConfig() (ToolsConfig, []string, error) {
 		return nil, nil, nil
 	}
 
-	resolver, _ := NewExpressionResolver()
 	merged := make(ToolsConfig)
 	var loadedPaths []string
 	// Merge from lowest priority to highest (reverse of paths)
@@ -292,17 +251,17 @@ func LoadToolsConfig() (ToolsConfig, []string, error) {
 
 		// Merge ToolsConfig to ensure deep merge of ToolConfig
 		for k, v := range layer {
-			// Resolve expressions and paths for this tool
-			resolvedTool := resolver.ResolveConfig(&v).(*ToolConfig)
-			ResolvePathsTool(resolvedTool, baseDir)
+			// Assign baseDir for relative path resolution later
+			// Only for non-empty paths to avoid creating non-zero values for mergo
+			v.SetBaseDir(baseDir)
 
 			if existing, ok := merged[k]; ok {
-				if err := mergo.Merge(&existing, resolvedTool, mergo.WithOverride); err != nil {
+				if err := mergo.Merge(&existing, &v, mergo.WithOverride); err != nil {
 					return nil, nil, fmt.Errorf("failed to merge tool config for %s from %s: %w", k, path, err)
 				}
 				merged[k] = existing
 			} else {
-				merged[k] = *resolvedTool
+				merged[k] = v
 			}
 		}
 		loadedPaths = append(loadedPaths, path)

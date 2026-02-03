@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"dario.cat/mergo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -10,6 +11,14 @@ import (
 func TestResolve(t *testing.T) {
 	// Setup helper to create bool pointers
 	ptr := func(b bool) *bool { return &b }
+	cp := func(s string) ConfigPath { return ConfigPath{Raw: s} }
+	cps := func(ss ...string) []ConfigPath {
+		var res []ConfigPath
+		for _, s := range ss {
+			res = append(res, ConfigPath{Raw: s})
+		}
+		return res
+	}
 
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
 		cli := CLIOptions{
@@ -99,7 +108,7 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image:   "node:20",
-				Volumes: []string{"/host/path:/container/path:ro", ".:/app"},
+				Volumes: cps("/host/path:/container/path:ro", ".:/app"),
 			},
 		}
 
@@ -119,11 +128,11 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
-				Volumes: []string{
+				Volumes: cps(
 					`C:\host\path:/container/path`,
 					`D:\data:/mnt:ro`,
 					`Z:\shared folder:/app:rw`,
-				},
+				),
 			},
 		}
 
@@ -186,8 +195,6 @@ func TestResolve(t *testing.T) {
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
 		// It will fallback to default auto-detection or empty, but should NOT be /var/run/docker.sock from DOCKER_HOST
-		// actually auto-detection might find /var/run/docker.sock if it exists on the machine.
-		// So we just check it doesn't affect MountSocket.
 		assert.False(t, res.MountSocket)
 	})
 
@@ -276,7 +283,7 @@ func TestResolve(t *testing.T) {
 		global := &CDERunConfig{
 			Logging: LoggingConfig{
 				Level: "info",
-				File:  "/var/log/cderun.log",
+				File:  cp("/var/log/cderun.log"),
 			},
 		}
 		tools := ToolsConfig{
@@ -351,5 +358,58 @@ func TestResolve(t *testing.T) {
 		_, err = Resolve("node", CLIOptions{}, tools, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
+	})
+
+	t.Run("Deferred path resolution with multiple layers", func(t *testing.T) {
+		global := &CDERunConfig{
+			SocketPath: ConfigPath{Raw: "./global.sock", BaseDir: "/etc/cderun"},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:   "node",
+				Volumes: []ConfigPath{{Raw: "./project-data:/data", BaseDir: "/home/user/project"}},
+			},
+		}
+
+		res, err := Resolve("node", CLIOptions{}, tools, global)
+		require.NoError(t, err)
+
+		assert.Equal(t, "/etc/cderun/global.sock", res.SocketPath)
+		require.Len(t, res.Volumes, 1)
+		assert.Equal(t, "/home/user/project/project-data", res.Volumes[0].HostPath)
+	})
+
+	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {
+		// Global sets network to host
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{Network: "host"},
+		}
+		// Tool sets network to bridge (which is the default fallback)
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:   "node",
+				Network: "bridge",
+			},
+		}
+
+		res, err := Resolve("node", CLIOptions{}, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "bridge", res.Network, "Tool config should take priority even if it matches fallback")
+	})
+
+	t.Run("Merging does not overwrite with empty Raw paths", func(t *testing.T) {
+		// Low priority layer has a path
+		merged := CDERunConfig{
+			SocketPath: ConfigPath{Raw: "./low.sock", BaseDir: "/low"},
+		}
+		// High priority layer does NOT have the path, but has a BaseDir (assigned by SetBaseDir)
+		highLayer := CDERunConfig{}
+		highLayer.SetBaseDir("/high")
+
+		err := mergo.Merge(&merged, &highLayer, mergo.WithOverride)
+		require.NoError(t, err)
+
+		assert.Equal(t, "./low.sock", merged.SocketPath.Raw)
+		assert.Equal(t, "/low", merged.SocketPath.BaseDir)
 	})
 }
