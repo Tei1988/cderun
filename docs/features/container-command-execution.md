@@ -1,8 +1,9 @@
-# コンテナコマンド実行 (Completed)
+# Feature: コンテナコマンド実行 (Completed)
 
 ## 概要
 
-`cderun`はエフェメラルコンテナでコマンドを実行し、開発ツールのローカルインストールを必要とせずにクリーンで再現可能な環境を提供します。
+`cderun`はエフェメラルコンテナでコマンドを実行し、開発ツールのローカルインストールを必要とせずにクリーンで再現可能な環境を提供する。
+コマンドライン引数は、[引数解析ストラテジー](./argument-parsing.md)で定義されたルールに従って解析され、コンテナ内で実行される最終的なコマンドが決定される。
 
 ## コア機能
 
@@ -19,15 +20,35 @@
 ## 使用例
 
 ### 基本コマンド実行
+`cderun` のコマンドライン引数の解釈と、それに伴うコンテナコマンドの組み立て方は、[引数解析ストラテジー](./argument-parsing.md) にて詳細に定義されています。
+
+以下に代表的な使用例を示します。
+
 ```bash
+# .tools.yaml に node ツールが定義されている場合 (例: image: node:20-alpine, entrypoint: ["node"])
 cderun node --version
-# Node.jsコンテナで'node --version'を実行
+# => サブコマンド 'node' がキーとして使われ、イメージ 'node:20-alpine' と entrypoint: ["node"] が解決される。
+#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'node --version' が実行される。
+
+# --image フラグと、サブコマンドがある場合 (サブコマンド 'go' はツール定義なし)
+cderun go --image=golang:1.22 --version
+# => サブコマンド 'go' がキーとして使われるがツール定義は見つからない。イメージは 'golang:1.22' が指定される。
+#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'go --version' が実行される
+#    (golang:1.22 イメージのデフォルト ENTRYPOINT が 'go' であると仮定)。
 ```
 
 ### インタラクティブシェル
 ```bash
+# .tools.yaml に bash ツールが定義されている場合 (例: image: alpine, entrypoint: ["bash"])
 cderun --tty --interactive bash
-# インタラクティブbashシェルを開く
+# => サブコマンド 'bash' がキーとして使われ、イメージ 'alpine' と entrypoint: ["bash"] が解決される。
+#    コンテナに渡されるコマンドは空となり、インタラクティブbashシェルが開かれる。
+
+# --image フラグと、サブコマンドがある場合 (サブコマンド 'sh' はツール定義なし)
+cderun --tty --interactive sh --image=alpine
+# => サブコマンド 'sh' がキーとして使われるがツール定義は見つからない。イメージは 'alpine' が指定される。
+#    コンテナに渡されるコマンドは空となり、インタラクティブshシェルが開かれる
+#    (alpine イメージのデフォルト ENTRYPOINT が 'sh' であると仮定)。
 ```
 
 ## メリット
