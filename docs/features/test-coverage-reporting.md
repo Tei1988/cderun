@@ -51,17 +51,17 @@ Dockerコンテナを起動するインテグレーションテストは、`go t
 1.  **カバレッジ計測用テストバイナリのビルド**:
     `go test -c -cover` コマンドを使い、カバレッジ計測が可能なテスト専用バイナリを生成する。
 
-    ```bash
-    go test -c ./internal/command -cover -o cderun.test
-    ```
+```bash
+go test -c ./internal/command -cover -o cderun.test
+```
 
 2.  **テストバイナリの実行**:
     生成されたテストバイナリを実行する際に、カバレッジプロファイルの出力先を指定する。インテグレーションテストのロジック内で、このテストバイナリを `cderun` の実行ファイルとして使用する。
 
-    ```bash
-    # テストコード内から、os/exec などで以下のように実行するイメージ
-    ./cderun.test -test.run ^TestIntegration$ -test.coverprofile=integration.cover.out
-    ```
+```bash
+# テストコード内から、os/exec などで以下のように実行するイメージ
+./cderun.test -test.run ^TestIntegration$ -test.coverprofile=integration.cover.out
+```
 
 3.  **プロファイルの統合 (任意)**:
     ユニットテストとインテグレーションテストで別々に生成されたカバレッジプロファイルは、ツールを使ってマージし、プロジェクト全体のカバレッジとして集計することも可能。

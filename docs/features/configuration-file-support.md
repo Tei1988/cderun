@@ -24,16 +24,18 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 設定ファイルは以下の順序で検索され、先に見つかった（優先順位が高い）ファイルの設定が、後のファイルの設定を上書きします。
 
 1.  **プロジェクト設定（親ディレクトリへの探索）**:
-    *   カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
-    *   例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
+  *   カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
+  *   例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
 
 2.  **ユーザー設定**:
-    *   `~/.config/cderun/.cderun.yaml`
-    *   `~/.config/cderun/.tools.yaml`
+  *   `~/.config/cderun/.cderun.yaml` （または `config.yaml`）
+  *   `~/.config/cderun/.tools.yaml` （または `tools.yaml`）
 
 3.  **システム全体設定**:
-    *   `/etc/cderun/.cderun.yaml`
-    *   `/etc/cderun/.tools.yaml`
+  *   `/etc/cderun/.cderun.yaml` （または `config.yaml`）
+  *   `/etc/cderun/.tools.yaml` （または `tools.yaml`）
+
+> **Note**: `~/.config/cderun/` および `/etc/cderun/` 配下では、`.` で始まらない `config.yaml` および `tools.yaml` もレガシーサポートとして読み込まれます。
 
 #### マージのルール
 - 見つかったすべての設定ファイルの内容がマージされます。
@@ -118,13 +120,13 @@ defaults:
   interactive: false               # デフォルトでインタラクティブモード
   network: bridge                  # デフォルトネットワーク
   remove: true                     # コンテナの自動削除
+  strictEnv: false                 # 環境変数の厳密モード
   mountSocket: false               # ソケットのマウント
   mountSocketPath: /var/run/docker.sock # コンテナ内のソケットマウントパス
   mountCderun: false               # cderunバイナリのマウント
   dryRun: false                    # ドライランモードのデフォルト
   dryRunFormat: yaml               # ドライランの出力形式
   # ネットワーク・セキュリティ・リソース等のデフォルト
-  network: bridge
   ports: ["8080:80"]
   user: "1000:1000"
   memory: "1g"
@@ -141,6 +143,7 @@ logging:
 ```yaml
 node:
   image: node:20-alpine
+  strictEnv: true
   tty: true
   interactive: true
   network: host
@@ -195,6 +198,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `interactive` (bool): デフォルトでSTDINを開いたままにする
 - `network` (string): デフォルトのネットワーク設定
 - `remove` (bool): コンテナ終了後に自動削除
+- `strictEnv` (bool): 指定された環境変数がホストに存在しない場合にエラーとする
 - `mountSocket` (bool): ホストのランタイムソケットをマウント
 - `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
@@ -237,6 +241,7 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `interactive` (bool): STDINを開く（`--interactive`フラグに相当）
 - `network` (string): ネットワーク設定（`--network`フラグに相当）
 - `remove` (bool): コンテナの自動削除
+- `strictEnv` (bool): 環境変数の厳密モード
 - `volumes` ([]string): ボリュームマウント
   - 形式: `<host-path>:<container-path>[:<options>]`
   - 例: `.:/workspace`, `~/.npm:/root/.npm:ro`

@@ -74,8 +74,8 @@ defaults:
 ### マウントされるもの
 
 1. **cderunバイナリ**
-   - 実行ホストの`cderun`バイナリをread-onlyでマウント
-   - パス: `/usr/local/bin/cderun`
+   - 実行ホストの`cderun`バイナリをread-onlyでマウント。実装では `os.Executable()` を使用して現在実行中のバイナリパスを特定します。
+   - コンテナ内パス: `/usr/local/bin/cderun`
 
 2. **ランタイムソケット**
    - コンテナ内のcderunが基底ホストのコンテナランタイム（Docker等）と通信できるように

@@ -80,7 +80,7 @@ cderun --mount-socket docker ps
 
 ### `--mount-socket-path`
 - **型**: string
-- **デフォルト**: `--socket-path` の値
+- **デフォルト**: ホスト側のソケットパス（`--socket-path` または自動検出された値）
 - **説明**: ソケットをコンテナ内にマウントする際のパスを指定
 - **用途**: ホストとコンテナ内でソケットのパスを異なるものにしたい場合に使用
 
@@ -367,7 +367,7 @@ cderun --log-timestamp=false node app.js
 ### `--cderun-*` (内部オーバーライドフラグ)
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
 - **カテゴリ別の対応フラグ例**:
-  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-volume`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
