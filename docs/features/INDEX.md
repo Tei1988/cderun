@@ -9,46 +9,46 @@
 ### コア機能
 
 1. **[引数解析 (Completed)](./argument-parsing.md)**
-   - 厳密な境界解析
-   - cderunフラグとサブコマンド引数の分離
+  - 厳密な境界解析
+  - cderunフラグとサブコマンド引数の分離
 
 2. **[引数・設定優先順位 (Completed)](./argument-priority-logic.md)**
-   - P1〜P6の優先順位階層
-   - CLI、環境変数、設定ファイルの解決ロジック
+  - P1〜P6の優先順位階層
+  - CLI、環境変数、設定ファイルの解決ロジック
 
 3. **[ポリグロットエントリーポイント (Completed)](./polyglot-entry.md)**
-   - シンボリックリンクによる自動ツール検出
-   - 単一バイナリで複数ツールとして動作
+  - シンボリックリンクによる自動ツール検出
+  - 単一バイナリで複数ツールとして動作
 
 4. **[設定ファイルサポート (Completed)](./configuration-file-support.md)**
-   - `.cderun.yaml`: cderun自体の設定
-   - `.tools.yaml`: 各ツールの実行設定
+  - `.cderun.yaml`: cderun自体の設定
+  - `.tools.yaml`: 各ツールでの実行設定
 
 ### ランタイム機能
 
 5. **[マルチランタイムサポート (Completed)](./multi-runtime-support.md)**
-   - Docker / Podman サポート
-   - ランタイム自動検出
-   - 統一されたCRIインターフェース
+  - Docker / Podman サポート
+  - ランタイム自動検出
+  - 統一されたCRIインターフェース
 
 6. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
-   - コマンド生成なしでランタイムAPIを直接使用
-   - 中間表現（ContainerConfig）からAPIコールへの変換
+  - コマンド生成なしでランタイムAPIを直接使用
+  - 中間表現（ContainerConfig）からAPIコールへの変換
 
 7. **[イメージマッピング (Completed)](./image-mapping.md)**
-   - サブコマンド名からイメージへの自動マッピング
-   - カスタムマッピング設定
+  - サブコマンド名からイメージへの自動マッピング
+  - カスタムマッピング設定
 
 ### 実行環境機能
 
 8. **[環境変数パススルー (Completed)](./env-passthrough.md)**
-   - デフォルトでは引き継がない
-   - 明示的指定による選択的パススルー
-   - `KEY=value`と`KEY`（ホストから取得）形式のサポート
+  - デフォルトでは引き継がない
+  - 明示的指定による選択的パススルー
+  - `KEY=value`と`KEY`（ホストから取得）形式のサポート
 
 9. **[Mount Tools (Completed)](./mount-tools.md)**
-   - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
-   - cderunバイナリを複数のツール名でマウント
+  - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
+  - cderunバイナリを複数のツール名でマウント
 
 10. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
     - エフェメラルコンテナでのコマンド実行
@@ -79,6 +79,13 @@
 16. **[README生成戦略 (Completed)](./readme-generation.md)**
     - 実装コードからREADMEを生成
     - Source of Truthの維持
+
+### 開発・検証機能
+
+17. **[インテグレーションテスト (Planned)](./integration-testing-with-docker.md)**
+  - testcontainers-go を利用した実ランタイムでの検証
+18. **[テストカバレッジ計測 (Planned)](./test-coverage-reporting.md)**
+  - コードカバレッジの可視化と自動計測
 
 ## 機能間の関係
 
@@ -129,3 +136,7 @@
 - 設定ファイルの階層的検索とマージ
 - 動的値解決 (Expressions)
 - 相対パス・チルダ解決
+
+### Phase 7: 機能改善と拡張 (Completed)
+- TTYフラグの短縮形 `-t` の追加
+- 環境変数の厳密モード `strictEnv` の実装

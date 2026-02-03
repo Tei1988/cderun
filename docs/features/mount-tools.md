@@ -30,10 +30,10 @@ cderun --mount-cderun --mount-socket --mount-all-tools sh
 # .tools.yamlに node, python, gemini-cli が定義されている場合
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/cderun:ro \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/node:ro \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/python:ro \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/gemini-cli:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/cderun:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/node:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/python:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/gemini-cli:ro \
   alpine:latest
 ```
 
@@ -60,9 +60,9 @@ cderun --mount-cderun --mount-socket --mount-tools python,node sh
 ```bash
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/cderun:ro \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/python:ro \
-  -v ~/.config/cderun/bin/cderun-linux-amd64:/usr/local/bin/node:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/cderun:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/python:ro \
+  -v <ホスト側cderunのパス>:/usr/local/bin/node:ro \
   alpine:latest
 ```
 
@@ -82,10 +82,10 @@ gemini-cli ask    # エラー: マウントされていない
 
 ```text
 /usr/local/bin/
-├── cderun       -> ~/.config/cderun/bin/cderun-linux-amd64
-├── node         -> ~/.config/cderun/bin/cderun-linux-amd64
-├── python       -> ~/.config/cderun/bin/cderun-linux-amd64
-└── gemini-cli   -> ~/.config/cderun/bin/cderun-linux-amd64
+├── cderun       -> <ホスト側cderunのパス>
+├── node         -> <ホスト側cderunのパス>
+├── python       -> <ホスト側cderunのパス>
+└── gemini-cli   -> <ホスト側cderunのパス>
 ```
 
 ### ポリグロットエントリーポイントの活用
@@ -193,7 +193,7 @@ cderun --mount-cderun \
 1. **依存性**: `--mount-socket`が必須
 2. **読み取り専用**: マウントされたツールは読み取り専用
 3. **パスの上書き**: コンテナ内に同名のツールがある場合、上書きされる
-4. **アーキテクチャ一致**: コンテナのアーキテクチャに合ったcderunバイナリが必要
+4. **アーキテクチャ一致**: コンテナのアーキテクチャに合ったcderunバイナリが必要（実行中のバイナリがそのままマウントされるため）
 
 ## メリット
 

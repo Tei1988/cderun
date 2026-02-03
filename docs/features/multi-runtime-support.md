@@ -50,7 +50,7 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 ### 解決ロジック (Completed)
 
 1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
-2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_MOUNT_SOCKET` 等。
+2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH` 等。
 3. **コマンドライン引数**: `--runtime`, `--socket-path` および P1 内部オーバーライド。
 
 ### 自動検出ロジック (Completed)
@@ -68,13 +68,12 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 #### 設定ファイル (`.cderun.yaml`)
 ```yaml
 runtime: podman
-runtimePath: /usr/bin/podman
 ```
 
 #### 環境変数
 ```bash
 export CDERUN_RUNTIME=podman
-export CDERUN_MOUNT_SOCKET=/run/podman/podman.sock
+export CDERUN_SOCKET_PATH=/run/podman/podman.sock
 cderun node app.js
 ```
 
