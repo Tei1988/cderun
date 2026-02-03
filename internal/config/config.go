@@ -134,40 +134,12 @@ func FindConfigs(filename string) []string {
 				paths = append(paths, p)
 			}
 		}
-		// Also support legacy name if different
-		legacy := ""
-		if filename == ".cderun.yaml" {
-			legacy = filepath.Join(home, ".config", "cderun", "config.yaml")
-		} else if filename == ".tools.yaml" {
-			legacy = filepath.Join(home, ".config", "cderun", "tools.yaml")
-		}
-		if legacy != "" && legacy != p {
-			if _, err := os.Stat(legacy); err == nil {
-				if abs, err := filepath.Abs(legacy); err == nil {
-					paths = append(paths, abs)
-				} else {
-					paths = append(paths, legacy)
-				}
-			}
-		}
 	}
 
 	// Add system path
 	p := filepath.Join("/etc", "cderun", filename)
 	if _, err := os.Stat(p); err == nil {
 		paths = append(paths, p)
-	}
-	// Also support legacy name
-	legacy := ""
-	if filename == ".cderun.yaml" {
-		legacy = "/etc/cderun/config.yaml"
-	} else if filename == ".tools.yaml" {
-		legacy = "/etc/cderun/tools.yaml"
-	}
-	if legacy != "" && legacy != p {
-		if _, err := os.Stat(legacy); err == nil {
-			paths = append(paths, legacy)
-		}
 	}
 
 	return paths

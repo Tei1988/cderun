@@ -62,14 +62,14 @@ defaults:
 		content := `
 runtime: podman
 `
-		err = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0644)
+		err = os.WriteFile(filepath.Join(configDir, ".cderun.yaml"), []byte(content), 0644)
 		require.NoError(t, err)
 
 		cfg, paths, err := LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
-		assert.Contains(t, paths[0], "config.yaml")
+		assert.Contains(t, paths[0], ".cderun.yaml")
 		assert.Equal(t, "podman", cfg.Runtime)
 	})
 }
