@@ -75,8 +75,8 @@ func TestResolve(t *testing.T) {
 		res, err := Resolve("node", cli, tools, nil)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)
-		// Image should ignore P3 environment variable (Step 10.1)
-		assert.Equal(t, "node:20", res.Image)
+		// Image should respect P3 environment variable
+		assert.Equal(t, "env-image:latest", res.Image)
 	})
 
 	t.Run("Image resolution from ToolConfig", func(t *testing.T) {

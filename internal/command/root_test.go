@@ -338,7 +338,7 @@ node:
 		assert.Equal(t, "/container", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
 	})
 
-	t.Run("CDERUN_IMAGE environment variable is ignored (Step 10.1)", func(t *testing.T) {
+	t.Run("P3 environment variable takes priority over tools.yaml (Step 10.1)", func(t *testing.T) {
 		// Save and restore package-level state
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
@@ -371,8 +371,8 @@ node:
 
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
-		// Should use image from tools.yaml, NOT from environment variable
-		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
+		// Should use image from environment variable (P3 > P4)
+		assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
 	})
 
 	t.Run("resolves base command from tools.yaml", func(t *testing.T) {
