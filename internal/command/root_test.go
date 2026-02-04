@@ -571,6 +571,11 @@ node:
 		assert.Contains(t, output, "Interactive: false")
 		assert.Contains(t, output, "Network: bridge")
 		assert.Contains(t, output, "Remove: true")
+
+		// Dry-run with device
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Devices: /dev/video0:/dev/video1:ro")
 	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
@@ -756,10 +761,10 @@ func TestPhase3Features(t *testing.T) {
 	}
 	exitFunc = func(code int) {}
 
-	t.Run("workdir and volume flags", func(t *testing.T) {
+	t.Run("workdir, volume and device flags", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--volume", "/h:/c:ro", "sh")
+		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--volume", "/h:/c:ro", "--device", "/dev/fuse:/dev/fuse:rm", "sh")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -768,6 +773,11 @@ func TestPhase3Features(t *testing.T) {
 		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Volumes[0].HostPath)
 		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
 		assert.True(t, mockRuntime.CreatedConfig.Volumes[0].ReadOnly)
+
+		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathInContainer)
+		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
 	})
 
 	t.Run("mounting flags require explicit cderun socket settings", func(t *testing.T) {

@@ -54,7 +54,7 @@ type ResolvedConfig struct {
 	Memory     int64
 	CPUs       float64
 	Tmpfs      []string
-	Devices    []string
+	Devices    []container.DeviceMapping
 }
 
 // CLIOptions represents values from CLI flags.
@@ -496,7 +496,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.Command = resolveStringSlice(nil, nil, "CDERUN_COMMAND", subcommand, tools, func(t ToolConfig) []string { return t.Command }, global, func(g CDERunConfig) []string { return g.Defaults.Command }, r)
 	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
 	res.Tmpfs = resolveStringSlice(cli.CderunTmpfs, cli.Tmpfs, "CDERUN_TMPFS", subcommand, tools, func(t ToolConfig) []string { return t.Tmpfs }, global, func(g CDERunConfig) []string { return g.Defaults.Tmpfs }, r)
-	res.Devices = resolveConfigPathSlice(cli.CderunDevices, cli.Devices, "CDERUN_DEVICE", subcommand, tools, func(t ToolConfig) []ConfigPath { return t.Devices }, global, func(g CDERunConfig) []ConfigPath { return g.Defaults.Devices }, r, "device")
+	res.Devices = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
 
 	// Memory resolution (string to bytes)
 	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "", r)
@@ -605,39 +605,50 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	}
 }
 
-func resolveConfigPathSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) []ConfigPath, r *ExpressionResolver, pathType string) []string {
-	var cps []ConfigPath
-	if len(p1) > 0 {
-		for _, v := range p1 {
-			cps = append(cps, ConfigPath{Raw: v, BaseDir: "."})
-		}
-	} else if len(p2) > 0 {
-		for _, v := range p2 {
-			cps = append(cps, ConfigPath{Raw: v, BaseDir: "."})
-		}
-	} else if env := os.Getenv(envKey); env != "" {
-		for _, v := range strings.Split(env, ",") {
-			cps = append(cps, ConfigPath{Raw: v, BaseDir: "."})
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			cps = toolGetter(tool)
-		}
-	}
-	if len(cps) == 0 && global != nil {
-		cps = globalGetter(*global)
+func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) []container.DeviceMapping {
+	var dcs []DeviceConfig
+
+	// Global defaults (lowest priority)
+	if global != nil {
+		dcs = append(dcs, global.Defaults.Devices...)
 	}
 
-	var res []string
-	for _, cp := range cps {
-		switch pathType {
-		case "volume":
-			res = append(res, cp.ResolveVolume(r))
-		case "device":
-			res = append(res, cp.ResolveDevice(r))
-		default:
-			res = append(res, cp.Resolve(r))
+	// Tool-specific devices
+	if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			dcs = append(dcs, tool.Devices...)
 		}
+	}
+
+	// Env var devices
+	if env := os.Getenv("CDERUN_DEVICE"); env != "" {
+		for _, d := range strings.Split(env, ",") {
+			if parsed, ok := ParseDeviceConfig(d); ok {
+				parsed.SetBaseDir(".")
+				dcs = append(dcs, parsed)
+			}
+		}
+	}
+
+	// P2 CLI devices
+	for _, d := range p2 {
+		if parsed, ok := ParseDeviceConfig(d); ok {
+			parsed.SetBaseDir(".")
+			dcs = append(dcs, parsed)
+		}
+	}
+
+	// P1 CLI devices (highest priority)
+	for _, d := range p1 {
+		if parsed, ok := ParseDeviceConfig(d); ok {
+			parsed.SetBaseDir(".")
+			dcs = append(dcs, parsed)
+		}
+	}
+
+	var res []container.DeviceMapping
+	for _, dc := range dcs {
+		res = append(res, dc.Resolve(r))
 	}
 	return res
 }
@@ -736,75 +747,34 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 }
 
 func resolveVolumes(p1 []string, p2 []string, subcommand string, tools ToolsConfig, r *ExpressionResolver) []container.VolumeMount {
-	var cps []ConfigPath
+	var vcs []VolumeConfig
 
 	// Tool-specific volumes (lowest priority)
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			cps = append(cps, tool.Volumes...)
+			vcs = append(vcs, tool.Volumes...)
 		}
 	}
 
 	// P2 CLI volumes (middle priority)
 	for _, v := range p2 {
-		cps = append(cps, ConfigPath{Raw: v, BaseDir: "."})
+		if parsed, ok := ParseVolumeConfig(v); ok {
+			parsed.SetBaseDir(".")
+			vcs = append(vcs, parsed)
+		}
 	}
 
 	// P1 CLI volumes (highest priority)
 	for _, v := range p1 {
-		cps = append(cps, ConfigPath{Raw: v, BaseDir: "."})
-	}
-
-	var resolvedVols []string
-	for _, cp := range cps {
-		resolvedVols = append(resolvedVols, cp.ResolveVolume(r))
-	}
-
-	return parseVolumes(resolvedVols)
-}
-
-func parseVolumes(vols []string) []container.VolumeMount {
-	var mounts []container.VolumeMount
-	for _, v := range vols {
-		if v == "" {
-			continue
-		}
-
-		var hostPath, containerPath string
-		var readOnly bool
-
-		// Locate the last colon to check for options or container path
-		lastColon := strings.LastIndex(v, ":")
-		if lastColon == -1 {
-			// Malformed entry: needs at least host:container
-			continue
-		}
-
-		partAfterLastColon := v[lastColon+1:]
-		if partAfterLastColon == "ro" || partAfterLastColon == "rw" {
-			readOnly = (partAfterLastColon == "ro")
-			// The part before the last colon must contain both host and container paths
-			remaining := v[:lastColon]
-			nextLastColon := strings.LastIndex(remaining, ":")
-			if nextLastColon == -1 {
-				// Malformed: only one colon found, but it was followed by a mode
-				continue
-			}
-			hostPath = remaining[:nextLastColon]
-			containerPath = remaining[nextLastColon+1:]
-		} else {
-			// No ro/rw mode at the end, so the part after the last colon is the container path
-			hostPath = v[:lastColon]
-			containerPath = v[lastColon+1:]
-		}
-
-		if hostPath != "" && containerPath != "" {
-			mounts = append(mounts, container.VolumeMount{
-				HostPath:      hostPath,
-				ContainerPath: containerPath,
-				ReadOnly:      readOnly,
-			})
+		if parsed, ok := ParseVolumeConfig(v); ok {
+			parsed.SetBaseDir(".")
+			vcs = append(vcs, parsed)
 		}
 	}
-	return mounts
+
+	var res []container.VolumeMount
+	for _, vc := range vcs {
+		res = append(res, vc.Resolve(r))
+	}
+	return res
 }

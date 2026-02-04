@@ -12,10 +12,21 @@ func TestResolve(t *testing.T) {
 	// Setup helper to create bool pointers
 	ptr := func(b bool) *bool { return &b }
 	cp := func(s string) ConfigPath { return ConfigPath{Raw: s} }
-	cps := func(ss ...string) []ConfigPath {
-		var res []ConfigPath
+	vcs := func(ss ...string) []VolumeConfig {
+		var res []VolumeConfig
 		for _, s := range ss {
-			res = append(res, ConfigPath{Raw: s})
+			if v, ok := ParseVolumeConfig(s); ok {
+				res = append(res, v)
+			}
+		}
+		return res
+	}
+	dcs := func(ss ...string) []DeviceConfig {
+		var res []DeviceConfig
+		for _, s := range ss {
+			if d, ok := ParseDeviceConfig(s); ok {
+				res = append(res, d)
+			}
 		}
 		return res
 	}
@@ -108,7 +119,7 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image:   "node:20",
-				Volumes: cps("/host/path:/container/path:ro", ".:/app"),
+				Volumes: vcs("/host/path:/container/path:ro", ".:/app"),
 			},
 		}
 
@@ -128,7 +139,7 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
-				Volumes: cps(
+				Volumes: vcs(
 					`C:\host\path:/container/path`,
 					`D:\data:/mnt:ro`,
 					`Z:\shared folder:/app:rw`,
@@ -366,8 +377,11 @@ func TestResolve(t *testing.T) {
 		}
 		tools := ToolsConfig{
 			"node": ToolConfig{
-				Image:   "node",
-				Volumes: []ConfigPath{{Raw: "./project-data:/data", BaseDir: "/home/user/project"}},
+				Image: "node",
+				Volumes: []VolumeConfig{{
+					Source:      ConfigPath{Raw: "./project-data", BaseDir: "/home/user/project"},
+					Destination: ConfigPath{Raw: "/data"},
+				}},
 			},
 		}
 
@@ -377,6 +391,33 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/etc/cderun/global.sock", res.SocketPath)
 		require.Len(t, res.Volumes, 1)
 		assert.Equal(t, "/home/user/project/project-data", res.Volumes[0].HostPath)
+	})
+
+	t.Run("Device resolution", func(t *testing.T) {
+		cli := CLIOptions{
+			Devices: []string{"/dev/video0:/dev/video0:rw"},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Devices: dcs("/dev/fuse:/dev/fuse"),
+			},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:   "node",
+				Devices: dcs("/dev/null:/dev/null:r"),
+			},
+		}
+
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+
+		// merged: global + tool + cli
+		assert.Len(t, res.Devices, 3)
+		assert.Equal(t, "/dev/fuse", res.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/null", res.Devices[1].PathOnHost)
+		assert.Equal(t, "/dev/video0", res.Devices[2].PathOnHost)
+		assert.Equal(t, "rw", res.Devices[2].CgroupPermissions)
 	})
 
 	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {

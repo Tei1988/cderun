@@ -463,7 +463,15 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
 		fmt.Printf("CPUs: %g\n", containerConfig.CPUs)
 		fmt.Printf("Tmpfs: %s\n", strings.Join(containerConfig.Tmpfs, ", "))
-		fmt.Printf("Devices: %s\n", strings.Join(containerConfig.Devices, ", "))
+		var devices []string
+		for _, d := range containerConfig.Devices {
+			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
+				devices = append(devices, d.PathOnHost)
+			} else {
+				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+			}
+		}
+		fmt.Printf("Devices: %s\n", strings.Join(devices, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(containerConfig)
 		if err != nil {

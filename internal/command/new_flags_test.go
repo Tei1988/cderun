@@ -66,7 +66,8 @@ func TestNewFlags(t *testing.T) {
 		assert.Equal(t, int64(512*1024*1024), mockRuntime.CreatedConfig.Memory)
 		assert.Equal(t, 2.5, mockRuntime.CreatedConfig.CPUs)
 		assert.Equal(t, []string{"/tmp:rw"}, mockRuntime.CreatedConfig.Tmpfs)
-		assert.Equal(t, []string{"/dev/fuse"}, mockRuntime.CreatedConfig.Devices)
+		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
 	})
 
 	t.Run("P1 flags override P2 for new features", func(t *testing.T) {
