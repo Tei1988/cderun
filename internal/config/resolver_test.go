@@ -8,35 +8,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolve(t *testing.T) {
-	// Setup helper to create bool pointers
-	ptr := func(b bool) *bool { return &b }
-	cp := func(s string) ConfigPath { return ConfigPath{Raw: s} }
-	mcs := func(tb testing.TB, ss ...string) []MountConfig {
-		tb.Helper()
-		var res []MountConfig
-		for _, s := range ss {
-			m, err := ParseMountFlag(s)
-			if err != nil {
-				tb.Fatalf("failed to parse mount flag %q: %v", s, err)
-			}
-			res = append(res, m)
+func mcs(tb testing.TB, ss ...string) []MountConfig {
+	tb.Helper()
+	var res []MountConfig
+	for _, s := range ss {
+		m, err := ParseMountFlag(s)
+		if err != nil {
+			tb.Fatalf("failed to parse mount flag %q: %v", s, err)
 		}
-		return res
+		res = append(res, m)
 	}
-	dcs := func(tb testing.TB, ss ...string) []DeviceConfig {
-		tb.Helper()
-		var res []DeviceConfig
-		for _, s := range ss {
-			d, ok := ParseDeviceConfig(s)
-			if !ok {
-				tb.Fatalf("failed to parse device config %q", s)
-			}
-			res = append(res, d)
-		}
-		return res
-	}
+	return res
+}
 
+func dcs(tb testing.TB, ss ...string) []DeviceConfig {
+	tb.Helper()
+	var res []DeviceConfig
+	for _, s := range ss {
+		d, ok := ParseDeviceConfig(s)
+		if !ok {
+			tb.Fatalf("failed to parse device config %q", s)
+		}
+		res = append(res, d)
+	}
+	return res
+}
+
+func ptr(b bool) *bool { return &b }
+func cp(s string) ConfigPath { return ConfigPath{Raw: s} }
+
+func TestResolve(t *testing.T) {
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
 		cli := CLIOptions{
 			TTY:    true,
