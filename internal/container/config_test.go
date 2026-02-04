@@ -9,8 +9,7 @@ import (
 func TestContainerConfigInitialization(t *testing.T) {
 	config := ContainerConfig{
 		Image:       "alpine:latest",
-		Command:     []string{"sh"},
-		Args:        []string{"-c", "echo hello"},
+		Command:     []string{"sh", "-c", "echo hello"},
 		TTY:         true,
 		Interactive: true,
 		Remove:      true,
@@ -28,8 +27,7 @@ func TestContainerConfigInitialization(t *testing.T) {
 	}
 
 	assert.Equal(t, "alpine:latest", config.Image)
-	assert.Equal(t, []string{"sh"}, config.Command)
-	assert.Equal(t, []string{"-c", "echo hello"}, config.Args)
+	assert.Equal(t, []string{"sh", "-c", "echo hello"}, config.Command)
 	assert.True(t, config.TTY)
 	assert.True(t, config.Interactive)
 	assert.True(t, config.Remove)

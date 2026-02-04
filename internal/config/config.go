@@ -47,6 +47,7 @@ type ConfigDefaults struct {
 	CapAdd     []string     `yaml:"capAdd"`
 	CapDrop    []string     `yaml:"capDrop"`
 	Entrypoint []string     `yaml:"entrypoint"`
+	Command    []string     `yaml:"command"`
 	Pull       string       `yaml:"pull"`
 	Memory     string       `yaml:"memory"`
 	CPUs       float64      `yaml:"cpus"`
@@ -114,6 +115,7 @@ type ToolConfig struct {
 	CapAdd     []string     `yaml:"capAdd"`
 	CapDrop    []string     `yaml:"capDrop"`
 	Entrypoint []string     `yaml:"entrypoint"`
+	Command    []string     `yaml:"command"`
 	Pull       string       `yaml:"pull"`
 	Memory     string       `yaml:"memory"`
 	CPUs       float64      `yaml:"cpus"`

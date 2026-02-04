@@ -94,7 +94,21 @@ func TestIntegrationBasic(t *testing.T) {
 	}
 
 	t.Run("cderun alpine echo hello", func(t *testing.T) {
-		stdout, _, exitCode, err := runCderun("--pull", "missing", "--image", testImage, "echo", "hello-cderun")
+		// Note: since alpine has no entrypoint, the subcommand 'echo' is stripped
+		// and the container command becomes 'hello-cderun'.
+		// This will fail unless the image has 'echo' as entrypoint.
+		// To fix this, we'll use a tool definition in .tools.yaml or just test that it fails/executes correctly.
+		// Actually, the requirement is to use alpine as image and echo hello.
+		// Let's use a temporary .tools.yaml for this test to be realistic.
+		oldWd, _ := os.Getwd()
+		tmpDir := t.TempDir()
+		_ = os.Chdir(tmpDir)
+		defer func() { _ = os.Chdir(oldWd) }()
+
+		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
+		require.NoError(t, err)
+
+		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -102,12 +116,19 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
+		oldWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
-		hostFile := filepath.Join(tmpDir, "hello.txt")
-		err := os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
+		_ = os.Chdir(tmpDir)
+		defer func() { _ = os.Chdir(oldWd) }()
+
+		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("--image", testImage, "-v", hostFile+":/hello.txt", "cat", "/hello.txt")
+		hostFile := filepath.Join(tmpDir, "hello.txt")
+		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
+		require.NoError(t, err)
+
+		stdout, _, exitCode, err := runCderun("-v", hostFile+":/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -115,8 +136,16 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("environment variables", func(t *testing.T) {
+		oldWd, _ := os.Getwd()
+		tmpDir := t.TempDir()
+		_ = os.Chdir(tmpDir)
+		defer func() { _ = os.Chdir(oldWd) }()
+
+		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0644)
+		require.NoError(t, err)
+
 		t.Setenv("HOST_VAR", "host-value")
-		stdout, _, exitCode, err := runCderun("--image", testImage, "-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
+		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -125,7 +154,7 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "echo", "port-test")
+		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)

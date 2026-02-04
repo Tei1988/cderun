@@ -78,7 +78,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
 	containerConfig := &dockercontainer.Config{
 		Image:        config.Image,
-		Cmd:          append(config.Command, config.Args...),
+		Cmd:          config.Command,
 		Tty:          config.TTY,
 		OpenStdin:    config.Interactive,
 		Env:          config.Env,

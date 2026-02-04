@@ -273,12 +273,18 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
 }
 
-func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, subcommand string, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
+func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
+	var fullCommand []string
+	if len(resolved.Command) > 0 || len(passthroughArgs) > 0 {
+		fullCommand = make([]string, 0, len(resolved.Command)+len(passthroughArgs))
+		fullCommand = append(fullCommand, resolved.Command...)
+		fullCommand = append(fullCommand, passthroughArgs...)
+	}
+
 	// Build ContainerConfig
 	containerConfig := &container.ContainerConfig{
 		Image:       resolved.Image,
-		Command:     []string{subcommand},
-		Args:        passthroughArgs,
+		Command:     fullCommand,
 		TTY:         resolved.TTY,
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,
@@ -430,11 +436,7 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Println(string(data))
 	case "simple":
 		fmt.Printf("Image: %s\n", containerConfig.Image)
-		fullCmd := strings.Join(containerConfig.Command, " ")
-		if len(containerConfig.Args) > 0 {
-			fullCmd += " " + strings.Join(containerConfig.Args, " ")
-		}
-		fmt.Printf("Command: %s\n", fullCmd)
+		fmt.Printf("Command: %s\n", strings.Join(containerConfig.Command, " "))
 		fmt.Printf("TTY: %v\n", containerConfig.TTY)
 		fmt.Printf("Interactive: %v\n", containerConfig.Interactive)
 		fmt.Printf("Network: %s\n", containerConfig.Network)
@@ -473,7 +475,7 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 }
 
 func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
-	logging.Info("Running: %s %s", containerConfig.Command[0], strings.Join(containerConfig.Args, " "))
+	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
@@ -680,7 +682,7 @@ intended for the subcommand.`,
 			// Build ContainerConfig
 			var containerConfig *container.ContainerConfig
 			if subcommand != "" {
-				containerConfig, err = opts.buildContainerConfig(resolved, subcommand, passthroughArgs, toolsCfg)
+				containerConfig, err = opts.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
 				if err != nil {
 					return fmt.Errorf("container configuration error: %w", err)
 				}
