@@ -63,6 +63,7 @@ func TestResolve(t *testing.T) {
 
 	t.Run("P3 Env Var priority", func(t *testing.T) {
 		t.Setenv("CDERUN_TTY", "true")
+		t.Setenv("CDERUN_IMAGE", "env-image:latest")
 		cli := CLIOptions{}
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -74,6 +75,8 @@ func TestResolve(t *testing.T) {
 		res, err := Resolve("node", cli, tools, nil)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)
+		// Image should ignore P3 environment variable (Step 10.1)
+		assert.Equal(t, "node:20", res.Image)
 	})
 
 	t.Run("Image resolution from ToolConfig", func(t *testing.T) {

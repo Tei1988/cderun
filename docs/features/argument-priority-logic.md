@@ -27,8 +27,9 @@
 
 ### P3: Environment Variables (Global Override)
 - **定義**: 実行環境全体に適用される設定。
-- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH` 等。
+- **主要なキー**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH` 等。
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
+  - ※ **例外**: `Image` フィールドは、Step 10.1 に基づく厳格な解決ルールに従い、P3 環境変数を**無視**する。
 - **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 
 ### P4: Tool-specific config (YAML Profile)
@@ -46,6 +47,7 @@ node:
 ### P5: Global defaults (Profile Default)
 - **定義**: 設定ファイル（`.cderun.yaml`）の `defaults` ブロック。
 - **挙動**: P1〜P4のいずれも指定がない場合、この値を採用する。
+  - ※ **例外**: `Image` フィールドは、Step 10.1 に基づく厳格な解決ルールに従い、P5 グローバルデフォルトを**無視**する。
 
 ### P6: Hardcoded Defaults (Lowest Priority)
 - **定義**: プログラム内でハードコードされた最終フォールバック値。

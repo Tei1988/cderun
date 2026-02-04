@@ -338,7 +338,7 @@ node:
 		assert.Equal(t, "/container", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
 	})
 
-	t.Run("P3 environment variable takes priority over tools.yaml", func(t *testing.T) {
+	t.Run("CDERUN_IMAGE environment variable is ignored (Step 10.1)", func(t *testing.T) {
 		// Save and restore package-level state
 		oldFactory := runtimeFactory
 		oldExit := exitFunc
@@ -371,7 +371,8 @@ node:
 
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
-		assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
+		// Should use image from tools.yaml, NOT from environment variable
+		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
 	})
 
 	t.Run("resolves base command from tools.yaml", func(t *testing.T) {
@@ -546,6 +547,7 @@ node:
 		exitFunc = func(code int) {}
 
 		// Dry-run with YAML (default)
+		// Step 10.2: subcommand 'sh' is excluded from command
 		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
@@ -898,6 +900,88 @@ sh:
 		output, err := executeCommand("--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
+	})
+}
+
+func TestPhase10StrictBehavior(t *testing.T) {
+	// Save and restore package-level state
+	oldFactory := runtimeFactory
+	oldExit := exitFunc
+	t.Cleanup(func() {
+		runtimeFactory = oldFactory
+		exitFunc = oldExit
+	})
+
+	mockRuntime := &runtime.MockRuntime{}
+	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		return mockRuntime, nil
+	}
+	exitFunc = func(code int) {}
+
+	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
+		// No .tools.yaml created, and no --image flag
+		_, err := executeCommand("unknown-tool", "--version")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no image mapping found for tool: unknown-tool")
+	})
+
+	t.Run("subcommand is excluded from CMD (Step 10.2)", func(t *testing.T) {
+		mockRuntime.CreatedConfig = nil
+		_, err := executeCommand("--image", "alpine", "ls", "-l", "/tmp")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		// 'ls' should be excluded, only '-l' and '/tmp' remain
+		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
+	})
+
+	t.Run("subcommand is excluded even if it is a tool (Step 10.2)", func(t *testing.T) {
+		// Setup tools config
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime.CreatedConfig = nil
+		_, err = executeCommand("node", "app.js")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		// 'node' is excluded from CMD because it's not defined in tool's 'command' field
+		assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
+	})
+
+	t.Run("subcommand is included if explicitly in tool's command field", func(t *testing.T) {
+		// Setup tools config
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+  command: ["node", "--no-warnings"]
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime.CreatedConfig = nil
+		_, err = executeCommand("node", "app.js")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		// 'node' and '--no-warnings' come from tool config, 'app.js' from passthrough
+		assert.Equal(t, []string{"node", "--no-warnings", "app.js"}, mockRuntime.CreatedConfig.Command)
 	})
 }
 

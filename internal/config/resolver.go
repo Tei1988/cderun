@@ -199,13 +199,15 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	// 1. Resolve Image
+	// 1. Resolve Image (Step 10.1: Strict resolution)
+	// Priority: P1 CLI > P2 CLI > Tool Config.
+	// Bypasses Env (P3) and Global Defaults (P5).
 	res.Image = resolveString(
 		cli.CderunImageSet, cli.CderunImage,
 		cli.ImageSet, cli.Image,
-		"CDERUN_IMAGE",
+		"", // No Environment Variable for Image
 		subcommand, tools, func(t ToolConfig) string { return t.Image },
-		global, func(g CDERunConfig) string { return "" },
+		nil, nil, // No Global Default for Image
 		"",
 		r,
 	)
