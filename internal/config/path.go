@@ -82,6 +82,10 @@ func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
 		mc.Source = a.Source
 		mc.Target = a.Target
 		mc.ReadOnly = a.ReadOnly
+
+		if mc.Target.IsEmpty() {
+			return fmt.Errorf("mount target is required at line %d (tag %s)", node.Line, node.Tag)
+		}
 		return nil
 	}
 

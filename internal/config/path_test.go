@@ -138,6 +138,15 @@ target: /app/implicit
 		err = yaml.Unmarshal([]byte("invalid-mount"), &mc)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config")
+
+		// Missing target
+		yamlStr = `
+type: bind
+source: ./data
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &mc)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target is required")
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
