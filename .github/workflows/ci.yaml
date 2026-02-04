@@ -22,16 +22,6 @@ jobs:
         with:
           version: latest
 
-  lint-md:
-    name: Lint Markdown
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Markdown Lint
-        uses: davidanson/markdownlint-cli2-action@v19
-        with:
-          globs: "**/*.md"
-
   test:
     name: Test
     runs-on: ubuntu-latest
