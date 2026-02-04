@@ -34,8 +34,13 @@ func dcs(tb testing.TB, ss ...string) []DeviceConfig {
 	return res
 }
 
-func ptr(b bool) *bool { return &b }
-func cp(s string) ConfigPath { return ConfigPath{Raw: s} }
+func ptr(b bool) *bool {
+	return &b
+}
+
+func cp(s string) ConfigPath {
+	return ConfigPath{Raw: s}
+}
 
 func TestResolve(t *testing.T) {
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
