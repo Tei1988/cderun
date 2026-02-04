@@ -46,8 +46,8 @@ type ContainerConfig struct {
 	CPUs   float64 `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 
 	// Storage and Devices
-	Tmpfs   []string `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
-	Devices []string `json:"devices,omitempty" yaml:"devices,omitempty"`
+	Tmpfs   []string        `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
+	Devices []DeviceMapping `json:"devices,omitempty" yaml:"devices,omitempty"`
 }
 
 // VolumeMount represents a host path to container path mapping.
@@ -55,4 +55,11 @@ type VolumeMount struct {
 	HostPath      string `json:"host_path" yaml:"host_path"`
 	ContainerPath string `json:"container_path" yaml:"container_path"`
 	ReadOnly      bool   `json:"read_only" yaml:"read_only"`
+}
+
+// DeviceMapping represents a host device to container device mapping.
+type DeviceMapping struct {
+	PathOnHost        string `json:"path_on_host" yaml:"path_on_host"`
+	PathInContainer   string `json:"path_in_container" yaml:"path_in_container"`
+	CgroupPermissions string `json:"cgroup_permissions" yaml:"cgroup_permissions"`
 }

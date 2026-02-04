@@ -36,23 +36,23 @@ type ConfigDefaults struct {
 	DryRun          *bool      `yaml:"dryRun"`
 	DryRunFormat    string     `yaml:"dryRunFormat"`
 	// New fields
-	Ports      []string     `yaml:"ports"`
-	PublishAll *bool        `yaml:"publishAll"`
-	Expose     []string     `yaml:"expose"`
-	Hostname   string       `yaml:"hostname"`
-	DNS        []string     `yaml:"dns"`
-	AddHosts   []string     `yaml:"addHosts"`
-	User       string       `yaml:"user"`
-	Privileged *bool        `yaml:"privileged"`
-	CapAdd     []string     `yaml:"capAdd"`
-	CapDrop    []string     `yaml:"capDrop"`
-	Entrypoint []string     `yaml:"entrypoint"`
-	Command    []string     `yaml:"command"`
-	Pull       string       `yaml:"pull"`
-	Memory     string       `yaml:"memory"`
-	CPUs       float64      `yaml:"cpus"`
-	Tmpfs      []string     `yaml:"tmpfs"`
-	Devices    []ConfigPath `yaml:"devices"`
+	Ports      []string       `yaml:"ports"`
+	PublishAll *bool          `yaml:"publishAll"`
+	Expose     []string       `yaml:"expose"`
+	Hostname   string         `yaml:"hostname"`
+	DNS        []string       `yaml:"dns"`
+	AddHosts   []string       `yaml:"addHosts"`
+	User       string         `yaml:"user"`
+	Privileged *bool          `yaml:"privileged"`
+	CapAdd     []string       `yaml:"capAdd"`
+	CapDrop    []string       `yaml:"capDrop"`
+	Entrypoint []string       `yaml:"entrypoint"`
+	Command    []string       `yaml:"command"`
+	Pull       string         `yaml:"pull"`
+	Memory     string         `yaml:"memory"`
+	CPUs       float64        `yaml:"cpus"`
+	Tmpfs      []string       `yaml:"tmpfs"`
+	Devices    []DeviceConfig `yaml:"devices"`
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
@@ -60,9 +60,7 @@ func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 		c.MountSocketPath.BaseDir = baseDir
 	}
 	for i := range c.Devices {
-		if c.Devices[i].Raw != "" {
-			c.Devices[i].BaseDir = baseDir
-		}
+		c.Devices[i].SetBaseDir(baseDir)
 	}
 }
 
@@ -89,38 +87,38 @@ type LoggingRotationConfig struct {
 }
 
 type ToolConfig struct {
-	Image           string       `yaml:"image"`
-	TTY             *bool        `yaml:"tty"`
-	Interactive     *bool        `yaml:"interactive"`
-	Network         string       `yaml:"network"`
-	Remove          *bool        `yaml:"remove"`
-	StrictEnv       *bool        `yaml:"strictEnv"`
-	Volumes         []ConfigPath `yaml:"volumes"`
-	Env             []string     `yaml:"env"`
-	Workdir         string       `yaml:"workdir"`
-	MountCderun     *bool        `yaml:"mountCderun"`
-	MountSocket     *bool        `yaml:"mountSocket"`
-	MountSocketPath ConfigPath   `yaml:"mountSocketPath"`
-	DryRun          *bool        `yaml:"dryRun"`
-	DryRunFormat    string       `yaml:"dryRunFormat"`
+	Image           string         `yaml:"image"`
+	TTY             *bool          `yaml:"tty"`
+	Interactive     *bool          `yaml:"interactive"`
+	Network         string         `yaml:"network"`
+	Remove          *bool          `yaml:"remove"`
+	StrictEnv       *bool          `yaml:"strictEnv"`
+	Volumes         []VolumeConfig `yaml:"volumes"`
+	Env             []string       `yaml:"env"`
+	Workdir         string         `yaml:"workdir"`
+	MountCderun     *bool          `yaml:"mountCderun"`
+	MountSocket     *bool          `yaml:"mountSocket"`
+	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	DryRun          *bool          `yaml:"dryRun"`
+	DryRunFormat    string         `yaml:"dryRunFormat"`
 	// New fields
-	Ports      []string     `yaml:"ports"`
-	PublishAll *bool        `yaml:"publishAll"`
-	Expose     []string     `yaml:"expose"`
-	Hostname   string       `yaml:"hostname"`
-	DNS        []string     `yaml:"dns"`
-	AddHosts   []string     `yaml:"addHosts"`
-	User       string       `yaml:"user"`
-	Privileged *bool        `yaml:"privileged"`
-	CapAdd     []string     `yaml:"capAdd"`
-	CapDrop    []string     `yaml:"capDrop"`
-	Entrypoint []string     `yaml:"entrypoint"`
-	Command    []string     `yaml:"command"`
-	Pull       string       `yaml:"pull"`
-	Memory     string       `yaml:"memory"`
-	CPUs       float64      `yaml:"cpus"`
-	Tmpfs      []string     `yaml:"tmpfs"`
-	Devices    []ConfigPath `yaml:"devices"`
+	Ports      []string       `yaml:"ports"`
+	PublishAll *bool          `yaml:"publishAll"`
+	Expose     []string       `yaml:"expose"`
+	Hostname   string         `yaml:"hostname"`
+	DNS        []string       `yaml:"dns"`
+	AddHosts   []string       `yaml:"addHosts"`
+	User       string         `yaml:"user"`
+	Privileged *bool          `yaml:"privileged"`
+	CapAdd     []string       `yaml:"capAdd"`
+	CapDrop    []string       `yaml:"capDrop"`
+	Entrypoint []string       `yaml:"entrypoint"`
+	Command    []string       `yaml:"command"`
+	Pull       string         `yaml:"pull"`
+	Memory     string         `yaml:"memory"`
+	CPUs       float64        `yaml:"cpus"`
+	Tmpfs      []string       `yaml:"tmpfs"`
+	Devices    []DeviceConfig `yaml:"devices"`
 }
 
 func (c *ToolConfig) SetBaseDir(baseDir string) {
@@ -128,14 +126,10 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 		c.MountSocketPath.BaseDir = baseDir
 	}
 	for i := range c.Volumes {
-		if c.Volumes[i].Raw != "" {
-			c.Volumes[i].BaseDir = baseDir
-		}
+		c.Volumes[i].SetBaseDir(baseDir)
 	}
 	for i := range c.Devices {
-		if c.Devices[i].Raw != "" {
-			c.Devices[i].BaseDir = baseDir
-		}
+		c.Devices[i].SetBaseDir(baseDir)
 	}
 }
 

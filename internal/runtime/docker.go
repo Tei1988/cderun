@@ -144,17 +144,10 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 
 	// Handle Devices
 	for _, dev := range config.Devices {
-		parts := strings.SplitN(dev, ":", 3)
 		dMapping := dockercontainer.DeviceMapping{
-			PathOnHost:        parts[0],
-			PathInContainer:   parts[0],
-			CgroupPermissions: "rwm",
-		}
-		if len(parts) > 1 {
-			dMapping.PathInContainer = parts[1]
-		}
-		if len(parts) > 2 {
-			dMapping.CgroupPermissions = parts[2]
+			PathOnHost:        dev.PathOnHost,
+			PathInContainer:   dev.PathInContainer,
+			CgroupPermissions: dev.CgroupPermissions,
 		}
 		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
 	}
