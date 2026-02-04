@@ -7,7 +7,7 @@
 
 ## Usage
 
-`cderun` supports three primary modes of operation:
+`cderun` supports four primary modes of operation:
 
 ### 1. Wrapper Mode
 Explicitly call `cderun` followed by the subcommand you want to run.
@@ -53,7 +53,7 @@ cderun --tty docker --tty
 ```
 
 ### P1 Internal Overrides
-Flags prefixed with `--cderun-` are "Internal Overrides" (P1). They have the highest priority and can be placed **after** the subcommand if needed.
+Flags prefixed with `--cderun-` are "Internal Overrides" (P1). They have the highest priority and **must** be placed **after** the subcommand in standard wrapper mode.
 
 ```bash
 cderun node app.js --cderun-image node:20-alpine
@@ -68,10 +68,21 @@ cderun node app.js --cderun-image node:20-alpine
 - `--workdir`, `-w`: Working directory inside the container.
 - `--network`: Connect a container to a network (default: "bridge").
 - `--publish`, `-p`: Publish a container's port(s) to the host.
+- `--publish-all`, `-P`: Publish all exposed ports to random ports.
+- `--expose`: Expose a port or a range of ports.
+- `--hostname`: Container host name.
+- `--dns`: Set custom DNS servers.
+- `--add-host`: Add a custom host-to-IP mapping (host:ip).
 - `--user`, `-u`: Username or UID to use.
 - `--privileged`: Give extended privileges to this container.
+- `--cap-add`: Add Linux capabilities.
+- `--cap-drop`: Drop Linux capabilities.
+- `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
 - `--pull`: Pull image before running (always, missing, never).
 - `--memory`, `-m`: Memory limit.
+- `--cpus`: Number of CPUs.
+- `--tmpfs`: Mount a tmpfs directory.
+- `--device`: Add a host device to the container.
 - `--remove`: Automatically remove the container when it exits (default: true).
 - `--runtime`: Container runtime to use (docker/podman).
 - `--socket-path`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
