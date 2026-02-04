@@ -16,14 +16,15 @@ READMEの内容は、以下の情報と整合性が取れていなければな�
 以下のコンセプト文言を冒頭に使用すること。
 
 > **Concept**
-> "All you need on your local machine is Docker."
-> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand. It keeps your host clean and ensures reproducible environments defined in a single YAML file.
+> "All you need on your local machine is Docker or Podman."
+> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand using container runtimes (Docker/Podman). It keeps your host clean and ensures reproducible environments defined in a single YAML file.
 
 ### 2. Usage Section
-以下の3つのパターンを、実際のコードの挙動に基づいて説明すること。
+以下の4つのパターンを、実際のコードの挙動に基づいて説明すること。
 - **Wrapper Mode**: `cderun [flags] <subcommand>`
 - **Symlink Mode**: `ln -s cderun node` -> `./node`
 - **Ad-hoc Mode**: `cderun --image=ubuntu bash`
+- **Global Dry Run (Diagnostics)**: `cderun --dry-run`
 
 ### 3. Argument Parsing & Flags (Important)
 `04-argument-parsing.md` の仕様に基づき、**「どこまでが cderun の引数で、どこからがコンテナへの引数か」** を明確に図解または例示すること。

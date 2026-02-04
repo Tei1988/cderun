@@ -16,8 +16,6 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 ### サポートされる形式
 - YAML形式のみがサポートされます。
 - **標準ファイル名**: `.cderun.yaml`, `.tools.yaml`
-- **レガシーファイル名**: `config.yaml`, `tools.yaml`
-  - ユーザー設定ディレクトリ（`~/.config/cderun/`）およびシステム設定ディレクトリ（`/etc/cderun/`）において、後方互換性のためにこれらの名前も受け入れられます。
 
 ### 検索とマージ
 
@@ -31,14 +29,12 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
   *   例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
 
 2.  **ユーザー設定**:
-  *   `~/.config/cderun/.cderun.yaml` （または `config.yaml`）
-  *   `~/.config/cderun/.tools.yaml` （または `tools.yaml`）
+  *   `~/.config/cderun/.cderun.yaml`
+  *   `~/.config/cderun/.tools.yaml`
 
 3.  **システム全体設定**:
-  *   `/etc/cderun/.cderun.yaml` （または `config.yaml`）
-  *   `/etc/cderun/.tools.yaml` （または `tools.yaml`）
-
-> **Note**: `~/.config/cderun/` および `/etc/cderun/` 配下では、`.` で始まらない `config.yaml` および `tools.yaml` もレガシーサポートとして読み込まれます。
+  *   `/etc/cderun/.cderun.yaml`
+  *   `/etc/cderun/.tools.yaml`
 
 #### マージのルール
 - 見つかったすべての設定ファイルの内容がマージされます。
