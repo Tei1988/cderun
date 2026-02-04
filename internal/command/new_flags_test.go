@@ -45,11 +45,12 @@ func TestNewFlags(t *testing.T) {
 			"--tmpfs", "/tmp:rw",
 			"--device", "/dev/fuse",
 			"--image", "alpine",
-			"sh",
+			"sh", "ls", "-l",
 		)
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, []string{"ls", "-l"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"8080:80"}, mockRuntime.CreatedConfig.Ports)
 		assert.True(t, mockRuntime.CreatedConfig.PublishAll)
 		assert.Equal(t, []string{"80"}, mockRuntime.CreatedConfig.Expose)
@@ -79,7 +80,7 @@ func TestNewFlags(t *testing.T) {
 			"--memory", "1g",
 			"--cpus", "1.0",
 			"--image", "alpine",
-			"sh",
+			"sh", "ls", "-l",
 			"--cderun-publish=9090:90",
 			"--cderun-user=newuser",
 			"--cderun-privileged=false",
@@ -90,6 +91,7 @@ func TestNewFlags(t *testing.T) {
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, []string{"ls", "-l"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"9090:90"}, mockRuntime.CreatedConfig.Ports)
 		assert.Equal(t, "newuser", mockRuntime.CreatedConfig.User)
 		assert.False(t, mockRuntime.CreatedConfig.Privileged)
@@ -123,6 +125,7 @@ node:
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"8080:80"}, mockRuntime.CreatedConfig.Ports)
 		assert.True(t, mockRuntime.CreatedConfig.Privileged)
 		assert.Equal(t, int64(1024*1024*1024), mockRuntime.CreatedConfig.Memory)

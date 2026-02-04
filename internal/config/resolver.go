@@ -49,6 +49,7 @@ type ResolvedConfig struct {
 	CapAdd     []string
 	CapDrop    []string
 	Entrypoint []string
+	Command    []string
 	Pull       string
 	Memory     int64
 	CPUs       float64
@@ -492,6 +493,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.CapAdd = resolveStringSlice(cli.CderunCapAdd, cli.CapAdd, "CDERUN_CAP_ADD", subcommand, tools, func(t ToolConfig) []string { return t.CapAdd }, global, func(g CDERunConfig) []string { return g.Defaults.CapAdd }, r)
 	res.CapDrop = resolveStringSlice(cli.CderunCapDrop, cli.CapDrop, "CDERUN_CAP_DROP", subcommand, tools, func(t ToolConfig) []string { return t.CapDrop }, global, func(g CDERunConfig) []string { return g.Defaults.CapDrop }, r)
 	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r)
+	res.Command = resolveStringSlice(nil, nil, "CDERUN_COMMAND", subcommand, tools, func(t ToolConfig) []string { return t.Command }, global, func(g CDERunConfig) []string { return g.Defaults.Command }, r)
 	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
 	res.Tmpfs = resolveStringSlice(cli.CderunTmpfs, cli.Tmpfs, "CDERUN_TMPFS", subcommand, tools, func(t ToolConfig) []string { return t.Tmpfs }, global, func(g CDERunConfig) []string { return g.Defaults.Tmpfs }, r)
 	res.Devices = resolveConfigPathSlice(cli.CderunDevices, cli.Devices, "CDERUN_DEVICE", subcommand, tools, func(t ToolConfig) []ConfigPath { return t.Devices }, global, func(g CDERunConfig) []ConfigPath { return g.Defaults.Devices }, r, "device")

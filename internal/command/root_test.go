@@ -216,8 +216,7 @@ func TestRootCmd(t *testing.T) {
 
 		assert.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)
-		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Args)
+		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 		assert.True(t, mockRuntime.CreatedConfig.Interactive)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
@@ -287,8 +286,7 @@ node:
 
 		assert.NoError(t, err)
 		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-		assert.Equal(t, []string{"node"}, mockRuntime.CreatedConfig.Command)
-		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Args)
+		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
 	})
 
 	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
@@ -331,6 +329,7 @@ node:
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
+		assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
 		assert.Contains(t, mockRuntime.CreatedConfig.Env, "KEY=VALUE")
@@ -373,6 +372,44 @@ node:
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
 		assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
+	})
+
+	t.Run("resolves base command from tools.yaml", func(t *testing.T) {
+		// Save and restore package-level state
+		oldFactory := runtimeFactory
+		oldExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = oldFactory
+			exitFunc = oldExit
+		})
+
+		// Use a temporary directory for this test
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+		toolsContent := `
+node:
+  image: node:20-alpine
+  command: ["node", "--no-warnings"]
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err = executeCommand("node", "app.js")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
+		assert.Equal(t, []string{"node", "--no-warnings", "app.js"}, mockRuntime.CreatedConfig.Command)
 	})
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
@@ -509,25 +546,27 @@ node:
 		exitFunc = func(code int) {}
 
 		// Dry-run with YAML (default)
-		output, err := executeCommand("--dry-run", "--image", "alpine", "sh")
+		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
 		assert.Contains(t, output, "command:")
-		assert.Contains(t, output, "- sh")
+		assert.Contains(t, output, "- echo")
+		assert.Contains(t, output, "- hello")
+		assert.NotContains(t, output, "- sh")
 		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
 
 		// Dry-run with JSON
-		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh")
+		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "\"image\": \"alpine\"")
 		assert.Contains(t, output, "\"command\": [")
 
 		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh")
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
 		assert.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
-		assert.Contains(t, output, "Command: sh")
-		assert.NotContains(t, output, "Command: sh ") // Ensure no trailing space
+		assert.Contains(t, output, "Command: echo hello")
+		assert.NotContains(t, output, "Command: sh")
 		assert.Contains(t, output, "TTY: false")
 		assert.Contains(t, output, "Interactive: false")
 		assert.Contains(t, output, "Network: bridge")
@@ -693,12 +732,12 @@ node:
 	t.Run("cderun internal overrides for dry-run", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		// cderun --image=alpine sh --cderun-dry-run --cderun-dry-run-format=simple
-		output, err := executeCommandRaw([]string{"cderun", "--image=alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format=simple"})
+		// cderun --image=alpine sh echo hello --cderun-dry-run --cderun-dry-run-format=simple
+		output, err := executeCommandRaw([]string{"cderun", "--image=alpine", "sh", "echo", "hello", "--cderun-dry-run", "--cderun-dry-run-format=simple"})
 		assert.NoError(t, err)
 		assert.Nil(t, mockRuntime.CreatedConfig)
 		assert.Contains(t, output, "Image: alpine")
-		assert.Contains(t, output, "Command: sh")
+		assert.Contains(t, output, "Command: echo hello")
 	})
 }
 

@@ -5,7 +5,6 @@ type ContainerConfig struct {
 	// Basic settings
 	Image   string   `json:"image" yaml:"image"`
 	Command []string `json:"command" yaml:"command"`
-	Args    []string `json:"args" yaml:"args"`
 
 	// Execution options
 	TTY         bool `json:"tty" yaml:"tty"`
