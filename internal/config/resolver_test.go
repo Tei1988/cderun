@@ -24,12 +24,15 @@ func TestResolve(t *testing.T) {
 		}
 		return res
 	}
-	dcs := func(ss ...string) []DeviceConfig {
+	dcs := func(tb testing.TB, ss ...string) []DeviceConfig {
+		tb.Helper()
 		var res []DeviceConfig
 		for _, s := range ss {
-			if d, ok := ParseDeviceConfig(s); ok {
-				res = append(res, d)
+			d, ok := ParseDeviceConfig(s)
+			if !ok {
+				tb.Fatalf("failed to parse device config %q", s)
 			}
+			res = append(res, d)
 		}
 		return res
 	}
@@ -403,13 +406,13 @@ func TestResolve(t *testing.T) {
 		}
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				Devices: dcs("/dev/fuse:/dev/fuse"),
+				Devices: dcs(t, "/dev/fuse:/dev/fuse"),
 			},
 		}
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image:   "node",
-				Devices: dcs("/dev/null:/dev/null:r"),
+				Devices: dcs(t, "/dev/null:/dev/null:r"),
 			},
 		}
 
