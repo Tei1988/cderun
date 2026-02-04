@@ -154,7 +154,7 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "echo", "port-test")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)

@@ -274,9 +274,12 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 }
 
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
-	fullCommand := make([]string, 0, len(resolved.Command)+len(passthroughArgs))
-	fullCommand = append(fullCommand, resolved.Command...)
-	fullCommand = append(fullCommand, passthroughArgs...)
+	var fullCommand []string
+	if len(resolved.Command) > 0 || len(passthroughArgs) > 0 {
+		fullCommand = make([]string, 0, len(resolved.Command)+len(passthroughArgs))
+		fullCommand = append(fullCommand, resolved.Command...)
+		fullCommand = append(fullCommand, passthroughArgs...)
+	}
 
 	// Build ContainerConfig
 	containerConfig := &container.ContainerConfig{
