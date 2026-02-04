@@ -26,7 +26,7 @@ cderun --verbose --verbose --verbose node app.js
 cderun --log-level trace node app.js
 ```
 
-> **Note**: `-v` shorthand is reserved for `--volume` and cannot be used for `--verbose`.
+> **Note**: `-v` shorthand is not supported (it is not used for `--verbose`).
 
 #### 設定ファイル
 ```yaml

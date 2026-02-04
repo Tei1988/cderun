@@ -145,14 +145,15 @@ cderun --env NPM_TOKEN node app.js  # ホストから取得
 cderun node app.js --cderun-env=NODE_ENV=production
 ```
 
-### `--volume`, `-v`
-- **型**: stringSlice
-- **説明**: ボリュームマウント
-- **用途**: `hostPath:containerPath[:ro|rw]`
+### `--mount`
+- **型**: stringArray
+- **説明**: マウントの設定（bind, volume, tmpfsをサポート）
+- **用途**: `type=bind,source=hostPath,target=containerPath[,readonly]`
 
 ```bash
-cderun --volume ./data:/data python script.py
-cderun -v ~/.ssh:/root/.ssh:ro git clone ...
+cderun --mount type=bind,source=./data,target=/data python script.py
+cderun --mount type=bind,source=~/.ssh,target=/root/.ssh,readonly git clone ...
+cderun --mount type=tmpfs,target=/tmp alpine
 ```
 
 ### `--workdir`, `-w`
@@ -275,14 +276,6 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: float64
 - **説明**: CPU数制限
 
-### `--tmpfs`
-- **型**: stringSlice
-- **説明**: tmpfsディレクトリのマウント
-
-```bash
-cderun --tmpfs /run alpine touch /run/test
-```
-
 ### `--device`
 - **型**: stringSlice
 - **説明**: ホストデバイスをコンテナに追加
@@ -370,7 +363,7 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **マウント・ツール**: `--cderun-volume`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
+  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
@@ -450,7 +443,6 @@ cderun --cderun-tty node --version
 現在サポートされている短縮形：
 - `-t` → `--tty`
 - `-i` → `--interactive`
-- `-v` → `--volume`
 - `-w` → `--workdir`
 - `-e` → `--env`
 - `-f` → `--dry-run-format`

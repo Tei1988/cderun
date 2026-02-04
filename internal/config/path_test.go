@@ -32,25 +32,28 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, filepath.Join(home, "config"), cp.Resolve(r))
 	})
 
-	t.Run("VolumeConfig.Resolve", func(t *testing.T) {
-		vc := VolumeConfig{
-			Source:      ConfigPath{Raw: "./data", BaseDir: baseDir},
-			Destination: ConfigPath{Raw: "/app/data", BaseDir: baseDir},
-			ReadOnly:    false,
+	t.Run("MountConfig.Resolve", func(t *testing.T) {
+		mc := MountConfig{
+			Type:     "bind",
+			Source:   ConfigPath{Raw: "./data", BaseDir: baseDir},
+			Target:   ConfigPath{Raw: "/app/data", BaseDir: baseDir},
+			ReadOnly: false,
 		}
-		mount := vc.Resolve(r)
-		assert.Equal(t, "/abs/path/data", mount.HostPath)
-		assert.Equal(t, "/app/data", mount.ContainerPath)
+		mount := mc.Resolve(r)
+		assert.Equal(t, "bind", mount.Type)
+		assert.Equal(t, "/abs/path/data", mount.Source)
+		assert.Equal(t, "/app/data", mount.Target)
 		assert.False(t, mount.ReadOnly)
 
-		vc = VolumeConfig{
-			Source:      ConfigPath{Raw: "~/config", BaseDir: baseDir},
-			Destination: ConfigPath{Raw: "/root/config", BaseDir: baseDir},
-			ReadOnly:    true,
+		mc = MountConfig{
+			Type:     "bind",
+			Source:   ConfigPath{Raw: "~/config", BaseDir: baseDir},
+			Target:   ConfigPath{Raw: "/root/config", BaseDir: baseDir},
+			ReadOnly: true,
 		}
-		mount = vc.Resolve(r)
-		assert.Equal(t, filepath.Join(home, "config"), mount.HostPath)
-		assert.Equal(t, "/root/config", mount.ContainerPath)
+		mount = mc.Resolve(r)
+		assert.Equal(t, filepath.Join(home, "config"), mount.Source)
+		assert.Equal(t, "/root/config", mount.Target)
 		assert.True(t, mount.ReadOnly)
 	})
 
@@ -66,28 +69,30 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, "rwm", mapping.CgroupPermissions)
 	})
 
-	t.Run("ParseVolumeConfig", func(t *testing.T) {
-		vc, ok := ParseVolumeConfig("./data:/app/data:ro")
-		assert.True(t, ok)
-		assert.Equal(t, "./data", vc.Source.Raw)
-		assert.Equal(t, "/app/data", vc.Destination.Raw)
-		assert.True(t, vc.ReadOnly)
+	t.Run("ParseMountFlag", func(t *testing.T) {
+		mc, err := ParseMountFlag("type=bind,source=./data,target=/app/data,readonly")
+		assert.NoError(t, err)
+		assert.Equal(t, "bind", mc.Type)
+		assert.Equal(t, "./data", mc.Source.Raw)
+		assert.Equal(t, "/app/data", mc.Target.Raw)
+		assert.True(t, mc.ReadOnly)
 
-		vc, ok = ParseVolumeConfig("/host/path:/container/path")
-		assert.True(t, ok)
-		assert.Equal(t, "/host/path", vc.Source.Raw)
-		assert.Equal(t, "/container/path", vc.Destination.Raw)
-		assert.False(t, vc.ReadOnly)
+		mc, err = ParseMountFlag("source=/host/path,target=/container/path")
+		assert.NoError(t, err)
+		assert.Equal(t, "bind", mc.Type)
+		assert.Equal(t, "/host/path", mc.Source.Raw)
+		assert.Equal(t, "/container/path", mc.Target.Raw)
+		assert.False(t, mc.ReadOnly)
 
-		_, ok = ParseVolumeConfig("invalid-format")
-		assert.False(t, ok)
+		_, err = ParseMountFlag("invalid-format")
+		assert.Error(t, err)
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
-		vc, ok := ParseVolumeConfig(`C:\host\path:/container`)
-		assert.True(t, ok)
-		assert.Equal(t, `C:\host\path`, vc.Source.Raw)
-		assert.Equal(t, `/container`, vc.Destination.Raw)
+		mc, err := ParseMountFlag(`type=bind,source=C:\host\path,target=/container`)
+		assert.NoError(t, err)
+		assert.Equal(t, `C:\host\path`, mc.Source.Raw)
+		assert.Equal(t, `/container`, mc.Target.Raw)
 
 		dc, ok := ParseDeviceConfig(`E:\dev\path:/dev/path:rwm`)
 		assert.True(t, ok)
@@ -104,18 +109,25 @@ func TestPathResolution(t *testing.T) {
 }
 
 func TestUnmarshalYAML_Errors(t *testing.T) {
-	t.Run("VolumeConfig", func(t *testing.T) {
-		var vc VolumeConfig
+	t.Run("MountConfig", func(t *testing.T) {
+		var mc MountConfig
 
-		// Valid
-		err := yaml.Unmarshal([]byte("./data:/app/data:ro"), &vc)
+		// Valid (structure)
+		yamlStr := `
+type: bind
+source: ./data
+target: /app/data
+read_only: true
+`
+		err := yaml.Unmarshal([]byte(yamlStr), &mc)
 		assert.NoError(t, err)
-		assert.Equal(t, "./data", vc.Source.Raw)
+		assert.Equal(t, "bind", mc.Type)
+		assert.Equal(t, "./data", mc.Source.Raw)
 
 		// Invalid
-		err = yaml.Unmarshal([]byte("invalid-volume"), &vc)
+		err = yaml.Unmarshal([]byte("invalid-mount"), &mc)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid volume config")
+		assert.Contains(t, err.Error(), "invalid mount config")
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {

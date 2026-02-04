@@ -64,7 +64,7 @@ cderun node app.js --cderun-image node:20-alpine
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--image`: Docker image to use (overrides mapping).
 - `--env`, `-e`: Set environment variables (KEY=VALUE or KEY).
-- `--volume`, `-v`: Bind mount a volume (hostPath:containerPath[:ro|rw]).
+- `--mount`: Attach a filesystem mount to the container (type=bind,source=...,target=...[,readonly]).
 - `--workdir`, `-w`: Working directory inside the container.
 - `--network`: Connect a container to a network (default: "bridge").
 - `--publish`, `-p`: Publish a container's port(s) to the host.
@@ -81,7 +81,6 @@ cderun node app.js --cderun-image node:20-alpine
 - `--pull`: Pull image before running (always, missing, never).
 - `--memory`, `-m`: Memory limit.
 - `--cpus`: Number of CPUs.
-- `--tmpfs`: Mount a tmpfs directory.
 - `--device`: Add a host device to the container.
 - `--remove`: Automatically remove the container when it exits (default: true).
 - `--runtime`: Container runtime to use (docker/podman).
@@ -124,8 +123,10 @@ Defines how specific tools should be containerized.
 ```yaml
 node:
   image: node:20-alpine
-  volumes:
-    - ".:/app"
+  mounts:
+    - type: bind
+      source: .
+      target: /app
   workdir: /app
 python:
   image: python:3.11-slim

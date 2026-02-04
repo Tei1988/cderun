@@ -20,8 +20,8 @@ type ContainerConfig struct {
 	DNS        []string `json:"dns,omitempty" yaml:"dns,omitempty"`
 	AddHosts   []string `json:"add_hosts,omitempty" yaml:"add_hosts,omitempty"`
 
-	// Volumes
-	Volumes []VolumeMount `json:"volumes" yaml:"volumes"`
+	// Mounts
+	Mounts []Mount `json:"mounts" yaml:"mounts"`
 
 	// Environment variables (format: ["KEY=value", "KEY2=value2"])
 	Env []string `json:"env" yaml:"env"`
@@ -46,15 +46,15 @@ type ContainerConfig struct {
 	CPUs   float64 `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 
 	// Storage and Devices
-	Tmpfs   []string        `json:"tmpfs,omitempty" yaml:"tmpfs,omitempty"`
 	Devices []DeviceMapping `json:"devices,omitempty" yaml:"devices,omitempty"`
 }
 
-// VolumeMount represents a host path to container path mapping.
-type VolumeMount struct {
-	HostPath      string `json:"host_path" yaml:"host_path"`
-	ContainerPath string `json:"container_path" yaml:"container_path"`
-	ReadOnly      bool   `json:"read_only" yaml:"read_only"`
+// Mount represents a mount point in the container (bind, volume, or tmpfs).
+type Mount struct {
+	Type     string `json:"type" yaml:"type"`
+	Source   string `json:"source,omitempty" yaml:"source,omitempty"`
+	Target   string `json:"target" yaml:"target"`
+	ReadOnly bool   `json:"read_only,omitempty" yaml:"read_only,omitempty"`
 }
 
 // DeviceMapping represents a host device to container device mapping.

@@ -39,7 +39,7 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunMountSocket = false
 	opts.cderunMountSocketPath = ""
 	opts.cderunWorkdir = ""
-	opts.cderunVolumes = nil
+	opts.cderunMounts = nil
 	opts.cderunMountCderun = false
 	opts.cderunMountTools = ""
 	opts.cderunMountAllTools = false
@@ -47,7 +47,7 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.env = nil
 	opts.cderunEnv = nil
 	opts.workdir = ""
-	opts.volumes = nil
+	opts.mounts = nil
 	opts.mountTools = ""
 	opts.mountAllTools = false
 	opts.dryRun = false
@@ -80,7 +80,6 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.pull = "missing"
 	opts.memory = ""
 	opts.cpus = 0
-	opts.tmpfs = nil
 	opts.devices = nil
 	opts.cderunPorts = nil
 	opts.cderunPublishAll = false
@@ -96,7 +95,6 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunPull = ""
 	opts.cderunMemory = ""
 	opts.cderunCPUs = 0
-	opts.cderunTmpfs = nil
 	opts.cderunDevices = nil
 
 	oldStdout := os.Stdout
@@ -312,8 +310,10 @@ node:
   network: host
   env:
     - KEY=VALUE
-  volumes:
-    - /host:/container
+  mounts:
+    - type: bind
+      source: /host
+      target: /container
 `
 		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
 		require.NoError(t, err)
@@ -333,9 +333,10 @@ node:
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
 		assert.Contains(t, mockRuntime.CreatedConfig.Env, "KEY=VALUE")
-		assert.Len(t, mockRuntime.CreatedConfig.Volumes, 1)
-		assert.Equal(t, "/host", mockRuntime.CreatedConfig.Volumes[0].HostPath)
-		assert.Equal(t, "/container", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
+		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "bind", mockRuntime.CreatedConfig.Mounts[0].Type)
+		assert.Equal(t, "/host", mockRuntime.CreatedConfig.Mounts[0].Source)
+		assert.Equal(t, "/container", mockRuntime.CreatedConfig.Mounts[0].Target)
 	})
 
 	t.Run("P3 environment variable takes priority over tools.yaml", func(t *testing.T) {
@@ -572,6 +573,11 @@ node:
 		assert.Contains(t, output, "Network: bridge")
 		assert.Contains(t, output, "Remove: true")
 
+		// Dry-run with mount
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "Mounts: type=bind,source=/h,target=/c,readonly=false")
+
 		// Dry-run with device
 		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
 		assert.NoError(t, err)
@@ -674,20 +680,20 @@ node:
 		assert.Equal(t, "alpine:latest", mockRuntime.CreatedConfig.Image)
 	})
 
-	t.Run("cderun internal overrides for network, remove, workdir and volume", func(t *testing.T) {
+	t.Run("cderun internal overrides for network, remove, workdir and mount", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/old", "--volume=/h1:/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/new", "--cderun-volume=/h2:/c2")
+		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/old", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/new", "--cderun-mount=type=bind,source=/h2,target=/c2")
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
 		assert.True(t, mockRuntime.CreatedConfig.Remove)
 		assert.Equal(t, "/new", mockRuntime.CreatedConfig.Workdir)
 
-		// Volumes should be merged (P1 added after P2)
-		assert.Len(t, mockRuntime.CreatedConfig.Volumes, 2)
-		assert.Equal(t, "/h1", mockRuntime.CreatedConfig.Volumes[0].HostPath)
-		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Volumes[1].HostPath)
+		// Mounts should be merged (P1 added after P2)
+		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 2)
+		assert.Equal(t, "/h1", mockRuntime.CreatedConfig.Mounts[0].Source)
+		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Mounts[1].Source)
 	})
 
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
@@ -709,14 +715,14 @@ node:
 		socketFound := false
 		cderunFound := false
 		nodeFound := false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == "/var/run/custom.sock" {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == "/var/run/custom.sock" {
 				socketFound = true
 			}
-			if v.ContainerPath == "/usr/local/bin/cderun" {
+			if v.Target == "/usr/local/bin/cderun" {
 				cderunFound = true
 			}
-			if v.ContainerPath == "/usr/local/bin/node" {
+			if v.Target == "/usr/local/bin/node" {
 				nodeFound = true
 			}
 		}
@@ -761,18 +767,18 @@ func TestPhase3Features(t *testing.T) {
 	}
 	exitFunc = func(code int) {}
 
-	t.Run("workdir, volume and device flags", func(t *testing.T) {
+	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--volume", "/h:/c:ro", "--device", "/dev/fuse:/dev/fuse:rm", "sh")
+		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh")
 		assert.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
-		require.Len(t, mockRuntime.CreatedConfig.Volumes, 1)
-		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Volumes[0].HostPath)
-		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Volumes[0].ContainerPath)
-		assert.True(t, mockRuntime.CreatedConfig.Volumes[0].ReadOnly)
+		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Mounts[0].Source)
+		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Mounts[0].Target)
+		assert.True(t, mockRuntime.CreatedConfig.Mounts[0].ReadOnly)
 
 		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
 		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
@@ -805,11 +811,11 @@ func TestPhase3Features(t *testing.T) {
 
 		binaryFound := false
 		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/cderun" {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == exePath && v.Target == "/usr/local/bin/cderun" {
 				binaryFound = true
 			}
-			if v.HostPath == "/socket" && v.ContainerPath == "/socket" {
+			if v.Source == "/socket" && v.Target == "/socket" {
 				socketFound = true
 			}
 		}
@@ -825,8 +831,8 @@ func TestPhase3Features(t *testing.T) {
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == "/host/socket" && v.ContainerPath == "/container/socket" {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == "/host/socket" && v.Target == "/container/socket" {
 				socketFound = true
 			}
 		}
@@ -862,11 +868,11 @@ sh:
 
 		nodeFound := false
 		pythonFound := false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/node" {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == exePath && v.Target == "/usr/local/bin/node" {
 				nodeFound = true
 			}
-			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/python" {
+			if v.Source == exePath && v.Target == "/usr/local/bin/python" {
 				pythonFound = true
 			}
 		}
@@ -881,11 +887,11 @@ sh:
 
 		nodeFound = false
 		pythonFound = false
-		for _, v := range mockRuntime.CreatedConfig.Volumes {
-			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/node" {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == exePath && v.Target == "/usr/local/bin/node" {
 				nodeFound = true
 			}
-			if v.HostPath == exePath && v.ContainerPath == "/usr/local/bin/python" {
+			if v.Source == exePath && v.Target == "/usr/local/bin/python" {
 				pythonFound = true
 			}
 		}

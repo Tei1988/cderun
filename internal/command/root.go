@@ -41,7 +41,7 @@ type rootOptions struct {
 	cderunMountSocket     bool
 	cderunMountSocketPath string
 	cderunWorkdir         string
-	cderunVolumes         []string
+	cderunMounts          []string
 	cderunMountCderun     bool
 	cderunMountTools      string
 	cderunMountAllTools   bool
@@ -49,7 +49,7 @@ type rootOptions struct {
 	env                   []string
 	cderunEnv             []string
 	workdir               string
-	volumes               []string
+	mounts                []string
 	mountTools            string
 	mountAllTools         bool
 	dryRun                bool
@@ -83,7 +83,6 @@ type rootOptions struct {
 	pull             string
 	memory           string
 	cpus             float64
-	tmpfs            []string
 	devices          []string
 	cderunPorts      []string
 	cderunPublishAll bool
@@ -99,7 +98,6 @@ type rootOptions struct {
 	cderunPull       string
 	cderunMemory     string
 	cderunCPUs       float64
-	cderunTmpfs      []string
 	cderunDevices    []string
 }
 
@@ -182,8 +180,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		WorkdirSet:               cmd.Flags().Changed("workdir"),
 		CderunWorkdir:            o.cderunWorkdir,
 		CderunWorkdirSet:         cmd.Flags().Changed("cderun-workdir"),
-		Volumes:                  o.volumes,
-		CderunVolumes:            o.cderunVolumes,
+		Mounts:                   o.mounts,
+		CderunMounts:             o.cderunMounts,
 		MountCderun:              o.mountCderun,
 		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
 		CderunMountCderun:        o.cderunMountCderun,
@@ -264,8 +262,6 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CPUsSet:             cmd.Flags().Changed("cpus"),
 		CderunCPUs:          o.cderunCPUs,
 		CderunCPUsSet:       cmd.Flags().Changed("cderun-cpus"),
-		Tmpfs:               o.tmpfs,
-		CderunTmpfs:         o.cderunTmpfs,
 		Devices:             o.devices,
 		CderunDevices:       o.cderunDevices,
 	}
@@ -289,7 +285,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,
 		Remove:      resolved.Remove,
-		Volumes:     resolved.Volumes,
+		Mounts:      resolved.Mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
 		User:        resolved.User,
@@ -308,7 +304,6 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Pull:       resolved.Pull,
 		Memory:     resolved.Memory,
 		CPUs:       resolved.CPUs,
-		Tmpfs:      resolved.Tmpfs,
 		Devices:    resolved.Devices,
 	}
 
@@ -323,17 +318,19 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		}
 
 		// Add binary mount
-		containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-			HostPath:      exePath,
-			ContainerPath: "/usr/local/bin/cderun",
-			ReadOnly:      true,
+		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+			Type:     "bind",
+			Source:   exePath,
+			Target:   "/usr/local/bin/cderun",
+			ReadOnly: true,
 		})
 
 		// Add socket mount
-		containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-			HostPath:      resolved.SocketPath,
-			ContainerPath: resolved.MountSocketPath,
-			ReadOnly:      false, // Socket needs to be writable
+		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+			Type:     "bind",
+			Source:   resolved.SocketPath,
+			Target:   resolved.MountSocketPath,
+			ReadOnly: false, // Socket needs to be writable
 		})
 
 		// Handle MountTools / MountAllTools
@@ -342,10 +339,11 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 				logging.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
 			}
 			for toolName := range toolsCfg {
-				containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-					HostPath:      exePath,
-					ContainerPath: "/usr/local/bin/" + toolName,
-					ReadOnly:      true,
+				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+					Type:     "bind",
+					Source:   exePath,
+					Target:   "/usr/local/bin/" + toolName,
+					ReadOnly: true,
 				})
 			}
 		} else if resolved.MountTools != "" {
@@ -355,19 +353,21 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 				if _, ok := toolsCfg[toolName]; !ok {
 					return nil, fmt.Errorf("tool %q not found in tools config", toolName)
 				}
-				containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-					HostPath:      exePath,
-					ContainerPath: "/usr/local/bin/" + toolName,
-					ReadOnly:      true,
+				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+					Type:     "bind",
+					Source:   exePath,
+					Target:   "/usr/local/bin/" + toolName,
+					ReadOnly: true,
 				})
 			}
 		}
 	} else if resolved.MountSocket {
 		// Just mount the socket if requested even if no other mounting flags are set
-		containerConfig.Volumes = append(containerConfig.Volumes, container.VolumeMount{
-			HostPath:      resolved.SocketPath,
-			ContainerPath: resolved.MountSocketPath,
-			ReadOnly:      false,
+		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+			Type:     "bind",
+			Source:   resolved.SocketPath,
+			Target:   resolved.MountSocketPath,
+			ReadOnly: false,
 		})
 	}
 
@@ -441,11 +441,11 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("Interactive: %v\n", containerConfig.Interactive)
 		fmt.Printf("Network: %s\n", containerConfig.Network)
 		fmt.Printf("Remove: %v\n", containerConfig.Remove)
-		var volumes []string
-		for _, v := range containerConfig.Volumes {
-			volumes = append(volumes, fmt.Sprintf("%s:%s", v.HostPath, v.ContainerPath))
+		var mounts []string
+		for _, m := range containerConfig.Mounts {
+			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
-		fmt.Printf("Volumes: %s\n", strings.Join(volumes, ", "))
+		fmt.Printf("Mounts: %s\n", strings.Join(mounts, ", "))
 		fmt.Printf("Env: %s\n", strings.Join(containerConfig.Env, ", "))
 		fmt.Printf("Workdir: %s\n", containerConfig.Workdir)
 		fmt.Printf("User: %s\n", containerConfig.User)
@@ -462,7 +462,6 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 		fmt.Printf("Pull: %s\n", containerConfig.Pull)
 		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
 		fmt.Printf("CPUs: %g\n", containerConfig.CPUs)
-		fmt.Printf("Tmpfs: %s\n", strings.Join(containerConfig.Tmpfs, ", "))
 		var devices []string
 		for _, d := range containerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
@@ -721,7 +720,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
 	cmd.PersistentFlags().StringSliceVarP(&opts.env, "env", "e", nil, "Set environment variables")
 	cmd.PersistentFlags().StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
-	cmd.PersistentFlags().StringSliceVarP(&opts.volumes, "volume", "v", nil, "Bind mount a volume")
+	cmd.PersistentFlags().StringArrayVar(&opts.mounts, "mount", nil, "Attach a filesystem mount to the container")
 	cmd.PersistentFlags().StringVar(&opts.mountTools, "mount-tools", "", "Mount specified tools into the container")
 	cmd.PersistentFlags().BoolVar(&opts.mountAllTools, "mount-all-tools", false, "Mount all defined tools into the container")
 	cmd.PersistentFlags().BoolVar(&opts.remove, "remove", true, "Automatically remove the container when it exits")
@@ -741,7 +740,6 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.pull, "pull", "missing", "Pull image before running (always, missing, never)")
 	cmd.PersistentFlags().StringVarP(&opts.memory, "memory", "m", "", "Memory limit")
 	cmd.PersistentFlags().Float64Var(&opts.cpus, "cpus", 0, "Number of CPUs")
-	cmd.PersistentFlags().StringSliceVar(&opts.tmpfs, "tmpfs", nil, "Mount a tmpfs directory")
 	cmd.PersistentFlags().StringSliceVar(&opts.devices, "device", nil, "Add a host device to the container")
 
 	cmd.PersistentFlags().BoolVar(&opts.cderunTTY, "cderun-tty", false, "Override TTY setting (highest priority, can be used after subcommand)")
@@ -755,7 +753,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunMountSocketPath, "cderun-mount-socket-path", "", "Override mount-socket-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunEnv, "cderun-env", nil, "Override environment variables (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunWorkdir, "cderun-workdir", "", "Override workdir setting (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().StringSliceVar(&opts.cderunVolumes, "cderun-volume", nil, "Override volume mounts (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringArrayVar(&opts.cderunMounts, "cderun-mount", nil, "Override mounts (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountCderun, "cderun-mount-cderun", false, "Override mount-cderun setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunMountTools, "cderun-mount-tools", "", "Override mount-tools setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
@@ -775,7 +773,6 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunPull, "cderun-pull", "", "Override pull setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunMemory, "cderun-memory", "", "Override memory setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().Float64Var(&opts.cderunCPUs, "cderun-cpus", 0, "Override cpus setting (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().StringSliceVar(&opts.cderunTmpfs, "cderun-tmpfs", nil, "Override tmpfs setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunDevices, "cderun-device", nil, "Override device setting (highest priority, can be used after subcommand)")
 
 	cmd.PersistentFlags().BoolVar(&opts.dryRun, "dry-run", false, "Preview container configuration without execution")

@@ -12,11 +12,11 @@ func TestResolve(t *testing.T) {
 	// Setup helper to create bool pointers
 	ptr := func(b bool) *bool { return &b }
 	cp := func(s string) ConfigPath { return ConfigPath{Raw: s} }
-	vcs := func(ss ...string) []VolumeConfig {
-		var res []VolumeConfig
+	mcs := func(ss ...string) []MountConfig {
+		var res []MountConfig
 		for _, s := range ss {
-			if v, ok := ParseVolumeConfig(s); ok {
-				res = append(res, v)
+			if m, err := ParseMountFlag(s); err == nil {
+				res = append(res, m)
 			}
 		}
 		return res
@@ -114,54 +114,54 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "", res.Image)
 	})
 
-	t.Run("Volume parsing", func(t *testing.T) {
+	t.Run("Mount parsing", func(t *testing.T) {
 		cli := CLIOptions{}
 		tools := ToolsConfig{
 			"node": ToolConfig{
-				Image:   "node:20",
-				Volumes: vcs("/host/path:/container/path:ro", ".:/app"),
+				Image:  "node:20",
+				Mounts: mcs("type=bind,source=/host/path,target=/container/path,readonly", "source=.,target=/app"),
 			},
 		}
 
 		res, err := Resolve("node", cli, tools, nil)
 		require.NoError(t, err)
-		assert.Len(t, res.Volumes, 2)
-		assert.Equal(t, "/host/path", res.Volumes[0].HostPath)
-		assert.Equal(t, "/container/path", res.Volumes[0].ContainerPath)
-		assert.True(t, res.Volumes[0].ReadOnly)
-		assert.Equal(t, ".", res.Volumes[1].HostPath)
-		assert.Equal(t, "/app", res.Volumes[1].ContainerPath)
-		assert.False(t, res.Volumes[1].ReadOnly)
+		assert.Len(t, res.Mounts, 2)
+		assert.Equal(t, "/host/path", res.Mounts[0].Source)
+		assert.Equal(t, "/container/path", res.Mounts[0].Target)
+		assert.True(t, res.Mounts[0].ReadOnly)
+		assert.Equal(t, ".", res.Mounts[1].Source)
+		assert.Equal(t, "/app", res.Mounts[1].Target)
+		assert.False(t, res.Mounts[1].ReadOnly)
 	})
 
-	t.Run("Windows-style volume parsing", func(t *testing.T) {
+	t.Run("Windows-style mount parsing", func(t *testing.T) {
 		cli := CLIOptions{}
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
-				Volumes: vcs(
-					`C:\host\path:/container/path`,
-					`D:\data:/mnt:ro`,
-					`Z:\shared folder:/app:rw`,
+				Mounts: mcs(
+					`type=bind,source=C:\host\path,target=/container/path`,
+					`type=bind,source=D:\data,target=/mnt,readonly`,
+					`type=bind,source=Z:\shared folder,target=/app,readonly=false`,
 				),
 			},
 		}
 
 		res, err := Resolve("node", cli, tools, nil)
 		require.NoError(t, err)
-		assert.Len(t, res.Volumes, 3)
+		assert.Len(t, res.Mounts, 3)
 
-		assert.Equal(t, `C:\host\path`, res.Volumes[0].HostPath)
-		assert.Equal(t, `/container/path`, res.Volumes[0].ContainerPath)
-		assert.False(t, res.Volumes[0].ReadOnly)
+		assert.Equal(t, `C:\host\path`, res.Mounts[0].Source)
+		assert.Equal(t, `/container/path`, res.Mounts[0].Target)
+		assert.False(t, res.Mounts[0].ReadOnly)
 
-		assert.Equal(t, `D:\data`, res.Volumes[1].HostPath)
-		assert.Equal(t, `/mnt`, res.Volumes[1].ContainerPath)
-		assert.True(t, res.Volumes[1].ReadOnly)
+		assert.Equal(t, `D:\data`, res.Mounts[1].Source)
+		assert.Equal(t, `/mnt`, res.Mounts[1].Target)
+		assert.True(t, res.Mounts[1].ReadOnly)
 
-		assert.Equal(t, `Z:\shared folder`, res.Volumes[2].HostPath)
-		assert.Equal(t, `/app`, res.Volumes[2].ContainerPath)
-		assert.False(t, res.Volumes[2].ReadOnly)
+		assert.Equal(t, `Z:\shared folder`, res.Mounts[2].Source)
+		assert.Equal(t, `/app`, res.Mounts[2].Target)
+		assert.False(t, res.Mounts[2].ReadOnly)
 	})
 
 	t.Run("Workdir resolution", func(t *testing.T) {
@@ -378,9 +378,10 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node",
-				Volumes: []VolumeConfig{{
-					Source:      ConfigPath{Raw: "./project-data", BaseDir: "/home/user/project"},
-					Destination: ConfigPath{Raw: "/data"},
+				Mounts: []MountConfig{{
+					Type:   "bind",
+					Source: ConfigPath{Raw: "./project-data", BaseDir: "/home/user/project"},
+					Target: ConfigPath{Raw: "/data"},
 				}},
 			},
 		}
@@ -389,8 +390,8 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "/etc/cderun/global.sock", res.SocketPath)
-		require.Len(t, res.Volumes, 1)
-		assert.Equal(t, "/home/user/project/project-data", res.Volumes[0].HostPath)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/home/user/project/project-data", res.Mounts[0].Source)
 	})
 
 	t.Run("Device resolution", func(t *testing.T) {

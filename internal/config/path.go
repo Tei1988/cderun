@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"regexp"
 	"strings"
 
@@ -57,44 +58,60 @@ func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
 	return resolveDevicePath(resolved, cp.BaseDir)
 }
 
-// VolumeConfig is an intermediate representation for volume mappings.
-type VolumeConfig struct {
-	Source      ConfigPath
-	Destination ConfigPath
-	ReadOnly    bool
+// MountConfig is an intermediate representation for mount points in configuration.
+type MountConfig struct {
+	Type     string
+	Source   ConfigPath
+	Target   ConfigPath
+	ReadOnly bool
 }
 
-func (vc *VolumeConfig) UnmarshalYAML(node *yaml.Node) error {
-	var s string
-	if err := node.Decode(&s); err != nil {
-		return err
+func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
+	// Support structure format
+	type alias MountConfig
+	var a struct {
+		Type     string     `yaml:"type"`
+		Source   ConfigPath `yaml:"source"`
+		Target   ConfigPath `yaml:"target"`
+		ReadOnly bool       `yaml:"read_only"`
 	}
-	parsed, ok := ParseVolumeConfig(s)
-	if !ok {
-		return fmt.Errorf("invalid volume config: %s", s)
+	if err := node.Decode(&a); err == nil && a.Type != "" {
+		mc.Type = a.Type
+		mc.Source = a.Source
+		mc.Target = a.Target
+		mc.ReadOnly = a.ReadOnly
+		return nil
 	}
-	*vc = parsed
-	return nil
+
+	return fmt.Errorf("invalid mount config: %v", node.Value)
 }
 
-func (vc VolumeConfig) IsEmpty() bool {
-	return vc.Source.IsEmpty() && vc.Destination.IsEmpty()
+func (mc MountConfig) IsEmpty() bool {
+	return mc.Target.IsEmpty()
 }
 
-func (vc *VolumeConfig) SetBaseDir(baseDir string) {
-	if vc.Source.Raw != "" {
-		vc.Source.BaseDir = baseDir
+func (mc *MountConfig) SetBaseDir(baseDir string) {
+	if mc.Source.Raw != "" {
+		mc.Source.BaseDir = baseDir
 	}
-	if vc.Destination.Raw != "" {
-		vc.Destination.BaseDir = baseDir
+	if mc.Target.Raw != "" {
+		mc.Target.BaseDir = baseDir
 	}
 }
 
-func (vc VolumeConfig) Resolve(r *ExpressionResolver) container.VolumeMount {
-	return container.VolumeMount{
-		HostPath:      vc.Source.Resolve(r),
-		ContainerPath: vc.Destination.Resolve(r),
-		ReadOnly:      vc.ReadOnly,
+func (mc MountConfig) Resolve(r *ExpressionResolver) container.Mount {
+	source := ""
+	if mc.Type == "bind" {
+		source = mc.Source.Resolve(r)
+	} else {
+		source = r.resolveString(mc.Source.Raw)
+	}
+
+	return container.Mount{
+		Type:     mc.Type,
+		Source:   source,
+		Target:   mc.Target.Resolve(r),
+		ReadOnly: mc.ReadOnly,
 	}
 }
 
@@ -139,41 +156,48 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) container.DeviceMapping {
 	}
 }
 
-func ParseVolumeConfig(v string) (VolumeConfig, bool) {
-	if v == "" {
-		return VolumeConfig{}, false
+func ParseMountFlag(s string) (MountConfig, error) {
+	parts := strings.Split(s, ",")
+	res := MountConfig{
+		Type: "bind", // Default type
 	}
 
-	host, remainder, ok := SplitHostRemainder(v)
-	if !ok {
-		return VolumeConfig{}, false
-	}
-
-	var containerPath string
-	var readOnly bool
-
-	lastColon := strings.LastIndex(remainder, ":")
-	if lastColon != -1 {
-		mode := remainder[lastColon+1:]
-		if mode == "ro" || mode == "rw" {
-			readOnly = (mode == "ro")
-			containerPath = remainder[:lastColon]
-		} else {
-			containerPath = remainder
+	for _, part := range parts {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			if part == "readonly" {
+				res.ReadOnly = true
+				continue
+			}
+			return MountConfig{}, fmt.Errorf("invalid mount format: %s", s)
 		}
-	} else {
-		containerPath = remainder
+
+		key := kv[0]
+		val := kv[1]
+
+		switch key {
+		case "type":
+			res.Type = val
+		case "source", "src":
+			res.Source = ConfigPath{Raw: val}
+		case "target", "dst", "destination":
+			res.Target = ConfigPath{Raw: val}
+		case "readonly":
+			b, err := strconv.ParseBool(val)
+			if err != nil {
+				return MountConfig{}, fmt.Errorf("invalid readonly value: %s", val)
+			}
+			res.ReadOnly = b
+		default:
+			// Ignore unknown options for now (like tmpfs-size)
+		}
 	}
 
-	if host == "" || containerPath == "" {
-		return VolumeConfig{}, false
+	if res.Target.IsEmpty() {
+		return MountConfig{}, fmt.Errorf("mount target is required: %s", s)
 	}
 
-	return VolumeConfig{
-		Source:      ConfigPath{Raw: host},
-		Destination: ConfigPath{Raw: containerPath},
-		ReadOnly:    readOnly,
-	}, true
+	return res, nil
 }
 
 func ParseDeviceConfig(d string) (DeviceConfig, bool) {
