@@ -2,6 +2,7 @@ package config
 
 import (
 	"cderun/internal/container"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -68,9 +69,11 @@ func (vc *VolumeConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&s); err != nil {
 		return err
 	}
-	if parsed, ok := ParseVolumeConfig(s); ok {
-		*vc = parsed
+	parsed, ok := ParseVolumeConfig(s)
+	if !ok {
+		return fmt.Errorf("invalid volume config: %s", s)
 	}
+	*vc = parsed
 	return nil
 }
 
@@ -107,9 +110,11 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&s); err != nil {
 		return err
 	}
-	if parsed, ok := ParseDeviceConfig(s); ok {
-		*dc = parsed
+	parsed, ok := ParseDeviceConfig(s)
+	if !ok {
+		return fmt.Errorf("invalid device config: %s", s)
 	}
+	*dc = parsed
 	return nil
 }
 

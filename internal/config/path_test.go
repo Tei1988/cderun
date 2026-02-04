@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestPathResolution(t *testing.T) {
@@ -99,5 +100,35 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:///var/run/docker.sock", baseDir))
 		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:////var/run/docker.sock", baseDir))
 		assert.Equal(t, "http://example.com/path", resolvePath("http://example.com/path", baseDir))
+	})
+}
+
+func TestUnmarshalYAML_Errors(t *testing.T) {
+	t.Run("VolumeConfig", func(t *testing.T) {
+		var vc VolumeConfig
+
+		// Valid
+		err := yaml.Unmarshal([]byte("./data:/app/data:ro"), &vc)
+		assert.NoError(t, err)
+		assert.Equal(t, "./data", vc.Source.Raw)
+
+		// Invalid
+		err = yaml.Unmarshal([]byte("invalid-volume"), &vc)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid volume config")
+	})
+
+	t.Run("DeviceConfig", func(t *testing.T) {
+		var dc DeviceConfig
+
+		// Valid
+		err := yaml.Unmarshal([]byte("/dev/video0:/dev/video0:rwm"), &dc)
+		assert.NoError(t, err)
+		assert.Equal(t, "/dev/video0", dc.Source.Raw)
+
+		// Invalid
+		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device config")
 	})
 }
