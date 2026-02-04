@@ -137,18 +137,18 @@
 **目的**: サブコマンドを純粋なキーとして扱い、イメージ名を解決する。
 
 **実装内容**:
-1.  `internal/config/resolver.go` を修正。
-2.  サブコマンドは、`.tools.yaml` から設定を読み込むためのキーとしてのみ使用する。
-3.  イメージ名の解決は、標準の優先順位（CLI > Env > Tool > Global > Default）に従う。
+  1. `internal/config/resolver.go` を修正。
+  2. サブコマンドは、`.tools.yaml` から設定を読み込むためのキーとしてのみ使用する。
+  3. イメージ名の解決は、標準の優先順位（CLI > Env > Tool > Global > Default）に従う。
 
 ### Step 10.2: コンテナコマンドの組み立て (Completed)
 
 **目的**: `subcommand` をコンテナコマンドに含めず、その後の引数のみを渡すようにする。
 
 **実装内容**:
-1.  `internal/command/root.go` を修正。
-2.  `subcommand` はコンテナに渡すコマンド（`CMD`）には含めない。
-3.  コンテナに渡すコマンド（`CMD`）は、常にツール定義の `command` またはサブコマンド名以降の引数のみとする。
+  1. `internal/command/root.go` を修正。
+  2. `subcommand` はコンテナに渡すコマンド（`CMD`）には含めない。
+  3. コンテナに渡すコマンド（`CMD`）は、常にツール定義の `command` またはサブコマンド名以降の引数のみとする。
 
 ## 実装チェックリスト
 
