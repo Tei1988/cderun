@@ -12,12 +12,13 @@ func TestResolve(t *testing.T) {
 	// Setup helper to create bool pointers
 	ptr := func(b bool) *bool { return &b }
 	cp := func(s string) ConfigPath { return ConfigPath{Raw: s} }
-	mcs := func(ss ...string) []MountConfig {
+	mcs := func(tb testing.TB, ss ...string) []MountConfig {
+		tb.Helper()
 		var res []MountConfig
 		for _, s := range ss {
 			m, err := ParseMountFlag(s)
 			if err != nil {
-				t.Fatalf("failed to parse mount flag %q: %v", s, err)
+				tb.Fatalf("failed to parse mount flag %q: %v", s, err)
 			}
 			res = append(res, m)
 		}
@@ -121,7 +122,7 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image:  "node:20",
-				Mounts: mcs("type=bind,source=/host/path,target=/container/path,readonly", "source=.,target=/app"),
+				Mounts: mcs(t, "type=bind,source=/host/path,target=/container/path,readonly", "source=.,target=/app"),
 			},
 		}
 
@@ -141,7 +142,7 @@ func TestResolve(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
-				Mounts: mcs(
+				Mounts: mcs(t,
 					`type=bind,source=C:\host\path,target=/container/path`,
 					`type=bind,source=D:\data,target=/mnt,readonly`,
 					`type=bind,source=Z:\shared folder,target=/app,readonly=false`,
