@@ -36,20 +36,20 @@ type ConfigDefaults struct {
 	DryRun          *bool      `yaml:"dryRun"`
 	DryRunFormat    string     `yaml:"dryRunFormat"`
 	// New fields
-	Ports      []string     `yaml:"ports"`
-	PublishAll *bool        `yaml:"publishAll"`
-	Expose     []string     `yaml:"expose"`
-	Hostname   string       `yaml:"hostname"`
-	DNS        []string     `yaml:"dns"`
-	AddHosts   []string     `yaml:"addHosts"`
-	User       string       `yaml:"user"`
-	Privileged *bool        `yaml:"privileged"`
-	CapAdd     []string     `yaml:"capAdd"`
-	CapDrop    []string     `yaml:"capDrop"`
-	Entrypoint []string     `yaml:"entrypoint"`
-	Command    []string     `yaml:"command"`
-	Pull       string       `yaml:"pull"`
-	Memory     string       `yaml:"memory"`
+	Ports      []string       `yaml:"ports"`
+	PublishAll *bool          `yaml:"publishAll"`
+	Expose     []string       `yaml:"expose"`
+	Hostname   string         `yaml:"hostname"`
+	DNS        []string       `yaml:"dns"`
+	AddHosts   []string       `yaml:"addHosts"`
+	User       string         `yaml:"user"`
+	Privileged *bool          `yaml:"privileged"`
+	CapAdd     []string       `yaml:"capAdd"`
+	CapDrop    []string       `yaml:"capDrop"`
+	Entrypoint []string       `yaml:"entrypoint"`
+	Command    []string       `yaml:"command"`
+	Pull       string         `yaml:"pull"`
+	Memory     string         `yaml:"memory"`
 	CPUs       float64        `yaml:"cpus"`
 	Tmpfs      []string       `yaml:"tmpfs"`
 	Devices    []DeviceConfig `yaml:"devices"`
@@ -96,26 +96,26 @@ type ToolConfig struct {
 	Volumes         []VolumeConfig `yaml:"volumes"`
 	Env             []string       `yaml:"env"`
 	Workdir         string         `yaml:"workdir"`
-	MountCderun     *bool        `yaml:"mountCderun"`
-	MountSocket     *bool        `yaml:"mountSocket"`
-	MountSocketPath ConfigPath   `yaml:"mountSocketPath"`
-	DryRun          *bool        `yaml:"dryRun"`
-	DryRunFormat    string       `yaml:"dryRunFormat"`
+	MountCderun     *bool          `yaml:"mountCderun"`
+	MountSocket     *bool          `yaml:"mountSocket"`
+	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	DryRun          *bool          `yaml:"dryRun"`
+	DryRunFormat    string         `yaml:"dryRunFormat"`
 	// New fields
-	Ports      []string     `yaml:"ports"`
-	PublishAll *bool        `yaml:"publishAll"`
-	Expose     []string     `yaml:"expose"`
-	Hostname   string       `yaml:"hostname"`
-	DNS        []string     `yaml:"dns"`
-	AddHosts   []string     `yaml:"addHosts"`
-	User       string       `yaml:"user"`
-	Privileged *bool        `yaml:"privileged"`
-	CapAdd     []string     `yaml:"capAdd"`
-	CapDrop    []string     `yaml:"capDrop"`
-	Entrypoint []string     `yaml:"entrypoint"`
-	Command    []string     `yaml:"command"`
-	Pull       string       `yaml:"pull"`
-	Memory     string       `yaml:"memory"`
+	Ports      []string       `yaml:"ports"`
+	PublishAll *bool          `yaml:"publishAll"`
+	Expose     []string       `yaml:"expose"`
+	Hostname   string         `yaml:"hostname"`
+	DNS        []string       `yaml:"dns"`
+	AddHosts   []string       `yaml:"addHosts"`
+	User       string         `yaml:"user"`
+	Privileged *bool          `yaml:"privileged"`
+	CapAdd     []string       `yaml:"capAdd"`
+	CapDrop    []string       `yaml:"capDrop"`
+	Entrypoint []string       `yaml:"entrypoint"`
+	Command    []string       `yaml:"command"`
+	Pull       string         `yaml:"pull"`
+	Memory     string         `yaml:"memory"`
 	CPUs       float64        `yaml:"cpus"`
 	Tmpfs      []string       `yaml:"tmpfs"`
 	Devices    []DeviceConfig `yaml:"devices"`
