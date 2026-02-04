@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -68,22 +68,24 @@ type MountConfig struct {
 
 func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
 	// Support structure format
-	type alias MountConfig
 	var a struct {
 		Type     string     `yaml:"type"`
 		Source   ConfigPath `yaml:"source"`
 		Target   ConfigPath `yaml:"target"`
 		ReadOnly bool       `yaml:"read_only"`
 	}
-	if err := node.Decode(&a); err == nil && a.Type != "" {
+	if err := node.Decode(&a); err == nil {
 		mc.Type = a.Type
+		if mc.Type == "" {
+			mc.Type = "bind"
+		}
 		mc.Source = a.Source
 		mc.Target = a.Target
 		mc.ReadOnly = a.ReadOnly
 		return nil
 	}
 
-	return fmt.Errorf("invalid mount config: %v", node.Value)
+	return fmt.Errorf("invalid mount config at line %d (tag %s): %v", node.Line, node.Tag, node.Value)
 }
 
 func (mc MountConfig) IsEmpty() bool {

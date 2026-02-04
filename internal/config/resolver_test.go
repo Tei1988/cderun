@@ -15,9 +15,11 @@ func TestResolve(t *testing.T) {
 	mcs := func(ss ...string) []MountConfig {
 		var res []MountConfig
 		for _, s := range ss {
-			if m, err := ParseMountFlag(s); err == nil {
-				res = append(res, m)
+			m, err := ParseMountFlag(s)
+			if err != nil {
+				t.Fatalf("failed to parse mount flag %q: %v", s, err)
 			}
+			res = append(res, m)
 		}
 		return res
 	}

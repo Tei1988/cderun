@@ -124,6 +124,16 @@ read_only: true
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "./data", mc.Source.Raw)
 
+		// Implicit type (default to bind)
+		yamlStr = `
+source: ./implicit
+target: /app/implicit
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &mc)
+		assert.NoError(t, err)
+		assert.Equal(t, "bind", mc.Type)
+		assert.Equal(t, "./implicit", mc.Source.Raw)
+
 		// Invalid
 		err = yaml.Unmarshal([]byte("invalid-mount"), &mc)
 		assert.Error(t, err)
