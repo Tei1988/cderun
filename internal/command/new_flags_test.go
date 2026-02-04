@@ -42,7 +42,7 @@ func TestNewFlags(t *testing.T) {
 			"--pull", "always",
 			"--memory", "512m",
 			"--cpus", "2.5",
-			"--tmpfs", "/tmp:rw",
+			"--mount", "type=tmpfs,target=/tmp",
 			"--device", "/dev/fuse",
 			"--image", "alpine",
 			"sh", "ls", "-l",
@@ -65,7 +65,9 @@ func TestNewFlags(t *testing.T) {
 		assert.Equal(t, "always", mockRuntime.CreatedConfig.Pull)
 		assert.Equal(t, int64(512*1024*1024), mockRuntime.CreatedConfig.Memory)
 		assert.Equal(t, 2.5, mockRuntime.CreatedConfig.CPUs)
-		assert.Equal(t, []string{"/tmp:rw"}, mockRuntime.CreatedConfig.Tmpfs)
+		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "tmpfs", mockRuntime.CreatedConfig.Mounts[0].Type)
+		assert.Equal(t, "/tmp", mockRuntime.CreatedConfig.Mounts[0].Target)
 		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
 		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
 	})

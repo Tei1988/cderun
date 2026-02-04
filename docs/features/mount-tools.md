@@ -29,11 +29,11 @@ cderun --mount-cderun --mount-socket --mount-all-tools sh
 ```bash
 # .tools.yamlに node, python, gemini-cli が定義されている場合
 docker run --rm \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v <ホスト側cderunのパス>:/usr/local/bin/cderun:ro \
-  -v <ホスト側cderunのパス>:/usr/local/bin/node:ro \
-  -v <ホスト側cderunのパス>:/usr/local/bin/python:ro \
-  -v <ホスト側cderunのパス>:/usr/local/bin/gemini-cli:ro \
+  --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/cderun,readonly \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/node,readonly \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/gemini-cli,readonly \
   alpine:latest
 ```
 
@@ -59,10 +59,10 @@ cderun --mount-cderun --mount-socket --mount-tools python,node sh
 **動作イメージ(実際はランタイムAPIで実現)**:
 ```bash
 docker run --rm \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v <ホスト側cderunのパス>:/usr/local/bin/cderun:ro \
-  -v <ホスト側cderunのパス>:/usr/local/bin/python:ro \
-  -v <ホスト側cderunのパス>:/usr/local/bin/node:ro \
+  --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/cderun,readonly \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
+  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/node,readonly \
   alpine:latest
 ```
 

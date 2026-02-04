@@ -18,7 +18,7 @@ type ResolvedConfig struct {
 	Interactive     bool
 	Network         string
 	Remove          bool
-	Volumes         []container.VolumeMount
+	Mounts          []container.Mount
 	Env             []string
 	Workdir         string
 	User            string
@@ -53,7 +53,6 @@ type ResolvedConfig struct {
 	Pull       string
 	Memory     int64
 	CPUs       float64
-	Tmpfs      []string
 	Devices    []container.DeviceMapping
 }
 
@@ -101,8 +100,8 @@ type CLIOptions struct {
 	WorkdirSet               bool
 	CderunWorkdir            string
 	CderunWorkdirSet         bool
-	Volumes                  []string
-	CderunVolumes            []string
+	Mounts                   []string
+	CderunMounts             []string
 	MountCderun              bool
 	MountCderunSet           bool
 	CderunMountCderun        bool
@@ -183,8 +182,6 @@ type CLIOptions struct {
 	CPUsSet             bool
 	CderunCPUs          float64
 	CderunCPUsSet       bool
-	Tmpfs               []string
-	CderunTmpfs         []string
 	Devices             []string
 	CderunDevices       []string
 }
@@ -269,8 +266,8 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		r,
 	)
 
-	// 8. Resolve Volumes (P1 > P2 > P4)
-	res.Volumes = resolveVolumes(cli.CderunVolumes, cli.Volumes, subcommand, tools, r)
+	// 8. Resolve Mounts (P1 > P2 > P4)
+	res.Mounts = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r)
 
 	// 10. Resolve StrictEnv
 	res.StrictEnv = resolveBool(
@@ -495,7 +492,6 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r)
 	res.Command = resolveStringSlice(nil, nil, "CDERUN_COMMAND", subcommand, tools, func(t ToolConfig) []string { return t.Command }, global, func(g CDERunConfig) []string { return g.Defaults.Command }, r)
 	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
-	res.Tmpfs = resolveStringSlice(cli.CderunTmpfs, cli.Tmpfs, "CDERUN_TMPFS", subcommand, tools, func(t ToolConfig) []string { return t.Tmpfs }, global, func(g CDERunConfig) []string { return g.Defaults.Tmpfs }, r)
 	res.Devices = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
 
 	// Memory resolution (string to bytes)
@@ -746,35 +742,40 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 	return res, nil
 }
 
-func resolveVolumes(p1 []string, p2 []string, subcommand string, tools ToolsConfig, r *ExpressionResolver) []container.VolumeMount {
-	var vcs []VolumeConfig
+func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) []container.Mount {
+	var mcs []MountConfig
 
-	// Tool-specific volumes (lowest priority)
+	// Global defaults (lowest priority)
+	if global != nil {
+		mcs = append(mcs, global.Defaults.Mounts...)
+	}
+
+	// Tool-specific mounts
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			vcs = append(vcs, tool.Volumes...)
+			mcs = append(mcs, tool.Mounts...)
 		}
 	}
 
-	// P2 CLI volumes (middle priority)
-	for _, v := range p2 {
-		if parsed, ok := ParseVolumeConfig(v); ok {
+	// P2 CLI mounts (middle priority)
+	for _, m := range p2 {
+		if parsed, err := ParseMountFlag(m); err == nil {
 			parsed.SetBaseDir(".")
-			vcs = append(vcs, parsed)
+			mcs = append(mcs, parsed)
 		}
 	}
 
-	// P1 CLI volumes (highest priority)
-	for _, v := range p1 {
-		if parsed, ok := ParseVolumeConfig(v); ok {
+	// P1 CLI mounts (highest priority)
+	for _, m := range p1 {
+		if parsed, err := ParseMountFlag(m); err == nil {
 			parsed.SetBaseDir(".")
-			vcs = append(vcs, parsed)
+			mcs = append(mcs, parsed)
 		}
 	}
 
-	var res []container.VolumeMount
-	for _, vc := range vcs {
-		res = append(res, vc.Resolve(r))
+	var res []container.Mount
+	for _, mc := range mcs {
+		res = append(res, mc.Resolve(r))
 	}
 	return res
 }

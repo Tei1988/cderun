@@ -132,16 +132,6 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 		}
 	}
 
-	// Handle Tmpfs
-	for _, t := range config.Tmpfs {
-		parts := strings.SplitN(t, ":", 2)
-		if len(parts) == 2 {
-			hostConfig.Tmpfs[parts[0]] = parts[1]
-		} else {
-			hostConfig.Tmpfs[parts[0]] = ""
-		}
-	}
-
 	// Handle Devices
 	for _, dev := range config.Devices {
 		dMapping := dockercontainer.DeviceMapping{
@@ -152,14 +142,25 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
 	}
 
-	for _, vol := range config.Volumes {
-		m := mount.Mount{
-			Type:     mount.TypeBind,
-			Source:   vol.HostPath,
-			Target:   vol.ContainerPath,
-			ReadOnly: vol.ReadOnly,
+	for _, m := range config.Mounts {
+		var mType mount.Type
+		switch m.Type {
+		case "bind":
+			mType = mount.TypeBind
+		case "volume":
+			mType = mount.TypeVolume
+		case "tmpfs":
+			mType = mount.TypeTmpfs
+		default:
+			mType = mount.TypeBind
 		}
-		hostConfig.Mounts = append(hostConfig.Mounts, m)
+
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:     mType,
+			Source:   m.Source,
+			Target:   m.Target,
+			ReadOnly: m.ReadOnly,
+		})
 	}
 
 	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")

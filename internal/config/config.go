@@ -50,13 +50,16 @@ type ConfigDefaults struct {
 	Pull            string         `yaml:"pull"`
 	Memory          string         `yaml:"memory"`
 	CPUs            float64        `yaml:"cpus"`
-	Tmpfs           []string       `yaml:"tmpfs"`
+	Mounts          []MountConfig  `yaml:"mounts"`
 	Devices         []DeviceConfig `yaml:"devices"`
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
+	}
+	for i := range c.Mounts {
+		c.Mounts[i].SetBaseDir(baseDir)
 	}
 	for i := range c.Devices {
 		c.Devices[i].SetBaseDir(baseDir)
@@ -92,7 +95,7 @@ type ToolConfig struct {
 	Network         string         `yaml:"network"`
 	Remove          *bool          `yaml:"remove"`
 	StrictEnv       *bool          `yaml:"strictEnv"`
-	Volumes         []VolumeConfig `yaml:"volumes"`
+	Mounts          []MountConfig  `yaml:"mounts"`
 	Env             []string       `yaml:"env"`
 	Workdir         string         `yaml:"workdir"`
 	MountCderun     *bool          `yaml:"mountCderun"`
@@ -115,7 +118,6 @@ type ToolConfig struct {
 	Pull            string         `yaml:"pull"`
 	Memory          string         `yaml:"memory"`
 	CPUs            float64        `yaml:"cpus"`
-	Tmpfs           []string       `yaml:"tmpfs"`
 	Devices         []DeviceConfig `yaml:"devices"`
 }
 
@@ -123,8 +125,8 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
 	}
-	for i := range c.Volumes {
-		c.Volumes[i].SetBaseDir(baseDir)
+	for i := range c.Mounts {
+		c.Mounts[i].SetBaseDir(baseDir)
 	}
 	for i := range c.Devices {
 		c.Devices[i].SetBaseDir(baseDir)

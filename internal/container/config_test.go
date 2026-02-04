@@ -14,11 +14,12 @@ func TestContainerConfigInitialization(t *testing.T) {
 		Interactive: true,
 		Remove:      true,
 		Network:     "bridge",
-		Volumes: []VolumeMount{
+		Mounts: []Mount{
 			{
-				HostPath:      "/tmp",
-				ContainerPath: "/data",
-				ReadOnly:      false,
+				Type:     "bind",
+				Source:   "/tmp",
+				Target:   "/data",
+				ReadOnly: false,
 			},
 		},
 		Env:     []string{"FOO=BAR"},
@@ -32,23 +33,26 @@ func TestContainerConfigInitialization(t *testing.T) {
 	assert.True(t, config.Interactive)
 	assert.True(t, config.Remove)
 	assert.Equal(t, "bridge", config.Network)
-	assert.Len(t, config.Volumes, 1)
-	assert.Equal(t, "/tmp", config.Volumes[0].HostPath)
-	assert.Equal(t, "/data", config.Volumes[0].ContainerPath)
-	assert.False(t, config.Volumes[0].ReadOnly)
+	assert.Len(t, config.Mounts, 1)
+	assert.Equal(t, "bind", config.Mounts[0].Type)
+	assert.Equal(t, "/tmp", config.Mounts[0].Source)
+	assert.Equal(t, "/data", config.Mounts[0].Target)
+	assert.False(t, config.Mounts[0].ReadOnly)
 	assert.Equal(t, []string{"FOO=BAR"}, config.Env)
 	assert.Equal(t, "/workspace", config.Workdir)
 	assert.Equal(t, "1000", config.User)
 }
 
-func TestVolumeMount(t *testing.T) {
-	mount := VolumeMount{
-		HostPath:      "/etc/hosts",
-		ContainerPath: "/etc/hosts",
-		ReadOnly:      true,
+func TestMount(t *testing.T) {
+	mount := Mount{
+		Type:     "bind",
+		Source:   "/etc/hosts",
+		Target:   "/etc/hosts",
+		ReadOnly: true,
 	}
 
-	assert.Equal(t, "/etc/hosts", mount.HostPath)
-	assert.Equal(t, "/etc/hosts", mount.ContainerPath)
+	assert.Equal(t, "bind", mount.Type)
+	assert.Equal(t, "/etc/hosts", mount.Source)
+	assert.Equal(t, "/etc/hosts", mount.Target)
 	assert.True(t, mount.ReadOnly)
 }

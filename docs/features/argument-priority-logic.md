@@ -12,15 +12,15 @@
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **マウント・ツール**: `--cderun-volume`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-tmpfs`, `--cderun-device`
+  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
-- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する（※`--cderun-volume` は例外的に `P2` とマージされる）。また、これらは**サブコマンドの後ろ**に配置する必要があります。
+- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する（※`--cderun-mount` は例外的に `P2` とマージされる）。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
 ### P2: CLI Flags (User Intent)
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。
 - **フラグ名**:
-  - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--volume`, `--mount-cderun`, `--mount-tools`, `--mount-all-tools`, `--remove`
-  - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--memory`, `--cpus`, `--tmpfs`, `--device`
+  - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-tools`, `--mount-all-tools`, `--remove`
+  - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--memory`, `--cpus`, `--device`
   - `--dry-run`, `--dry-run-format`, `--log-level`, `--log-file`, `--log-format`, `--log-tee`, `--log-timestamp`, `--verbose`
 - **判定条件**: `cmd.Flags().Changed(name)` が `true` であること。
   - ※ ユーザーがフラグを入力していない場合、Cobraが持つデフォルト値は無視し、P3以下の判定へ進むこと。

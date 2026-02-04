@@ -128,7 +128,7 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("-v", hostFile+":/hello.txt", "cat", "/hello.txt")
+		stdout, _, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -196,7 +196,7 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.MkdirAll(subDir, 0755)
 		require.NoError(t, err)
 
-		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  volumes:\n    - ./subdir:/mnt"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
