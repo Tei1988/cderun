@@ -150,6 +150,27 @@
   2. `subcommand` はコンテナに渡すコマンド（`CMD`）には含めない。
   3. コンテナに渡すコマンド（`CMD`）は、常にツール定義の `command` またはサブコマンド名以降の引数のみとする。
 
+### Phase 11: 再帰的実行のサポートとCLIフラグの拡充 (Completed)
+
+このフェーズでは、コンテナ内から別のコンテナを再帰的に実行するためのコンテキスト伝播機能を実装し、設定項目に対するCLIフラグの網羅性を向上させた。
+
+### Step 11.1: 再帰的コンテキストの伝播 (Completed)
+
+**目的**: ホスト側の実行パスやソケットパスの情報をコンテナ内に環境変数として注入し、入れ子になったcderunが正しく動作するようにする。
+
+**実装内容**:
+  1. `internal/command/root.go` を修正。
+  2. `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET_SOURCE_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_RUNTIME` をコンテナに注入。
+  3. `resolved.MountSocketSourcePath` がある場合、それをソケットマウントのソースとして使用する。
+
+### Step 11.2: 未実装フラグの追加とエラーメッセージの改善 (Completed)
+
+**目的**: 設定ファイルでしか指定できなかった項目のフラグ化と、ツールのマウント失敗時のフィードバック改善。
+
+**実装内容**:
+  1. `--strict-env`, `--log-timestamp`, `--mount-socket-source-path` およびそれらのP1オーバーライドフラグを追加。
+  2. `--mount-tools` で指定されたツールが見つからない場合、利用可能なツール一覧を表示するように改善。
+
 ## 実装チェックリスト
 
 ### Phase 1 (Completed)
@@ -197,6 +218,10 @@
 ### Phase 10 (Completed)
 - [x] Step 10.1: サブコマンドのキー化とイメージ解決
 - [x] Step 10.2: コンテナコマンドの組み立て
+
+### Phase 11 (Completed)
+- [x] Step 11.1: 再帰적コンテキストの伝播
+- [x] Step 11.2: 未実装フラグの追加とエラーメッセージの改善
 
 ## 各ステップの完了基準
 

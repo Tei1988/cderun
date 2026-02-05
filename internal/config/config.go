@@ -34,6 +34,7 @@ type ConfigDefaults struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountSocketSourcePath ConfigPath `yaml:"mountSocketSourcePath"`
 	DryRun          *bool          `yaml:"dryRun"`
 	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
@@ -58,6 +59,9 @@ type ConfigDefaults struct {
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
+	}
+	if c.MountSocketSourcePath.Raw != "" {
+		c.MountSocketSourcePath.BaseDir = baseDir
 	}
 	if c.MountCderunPath.Raw != "" {
 		c.MountCderunPath.BaseDir = baseDir
@@ -106,6 +110,7 @@ type ToolConfig struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountSocketSourcePath ConfigPath `yaml:"mountSocketSourcePath"`
 	DryRun          *bool          `yaml:"dryRun"`
 	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`

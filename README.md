@@ -112,31 +112,68 @@ cderun node app.js --cderun-image node:20-alpine
 `cderun` uses two configuration files to manage its behavior.
 
 ### `.cderun.yaml` (Global Settings)
-Used for general settings and defaults.
+Used for general settings, logging, and defaults.
+
 ```yaml
 runtime: docker
+socketPath: /var/run/docker.sock
+logging:
+  level: info
+  format: text
+  file: ~/.cderun/cderun.log
+  tee: true
+  timestamp: true
 defaults:
   tty: true
   interactive: true
   remove: true
-logging:
-  level: info
-  format: text
+  network: bridge
+  pull: missing
+  user: "1000:1000"
+  workdir: /workspace
+  mountSocket: false
+  mountCderun: false
+  strictEnv: false
+  # Docker-compatible defaults
+  memory: 512m
+  cpus: 1.0
+  privileged: false
+  capAdd: [SYS_ADMIN]
 ```
 
 ### `.tools.yaml` (Tool Mappings)
-Defines how specific tools should be containerized.
+Defines how specific tools should be containerized. Supports all fields available in `defaults`.
+
 ```yaml
 node:
   image: node:20-alpine
+  command: ["node"]
   mounts:
     - type: bind
       source: .
       target: /app
   workdir: /app
+  env:
+    - NODE_ENV=development
+    - NPM_TOKEN  # Passthrough from host
+
 python:
   image: python:3.11-slim
+  command: ["python3"]
+  devices:
+    - /dev/fuse
 ```
+
+## Priority Logic
+
+`cderun` resolves configuration using the following priority order (from highest to lowest):
+
+1. **P1: Internal Overrides**: Flags prefixed with `--cderun-` (must be placed after the subcommand).
+2. **P2: CLI Flags**: Standard flags like `--tty` or `--env` (must be placed before the subcommand).
+3. **P3: Environment Variables**: Global overrides like `CDERUN_IMAGE` or `CDERUN_SOCKET_PATH`.
+4. **P4: Tool-specific config**: Settings defined for the subcommand in `.tools.yaml`.
+5. **P5: Global defaults**: Settings defined in the `defaults` section of `.cderun.yaml`.
+6. **P6: Hardcoded Defaults**: Built-in fallback values.
 
 ## Features
 

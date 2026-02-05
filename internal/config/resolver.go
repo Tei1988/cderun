@@ -38,6 +38,7 @@ type ResolvedConfig struct {
 	LogTee          bool
 	LogTimestamp    bool
 	StrictEnv       bool
+	MountSocketSourcePath string
 
 	// Docker-compatible flags
 	Ports      []string
@@ -142,7 +143,17 @@ type CLIOptions struct {
 	CderunLogFormatSet       bool
 	CderunLogTee             bool
 	CderunLogTeeSet          bool
+	CderunLogTimestamp       bool
+	CderunLogTimestampSet    bool
+	CderunStrictEnv          bool
+	CderunStrictEnvSet       bool
 	CderunVerbose            int
+	StrictEnv                bool
+	StrictEnvSet             bool
+	MountSocketSourcePath    string
+	MountSocketSourcePathSet bool
+	CderunMountSocketSourcePath    string
+	CderunMountSocketSourcePathSet bool
 
 	// Docker-compatible flags
 	Ports               []string
@@ -281,8 +292,8 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// 10. Resolve StrictEnv
 	res.StrictEnv = resolveBool(
-		false, false, // No P1 for strictEnv yet
-		false, false, // No P2 for strictEnv yet
+		cli.CderunStrictEnvSet, cli.CderunStrictEnv,
+		cli.StrictEnvSet, cli.StrictEnv,
 		"CDERUN_STRICT_ENV",
 		subcommand, tools, func(t ToolConfig) *bool { return t.StrictEnv },
 		global, func(g CDERunConfig) *bool { return g.Defaults.StrictEnv },
@@ -402,6 +413,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"path",
 	)
 
+	res.MountSocketSourcePath = resolveConfigPath(
+		cli.CderunMountSocketSourcePathSet, cli.CderunMountSocketSourcePath,
+		cli.MountSocketSourcePathSet, cli.MountSocketSourcePath,
+		"CDERUN_MOUNT_SOCKET_SOURCE_PATH",
+		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketSourcePath },
+		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketSourcePath },
+		"",
+		r,
+		"path",
+	)
+
 	// 14. Pass-through other mounting flags
 	if cli.CderunMountTools != "" {
 		res.MountTools = r.resolveString(cli.CderunMountTools)
@@ -491,7 +513,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	res.LogTimestamp = resolveBool(
-		false, false, // No P1 for timestamp yet
+		cli.CderunLogTimestampSet, cli.CderunLogTimestamp,
 		cli.LogTimestampSet, cli.LogTimestamp,
 		"CDERUN_LOG_TIMESTAMP",
 		"", nil, nil,

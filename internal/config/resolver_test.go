@@ -565,4 +565,30 @@ func TestResolve(t *testing.T) {
 		_, err := Resolve("", cli, nil, nil)
 		assert.Error(t, err)
 	})
+
+	t.Run("Recursive context resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_SOCKET_SOURCE_PATH", "/host/docker.sock")
+		t.Setenv("CDERUN_STRICT_ENV", "true")
+		t.Setenv("CDERUN_LOG_TIMESTAMP", "false")
+
+		cli := CLIOptions{}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/docker.sock", res.MountSocketSourcePath)
+		assert.True(t, res.StrictEnv)
+		assert.False(t, res.LogTimestamp)
+
+		// P1 Override
+		cli.CderunMountSocketSourcePath = "/p1/socket.sock"
+		cli.CderunMountSocketSourcePathSet = true
+		cli.CderunStrictEnv = false
+		cli.CderunStrictEnvSet = true
+		cli.CderunLogTimestamp = true
+		cli.CderunLogTimestampSet = true
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/p1/socket.sock", res.MountSocketSourcePath)
+		assert.False(t, res.StrictEnv)
+		assert.True(t, res.LogTimestamp)
+	})
 }

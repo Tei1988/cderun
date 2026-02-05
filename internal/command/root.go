@@ -64,12 +64,17 @@ type rootOptions struct {
 	logFormat             string
 	logTee                bool
 	logTimestamp          bool
+	strictEnv       bool
+	mountSocketSourcePath string
 	verbose               int
 	cderunLogLevel        string
 	cderunLogFile         string
 	cderunLogFormat       string
 	cderunLogTee          bool
+	cderunLogTimestamp    bool
+	cderunStrictEnv       bool
 	cderunVerbose         int
+	cderunMountSocketSourcePath string
 
 	// Docker-compatible flags
 	ports            []string
@@ -215,6 +220,16 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		LogTeeSet:                cmd.Flags().Changed("log-tee"),
 		LogTimestamp:             o.logTimestamp,
 		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
+		CderunLogTimestamp:       o.cderunLogTimestamp,
+		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
+		StrictEnv:                o.strictEnv,
+		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
+		CderunStrictEnv:          o.cderunStrictEnv,
+		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
+		MountSocketSourcePath:    o.mountSocketSourcePath,
+		MountSocketSourcePathSet: cmd.Flags().Changed("mount-socket-source-path"),
+		CderunMountSocketSourcePath:    o.cderunMountSocketSourcePath,
+		CderunMountSocketSourcePathSet: cmd.Flags().Changed("cderun-mount-socket-source-path"),
 		Verbose:                  o.verbose,
 		CderunLogLevel:           o.cderunLogLevel,
 		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
@@ -341,9 +356,13 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		})
 
 		// Add socket mount
+		socketSource := resolved.SocketPath
+		if resolved.MountSocketSourcePath != "" {
+			socketSource = resolved.MountSocketSourcePath
+		}
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
-			Source:   resolved.SocketPath,
+			Source:   socketSource,
 			Target:   resolved.MountSocketPath,
 			ReadOnly: false, // Socket needs to be writable
 		})
@@ -373,7 +392,12 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			for _, toolName := range tools {
 				toolName = strings.TrimSpace(toolName)
 				if _, ok := toolsCfg[toolName]; !ok {
-					return nil, fmt.Errorf("tool %q not found in tools config", toolName)
+					toolNames := make([]string, 0, len(toolsCfg))
+					for name := range toolsCfg {
+						toolNames = append(toolNames, name)
+					}
+					sort.Strings(toolNames)
+					return nil, fmt.Errorf("tool %q not found in tools config. Available tools: %s", toolName, strings.Join(toolNames, ", "))
 				}
 				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 					Type:     "bind",
@@ -383,11 +407,24 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 				})
 			}
 		}
+
+		// Inject recursive context environment variables
+		containerConfig.Env = append(containerConfig.Env,
+			"CDERUN_MOUNT_CDERUN_PATH="+exePath,
+			"CDERUN_SOCKET_PATH="+resolved.MountSocketPath,
+			"CDERUN_MOUNT_SOCKET_SOURCE_PATH="+socketSource,
+			"CDERUN_MOUNT_SOCKET=true",
+			"CDERUN_RUNTIME="+resolved.Runtime,
+		)
 	} else if resolved.MountSocket {
 		// Just mount the socket if requested even if no other mounting flags are set
+		socketSource := resolved.SocketPath
+		if resolved.MountSocketSourcePath != "" {
+			socketSource = resolved.MountSocketSourcePath
+		}
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
-			Source:   resolved.SocketPath,
+			Source:   socketSource,
 			Target:   resolved.MountSocketPath,
 			ReadOnly: false,
 		})
@@ -737,6 +774,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.socketPath, "socket-path", "", "Path to the container runtime socket on the host")
 	cmd.PersistentFlags().BoolVar(&opts.mountSocket, "mount-socket", false, "Mount the container runtime socket into the container")
 	cmd.PersistentFlags().StringVar(&opts.mountSocketPath, "mount-socket-path", "", "Path where the socket should be mounted inside the container (defaults to host path)")
+	cmd.PersistentFlags().StringVar(&opts.mountSocketSourcePath, "mount-socket-source-path", "", "Host path to the container runtime socket to mount inside container")
 	cmd.PersistentFlags().BoolVar(&opts.mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 	cmd.PersistentFlags().StringVar(&opts.mountCderunPath, "mount-cderun-path", "", "Host path to cderun binary to mount inside container")
 	cmd.PersistentFlags().StringVar(&opts.image, "image", "", "Docker image to use")
@@ -810,11 +848,15 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.logFormat, "log-format", "text", "Set log format (text, json)")
 	cmd.PersistentFlags().BoolVar(&opts.logTee, "log-tee", false, "Output log to both stderr and log file")
 	cmd.PersistentFlags().BoolVar(&opts.logTimestamp, "log-timestamp", true, "Include timestamp in logs")
+	cmd.PersistentFlags().BoolVar(&opts.strictEnv, "strict-env", false, "Strict environment variable resolution")
 
 	cmd.PersistentFlags().StringVar(&opts.cderunLogLevel, "cderun-log-level", "", "Override log level (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunMountSocketSourcePath, "cderun-mount-socket-source-path", "", "Override mount-socket-source-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFile, "cderun-log-file", "", "Override log file path (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunLogTee, "cderun-log-tee", false, "Override log-tee setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunLogTimestamp, "cderun-log-timestamp", false, "Override log-timestamp setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunStrictEnv, "cderun-strict-env", false, "Override strict-env setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 
 	cmd.Flags().SetInterspersed(false)

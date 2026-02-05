@@ -212,4 +212,28 @@ func TestIntegrationBasic(t *testing.T) {
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "source="+customPath+",target=/usr/local/bin/cderun")
 	})
+
+	t.Run("recursive context injection (dry-run)", func(t *testing.T) {
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
+
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mountCderun: true\n  mountSocket: true"), 0644)
+		require.NoError(t, err)
+
+		// Note: Standard flags (P2) like --dry-run must be before the subcommand.
+		// Internal overrides (P1) like --cderun-dry-run can be after.
+		stdout, _, exitCode, err := runCderun("--dry-run", "--dry-run-format", "simple", "mytool")
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+
+		// Check injected environment variables
+		assert.Contains(t, stdout, "CDERUN_MOUNT_CDERUN_PATH=")
+		assert.Contains(t, stdout, "CDERUN_SOCKET_PATH=")
+		assert.Contains(t, stdout, "CDERUN_MOUNT_SOCKET_SOURCE_PATH=")
+		assert.Contains(t, stdout, "CDERUN_MOUNT_SOCKET=true")
+		assert.Contains(t, stdout, "CDERUN_RUNTIME=")
+	})
 }
