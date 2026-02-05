@@ -18,8 +18,8 @@ const testImage = "public.ecr.aws/docker/library/alpine:latest"
 // It captures stdout and stderr and returns the exit code.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	// Re-use logic from root_test.go but simplified
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
 
 	rOut, wOut, err := os.Pipe()
 	if err != nil {
@@ -60,12 +60,12 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 
 	// Mock exitFunc to capture exit code
 	capturedExitCode := 0
-	oldExitFunc := exitFunc
+	originalExitFunc := exitFunc
 	exitFunc = func(code int) {
 		capturedExitCode = code
 	}
 	defer func() {
-		exitFunc = oldExitFunc
+		exitFunc = originalExitFunc
 	}()
 
 	execErr := Execute(append([]string{"cderun"}, args...))
@@ -76,8 +76,8 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 	stdout = <-stdoutChan
 	stderr = <-stderrChan
 
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
+	os.Stdout = originalStdout
+	os.Stderr = originalStderr
 
 	return stdout, stderr, capturedExitCode, execErr
 }
@@ -100,10 +100,10 @@ func TestIntegrationBasic(t *testing.T) {
 		// To fix this, we'll use a tool definition in .tools.yaml or just test that it fails/executes correctly.
 		// Actually, the requirement is to use alpine as image and echo hello.
 		// Let's use a temporary .tools.yaml for this test to be realistic.
-		oldWd, _ := os.Getwd()
+		originalWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
 		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(oldWd) }()
+		defer func() { _ = os.Chdir(originalWd) }()
 
 		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
 		require.NoError(t, err)
@@ -116,10 +116,10 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
-		oldWd, _ := os.Getwd()
+		originalWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
 		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(oldWd) }()
+		defer func() { _ = os.Chdir(originalWd) }()
 
 		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
 		require.NoError(t, err)
@@ -136,10 +136,10 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("environment variables", func(t *testing.T) {
-		oldWd, _ := os.Getwd()
+		originalWd, _ := os.Getwd()
 		tmpDir := t.TempDir()
 		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(oldWd) }()
+		defer func() { _ = os.Chdir(originalWd) }()
 
 		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0644)
 		require.NoError(t, err)
@@ -161,13 +161,13 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("cderun expressions", func(t *testing.T) {
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		err = os.Chdir(tmpDir)
 		require.NoError(t, err)
 		defer func() {
-			err := os.Chdir(oldWd)
+			err := os.Chdir(originalWd)
 			require.NoError(t, err)
 		}()
 
@@ -182,13 +182,13 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("relative path and tilde expansion", func(t *testing.T) {
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		err = os.Chdir(tmpDir)
 		require.NoError(t, err)
 		defer func() {
-			err := os.Chdir(oldWd)
+			err := os.Chdir(originalWd)
 			require.NoError(t, err)
 		}()
 

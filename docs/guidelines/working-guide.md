@@ -39,6 +39,11 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 ## 3. Coding Guidelines
 ### General
 - **Effective Go:** Goの公式スタイルガイドに従う。
+- **Naming Conventions:**
+  - 時間軸に依存した命名（`new`, `old`, `current`, `latest` など）を避ける。
+  - 理由: 時間が経つと何が「新」で何が「旧」か判別不能になるため。
+  - 代替案: `processed`, `original`, `initial`, `override` など、その変数の役割や状態を具体的に示す名前を使用する。
+  - 例外: `newRootCmd` のように、Goの慣習として「常に新しいインスタンスを生成する」ことを示すコンストラクタ的な関数名は許可される。
 - **Error Handling:**
   - エラーを握り潰さない（`_` で捨てない）。
   - エラーを返す際は、コンテキストを付与する: `fmt.Errorf("failed to open file: %w", err)`

@@ -13,10 +13,10 @@ func TestExpressionResolver(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	oldWd, err := os.Getwd()
+	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	resolver, err := NewExpressionResolver()
 	require.NoError(t, err)

@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewFlags(t *testing.T) {
+func TestDockerFlags(t *testing.T) {
 	// Save and restore package-level state
-	oldFactory := runtimeFactory
-	oldExit := exitFunc
+	originalFactory := runtimeFactory
+	originalExit := exitFunc
 	t.Cleanup(func() {
-		runtimeFactory = oldFactory
-		exitFunc = oldExit
+		runtimeFactory = originalFactory
+		exitFunc = originalExit
 	})
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -24,7 +24,7 @@ func TestNewFlags(t *testing.T) {
 	}
 	exitFunc = func(code int) {}
 
-	t.Run("P2 flags for new features", func(t *testing.T) {
+	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand(
@@ -72,12 +72,12 @@ func TestNewFlags(t *testing.T) {
 		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
 	})
 
-	t.Run("P1 flags override P2 for new features", func(t *testing.T) {
+	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
 		_, err := executeCommand(
 			"--publish", "8080:80",
-			"--user", "olduser",
+			"--user", "initialUser",
 			"--privileged=true",
 			"--pull", "missing",
 			"--memory", "1g",
@@ -85,7 +85,7 @@ func TestNewFlags(t *testing.T) {
 			"--image", "alpine",
 			"sh", "ls", "-l",
 			"--cderun-publish=9090:90",
-			"--cderun-user=newuser",
+			"--cderun-user=overrideUser",
 			"--cderun-privileged=false",
 			"--cderun-pull=always",
 			"--cderun-memory=2g",
@@ -96,22 +96,22 @@ func TestNewFlags(t *testing.T) {
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, []string{"ls", "-l"}, mockRuntime.CreatedConfig.Command)
 		assert.Equal(t, []string{"9090:90"}, mockRuntime.CreatedConfig.Ports)
-		assert.Equal(t, "newuser", mockRuntime.CreatedConfig.User)
+		assert.Equal(t, "overrideUser", mockRuntime.CreatedConfig.User)
 		assert.False(t, mockRuntime.CreatedConfig.Privileged)
 		assert.Equal(t, "always", mockRuntime.CreatedConfig.Pull)
 		assert.Equal(t, int64(2*1024*1024*1024), mockRuntime.CreatedConfig.Memory)
 		assert.Equal(t, 2.0, mockRuntime.CreatedConfig.CPUs)
 	})
 
-	t.Run("Resolve from .tools.yaml for new features", func(t *testing.T) {
+	t.Run("Resolve from .tools.yaml for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		err = os.Chdir(tmpDir)
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:

@@ -38,7 +38,7 @@ type ResolvedConfig struct {
 	LogTimestamp    bool
 	StrictEnv       bool
 
-	// New fields
+	// Docker-compatible flags
 	Ports      []string
 	PublishAll bool
 	Expose     []string
@@ -139,7 +139,7 @@ type CLIOptions struct {
 	CderunLogTeeSet          bool
 	CderunVerbose            int
 
-	// New fields
+	// Docker-compatible flags
 	Ports               []string
 	CderunPorts         []string
 	PublishAll          bool
@@ -479,7 +479,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		true, // Default to true
 	)
 
-	// Resolve new fields
+	// Resolve Docker-compatible flags
 	res.Ports = resolveStringSlice(cli.CderunPorts, cli.Ports, "CDERUN_PUBLISH", subcommand, tools, func(t ToolConfig) []string { return t.Ports }, global, func(g CDERunConfig) []string { return g.Defaults.Ports }, r)
 	res.PublishAll = resolveBool(cli.CderunPublishAllSet, cli.CderunPublishAll, cli.PublishAllSet, cli.PublishAll, "CDERUN_PUBLISH_ALL", subcommand, tools, func(t ToolConfig) *bool { return t.PublishAll }, global, func(g CDERunConfig) *bool { return g.Defaults.PublishAll }, false)
 	res.Expose = resolveStringSlice(cli.CderunExpose, cli.Expose, "CDERUN_EXPOSE", subcommand, tools, func(t ToolConfig) []string { return t.Expose }, global, func(g CDERunConfig) []string { return g.Defaults.Expose }, r)
