@@ -59,12 +59,17 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.logFormat = "text"
 	opts.logTee = false
 	opts.logTimestamp = true
+	opts.strictEnv = false
+	opts.mountSocketSourcePath = ""
 	opts.verbose = 0
 	opts.cderunLogLevel = ""
 	opts.cderunLogFile = ""
 	opts.cderunLogFormat = ""
 	opts.cderunLogTee = false
+	opts.cderunLogTimestamp = false
+	opts.cderunStrictEnv = false
 	opts.cderunVerbose = 0
+	opts.cderunMountSocketSourcePath = ""
 
 	opts.ports = nil
 	opts.publishAll = false
