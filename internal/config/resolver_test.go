@@ -527,7 +527,7 @@ func TestResolve(t *testing.T) {
 		cli := CLIOptions{
 			Mounts: []string{"type=bind,source=./data,target=/data"},
 		}
-		r, _ := NewExpressionResolver()
+		r, _ := NewExpressionResolver(nil)
 
 		res, err := Resolve("", cli, nil, nil)
 		require.NoError(t, err)

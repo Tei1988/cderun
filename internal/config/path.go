@@ -40,13 +40,35 @@ func (cp ConfigPath) Resolve(r *ExpressionResolver) string {
 	return resolvePath(resolved, cp.BaseDir)
 }
 
+// ResolveHost expands expressions, resolves the path relative to BaseDir, and translates it back to the Base Host path if needed.
+func (cp ConfigPath) ResolveHost(r *ExpressionResolver) string {
+	if cp.IsEmpty() {
+		return ""
+	}
+	resolved := r.resolveString(cp.Raw)
+	p := resolvePath(resolved, cp.BaseDir)
+	if r.HostContext != nil {
+		p = ResolveHostPath(p, r.HostContext.Mounts)
+	}
+	return p
+}
+
 // ResolveVolume expands expressions and resolves the volume host path relative to BaseDir.
 func (cp ConfigPath) ResolveVolume(r *ExpressionResolver) string {
 	if cp.IsEmpty() {
 		return ""
 	}
 	resolved := r.resolveString(cp.Raw)
-	return resolveVolumePath(resolved, cp.BaseDir)
+	p := resolveVolumePath(resolved, cp.BaseDir)
+	if r.HostContext != nil {
+		host, remainder, ok := SplitHostRemainder(p)
+		if ok {
+			p = ResolveHostPath(host, r.HostContext.Mounts) + ":" + remainder
+		} else {
+			p = ResolveHostPath(p, r.HostContext.Mounts)
+		}
+	}
+	return p
 }
 
 // ResolveDevice expands expressions and resolves the device host path relative to BaseDir.
@@ -55,7 +77,16 @@ func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
 		return ""
 	}
 	resolved := r.resolveString(cp.Raw)
-	return resolveDevicePath(resolved, cp.BaseDir)
+	p := resolveDevicePath(resolved, cp.BaseDir)
+	if r.HostContext != nil {
+		host, remainder, ok := SplitHostRemainder(p)
+		if ok {
+			p = ResolveHostPath(host, r.HostContext.Mounts) + ":" + remainder
+		} else {
+			p = ResolveHostPath(p, r.HostContext.Mounts)
+		}
+	}
+	return p
 }
 
 // MountConfig is an intermediate representation for mount points in configuration.
@@ -108,7 +139,7 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 func (mc MountConfig) Resolve(r *ExpressionResolver) container.Mount {
 	source := ""
 	if mc.Type == "bind" {
-		source = mc.Source.Resolve(r)
+		source = mc.Source.ResolveHost(r)
 	} else {
 		source = r.resolveString(mc.Source.Raw)
 	}
@@ -156,7 +187,7 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) container.DeviceMapping {
 	return container.DeviceMapping{
-		PathOnHost:        dc.Source.Resolve(r),
+		PathOnHost:        dc.Source.ResolveHost(r),
 		PathInContainer:   dc.Destination.Resolve(r),
 		CgroupPermissions: dc.Permissions,
 	}
@@ -294,6 +325,41 @@ func resolveDevicePath(d string, baseDir string) string {
 		return d
 	}
 	return resolvePath(host, baseDir) + ":" + remainder
+}
+
+func ResolveHostPath(p string, mounts []HostMount) string {
+	if len(mounts) == 0 {
+		return p
+	}
+
+	// Ensure p is absolute for prefix matching
+	absPath, err := filepath.Abs(p)
+	if err != nil {
+		absPath = p
+	}
+
+	var bestMatch *HostMount
+	for i := range mounts {
+		m := &mounts[i]
+		// Target should be absolute in the HostContext
+		if strings.HasPrefix(absPath, m.Target) {
+			// Check if it's a full component match
+			if len(absPath) == len(m.Target) || absPath[len(m.Target)] == filepath.Separator || m.Target == "/" {
+				if bestMatch == nil || m.Level > bestMatch.Level || (m.Level == bestMatch.Level && len(m.Target) > len(bestMatch.Target)) {
+					bestMatch = m
+				}
+			}
+		}
+	}
+
+	if bestMatch != nil {
+		rel, err := filepath.Rel(bestMatch.Target, absPath)
+		if err == nil {
+			return filepath.Join(bestMatch.Source, rel)
+		}
+	}
+
+	return p
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {

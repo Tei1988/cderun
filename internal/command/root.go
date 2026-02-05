@@ -102,6 +102,8 @@ type rootOptions struct {
 	cderunMemory     string
 	cderunCPUs       float64
 	cderunDevices    []string
+
+	tempSnapshotDirs []string
 }
 
 var (
@@ -276,7 +278,7 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
 }
 
-func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
+func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*container.ContainerConfig, error) {
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.
 	// Only the command defined in configuration (resolved.Command) and
@@ -383,6 +385,18 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 				})
 			}
 		}
+
+		// Create and mount configuration snapshot
+		hostSnapshotDir, err := o.createSnapshot(resolved, toolsCfg, globalCfg, containerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create configuration snapshot: %w", err)
+		}
+		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+			Type:     "bind",
+			Source:   hostSnapshotDir,
+			Target:   "/run/cderun",
+			ReadOnly: true,
+		})
 	} else if resolved.MountSocket {
 		// Just mount the socket if requested even if no other mounting flags are set
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
@@ -711,7 +725,7 @@ intended for the subcommand.`,
 			// Build ContainerConfig
 			var containerConfig *container.ContainerConfig
 			if subcommand != "" {
-				containerConfig, err = opts.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
+				containerConfig, err = opts.buildContainerConfig(resolved, passthroughArgs, toolsCfg, globalCfg)
 				if err != nil {
 					return fmt.Errorf("container configuration error: %w", err)
 				}
@@ -722,6 +736,7 @@ intended for the subcommand.`,
 			}
 
 			// Execute Container
+			defer opts.cleanupSnapshots()
 			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
 			if err != nil {
 				return err
@@ -914,4 +929,109 @@ func preprocessArgs(args []string) ([]string, error) {
 
 func init() {
 	// Intentionally empty. All initialization is done in newRootCmd.
+}
+
+func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig, containerConfig *container.ContainerConfig) (string, error) {
+	var hostSnapshotDir string
+	var localSnapshotDir string
+	snapshotID := fmt.Sprintf("snap-%d", time.Now().UnixNano())
+
+	if resolved.HostContext != nil && resolved.HostContext.SnapshotDir != "" {
+		hostSnapshotDir = filepath.Join(resolved.HostContext.SnapshotDir, snapshotID)
+		// Use /run/cderun if available (running in container), otherwise fallback to host path (for tests)
+		if info, err := os.Stat("/run/cderun"); err == nil && info.IsDir() {
+			localSnapshotDir = filepath.Join("/run/cderun", snapshotID)
+		} else {
+			localSnapshotDir = hostSnapshotDir
+		}
+	} else {
+		hostSnapshotDir = filepath.Join(os.TempDir(), "cderun-"+snapshotID)
+		localSnapshotDir = hostSnapshotDir
+	}
+
+	if err := os.MkdirAll(localSnapshotDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
+	}
+
+	if resolved.HostContext == nil {
+		o.tempSnapshotDirs = append(o.tempSnapshotDirs, hostSnapshotDir)
+	}
+
+	// Prepare Snapshot Config
+	var snapshotGlobal config.CDERunConfig
+	if globalCfg != nil {
+		snapshotGlobal = *globalCfg
+	}
+
+	// Create new HostContext
+	currentLevel := 0
+	if resolved.HostContext != nil {
+		currentLevel = resolved.HostContext.Level
+	}
+
+	exePath := resolved.MountCderunPath
+	if exePath == "" {
+		var err error
+		exePath, err = os.Executable()
+		if err != nil {
+			return "", fmt.Errorf("failed to get executable path: %w", err)
+		}
+		// Map it back to host path if we are in a container
+		if resolved.HostContext != nil {
+			exePath = config.ResolveHostPath(exePath, resolved.HostContext.Mounts)
+		}
+	}
+
+	cwd, _ := os.Getwd()
+	hostCwd := cwd
+	if resolved.HostContext != nil {
+		hostCwd = config.ResolveHostPath(cwd, resolved.HostContext.Mounts)
+	}
+
+	newHostMounts := make([]config.HostMount, 0, len(containerConfig.Mounts))
+	for _, m := range containerConfig.Mounts {
+		if m.Type == "bind" {
+			newHostMounts = append(newHostMounts, config.HostMount{
+				Source: m.Source,
+				Target: m.Target,
+				Level:  currentLevel + 1,
+			})
+		}
+	}
+
+	snapshotGlobal.HostContext = &config.HostContext{
+		BinPath:     exePath,
+		SnapshotDir: hostSnapshotDir,
+		WorkingDir:  hostCwd,
+		Level:       currentLevel + 1,
+		Mounts:      newHostMounts,
+	}
+
+	// Write .cderun.yaml
+	data, err := yaml.Marshal(snapshotGlobal)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal snapshot config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(localSnapshotDir, ".cderun.yaml"), data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write snapshot config: %w", err)
+	}
+
+	// Write .tools.yaml
+	data, err = yaml.Marshal(toolsCfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal tools config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(localSnapshotDir, ".tools.yaml"), data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write tools snapshot: %w", err)
+	}
+
+	return hostSnapshotDir, nil
+}
+
+func (o *rootOptions) cleanupSnapshots() {
+	for _, dir := range o.tempSnapshotDirs {
+		logging.Trace("Cleaning up snapshot directory: %s", dir)
+		_ = os.RemoveAll(dir)
+	}
+	o.tempSnapshotDirs = nil
 }

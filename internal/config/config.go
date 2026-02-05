@@ -10,10 +10,25 @@ import (
 )
 
 type CDERunConfig struct {
-	Runtime    string         `yaml:"runtime"`
-	SocketPath ConfigPath     `yaml:"socketPath"`
-	Defaults   ConfigDefaults `yaml:"defaults"`
-	Logging    LoggingConfig  `yaml:"logging"`
+	Runtime     string         `yaml:"runtime"`
+	SocketPath  ConfigPath     `yaml:"socketPath"`
+	Defaults    ConfigDefaults `yaml:"defaults"`
+	Logging     LoggingConfig  `yaml:"logging"`
+	HostContext *HostContext   `yaml:"hostContext,omitempty"`
+}
+
+type HostContext struct {
+	BinPath     string      `yaml:"binPath"`
+	SnapshotDir string      `yaml:"snapshotDir"`
+	WorkingDir  string      `yaml:"workingDir"`
+	Level       int         `yaml:"level"`
+	Mounts      []HostMount `yaml:"mounts"`
+}
+
+type HostMount struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
+	Level  int    `yaml:"level"`
 }
 
 func (c *CDERunConfig) SetBaseDir(baseDir string) {
@@ -183,6 +198,12 @@ func FindConfigs(filename string) []string {
 	p := filepath.Join("/etc", "cderun", filename)
 	if _, err := os.Stat(p); err == nil {
 		paths = append(paths, p)
+	}
+
+	// Add snapshot path (lowest priority)
+	snapshotP := filepath.Join("/run/cderun", filename)
+	if _, err := os.Stat(snapshotP); err == nil {
+		paths = append(paths, snapshotP)
 	}
 
 	return paths

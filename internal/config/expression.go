@@ -10,11 +10,12 @@ var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
-	Home string
-	Pwd  string
+	Home        string
+	Pwd         string
+	HostContext *HostContext
 }
 
-func NewExpressionResolver() (*ExpressionResolver, error) {
+func NewExpressionResolver(global *CDERunConfig) (*ExpressionResolver, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = ""
@@ -23,10 +24,14 @@ func NewExpressionResolver() (*ExpressionResolver, error) {
 	if err != nil {
 		pwd = ""
 	}
-	return &ExpressionResolver{
+	res := &ExpressionResolver{
 		Home: home,
 		Pwd:  pwd,
-	}, nil
+	}
+	if global != nil {
+		res.HostContext = global.HostContext
+	}
+	return res, nil
 }
 
 // Resolve processes a value (string, slice, or map) and resolves any expressions found.

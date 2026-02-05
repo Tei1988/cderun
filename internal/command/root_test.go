@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -1044,5 +1045,97 @@ func TestRemoveContainerWarning(t *testing.T) {
 		output, err := executeCommand("--image", "alpine", "sh")
 		assert.NoError(t, err)
 		assert.NotContains(t, output, "[WARN] failed to remove container (defer)")
+	})
+}
+
+func TestNestedSnapshot(t *testing.T) {
+	// Use a temporary directory for this test
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	tmpDir := t.TempDir()
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+
+	t.Run("creates configuration snapshot when --mount-cderun is used", func(t *testing.T) {
+		// Use dry-run to capture the config and keep the snapshot files
+		output, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "--dry-run", "sh")
+		assert.NoError(t, err)
+
+		// Find the snapshot source path in dry-run output
+		// Output format (YAML):
+		// mounts:
+		// - type: bind
+		//   source: /tmp/cderun-snap-xxx
+		//   target: /run/cderun
+
+		lines := strings.Split(output, "\n")
+		var snapshotSource string
+		for i, line := range lines {
+			if strings.Contains(line, "target: /run/cderun") {
+				// Look at previous line for source
+				if i > 0 && strings.Contains(lines[i-1], "source:") {
+					parts := strings.SplitN(lines[i-1], ":", 2)
+					if len(parts) == 2 {
+						snapshotSource = strings.TrimSpace(parts[1])
+					}
+					break
+				}
+			}
+		}
+
+		require.NotEmpty(t, snapshotSource, "snapshot source should be found in dry-run output")
+		t.Cleanup(func() { _ = os.RemoveAll(snapshotSource) })
+
+		// Verify snapshot files exist
+		assert.FileExists(t, filepath.Join(snapshotSource, ".cderun.yaml"))
+		assert.FileExists(t, filepath.Join(snapshotSource, ".tools.yaml"))
+
+		// Verify content of .cderun.yaml includes HostContext
+		content, err := os.ReadFile(filepath.Join(snapshotSource, ".cderun.yaml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "hostContext:")
+		assert.Contains(t, string(content), "snapshotDir: "+snapshotSource)
+		assert.Contains(t, string(content), "level: 1")
+	})
+
+	t.Run("recursive snapshots use subdirectories", func(t *testing.T) {
+		// Mock a nested environment
+		fakeBaseSnap := t.TempDir()
+		fakeBaseSnapAbs, err := filepath.Abs(fakeBaseSnap)
+		require.NoError(t, err)
+
+		globalCfg := `
+hostContext:
+  snapshotDir: ` + fakeBaseSnapAbs + `
+  level: 1
+  mounts:
+    - source: /host/proj
+      target: /app
+      level: 1
+`
+		err = os.WriteFile(".cderun.yaml", []byte(globalCfg), 0644)
+		require.NoError(t, err)
+		defer os.Remove(".cderun.yaml")
+
+		output, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "--dry-run", "sh")
+		assert.NoError(t, err)
+
+		// Parse output to find snapshotSource
+		lines := strings.Split(output, "\n")
+		var snapshotSource string
+		for i, line := range lines {
+			if strings.Contains(line, "target: /run/cderun") {
+				if i > 0 && strings.Contains(lines[i-1], "source:") {
+					parts := strings.SplitN(lines[i-1], ":", 2)
+					if len(parts) == 2 {
+						snapshotSource = strings.TrimSpace(parts[1])
+					}
+					break
+				}
+			}
+		}
+
+		require.NotEmpty(t, snapshotSource, "snapshot source should be found")
+		assert.True(t, strings.HasPrefix(snapshotSource, fakeBaseSnapAbs), "nested snapshot should be inside base snapshot dir")
 	})
 }

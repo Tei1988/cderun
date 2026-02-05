@@ -13,7 +13,7 @@ import (
 func TestPathResolution(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	baseDir := "/abs/path"
-	r, err := NewExpressionResolver()
+	r, err := NewExpressionResolver(nil)
 	require.NoError(t, err)
 
 	t.Run("resolvePath", func(t *testing.T) {
@@ -105,6 +105,25 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:///var/run/docker.sock", baseDir))
 		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:////var/run/docker.sock", baseDir))
 		assert.Equal(t, "http://example.com/path", resolvePath("http://example.com/path", baseDir))
+	})
+
+	t.Run("ResolveHostPath", func(t *testing.T) {
+		mounts := []HostMount{
+			{Source: "/home/user/project", Target: "/app", Level: 1},
+			{Source: "/home/user/project/data", Target: "/app/data", Level: 2}, // More specific and higher level
+			{Source: "/home/user", Target: "/home/user", Level: 1},
+		}
+
+		// Direct match
+		assert.Equal(t, "/home/user/project", ResolveHostPath("/app", mounts))
+		// Subpath match
+		assert.Equal(t, "/home/user/project/src/main.go", ResolveHostPath("/app/src/main.go", mounts))
+		// Higher level/More specific match
+		assert.Equal(t, "/home/user/project/data/db.sqlite", ResolveHostPath("/app/data/db.sqlite", mounts))
+		// Other mount match
+		assert.Equal(t, "/home/user/.ssh", ResolveHostPath("/home/user/.ssh", mounts))
+		// No match
+		assert.Equal(t, "/tmp/other", ResolveHostPath("/tmp/other", mounts))
 	})
 }
 

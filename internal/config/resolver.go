@@ -38,6 +38,7 @@ type ResolvedConfig struct {
 	LogTee          bool
 	LogTimestamp    bool
 	StrictEnv       bool
+	HostContext     *HostContext
 
 	// Docker-compatible flags
 	Ports      []string
@@ -197,7 +198,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res := &ResolvedConfig{}
 	var err error
 
-	r, err := NewExpressionResolver()
+	r, err := NewExpressionResolver(global)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
@@ -320,7 +321,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
 		"", // Fallback to empty for auto-detection
 		r,
-		"path",
+		"host",
 	)
 
 	// Auto-detection logic
@@ -399,7 +400,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
 		"",
 		r,
-		"path",
+		"host",
 	)
 
 	// 14. Pass-through other mounting flags
@@ -531,6 +532,10 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	// CPUs resolution
 	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
 
+	if global != nil {
+		res.HostContext = global.HostContext
+	}
+
 	return res, nil
 }
 
@@ -620,6 +625,8 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 		return cp.ResolveVolume(r)
 	case "device":
 		return cp.ResolveDevice(r)
+	case "host":
+		return cp.ResolveHost(r)
 	default:
 		return cp.Resolve(r)
 	}
