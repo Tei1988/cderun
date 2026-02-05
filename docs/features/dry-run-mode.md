@@ -28,8 +28,8 @@ cderun --dry-run
 ## 出力フォーマット
 
 ### YAML形式（デフォルト）
+`cderun --dry-run node app.js`
 ```yaml
-# cderun --dry-run node app.js
 image: node:latest
 command:
   - node
@@ -49,8 +49,8 @@ user: ""
 ```
 
 ### JSON形式
+`cderun --dry-run --dry-run-format json node app.js`
 ```json
-// cderun --dry-run --dry-run-format json node app.js
 {
   "image": "node:latest",
   "command": ["node", "app.js"],
@@ -72,8 +72,8 @@ user: ""
 ```
 
 ### 簡易形式
+`cderun --dry-run --dry-run-format simple node app.js`
 ```text
-# cderun --dry-run --dry-run-format simple node app.js
 Image: node:latest
 Command: node app.js
 TTY: true
