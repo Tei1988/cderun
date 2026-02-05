@@ -1115,7 +1115,7 @@ hostContext:
 `
 		err = os.WriteFile(".cderun.yaml", []byte(globalCfg), 0644)
 		require.NoError(t, err)
-		defer os.Remove(".cderun.yaml")
+		defer func() { _ = os.Remove(".cderun.yaml") }()
 
 		output, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "--dry-run", "sh")
 		assert.NoError(t, err)
