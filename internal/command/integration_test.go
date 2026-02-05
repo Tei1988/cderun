@@ -204,4 +204,12 @@ func TestIntegrationBasic(t *testing.T) {
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "/mnt")
 	})
+
+	t.Run("mount-cderun-path", func(t *testing.T) {
+		customPath := "/tmp/custom-cderun"
+		stdout, _, exitCode, err := runCderun("--image", testImage, "--mount-socket", "--mount-cderun", "--mount-cderun-path", customPath, "--dry-run", "--dry-run-format", "simple", "echo", "hello")
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "source="+customPath+",target=/usr/local/bin/cderun")
+	})
 }

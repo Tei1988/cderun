@@ -31,6 +31,7 @@ type ConfigDefaults struct {
 	Remove          *bool          `yaml:"remove"`
 	StrictEnv       *bool          `yaml:"strictEnv"`
 	MountCderun     *bool          `yaml:"mountCderun"`
+	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
 	DryRun          *bool          `yaml:"dryRun"`
@@ -57,6 +58,9 @@ type ConfigDefaults struct {
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
+	}
+	if c.MountCderunPath.Raw != "" {
+		c.MountCderunPath.BaseDir = baseDir
 	}
 	for i := range c.Mounts {
 		c.Mounts[i].SetBaseDir(baseDir)
@@ -99,6 +103,7 @@ type ToolConfig struct {
 	Env             []string       `yaml:"env"`
 	Workdir         string         `yaml:"workdir"`
 	MountCderun     *bool          `yaml:"mountCderun"`
+	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
 	DryRun          *bool          `yaml:"dryRun"`
@@ -124,6 +129,9 @@ type ToolConfig struct {
 func (c *ToolConfig) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
+	}
+	if c.MountCderunPath.Raw != "" {
+		c.MountCderunPath.BaseDir = baseDir
 	}
 	for i := range c.Mounts {
 		c.Mounts[i].SetBaseDir(baseDir)
