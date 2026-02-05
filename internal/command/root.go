@@ -27,25 +27,27 @@ type rootOptions struct {
 	interactive           bool
 	network               string
 	socketPath            string
-	mountSocket           bool
-	mountSocketPath       string
-	mountCderun           bool
-	mountCderunPath       string
-	image                 string
-	remove                bool
-	cderunTTY             bool
-	cderunInteractive     bool
-	cderunImage           string
-	cderunNetwork         string
-	cderunRemove          bool
-	cderunRuntime         string
-	cderunSocketPath      string
-	cderunMountSocket     bool
-	cderunMountSocketPath string
-	cderunWorkdir         string
-	cderunMounts          []string
-	cderunMountCderun     bool
-	cderunMountCderunPath string
+	mountSocket                 bool
+	mountSocketPath             string
+	mountSocketSourcePath       string
+	mountCderun                 bool
+	mountCderunPath             string
+	image                       string
+	remove                      bool
+	cderunTTY                   bool
+	cderunInteractive           bool
+	cderunImage                 string
+	cderunNetwork               string
+	cderunRemove                bool
+	cderunRuntime               string
+	cderunSocketPath            string
+	cderunMountSocket           bool
+	cderunMountSocketPath       string
+	cderunMountSocketSourcePath string
+	cderunWorkdir               string
+	cderunMounts                []string
+	cderunMountCderun           bool
+	cderunMountCderunPath       string
 	cderunMountTools      string
 	cderunMountAllTools   bool
 	runtimeName           string
@@ -173,11 +175,15 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		MountSocketSet:           cmd.Flags().Changed("mount-socket"),
 		CderunMountSocket:        o.cderunMountSocket,
 		CderunMountSocketSet:     cmd.Flags().Changed("cderun-mount-socket"),
-		MountSocketPath:          o.mountSocketPath,
-		MountSocketPathSet:       cmd.Flags().Changed("mount-socket-path"),
-		CderunMountSocketPath:    o.cderunMountSocketPath,
-		CderunMountSocketPathSet: cmd.Flags().Changed("cderun-mount-socket-path"),
-		Env:                      o.env,
+		MountSocketPath:             o.mountSocketPath,
+		MountSocketPathSet:          cmd.Flags().Changed("mount-socket-path"),
+		CderunMountSocketPath:       o.cderunMountSocketPath,
+		CderunMountSocketPathSet:    cmd.Flags().Changed("cderun-mount-socket-path"),
+		MountSocketSourcePath:       o.mountSocketSourcePath,
+		MountSocketSourcePathSet:    cmd.Flags().Changed("mount-socket-source"),
+		CderunMountSocketSourcePath: o.cderunMountSocketSourcePath,
+		CderunMountSocketSourcePathSet: cmd.Flags().Changed("cderun-mount-socket-source"),
+		Env:                         o.env,
 		CderunEnv:                o.cderunEnv,
 		Workdir:                  o.workdir,
 		WorkdirSet:               cmd.Flags().Changed("workdir"),
@@ -343,10 +349,19 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// Add socket mount
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
-			Source:   resolved.SocketPath,
+			Source:   resolved.MountSocketSourcePath,
 			Target:   resolved.MountSocketPath,
 			ReadOnly: false, // Socket needs to be writable
 		})
+
+		// Propagate host paths via environment variables for nested cderun calls
+		containerConfig.Env = append(containerConfig.Env,
+			"CDERUN_MOUNT_CDERUN_PATH="+exePath,
+			"CDERUN_SOCKET_PATH="+resolved.MountSocketPath,
+			"CDERUN_MOUNT_SOCKET_SOURCE_PATH="+resolved.MountSocketSourcePath,
+			"CDERUN_MOUNT_SOCKET=true",
+			"CDERUN_RUNTIME="+resolved.Runtime,
+		)
 
 		// Handle MountTools / MountAllTools
 		if resolved.MountAllTools {
@@ -387,10 +402,17 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// Just mount the socket if requested even if no other mounting flags are set
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
-			Source:   resolved.SocketPath,
+			Source:   resolved.MountSocketSourcePath,
 			Target:   resolved.MountSocketPath,
 			ReadOnly: false,
 		})
+		// Also propagate socket paths for consistency
+		containerConfig.Env = append(containerConfig.Env,
+			"CDERUN_SOCKET_PATH="+resolved.MountSocketPath,
+			"CDERUN_MOUNT_SOCKET_SOURCE_PATH="+resolved.MountSocketSourcePath,
+			"CDERUN_MOUNT_SOCKET=true",
+			"CDERUN_RUNTIME="+resolved.Runtime,
+		)
 	}
 
 	return containerConfig, nil
@@ -737,6 +759,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.socketPath, "socket-path", "", "Path to the container runtime socket on the host")
 	cmd.PersistentFlags().BoolVar(&opts.mountSocket, "mount-socket", false, "Mount the container runtime socket into the container")
 	cmd.PersistentFlags().StringVar(&opts.mountSocketPath, "mount-socket-path", "", "Path where the socket should be mounted inside the container (defaults to host path)")
+	cmd.PersistentFlags().StringVar(&opts.mountSocketSourcePath, "mount-socket-source", "", "Host path to the socket to mount (defaults to socket-path)")
 	cmd.PersistentFlags().BoolVar(&opts.mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
 	cmd.PersistentFlags().StringVar(&opts.mountCderunPath, "mount-cderun-path", "", "Host path to cderun binary to mount inside container")
 	cmd.PersistentFlags().StringVar(&opts.image, "image", "", "Docker image to use")
@@ -774,6 +797,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunSocketPath, "cderun-socket-path", "", "Override socket path (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountSocket, "cderun-mount-socket", false, "Override mount-socket setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunMountSocketPath, "cderun-mount-socket-path", "", "Override mount-socket-path setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunMountSocketSourcePath, "cderun-mount-socket-source", "", "Override mount-socket-source setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunEnv, "cderun-env", nil, "Override environment variables (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunWorkdir, "cderun-workdir", "", "Override workdir setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringArrayVar(&opts.cderunMounts, "cderun-mount", nil, "Override mounts (highest priority, can be used after subcommand)")

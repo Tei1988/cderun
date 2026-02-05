@@ -26,6 +26,7 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.socketPath = ""
 	opts.mountSocket = false
 	opts.mountSocketPath = ""
+	opts.mountSocketSourcePath = ""
 	opts.mountCderun = false
 	opts.image = ""
 	opts.remove = true
@@ -38,6 +39,7 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunSocketPath = ""
 	opts.cderunMountSocket = false
 	opts.cderunMountSocketPath = ""
+	opts.cderunMountSocketSourcePath = ""
 	opts.cderunWorkdir = ""
 	opts.cderunMounts = nil
 	opts.cderunMountCderun = false

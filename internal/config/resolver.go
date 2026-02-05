@@ -24,9 +24,10 @@ type ResolvedConfig struct {
 	User            string
 	Runtime         string
 	SocketPath      string
-	MountSocket     bool
-	MountSocketPath string
-	MountCderun     bool
+	MountSocket           bool
+	MountSocketPath       string
+	MountSocketSourcePath string
+	MountCderun           bool
 	MountCderunPath string
 	MountTools      string
 	MountAllTools   bool
@@ -91,11 +92,15 @@ type CLIOptions struct {
 	MountSocketSet           bool
 	CderunMountSocket        bool
 	CderunMountSocketSet     bool
-	MountSocketPath          string
-	MountSocketPathSet       bool
-	CderunMountSocketPath    string
-	CderunMountSocketPathSet bool
-	Env                      []string
+	MountSocketPath             string
+	MountSocketPathSet          bool
+	CderunMountSocketPath       string
+	CderunMountSocketPathSet    bool
+	MountSocketSourcePath       string
+	MountSocketSourcePathSet    bool
+	CderunMountSocketSourcePath string
+	CderunMountSocketSourcePathSet bool
+	Env                         []string
 	CderunEnv                []string
 	Workdir                  string
 	WorkdirSet               bool
@@ -376,6 +381,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"CDERUN_MOUNT_SOCKET_PATH",
 		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
 		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+		res.SocketPath, // Default to host-side socket path
+		r,
+		"path",
+	)
+
+	res.MountSocketSourcePath = resolveConfigPath(
+		cli.CderunMountSocketSourcePathSet, cli.CderunMountSocketSourcePath,
+		cli.MountSocketSourcePathSet, cli.MountSocketSourcePath,
+		"CDERUN_MOUNT_SOCKET_SOURCE_PATH",
+		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketSourcePath },
+		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketSourcePath },
 		res.SocketPath, // Default to host-side socket path
 		r,
 		"path",

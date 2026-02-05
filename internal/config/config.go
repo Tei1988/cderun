@@ -30,11 +30,12 @@ type ConfigDefaults struct {
 	Network         string         `yaml:"network"`
 	Remove          *bool          `yaml:"remove"`
 	StrictEnv       *bool          `yaml:"strictEnv"`
-	MountCderun     *bool          `yaml:"mountCderun"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
-	MountSocket     *bool          `yaml:"mountSocket"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
+	MountCderun           *bool          `yaml:"mountCderun"`
+	MountCderunPath       ConfigPath     `yaml:"mountCderunPath"`
+	MountSocket           *bool          `yaml:"mountSocket"`
+	MountSocketPath       ConfigPath     `yaml:"mountSocketPath"`
+	MountSocketSourcePath ConfigPath     `yaml:"mountSocketSourcePath"`
+	DryRun                *bool          `yaml:"dryRun"`
 	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
@@ -61,6 +62,9 @@ func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 	}
 	if c.MountCderunPath.Raw != "" {
 		c.MountCderunPath.BaseDir = baseDir
+	}
+	if c.MountSocketSourcePath.Raw != "" {
+		c.MountSocketSourcePath.BaseDir = baseDir
 	}
 	for i := range c.Mounts {
 		c.Mounts[i].SetBaseDir(baseDir)
@@ -102,11 +106,12 @@ type ToolConfig struct {
 	Mounts          []MountConfig  `yaml:"mounts"`
 	Env             []string       `yaml:"env"`
 	Workdir         string         `yaml:"workdir"`
-	MountCderun     *bool          `yaml:"mountCderun"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
-	MountSocket     *bool          `yaml:"mountSocket"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
+	MountCderun           *bool          `yaml:"mountCderun"`
+	MountCderunPath       ConfigPath     `yaml:"mountCderunPath"`
+	MountSocket           *bool          `yaml:"mountSocket"`
+	MountSocketPath       ConfigPath     `yaml:"mountSocketPath"`
+	MountSocketSourcePath ConfigPath     `yaml:"mountSocketSourcePath"`
+	DryRun                *bool          `yaml:"dryRun"`
 	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
@@ -132,6 +137,9 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 	}
 	if c.MountCderunPath.Raw != "" {
 		c.MountCderunPath.BaseDir = baseDir
+	}
+	if c.MountSocketSourcePath.Raw != "" {
+		c.MountSocketSourcePath.BaseDir = baseDir
 	}
 	for i := range c.Mounts {
 		c.Mounts[i].SetBaseDir(baseDir)
