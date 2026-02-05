@@ -30,6 +30,7 @@ type rootOptions struct {
 	mountSocket           bool
 	mountSocketPath       string
 	mountCderun           bool
+	mountCderunPath       string
 	image                 string
 	remove                bool
 	cderunTTY             bool
@@ -44,6 +45,7 @@ type rootOptions struct {
 	cderunWorkdir         string
 	cderunMounts          []string
 	cderunMountCderun     bool
+	cderunMountCderunPath string
 	cderunMountTools      string
 	cderunMountAllTools   bool
 	runtimeName           string
@@ -187,6 +189,10 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
 		CderunMountCderun:        o.cderunMountCderun,
 		CderunMountCderunSet:     cmd.Flags().Changed("cderun-mount-cderun"),
+		MountCderunPath:          o.mountCderunPath,
+		MountCderunPathSet:       cmd.Flags().Changed("mount-cderun-path"),
+		CderunMountCderunPath:    o.cderunMountCderunPath,
+		CderunMountCderunPathSet: cmd.Flags().Changed("cderun-mount-cderun-path"),
 		MountTools:               o.mountTools,
 		CderunMountTools:         o.cderunMountTools,
 		MountAllTools:            o.mountAllTools,
@@ -317,9 +323,13 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		if !resolved.MountSocket {
 			return nil, fmt.Errorf("--mount-cderun, --mount-tools, or --mount-all-tools requires --mount-socket")
 		}
-		exePath, err := os.Executable()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get executable path: %w", err)
+		exePath := resolved.MountCderunPath
+		if exePath == "" {
+			var err error
+			exePath, err = os.Executable()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get executable path: %w", err)
+			}
 		}
 
 		// Add binary mount
@@ -728,6 +738,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().BoolVar(&opts.mountSocket, "mount-socket", false, "Mount the container runtime socket into the container")
 	cmd.PersistentFlags().StringVar(&opts.mountSocketPath, "mount-socket-path", "", "Path where the socket should be mounted inside the container (defaults to host path)")
 	cmd.PersistentFlags().BoolVar(&opts.mountCderun, "mount-cderun", false, "Mount cderun binary for use inside container")
+	cmd.PersistentFlags().StringVar(&opts.mountCderunPath, "mount-cderun-path", "", "Host path to cderun binary to mount inside container")
 	cmd.PersistentFlags().StringVar(&opts.image, "image", "", "Docker image to use")
 	cmd.PersistentFlags().StringVar(&opts.runtimeName, "runtime", "docker", "Container runtime to use (docker/podman)")
 	cmd.PersistentFlags().StringSliceVarP(&opts.env, "env", "e", nil, "Set environment variables")
@@ -767,6 +778,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunWorkdir, "cderun-workdir", "", "Override workdir setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringArrayVar(&opts.cderunMounts, "cderun-mount", nil, "Override mounts (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountCderun, "cderun-mount-cderun", false, "Override mount-cderun setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunMountCderunPath, "cderun-mount-cderun-path", "", "Override mount-cderun-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunMountTools, "cderun-mount-tools", "", "Override mount-tools setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
 

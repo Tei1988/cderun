@@ -299,6 +299,58 @@ func TestResolve(t *testing.T) {
 		assert.False(t, res.MountCderun)
 	})
 
+	t.Run("MountCderunPath resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_CDERUN_PATH", "/env/path/cderun")
+		cli := CLIOptions{
+			MountCderunPath:    "/cli/path/cderun",
+			MountCderunPathSet: true,
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:           "node",
+				MountCderunPath: cp("/tool/path/cderun"),
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				MountCderunPath: cp("/global/path/cderun"),
+			},
+		}
+
+		// CLI (P2) takes priority
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/cli/path/cderun", res.MountCderunPath)
+
+		// P1 Override
+		cli.CderunMountCderunPath = "/p1/path/cderun"
+		cli.CderunMountCderunPathSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/p1/path/cderun", res.MountCderunPath)
+
+		// Env (P3) takes priority if CLI not set
+		cli.MountCderunPathSet = false
+		cli.CderunMountCderunPathSet = false
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/env/path/cderun", res.MountCderunPath)
+
+		// Tool (P4) takes priority if CLI and Env not set
+		t.Setenv("CDERUN_MOUNT_CDERUN_PATH", "")
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/tool/path/cderun", res.MountCderunPath)
+
+		// Global (P5)
+		delete(tools, "node")
+		cli.Image = "node-image"
+		cli.ImageSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/global/path/cderun", res.MountCderunPath)
+	})
+
 	t.Run("Logging resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			LogLevel:     "debug",

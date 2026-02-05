@@ -27,6 +27,7 @@ type ResolvedConfig struct {
 	MountSocket     bool
 	MountSocketPath string
 	MountCderun     bool
+	MountCderunPath string
 	MountTools      string
 	MountAllTools   bool
 	DryRun          bool
@@ -106,6 +107,10 @@ type CLIOptions struct {
 	MountCderunSet           bool
 	CderunMountCderun        bool
 	CderunMountCderunSet     bool
+	MountCderunPath          string
+	MountCderunPathSet       bool
+	CderunMountCderunPath    string
+	CderunMountCderunPathSet bool
 	MountTools               string
 	CderunMountTools         string
 	MountAllTools            bool
@@ -386,6 +391,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		false,
 	)
 
+	res.MountCderunPath = resolveConfigPath(
+		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
+		cli.MountCderunPathSet, cli.MountCderunPath,
+		"CDERUN_MOUNT_CDERUN_PATH",
+		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		"",
+		r,
+		"path",
+	)
+
 	// 14. Pass-through other mounting flags
 	if cli.CderunMountTools != "" {
 		res.MountTools = r.resolveString(cli.CderunMountTools)
@@ -573,11 +589,11 @@ func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string) string {
 	var cp ConfigPath
 	if p1Set {
-		cp = ConfigPath{Raw: p1Val, BaseDir: "."}
+		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
 	} else if cliSet {
-		cp = ConfigPath{Raw: cliVal, BaseDir: "."}
+		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
 	} else if env := os.Getenv(envKey); env != "" {
-		cp = ConfigPath{Raw: env, BaseDir: "."}
+		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
 	} else {
 		found := false
 		if tools != nil {
@@ -595,7 +611,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 			}
 		}
 		if !found {
-			cp = ConfigPath{Raw: fallback, BaseDir: "."}
+			cp = ConfigPath{Raw: fallback, BaseDir: r.Pwd}
 		}
 	}
 
