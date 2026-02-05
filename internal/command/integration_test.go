@@ -100,12 +100,13 @@ func TestIntegrationBasic(t *testing.T) {
 		// To fix this, we'll use a tool definition in .tools.yaml or just test that it fails/executes correctly.
 		// Actually, the requirement is to use alpine as image and echo hello.
 		// Let's use a temporary .tools.yaml for this test to be realistic.
-		originalWd, _ := os.Getwd()
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(originalWd) }()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
@@ -116,12 +117,13 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
-		originalWd, _ := os.Getwd()
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(originalWd) }()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
@@ -136,12 +138,13 @@ func TestIntegrationBasic(t *testing.T) {
 	})
 
 	t.Run("environment variables", func(t *testing.T) {
-		originalWd, _ := os.Getwd()
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		_ = os.Chdir(tmpDir)
-		defer func() { _ = os.Chdir(originalWd) }()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0644)
 		require.NoError(t, err)
 
 		t.Setenv("HOST_VAR", "host-value")
@@ -164,12 +167,10 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		err = os.Chdir(tmpDir)
-		require.NoError(t, err)
-		defer func() {
-			err := os.Chdir(originalWd)
-			require.NoError(t, err)
-		}()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() {
+			require.NoError(t, os.Chdir(originalWd))
+		})
 
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
 		require.NoError(t, err)
@@ -185,12 +186,10 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		err = os.Chdir(tmpDir)
-		require.NoError(t, err)
-		defer func() {
-			err := os.Chdir(originalWd)
-			require.NoError(t, err)
-		}()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() {
+			require.NoError(t, os.Chdir(originalWd))
+		})
 
 		subDir := filepath.Join(tmpDir, "subdir")
 		err = os.MkdirAll(subDir, 0755)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
 	"dario.cat/mergo"
@@ -468,5 +469,48 @@ func TestResolve(t *testing.T) {
 
 		assert.Equal(t, "./low.sock", merged.SocketPath.Raw)
 		assert.Equal(t, "/low", merged.SocketPath.BaseDir)
+	})
+
+	t.Run("Absolute CLI paths resolution", func(t *testing.T) {
+		cli := CLIOptions{
+			Mounts: []string{"type=bind,source=./data,target=/data"},
+		}
+		r, _ := NewExpressionResolver()
+
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+
+		// Should be an absolute path
+		assert.True(t, filepath.IsAbs(res.Mounts[0].Source))
+		assert.Equal(t, resolvePath("./data", r.Pwd), res.Mounts[0].Source)
+	})
+
+	t.Run("CDERUN_MOUNT resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT", "type=bind,source=/env/path,target=/env/target")
+
+		res, err := Resolve("", CLIOptions{}, nil, nil)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/env/path", res.Mounts[0].Source)
+		assert.Equal(t, "/env/target", res.Mounts[0].Target)
+	})
+
+	t.Run("CDERUN_MOUNT multiple resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT", "type=bind,source=/path1,target=/target1 ; type=bind,source=/path2,target=/target2")
+
+		res, err := Resolve("", CLIOptions{}, nil, nil)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 2)
+		assert.Equal(t, "/path1", res.Mounts[0].Source)
+		assert.Equal(t, "/path2", res.Mounts[1].Source)
+	})
+
+	t.Run("Error on invalid mount flag", func(t *testing.T) {
+		cli := CLIOptions{
+			Mounts: []string{"invalid"},
+		}
+		_, err := Resolve("", cli, nil, nil)
+		assert.Error(t, err)
 	})
 }

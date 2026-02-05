@@ -16,15 +16,15 @@ func TestExpressionResolver(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
 	resolver, err := NewExpressionResolver()
 	require.NoError(t, err)
 
 	t.Run("Magic Words", func(t *testing.T) {
-		assert.Equal(t, resolver.pwd, resolver.Resolve("{{PWD}}"))
-		assert.Equal(t, resolver.home, resolver.Resolve("{{HOME}}"))
-		assert.Equal(t, resolver.pwd+"/src", resolver.Resolve("{{PWD}}/src"))
+		assert.Equal(t, resolver.Pwd, resolver.Resolve("{{PWD}}"))
+		assert.Equal(t, resolver.Home, resolver.Resolve("{{HOME}}"))
+		assert.Equal(t, resolver.Pwd+"/src", resolver.Resolve("{{PWD}}/src"))
 	})
 
 	t.Run("File Directive", func(t *testing.T) {
@@ -44,9 +44,9 @@ func TestExpressionResolver(t *testing.T) {
 			},
 		}
 		expected := map[string]any{
-			"image": "node:" + resolver.pwd,
+			"image": "node:" + resolver.Pwd,
 			"env": []any{
-				"HOME=" + resolver.home,
+				"HOME=" + resolver.Home,
 				"OTHER=fixed",
 			},
 		}

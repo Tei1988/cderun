@@ -19,7 +19,7 @@ func TestLoadCDERunConfig(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
 	t.Run("not found", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()
@@ -84,7 +84,7 @@ func TestLoadToolsConfig(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
 	t.Run("not found", func(t *testing.T) {
 		cfg, paths, err := LoadToolsConfig()

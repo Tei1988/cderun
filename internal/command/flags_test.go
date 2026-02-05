@@ -109,9 +109,8 @@ func TestDockerFlags(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
-		err = os.Chdir(tmpDir)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = os.Chdir(originalWd) })
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
 		toolsContent := `
 node:

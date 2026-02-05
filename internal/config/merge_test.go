@@ -63,7 +63,7 @@ python:
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(childDir))
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()

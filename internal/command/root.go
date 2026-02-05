@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -342,7 +343,14 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			if len(toolsCfg) == 0 {
 				logging.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
 			}
-			for toolName := range toolsCfg {
+			// Sort tool names to ensure deterministic mount order
+			toolNames := make([]string, 0, len(toolsCfg))
+			for name := range toolsCfg {
+				toolNames = append(toolNames, name)
+			}
+			sort.Strings(toolNames)
+
+			for _, toolName := range toolNames {
 				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 					Type:     "bind",
 					Source:   exePath,
