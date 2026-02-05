@@ -367,6 +367,13 @@ cderun --log-timestamp=false node app.js
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
+## その他の設定オプション
+
+### `strictEnv`
+- **説明**: 指定された環境変数がホストに存在しない場合にエラーとする設定。
+- **指定方法**: `.cderun.yaml`, `.tools.yaml` の `strictEnv` フィールド、または環境変数 `CDERUN_STRICT_ENV=true` で指定します。
+- **注意**: このオプションには直接のコマンドラインフラグはありません。
+
 ## オプションの優先順位
 
 1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ

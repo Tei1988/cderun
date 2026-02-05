@@ -73,11 +73,15 @@ golang:
   image: "golang:{{file:.go-version}}"
 
 node:
-  volumes:
+  mounts:
     # ホームディレクトリの .npmrc をマウント
-    - "{{HOME}}/.npmrc:/root/.npmrc"
+    - type: bind
+      source: "{{HOME}}/.npmrc"
+      target: /root/.npmrc
     # cderun 実行ディレクトリの src をマウント
-    - "{{PWD}}/src:/app"
+    - type: bind
+      source: "{{PWD}}/src"
+      target: /app
 ```
 
 #### チルダ展開 (Tilde Expansion)
@@ -85,20 +89,24 @@ node:
 
 **例:**
 ```yaml
-volumes:
-  - ~/.kube:/root/.kube
+mounts:
+  - type: bind
+    source: ~/.kube
+    target: /root/.kube
 ```
-は、`/home/user/.kube:/root/.kube` のように解決されます。
+は、`source: /home/user/.kube` のように解決されます。
 
 #### 相対パスの解決
-`volumes` のホストパスなど、設定値に `./` や `../` で始まる相対パスが記述されている場合、そのパスは**設定ファイルが置かれているディレクトリ**を基準に絶対パスへ変換されます。
+`mounts` の `source` や `devices` のホストパスなど、設定値に `./` や `../` で始まる相対パスが記述されている場合、そのパスは**設定ファイルが置かれているディレクトリ**を基準に絶対パスへ変換されます。
 
 **例:** `/home/user/project/.tools.yaml` 内の以下の記述
 ```yaml
-volumes:
-  - ./src:/app
+mounts:
+  - type: bind
+    source: ./src
+    target: /app
 ```
-は、`/home/user/project/src:/app` として解決されます。
+は、`source: /home/user/project/src` として解決されます。
 
 #### 解決の順序とルール
 値の解決は、以下の順序で実行されます。
@@ -130,6 +138,11 @@ defaults:
   user: "1000:1000"
   memory: "1g"
   cpus: 1.5
+  mounts:
+    - type: tmpfs
+      target: /tmp
+  devices:
+    - /dev/fuse
 logging:
   level: info                      # ログレベル
   file: ./cderun.log               # ログファイルパス
@@ -148,9 +161,13 @@ node:
   network: host
   ports:
     - "3000:3000"
-  volumes:
-    - .:/workspace
-    - ~/.npm:/root/.npm
+  mounts:
+    - type: bind
+      source: .
+      target: /workspace
+    - type: bind
+      source: ~/.npm
+      target: /root/.npm
   env:
     - NODE_ENV=development
   workdir: /workspace
@@ -165,15 +182,21 @@ python:
   interactive: true
   env:
     - PYTHONUNBUFFERED=1
-  volumes:
-    - .:/app
-    - ~/.cache/pip:/root/.cache/pip
+  mounts:
+    - type: bind
+      source: .
+      target: /app
+    - type: bind
+      source: ~/.cache/pip
+      target: /root/.cache/pip
   workdir: /app
 
 docker:
   image: docker:latest
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
+  mounts:
+    - type: bind
+      source: /var/run/docker.sock
+      target: /var/run/docker.sock
   network: host
 ```
 
@@ -217,8 +240,13 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
-- `tmpfs` ([]string): tmpfsマウント
+- `mounts` ([]object): マウント設定
+  - `type` (string): `bind` | `volume` | `tmpfs`
+  - `source` (string): ホスト側のパス（bindの場合）
+  - `target` (string, 必須): コンテナ内のパス
+  - `read_only` (bool): 読み取り専用
 - `devices` ([]string): デバイス追加
+  - 形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`
 
 #### `logging` サブセクション
 ログ出力に関する設定。
@@ -241,9 +269,7 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `network` (string): ネットワーク設定（`--network`フラグに相当）
 - `remove` (bool): コンテナの自動削除
 - `strictEnv` (bool): 環境変数の厳密モード
-- `volumes` ([]string): ボリュームマウント
-  - 形式: `<host-path>:<container-path>[:<options>]`
-  - 例: `.:/workspace`, `~/.npm:/root/.npm:ro`
+- `mounts` ([]object): マウント設定（上述）
 - `env` ([]string): 環境変数
   - 形式: `KEY=VALUE`
   - 例: `NODE_ENV=development`
@@ -267,8 +293,7 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
-- `tmpfs` ([]string): tmpfsマウント
-- `devices` ([]string): デバイス追加
+- `devices` ([]string): デバイス追加（上述）
 
 ## 優先順位
 
