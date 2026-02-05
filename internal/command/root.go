@@ -68,7 +68,7 @@ type rootOptions struct {
 	cderunLogTee          bool
 	cderunVerbose         int
 
-	// New fields
+	// Docker-compatible flags
 	ports            []string
 	publishAll       bool
 	expose           []string
@@ -219,7 +219,7 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunLogTeeSet:          cmd.Flags().Changed("cderun-log-tee"),
 		CderunVerbose:            o.cderunVerbose,
 
-		// New fields
+		// Docker-compatible flags
 		Ports:               o.ports,
 		CderunPorts:         o.cderunPorts,
 		PublishAll:          o.publishAll,
@@ -294,7 +294,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Workdir:     resolved.Workdir,
 		User:        resolved.User,
 
-		// New fields
+		// Docker-compatible flags
 		Ports:      resolved.Ports,
 		PublishAll: resolved.PublishAll,
 		Expose:     resolved.Expose,
@@ -729,7 +729,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().BoolVar(&opts.mountAllTools, "mount-all-tools", false, "Mount all defined tools into the container")
 	cmd.PersistentFlags().BoolVar(&opts.remove, "remove", true, "Automatically remove the container when it exits")
 
-	// New fields
+	// Docker-compatible flags
 	cmd.PersistentFlags().StringSliceVarP(&opts.ports, "publish", "p", nil, "Publish a container's port(s) to the host")
 	cmd.PersistentFlags().BoolVarP(&opts.publishAll, "publish-all", "P", false, "Publish all exposed ports to random ports")
 	cmd.PersistentFlags().StringSliceVar(&opts.expose, "expose", nil, "Expose a port or a range of ports")
@@ -762,7 +762,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunMountTools, "cderun-mount-tools", "", "Override mount-tools setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
 
-	// New fields P1
+	// Priority 1 overrides
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunPorts, "cderun-publish", nil, "Override publish setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunPublishAll, "cderun-publish-all", false, "Override publish-all setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringSliceVar(&opts.cderunExpose, "cderun-expose", nil, "Override expose setting (highest priority, can be used after subcommand)")
@@ -849,11 +849,11 @@ func preprocessArgs(args []string) ([]string, error) {
 		}
 	}
 
-	newArgs := make([]string, 0, len(args)+1)
+	processedArgs := make([]string, 0, len(args)+1)
 	if isPolyglot {
-		newArgs = append(newArgs, "cderun")
+		processedArgs = append(processedArgs, "cderun")
 	} else {
-		newArgs = append(newArgs, args[0])
+		processedArgs = append(processedArgs, args[0])
 	}
 
 	var overrides []string
@@ -880,16 +880,16 @@ func preprocessArgs(args []string) ([]string, error) {
 	}
 
 	// Place --cderun-* overrides immediately after "cderun" so they are always parsed
-	newArgs = append(newArgs, overrides...)
+	processedArgs = append(processedArgs, overrides...)
 
 	if isPolyglot {
 		// In polyglot mode, the original executable name becomes the subcommand
-		newArgs = append(newArgs, execName)
+		processedArgs = append(processedArgs, execName)
 	}
 
-	newArgs = append(newArgs, others...)
+	processedArgs = append(processedArgs, others...)
 
-	return newArgs, nil
+	return processedArgs, nil
 }
 
 func init() {

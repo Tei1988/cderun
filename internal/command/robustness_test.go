@@ -29,11 +29,11 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 
 func TestExecuteRobustness(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		}()
 
 		mock := &blockingMockRuntime{
@@ -74,11 +74,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		}()
 
 		// Use a mock that blocks in WaitContainer to simulate long running process
@@ -147,11 +147,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		defer func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		}()
 
 		mock := &blockingMockRuntime{

@@ -97,15 +97,15 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunCPUs = 0
 	opts.cderunDevices = nil
 
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	oldOut := rootCmd.OutOrStdout()
-	oldErr := rootCmd.ErrOrStderr()
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
+	originalOut := rootCmd.OutOrStdout()
+	originalErr := rootCmd.ErrOrStderr()
 	defer func() {
-		os.Stdout = oldStdout
-		os.Stderr = oldStderr
-		rootCmd.SetOut(oldOut)
-		rootCmd.SetErr(oldErr)
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+		rootCmd.SetOut(originalOut)
+		rootCmd.SetErr(originalErr)
 	}()
 
 	r, w, err := os.Pipe()
@@ -189,11 +189,11 @@ func TestExecuteEmptyArgs(t *testing.T) {
 func TestRootCmd(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Prepare mock runtime
@@ -226,11 +226,11 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Prepare mock runtime
@@ -248,19 +248,19 @@ func TestRootCmd(t *testing.T) {
 
 	t.Run("handles symlink execution via Execute", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Use a temporary directory for this test
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		// Create a temporary .tools.yaml for image mapping
 		toolsContent := `
@@ -289,19 +289,19 @@ node:
 
 	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Use a temporary directory for this test
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -341,21 +341,21 @@ node:
 
 	t.Run("P3 environment variable takes priority over tools.yaml (Step 10.1)", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		t.Setenv("CDERUN_IMAGE", "env-image:latest")
 
 		// Use a temporary directory for this test
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -378,19 +378,19 @@ node:
 
 	t.Run("resolves base command from tools.yaml", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Use a temporary directory for this test
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -416,11 +416,11 @@ node:
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{}
@@ -436,11 +436,11 @@ node:
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{}
@@ -456,11 +456,11 @@ node:
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Use the real runtimeFactory here to test the validation logic
@@ -473,19 +473,19 @@ node:
 
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		// Use a temporary directory for this test
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -534,11 +534,11 @@ node:
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{}
@@ -588,11 +588,11 @@ node:
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{
@@ -611,11 +611,11 @@ node:
 
 func TestCderunInternalOverrides(t *testing.T) {
 	// Use a temporary directory for this test
-	oldWd, err := os.Getwd()
+	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	tmpDir := t.TempDir()
 	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	// Create a temporary .tools.yaml for image mapping
 	toolsContent := `
@@ -626,15 +626,15 @@ node:
 	require.NoError(t, err)
 
 	// Save and restore package-level state
-	oldTTY := opts.tty
-	oldCderunTTY := opts.cderunTTY
-	oldFactory := runtimeFactory
-	oldExit := exitFunc
+	originalTTY := opts.tty
+	originalCderunTTY := opts.cderunTTY
+	originalFactory := runtimeFactory
+	originalExit := exitFunc
 	t.Cleanup(func() {
-		opts.tty = oldTTY
-		opts.cderunTTY = oldCderunTTY
-		runtimeFactory = oldFactory
-		exitFunc = oldExit
+		opts.tty = originalTTY
+		opts.cderunTTY = originalCderunTTY
+		runtimeFactory = originalFactory
+		exitFunc = originalExit
 	})
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -685,12 +685,12 @@ node:
 	t.Run("cderun internal overrides for network, remove, workdir and mount", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/old", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/new", "--cderun-mount=type=bind,source=/h2,target=/c2")
+		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/initial", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/override", "--cderun-mount=type=bind,source=/h2,target=/c2")
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
 		assert.True(t, mockRuntime.CreatedConfig.Remove)
-		assert.Equal(t, "/new", mockRuntime.CreatedConfig.Workdir)
+		assert.Equal(t, "/override", mockRuntime.CreatedConfig.Workdir)
 
 		// Mounts should be merged (P1 added after P2)
 		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 2)
@@ -702,11 +702,11 @@ node:
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config for mount-tools
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 		err = os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
 		require.NoError(t, err)
 
@@ -756,11 +756,11 @@ node:
 
 func TestPhase3Features(t *testing.T) {
 	// Save and restore package-level state
-	oldFactory := runtimeFactory
-	oldExit := exitFunc
+	originalFactory := runtimeFactory
+	originalExit := exitFunc
 	t.Cleanup(func() {
-		runtimeFactory = oldFactory
-		exitFunc = oldExit
+		runtimeFactory = originalFactory
+		exitFunc = originalExit
 	})
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -845,11 +845,11 @@ func TestPhase3Features(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
 		// Setup tools config
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -905,11 +905,11 @@ sh:
 		mockRuntime.CreatedConfig = nil
 
 		// Setup empty tools config
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		// No .tools.yaml created
 
@@ -921,11 +921,11 @@ sh:
 
 func TestPhase10StrictBehavior(t *testing.T) {
 	// Save and restore package-level state
-	oldFactory := runtimeFactory
-	oldExit := exitFunc
+	originalFactory := runtimeFactory
+	originalExit := exitFunc
 	t.Cleanup(func() {
-		runtimeFactory = oldFactory
-		exitFunc = oldExit
+		runtimeFactory = originalFactory
+		exitFunc = originalExit
 	})
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -953,11 +953,11 @@ func TestPhase10StrictBehavior(t *testing.T) {
 
 	t.Run("subcommand is excluded even if it is a tool (Step 10.2)", func(t *testing.T) {
 		// Setup tools config
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -977,11 +977,11 @@ node:
 
 	t.Run("subcommand is included if explicitly in tool's command field", func(t *testing.T) {
 		// Setup tools config
-		oldWd, err := os.Getwd()
+		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
 		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { _ = os.Chdir(oldWd) })
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 		toolsContent := `
 node:
@@ -1004,11 +1004,11 @@ node:
 func TestRemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{
@@ -1026,11 +1026,11 @@ func TestRemoveContainerWarning(t *testing.T) {
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
 		// Save and restore package-level state
-		oldFactory := runtimeFactory
-		oldExit := exitFunc
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
 		t.Cleanup(func() {
-			runtimeFactory = oldFactory
-			exitFunc = oldExit
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
 		})
 
 		mockRuntime := &runtime.MockRuntime{

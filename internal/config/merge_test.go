@@ -60,10 +60,10 @@ python:
 	require.NoError(t, err)
 
 	// Change working directory to childDir
-	oldWd, err := os.Getwd()
+	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(childDir))
-	defer func() { _ = os.Chdir(oldWd) }()
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()
@@ -84,9 +84,9 @@ python:
 
 		node := cfg["node"]
 		assert.Equal(t, "node:16", node.Image) // From child (overridden)
-		// Note: Manual merge logic in config.go currently overwrites ToolConfig struct
-		// If we want deep merge within ToolConfig, we need mergo or more complex logic.
-		// The current manual merge uses yaml.Marshal/Unmarshal which DOES deep merge.
+		// Note: Manual merge logic in config.go overwrites ToolConfig struct.
+		// If deep merge within ToolConfig is required, we use mergo or similar logic.
+		// The manual merge uses yaml.Marshal/Unmarshal which performs a deep merge.
 		assert.Equal(t, []string{"PARENT=1"}, node.Env) // From parent (preserved by deep merge)
 
 		python := cfg["python"]
