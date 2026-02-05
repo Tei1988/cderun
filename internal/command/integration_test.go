@@ -130,11 +130,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
+		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "hello-from-host")
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		require.Contains(t, stdout, "hello-from-host", "stderr: %s", stderr)
 	})
 
 	t.Run("environment variables", func(t *testing.T) {

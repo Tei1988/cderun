@@ -991,8 +991,12 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 	newHostMounts := make([]config.HostMount, 0, len(containerConfig.Mounts))
 	for _, m := range containerConfig.Mounts {
 		if m.Type == "bind" {
+			hostSource := m.Source
+			if resolved.HostContext != nil {
+				hostSource = config.ResolveHostPath(m.Source, resolved.HostContext.Mounts)
+			}
 			newHostMounts = append(newHostMounts, config.HostMount{
-				Source: m.Source,
+				Source: hostSource,
 				Target: m.Target,
 				Level:  currentLevel + 1,
 			})

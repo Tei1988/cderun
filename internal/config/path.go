@@ -2,6 +2,7 @@ package config
 
 import (
 	"cderun/internal/container"
+	"cderun/internal/logging"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -332,6 +333,8 @@ func ResolveHostPath(p string, mounts []HostMount) string {
 		return p
 	}
 
+	logging.Trace("Resolving host path for: %s", p)
+
 	// Ensure p is absolute for prefix matching
 	absPath, err := filepath.Abs(p)
 	if err != nil {
@@ -355,7 +358,9 @@ func ResolveHostPath(p string, mounts []HostMount) string {
 	if bestMatch != nil {
 		rel, err := filepath.Rel(bestMatch.Target, absPath)
 		if err == nil {
-			return filepath.Join(bestMatch.Source, rel)
+			resolved := filepath.Join(bestMatch.Source, rel)
+			logging.Trace("Resolved %s to host path %s via target %s", p, resolved, bestMatch.Target)
+			return resolved
 		}
 	}
 

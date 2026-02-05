@@ -97,6 +97,7 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunMemory = ""
 	opts.cderunCPUs = 0
 	opts.cderunDevices = nil
+	opts.tempSnapshotDirs = nil
 
 	originalStdout := os.Stdout
 	originalStderr := os.Stderr
