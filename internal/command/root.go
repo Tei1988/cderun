@@ -395,7 +395,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			Type:     "bind",
 			Source:   hostSnapshotDir,
 			Target:   "/run/cderun",
-			ReadOnly: true,
+			ReadOnly: false, // Must be writable for nested snapshots
 		})
 	} else if resolved.MountSocket {
 		// Just mount the socket if requested even if no other mounting flags are set
@@ -988,7 +988,7 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 		hostCwd = config.ResolveHostPath(cwd, resolved.HostContext.Mounts)
 	}
 
-	newHostMounts := make([]config.HostMount, 0, len(containerConfig.Mounts))
+	newHostMounts := make([]config.HostMount, 0, len(containerConfig.Mounts)+1)
 	for _, m := range containerConfig.Mounts {
 		if m.Type == "bind" {
 			hostSource := m.Source
@@ -1002,6 +1002,13 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 			})
 		}
 	}
+
+	// Add the snapshot directory itself to the mounts list for the next level
+	newHostMounts = append(newHostMounts, config.HostMount{
+		Source: hostSnapshotDir,
+		Target: "/run/cderun",
+		Level:  currentLevel + 1,
+	})
 
 	snapshotGlobal.HostContext = &config.HostContext{
 		BinPath:     exePath,
