@@ -84,9 +84,8 @@ python:
 
 		node := cfg["node"]
 		assert.Equal(t, "node:16", node.Image) // From child (overridden)
-		// Note: Manual merge logic in config.go overwrites ToolConfig struct.
-		// If deep merge within ToolConfig is required, we use mergo or similar logic.
-		// The manual merge uses yaml.Marshal/Unmarshal which performs a deep merge.
+		// Note: 既存の ToolConfig に対して mergo.Merge を使って深いマージを行う (LoadToolsConfig 内)。
+		// yaml.Unmarshal はファイルの読み込みに使用され、実際の深いマージは mergo.Merge が担当する。
 		assert.Equal(t, []string{"PARENT=1"}, node.Env) // From parent (preserved by deep merge)
 
 		python := cfg["python"]
