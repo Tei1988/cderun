@@ -83,8 +83,14 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 }
 
 func skipIfDockerBroken(t *testing.T, err error) {
-	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
-		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
+	if err == nil {
+		return
+	}
+	msg := err.Error()
+	if (strings.Contains(msg, "failed to mount") && strings.Contains(msg, "invalid argument")) ||
+		strings.Contains(msg, "toomanyrequests") ||
+		strings.Contains(msg, "Rate exceeded") {
+		t.Skipf("Skipping test due to environment limitation: %v", err)
 	}
 }
 
@@ -109,11 +115,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
+		stdout, stderr, exitCode, err := runCderun("echo", "hello-cderun")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "hello-cderun")
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		require.Contains(t, stdout, "hello-cderun", "stderr: %s", stderr)
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
@@ -148,19 +154,19 @@ func TestIntegrationBasic(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Setenv("HOST_VAR", "host-value")
-		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
+		stdout, stderr, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "EXPLICIT_VAR=explicit-value")
-		assert.Contains(t, stdout, "HOST_VAR=host-value")
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		require.Contains(t, stdout, "EXPLICIT_VAR=explicit-value", "stderr: %s", stderr)
+		require.Contains(t, stdout, "HOST_VAR=host-value", "stderr: %s", stderr)
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+		_, stderr, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
 	})
 
 	t.Run("cderun expressions", func(t *testing.T) {
@@ -175,11 +181,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "env")
+		stdout, stderr, exitCode, err := runCderun("mytool", "env")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "MY_PWD="+tmpDir)
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		require.Contains(t, stdout, "MY_PWD="+tmpDir, "stderr: %s", stderr)
 	})
 
 	t.Run("relative path and tilde expansion", func(t *testing.T) {
@@ -198,11 +204,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
+		stdout, stderr, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
 		skipIfDockerBroken(t, err)
-		assert.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "/mnt")
+		require.NoError(t, err, "stderr: %s", stderr)
+		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		require.Contains(t, stdout, "/mnt", "stderr: %s", stderr)
 	})
 
 	t.Run("mount-cderun-path", func(t *testing.T) {
