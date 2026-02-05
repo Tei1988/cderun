@@ -40,7 +40,13 @@ cderun --dry-run
 
 ## Argument Parsing & Flags
 
-`cderun` uses a strict boundary for argument parsing. The first non-flag argument is considered the **subcommand**. All arguments before it are parsed as `cderun` flags, and all arguments after it (including flags) are passed directly to the subcommand.
+`cderun` uses a strict boundary for argument parsing. The first non-flag argument is considered the **subcommand**. This subcommand acts as a lookup key for configuration.
+
+- **[cderun-flags]**: Arguments before the subcommand are parsed as `cderun` flags.
+- **\<subcommand\>**: The lookup key (e.g., `node`, `python`). It is NOT included in the final container command by default.
+- **[passthrough-args]**: All arguments after the subcommand are passed directly to the container.
+
+The final command executed in the container is the combination of any `command` defined in `.tools.yaml` for that subcommand plus the `passthrough-args`.
 
 ### Illustration
 ```text

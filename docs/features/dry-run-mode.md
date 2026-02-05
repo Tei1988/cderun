@@ -28,57 +28,59 @@ cderun --dry-run
 ## 出力フォーマット
 
 ### YAML形式（デフォルト）
+`cderun --dry-run node app.js`
 ```yaml
-cderun --dry-run node app.js
 image: node:latest
 command:
   - node
-args:
   - app.js
 tty: true
 interactive: true
 remove: true
-volumes:
-  - hostPath: /home/user/project
-    containerPath: /workspace
-    readOnly: false
+network: bridge
+mounts:
+  - type: bind
+    source: /home/user/project
+    target: /workspace
 env:
   - NODE_ENV=development
 workdir: /workspace
+user: ""
 ```
 
 ### JSON形式
+`cderun --dry-run --dry-run-format json node app.js`
 ```json
-cderun --dry-run --dry-run-format json node app.js
 {
   "image": "node:latest",
-  "command": ["node"],
-  "args": ["app.js"],
+  "command": ["node", "app.js"],
   "tty": true,
   "interactive": true,
   "remove": true,
-  "volumes": [
+  "network": "bridge",
+  "mounts": [
     {
-      "hostPath": "/home/user/project",
-      "containerPath": "/workspace",
-      "readOnly": false
+      "type": "bind",
+      "source": "/home/user/project",
+      "target": "/workspace"
     }
   ],
   "env": ["NODE_ENV=development"],
-  "workdir": "/workspace"
+  "workdir": "/workspace",
+  "user": ""
 }
 ```
 
 ### 簡易形式
+`cderun --dry-run --dry-run-format simple node app.js`
 ```text
-cderun --dry-run --dry-run-format simple node app.js
 Image: node:latest
 Command: node app.js
 TTY: true
 Interactive: true
 Network: bridge
 Remove: true
-Volumes: /home/user/project:/workspace
+Mounts: type=bind,source=/home/user/project,target=/workspace,readonly=false
 Env: NODE_ENV=development
 Workdir: /workspace
 User:
@@ -95,7 +97,6 @@ Entrypoint:
 Pull: missing
 Memory: 0 B
 CPUs: 0
-Tmpfs:
 Devices:
 ```
 
@@ -128,6 +129,25 @@ cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
 ### 4. システム診断とツール一覧の確認
 ```bash
 cderun --dry-run
+# または詳細形式
+cderun --dry-run -f json
+```
+
+**YAML出力例（診断情報）**:
+```yaml
+runtime:
+  name: docker
+  socket: /var/run/docker.sock
+  status: accessible
+configs:
+  global:
+    - /home/user/.cderun.yaml
+  tools:
+    - /home/user/project/.tools.yaml
+available_tools:
+  - node
+  - python
+  - git
 ```
 
 ## 他のフラグとの組み合わせ
@@ -141,8 +161,7 @@ cderun --dry-run --verbose node app.js
 [INFO] Environment variables: NODE_ENV=development
 [INFO] Generated ContainerConfig:
 image: node:20-alpine
-command: [node]
-args: [app.js]
+command: [node, app.js]
 ...
 ```
 
@@ -161,7 +180,9 @@ env:
 相対パスは絶対パスに解決される：
 ```bash
 cderun --dry-run node ./app.js
-volumes:
-  - hostPath: /home/user/project
-    containerPath: /home/user/project
+# mounts の source などが絶対パスに解決される
+mounts:
+  - type: bind
+    source: /home/user/project
+    target: /workspace
 ```
