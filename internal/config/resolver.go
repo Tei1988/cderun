@@ -190,6 +190,7 @@ type CLIOptions struct {
 func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
+	var err error
 
 	r, err := NewExpressionResolver()
 	if err != nil {
@@ -268,7 +269,10 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	// 8. Resolve Mounts (P1 > P2 > P4)
-	res.Mounts = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r)
+	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r)
+	if err != nil {
+		return nil, err
+	}
 
 	// 10. Resolve StrictEnv
 	res.StrictEnv = resolveBool(
@@ -493,7 +497,10 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r)
 	res.Command = resolveStringSlice(nil, nil, "CDERUN_COMMAND", subcommand, tools, func(t ToolConfig) []string { return t.Command }, global, func(g CDERunConfig) []string { return g.Defaults.Command }, r)
 	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
-	res.Devices = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
+	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
+	if err != nil {
+		return nil, err
+	}
 
 	// Memory resolution (string to bytes)
 	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "", r)
@@ -602,7 +609,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	}
 }
 
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) []container.DeviceMapping {
+func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
 
 	// Global defaults (lowest priority)
@@ -620,34 +627,40 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	// Env var devices
 	if env := os.Getenv("CDERUN_DEVICE"); env != "" {
 		for _, d := range strings.Split(env, ",") {
-			if parsed, ok := ParseDeviceConfig(d); ok {
-				parsed.SetBaseDir(".")
-				dcs = append(dcs, parsed)
+			parsed, ok := ParseDeviceConfig(d)
+			if !ok {
+				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
 			}
+			parsed.SetBaseDir(r.Pwd)
+			dcs = append(dcs, parsed)
 		}
 	}
 
 	// P2 CLI devices
 	for _, d := range p2 {
-		if parsed, ok := ParseDeviceConfig(d); ok {
-			parsed.SetBaseDir(".")
-			dcs = append(dcs, parsed)
+		parsed, ok := ParseDeviceConfig(d)
+		if !ok {
+			return nil, fmt.Errorf("invalid device config: %s", d)
 		}
+		parsed.SetBaseDir(r.Pwd)
+		dcs = append(dcs, parsed)
 	}
 
 	// P1 CLI devices (highest priority)
 	for _, d := range p1 {
-		if parsed, ok := ParseDeviceConfig(d); ok {
-			parsed.SetBaseDir(".")
-			dcs = append(dcs, parsed)
+		parsed, ok := ParseDeviceConfig(d)
+		if !ok {
+			return nil, fmt.Errorf("invalid device config (override): %s", d)
 		}
+		parsed.SetBaseDir(r.Pwd)
+		dcs = append(dcs, parsed)
 	}
 
 	var res []container.DeviceMapping
 	for _, dc := range dcs {
 		res = append(res, dc.Resolve(r))
 	}
-	return res
+	return res, nil
 }
 
 func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver) []string {
@@ -743,7 +756,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 	return res, nil
 }
 
-func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) []container.Mount {
+func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.Mount, error) {
 	var mcs []MountConfig
 
 	// Global defaults (lowest priority)
@@ -758,25 +771,46 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		}
 	}
 
-	// P2 CLI mounts (middle priority)
-	for _, m := range p2 {
-		if parsed, err := ParseMountFlag(m); err == nil {
-			parsed.SetBaseDir(".")
+	// Env var mounts
+	if env := os.Getenv("CDERUN_MOUNT"); env != "" {
+		// Use semicolon as separator for multiple mounts since commas are used within mount specs
+		for _, m := range strings.Split(env, ";") {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			parsed, err := ParseMountFlag(m)
+			if err != nil {
+				return nil, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
+			}
+			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
 	}
 
+	// P2 CLI mounts (middle priority)
+	for _, m := range p2 {
+		parsed, err := ParseMountFlag(m)
+		if err != nil {
+			return nil, err
+		}
+		parsed.SetBaseDir(r.Pwd)
+		mcs = append(mcs, parsed)
+	}
+
 	// P1 CLI mounts (highest priority)
 	for _, m := range p1 {
-		if parsed, err := ParseMountFlag(m); err == nil {
-			parsed.SetBaseDir(".")
-			mcs = append(mcs, parsed)
+		parsed, err := ParseMountFlag(m)
+		if err != nil {
+			return nil, fmt.Errorf("invalid mount config (override): %w", err)
 		}
+		parsed.SetBaseDir(r.Pwd)
+		mcs = append(mcs, parsed)
 	}
 
 	var res []container.Mount
 	for _, mc := range mcs {
 		res = append(res, mc.Resolve(r))
 	}
-	return res
+	return res, nil
 }

@@ -10,8 +10,8 @@ var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
-	home string
-	pwd  string
+	Home string
+	Pwd  string
 }
 
 func NewExpressionResolver() (*ExpressionResolver, error) {
@@ -24,8 +24,8 @@ func NewExpressionResolver() (*ExpressionResolver, error) {
 		pwd = ""
 	}
 	return &ExpressionResolver{
-		home: home,
-		pwd:  pwd,
+		Home: home,
+		Pwd:  pwd,
 	}, nil
 }
 
@@ -56,9 +56,9 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		// 1. Magic Words
 		switch content {
 		case "HOME":
-			return r.home
+			return r.Home
 		case "PWD":
-			return r.pwd
+			return r.Pwd
 		}
 
 		// 2. Directives
