@@ -27,7 +27,7 @@
 
 ### P3: Environment Variables (Global Override)
 - **定義**: 実行環境全体に適用される設定。
-- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT`, `CDERUN_DEVICE`, `CDERUN_ENV` 等。
+- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT`, `CDERUN_DEVICE`, `CDERUN_ENV` 等。（※ `CDERUN_MOUNT` や `CDERUN_ENV` はセミコロン `;` をセパレータとして使用します）。
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
 - **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 

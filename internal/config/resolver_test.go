@@ -565,4 +565,15 @@ func TestResolve(t *testing.T) {
 		_, err := Resolve("", cli, nil, nil)
 		assert.Error(t, err)
 	})
+
+	t.Run("CDERUN_ENV resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_ENV", "A=1;B=2,3;C")
+		t.Setenv("C", "4")
+
+		res, err := Resolve("", CLIOptions{}, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "A=1")
+		assert.Contains(t, res.Env, "B=2,3")
+		assert.Contains(t, res.Env, "C=4")
+	})
 }

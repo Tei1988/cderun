@@ -298,7 +298,8 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	}
 	var envP3 []string
 	if val := os.Getenv("CDERUN_ENV"); val != "" {
-		envP3 = strings.Split(val, ",")
+		// Use semicolon as separator to allow values containing commas.
+		envP3 = strings.Split(val, ";")
 	}
 	res.Env, err = resolveEnvValues(mergeEnv(toolsEnv, envP3, cli.Env, cli.CderunEnv), res.StrictEnv, r)
 	if err != nil {

@@ -429,7 +429,7 @@ node:
 		}
 		exitFunc = func(code int) {}
 
-		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
+		_, err := executeCommand("--image", "alpine", "--tty=true", "sh", "--cderun-tty=false")
 		assert.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})

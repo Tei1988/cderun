@@ -103,6 +103,7 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+		require.NoError(t, os.Chmod(tmpDir, 0755))
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
@@ -120,6 +121,7 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+		require.NoError(t, os.Chmod(tmpDir, 0755))
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
@@ -141,6 +143,7 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+		require.NoError(t, os.Chmod(tmpDir, 0755))
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
@@ -167,6 +170,7 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+		require.NoError(t, os.Chmod(tmpDir, 0755))
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() {
 			require.NoError(t, os.Chdir(originalWd))
@@ -186,6 +190,7 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+		require.NoError(t, os.Chmod(tmpDir, 0755))
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() {
 			require.NoError(t, os.Chdir(originalWd))

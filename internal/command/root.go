@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -627,14 +629,16 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
 	}
 
-	// After container exits, wait a short grace period for remaining output
+	// After container exits, wait a grace period for remaining output.
+	// This prevents output loss from fast-exiting containers where Docker
+	// may still be flushing the log stream.
 	select {
 	case err := <-attachDone:
 		if err != nil && err != context.Canceled {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
-	case <-time.After(500 * time.Millisecond):
-		logging.Debug("AttachContainer timed out after container exit, forcing close")
+	case <-time.After(5 * time.Second):
+		logging.Debug("AttachContainer timed out after container exit grace period, forcing close")
 		cancelAttach()
 		<-attachDone
 	}
@@ -847,20 +851,67 @@ func preprocessArgs(args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index
+	// Find the subcommand index reliably by skipping known flags and their values.
 	subcmdIdx := -1
 	if isPolyglot {
 		subcmdIdx = 0
 	} else {
-		for i := 1; i < len(args); i++ {
-			if !strings.HasPrefix(args[i], "-") {
-				subcmdIdx = i
-				break
+		// Use a temporary flag set to discover where the subcommand starts.
+		// We must define flags that take arguments so pflag knows to skip the next arg.
+		fs := pflag.NewFlagSet("discover", pflag.ContinueOnError)
+		fs.ParseErrorsWhitelist.UnknownFlags = true
+		fs.SetInterspersed(false)
+
+		var dummy string
+		var dummySlice []string
+		var dummyInt int
+		var dummyFloat float64
+
+		// P2 Flags that take values
+		fs.StringVar(&dummy, "network", "", "")
+		fs.StringVar(&dummy, "socket-path", "", "")
+		fs.StringVar(&dummy, "mount-socket-path", "", "")
+		fs.StringVar(&dummy, "mount-cderun-path", "", "")
+		fs.StringVar(&dummy, "image", "", "")
+		fs.StringVar(&dummy, "runtime", "", "")
+		fs.StringSliceVarP(&dummySlice, "env", "e", nil, "")
+		fs.StringVarP(&dummy, "workdir", "w", "", "")
+		fs.StringArrayVar(&dummySlice, "mount", nil, "")
+		fs.StringVar(&dummy, "mount-tools", "", "")
+		fs.StringSliceVarP(&dummySlice, "publish", "p", nil, "")
+		fs.StringSliceVar(&dummySlice, "expose", nil, "")
+		fs.StringVar(&dummy, "hostname", "", "")
+		fs.StringSliceVar(&dummySlice, "dns", nil, "")
+		fs.StringSliceVar(&dummySlice, "add-host", nil, "")
+		fs.StringVarP(&dummy, "user", "u", "", "")
+		fs.StringSliceVar(&dummySlice, "cap-add", nil, "")
+		fs.StringSliceVar(&dummySlice, "cap-drop", nil, "")
+		fs.StringSliceVar(&dummySlice, "entrypoint", nil, "")
+		fs.StringVar(&dummy, "pull", "", "")
+		fs.StringVarP(&dummy, "memory", "m", "", "")
+		fs.Float64Var(&dummyFloat, "cpus", 0, "")
+		fs.StringSliceVar(&dummySlice, "device", nil, "")
+		fs.StringVarP(&dummy, "dry-run-format", "f", "", "")
+		fs.CountVar(&dummyInt, "verbose", "")
+		fs.StringVar(&dummy, "log-level", "", "")
+		fs.StringVar(&dummy, "log-file", "", "")
+		fs.StringVar(&dummy, "log-format", "", "")
+
+		_ = fs.Parse(args[1:])
+		subcmdArgs := fs.Args()
+		if len(subcmdArgs) > 0 {
+			firstSubcmd := subcmdArgs[0]
+			for i := 1; i < len(args); i++ {
+				if args[i] == firstSubcmd {
+					subcmdIdx = i
+					break
+				}
 			}
 		}
 	}
 
-	// If not polyglot, check for P1 flags before the subcommand
+	// If not polyglot, check for P1 flags before the subcommand.
+	// P1 flags (starting with --cderun-) MUST be placed after the subcommand in wrapper mode.
 	if !isPolyglot && subcmdIdx != -1 {
 		for i := 1; i < subcmdIdx; i++ {
 			if strings.HasPrefix(args[i], "--cderun-") {
