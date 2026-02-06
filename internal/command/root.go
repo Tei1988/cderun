@@ -879,7 +879,7 @@ func preprocessArgs(args []string) ([]string, error) {
 		subcmdIdx = 0
 	} else {
 		fs := pflag.NewFlagSet("discover", pflag.ContinueOnError)
-		fs.ParseErrorsWhitelist.UnknownFlags = true
+		fs.ParseErrorsAllowlist.UnknownFlags = true
 
 		// Copy flags from the real rootCmd but use dummy values to avoid side effects
 		// on the global 'opts' state during discovery.
