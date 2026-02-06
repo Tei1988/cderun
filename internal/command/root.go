@@ -55,15 +55,15 @@ type rootOptions struct {
 	mounts                []string
 	mountTools            string
 	mountAllTools         bool
-	dryRun                   bool
-	dryRunFormat             string
-	cderunDryRun             bool
-	cderunDryRunFormat       string
-	diagnosis                bool
-	diagnosisFormat          string
-	cderunDiagnosis          bool
-	cderunDiagnosisFormat    string
-	logLevel                 string
+	dryRun                bool
+	dryRunFormat          string
+	cderunDryRun          bool
+	cderunDryRunFormat    string
+	diagnosis             bool
+	diagnosisFormat       string
+	cderunDiagnosis       bool
+	cderunDiagnosisFormat string
+	logLevel              string
 	logFile               string
 	logFormat             string
 	logTee                bool
