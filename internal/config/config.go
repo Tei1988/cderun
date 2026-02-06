@@ -34,8 +34,6 @@ type ConfigDefaults struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
-	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`
@@ -107,8 +105,6 @@ type ToolConfig struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
-	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`

@@ -8,21 +8,16 @@
 
 ### 基本動作
 `--dry-run`フラグが指定された場合：
-1. 通常通り設定を読み込み、中間表現を生成
-2. コンテナを実行せず、中間表現を表示
-3. 終了コード0で終了
+1. サブコマンドの指定が必須（指定がない場合はエラー）
+2. 通常通り設定を読み込み、中間表現を生成
+3. コンテナを実行せず、中間表現を表示
+4. 終了コード0で終了
 
 ## 使用方法
 
 ### 基本的な使用
 ```bash
 cderun --dry-run node --version
-```
-
-### グローバルドライラン（診断情報）
-サブコマンドを指定せずに `--dry-run` を実行すると、システムの診断情報と利用可能なツールの一覧を表示します。
-```bash
-cderun --dry-run
 ```
 
 ## 出力フォーマット
@@ -124,30 +119,6 @@ fi
 ### 3. 設定ファイルのドキュメント化
 ```bash
 cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
-```
-
-### 4. システム診断とツール一覧の確認
-```bash
-cderun --dry-run
-# または詳細形式
-cderun --dry-run -f json
-```
-
-**YAML出力例（診断情報）**:
-```yaml
-runtime:
-  name: docker
-  socket: /var/run/docker.sock
-  status: accessible
-configs:
-  global:
-    - /home/user/.cderun.yaml
-  tools:
-    - /home/user/project/.tools.yaml
-available_tools:
-  - node
-  - python
-  - git
 ```
 
 ## 他のフラグとの組み合わせ

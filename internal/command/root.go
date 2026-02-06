@@ -59,6 +59,10 @@ type rootOptions struct {
 	dryRunFormat          string
 	cderunDryRun          bool
 	cderunDryRunFormat    string
+	diagnosis             bool
+	diagnosisFormat       string
+	cderunDiagnosis       bool
+	cderunDiagnosisFormat string
 	logLevel              string
 	logFile               string
 	logFormat             string
@@ -205,6 +209,14 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		DryRunFormatSet:          cmd.Flags().Changed("dry-run-format"),
 		CderunDryRunFormat:       o.cderunDryRunFormat,
 		CderunDryRunFormatSet:    cmd.Flags().Changed("cderun-dry-run-format"),
+		Diagnosis:                o.diagnosis,
+		DiagnosisSet:             cmd.Flags().Changed("diagnosis"),
+		CderunDiagnosis:          o.cderunDiagnosis,
+		CderunDiagnosisSet:       cmd.Flags().Changed("cderun-diagnosis"),
+		DiagnosisFormat:          o.diagnosisFormat,
+		DiagnosisFormatSet:       cmd.Flags().Changed("diagnosis-format"),
+		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
+		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
 		LogLevel:                 o.logLevel,
 		LogLevelSet:              cmd.Flags().Changed("log-level"),
 		LogFile:                  o.logFile,
@@ -409,46 +421,46 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
-	if containerConfig == nil {
-		// Global Dry Run / Diagnostics
-		info := diagnosticsInfo{}
-		info.Runtime.Name = resolved.Runtime
-		info.Runtime.Socket = resolved.SocketPath
-		if _, err := os.Stat(resolved.SocketPath); err == nil {
-			info.Runtime.Status = "accessible"
-		} else {
-			info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
-		}
-		info.Configs.Global = globalPaths
-		info.Configs.Tools = toolsPaths
-		for toolName := range toolsCfg {
-			info.AvailableTools = append(info.AvailableTools, toolName)
-		}
-
-		switch strings.ToLower(resolved.DryRunFormat) {
-		case "json":
-			data, err := json.MarshalIndent(info, "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON: %w", err)
-			}
-			fmt.Println(string(data))
-		case "simple":
-			fmt.Printf("Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-			fmt.Printf("Runtime Status: %s\n", info.Runtime.Status)
-			fmt.Printf("Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-			fmt.Printf("Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-			fmt.Printf("Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
-		default: // Default to YAML
-			data, err := yaml.Marshal(info)
-			if err != nil {
-				return fmt.Errorf("failed to marshal YAML: %w", err)
-			}
-			fmt.Print(string(data))
-		}
-		return nil
+func (o *rootOptions) handleDiagnosis(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+	info := diagnosticsInfo{}
+	info.Runtime.Name = resolved.Runtime
+	info.Runtime.Socket = resolved.SocketPath
+	if _, err := os.Stat(resolved.SocketPath); err == nil {
+		info.Runtime.Status = "accessible"
+	} else {
+		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
 	}
+	info.Configs.Global = globalPaths
+	info.Configs.Tools = toolsPaths
+	for toolName := range toolsCfg {
+		info.AvailableTools = append(info.AvailableTools, toolName)
+	}
+	sort.Strings(info.AvailableTools)
 
+	switch strings.ToLower(resolved.DiagnosisFormat) {
+	case "json":
+		data, err := json.MarshalIndent(info, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+	case "simple":
+		fmt.Printf("Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
+		fmt.Printf("Runtime Status: %s\n", info.Runtime.Status)
+		fmt.Printf("Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+		fmt.Printf("Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
+		fmt.Printf("Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+	default: // Default to YAML
+		data, err := yaml.Marshal(info)
+		if err != nil {
+			return fmt.Errorf("failed to marshal YAML: %w", err)
+		}
+		fmt.Print(string(data))
+	}
+	return nil
+}
+
+func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	switch strings.ToLower(resolved.DryRunFormat) {
 	case "json":
 		data, err := json.MarshalIndent(containerConfig, "", "  ")
@@ -698,7 +710,14 @@ intended for the subcommand.`,
 				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
 			}
 
-			if len(args) == 0 && !resolved.DryRun {
+			if resolved.Diagnosis {
+				return opts.handleDiagnosis(resolved, toolsCfg, globalPaths, toolsPaths)
+			}
+
+			if len(args) == 0 {
+				if resolved.DryRun {
+					return fmt.Errorf("--dry-run requires a subcommand")
+				}
 				return cmd.Help()
 			}
 
@@ -718,7 +737,7 @@ intended for the subcommand.`,
 			}
 
 			if resolved.DryRun {
-				return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPaths, toolsPaths)
+				return opts.handleDryRun(containerConfig, resolved)
 			}
 
 			// Execute Container
@@ -804,6 +823,11 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().BoolVar(&opts.cderunDryRun, "cderun-dry-run", false, "Override dry-run setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunDryRunFormat, "cderun-dry-run-format", "", "Override dry-run-format setting (highest priority, can be used after subcommand)")
 
+	cmd.PersistentFlags().BoolVar(&opts.diagnosis, "diagnosis", false, "Show system diagnostics and available tools")
+	cmd.PersistentFlags().StringVar(&opts.diagnosisFormat, "diagnosis-format", "yaml", "Diagnosis output format (yaml, json, simple)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunDiagnosis, "cderun-diagnosis", false, "Override diagnosis setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&opts.cderunDiagnosisFormat, "cderun-diagnosis-format", "", "Override diagnosis-format setting (highest priority, can be used after subcommand)")
+
 	cmd.PersistentFlags().CountVar(&opts.verbose, "verbose", "Enable verbose logging (--verbose: info, --verbose --verbose: debug, --verbose --verbose --verbose: trace)")
 	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", "", "Set log level (error, warn, info, debug, trace)")
 	cmd.PersistentFlags().StringVar(&opts.logFile, "log-file", "", "Set log file path")
@@ -847,15 +871,32 @@ func preprocessArgs(args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index
+	// Find the subcommand index robustly by skipping flags and their arguments
 	subcmdIdx := -1
 	if isPolyglot {
 		subcmdIdx = 0
 	} else {
 		for i := 1; i < len(args); i++ {
-			if !strings.HasPrefix(args[i], "-") {
+			arg := args[i]
+			if !strings.HasPrefix(arg, "-") {
 				subcmdIdx = i
 				break
+			}
+			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
+			if strings.HasPrefix(arg, "--") {
+				name := strings.SplitN(arg[2:], "=", 2)[0]
+				if f := rootCmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+					// Flag exists, takes an argument, and no '=' used, so skip next argument.
+					i++
+				}
+			} else if len(arg) > 1 {
+				// Shorthand(s), e.g., -i, -it, -p 80:80
+				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
+				lastChar := string(arg[len(arg)-1])
+				if f := rootCmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+					// Last shorthand takes an argument, skip next argument.
+					i++
+				}
 			}
 		}
 	}
