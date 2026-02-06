@@ -110,7 +110,8 @@ var (
 	opts rootOptions
 
 	// For testing
-	exitFunc       = os.Exit
+	attachGracePeriod = 5 * time.Second
+	exitFunc          = os.Exit
 	runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
 		switch name {
 		case "docker":
@@ -641,13 +642,13 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
 	}
 
-	// After container exits, wait a short grace period for remaining output
+	// After container exits, wait for remaining output with a grace period
 	select {
 	case err := <-attachDone:
 		if err != nil && err != context.Canceled {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(attachGracePeriod):
 		logging.Debug("AttachContainer timed out after container exit, forcing close")
 		cancelAttach()
 		<-attachDone

@@ -31,10 +31,13 @@ func TestExecuteRobustness(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		originalFactory := runtimeFactory
 		originalExit := exitFunc
+		originalGrace := attachGracePeriod
 		defer func() {
 			runtimeFactory = originalFactory
 			exitFunc = originalExit
+			attachGracePeriod = originalGrace
 		}()
+		attachGracePeriod = 500 * time.Millisecond
 
 		mock := &blockingMockRuntime{
 			attachStarted: make(chan struct{}),

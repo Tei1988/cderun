@@ -128,18 +128,32 @@ func TestIntegrationBasic(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
+
+		// Ensure the temp directory is accessible by the container user
+		require.NoError(t, os.Chmod(tmpDir, 0755))
+
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
+		// Use a script to debug if cat fails
+		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"sh\", \"-c\"]"), 0644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
+		require.NoError(t, os.Chmod(hostFile, 0644))
 
-		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
+		// Run cat and also ls to see if file exists if cat fails
+		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "cat /hello.txt || (ls -l /hello.txt; exit 1)")
 		skipIfDockerBroken(t, err)
+
+		// If it failed, show stderr and stdout for debugging
+		if err != nil || exitCode != 0 || !strings.Contains(stdout, "hello-from-host") {
+			t.Logf("STDOUT: %s", stdout)
+			t.Logf("STDERR: %s", stderr)
+		}
+
 		require.NoError(t, err, "stderr: %s", stderr)
 		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
 		require.Contains(t, stdout, "hello-from-host", "stderr: %s", stderr)
