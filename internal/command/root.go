@@ -1017,7 +1017,10 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 		}
 	}
 
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("getting working directory: %w", err)
+	}
 	hostCwd := cwd
 	if resolved.HostContext != nil {
 		hostCwd = config.ResolveHostPath(cwd, resolved.HostContext.Mounts)
