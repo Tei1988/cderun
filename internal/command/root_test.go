@@ -678,6 +678,65 @@ node:
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
 	})
+
+	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--env", "MYVAR=a,b", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
+	})
+
+	t.Run("mount-tools not found error message includes available tools", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		// Setup tools config
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+python:
+  image: python:3
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err = executeCommand("--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"unknown\" not found in .tools.yaml")
+		assert.Contains(t, err.Error(), "available tools: node, python")
+	})
 }
 
 func TestCderunInternalOverrides(t *testing.T) {
