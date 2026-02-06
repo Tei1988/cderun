@@ -532,9 +532,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	// CPUs resolution
 	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
 
-	if global != nil {
-		res.HostContext = global.HostContext
-	}
+	res.HostContext = r.HostContext
 
 	return res, nil
 }

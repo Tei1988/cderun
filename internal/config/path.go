@@ -367,6 +367,50 @@ func ResolveHostPath(p string, mounts []HostMount) string {
 	return p
 }
 
+func DiscoverHostRoot() string {
+	data, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		// Look for root mount
+		if !strings.Contains(line, " / / ") {
+			continue
+		}
+
+		// mountinfo format:
+		// 36 35 98:0 /mnt1 /mnt2 rw,relatime master:1 - ext3 /dev/root rw,errors=continue
+		// separator is " - "
+		parts := strings.Split(line, " - ")
+		if len(parts) < 2 {
+			continue
+		}
+
+		// After " - ", fields are: type, source, data
+		tail := strings.SplitN(parts[1], " ", 3)
+		if len(tail) < 3 {
+			continue
+		}
+
+		fstype := tail[0]
+		if fstype != "overlay" {
+			continue
+		}
+
+		mountData := tail[2]
+		opts := strings.Split(mountData, ",")
+		for _, opt := range opts {
+			if strings.HasPrefix(opt, "upperdir=") {
+				return strings.TrimPrefix(opt, "upperdir=")
+			}
+		}
+	}
+
+	return ""
+}
+
 func SplitHostRemainder(s string) (string, string, bool) {
 	sepIdx := strings.Index(s, ":")
 	if sepIdx == -1 {

@@ -11,6 +11,9 @@ import (
 )
 
 func TestPathResolution(t *testing.T) {
+	DisableDiscovery = true
+	t.Cleanup(func() { DisableDiscovery = false })
+
 	home, _ := os.UserHomeDir()
 	baseDir := "/abs/path"
 	r, err := NewExpressionResolver(nil)
@@ -124,6 +127,40 @@ func TestPathResolution(t *testing.T) {
 		assert.Equal(t, "/home/user/.ssh", ResolveHostPath("/home/user/.ssh", mounts))
 		// No match
 		assert.Equal(t, "/tmp/other", ResolveHostPath("/tmp/other", mounts))
+	})
+
+	t.Run("DiscoverHostRoot", func(t *testing.T) {
+		DisableDiscovery = false
+		root := DiscoverHostRoot()
+		if root != "" {
+			t.Logf("Discovered host root: %s", root)
+			assert.True(t, filepath.IsAbs(root))
+		} else {
+			t.Log("No host root discovered (not an overlay environment?)")
+		}
+	})
+
+	t.Run("End-to-end Overlay Resolution", func(t *testing.T) {
+		// Mock discovered root
+		rootPath := "/var/lib/docker/overlay2/merged"
+		r, _ := NewExpressionResolver(nil)
+		// Manually inject the context as if discovered
+		r.HostContext = &HostContext{
+			Level: 0,
+			Mounts: []HostMount{
+				{Source: rootPath, Target: "/", Level: 0},
+			},
+		}
+
+		cp := ConfigPath{Raw: "/tmp/foo"}
+		assert.Equal(t, "/var/lib/docker/overlay2/merged/tmp/foo", cp.ResolveHost(r))
+
+		// Check priority
+		r.HostContext.Mounts = append(r.HostContext.Mounts, HostMount{
+			Source: "/home/user/project", Target: "/app", Level: 1,
+		})
+		cp = ConfigPath{Raw: "/app/src"}
+		assert.Equal(t, "/home/user/project/src", cp.ResolveHost(r))
 	})
 }
 

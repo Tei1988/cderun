@@ -67,6 +67,12 @@ When `cderun` is running inside a container (Level >= 1) and wants to mount a di
 Example:
 If `/app` is mapped to `/home/user/project` at Level 1, then a request to mount `/app/src` from within the container will be translated to `/home/user/project/src` before being sent to the container runtime.
 
+## Automatic Root Discovery (OverlayFS)
+
+If `cderun` detects it is running inside a container with an OverlayFS root filesystem, it automatically discovers the host-side `upperdir` by parsing `/proc/self/mountinfo`. It then adds a base mapping for `/` in the `hostContext`.
+
+This enables `cderun` to correctly resolve any file within the container back to its host-side path, even if the file is not in an explicitly mounted volume.
+
 ## Configuration Discovery Priority
 
 Inside a container, `cderun` looks for configuration files in the following order (highest priority first):

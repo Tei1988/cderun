@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 	"errors"
 	"io"
@@ -19,6 +20,7 @@ func executeCommand(args ...string) (string, error) {
 }
 
 func executeCommandRaw(args []string) (string, error) {
+	config.DisableDiscovery = true
 	// Reset flag variables and Changed state
 	rootCmd = newRootCmd()
 	opts.tty = false

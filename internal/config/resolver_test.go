@@ -44,6 +44,9 @@ func cp(s string) ConfigPath {
 }
 
 func TestResolve(t *testing.T) {
+	DisableDiscovery = true
+	t.Cleanup(func() { DisableDiscovery = false })
+
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
 		cli := CLIOptions{
 			TTY:    true,

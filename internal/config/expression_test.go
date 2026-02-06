@@ -9,6 +9,9 @@ import (
 )
 
 func TestExpressionResolver(t *testing.T) {
+	DisableDiscovery = true
+	t.Cleanup(func() { DisableDiscovery = false })
+
 	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tmpDir) }()

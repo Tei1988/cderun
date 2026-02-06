@@ -8,6 +8,8 @@ import (
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
+var DisableDiscovery = false
+
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
 	Home        string
@@ -28,9 +30,47 @@ func NewExpressionResolver(global *CDERunConfig) (*ExpressionResolver, error) {
 		Home: home,
 		Pwd:  pwd,
 	}
+
 	if global != nil {
 		res.HostContext = global.HostContext
 	}
+
+	if DisableDiscovery {
+		return res, nil
+	}
+
+	// Supplement HostContext with discovered root if applicable
+	if res.HostContext == nil {
+		rootPath := DiscoverHostRoot()
+		if rootPath != "" {
+			res.HostContext = &HostContext{
+				Level: 0,
+				Mounts: []HostMount{
+					{Source: rootPath, Target: "/", Level: 0},
+				},
+			}
+		}
+	} else {
+		// Even if we have a context, ensure we have a base root if none exists
+		hasRoot := false
+		for _, m := range res.HostContext.Mounts {
+			if m.Target == "/" {
+				hasRoot = true
+				break
+			}
+		}
+		if !hasRoot {
+			rootPath := DiscoverHostRoot()
+			if rootPath != "" {
+				res.HostContext.Mounts = append(res.HostContext.Mounts, HostMount{
+					Source: rootPath,
+					Target: "/",
+					Level:  0,
+				})
+			}
+		}
+	}
+
 	return res, nil
 }
 

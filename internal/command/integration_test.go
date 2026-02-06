@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"cderun/internal/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ const testImage = "public.ecr.aws/docker/library/alpine:latest"
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
+	config.DisableDiscovery = true
 	// Re-use logic from root_test.go but simplified
 	originalStdout := os.Stdout
 	originalStderr := os.Stderr
