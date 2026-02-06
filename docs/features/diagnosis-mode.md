@@ -97,3 +97,22 @@ cderun node app.js --cderun-diagnosis
 export CDERUN_DIAGNOSIS=true
 cderun
 ```
+
+### 出力フォーマットの環境変数
+
+`CDERUN_DIAGNOSIS_FORMAT` 環境変数を使用して、出力フォーマットを制御できます。
+
+```bash
+export CDERUN_DIAGNOSIS_FORMAT=json
+cderun --diagnosis
+```
+
+`CDERUN_DIAGNOSIS=true` と組み合わせることで、フラグなしで特定のフォーマットの診断出力を得ることができます。
+
+```bash
+export CDERUN_DIAGNOSIS=true
+export CDERUN_DIAGNOSIS_FORMAT=json
+cderun
+```
+
+利用可能な値は `yaml`（デフォルト）、`json`、`simple` です。

@@ -633,34 +633,47 @@ func TestResolve(t *testing.T) {
 		assert.Contains(t, res.Env, "GLOBAL_VAR=global-value")
 	})
 
-	t.Run("DryRun and Diagnosis resolution (CLI/Env only)", func(t *testing.T) {
+	t.Run("DryRun resolution (CLI/Env only)", func(t *testing.T) {
 		t.Setenv("CDERUN_DRY_RUN", "true")
-		t.Setenv("CDERUN_DIAGNOSIS", "true")
 		cli := CLIOptions{}
 		res, err := Resolve("", cli, nil, nil)
 		require.NoError(t, err)
 		assert.True(t, res.DryRun)
-		assert.True(t, res.Diagnosis)
 
 		t.Setenv("CDERUN_DRY_RUN", "false")
-		t.Setenv("CDERUN_DIAGNOSIS", "false")
 		cli.DryRun = true
 		cli.DryRunSet = true
-		cli.Diagnosis = true
-		cli.DiagnosisSet = true
 		res, err = Resolve("", cli, nil, nil)
 		require.NoError(t, err)
 		assert.True(t, res.DryRun)
-		assert.True(t, res.Diagnosis)
 
 		// P1 overrides
 		cli.CderunDryRun = false
 		cli.CderunDryRunSet = true
+		res, err = Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.False(t, res.DryRun)
+	})
+
+	t.Run("Diagnosis resolution (CLI/Env only)", func(t *testing.T) {
+		t.Setenv("CDERUN_DIAGNOSIS", "true")
+		cli := CLIOptions{}
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, res.Diagnosis)
+
+		t.Setenv("CDERUN_DIAGNOSIS", "false")
+		cli.Diagnosis = true
+		cli.DiagnosisSet = true
+		res, err = Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, res.Diagnosis)
+
+		// P1 overrides
 		cli.CderunDiagnosis = false
 		cli.CderunDiagnosisSet = true
 		res, err = Resolve("", cli, nil, nil)
 		require.NoError(t, err)
-		assert.False(t, res.DryRun)
 		assert.False(t, res.Diagnosis)
 	})
 
