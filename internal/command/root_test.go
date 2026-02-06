@@ -146,6 +146,11 @@ func TestPreprocessArgs(t *testing.T) {
 		expected []string
 	}{
 		{
+			name:     "cderun with flag value matching subcommand",
+			args:     []string{"cderun", "--image", "ls", "ls", "-l"},
+			expected: []string{"cderun", "--image", "ls", "ls", "-l"},
+		},
+		{
 			name:     "cderun with args",
 			args:     []string{"cderun", "node", "--version"},
 			expected: []string{"cderun", "node", "--version"},

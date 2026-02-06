@@ -857,11 +857,19 @@ func Execute(rawArgs []string) error {
 	return rootCmd.Execute()
 }
 
-type discoverValue struct{}
+type discoverValue struct {
+	isBool bool
+}
 
 func (d *discoverValue) Set(s string) error { return nil }
-func (d *discoverValue) Type() string       { return "string" }
-func (d *discoverValue) String() string     { return "" }
+func (d *discoverValue) Type() string {
+	if d.isBool {
+		return "bool"
+	}
+	return "string"
+}
+func (d *discoverValue) String() string   { return "" }
+func (d *discoverValue) IsBoolFlag() bool { return d.isBool }
 
 func preprocessArgs(args []string) ([]string, error) {
 	if len(args) == 0 {
@@ -879,13 +887,18 @@ func preprocessArgs(args []string) ([]string, error) {
 		subcmdIdx = 0
 	} else {
 		fs := pflag.NewFlagSet("discover", pflag.ContinueOnError)
+		fs.SetInterspersed(false)
 		fs.ParseErrorsAllowlist.UnknownFlags = true
 
 		// Copy flags from the real rootCmd but use dummy values to avoid side effects
 		// on the global 'opts' state during discovery.
 		copyFlag := func(f *pflag.Flag) {
 			nf := *f
-			nf.Value = &discoverValue{}
+			isBool := false
+			if f.Value.Type() == "bool" {
+				isBool = true
+			}
+			nf.Value = &discoverValue{isBool: isBool}
 			fs.AddFlag(&nf)
 		}
 		rootCmd.Flags().VisitAll(copyFlag)
@@ -899,10 +912,20 @@ func preprocessArgs(args []string) ([]string, error) {
 		fs.SetOutput(io.Discard)
 
 		_ = fs.Parse(args[1:])
-		subcmd := fs.Arg(0)
-		if subcmd != "" {
-			for i := 1; i < len(args); i++ {
-				if args[i] == subcmd {
+		remaining := fs.Args()
+		if len(remaining) > 0 {
+			// Find the start of the continuous sequence of remaining arguments in args.
+			// This ensures we correctly identify the subcommand and its arguments,
+			// skipping any values assigned to flags.
+			for i := 1; i <= len(args)-len(remaining); i++ {
+				match := true
+				for j := 0; j < len(remaining); j++ {
+					if args[i+j] != remaining[j] {
+						match = false
+						break
+					}
+				}
+				if match {
 					subcmdIdx = i
 					break
 				}
@@ -917,6 +940,10 @@ func preprocessArgs(args []string) ([]string, error) {
 				return nil, fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", args[i])
 			}
 		}
+	}
+
+	if subcmdIdx == -1 {
+		return args, nil
 	}
 
 	processedArgs := make([]string, 0, len(args)+1)
