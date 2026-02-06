@@ -860,8 +860,8 @@ func Execute(rawArgs []string) error {
 type discoverValue struct{}
 
 func (d *discoverValue) Set(s string) error { return nil }
-func (d *discoverValue) Type() string     { return "string" }
-func (d *discoverValue) String() string   { return "" }
+func (d *discoverValue) Type() string       { return "string" }
+func (d *discoverValue) String() string     { return "" }
 
 func preprocessArgs(args []string) ([]string, error) {
 	if len(args) == 0 {

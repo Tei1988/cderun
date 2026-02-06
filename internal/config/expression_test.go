@@ -60,3 +60,30 @@ func TestExpressionResolver(t *testing.T) {
 		assert.Equal(t, expected["env"], actual["env"])
 	})
 }
+
+func TestExpressionResolver_HostContextDeepCopy(t *testing.T) {
+	global := &CDERunConfig{
+		HostContext: &HostContext{
+			Level: 1,
+			Mounts: []HostMount{
+				{Source: "/host", Target: "/container", Level: 1},
+			},
+		},
+	}
+
+	resolver, err := NewExpressionResolver(global)
+	require.NoError(t, err)
+
+	assert.NotNil(t, resolver.HostContext)
+	// Ensure it's not the same pointer
+	assert.NotSame(t, global.HostContext, resolver.HostContext)
+	// Ensure Mounts slice is not shared
+	assert.NotSame(t, &global.HostContext.Mounts[0], &resolver.HostContext.Mounts[0])
+
+	// Modifying resolver's context should not affect global
+	resolver.HostContext.Level = 2
+	resolver.HostContext.Mounts[0].Source = "/modified"
+
+	assert.Equal(t, 1, global.HostContext.Level)
+	assert.Equal(t, "/host", global.HostContext.Mounts[0].Source)
+}

@@ -31,8 +31,14 @@ func NewExpressionResolver(global *CDERunConfig) (*ExpressionResolver, error) {
 		Pwd:  pwd,
 	}
 
-	if global != nil {
-		res.HostContext = global.HostContext
+	if global != nil && global.HostContext != nil {
+		// Deep copy HostContext to avoid side effects on the input global config
+		hc := *global.HostContext
+		if global.HostContext.Mounts != nil {
+			hc.Mounts = make([]HostMount, len(global.HostContext.Mounts))
+			copy(hc.Mounts, global.HostContext.Mounts)
+		}
+		res.HostContext = &hc
 	}
 
 	if DisableDiscovery {
