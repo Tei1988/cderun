@@ -871,15 +871,32 @@ func preprocessArgs(args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index
+	// Find the subcommand index robustly by skipping flags and their arguments
 	subcmdIdx := -1
 	if isPolyglot {
 		subcmdIdx = 0
 	} else {
 		for i := 1; i < len(args); i++ {
-			if !strings.HasPrefix(args[i], "-") {
+			arg := args[i]
+			if !strings.HasPrefix(arg, "-") {
 				subcmdIdx = i
 				break
+			}
+			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
+			if strings.HasPrefix(arg, "--") {
+				name := strings.SplitN(arg[2:], "=", 2)[0]
+				if f := rootCmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+					// Flag exists, takes an argument, and no '=' used, so skip next argument.
+					i++
+				}
+			} else if len(arg) > 1 {
+				// Shorthand(s), e.g., -i, -it, -p 80:80
+				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
+				lastChar := string(arg[len(arg)-1])
+				if f := rootCmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+					// Last shorthand takes an argument, skip next argument.
+					i++
+				}
 			}
 		}
 	}
