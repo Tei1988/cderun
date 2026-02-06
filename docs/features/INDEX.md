@@ -87,6 +87,9 @@
 18. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
   - コードカバレッジの可視化と自動計測
 
+19. **[診断モード (Completed)](./diagnosis-mode.md)**
+  - システム診断情報と利用可能なツールの表示
+
 ## 機能間の関係
 
 ```text

@@ -54,6 +54,10 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.dryRunFormat = "yaml"
 	opts.cderunDryRun = false
 	opts.cderunDryRunFormat = ""
+	opts.diagnosis = false
+	opts.diagnosisFormat = "yaml"
+	opts.cderunDiagnosis = false
+	opts.cderunDiagnosisFormat = ""
 	opts.logLevel = ""
 	opts.logFile = ""
 	opts.logFormat = "text"
@@ -532,6 +536,71 @@ node:
 		assert.NotContains(t, envs, "HOST_KEY=HOST_VALUE")
 		assert.NotContains(t, envs, "CLI_KEY=CLI_VALUE")
 		assert.NotContains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE")
+	})
+
+	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--diagnosis")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "configs:")
+		assert.Nil(t, mockRuntime.CreatedConfig)
+	})
+
+	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--diagnosis", "node", "--version")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "configs:")
+		assert.NotContains(t, output, "image: node") // Should not be container config dry-run
+		assert.Nil(t, mockRuntime.CreatedConfig)
+	})
+
+	t.Run("dry-run requires a subcommand", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--dry-run")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 	})
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {

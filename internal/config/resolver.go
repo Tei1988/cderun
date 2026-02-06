@@ -32,6 +32,8 @@ type ResolvedConfig struct {
 	MountAllTools   bool
 	DryRun          bool
 	DryRunFormat    string
+	Diagnosis       bool
+	DiagnosisFormat string
 	LogLevel        string
 	LogFile         string
 	LogFormat       string
@@ -123,6 +125,14 @@ type CLIOptions struct {
 	DryRunFormatSet          bool
 	CderunDryRunFormat       string
 	CderunDryRunFormatSet    bool
+	Diagnosis                bool
+	DiagnosisSet             bool
+	CderunDiagnosis          bool
+	CderunDiagnosisSet       bool
+	DiagnosisFormat          string
+	DiagnosisFormatSet       bool
+	CderunDiagnosisFormat    string
+	CderunDiagnosisFormatSet bool
 	LogLevel                 string
 	LogLevelSet              bool
 	LogFile                  string
@@ -202,6 +212,17 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
+	// 0. Resolve Diagnosis (CLI/Env only)
+	// This is resolved early because diagnosis mode bypasses some validations.
+	res.Diagnosis = resolveBool(
+		cli.CderunDiagnosisSet, cli.CderunDiagnosis,
+		cli.DiagnosisSet, cli.Diagnosis,
+		"CDERUN_DIAGNOSIS",
+		"", nil, nil,
+		nil, nil,
+		false,
+	)
+
 	// 1. Resolve Image (Step 10.1: Subcommand as key)
 	// Priority: P1 CLI > P2 CLI > Env (P3) > Tool Config (P4) > Global Defaults (P5)
 	res.Image = resolveString(
@@ -214,7 +235,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		r,
 	)
 
-	if res.Image == "" && subcommand != "" {
+	if res.Image == "" && subcommand != "" && !res.Diagnosis {
 		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
 	}
 	if res.Image != "" {
@@ -409,28 +430,39 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		res.MountAllTools = cli.MountAllTools
 	}
 
-	// 15. Resolve DryRun
+	// 15. Resolve DryRun (CLI/Env only)
 	res.DryRun = resolveBool(
 		cli.CderunDryRunSet, cli.CderunDryRun,
 		cli.DryRunSet, cli.DryRun,
 		"CDERUN_DRY_RUN",
-		subcommand, tools, func(t ToolConfig) *bool { return t.DryRun },
-		global, func(g CDERunConfig) *bool { return g.Defaults.DryRun },
+		"", nil, nil,
+		nil, nil,
 		false,
 	)
 
-	// 16. Resolve DryRunFormat
+	// 16. Resolve DryRunFormat (CLI/Env only)
 	res.DryRunFormat = resolveString(
 		cli.CderunDryRunFormatSet, cli.CderunDryRunFormat,
 		cli.DryRunFormatSet, cli.DryRunFormat,
 		"CDERUN_DRY_RUN_FORMAT",
-		subcommand, tools, func(t ToolConfig) string { return t.DryRunFormat },
-		global, func(g CDERunConfig) string { return g.Defaults.DryRunFormat },
+		"", nil, nil,
+		nil, nil,
 		"yaml",
 		r,
 	)
 
-	// 17. Resolve Logging
+	// 17. Resolve DiagnosisFormat (CLI/Env only)
+	res.DiagnosisFormat = resolveString(
+		cli.CderunDiagnosisFormatSet, cli.CderunDiagnosisFormat,
+		cli.DiagnosisFormatSet, cli.DiagnosisFormat,
+		"CDERUN_DIAGNOSIS_FORMAT",
+		"", nil, nil,
+		nil, nil,
+		"yaml",
+		r,
+	)
+
+	// 18. Resolve Logging
 	res.LogLevel = resolveString(
 		cli.CderunLogLevelSet, cli.CderunLogLevel,
 		cli.LogLevelSet, cli.LogLevel,
