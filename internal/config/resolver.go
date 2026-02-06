@@ -289,14 +289,8 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		false,
 	)
 
-	// 11. Resolve Env (P1 > P2 > P4)
-	var toolsEnv []string
-	if tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			toolsEnv = tool.Env
-		}
-	}
-	res.Env, err = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv), res.StrictEnv, r)
+	// 11. Resolve Env (P1 > P2 > Env (P3) > Tool (P4) > Global (P5))
+	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r)
 	if err != nil {
 		return nil, err
 	}
@@ -628,20 +622,25 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
 
-	// Global defaults (lowest priority)
-	if global != nil {
-		dcs = append(dcs, global.Defaults.Devices...)
-	}
-
-	// Tool-specific devices
-	if tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			dcs = append(dcs, tool.Devices...)
+	if len(p1) > 0 {
+		for _, d := range p1 {
+			parsed, ok := ParseDeviceConfig(d)
+			if !ok {
+				return nil, fmt.Errorf("invalid device config (override): %s", d)
+			}
+			parsed.SetBaseDir(r.Pwd)
+			dcs = append(dcs, parsed)
 		}
-	}
-
-	// Env var devices
-	if env := os.Getenv("CDERUN_DEVICE"); env != "" {
+	} else if len(p2) > 0 {
+		for _, d := range p2 {
+			parsed, ok := ParseDeviceConfig(d)
+			if !ok {
+				return nil, fmt.Errorf("invalid device config: %s", d)
+			}
+			parsed.SetBaseDir(r.Pwd)
+			dcs = append(dcs, parsed)
+		}
+	} else if env := os.Getenv("CDERUN_DEVICE"); env != "" {
 		for _, d := range strings.Split(env, ",") {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -650,26 +649,14 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
+	} else if tools != nil {
+		if tool, ok := tools[subcommand]; ok && len(tool.Devices) > 0 {
+			dcs = tool.Devices
+		}
 	}
 
-	// P2 CLI devices
-	for _, d := range p2 {
-		parsed, ok := ParseDeviceConfig(d)
-		if !ok {
-			return nil, fmt.Errorf("invalid device config: %s", d)
-		}
-		parsed.SetBaseDir(r.Pwd)
-		dcs = append(dcs, parsed)
-	}
-
-	// P1 CLI devices (highest priority)
-	for _, d := range p1 {
-		parsed, ok := ParseDeviceConfig(d)
-		if !ok {
-			return nil, fmt.Errorf("invalid device config (override): %s", d)
-		}
-		parsed.SetBaseDir(r.Pwd)
-		dcs = append(dcs, parsed)
+	if len(dcs) == 0 && global != nil {
+		dcs = global.Defaults.Devices
 	}
 
 	var res []container.DeviceMapping
@@ -730,6 +717,34 @@ func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envK
 	return fallback
 }
 
+func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver) ([]string, error) {
+	var envs []string
+
+	if len(p1) > 0 {
+		envs = p1
+	} else if len(p2) > 0 {
+		envs = p2
+	} else if env := os.Getenv(envKey); env != "" {
+		envs = strings.Split(env, ";")
+		for i := range envs {
+			envs[i] = strings.TrimSpace(envs[i])
+		}
+	} else if tools != nil {
+		if tool, ok := tools[subcommand]; ok && len(tool.Env) > 0 {
+			envs = tool.Env
+		}
+	}
+
+	if len(envs) == 0 && global != nil {
+		envs = global.Defaults.Env
+	}
+
+	// Deduplicate within the winning source (last-one-wins for the same key)
+	merged := mergeEnv(nil, nil, envs)
+
+	return resolveEnvValues(merged, strict, r)
+}
+
 func mergeEnv(base, p2, p1 []string) []string {
 	m := make(map[string]string)
 	var keys []string
@@ -775,21 +790,25 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.Mount, error) {
 	var mcs []MountConfig
 
-	// Global defaults (lowest priority)
-	if global != nil {
-		mcs = append(mcs, global.Defaults.Mounts...)
-	}
-
-	// Tool-specific mounts
-	if tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			mcs = append(mcs, tool.Mounts...)
+	if len(p1) > 0 {
+		for _, m := range p1 {
+			parsed, err := ParseMountFlag(m)
+			if err != nil {
+				return nil, fmt.Errorf("invalid mount config (override): %w", err)
+			}
+			parsed.SetBaseDir(r.Pwd)
+			mcs = append(mcs, parsed)
 		}
-	}
-
-	// Env var mounts
-	if env := os.Getenv("CDERUN_MOUNT"); env != "" {
-		// Use semicolon as separator for multiple mounts since commas are used within mount specs
+	} else if len(p2) > 0 {
+		for _, m := range p2 {
+			parsed, err := ParseMountFlag(m)
+			if err != nil {
+				return nil, err
+			}
+			parsed.SetBaseDir(r.Pwd)
+			mcs = append(mcs, parsed)
+		}
+	} else if env := os.Getenv("CDERUN_MOUNT"); env != "" {
 		for _, m := range strings.Split(env, ";") {
 			m = strings.TrimSpace(m)
 			if m == "" {
@@ -802,26 +821,14 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
+	} else if tools != nil {
+		if tool, ok := tools[subcommand]; ok && len(tool.Mounts) > 0 {
+			mcs = tool.Mounts
+		}
 	}
 
-	// P2 CLI mounts (middle priority)
-	for _, m := range p2 {
-		parsed, err := ParseMountFlag(m)
-		if err != nil {
-			return nil, err
-		}
-		parsed.SetBaseDir(r.Pwd)
-		mcs = append(mcs, parsed)
-	}
-
-	// P1 CLI mounts (highest priority)
-	for _, m := range p1 {
-		parsed, err := ParseMountFlag(m)
-		if err != nil {
-			return nil, fmt.Errorf("invalid mount config (override): %w", err)
-		}
-		parsed.SetBaseDir(r.Pwd)
-		mcs = append(mcs, parsed)
+	if len(mcs) == 0 && global != nil {
+		mcs = global.Defaults.Mounts
 	}
 
 	var res []container.Mount
