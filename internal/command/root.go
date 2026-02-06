@@ -112,7 +112,7 @@ var (
 	// For testing
 	attachGracePeriod = 5 * time.Second
 	exitFunc          = os.Exit
-	runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+	runtimeFactory    = func(name string, socket string) (runtime.ContainerRuntime, error) {
 		switch name {
 		case "docker":
 			return runtime.NewDockerRuntime(socket)
