@@ -135,8 +135,8 @@ func TestIntegrationBasic(t *testing.T) {
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		// Use a script to debug if cat fails
-		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"sh\", \"-c\"]"), 0644)
+		// Use cat directly to minimize shell complexity
+		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
@@ -144,14 +144,18 @@ func TestIntegrationBasic(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, os.Chmod(hostFile, 0644))
 
-		// Run cat and also ls to see if file exists if cat fails
-		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "cat /hello.txt || (ls -l /hello.txt; exit 1)")
+		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 
-		// If it failed, show stderr and stdout for debugging
+		// Detailed diagnostics on failure
 		if err != nil || exitCode != 0 || !strings.Contains(stdout, "hello-from-host") {
-			t.Logf("STDOUT: %s", stdout)
-			t.Logf("STDERR: %s", stderr)
+			t.Logf("DIAGNOSTICS:")
+			t.Logf("  Exit Code: %d", exitCode)
+			t.Logf("  Error: %v", err)
+			t.Logf("  STDOUT length: %d", len(stdout))
+			t.Logf("  STDOUT content: %q", stdout)
+			t.Logf("  STDERR length: %d", len(stderr))
+			t.Logf("  STDERR content: %q", stderr)
 		}
 
 		require.NoError(t, err, "stderr: %s", stderr)

@@ -18,6 +18,7 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -591,6 +592,21 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	// Attach to container IO concurrently BEFORE starting it to avoid race conditions
+	// for fast-exiting containers.
+	var stdin io.Reader
+	if containerConfig.Interactive {
+		stdin = os.Stdin
+	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
+	}()
+
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
@@ -621,20 +637,6 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 		}
 	}
-
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	if containerConfig.Interactive {
-		stdin = os.Stdin
-	}
-
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
-	}()
 
 	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)
@@ -855,6 +857,12 @@ func Execute(rawArgs []string) error {
 	return rootCmd.Execute()
 }
 
+type discoverValue struct{}
+
+func (d *discoverValue) Set(s string) error { return nil }
+func (d *discoverValue) Type() string     { return "string" }
+func (d *discoverValue) String() string   { return "" }
+
 func preprocessArgs(args []string) ([]string, error) {
 	if len(args) == 0 {
 		return args, nil
@@ -863,15 +871,41 @@ func preprocessArgs(args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index
+	// Find the subcommand index by correctly parsing flags.
+	// This ensures that flag arguments (like "--mount type=bind,...") are not
+	// mistaken for the subcommand.
 	subcmdIdx := -1
 	if isPolyglot {
 		subcmdIdx = 0
 	} else {
-		for i := 1; i < len(args); i++ {
-			if !strings.HasPrefix(args[i], "-") {
-				subcmdIdx = i
-				break
+		fs := pflag.NewFlagSet("discover", pflag.ContinueOnError)
+		fs.ParseErrorsWhitelist.UnknownFlags = true
+
+		// Copy flags from the real rootCmd but use dummy values to avoid side effects
+		// on the global 'opts' state during discovery.
+		copyFlag := func(f *pflag.Flag) {
+			nf := *f
+			nf.Value = &discoverValue{}
+			fs.AddFlag(&nf)
+		}
+		rootCmd.Flags().VisitAll(copyFlag)
+		rootCmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+			if fs.Lookup(f.Name) == nil {
+				copyFlag(f)
+			}
+		})
+
+		// We don't want to actually SET any values or see output
+		fs.SetOutput(io.Discard)
+
+		_ = fs.Parse(args[1:])
+		subcmd := fs.Arg(0)
+		if subcmd != "" {
+			for i := 1; i < len(args); i++ {
+				if args[i] == subcmd {
+					subcmdIdx = i
+					break
+				}
 			}
 		}
 	}

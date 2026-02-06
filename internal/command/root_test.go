@@ -433,8 +433,10 @@ node:
 		}
 		exitFunc = func(code int) {}
 
-		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
-		assert.NoError(t, err)
+		// P1 overrides must be placed after the subcommand in standard mode
+		_, err := executeCommand("--image", "alpine", "--tty=true", "sh", "--cderun-tty=false")
+		require.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})
 
