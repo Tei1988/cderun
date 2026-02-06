@@ -86,8 +86,7 @@ Goでは os/signal パッケージの signal.Notify を使用してこれらの�
 2. **現在サイズの取得**: ホスト側のターミナル（os.Stdout など）に対して TIOCGWINSZ を発行し、現在の行数と列数を取得する 27。
 3. **PTYへの適用**: 取得したサイズ情報を pty.Setsize などの関数を用いてPTYマスタに適用する 4。
 
-Go
-
+```go
 // SIGWINCHのハンドリング例
 sigChan := make(chan os.Signal, 1)
 signal.Notify(sigChan, syscall.SIGWINCH)
@@ -99,6 +98,7 @@ go func() {
     }
   }
 }()
+```
 
 このリレーが正常に行われると、カーネルはコンテナ内のPTYスレーブに対しても SIGWINCH を送信し、それを受けたコンテナ内プロセス（例えば bash）が環境変数 LINES や COLUMNS を更新、あるいはアプリケーションが再描画を行うことで、表示の崩れを防ぐことができる 27。
 
@@ -145,8 +145,7 @@ io.Copy は、読み込み元が EOF を返すか、書き込み先でエラー�
 
 ユーザにとって、CLIツールがコンテナ内プロセスの終了コードを正しく返すことは、スクリプトによる自動化などにおいて不可欠である。Goでは、cmd.Wait() の結果を解析して終了コードを取得する 46。
 
-Go
-
+```go
 err := cmd.Wait()
 if err\!= nil {
   if exiterr, ok := err.(\*exec.ExitError); ok {
@@ -155,6 +154,7 @@ if err\!= nil {
     os.Exit(exitCode) \[46, 47\]
   }
 }
+```
 
 この処理の前に、term.Restore を呼び出してターミナルを正常な状態に戻すことを忘れてはならない 16。正常な終了シーケンスは、
 

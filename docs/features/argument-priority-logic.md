@@ -14,7 +14,7 @@
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
-- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。ただし、`mounts`, `devices`, `env` などのコレクション型設定は、上位のレベルが下位のレベルに追加（マージ）される挙動となります。また、これらは**サブコマンドの後ろ**に配置する必要があります。
+- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。ただし、`mounts`, `devices`, `env` などのコレクション型設定は、上位のレベルが下位のレベルに追加（マージ）される挙動となります。なお、`env` は `mounts` や `devices` と異なり、P3レベルでの一括指定用環境変数（`CDERUN_ENV` 等）をサポートしていない点に注意してください。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
 ### P2: CLI Flags (User Intent)
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。
