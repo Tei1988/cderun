@@ -524,12 +524,14 @@ node:
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		envs := mockRuntime.CreatedConfig.Env
-		assert.Contains(t, envs, "TOOL_KEY=TOOL_VALUE")
-		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")      // CLI overrides Tool
+		// Now using overwrite logic: P1 overrides everything else
+		assert.Len(t, envs, 1)
 		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")    // P1 overrides CLI and Tool
-		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")         // Resolved from host (via Tool config)
-		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")           // CLI explicit
-		assert.Contains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE") // Resolved from host (via CLI flag)
+		assert.NotContains(t, envs, "TOOL_KEY=TOOL_VALUE")
+		assert.NotContains(t, envs, "OVERRIDE_KEY=CLI_VALUE")
+		assert.NotContains(t, envs, "HOST_KEY=HOST_VALUE")
+		assert.NotContains(t, envs, "CLI_KEY=CLI_VALUE")
+		assert.NotContains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE")
 	})
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
@@ -692,10 +694,9 @@ node:
 		assert.True(t, mockRuntime.CreatedConfig.Remove)
 		assert.Equal(t, "/override", mockRuntime.CreatedConfig.Workdir)
 
-		// Mounts should be merged (P1 added after P2)
-		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 2)
-		assert.Equal(t, "/h1", mockRuntime.CreatedConfig.Mounts[0].Source)
-		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Mounts[1].Source)
+		// Mounts should be overwritten (P1 replaces P2)
+		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Mounts[0].Source)
 	})
 
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
