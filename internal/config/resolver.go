@@ -725,9 +725,11 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	} else if len(p2) > 0 {
 		envs = p2
 	} else if env := os.Getenv(envKey); env != "" {
-		envs = strings.Split(env, ";")
-		for i := range envs {
-			envs[i] = strings.TrimSpace(envs[i])
+		for _, e := range strings.Split(env, ";") {
+			e = strings.TrimSpace(e)
+			if e != "" {
+				envs = append(envs, e)
+			}
 		}
 	} else if tools != nil {
 		if tool, ok := tools[subcommand]; ok && len(tool.Env) > 0 {
@@ -740,6 +742,7 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	}
 
 	// Deduplicate within the winning source (last-one-wins for the same key)
+	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
 	merged := mergeEnv(nil, nil, envs)
 
 	return resolveEnvValues(merged, strict, r)
@@ -803,7 +806,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("invalid mount config: %w", err)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)

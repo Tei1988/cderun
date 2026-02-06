@@ -526,7 +526,7 @@ node:
 		envs := mockRuntime.CreatedConfig.Env
 		// Now using overwrite logic: P1 overrides everything else
 		assert.Len(t, envs, 1)
-		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")    // P1 overrides CLI and Tool
+		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")
 		assert.NotContains(t, envs, "TOOL_KEY=TOOL_VALUE")
 		assert.NotContains(t, envs, "OVERRIDE_KEY=CLI_VALUE")
 		assert.NotContains(t, envs, "HOST_KEY=HOST_VALUE")
