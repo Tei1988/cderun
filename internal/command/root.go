@@ -859,18 +859,23 @@ func preprocessArgs(args []string) ([]string, error) {
 		// Use a temporary flag set to discover where the subcommand starts.
 		// We must define flags that take arguments so pflag knows to skip the next arg.
 		fs := pflag.NewFlagSet("discover", pflag.ContinueOnError)
-		fs.ParseErrorsWhitelist.UnknownFlags = true
+		fs.ParseErrorsAllowlist.UnknownFlags = true
 		fs.SetInterspersed(false)
 
 		var dummy string
 		var dummySlice []string
 		var dummyInt int
 		var dummyFloat float64
+		var dummyBool bool
 
-		// P2 Flags that take values
+		// P2 Flags
+		fs.BoolVarP(&dummyBool, "tty", "t", false, "")
+		fs.BoolVarP(&dummyBool, "interactive", "i", false, "")
 		fs.StringVar(&dummy, "network", "", "")
 		fs.StringVar(&dummy, "socket-path", "", "")
+		fs.BoolVar(&dummyBool, "mount-socket", false, "")
 		fs.StringVar(&dummy, "mount-socket-path", "", "")
+		fs.BoolVar(&dummyBool, "mount-cderun", false, "")
 		fs.StringVar(&dummy, "mount-cderun-path", "", "")
 		fs.StringVar(&dummy, "image", "", "")
 		fs.StringVar(&dummy, "runtime", "", "")
@@ -878,12 +883,18 @@ func preprocessArgs(args []string) ([]string, error) {
 		fs.StringVarP(&dummy, "workdir", "w", "", "")
 		fs.StringArrayVar(&dummySlice, "mount", nil, "")
 		fs.StringVar(&dummy, "mount-tools", "", "")
+		fs.BoolVar(&dummyBool, "mount-all-tools", false, "")
+		fs.BoolVar(&dummyBool, "remove", false, "")
+
+		// Docker-compatible flags
 		fs.StringSliceVarP(&dummySlice, "publish", "p", nil, "")
+		fs.BoolVarP(&dummyBool, "publish-all", "P", false, "")
 		fs.StringSliceVar(&dummySlice, "expose", nil, "")
 		fs.StringVar(&dummy, "hostname", "", "")
 		fs.StringSliceVar(&dummySlice, "dns", nil, "")
 		fs.StringSliceVar(&dummySlice, "add-host", nil, "")
 		fs.StringVarP(&dummy, "user", "u", "", "")
+		fs.BoolVar(&dummyBool, "privileged", false, "")
 		fs.StringSliceVar(&dummySlice, "cap-add", nil, "")
 		fs.StringSliceVar(&dummySlice, "cap-drop", nil, "")
 		fs.StringSliceVar(&dummySlice, "entrypoint", nil, "")
@@ -891,20 +902,35 @@ func preprocessArgs(args []string) ([]string, error) {
 		fs.StringVarP(&dummy, "memory", "m", "", "")
 		fs.Float64Var(&dummyFloat, "cpus", 0, "")
 		fs.StringSliceVar(&dummySlice, "device", nil, "")
+
+		fs.BoolVar(&dummyBool, "dry-run", false, "")
 		fs.StringVarP(&dummy, "dry-run-format", "f", "", "")
 		fs.CountVar(&dummyInt, "verbose", "")
 		fs.StringVar(&dummy, "log-level", "", "")
 		fs.StringVar(&dummy, "log-file", "", "")
 		fs.StringVar(&dummy, "log-format", "", "")
+		fs.BoolVar(&dummyBool, "log-tee", false, "")
+		fs.BoolVar(&dummyBool, "log-timestamp", false, "")
 
 		_ = fs.Parse(args[1:])
 		subcmdArgs := fs.Args()
 		if len(subcmdArgs) > 0 {
-			firstSubcmd := subcmdArgs[0]
-			for i := 1; i < len(args); i++ {
-				if args[i] == firstSubcmd {
-					subcmdIdx = i
+			// The first argument that doesn't start with '-' is likely the subcommand.
+			// This handles unknown P2 flags placed before the subcommand.
+			var firstSubcmd string
+			for _, arg := range subcmdArgs {
+				if !strings.HasPrefix(arg, "-") {
+					firstSubcmd = arg
 					break
+				}
+			}
+
+			if firstSubcmd != "" {
+				for i := 1; i < len(args); i++ {
+					if args[i] == firstSubcmd {
+						subcmdIdx = i
+						break
+					}
 				}
 			}
 		}
