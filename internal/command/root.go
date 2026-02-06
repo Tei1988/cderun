@@ -105,6 +105,7 @@ type rootOptions struct {
 	cderunDevices    []string
 
 	tempSnapshotDirs []string
+	SkipCleanup      bool // For testing: if true, snapshots are not deleted
 }
 
 var (
@@ -661,6 +662,10 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 }
 
 func newRootCmd() *cobra.Command {
+	opts = rootOptions{
+		SkipCleanup: os.Getenv("CDERUN_SKIP_CLEANUP") == "true",
+	}
+
 	cmd := &cobra.Command{
 		Use:          "cderun",
 		SilenceUsage: true,
@@ -734,12 +739,14 @@ intended for the subcommand.`,
 				}
 			}
 
+			// Ensure snapshots are cleaned up even in dry-run mode
+			defer opts.cleanupSnapshots()
+
 			if resolved.DryRun {
 				return opts.handleDryRun(containerConfig, resolved, toolsCfg, globalPaths, toolsPaths)
 			}
 
 			// Execute Container
-			defer opts.cleanupSnapshots()
 			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
 			if err != nil {
 				return err
@@ -895,7 +902,7 @@ func preprocessArgs(args []string) ([]string, error) {
 		copyFlag := func(f *pflag.Flag) {
 			nf := *f
 			isBool := false
-			if f.Value.Type() == "bool" {
+			if t := f.Value.Type(); t == "bool" || t == "count" {
 				isBool = true
 			}
 			nf.Value = &discoverValue{isBool: isBool}
@@ -1105,6 +1112,9 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 }
 
 func (o *rootOptions) cleanupSnapshots() {
+	if o.SkipCleanup {
+		return
+	}
 	for _, dir := range o.tempSnapshotDirs {
 		logging.Trace("Cleaning up snapshot directory: %s", dir)
 		_ = os.RemoveAll(dir)

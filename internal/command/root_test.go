@@ -177,6 +177,20 @@ func TestPreprocessArgs(t *testing.T) {
 		},
 	}
 
+	// Test case for count flag (e.g., --verbose) which should not consume the next argument
+	t.Run("count flag does not consume subcommand", func(t *testing.T) {
+		// Re-initialize rootCmd to ensure flags are registered
+		rootCmd = newRootCmd()
+		args := []string{"cderun", "--verbose", "ls", "-l"}
+		processed, err := preprocessArgs(args)
+		require.NoError(t, err)
+
+		// The "ls" should be identified as the subcommand, and --verbose should be hoisted.
+		// Wait, --verbose is a persistent flag, so in standard mode it should be fine.
+		// Result should be ["cderun", "--verbose", "ls", "-l"]
+		assert.Equal(t, []string{"cderun", "--verbose", "ls", "-l"}, processed)
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			actual, err := preprocessArgs(tt.args)
@@ -1067,6 +1081,7 @@ func TestNestedSnapshot(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	t.Run("creates configuration snapshot when --mount-cderun is used", func(t *testing.T) {
+		t.Setenv("CDERUN_SKIP_CLEANUP", "true")
 		// Use dry-run to capture the config and keep the snapshot files
 		output, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "--dry-run", "sh")
 		assert.NoError(t, err)
