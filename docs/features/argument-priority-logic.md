@@ -14,7 +14,7 @@
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
-- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する（※`--cderun-mount` は例外的に `P2` とマージされる）。また、これらは**サブコマンドの後ろ**に配置する必要があります。
+- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。ただし、`mounts`, `devices`, `env` などのコレクション型設定は、上位のレベルが下位のレベルに追加（マージ）される挙動となります。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
 ### P2: CLI Flags (User Intent)
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。
@@ -27,7 +27,7 @@
 
 ### P3: Environment Variables (Global Override)
 - **定義**: 実行環境全体に適用される設定。
-- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH` 等。
+- **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT`, `CDERUN_DEVICE` 等。
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
 - **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 

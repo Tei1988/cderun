@@ -9,13 +9,13 @@
 
 ```text
 cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コンテナ実行
-                    ↓
-               ContainerConfig
-                    ↓
-          runtime.CreateContainer()
-          runtime.StartContainer()
-          runtime.AttachContainer()
-          ...
+  ↓
+  ContainerConfig
+    ↓
+  runtime.CreateContainer()
+  runtime.StartContainer()
+  runtime.AttachContainer()
+  ...
 ```
 
 ### 実装ステータス (CRIインターフェース)
@@ -43,9 +43,9 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 - **基本属性**: イメージ名、コマンド（`Command`）。これらは実行時に結合され、ランタイムに渡されます。
 - **実行制御**: TTY、インタラクティブモード、自動削除フラグ、イメージプルポリシー（`Pull`）。
 - **ネットワーク**: ネットワークモード、ポートマッピング（`Ports`）、全ポート公開（`PublishAll`）、ポート露出（`Expose`）、ホスト名、DNS設定、ホストマップ（`AddHosts`）。
-- **環境構成**: ボリュームマウント（Host/Container）、環境変数、作業ディレクトリ、実行ユーザー。
+- **環境構成**: マウント（bind, volume, tmpfsをサポート）、環境変数、作業ディレクトリ、実行ユーザー。
 - **セキュリティ・リソース**: 特権モード（`Privileged`）、ケーパビリティ追加/削除（`CapAdd`/`CapDrop`）、メモリ制限、CPU制限。
-- **その他**: エントリーポイント上書き、tmpfsマウント、デバイス追加。
+- **その他**: エントリーポイント上書き、デバイス追加。
 
 ## CRIインターフェース: ContainerRuntime
 
@@ -109,8 +109,8 @@ CRIを直接使うことで、コンテナ内からcderunを実行しても、�
 
 ```go
 import (
-    "github.com/docker/docker/client"
-    "github.com/docker/docker/api/types/container"
-    "github.com/docker/docker/api/types/mount"
+  "github.com/docker/docker/client"
+  "github.com/docker/docker/api/types/container"
+  "github.com/docker/docker/api/types/mount"
 )
 ```

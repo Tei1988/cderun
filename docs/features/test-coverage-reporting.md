@@ -49,14 +49,14 @@ Dockerコンテナを起動するインテグレーションテストは、`go t
 これを解決するため、以下の手順を踏む。
 
 1.  **カバレッジ計測用テストバイナリのビルド**:
-    `go test -c -cover` コマンドを使い、カバレッジ計測が可能なテスト専用バイナリを生成する。
+  `go test -c -cover` コマンドを使い、カバレッジ計測が可能なテスト専用バイナリを生成する。
 
 ```bash
 go test -c ./internal/command -cover -o cderun.test
 ```
 
 2.  **テストバイナリの実行**:
-    生成されたテストバイナリを実行する際に、カバレッジプロファイルの出力先を指定する。インテグレーションテストのロジック内で、このテストバイナリを `cderun` の実行ファイルとして使用する。
+  生成されたテストバイナリを実行する際に、カバレッジプロファイルの出力先を指定する。インテグレーションテストのロジック内で、このテストバイナリを `cderun` の実行ファイルとして使用する。
 
 ```bash
 # テストコード内から、os/exec などで以下のように実行するイメージ
@@ -64,7 +64,7 @@ go test -c ./internal/command -cover -o cderun.test
 ```
 
 3.  **プロファイルの統合 (任意)**:
-    ユニットテストとインテグレーションテストで別々に生成されたカバレッジプロファイルは、ツールを使ってマージし、プロジェクト全体のカバレッジとして集計することも可能。
+  ユニットテストとインテグレーションテストで別々に生成されたカバレッジプロファイルは、ツールを使ってマージし、プロジェクト全体のカバレッジとして集計することも可能。
 
 ## 4. 自動化
 
@@ -75,19 +75,19 @@ go test -c ./internal/command -cover -o cderun.test
 ```makefile
 .PHONY: test
 test:
-	@echo "Running all tests..."
-	@go test -v ./...
+  @echo "Running all tests..."
+  @go test -v ./...
 
 .PHONY: coverage
 coverage:
-	@echo "Generating coverage report..."
-	@go test ./... -cover -coverprofile=coverage.out
-	@echo "Done. To view HTML report, run: go tool cover -html=coverage.out"
+  @echo "Generating coverage report..."
+  @go test ./... -cover -coverprofile=coverage.out
+  @echo "Done. To view HTML report, run: go tool cover -html=coverage.out"
 
 .PHONY: coverage-html
 coverage-html: coverage
-	@go tool cover -html=coverage.out -o coverage.html
-	@echo "Generated coverage.html"
+  @go tool cover -html=coverage.out -o coverage.html
+  @echo "Generated coverage.html"
 ```
 
 ## 5. CIへの統合 (将来的な展望)

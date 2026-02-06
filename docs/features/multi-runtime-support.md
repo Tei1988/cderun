@@ -28,10 +28,10 @@ cderun独自の`ContainerRuntime`インターフェースを定義し、各ラ�
 
 ```text
 cderun ContainerRuntimeインターフェース
-        │
-        ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
-        ├── PodmanRuntime → Podman API (HTTP over Unix socket)
-        └── NerdctlRuntime → containerd API (gRPC)
+  │
+  ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
+  ├── PodmanRuntime → Podman API (HTTP over Unix socket)
+  └── NerdctlRuntime → containerd API (gRPC)
 ```
 
 ### 共通インターフェースの役割
@@ -109,6 +109,6 @@ cderun --dry-run
 ### Docker
 ```go
 import (
-    "github.com/docker/docker/client"
+  "github.com/docker/docker/client"
 )
 ```

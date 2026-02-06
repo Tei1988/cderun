@@ -51,8 +51,8 @@
   - cderunバイナリを複数のツール名でマウント
 
 10. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
-    - エフェメラルコンテナでのコマンド実行
-    - TTY/インタラクティブサポート
+  - エフェメラルコンテナでのコマンド実行
+  - TTY/インタラクティブサポート
 
 ### 高度な機能
 
@@ -61,8 +61,8 @@
   - Docker CLI互換のオプションサポート
 
 12. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
-    - `--mount-cderun`でコンテナ内でcderunを使用
-    - `--mount-socket` (boolean) との併用必須
+  - `--mount-cderun`でコンテナ内でcderunを使用
+  - `--mount-socket` (boolean) との併用必須
 
 13. **[ドライランモード (Completed)](./dry-run-mode.md)**
   - 実行前のコマンドプレビュー
@@ -77,8 +77,8 @@
   - TTYリサイズ同期
 
 16. **[README生成戦略 (Completed)](./readme-generation.md)**
-    - 実装コードからREADMEを生成
-    - Source of Truthの維持
+  - 実装コードからREADMEを生成
+  - Source of Truthの維持
 
 ### 開発・検証機能
 
@@ -91,12 +91,12 @@
 
 ```text
 引数解析 → 優先順位解決 → 中間表現(ContainerConfig)
-                              ↓
-                         ランタイム選択
-                              ↓
-                    直接コンテナ実行(CRI)
-                              ↓
-                         コンテナ起動
+  ↓
+  ランタイム選択
+    ↓
+  直接コンテナ実行(CRI)
+    ↓
+    コンテナ起動
 ```
 
 ## 重要な設計原則

@@ -92,12 +92,12 @@ Go
 sigChan := make(chan os.Signal, 1)
 signal.Notify(sigChan, syscall.SIGWINCH)
 go func() {
-    for range sigChan {
-        // ホスト端末のサイズを取得し、PTYに継承させる
-        if err := pty.InheritSize(os.Stdin, ptyMaster); err\!= nil {
-            log.Printf("サイズ変更に失敗: %v", err)
-        }
+  for range sigChan {
+    // ホスト端末のサイズを取得し、PTYに継承させる
+    if err := pty.InheritSize(os.Stdin, ptyMaster); err\!= nil {
+      log.Printf("サイズ変更に失敗: %v", err)
     }
+  }
 }()
 
 このリレーが正常に行われると、カーネルはコンテナ内のPTYスレーブに対しても SIGWINCH を送信し、それを受けたコンテナ内プロセス（例えば bash）が環境変数 LINES や COLUMNS を更新、あるいはアプリケーションが再描画を行うことで、表示の崩れを防ぐことができる 27。
@@ -149,11 +149,11 @@ Go
 
 err := cmd.Wait()
 if err\!= nil {
-    if exiterr, ok := err.(\*exec.ExitError); ok {
-        // コンテナ内プロセスの終了ステータスを取得
-        exitCode := exiterr.ExitCode()
-        os.Exit(exitCode) \[46, 47\]
-    }
+  if exiterr, ok := err.(\*exec.ExitError); ok {
+    // コンテナ内プロセスの終了ステータスを取得
+    exitCode := exiterr.ExitCode()
+    os.Exit(exitCode) \[46, 47\]
+  }
 }
 
 この処理の前に、term.Restore を呼び出してターミナルを正常な状態に戻すことを忘れてはならない 16。正常な終了シーケンスは、
@@ -162,7 +162,7 @@ if err\!= nil {
 2. ターミナル復元
 3. リソース解放（PTYクローズ、ゴルーチン停止確認）
 4. 終了コードを伴う os.Exit
-   という順序で行われるべきである。
+  という順序で行われるべきである。
 
 ## **実践的な実装例とライブラリの活用**
 
