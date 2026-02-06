@@ -126,7 +126,7 @@ cderun --image node:18-alpine node --version
 ```
 
 ### `--env`, `-e`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 環境変数の設定・パススルー
 - **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
 
@@ -136,7 +136,7 @@ cderun --env NPM_TOKEN node app.js  # ホストから取得
 ```
 
 ### `--cderun-env`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 環境変数の強制上書き（P1優先順位）
 - **用途**: サブコマンドの後ろでも指定可能
 
@@ -183,7 +183,7 @@ cderun --remove=false node app.js  # コンテナを残す
 ```
 
 ### `--publish`, `-p`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: ポートマッピング（ホストポート:コンテナポート）
 - **用途**: コンテナのポートをホストに公開
 
@@ -197,7 +197,7 @@ cderun -p 8080:80 nginx
 - **説明**: すべての公開ポートをランダムなポートにマッピング
 
 ### `--expose`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 特定のポートまたはポート範囲を公開
 
 ```bash
@@ -214,7 +214,7 @@ cderun --hostname my-container alpine hostname
 ```
 
 ### `--dns`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: カスタムDNSサーバの設定
 
 ```bash
@@ -222,7 +222,7 @@ cderun --dns 8.8.8.8 alpine ping google.com
 ```
 
 ### `--add-host`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
 
 ```bash
@@ -247,7 +247,7 @@ cderun --privileged alpine ls /dev
 ```
 
 ### `--cap-add`, `--cap-drop`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: Linuxケーパビリティの追加/削除
 
 ```bash
@@ -255,7 +255,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 ```
 
 ### `--entrypoint`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: イメージのデフォルトENTRYPOINTを上書き
 
 ```bash
@@ -277,7 +277,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **説明**: CPU数制限
 
 ### `--device`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: ホストデバイスをコンテナに追加
 
 ```bash
