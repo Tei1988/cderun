@@ -576,6 +576,20 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	// Attach to container IO concurrently BEFORE starting to avoid race conditions with fast-exiting containers.
+	var stdin io.Reader
+	if containerConfig.Interactive {
+		stdin = os.Stdin
+	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
+	}()
+
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
@@ -606,20 +620,6 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 		}
 	}
-
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	if containerConfig.Interactive {
-		stdin = os.Stdin
-	}
-
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
-	}()
 
 	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)

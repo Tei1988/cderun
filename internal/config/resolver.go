@@ -289,14 +289,18 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		false,
 	)
 
-	// 11. Resolve Env (P1 > P2 > P4)
+	// 11. Resolve Env (P1 > P2 > P3 > P4)
 	var toolsEnv []string
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			toolsEnv = tool.Env
 		}
 	}
-	res.Env, err = resolveEnvValues(mergeEnv(toolsEnv, cli.Env, cli.CderunEnv), res.StrictEnv, r)
+	var envP3 []string
+	if val := os.Getenv("CDERUN_ENV"); val != "" {
+		envP3 = strings.Split(val, ",")
+	}
+	res.Env, err = resolveEnvValues(mergeEnv(toolsEnv, envP3, cli.Env, cli.CderunEnv), res.StrictEnv, r)
 	if err != nil {
 		return nil, err
 	}
@@ -730,7 +734,7 @@ func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envK
 	return fallback
 }
 
-func mergeEnv(base, p2, p1 []string) []string {
+func mergeEnv(base, p3, p2, p1 []string) []string {
 	m := make(map[string]string)
 	var keys []string
 
@@ -745,6 +749,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 
 	add(base)
+	add(p3)
 	add(p2)
 	add(p1)
 
