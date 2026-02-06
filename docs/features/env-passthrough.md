@@ -42,21 +42,23 @@ cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 
 ## 優先順位
 
-後から指定された値が優先される：
+高い優先順位のソース（CLI、環境変数、設定ファイル）に値がある場合、それより低い優先順位のソースはすべて無視されます（上書き）。
 
 ```yaml
 # .tools.yaml
 node:
   env:
-    - NODE_ENV=development  # 設定ファイル
+    - NODE_ENV=development
+    - PORT=3000
 ```
 
 ```bash
 cderun --env NODE_ENV=production node app.js
-# → NODE_ENV=production が使われる（コマンドラインが優先）
+# → NODE_ENV=production のみがコンテナに渡されます。
+# 設定ファイル内の PORT=3000 は無視されます。
 ```
 
-### 同じキーが複数回指定された場合
+### 同じソース内でキーが複数回指定された場合
 
 ```yaml
 # .tools.yaml

@@ -53,6 +53,7 @@ type ConfigDefaults struct {
 	CPUs            float64        `yaml:"cpus"`
 	Mounts          []MountConfig  `yaml:"mounts"`
 	Devices         []DeviceConfig `yaml:"devices"`
+	Env             []string       `yaml:"env"`
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {

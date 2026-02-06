@@ -462,7 +462,7 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/home/user/project/project-data", res.Mounts[0].Source)
 	})
 
-	t.Run("Device resolution", func(t *testing.T) {
+	t.Run("Device resolution (overwrite logic)", func(t *testing.T) {
 		cli := CLIOptions{
 			Devices: []string{"/dev/video0:/dev/video0:rw"},
 		}
@@ -481,12 +481,26 @@ func TestResolve(t *testing.T) {
 		res, err := Resolve("node", cli, tools, global)
 		require.NoError(t, err)
 
-		// merged: global + tool + cli
-		assert.Len(t, res.Devices, 3)
+		// Overwrite: only CLI should be present
+		assert.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/video0", res.Devices[0].PathOnHost)
+		assert.Equal(t, "rw", res.Devices[0].CgroupPermissions)
+
+		// If CLI is empty, Tool should be used
+		cli.Devices = nil
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/null", res.Devices[0].PathOnHost)
+
+		// If Tool is also empty, Global should be used
+		delete(tools, "node")
+		cli.Image = "node" // restore image for resolution
+		cli.ImageSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/fuse", res.Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/null", res.Devices[1].PathOnHost)
-		assert.Equal(t, "/dev/video0", res.Devices[2].PathOnHost)
-		assert.Equal(t, "rw", res.Devices[2].CgroupPermissions)
 	})
 
 	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {
@@ -564,5 +578,113 @@ func TestResolve(t *testing.T) {
 		}
 		_, err := Resolve("", cli, nil, nil)
 		assert.Error(t, err)
+	})
+
+	t.Run("Env resolution with overwrite logic", func(t *testing.T) {
+		t.Setenv("EXISTING_VAR", "host-value")
+		cli := CLIOptions{
+			Env: []string{"CLI_VAR=cli-value", "EXISTING_VAR"},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node",
+				Env:   []string{"TOOL_VAR=tool-value"},
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Env: []string{"GLOBAL_VAR=global-value"},
+			},
+		}
+
+		// CLI takes priority and overwrites Tool and Global
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 2)
+		assert.Contains(t, res.Env, "CLI_VAR=cli-value")
+		assert.Contains(t, res.Env, "EXISTING_VAR=host-value")
+		assert.NotContains(t, res.Env, "TOOL_VAR=tool-value")
+		assert.NotContains(t, res.Env, "GLOBAL_VAR=global-value")
+
+		// CDERUN_ENV (P3)
+		t.Setenv("CDERUN_ENV", "ENV_VAR=env-value; EXISTING_VAR")
+		cli.Env = nil
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 2)
+		assert.Contains(t, res.Env, "ENV_VAR=env-value")
+		assert.Contains(t, res.Env, "EXISTING_VAR=host-value")
+		assert.NotContains(t, res.Env, "TOOL_VAR=tool-value")
+
+		// Tool (P4)
+		t.Setenv("CDERUN_ENV", "")
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 1)
+		assert.Contains(t, res.Env, "TOOL_VAR=tool-value")
+
+		// Global (P5)
+		delete(tools, "node")
+		cli.Image = "node"
+		cli.ImageSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 1)
+		assert.Contains(t, res.Env, "GLOBAL_VAR=global-value")
+	})
+
+	t.Run("Mount resolution with overwrite logic", func(t *testing.T) {
+		cli := CLIOptions{
+			Mounts: []string{"source=/cli/path,target=/cli/target"},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:  "node",
+				Mounts: mcs(t, "source=/tool/path,target=/tool/target"),
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Mounts: mcs(t, "source=/global/path,target=/global/target"),
+			},
+		}
+
+		// CLI (P2)
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/cli/path", res.Mounts[0].Source)
+
+		// CDERUN_MOUNT (P3)
+		t.Setenv("CDERUN_MOUNT", "source=/env/path,target=/env/target")
+		cli.Mounts = nil
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/env/path", res.Mounts[0].Source)
+
+		// Tool (P4)
+		t.Setenv("CDERUN_MOUNT", "")
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/tool/path", res.Mounts[0].Source)
+
+		// Global (P5)
+		delete(tools, "node")
+		cli.Image = "node"
+		cli.ImageSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/global/path", res.Mounts[0].Source)
+
+		// P1 Overwrites P2
+		cli.CderunMounts = []string{"source=/p1/path,target=/p1/target"}
+		cli.Mounts = []string{"source=/p2/path,target=/p2/target"}
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/p1/path", res.Mounts[0].Source)
 	})
 }
