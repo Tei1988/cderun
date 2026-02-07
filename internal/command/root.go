@@ -593,6 +593,29 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	// Attach to container IO concurrently
+	var stdin io.Reader
+	if containerConfig.Interactive {
+		stdin = os.Stdin
+	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachReady := make(chan struct{}, 1)
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr, attachReady)
+	}()
+
+	// Wait for attach to be ready before starting the container
+	select {
+	case <-attachReady:
+		logging.Trace("Attach ready, starting container")
+	case err := <-attachDone:
+		return 0, fmt.Errorf("attach failed before container start: %w", err)
+	}
+
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
@@ -623,20 +646,6 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 		}
 	}
-
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	if containerConfig.Interactive {
-		stdin = os.Stdin
-	}
-
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
-	}()
 
 	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)

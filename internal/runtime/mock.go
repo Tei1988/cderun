@@ -57,8 +57,11 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 	return m.RemoveErr
 }
 
-func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.AttachedContainerID = containerID
+	if ready != nil {
+		close(ready)
+	}
 	return m.AttachErr
 }
 

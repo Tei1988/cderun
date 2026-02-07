@@ -16,9 +16,12 @@ type blockingMockRuntime struct {
 	blockAttach   chan struct{}
 }
 
-func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.AttachedContainerID = containerID
 	close(m.attachStarted)
+	if ready != nil {
+		close(ready)
+	}
 	select {
 	case <-m.blockAttach:
 		return nil

@@ -253,7 +253,7 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 }
 
 // AttachContainer attaches to a container's IO streams.
-func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -272,6 +272,10 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		return err
 	}
 	defer resp.Close()
+
+	if ready != nil {
+		close(ready)
+	}
 
 	var stdinErr error
 	stdinDone := make(chan struct{})
