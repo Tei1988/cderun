@@ -64,7 +64,7 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 
 		// executeCommand should eventually finish because WaitContainer returns immediately
-		// and AttachContainer will be canceled after 500ms grace period.
+		// and AttachContainer will be canceled after attachGracePeriod.
 		select {
 		case <-done:
 			// Success

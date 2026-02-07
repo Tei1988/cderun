@@ -108,6 +108,8 @@ type rootOptions struct {
 	cderunDevices    []string
 }
 
+const attachGracePeriod = 1 * time.Second
+
 var (
 	opts rootOptions
 
@@ -593,6 +595,20 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	// Attach to container IO concurrently
+	var stdin io.Reader
+	if containerConfig.Interactive {
+		stdin = os.Stdin
+	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
+	}()
+
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
@@ -624,20 +640,6 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}
 
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	if containerConfig.Interactive {
-		stdin = os.Stdin
-	}
-
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
-	}()
-
 	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)
 	if err != nil {
@@ -650,7 +652,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		if err != nil && err != context.Canceled {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(attachGracePeriod):
 		logging.Debug("AttachContainer timed out after container exit, forcing close")
 		cancelAttach()
 		<-attachDone
