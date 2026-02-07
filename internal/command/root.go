@@ -537,11 +537,11 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	logging.Trace("Creating container...")
-	if err := rt.PullImage(cmd.Context(), containerConfig.Image, containerConfig.Pull); err != nil {
+	if err := rt.PullImage(ctxG, containerConfig.Image, containerConfig.Pull); err != nil {
 		return 0, fmt.Errorf("failed to pull image: %w", err)
 	}
 
-	containerID, err := rt.CreateContainer(cmd.Context(), containerConfig)
+	containerID, err := rt.CreateContainer(ctxG, containerConfig)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -625,7 +625,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	logging.Trace("Starting container: %s", containerID)
-	if err := rt.StartContainer(cmd.Context(), containerID); err != nil {
+	if err := rt.StartContainer(ctxG, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
 
