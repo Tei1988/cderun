@@ -428,7 +428,7 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) handleDiagnosis(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	info := diagnosticsInfo{}
 	info.Runtime.Name = resolved.Runtime
 	info.Runtime.Socket = resolved.SocketPath
@@ -450,59 +450,59 @@ func (o *rootOptions) handleDiagnosis(resolved *config.ResolvedConfig, toolsCfg 
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "simple":
-		fmt.Printf("Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		fmt.Printf("Runtime Status: %s\n", info.Runtime.Status)
-		fmt.Printf("Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		fmt.Printf("Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		fmt.Printf("Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
+		fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
+		fmt.Fprintf(cmd.OutOrStdout(), "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(info)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		fmt.Print(string(data))
+		fmt.Fprint(cmd.OutOrStdout(), string(data))
 	}
 	return nil
 }
 
-func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
+func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	switch strings.ToLower(resolved.DryRunFormat) {
 	case "json":
 		data, err := json.MarshalIndent(containerConfig, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "simple":
-		fmt.Printf("Image: %s\n", containerConfig.Image)
-		fmt.Printf("Command: %s\n", strings.Join(containerConfig.Command, " "))
-		fmt.Printf("TTY: %v\n", containerConfig.TTY)
-		fmt.Printf("Interactive: %v\n", containerConfig.Interactive)
-		fmt.Printf("Network: %s\n", containerConfig.Network)
-		fmt.Printf("Remove: %v\n", containerConfig.Remove)
+		fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
+		fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
+		fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
+		fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
+		fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
+		fmt.Fprintf(cmd.OutOrStdout(), "Remove: %v\n", containerConfig.Remove)
 		var mounts []string
 		for _, m := range containerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
-		fmt.Printf("Mounts: %s\n", strings.Join(mounts, ", "))
-		fmt.Printf("Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		fmt.Printf("Workdir: %s\n", containerConfig.Workdir)
-		fmt.Printf("User: %s\n", containerConfig.User)
-		fmt.Printf("Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		fmt.Printf("PublishAll: %v\n", containerConfig.PublishAll)
-		fmt.Printf("Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		fmt.Printf("Hostname: %s\n", containerConfig.Hostname)
-		fmt.Printf("DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		fmt.Printf("AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		fmt.Printf("Privileged: %v\n", containerConfig.Privileged)
-		fmt.Printf("CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		fmt.Printf("CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		fmt.Printf("Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		fmt.Printf("Pull: %s\n", containerConfig.Pull)
-		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		fmt.Printf("CPUs: %g\n", containerConfig.CPUs)
+		fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
+		fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
+		fmt.Fprintf(cmd.OutOrStdout(), "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "PublishAll: %v\n", containerConfig.PublishAll)
+		fmt.Fprintf(cmd.OutOrStdout(), "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Hostname: %s\n", containerConfig.Hostname)
+		fmt.Fprintf(cmd.OutOrStdout(), "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Privileged: %v\n", containerConfig.Privileged)
+		fmt.Fprintf(cmd.OutOrStdout(), "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
+		fmt.Fprintf(cmd.OutOrStdout(), "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
+		fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
 		var devices []string
 		for _, d := range containerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
@@ -511,20 +511,24 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 			}
 		}
-		fmt.Printf("Devices: %s\n", strings.Join(devices, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(containerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		fmt.Print(string(data))
+		fmt.Fprint(cmd.OutOrStdout(), string(data))
 	}
 	return nil
 }
 
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
-	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
+	fullCmdStr := strings.Join(containerConfig.Command, " ")
+	if len(containerConfig.Entrypoint) > 0 {
+		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
+	}
+	logging.Info("Running: %s", fullCmdStr)
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
@@ -609,6 +613,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	go func() {
 		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
 	}()
+
+	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
+	// reducing race condition where container starts and finishes before attachment.
+	time.Sleep(100 * time.Millisecond)
 
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
@@ -719,7 +727,7 @@ intended for the subcommand.`,
 			}
 
 			if resolved.Diagnosis {
-				return opts.handleDiagnosis(resolved, toolsCfg, globalPaths, toolsPaths)
+				return opts.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
 			}
 
 			if len(args) == 0 {
@@ -733,6 +741,8 @@ intended for the subcommand.`,
 			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
 				return fmt.Errorf("failed to initialize logger: %w", err)
 			}
+			// Redirect logging to the command's stderr stream.
+			logging.SetOutput(cmd.ErrOrStderr())
 			logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 			// Build ContainerConfig
@@ -745,7 +755,7 @@ intended for the subcommand.`,
 			}
 
 			if resolved.DryRun {
-				return opts.handleDryRun(containerConfig, resolved)
+				return opts.handleDryRun(cmd, containerConfig, resolved)
 			}
 
 			// Execute Container

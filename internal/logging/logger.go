@@ -108,6 +108,12 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 	return nil
 }
 
+func SetOutput(w io.Writer) {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	globalLogger.Writer = w
+}
+
 func (l *Logger) log(level Level, msg string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
