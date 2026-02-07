@@ -383,7 +383,7 @@ cderun --log-timestamp=false node app.js
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-log-timestamp`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## その他の設定オプション

@@ -73,6 +73,7 @@ type rootOptions struct {
 	cderunLogFile         string
 	cderunLogFormat       string
 	cderunLogTee          bool
+	cderunLogTimestamp    bool
 	cderunVerbose         int
 
 	// Docker-compatible flags
@@ -238,6 +239,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
 		CderunLogTee:             o.cderunLogTee,
 		CderunLogTeeSet:          cmd.Flags().Changed("cderun-log-tee"),
+		CderunLogTimestamp:       o.cderunLogTimestamp,
+		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
 		CderunVerbose:            o.cderunVerbose,
 
 		// Docker-compatible flags
@@ -857,6 +860,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFile, "cderun-log-file", "", "Override log file path (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunLogTee, "cderun-log-tee", false, "Override log-tee setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunLogTimestamp, "cderun-log-timestamp", true, "Override log-timestamp setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 
 	cmd.Flags().SetInterspersed(false)
