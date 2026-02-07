@@ -7,6 +7,7 @@ import (
 	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -656,7 +657,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// After container exits, wait a short grace period for remaining output
 	select {
 	case err := <-attachDone:
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
 	case <-time.After(500 * time.Millisecond):

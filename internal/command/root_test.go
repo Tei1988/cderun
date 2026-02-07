@@ -676,7 +676,7 @@ node:
 
 		_, err := executeCommand("--image", "alpine", "sh")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+		assert.Contains(t, err.Error(), "attach failed before container start: attach failed")
 	})
 
 	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {

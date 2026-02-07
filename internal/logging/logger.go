@@ -110,6 +110,11 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 	return nil
 }
 
+// SetOutput updates the primary output writer for the global logger.
+// If a log file is currently open (configured via Init), SetOutput will
+// create a multi-writer that sends logs to both the new writer and the
+// existing log file, effectively replacing the original tee destination (os.Stderr)
+// with the provided writer.
 func SetOutput(w io.Writer) {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
