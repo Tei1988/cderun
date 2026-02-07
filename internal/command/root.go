@@ -520,13 +520,13 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 	return nil
 }
 
-func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
 
-	ctxG, cancel := context.WithCancel(ctx)
+	ctxG, cancel := context.WithCancel(cmd.Context())
 	defer cancel()
 
 	// Initialize Runtime
@@ -536,17 +536,17 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	}
 
 	logging.Trace("Creating container...")
-	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull); err != nil {
+	if err := rt.PullImage(cmd.Context(), containerConfig.Image, containerConfig.Pull); err != nil {
 		return 0, fmt.Errorf("failed to pull image: %w", err)
 	}
 
-	containerID, err := rt.CreateContainer(ctx, containerConfig)
+	containerID, err := rt.CreateContainer(cmd.Context(), containerConfig)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create container: %w", err)
 	}
 
 	if containerConfig.Remove {
-		cleanupCtx := context.WithoutCancel(ctx)
+		cleanupCtx := context.WithoutCancel(cmd.Context())
 		defer func() {
 			logging.Trace("Removing container: %s", containerID)
 			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
@@ -596,7 +596,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	// Attach to container IO concurrently
 	var stdin io.Reader
 	if containerConfig.Interactive {
-		stdin = os.Stdin
+		stdin = cmd.InOrStdin()
 	}
 
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
@@ -605,7 +605,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	attachReady := make(chan struct{}, 1)
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr, attachReady)
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr(), attachReady)
 	}()
 
 	// Wait for attach to be ready before starting the container
@@ -617,7 +617,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	}
 
 	logging.Trace("Starting container: %s", containerID)
-	if err := rt.StartContainer(ctx, containerID); err != nil {
+	if err := rt.StartContainer(cmd.Context(), containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
 
@@ -755,7 +755,7 @@ intended for the subcommand.`,
 			}
 
 			// Execute Container
-			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
+			exitCode, err := opts.execute(cmd, resolved, containerConfig)
 			if err != nil {
 				return err
 			}

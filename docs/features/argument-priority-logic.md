@@ -13,7 +13,7 @@
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-log-timestamp`, `--cderun-verbose`
 - **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
 ### P2: CLI Flags (User Intent)
@@ -21,13 +21,14 @@
 - **フラグ名**:
   - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-tools`, `--mount-all-tools`, `--remove`
   - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--memory`, `--cpus`, `--device`
-  - `--dry-run`, `--dry-run-format`, `--log-level`, `--log-file`, `--log-format`, `--log-tee`, `--log-timestamp`, `--verbose`
+  - `--dry-run`, `--dry-run-format`, `--diagnosis`, `--diagnosis-format`, `--log-level`, `--log-file`, `--log-format`, `--log-tee`, `--log-timestamp`, `--verbose`
 - **判定条件**: `cmd.Flags().Changed(name)` が `true` であること。
   - ※ ユーザーがフラグを入力していない場合、Cobraが持つデフォルト値は無視し、P3以下の判定へ進むこと。
 
 ### P3: Environment Variables (Global Override)
 - **定義**: 実行環境全体に適用される設定。
 - **主要なキー**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH` 等。
+- **セパレータ**: `CDERUN_ENV` および `CDERUN_MOUNT` はセミコロン (`;`) を、`CDERUN_DEVICE` はカンマ (`,`) をセパレータとして使用します。
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
 - **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 
@@ -83,3 +84,4 @@ node:
 
 ## 注意点
 - **明示的な未指定の扱い**: YAMLのフィールドはポインタ型（`*bool` 等）で定義し、「未設定（nil）」と「明示的なfalse」を区別できるようにする。
+- **YAML非サポートの設定**: `dry-run` および `diagnosis` モードの設定は、設定ファイル（P4/P5）ではサポートされておらず、CLI（P1/P2）または環境変数（P3）でのみ有効です。

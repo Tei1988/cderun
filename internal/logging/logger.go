@@ -56,6 +56,7 @@ type Logger struct {
 	Writer    io.Writer
 	Format    string // "text" or "json"
 	Timestamp bool
+	Tee       bool
 }
 
 var (
@@ -76,6 +77,7 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 	globalLogger.Level = ParseLevel(level)
 	globalLogger.Format = strings.ToLower(format)
 	globalLogger.Timestamp = timestamp
+	globalLogger.Tee = tee
 
 	var out io.Writer = os.Stderr
 
@@ -106,6 +108,28 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 
 	globalLogger.Writer = out
 	return nil
+}
+
+func SetOutput(w io.Writer) {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	if currentLogFile != nil {
+		globalLogger.Writer = io.MultiWriter(w, currentLogFile)
+	} else {
+		globalLogger.Writer = w
+	}
+}
+
+func HasFileOutput() bool {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	return currentLogFile != nil
+}
+
+func IsTeeEnabled() bool {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	return globalLogger.Tee
 }
 
 func (l *Logger) log(level Level, msg string, args ...interface{}) {
