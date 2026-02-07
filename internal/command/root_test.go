@@ -19,6 +19,21 @@ func executeCommand(args ...string) (string, error) {
 	return executeCommandRaw(append([]string{"cderun"}, args...))
 }
 
+func extractSnapshotSource(output string) string {
+	lines := strings.Split(output, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "target: /run/cderun") {
+			if i > 0 && strings.Contains(lines[i-1], "source:") {
+				parts := strings.SplitN(lines[i-1], ":", 2)
+				if len(parts) == 2 {
+					return strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func executeCommandRaw(args []string) (string, error) {
 	config.DisableDiscovery = true
 	// Reset flag variables and Changed state
@@ -1087,27 +1102,7 @@ func TestNestedSnapshot(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Find the snapshot source path in dry-run output
-		// Output format (YAML):
-		// mounts:
-		// - type: bind
-		//   source: /tmp/cderun-snap-xxx
-		//   target: /run/cderun
-
-		lines := strings.Split(output, "\n")
-		var snapshotSource string
-		for i, line := range lines {
-			if strings.Contains(line, "target: /run/cderun") {
-				// Look at previous line for source
-				if i > 0 && strings.Contains(lines[i-1], "source:") {
-					parts := strings.SplitN(lines[i-1], ":", 2)
-					if len(parts) == 2 {
-						snapshotSource = strings.TrimSpace(parts[1])
-					}
-					break
-				}
-			}
-		}
-
+		snapshotSource := extractSnapshotSource(output)
 		require.NotEmpty(t, snapshotSource, "snapshot source should be found in dry-run output")
 		t.Cleanup(func() { _ = os.RemoveAll(snapshotSource) })
 
@@ -1146,20 +1141,7 @@ hostContext:
 		assert.NoError(t, err)
 
 		// Parse output to find snapshotSource
-		lines := strings.Split(output, "\n")
-		var snapshotSource string
-		for i, line := range lines {
-			if strings.Contains(line, "target: /run/cderun") {
-				if i > 0 && strings.Contains(lines[i-1], "source:") {
-					parts := strings.SplitN(lines[i-1], ":", 2)
-					if len(parts) == 2 {
-						snapshotSource = strings.TrimSpace(parts[1])
-					}
-					break
-				}
-			}
-		}
-
+		snapshotSource := extractSnapshotSource(output)
 		require.NotEmpty(t, snapshotSource, "snapshot source should be found")
 		assert.True(t, strings.HasPrefix(snapshotSource, fakeBaseSnapAbs), "nested snapshot should be inside base snapshot dir")
 	})

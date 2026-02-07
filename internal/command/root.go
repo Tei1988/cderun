@@ -1003,11 +1003,14 @@ func init() {
 func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig, containerConfig *container.ContainerConfig) (string, error) {
 	var hostSnapshotDir string
 	var localSnapshotDir string
-	snapshotID := fmt.Sprintf("snap-%d", time.Now().UnixNano())
+	// Use UnixNano and PID to reduce collision risk in shared environments or tests
+	snapshotID := fmt.Sprintf("snap-%d-%d", time.Now().UnixNano(), os.Getpid())
 
 	if resolved.HostContext != nil && resolved.HostContext.SnapshotDir != "" {
 		hostSnapshotDir = filepath.Join(resolved.HostContext.SnapshotDir, snapshotID)
-		// Use /run/cderun if available (running in container), otherwise fallback to host path (for tests)
+		// Use /run/cderun if available (running in container), otherwise fallback to host path (for tests).
+		// Note: We assume that if /run/cderun exists and is a directory, we are running inside
+		// a cderun container where this path is our mount point for nested snapshots.
 		if info, err := os.Stat("/run/cderun"); err == nil && info.IsDir() {
 			localSnapshotDir = filepath.Join("/run/cderun", snapshotID)
 		} else {
@@ -1026,7 +1029,10 @@ func (o *rootOptions) createSnapshot(resolved *config.ResolvedConfig, toolsCfg c
 		o.tempSnapshotDirs = append(o.tempSnapshotDirs, hostSnapshotDir)
 	}
 
-	// Prepare Snapshot Config
+	// Prepare Snapshot Config.
+	// We use a shallow copy of globalCfg here. This is safe as long as we only
+	// overwrite HostContext and don't modify other slice/map fields like Defaults.Mounts.
+	// If more complex fields are added to CDERunConfig in the future, consider a deep copy.
 	var snapshotGlobal config.CDERunConfig
 	if globalCfg != nil {
 		snapshotGlobal = *globalCfg
