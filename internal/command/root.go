@@ -611,12 +611,15 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Wait for attach to be ready before starting the container.
 	// We wait for either the ready signal or the attachment to complete early (e.g. on error).
+	var attachErr error
+	var attachDoneConsumed bool
 	select {
 	case <-attachReady:
 		logging.Trace("Attach ready, starting container")
-	case err := <-attachDone:
-		if err != nil {
-			return 0, fmt.Errorf("attach failed before container start: %w", err)
+	case attachErr = <-attachDone:
+		attachDoneConsumed = true
+		if attachErr != nil {
+			return 0, fmt.Errorf("attach failed before container start: %w", attachErr)
 		}
 		logging.Trace("Attach completed early without error, starting container")
 	}
@@ -659,15 +662,19 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// After container exits, wait a short grace period for remaining output
-	select {
-	case err := <-attachDone:
-		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			return 0, fmt.Errorf("failed to attach to container: %w", err)
+	if !attachDoneConsumed {
+		select {
+		case err := <-attachDone:
+			attachErr = err
+		case <-time.After(500 * time.Millisecond):
+			logging.Debug("AttachContainer timed out after container exit, forcing close")
+			cancelAttach()
+			attachErr = <-attachDone
 		}
-	case <-time.After(500 * time.Millisecond):
-		logging.Debug("AttachContainer timed out after container exit, forcing close")
-		cancelAttach()
-		<-attachDone
+	}
+
+	if attachErr != nil && !errors.Is(attachErr, context.Canceled) && !errors.Is(attachErr, context.DeadlineExceeded) {
+		return 0, fmt.Errorf("failed to attach to container: %w", attachErr)
 	}
 
 	logging.Debug("Container exited with code: %d", exitCode)

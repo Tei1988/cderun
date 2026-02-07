@@ -125,8 +125,10 @@ func SetOutput(w io.Writer) {
 
 	if currentLogFile != nil {
 		globalLogger.Writer = io.MultiWriter(w, currentLogFile)
+		globalLogger.Tee = true
 	} else {
 		globalLogger.Writer = w
+		globalLogger.Tee = false
 	}
 }
 
