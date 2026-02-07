@@ -72,6 +72,10 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.dryRunFormat = "yaml"
 	opts.cderunDryRun = false
 	opts.cderunDryRunFormat = ""
+	opts.diagnosis = false
+	opts.diagnosisFormat = "yaml"
+	opts.cderunDiagnosis = false
+	opts.cderunDiagnosisFormat = ""
 	opts.logLevel = ""
 	opts.logFile = ""
 	opts.logFormat = "text"
@@ -564,12 +568,79 @@ node:
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		envs := mockRuntime.CreatedConfig.Env
-		assert.Contains(t, envs, "TOOL_KEY=TOOL_VALUE")
-		assert.Contains(t, envs, "OVERRIDE_KEY=CLI_VALUE")      // CLI overrides Tool
-		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")    // P1 overrides CLI and Tool
-		assert.Contains(t, envs, "HOST_KEY=HOST_VALUE")         // Resolved from host (via Tool config)
-		assert.Contains(t, envs, "CLI_KEY=CLI_VALUE")           // CLI explicit
-		assert.Contains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE") // Resolved from host (via CLI flag)
+		// Now using overwrite logic: P1 overrides everything else
+		assert.Len(t, envs, 1)
+		assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")
+		assert.NotContains(t, envs, "TOOL_KEY=TOOL_VALUE")
+		assert.NotContains(t, envs, "OVERRIDE_KEY=CLI_VALUE")
+		assert.NotContains(t, envs, "HOST_KEY=HOST_VALUE")
+		assert.NotContains(t, envs, "CLI_KEY=CLI_VALUE")
+		assert.NotContains(t, envs, "CLI_HOST_KEY=CLI_HOST_VALUE")
+	})
+
+	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--diagnosis")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "configs:")
+		assert.Nil(t, mockRuntime.CreatedConfig)
+	})
+
+	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		output, err := executeCommand("--diagnosis", "node", "--version")
+		assert.NoError(t, err)
+		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "configs:")
+		assert.NotContains(t, output, "image: node") // Should not be container config dry-run
+		assert.Nil(t, mockRuntime.CreatedConfig)
+	})
+
+	t.Run("dry-run requires a subcommand", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--dry-run")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 	})
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
@@ -646,6 +717,65 @@ node:
 		_, err := executeCommand("--image", "alpine", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+	})
+
+	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err := executeCommand("--image", "alpine", "--env", "MYVAR=a,b", "sh")
+		assert.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
+	})
+
+	t.Run("mount-tools not found error message includes available tools", func(t *testing.T) {
+		// Save and restore package-level state
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		t.Cleanup(func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+		})
+
+		// Setup tools config
+		originalWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(originalWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+python:
+  image: python:3
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime := &runtime.MockRuntime{}
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		exitFunc = func(code int) {}
+
+		_, err = executeCommand("--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"unknown\" not found in .tools.yaml")
+		assert.Contains(t, err.Error(), "available tools: node, python")
 	})
 }
 
@@ -732,10 +862,9 @@ node:
 		assert.True(t, mockRuntime.CreatedConfig.Remove)
 		assert.Equal(t, "/override", mockRuntime.CreatedConfig.Workdir)
 
-		// Mounts should be merged (P1 added after P2)
-		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 2)
-		assert.Equal(t, "/h1", mockRuntime.CreatedConfig.Mounts[0].Source)
-		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Mounts[1].Source)
+		// Mounts should be overwritten (P1 replaces P2)
+		assert.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "/h2", mockRuntime.CreatedConfig.Mounts[0].Source)
 	})
 
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {

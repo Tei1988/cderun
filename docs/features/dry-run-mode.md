@@ -8,21 +8,16 @@
 
 ### 基本動作
 `--dry-run`フラグが指定された場合：
-1. 通常通り設定を読み込み、中間表現を生成
-2. コンテナを実行せず、中間表現を表示
-3. 終了コード0で終了
+1. サブコマンドの指定が必須（指定がない場合はエラー）
+2. 通常通り設定を読み込み、中間表現を生成
+3. コンテナを実行せず、中間表現を表示
+4. 終了コード0で終了
 
 ## 使用方法
 
 ### 基本的な使用
 ```bash
 cderun --dry-run node --version
-```
-
-### グローバルドライラン（診断情報）
-サブコマンドを指定せずに `--dry-run` を実行すると、システムの診断情報と利用可能なツールの一覧を表示します。
-```bash
-cderun --dry-run
 ```
 
 ## 出力フォーマット
@@ -126,30 +121,6 @@ fi
 cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
 ```
 
-### 4. システム診断とツール一覧の確認
-```bash
-cderun --dry-run
-# または詳細形式
-cderun --dry-run -f json
-```
-
-**YAML出力例（診断情報）**:
-```yaml
-runtime:
-  name: docker
-  socket: /var/run/docker.sock
-  status: accessible
-configs:
-  global:
-    - /home/user/.cderun.yaml
-  tools:
-    - /home/user/project/.tools.yaml
-available_tools:
-  - node
-  - python
-  - git
-```
-
 ## 他のフラグとの組み合わせ
 
 ### --verboseとの組み合わせ
@@ -166,6 +137,11 @@ command: [node, app.js]
 ```
 
 ## 実装上の注意
+
+### 設定ファイル（YAML）での非サポート
+ドライランモードの設定 (`--dry-run`, `--dry-run-format`) は、設定ファイル (`.cderun.yaml`, `.tools.yaml`) ではサポートされていません。これは、誤ってドライランが有効な設定ファイルが共有されることによる混乱を防ぐためです。
+
+ドライランを有効にするには、常にコマンドライン引数または環境変数 (`CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`) を使用してください。
 
 ### 環境変数の展開
 ドライラン時も環境変数は実際の値に展開される：

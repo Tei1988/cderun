@@ -126,7 +126,7 @@ cderun --image node:18-alpine node --version
 ```
 
 ### `--env`, `-e`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 環境変数の設定・パススルー
 - **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
 
@@ -136,7 +136,7 @@ cderun --env NPM_TOKEN node app.js  # ホストから取得
 ```
 
 ### `--cderun-env`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 環境変数の強制上書き（P1優先順位）
 - **用途**: サブコマンドの後ろでも指定可能
 
@@ -183,7 +183,7 @@ cderun --remove=false node app.js  # コンテナを残す
 ```
 
 ### `--publish`, `-p`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: ポートマッピング（ホストポート:コンテナポート）
 - **用途**: コンテナのポートをホストに公開
 
@@ -197,7 +197,7 @@ cderun -p 8080:80 nginx
 - **説明**: すべての公開ポートをランダムなポートにマッピング
 
 ### `--expose`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: 特定のポートまたはポート範囲を公開
 
 ```bash
@@ -214,7 +214,7 @@ cderun --hostname my-container alpine hostname
 ```
 
 ### `--dns`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: カスタムDNSサーバの設定
 
 ```bash
@@ -222,7 +222,7 @@ cderun --dns 8.8.8.8 alpine ping google.com
 ```
 
 ### `--add-host`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
 
 ```bash
@@ -247,7 +247,7 @@ cderun --privileged alpine ls /dev
 ```
 
 ### `--cap-add`, `--cap-drop`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: Linuxケーパビリティの追加/削除
 
 ```bash
@@ -255,7 +255,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 ```
 
 ### `--entrypoint`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: イメージのデフォルトENTRYPOINTを上書き
 
 ```bash
@@ -277,7 +277,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **説明**: CPU数制限
 
 ### `--device`
-- **型**: stringSlice
+- **型**: stringArray
 - **説明**: ホストデバイスをコンテナに追加
 
 ```bash
@@ -302,6 +302,25 @@ cderun --dry-run node --version
 ```bash
 cderun --dry-run --dry-run-format json node --version
 cderun --dry-run -f simple node --version
+```
+
+### `--diagnosis`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: システム診断情報と利用可能なツールの一覧を表示する
+
+```bash
+cderun --diagnosis
+```
+
+### `--diagnosis-format`
+- **型**: string
+- **デフォルト**: `yaml`
+- **説明**: 診断情報の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --diagnosis --diagnosis-format json
 ```
 
 ### `--verbose`
@@ -364,7 +383,7 @@ cderun --log-timestamp=false node app.js
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-log-timestamp`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## その他の設定オプション
@@ -378,7 +397,8 @@ cderun --log-timestamp=false node app.js
 
 1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
-3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
+3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等。
+   - **セパレータ**: `CDERUN_ENV` および `CDERUN_MOUNT` はセミコロン (`;`) を、`CDERUN_DEVICE` はカンマ (`,`) をセパレータとして使用します。
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)

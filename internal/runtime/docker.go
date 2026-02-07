@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
@@ -63,15 +64,44 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	}
 
 	// Policy is "always" or "missing" (and not found locally)
-	logging.Info("Pulling image %s...", img)
-	reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to pull image: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
+	var lastErr error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, img, lastErr)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(i*2) * time.Second):
+				// Exponential backoff
+			}
+		}
 
-	// Wait for pull to complete and check for errors in the stream
-	return jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
+		logging.Info("Pulling image %s...", img)
+		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
+		if err != nil {
+			lastErr = err
+			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+				continue
+			}
+			return fmt.Errorf("failed to pull image: %w", err)
+		}
+
+		// Wait for pull to complete and check for errors in the stream
+		err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
+		_ = reader.Close()
+		if err != nil {
+			lastErr = err
+			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+				continue
+			}
+			return fmt.Errorf("failed to pull image (stream): %w", err)
+		}
+
+		return nil // Success
+	}
+
+	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 }
 
 // CreateContainer creates a new container based on the provided config.

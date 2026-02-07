@@ -32,10 +32,10 @@ You can use `cderun` to run arbitrary commands in a containerized environment by
 cderun --image alpine ls -l
 ```
 
-### 4. Global Dry Run (Diagnostics)
-Run `cderun` with the `--dry-run` flag but without a subcommand to see system diagnostics and available tools.
+### 4. Diagnosis Mode
+Run `cderun` with the `--diagnosis` flag to see system diagnostics and available tools.
 ```bash
-cderun --dry-run
+cderun --diagnosis
 ```
 
 ## Argument Parsing & Flags
@@ -96,8 +96,10 @@ cderun node app.js --cderun-image node:20-alpine
 - `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
 - `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
 - `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
-- `--dry-run`: Preview container configuration or show system diagnostics.
-- `--dry-run-format`, `-f`: Output format (yaml, json, simple).
+- `--dry-run`: Preview container configuration without execution. Requires a subcommand.
+- `--dry-run-format`, `-f`: Output format for dry-run (yaml, json, simple).
+- `--diagnosis`: Show system diagnostics and available tools.
+- `--diagnosis-format`: Output format for diagnosis (yaml, json, simple).
 - `--verbose`: Enable verbose logging (repeat for more detail).
 - `--log-level`: Set log level (error, warn, info, debug, trace).
 - `--log-file`: Set log file path.

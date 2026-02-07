@@ -49,8 +49,6 @@ type ConfigDefaults struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
-	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`
@@ -68,6 +66,7 @@ type ConfigDefaults struct {
 	CPUs            float64        `yaml:"cpus"`
 	Mounts          []MountConfig  `yaml:"mounts"`
 	Devices         []DeviceConfig `yaml:"devices"`
+	Env             []string       `yaml:"env"`
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
@@ -121,8 +120,6 @@ type ToolConfig struct {
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	DryRun          *bool          `yaml:"dryRun"`
-	DryRunFormat    string         `yaml:"dryRunFormat"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`

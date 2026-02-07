@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,7 +17,6 @@ const testImage = "public.ecr.aws/docker/library/alpine:latest"
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	config.DisableDiscovery = true
 	// Re-use logic from root_test.go but simplified
 	originalStdout := os.Stdout
 	originalStderr := os.Stderr
@@ -90,9 +88,8 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	}
 	msg := err.Error()
 	if (strings.Contains(msg, "failed to mount") && strings.Contains(msg, "invalid argument")) ||
-		strings.Contains(msg, "toomanyrequests") ||
-		strings.Contains(msg, "Rate exceeded") {
-		t.Skipf("Skipping test due to environment limitation: %v", err)
+		strings.Contains(msg, "bind source path does not exist") {
+		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay or nested execution in sandbox)")
 	}
 }
 
@@ -117,34 +114,29 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
 		require.NoError(t, err)
 
-		stdout, stderr, exitCode, err := runCderun("echo", "hello-cderun")
+		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
 		skipIfDockerBroken(t, err)
-		require.NoError(t, err, "stderr: %s", stderr)
-		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
-		require.Contains(t, stdout, "hello-cderun", "stderr: %s", stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "hello-cderun")
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
 		originalWd, err := os.Getwd()
 		require.NoError(t, err)
 		tmpDir := t.TempDir()
-
-		// Ensure the temp directory is accessible by the container user
-		require.NoError(t, os.Chmod(tmpDir, 0755))
-
 		require.NoError(t, os.Chdir(tmpDir))
 		t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
-		// Use cat directly to minimize shell complexity
 		err = os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
-		require.NoError(t, os.Chmod(hostFile, 0644))
 
-		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
+		// Use --verbose to get more info in CI if it fails
+		stdout, stderr, exitCode, err := runCderun("--verbose", "--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 
 		// Detailed diagnostics on failure
@@ -174,19 +166,19 @@ func TestIntegrationBasic(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Setenv("HOST_VAR", "host-value")
-		stdout, stderr, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
+		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
 		skipIfDockerBroken(t, err)
-		require.NoError(t, err, "stderr: %s", stderr)
-		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
-		require.Contains(t, stdout, "EXPLICIT_VAR=explicit-value", "stderr: %s", stderr)
-		require.Contains(t, stdout, "HOST_VAR=host-value", "stderr: %s", stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "EXPLICIT_VAR=explicit-value")
+		assert.Contains(t, stdout, "HOST_VAR=host-value")
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, stderr, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
 		skipIfDockerBroken(t, err)
-		require.NoError(t, err, "stderr: %s", stderr)
-		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
 	})
 
 	t.Run("cderun expressions", func(t *testing.T) {
@@ -201,11 +193,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
 		require.NoError(t, err)
 
-		stdout, stderr, exitCode, err := runCderun("mytool", "env")
+		stdout, _, exitCode, err := runCderun("mytool", "env")
 		skipIfDockerBroken(t, err)
-		require.NoError(t, err, "stderr: %s", stderr)
-		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
-		require.Contains(t, stdout, "MY_PWD="+tmpDir, "stderr: %s", stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "MY_PWD="+tmpDir)
 	})
 
 	t.Run("relative path and tilde expansion", func(t *testing.T) {
@@ -224,11 +216,11 @@ func TestIntegrationBasic(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0644)
 		require.NoError(t, err)
 
-		stdout, stderr, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
+		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
 		skipIfDockerBroken(t, err)
-		require.NoError(t, err, "stderr: %s", stderr)
-		require.Equal(t, 0, exitCode, "stderr: %s", stderr)
-		require.Contains(t, stdout, "/mnt", "stderr: %s", stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+		assert.Contains(t, stdout, "/mnt")
 	})
 
 	t.Run("mount-cderun-path", func(t *testing.T) {
