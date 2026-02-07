@@ -106,8 +106,8 @@ cderun node --version
 
 ```bash
 cderun --mount-tools unknown-tool alpine sh
-Error: Tool 'unknown-tool' not found in .tools.yaml
-Available tools: node, python, gemini-cli
+Error: tool "unknown-tool" not found in .tools.yaml
+available tools: node, python, gemini-cli
 ```
 
 ## 使用例

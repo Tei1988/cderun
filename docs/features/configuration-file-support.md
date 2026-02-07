@@ -17,6 +17,11 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 - YAML形式のみがサポートされます。
 - **標準ファイル名**: `.cderun.yaml`, `.tools.yaml`
 
+### 設定不可能なオプション
+以下のモード設定は、セキュリティおよび混乱回避のため設定ファイル（YAML）ではサポートされておらず、コマンドライン引数または環境変数でのみ指定可能です。
+- **ドライランモード** (`--dry-run`, `--dry-run-format`)
+- **診断モード** (`--diagnosis`, `--diagnosis-format`)
+
 ### 検索とマージ
 
 cderunは、柔軟な設定管理のため、複数の場所から設定ファイルを検索し、それらを階層的にマージします。
@@ -131,8 +136,6 @@ defaults:
   mountSocket: false               # ソケットのマウント
   mountSocketPath: /var/run/docker.sock # コンテナ内のソケットマウントパス
   mountCderun: false               # cderunバイナリのマウント
-  dryRun: false                    # ドライランモードのデフォルト
-  dryRunFormat: yaml               # ドライランの出力形式
   # ネットワーク・セキュリティ・リソース等のデフォルト
   ports: ["8080:80"]
   user: "1000:1000"
@@ -224,8 +227,6 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `mountSocket` (bool): ホストのランタイムソケットをマウント
 - `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
-- `dryRun` (bool): ドライランモードのデフォルト値
-- `dryRunFormat` (string): ドライランの出力形式 (`yaml` | `json` | `simple`)
 - `ports` ([]string): ポートマッピング
 - `publishAll` (bool): 全ポート公開
 - `expose` ([]string): ポート露出
@@ -277,8 +278,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `mountSocket` (bool): ホストのランタイムソケットをマウント
 - `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
-- `dryRun` (bool): ドライランモード
-- `dryRunFormat` (string): ドライラン形式
 - `ports` ([]string): ポートマッピング
 - `publishAll` (bool): 全ポート公開
 - `expose` ([]string): ポート露出

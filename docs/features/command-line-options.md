@@ -304,6 +304,25 @@ cderun --dry-run --dry-run-format json node --version
 cderun --dry-run -f simple node --version
 ```
 
+### `--diagnosis`
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: システム診断情報と利用可能なツールの一覧を表示する
+
+```bash
+cderun --diagnosis
+```
+
+### `--diagnosis-format`
+- **型**: string
+- **デフォルト**: `yaml`
+- **説明**: 診断情報の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --diagnosis --diagnosis-format json
+```
+
 ### `--verbose`
 - **型**: count
 - **説明**: ログ出力の詳細度を上げる
@@ -364,7 +383,7 @@ cderun --log-timestamp=false node app.js
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## その他の設定オプション
@@ -378,7 +397,8 @@ cderun --log-timestamp=false node app.js
 
 1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
-3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等
+3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`, `CDERUN_TTY` 等。
+   - **セパレータ**: `CDERUN_ENV` および `CDERUN_MOUNT` はセミコロン (`;`) を、`CDERUN_DEVICE` はカンマ (`,`) をセパレータとして使用します。
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)
