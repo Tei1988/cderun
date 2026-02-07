@@ -118,6 +118,11 @@ func Init(level string, format string, file string, tee bool, timestamp bool) er
 func SetOutput(w io.Writer) {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
+
+	if w == nil {
+		w = io.Discard
+	}
+
 	if currentLogFile != nil {
 		globalLogger.Writer = io.MultiWriter(w, currentLogFile)
 	} else {

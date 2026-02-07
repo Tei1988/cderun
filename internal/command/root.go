@@ -609,12 +609,16 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr(), attachReady)
 	}()
 
-	// Wait for attach to be ready before starting the container
+	// Wait for attach to be ready before starting the container.
+	// We wait for either the ready signal or the attachment to complete early (e.g. on error).
 	select {
 	case <-attachReady:
 		logging.Trace("Attach ready, starting container")
 	case err := <-attachDone:
-		return 0, fmt.Errorf("attach failed before container start: %w", err)
+		if err != nil {
+			return 0, fmt.Errorf("attach failed before container start: %w", err)
+		}
+		logging.Trace("Attach completed early without error, starting container")
 	}
 
 	logging.Trace("Starting container: %s", containerID)
