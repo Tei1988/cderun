@@ -64,11 +64,11 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 
 		// executeCommand should eventually finish because WaitContainer returns immediately
-		// and AttachContainer will be canceled after attachGracePeriod.
+		// and AttachContainer will be canceled after 500ms grace period.
 		select {
 		case <-done:
 			// Success
-		case <-time.After(2 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
 		}
 	})

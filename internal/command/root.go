@@ -108,7 +108,7 @@ type rootOptions struct {
 	cderunDevices    []string
 }
 
-const attachGracePeriod = 1 * time.Second
+const attachGracePeriod = 5 * time.Second
 
 var (
 	opts rootOptions
@@ -522,7 +522,8 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 	return nil
 }
 
-func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+	ctx := cmd.Context()
 	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
@@ -598,7 +599,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 	// Attach to container IO concurrently
 	var stdin io.Reader
 	if containerConfig.Interactive {
-		stdin = os.Stdin
+		stdin = cmd.InOrStdin()
 	}
 
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
@@ -606,7 +607,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
 	}()
 
 	logging.Trace("Starting container: %s", containerID)
@@ -748,7 +749,7 @@ intended for the subcommand.`,
 			}
 
 			// Execute Container
-			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
+			exitCode, err := opts.execute(cmd, resolved, containerConfig)
 			if err != nil {
 				return err
 			}
