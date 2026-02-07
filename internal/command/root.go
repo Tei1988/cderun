@@ -109,6 +109,8 @@ type rootOptions struct {
 	cderunDevices    []string
 }
 
+const attachGracePeriod = 5 * time.Second
+
 var (
 	opts rootOptions
 
@@ -670,7 +672,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		select {
 		case err := <-attachDone:
 			attachErr = err
-		case <-time.After(500 * time.Millisecond):
+		case <-time.After(attachGracePeriod):
 			logging.Debug("AttachContainer timed out after container exit, forcing close")
 			cancelAttach()
 			attachErr = <-attachDone
