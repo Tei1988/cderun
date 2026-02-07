@@ -68,7 +68,7 @@ func TestExecuteRobustness(t *testing.T) {
 		select {
 		case <-done:
 			// Success
-		case <-time.After(2 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
 		}
 	})

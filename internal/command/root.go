@@ -73,6 +73,7 @@ type rootOptions struct {
 	cderunLogFile         string
 	cderunLogFormat       string
 	cderunLogTee          bool
+	cderunLogTimestamp    bool
 	cderunVerbose         int
 
 	// Docker-compatible flags
@@ -107,6 +108,8 @@ type rootOptions struct {
 	cderunCPUs       float64
 	cderunDevices    []string
 }
+
+const attachGracePeriod = 5 * time.Second
 
 var (
 	opts rootOptions
@@ -236,6 +239,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
 		CderunLogTee:             o.cderunLogTee,
 		CderunLogTeeSet:          cmd.Flags().Changed("cderun-log-tee"),
+		CderunLogTimestamp:       o.cderunLogTimestamp,
+		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
 		CderunVerbose:            o.cderunVerbose,
 
 		// Docker-compatible flags
@@ -426,7 +431,7 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) handleDiagnosis(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	info := diagnosticsInfo{}
 	info.Runtime.Name = resolved.Runtime
 	info.Runtime.Socket = resolved.SocketPath
@@ -448,59 +453,59 @@ func (o *rootOptions) handleDiagnosis(resolved *config.ResolvedConfig, toolsCfg 
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "simple":
-		fmt.Printf("Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		fmt.Printf("Runtime Status: %s\n", info.Runtime.Status)
-		fmt.Printf("Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		fmt.Printf("Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		fmt.Printf("Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
+		fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
+		fmt.Fprintf(cmd.OutOrStdout(), "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(info)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		fmt.Print(string(data))
+		fmt.Fprint(cmd.OutOrStdout(), string(data))
 	}
 	return nil
 }
 
-func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
+func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	switch strings.ToLower(resolved.DryRunFormat) {
 	case "json":
 		data, err := json.MarshalIndent(containerConfig, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "simple":
-		fmt.Printf("Image: %s\n", containerConfig.Image)
-		fmt.Printf("Command: %s\n", strings.Join(containerConfig.Command, " "))
-		fmt.Printf("TTY: %v\n", containerConfig.TTY)
-		fmt.Printf("Interactive: %v\n", containerConfig.Interactive)
-		fmt.Printf("Network: %s\n", containerConfig.Network)
-		fmt.Printf("Remove: %v\n", containerConfig.Remove)
+		fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
+		fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
+		fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
+		fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
+		fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
+		fmt.Fprintf(cmd.OutOrStdout(), "Remove: %v\n", containerConfig.Remove)
 		var mounts []string
 		for _, m := range containerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
-		fmt.Printf("Mounts: %s\n", strings.Join(mounts, ", "))
-		fmt.Printf("Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		fmt.Printf("Workdir: %s\n", containerConfig.Workdir)
-		fmt.Printf("User: %s\n", containerConfig.User)
-		fmt.Printf("Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		fmt.Printf("PublishAll: %v\n", containerConfig.PublishAll)
-		fmt.Printf("Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		fmt.Printf("Hostname: %s\n", containerConfig.Hostname)
-		fmt.Printf("DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		fmt.Printf("AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		fmt.Printf("Privileged: %v\n", containerConfig.Privileged)
-		fmt.Printf("CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		fmt.Printf("CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		fmt.Printf("Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		fmt.Printf("Pull: %s\n", containerConfig.Pull)
-		fmt.Printf("Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		fmt.Printf("CPUs: %g\n", containerConfig.CPUs)
+		fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
+		fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
+		fmt.Fprintf(cmd.OutOrStdout(), "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "PublishAll: %v\n", containerConfig.PublishAll)
+		fmt.Fprintf(cmd.OutOrStdout(), "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Hostname: %s\n", containerConfig.Hostname)
+		fmt.Fprintf(cmd.OutOrStdout(), "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Privileged: %v\n", containerConfig.Privileged)
+		fmt.Fprintf(cmd.OutOrStdout(), "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
+		fmt.Fprintf(cmd.OutOrStdout(), "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
+		fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
 		var devices []string
 		for _, d := range containerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
@@ -509,19 +514,24 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 			}
 		}
-		fmt.Printf("Devices: %s\n", strings.Join(devices, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(containerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		fmt.Print(string(data))
+		fmt.Fprint(cmd.OutOrStdout(), string(data))
 	}
 	return nil
 }
 
-func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
-	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
+func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+	ctx := cmd.Context()
+	fullCmdStr := strings.Join(containerConfig.Command, " ")
+	if len(containerConfig.Entrypoint) > 0 {
+		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
+	}
+	logging.Info("Running: %s", fullCmdStr)
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
@@ -593,6 +603,24 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}()
 
+	// Attach to container IO concurrently
+	var stdin io.Reader
+	if containerConfig.Interactive {
+		stdin = cmd.InOrStdin()
+	}
+
+	attachCtx, cancelAttach := context.WithCancel(ctxG)
+	defer cancelAttach()
+
+	attachDone := make(chan error, 1)
+	go func() {
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
+	}()
+
+	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
+	// reducing race condition where container starts and finishes before attachment.
+	time.Sleep(100 * time.Millisecond)
+
 	logging.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
@@ -624,20 +652,6 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		}
 	}
 
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	if containerConfig.Interactive {
-		stdin = os.Stdin
-	}
-
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, os.Stdout, os.Stderr)
-	}()
-
 	logging.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)
 	if err != nil {
@@ -650,7 +664,7 @@ func (o *rootOptions) execute(ctx context.Context, resolved *config.ResolvedConf
 		if err != nil && err != context.Canceled {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(attachGracePeriod):
 		logging.Debug("AttachContainer timed out after container exit, forcing close")
 		cancelAttach()
 		<-attachDone
@@ -716,7 +730,7 @@ intended for the subcommand.`,
 			}
 
 			if resolved.Diagnosis {
-				return opts.handleDiagnosis(resolved, toolsCfg, globalPaths, toolsPaths)
+				return opts.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
 			}
 
 			if len(args) == 0 {
@@ -730,6 +744,8 @@ intended for the subcommand.`,
 			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
 				return fmt.Errorf("failed to initialize logger: %w", err)
 			}
+			// Redirect logging to the command's stderr stream.
+			logging.SetOutput(cmd.ErrOrStderr())
 			logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 			// Build ContainerConfig
@@ -742,11 +758,11 @@ intended for the subcommand.`,
 			}
 
 			if resolved.DryRun {
-				return opts.handleDryRun(containerConfig, resolved)
+				return opts.handleDryRun(cmd, containerConfig, resolved)
 			}
 
 			// Execute Container
-			exitCode, err := opts.execute(cmd.Context(), resolved, containerConfig)
+			exitCode, err := opts.execute(cmd, resolved, containerConfig)
 			if err != nil {
 				return err
 			}
@@ -844,6 +860,7 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFile, "cderun-log-file", "", "Override log file path (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunLogTee, "cderun-log-tee", false, "Override log-tee setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&opts.cderunLogTimestamp, "cderun-log-timestamp", true, "Override log-timestamp setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 
 	cmd.Flags().SetInterspersed(false)

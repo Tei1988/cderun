@@ -5,7 +5,7 @@
 実行ホストの環境変数を選択的にコンテナに引き継ぐ機能。
 **デフォルトでは環境変数は引き継がれない。**明示的に指定した環境変数のみがコンテナに渡される。
 
-`.tools.yaml`（優先順位 P4）、`--env` フラグ（優先順位 P2）、`--cderun-env` フラグ（優先順位 P1）による指定がサポートされており、`KEY=value` 形式（明示的指定）と `KEY` 形式（ホストからの取得）の両方に対応しています。
+`.tools.yaml`（優先順位 P4）、`--env` フラグ（優先順位 P2）、`--cderun-env` フラグ（優先順位 P1）および環境変数 `CDERUN_ENV`（優先順位 P3）による指定がサポートされており、`KEY=value` 形式（明示的指定）と `KEY` 形式（ホストからの取得）の両方に対応しています。
 
 ## 中間表現での扱い
 
@@ -38,6 +38,14 @@ cderun --env NPM_TOKEN --env HOME node app.js
 
 # 混在
 cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
+```
+
+### 環境変数 (P3)
+`CDERUN_ENV` 環境変数を使用して、複数の環境変数を一度に指定できます。セパレータとしてセミコロン (`;`) を使用します。
+
+```bash
+export CDERUN_ENV="NODE_ENV=production;NPM_TOKEN;HOME"
+cderun node app.js
 ```
 
 ## 優先順位

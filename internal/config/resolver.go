@@ -152,6 +152,8 @@ type CLIOptions struct {
 	CderunLogFormatSet       bool
 	CderunLogTee             bool
 	CderunLogTeeSet          bool
+	CderunLogTimestamp       bool
+	CderunLogTimestampSet    bool
 	CderunVerbose            int
 
 	// Docker-compatible flags
@@ -517,7 +519,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	)
 
 	res.LogTimestamp = resolveBool(
-		false, false, // No P1 for timestamp yet
+		cli.CderunLogTimestampSet, cli.CderunLogTimestamp,
 		cli.LogTimestampSet, cli.LogTimestamp,
 		"CDERUN_LOG_TIMESTAMP",
 		"", nil, nil,
