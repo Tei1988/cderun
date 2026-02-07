@@ -522,7 +522,11 @@ func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, r
 }
 
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
-	logging.Info("Running: %s", strings.Join(containerConfig.Command, " "))
+	fullCmdStr := strings.Join(containerConfig.Command, " ")
+	if len(containerConfig.Entrypoint) > 0 {
+		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
+	}
+	logging.Info("Running: %s", fullCmdStr)
 	logging.Debug("Image: %s", containerConfig.Image)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
