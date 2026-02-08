@@ -140,6 +140,11 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 
 type ToolsConfig map[string]ToolConfig
 
+var (
+	systemConfigDir = "/etc/cderun"
+	runConfigDir    = "/run/cderun"
+)
+
 // FindConfigs searches for config files in hierarchical order.
 // Priority: Current Dir > Parent Dirs > Home Dir > System Paths.
 // The returned list is ordered by priority (highest first).
@@ -177,7 +182,13 @@ func FindConfigs(filename string) []string {
 	}
 
 	// Add system path
-	p := filepath.Join("/etc", "cderun", filename)
+	p := filepath.Join(systemConfigDir, filename)
+	if _, err := os.Stat(p); err == nil {
+		paths = append(paths, p)
+	}
+
+	// Add nested injection path
+	p = filepath.Join(runConfigDir, filename)
 	if _, err := os.Stat(p); err == nil {
 		paths = append(paths, p)
 	}
