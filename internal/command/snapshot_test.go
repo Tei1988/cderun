@@ -3,6 +3,7 @@ package command
 import (
 	"cderun/internal/config"
 	"cderun/internal/container"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,8 +29,11 @@ func TestCreateSnapshotImmutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	_, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
+	if snapshotDir != "" {
+		defer os.RemoveAll(snapshotDir)
+	}
 
 	// Verify that globalCfg was NOT mutated
 	assert.Equal(t, initialLevel, globalCfg.HostContext.Level)
@@ -46,8 +50,11 @@ func TestCreateSnapshotWithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	_, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
+	if snapshotDir != "" {
+		defer os.RemoveAll(snapshotDir)
+	}
 
 	// Verify that globalCfg.HostContext is still nil
 	assert.Nil(t, globalCfg.HostContext)

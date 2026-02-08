@@ -68,11 +68,11 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 	}
 
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
-	saveCfg := *globalCfg
-	saveCfg.HostContext = &hostCtx
+	snapshotCfg := *globalCfg
+	snapshotCfg.HostContext = &hostCtx
 
 	// Save .cderun.yaml
-	cderunData, err := yaml.Marshal(saveCfg)
+	cderunData, err := yaml.Marshal(snapshotCfg)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
