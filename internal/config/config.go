@@ -187,7 +187,7 @@ func FindConfigs(filename string) []string {
 		paths = append(paths, p)
 	}
 
-	// Add nested injection path
+	// Add run directory path (used for nested execution config injection)
 	p = filepath.Join(runConfigDir, filename)
 	if _, err := os.Stat(p); err == nil {
 		paths = append(paths, p)
