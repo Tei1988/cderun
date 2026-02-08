@@ -94,6 +94,10 @@
 20. **[診断モード (Completed)](./diagnosis-mode.md)**
   - システム診断情報と利用可能なツールの表示
 
+## 技術リファレンス
+
+- **[/proc/self/mountinfo 仕様](../references/proc-self-mountinfo.md)**
+
 ## 機能間の関係
 
 ```text
