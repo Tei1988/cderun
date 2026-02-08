@@ -159,6 +159,8 @@ hostContext:
 		assert.Equal(t, "/tmp/snap", cfg.HostContext.SnapshotDir)
 		require.Len(t, cfg.HostContext.Mounts, 1)
 		assert.Equal(t, "/host", cfg.HostContext.Mounts[0].Source)
+		assert.Equal(t, "/container", cfg.HostContext.Mounts[0].Target)
+		assert.Equal(t, 1, cfg.HostContext.Mounts[0].Level)
 	})
 }
 
