@@ -90,10 +90,16 @@ cderun --runtime podman node app.js
 ## ランタイム情報の表示 (Completed)
 
 ### 現在のランタイム確認
-サブコマンドを指定せずに `--dry-run` を実行することで、診断情報を表示できます。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
+`--diagnosis` フラグを使用することで、現在のランタイム設定や接続状態を含む診断情報を表示できます。詳細は[診断モード](./diagnosis-mode.md)を参照してください。
 
 ```bash
-cderun --dry-run
+cderun --diagnosis
+```
+
+診断情報の出力フォーマットは `--diagnosis-format`（または `-f`）で指定可能です（`yaml`, `json`, `simple`）。
+
+```bash
+cderun --diagnosis --diagnosis-format simple
 ```
 
 

@@ -43,7 +43,19 @@ logging:
 ```bash
 export CDERUN_LOG_LEVEL=debug
 export CDERUN_LOG_FILE=/tmp/cderun.log
+export CDERUN_LOG_TIMESTAMP=true
 ```
+
+## P1 Internal Overrides
+
+他の設定同様、`--cderun-` プレフィックスを用いた Priority 1 オーバーライドが可能です。サブコマンドの後に指定し、設定ファイルや環境変数の値を強制的に上書きします。
+
+- `--cderun-log-level`
+- `--cderun-log-file`
+- `--cderun-log-format`
+- `--cderun-log-tee`
+- `--cderun-log-timestamp`
+- `--cderun-verbose`
 
 ## ログ出力例
 
