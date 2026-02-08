@@ -78,9 +78,9 @@ runtime: podman
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(runDir) }()
 
-		oldRunDir := runConfigDir
+		originalRunConfigDir := runConfigDir
 		runConfigDir = runDir
-		defer func() { runConfigDir = oldRunDir }()
+		defer func() { runConfigDir = originalRunConfigDir }()
 
 		content := `
 runtime: docker
@@ -103,14 +103,15 @@ defaults:
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(homeDir) }()
 		t.Setenv("HOME", homeDir)
+		t.Setenv("USERPROFILE", homeDir)
 
 		runDir, err := os.MkdirTemp("", "cderun-run-*")
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(runDir) }()
 
-		oldRunDir := runConfigDir
+		originalRunConfigDir := runConfigDir
 		runConfigDir = runDir
-		defer func() { runConfigDir = oldRunDir }()
+		defer func() { runConfigDir = originalRunConfigDir }()
 
 		// Home config
 		homeConfigDir := filepath.Join(homeDir, ".config", "cderun")
@@ -175,9 +176,9 @@ node:
 		require.NoError(t, err)
 		defer func() { _ = os.RemoveAll(runDir) }()
 
-		oldRunDir := runConfigDir
+		originalRunConfigDir := runConfigDir
 		runConfigDir = runDir
-		defer func() { runConfigDir = oldRunDir }()
+		defer func() { runConfigDir = originalRunConfigDir }()
 
 		content := `
 node:
