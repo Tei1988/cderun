@@ -159,5 +159,11 @@ python:
 - Mount the `cderun` binary and other defined tools into the container.
 - Enables recursive container execution without installing tools in the container image.
 
+### Nested Execution Support
+- Transparently handles `cderun` execution inside a `cderun`-managed container.
+- Automatically propagates host context and settings via snapshots.
+- Implements "Reverse Path Resolution" to translate container-local paths back to host paths for nested mounts.
+- Detects OverlayFS upperdir for automatic root filesystem mapping.
+
 ---
 *This project is under active development.*

@@ -150,6 +150,33 @@
   2. `subcommand` はコンテナに渡すコマンド（`CMD`）には含めない。
   3. コンテナに渡すコマンド（`CMD`）は、常にツール定義の `command` またはサブコマンド名以降の引数のみとする。
 
+### Phase 11: ネスト実行 (Completed)
+
+このフェーズでは、コンテナ内での `cderun` の再帰的な実行をサポートした。
+
+### Step 11.1: ホストコンテキストの定義 (Completed)
+
+**目的**: ネストされた `cderun` がホストの状態を把握するための構造体を定義する。
+
+**実装内容**:
+  1. `internal/config/config.go` に `HostContext` と `MountMapping` を追加。
+
+### Step 11.2: スナップショット管理 (Completed)
+
+**目的**: 設定ファイルとホストコンテキストをコンテナに渡すためのスナップショットを作成する。
+
+**実装内容**:
+  1. `internal/command/snapshot.go` を作成。
+  2. UUIDベースの一時ディレクトリ作成、設定ファイルの保存、OverlayFSのルート検出を実装。
+
+### Step 11.3: 逆パス解決 (Completed)
+
+**目的**: コンテナ内のパスを基底ホストのパスに翻訳し、ネストされたコンテナでのマウントを可能にする。
+
+**実装内容**:
+  1. `internal/config/path.go` の `resolvePath` を修正。
+  2. `HostContext.Mounts` を使用したプレフィックス置換ロジックを実装。
+
 ## 実装チェックリスト
 
 ### Phase 1 (Completed)
@@ -197,6 +224,11 @@
 ### Phase 10 (Completed)
 - [x] Step 10.1: サブコマンドのキー化とイメージ解決
 - [x] Step 10.2: コンテナコマンドの組み立て
+
+### Phase 11 (Completed)
+- [x] Step 11.1: ホストコンテキストの定義
+- [x] Step 11.2: スナップショット管理
+- [x] Step 11.3: 逆パス解決
 
 ## 各ステップの完了基準
 

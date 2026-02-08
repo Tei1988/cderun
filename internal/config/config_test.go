@@ -129,6 +129,37 @@ defaults:
 		assert.Contains(t, paths[1], runDir)
 		assert.Equal(t, "podman", cfg.Runtime)
 	})
+
+	t.Run("HostContext is loaded and merged", func(t *testing.T) {
+		runDir, err := os.MkdirTemp("", "cderun-run-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(runDir) }()
+
+		originalRunConfigDir := runConfigDir
+		runConfigDir = runDir
+		defer func() { runConfigDir = originalRunConfigDir }()
+
+		content := `
+hostContext:
+  level: 1
+  snapshotDir: /tmp/snap
+  mounts:
+    - source: /host
+      target: /container
+      level: 1
+`
+		err = os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(content), 0644)
+		require.NoError(t, err)
+
+		cfg, _, err := LoadCDERunConfig()
+		assert.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.HostContext)
+		assert.Equal(t, 1, cfg.HostContext.Level)
+		assert.Equal(t, "/tmp/snap", cfg.HostContext.SnapshotDir)
+		require.Len(t, cfg.HostContext.Mounts, 1)
+		assert.Equal(t, "/host", cfg.HostContext.Mounts[0].Source)
+	})
 }
 
 func TestLoadToolsConfig(t *testing.T) {
