@@ -32,7 +32,7 @@ func TestCreateSnapshotImmutability(t *testing.T) {
 	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
 	if snapshotDir != "" {
-		defer os.RemoveAll(snapshotDir)
+		defer func() { _ = os.RemoveAll(snapshotDir) }()
 	}
 
 	// Verify that globalCfg was NOT mutated
@@ -53,7 +53,7 @@ func TestCreateSnapshotWithNilHostContext(t *testing.T) {
 	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
 	if snapshotDir != "" {
-		defer os.RemoveAll(snapshotDir)
+		defer func() { _ = os.RemoveAll(snapshotDir) }()
 	}
 
 	// Verify that globalCfg.HostContext is still nil
