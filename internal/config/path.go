@@ -251,6 +251,11 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 
 var schemeRegex = regexp.MustCompile(`^[a-z]+://`)
 
+// ResolvePath resolves the path p against baseDir, expanding a leading tilde, preserving a scheme prefix (e.g., "http://"), and remapping paths through host mounts when a nested host context is present in r.
+// 
+// If p is a relative path beginning with "./", "../", "." or "..", it is joined with baseDir. A leading "~" is expanded to the current user's home directory when available. If r and r.HostContext are provided and HostContext.Level > 0, the function attempts a reverse resolution: it finds the best matching host mount whose Target contains the absolute path and rewrites the path to use that mount's Source.
+// 
+// The returned string is the resolved path with the original scheme prefix (if any) reattached.
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	if p == "" {
 		return p
@@ -317,6 +322,9 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
+// resolveVolumePath resolves the host portion of a volume specification and returns the reconstructed volume string.
+// If the input contains a host and remainder separated by the recognized colon syntax, the host is resolved via ResolvePath
+// and concatenated with ":" and the remainder; otherwise the input is returned unchanged.
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) string {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
@@ -325,6 +333,7 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) string {
 	return ResolvePath(host, baseDir, r) + ":" + remainder
 }
 
+// via ResolvePath and the function returns "resolved-host:remainder".
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) string {
 	// host-path:container-path[:permissions]
 	host, remainder, ok := SplitHostRemainder(d)
@@ -334,6 +343,11 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) string {
 	return ResolvePath(host, baseDir, r) + ":" + remainder
 }
 
+// SplitHostRemainder splits s into a host (text before the separator) and a remainder (text after the separator)
+// using the first ':' as the separator and reports whether a valid separator was found.
+// If s contains a leading Windows drive letter (e.g. "C:\" or "C:/"), that first ':' is considered part of the path
+// and the function uses the next ':' as the separator. It returns the host, the remainder, and true on success;
+// otherwise it returns empty strings and false.
 func SplitHostRemainder(s string) (string, string, bool) {
 	sepIdx := strings.Index(s, ":")
 	if sepIdx == -1 {

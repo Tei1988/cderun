@@ -13,6 +13,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// createSnapshot creates a temporary snapshot directory and records the current host context and mounts into it.
+// It ensures globalCfg.HostContext exists, sets HostContext.SnapshotDir, BinPath (when available), WorkingDir (when available),
+// increments HostContext.Level, appends bind mounts from currentMounts and an OverlayFS upperdir (if discovered) to HostContext.Mounts,
+// and writes .cderun.yaml and .tools.yaml into the snapshot directory.
+// On success it returns the path to the created snapshot directory; on failure it returns a non-nil error.
 func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(os.TempDir(), "cderun-snap-"+id)
@@ -87,6 +92,9 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 	return snapshotDir, nil
 }
 
+// cleanupSnapshot removes the snapshot directory identified by snapshotDir.
+// If snapshotDir is empty the function does nothing and returns nil; otherwise it removes
+// the path and returns any error produced by os.RemoveAll.
 func cleanupSnapshot(snapshotDir string) error {
 	if snapshotDir == "" {
 		return nil
@@ -94,6 +102,10 @@ func cleanupSnapshot(snapshotDir string) error {
 	return os.RemoveAll(snapshotDir)
 }
 
+// discoverOverlayUpperDir reads /proc/self/mountinfo and returns the OverlayFS `upperdir` path for the root mount if present.
+// If an `upperdir` option is found for an overlay filesystem mounted at `/`, the path is returned.
+// If no matching overlay `upperdir` is found the function returns an empty string and a nil error.
+// Any error reading /proc/self/mountinfo is returned.
 func discoverOverlayUpperDir() (string, error) {
 	data, err := os.ReadFile("/proc/self/mountinfo")
 	if err != nil {

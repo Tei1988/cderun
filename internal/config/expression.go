@@ -15,6 +15,8 @@ type ExpressionResolver struct {
 	HostContext *HostContext
 }
 
+// NewExpressionResolver creates an ExpressionResolver initialized with the current user's home directory, the current working directory, and the supplied HostContext.
+// It attempts to obtain the home directory and working directory; if either lookup fails the corresponding field is set to the empty string. The returned error is always nil.
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

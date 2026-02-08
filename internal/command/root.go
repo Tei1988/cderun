@@ -683,6 +683,18 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	return exitCode, nil
 }
 
+// newRootCmd creates the root cobra.Command for the cderun CLI and wires its
+// runtime behaviour, persistent flags, and subcommand handling.
+//
+// The command's RunE initializes logging, loads and resolves configuration,
+// validates settings, supports diagnosis and dry-run modes, builds the container
+// configuration (including nested-execution snapshots and mounts when requested),
+// and executes the configured container lifecycle. It also registers the full
+// set of persistent flags (TTY/interactive, networking, mounts, image/runtime,
+// Docker-compatible options, cderun-prefixed highest-priority overrides,
+// dry-run/diagnosis options, and logging/verbosity controls).
+//
+// The returned *cobra.Command is ready to be executed as the CLI root command.
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "cderun",
