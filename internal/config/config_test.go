@@ -72,6 +72,63 @@ runtime: podman
 		assert.Contains(t, paths[0], ".cderun.yaml")
 		assert.Equal(t, "podman", cfg.Runtime)
 	})
+
+	t.Run("found in run dir", func(t *testing.T) {
+		runDir, err := os.MkdirTemp("", "cderun-run-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(runDir) }()
+
+		originalRunConfigDir := runConfigDir
+		runConfigDir = runDir
+		defer func() { runConfigDir = originalRunConfigDir }()
+
+		content := `
+runtime: docker
+defaults:
+  network: host
+`
+		err = os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(content), 0644)
+		require.NoError(t, err)
+
+		cfg, paths, err := LoadCDERunConfig()
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+		require.NotEmpty(t, paths)
+		assert.Contains(t, paths[0], ".cderun.yaml")
+		assert.Equal(t, "host", cfg.Defaults.Network)
+	})
+
+	t.Run("priority: home over run", func(t *testing.T) {
+		homeDir, err := os.MkdirTemp("", "cderun-home-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(homeDir) }()
+		t.Setenv("HOME", homeDir)
+		t.Setenv("USERPROFILE", homeDir)
+
+		runDir, err := os.MkdirTemp("", "cderun-run-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(runDir) }()
+
+		originalRunConfigDir := runConfigDir
+		runConfigDir = runDir
+		defer func() { runConfigDir = originalRunConfigDir }()
+
+		// Home config
+		homeConfigDir := filepath.Join(homeDir, ".config", "cderun")
+		require.NoError(t, os.MkdirAll(homeConfigDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(homeConfigDir, ".cderun.yaml"), []byte("runtime: podman"), 0644))
+
+		// Run config
+		require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte("runtime: docker"), 0644))
+
+		cfg, paths, err := LoadCDERunConfig()
+		assert.NoError(t, err)
+		require.Equal(t, 2, len(paths))
+		// Priority: higher first. Home > Run.
+		assert.Contains(t, paths[0], homeDir)
+		assert.Contains(t, paths[1], runDir)
+		assert.Equal(t, "podman", cfg.Runtime)
+	})
 }
 
 func TestLoadToolsConfig(t *testing.T) {
@@ -112,5 +169,29 @@ node:
 		assert.True(t, ok)
 		assert.Equal(t, "node:20-alpine", tool.Image)
 		assert.True(t, *tool.TTY)
+	})
+
+	t.Run("found in run dir", func(t *testing.T) {
+		runDir, err := os.MkdirTemp("", "cderun-run-*")
+		require.NoError(t, err)
+		defer func() { _ = os.RemoveAll(runDir) }()
+
+		originalRunConfigDir := runConfigDir
+		runConfigDir = runDir
+		defer func() { runConfigDir = originalRunConfigDir }()
+
+		content := `
+node:
+  image: node:18-alpine
+`
+		err = os.WriteFile(filepath.Join(runDir, ".tools.yaml"), []byte(content), 0644)
+		require.NoError(t, err)
+
+		cfg, paths, err := LoadToolsConfig()
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+		require.NotEmpty(t, paths)
+		assert.Contains(t, paths[0], ".tools.yaml")
+		assert.Equal(t, "node:18-alpine", cfg["node"].Image)
 	})
 }
