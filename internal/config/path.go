@@ -281,7 +281,8 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
 		abs, err := filepath.Abs(absPath)
 		if err == nil {
-			bestMatch := -1
+			found := false
+			bestRel := ""
 			bestSource := ""
 			bestTarget := ""
 			maxLevel := -1
@@ -298,16 +299,14 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 						maxLevel = m.Level
 						bestTarget = m.Target
 						bestSource = m.Source
-						bestMatch = 1
+						bestRel = rel
+						found = true
 					}
 				}
 			}
 
-			if bestMatch != -1 {
-				rel, err := filepath.Rel(bestTarget, abs)
-				if err == nil {
-					absPath = filepath.Join(bestSource, rel)
-				}
+			if found {
+				absPath = filepath.Join(bestSource, bestRel)
 			}
 		}
 	}

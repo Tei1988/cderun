@@ -21,14 +21,15 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
-	// Prepare HostContext
-	if globalCfg.HostContext == nil {
-		globalCfg.HostContext = &config.HostContext{
-			Level: 0,
-		}
+	// Prepare HostContext (copy to avoid mutating the caller's config)
+	var hostCtx config.HostContext
+	if globalCfg.HostContext != nil {
+		hostCtx = *globalCfg.HostContext
+		// Deep copy Mounts slice
+		hostCtx.Mounts = make([]config.MountMapping, len(globalCfg.HostContext.Mounts))
+		copy(hostCtx.Mounts, globalCfg.HostContext.Mounts)
 	}
 
-	hostCtx := globalCfg.HostContext
 	hostCtx.SnapshotDir = snapshotDir
 
 	exePath, err := os.Executable()
@@ -66,8 +67,12 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 		})
 	}
 
+	// Create a temporary config for marshaling to avoid side effects on the caller's config
+	saveCfg := *globalCfg
+	saveCfg.HostContext = &hostCtx
+
 	// Save .cderun.yaml
-	cderunData, err := yaml.Marshal(globalCfg)
+	cderunData, err := yaml.Marshal(saveCfg)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}

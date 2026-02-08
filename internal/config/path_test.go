@@ -114,7 +114,8 @@ func TestPathResolution(t *testing.T) {
 				{Source: "/home/user/project", Target: "/app", Level: 1},
 			},
 		}
-		rn, _ := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolver(hostCtx)
+		require.NoError(t, err)
 
 		// Inside container /app/src should resolve to host /home/user/project/src
 		assert.Equal(t, "/home/user/project/src", ResolvePath("/app/src", baseDir, rn))
@@ -130,7 +131,8 @@ func TestPathResolution(t *testing.T) {
 				{Source: "/home/user/project/src", Target: "/src", Level: 2},
 			},
 		}
-		rn, _ := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolver(hostCtx)
+		require.NoError(t, err)
 
 		// /src should match level 2 mapping
 		assert.Equal(t, "/home/user/project/src/file", ResolvePath("/src/file", baseDir, rn))
@@ -145,7 +147,8 @@ func TestPathResolution(t *testing.T) {
 				{Source: "/host/app", Target: "/app", Level: 1},
 			},
 		}
-		rn, _ := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolver(hostCtx)
+		require.NoError(t, err)
 
 		// /apple should NOT match /app
 		assert.Equal(t, "/apple", ResolvePath("/apple", baseDir, rn))
