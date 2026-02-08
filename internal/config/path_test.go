@@ -13,15 +13,15 @@ import (
 func TestPathResolution(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	baseDir := "/abs/path"
-	r, err := NewExpressionResolver()
+	r, err := NewExpressionResolver(nil)
 	require.NoError(t, err)
 
 	t.Run("resolvePath", func(t *testing.T) {
-		assert.Equal(t, "/abs/path/file", resolvePath("./file", baseDir))
-		assert.Equal(t, "/abs/file", resolvePath("../file", baseDir))
-		assert.Equal(t, filepath.Join(home, ".ssh"), resolvePath("~/.ssh", baseDir))
-		assert.Equal(t, "/other/abs/path", resolvePath("/other/abs/path", baseDir))
-		assert.Equal(t, "just-name", resolvePath("just-name", baseDir)) // No ./ prefix, no resolution
+		assert.Equal(t, "/abs/path/file", ResolvePath("./file", baseDir, r))
+		assert.Equal(t, "/abs/file", ResolvePath("../file", baseDir, r))
+		assert.Equal(t, filepath.Join(home, ".ssh"), ResolvePath("~/.ssh", baseDir, r))
+		assert.Equal(t, "/other/abs/path", ResolvePath("/other/abs/path", baseDir, r))
+		assert.Equal(t, "just-name", ResolvePath("just-name", baseDir, r)) // No ./ prefix, no resolution
 	})
 
 	t.Run("ConfigPath.Resolve", func(t *testing.T) {
@@ -102,9 +102,55 @@ func TestPathResolution(t *testing.T) {
 	})
 
 	t.Run("Scheme Preservation", func(t *testing.T) {
-		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:///var/run/docker.sock", baseDir))
-		assert.Equal(t, "unix:///var/run/docker.sock", resolvePath("unix:////var/run/docker.sock", baseDir))
-		assert.Equal(t, "http://example.com/path", resolvePath("http://example.com/path", baseDir))
+		assert.Equal(t, "unix:///var/run/docker.sock", ResolvePath("unix:///var/run/docker.sock", baseDir, r))
+		assert.Equal(t, "unix:///var/run/docker.sock", ResolvePath("unix:////var/run/docker.sock", baseDir, r))
+		assert.Equal(t, "http://example.com/path", ResolvePath("http://example.com/path", baseDir, r))
+	})
+
+	t.Run("Reverse Path Resolution (Nested)", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/home/user/project", Target: "/app", Level: 1},
+			},
+		}
+		rn, _ := NewExpressionResolver(hostCtx)
+
+		// Inside container /app/src should resolve to host /home/user/project/src
+		assert.Equal(t, "/home/user/project/src", ResolvePath("/app/src", baseDir, rn))
+		// Path outside mapping should stay same
+		assert.Equal(t, "/tmp/other", ResolvePath("/tmp/other", baseDir, rn))
+	})
+
+	t.Run("Reverse Path Resolution (Nested Priority)", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 2,
+			Mounts: []MountMapping{
+				{Source: "/home/user/project", Target: "/app", Level: 1},
+				{Source: "/home/user/project/src", Target: "/src", Level: 2},
+			},
+		}
+		rn, _ := NewExpressionResolver(hostCtx)
+
+		// /src should match level 2 mapping
+		assert.Equal(t, "/home/user/project/src/file", ResolvePath("/src/file", baseDir, rn))
+		// /app should match level 1 mapping
+		assert.Equal(t, "/home/user/project/file", ResolvePath("/app/file", baseDir, rn))
+	})
+
+	t.Run("Reverse Path Resolution (Partial Segment Match)", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/app", Target: "/app", Level: 1},
+			},
+		}
+		rn, _ := NewExpressionResolver(hostCtx)
+
+		// /apple should NOT match /app
+		assert.Equal(t, "/apple", ResolvePath("/apple", baseDir, rn))
+		// /app/le should match /app
+		assert.Equal(t, "/host/app/le", ResolvePath("/app/le", baseDir, rn))
 	})
 }
 

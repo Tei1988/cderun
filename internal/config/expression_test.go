@@ -18,7 +18,7 @@ func TestExpressionResolver(t *testing.T) {
 	require.NoError(t, os.Chdir(tmpDir))
 	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
 
-	resolver, err := NewExpressionResolver()
+	resolver, err := NewExpressionResolver(nil)
 	require.NoError(t, err)
 
 	t.Run("Magic Words", func(t *testing.T) {

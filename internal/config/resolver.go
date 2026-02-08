@@ -13,6 +13,7 @@ import (
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
+	HostContext     *HostContext
 	Image           string
 	TTY             bool
 	Interactive     bool
@@ -209,7 +210,12 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	res := &ResolvedConfig{}
 	var err error
 
-	r, err := NewExpressionResolver()
+	var hostCtx *HostContext
+	if global != nil {
+		hostCtx = global.HostContext
+	}
+
+	r, err := NewExpressionResolver(hostCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
@@ -558,6 +564,8 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 
 	// CPUs resolution
 	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
+
+	res.HostContext = hostCtx
 
 	return res, nil
 }

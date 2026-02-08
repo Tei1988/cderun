@@ -349,6 +349,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			}
 		}
 
+		// Translate exePath for nested execution if it was determined from os.Executable()
+		// (MountCderunPath is already resolved during resolution if it came from config/flags)
+		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
+			r, err := config.NewExpressionResolver(resolved.HostContext)
+			if err == nil {
+				exePath = config.ResolvePath(exePath, "", r)
+			}
+		}
+
 		// Add binary mount
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
@@ -761,6 +770,35 @@ intended for the subcommand.`,
 
 			if resolved.DryRun {
 				return opts.handleDryRun(cmd, containerConfig, resolved)
+			}
+
+			// Create snapshot if nested execution support is requested or already active
+			var snapshotDir string
+			if resolved.MountCderun || resolved.MountAllTools || resolved.MountTools != "" || (globalCfg != nil && globalCfg.HostContext != nil) {
+				logging.Debug("Creating execution snapshot for nested support...")
+				// Ensure globalCfg is initialized for snapshot if it was nil
+				if globalCfg == nil {
+					globalCfg = &config.CDERunConfig{}
+				}
+				sDir, err := createSnapshot(globalCfg, toolsCfg, containerConfig.Mounts)
+				if err != nil {
+					logging.Warn("failed to create snapshot: %v", err)
+				} else {
+					snapshotDir = sDir
+					defer func() {
+						logging.Trace("Cleaning up snapshot: %s", snapshotDir)
+						if err := cleanupSnapshot(snapshotDir); err != nil {
+							logging.Warn("failed to cleanup snapshot: %v", err)
+						}
+					}()
+					// Mount the snapshot directory
+					containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+						Type:     "bind",
+						Source:   snapshotDir,
+						Target:   "/run/cderun",
+						ReadOnly: true,
+					})
+				}
 			}
 
 			// Execute Container

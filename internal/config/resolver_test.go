@@ -541,7 +541,7 @@ func TestResolve(t *testing.T) {
 		cli := CLIOptions{
 			Mounts: []string{"type=bind,source=./data,target=/data"},
 		}
-		r, _ := NewExpressionResolver()
+		r, _ := NewExpressionResolver(nil)
 
 		res, err := Resolve("", cli, nil, nil)
 		require.NoError(t, err)
@@ -549,7 +549,7 @@ func TestResolve(t *testing.T) {
 
 		// Should be an absolute path
 		assert.True(t, filepath.IsAbs(res.Mounts[0].Source))
-		assert.Equal(t, resolvePath("./data", r.Pwd), res.Mounts[0].Source)
+		assert.Equal(t, ResolvePath("./data", r.Pwd, r), res.Mounts[0].Source)
 	})
 
 	t.Run("CDERUN_MOUNT resolution", func(t *testing.T) {

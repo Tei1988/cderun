@@ -37,7 +37,7 @@ func (cp ConfigPath) Resolve(r *ExpressionResolver) string {
 		return ""
 	}
 	resolved := r.resolveString(cp.Raw)
-	return resolvePath(resolved, cp.BaseDir)
+	return ResolvePath(resolved, cp.BaseDir, r)
 }
 
 // ResolveVolume expands expressions and resolves the volume host path relative to BaseDir.
@@ -46,7 +46,7 @@ func (cp ConfigPath) ResolveVolume(r *ExpressionResolver) string {
 		return ""
 	}
 	resolved := r.resolveString(cp.Raw)
-	return resolveVolumePath(resolved, cp.BaseDir)
+	return resolveVolumePath(resolved, cp.BaseDir, r)
 }
 
 // ResolveDevice expands expressions and resolves the device host path relative to BaseDir.
@@ -55,7 +55,7 @@ func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
 		return ""
 	}
 	resolved := r.resolveString(cp.Raw)
-	return resolveDevicePath(resolved, cp.BaseDir)
+	return resolveDevicePath(resolved, cp.BaseDir, r)
 }
 
 // MountConfig is an intermediate representation for mount points in configuration.
@@ -251,7 +251,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 
 var schemeRegex = regexp.MustCompile(`^[a-z]+://`)
 
-func resolvePath(p string, baseDir string) string {
+func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	if p == "" {
 		return p
 	}
@@ -274,26 +274,64 @@ func resolvePath(p string, baseDir string) string {
 	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
 		p = filepath.Join(baseDir, p)
 	}
-	return prefix + filepath.Clean(p)
+
+	absPath := filepath.Clean(p)
+
+	// Reverse Path Resolution for Nested Execution
+	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
+		abs, err := filepath.Abs(absPath)
+		if err == nil {
+			bestMatch := -1
+			bestSource := ""
+			bestTarget := ""
+			maxLevel := -1
+
+			for _, m := range r.HostContext.Mounts {
+				rel, err := filepath.Rel(m.Target, abs)
+				if err == nil && !strings.HasPrefix(rel, "..") {
+					// It's a match. Ensure it's not a partial segment match.
+					// filepath.Rel already handles this correctly (if it doesn't start with .. and it's a match).
+					// But we should double check if the match is exact or follows a separator.
+
+					// Longest match and highest level priority
+					if m.Level > maxLevel || (m.Level == maxLevel && len(m.Target) > len(bestTarget)) {
+						maxLevel = m.Level
+						bestTarget = m.Target
+						bestSource = m.Source
+						bestMatch = 1
+					}
+				}
+			}
+
+			if bestMatch != -1 {
+				rel, err := filepath.Rel(bestTarget, abs)
+				if err == nil {
+					absPath = filepath.Join(bestSource, rel)
+				}
+			}
+		}
+	}
+
+	return prefix + absPath
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
-func resolveVolumePath(v string, baseDir string) string {
+func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) string {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
 		return v
 	}
-	return resolvePath(host, baseDir) + ":" + remainder
+	return ResolvePath(host, baseDir, r) + ":" + remainder
 }
 
-func resolveDevicePath(d string, baseDir string) string {
+func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) string {
 	// host-path:container-path[:permissions]
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
 		return d
 	}
-	return resolvePath(host, baseDir) + ":" + remainder
+	return ResolvePath(host, baseDir, r) + ":" + remainder
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {
