@@ -56,15 +56,15 @@ nested:
 2.  **P2: コマンドライン引数**
 3.  **P3: 環境変数**
 4.  **P4: ツール固有設定** (`.tools.yaml`)
-    - カレントディレクトリから親へ遡って検索
-    - `~/.config/cderun/.tools.yaml`
-    - `/etc/cderun/.tools.yaml`
-    - **/run/cderun/.tools.yaml** (ネスト注入された設定)
+  - カレントディレクトリから親へ遡って検索
+  - `~/.config/cderun/.tools.yaml`
+  - `/etc/cderun/.tools.yaml`
+  - **/run/cderun/.tools.yaml** (ネスト注入された設定)
 5.  **P5: cderunデフォルト設定** (`.cderun.yaml`)
-    - カレントディレクトリから親へ遡って検索
-    - `~/.config/cderun/.cderun.yaml`
-    - `/etc/cderun/.cderun.yaml`
-    - **/run/cderun/.cderun.yaml** (ネスト注入された設定)
+  - カレントディレクトリから親へ遡って検索
+  - `~/.config/cderun/.cderun.yaml`
+  - `/etc/cderun/.cderun.yaml`
+  - **/run/cderun/.cderun.yaml** (ネスト注入された設定)
 6.  **P6: ハードコードされたデフォルト値**
 
 ※ `/run/cderun/` は「真のデフォルト」として機能し、ユーザーがコンテナ内で明示的に用意した設定ファイルがある場合はそちらが優先されます。
