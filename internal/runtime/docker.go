@@ -1,29 +1,59 @@
 package runtime
 
 import (
-	"cderun/internal/container"
 	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"cderun/internal/container"
 	"cderun/internal/logging"
+
 	"github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
+
+const (
+	pullMaxRetries = 3
+)
+
+func isRetryablePullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "Rate exceeded")
+}
+
+// dockerClient is an interface that matches the Docker client methods we use.
+type dockerClient interface {
+	ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
+	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
+	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
+	ContainerStart(ctx context.Context, containerID string, options dockercontainer.StartOptions) error
+	ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
+	ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error
+	ContainerResize(ctx context.Context, containerID string, options dockercontainer.ResizeOptions) error
+	ContainerKill(ctx context.Context, containerID string, signal string) error
+	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
+}
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
-	client *client.Client
-	socket string
-	name   string
+	client    dockerClient
+	socket    string
+	name      string
+	sleepFunc func(context.Context, time.Duration) error
 }
 
 // NewDockerRuntime creates a new DockerRuntime instance with name "docker".
@@ -45,6 +75,14 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 		client: cli,
 		socket: socket,
 		name:   name,
+		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(d):
+				return nil
+			}
+		},
 	}, nil
 }
 
@@ -65,15 +103,11 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 	// Policy is "always" or "missing" (and not found locally)
 	var lastErr error
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < pullMaxRetries; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, img, lastErr)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(time.Duration(i*2) * time.Second):
-				// Exponential backoff
+			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
+				return err
 			}
 		}
 
@@ -81,7 +115,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
 			lastErr = err
-			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+			if isRetryablePullError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to pull image: %w", err)
@@ -92,7 +126,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		_ = reader.Close()
 		if err != nil {
 			lastErr = err
-			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+			if isRetryablePullError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to pull image (stream): %w", err)
@@ -101,7 +135,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", pullMaxRetries, lastErr)
 }
 
 // CreateContainer creates a new container based on the provided config.

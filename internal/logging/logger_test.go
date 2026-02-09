@@ -3,6 +3,7 @@ package logging
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,9 +60,14 @@ func TestParseLevel(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	// Test Init updates globalLogger
-	err := Init("debug", "json", "", false, false)
+	err := Init("debug", "json", false)
 	assert.NoError(t, err)
 	assert.Equal(t, DebugLevel, globalLogger.Level)
 	assert.Equal(t, "json", globalLogger.Format)
 	assert.Equal(t, false, globalLogger.Timestamp)
+}
+
+func TestSetOutputNil(t *testing.T) {
+	SetOutput(nil)
+	assert.Equal(t, io.Discard, globalLogger.Writer)
 }

@@ -36,7 +36,6 @@ func (c *CDERunConfig) SetBaseDir(baseDir string) {
 		c.SocketPath.BaseDir = baseDir
 	}
 	c.Defaults.SetBaseDir(baseDir)
-	c.Logging.SetBaseDir(baseDir)
 }
 
 type ConfigDefaults struct {
@@ -85,25 +84,9 @@ func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 }
 
 type LoggingConfig struct {
-	Level     string                `yaml:"level"`
-	File      ConfigPath            `yaml:"file"`
-	Format    string                `yaml:"format"`
-	Timestamp *bool                 `yaml:"timestamp"`
-	Rotation  LoggingRotationConfig `yaml:"rotation"`
-	Tee       *bool                 `yaml:"tee"`
-}
-
-func (c *LoggingConfig) SetBaseDir(baseDir string) {
-	if c.File.Raw != "" {
-		c.File.BaseDir = baseDir
-	}
-}
-
-type LoggingRotationConfig struct {
-	MaxSize    string `yaml:"maxSize"`
-	MaxAge     string `yaml:"maxAge"`
-	MaxBackups int    `yaml:"maxBackups"`
-	Compress   bool   `yaml:"compress"`
+	Level     string `yaml:"level"`
+	Format    string `yaml:"format"`
+	Timestamp *bool  `yaml:"timestamp"`
 }
 
 type ToolConfig struct {
@@ -159,6 +142,20 @@ var (
 	systemConfigDir = "/etc/cderun"
 	runConfigDir    = "/run/cderun"
 )
+
+// SetRunConfigDirForTest sets the directory for run configuration (used for testing).
+func SetRunConfigDirForTest(path string) func() {
+	restoreDir := runConfigDir
+	runConfigDir = path
+	return func() { runConfigDir = restoreDir }
+}
+
+// SetSystemConfigDirForTest sets the directory for system configuration (used for testing).
+func SetSystemConfigDirForTest(path string) func() {
+	restoreDir := systemConfigDir
+	systemConfigDir = path
+	return func() { systemConfigDir = restoreDir }
+}
 
 // FindConfigs searches for config files in hierarchical order.
 // Priority: Current Dir > Parent Dirs > Home Dir > System Paths.
