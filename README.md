@@ -100,11 +100,9 @@ cderun node app.js --cderun-image node:20-alpine
 - `--dry-run-format`, `-f`: Output format for dry-run (yaml, json, simple).
 - `--diagnosis`: Show system diagnostics and available tools.
 - `--diagnosis-format`: Output format for diagnosis (yaml, json, simple).
-- `--verbose`: Enable verbose logging (repeat for more detail).
+- `--verbose`: Enable verbose logging (repeat for more detail). Default log level is `warn`.
 - `--log-level`: Set log level (error, warn, info, debug, trace).
-- `--log-file`: Set log file path.
 - `--log-format`: Set log format (text, json).
-- `--log-tee`: Output log to both stderr and log file.
 - `--log-timestamp`: Include timestamp in logs (default: true).
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
@@ -122,7 +120,7 @@ defaults:
   interactive: true
   remove: true
 logging:
-  level: info
+  level: warn
   format: text
 ```
 

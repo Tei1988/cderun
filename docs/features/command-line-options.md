@@ -334,8 +334,12 @@ cderun --diagnosis --diagnosis-format json
 
 ### `--verbose`
 - **型**: count
-- **説明**: ログ出力の詳細度を上げる
-- **用途**: `--verbose` (INFO), `--verbose --verbose` (DEBUG), `--verbose --verbose --verbose` (TRACE)
+- **説明**: ログ出力の詳細度を上げる。デフォルトのログレベルは `WARN` です。
+- **用途**:
+  - 指定なし: `WARN` (警告とエラーのみ)
+  - `--verbose`: `INFO` ("Running: ..." 等の情報を表示)
+  - `--verbose --verbose`: `DEBUG`
+  - `--verbose --verbose --verbose`: `TRACE`
 
 ```bash
 cderun --verbose node app.js
@@ -343,19 +347,12 @@ cderun --verbose node app.js
 
 ### `--log-level`
 - **型**: string
+- **デフォルト**: `warn`
 - **説明**: ログレベルを直接指定
 - **値**: `error`, `warn`, `info`, `debug`, `trace`
 
 ```bash
-cderun --log-level debug node app.js
-```
-
-### `--log-file`
-- **型**: string
-- **説明**: ログ出力先のファイルパス
-
-```bash
-cderun --log-file ./cderun.log node app.js
+cderun --log-level info node app.js
 ```
 
 ### `--log-format`
@@ -364,16 +361,7 @@ cderun --log-file ./cderun.log node app.js
 - **説明**: ログの出力形式 (`text` | `json`)
 
 ```bash
-cderun --log-format json node app.js
-```
-
-### `--log-tee`
-- **型**: bool
-- **デフォルト**: `false`
-- **説明**: ログを標準エラー出力とファイルの両方に出力（`--log-file` と併用）
-
-```bash
-cderun --log-file ./cderun.log --log-tee node app.js
+cderun --log-format json --verbose node app.js
 ```
 
 ### `--log-timestamp`
@@ -392,7 +380,7 @@ cderun --log-timestamp=false node app.js
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-log-timestamp`, `--cderun-verbose`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## その他の設定オプション
@@ -507,7 +495,7 @@ cderun --tty node
 
 ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
 ```bash
-cderun node --cderun-tty
+cderun node --version --cderun-tty
 ```
 
 ### --mount-cderunが動作しない
