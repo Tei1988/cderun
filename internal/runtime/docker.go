@@ -38,9 +38,10 @@ type dockerClient interface {
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
-	client dockerClient
-	socket string
-	name   string
+	client    dockerClient
+	socket    string
+	name      string
+	sleepFunc func(context.Context, time.Duration) error
 }
 
 // NewDockerRuntime creates a new DockerRuntime instance with name "docker".
@@ -62,6 +63,14 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 		client: cli,
 		socket: socket,
 		name:   name,
+		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(d):
+				return nil
+			}
+		},
 	}, nil
 }
 
@@ -86,11 +95,8 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	for i := 0; i < maxRetries; i++ {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, img, lastErr)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(time.Duration(1<<i) * time.Second):
-				// Exponential backoff: 2s, 4s
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
+				return err
 			}
 		}
 

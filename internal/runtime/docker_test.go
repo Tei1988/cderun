@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -59,6 +60,9 @@ func TestDockerRuntime_PullImage_Retry(t *testing.T) {
 		runtime := &DockerRuntime{
 			client: mock,
 			name:   "docker",
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return nil
+			},
 		}
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
@@ -72,6 +76,9 @@ func TestDockerRuntime_PullImage_Retry(t *testing.T) {
 		runtime := &DockerRuntime{
 			client: mock,
 			name:   "docker",
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return nil
+			},
 		}
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
@@ -84,6 +91,9 @@ func TestDockerRuntime_PullImage_Retry(t *testing.T) {
 		runtime := &DockerRuntime{
 			client: mock,
 			name:   "docker",
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return nil
+			},
 		}
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
