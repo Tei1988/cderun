@@ -80,7 +80,7 @@
   - 実装コードからREADMEを生成
   - Source of Truthの維持
 
-17. **[Nested Execution (Specification)](./nested-execution.md)**
+17. **[Nested Execution (Completed)](./nested-execution.md)**
   - コンテナ内からの再帰的なcderun実行
   - 設定の動的な注入とパス変換ロジック
 

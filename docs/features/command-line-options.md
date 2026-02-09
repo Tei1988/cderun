@@ -99,6 +99,15 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 cderun --mount-cderun --mount-socket alpine sh
 ```
 
+### `--mount-cderun-path`
+- **型**: string
+- **説明**: コンテナ内にマウントするホスト側のcderunバイナリのパスを指定
+- **用途**: 明示的に特定のcderunバイナリをマウントしたい場合に使用
+
+```bash
+cderun --mount-cderun --mount-cderun-path /path/to/cderun --mount-socket alpine sh
+```
+
 ### `--mount-tools`
 - **型**: string
 - **説明**: 指定したツール（カンマ区切り）のエイリアスをコンテナ内にマウント
@@ -382,7 +391,7 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`, `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
+  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-file`, `--cderun-log-format`, `--cderun-log-tee`, `--cderun-log-timestamp`, `--cderun-verbose`
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 

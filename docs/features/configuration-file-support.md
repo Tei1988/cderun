@@ -141,6 +141,7 @@ defaults:
   mountSocket: false               # ソケットのマウント
   mountSocketPath: /var/run/docker.sock # コンテナ内のソケットマウントパス
   mountCderun: false               # cderunバイナリのマウント
+  mountCderunPath: ""              # cderunバイナリのホスト側パス
   # ネットワーク・セキュリティ・リソース等のデフォルト
   ports: ["8080:80"]
   user: "1000:1000"
@@ -157,6 +158,11 @@ logging:
   format: text                     # ログフォーマット (text/json)
   timestamp: true                  # タイムスタンプの有無
   tee: false                       # stderrとファイルの両方に出力
+  rotation:                        # ログローテーション設定
+    maxSize: 100mb                 # 最大ファイルサイズ
+    maxAge: 7d                     # 保存期間
+    maxBackups: 10                 # 最大バックアップ数
+    compress: true                 # 圧縮の有無
 ```
 
 ### `.tools.yaml` 例
@@ -232,6 +238,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `mountSocket` (bool): ホストのランタイムソケットをマウント
 - `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
+- `mountCderunPath` (string): cderunバイナリのホスト側パス
 - `ports` ([]string): ポートマッピング
 - `publishAll` (bool): 全ポート公開
 - `expose` ([]string): ポート露出
@@ -262,6 +269,11 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `format` (string): ログの出力形式 (`text` | `json`)
 - `timestamp` (bool): タイムスタンプを含めるかどうか
 - `tee` (bool): 標準エラー出力とファイルの両方に出力するかどうか
+- `rotation` (object): ログローテーション設定
+  - `maxSize` (string): 最大ファイルサイズ (例: `100mb`, `1gb`)
+  - `maxAge` (string): 保存期間 (例: `7d`, `30d`)
+  - `maxBackups` (int): 最大バックアップ数
+  - `compress` (bool): 圧縮を行うかどうか
 
 ### `.tools.yaml` （サブコマンドの設定）
 
@@ -283,6 +295,7 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `mountSocket` (bool): ホストのランタイムソケットをマウント
 - `mountSocketPath` (string): コンテナ内のソケットマウントパス
 - `mountCderun` (bool): cderunバイナリをマウント
+- `mountCderunPath` (string): cderunバイナリのホスト側パス
 - `ports` ([]string): ポートマッピング
 - `publishAll` (bool): 全ポート公開
 - `expose` ([]string): ポート露出
