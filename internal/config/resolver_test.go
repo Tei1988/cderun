@@ -519,7 +519,6 @@ func TestResolve(t *testing.T) {
 		assert.Equal(t, "/dev/fuse", res.Devices[0].PathOnHost)
 	})
 
-
 	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {
 		// Global sets network to host
 		global := &CDERunConfig{
