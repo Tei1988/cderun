@@ -59,15 +59,11 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunDiagnosis = false
 	opts.cderunDiagnosisFormat = ""
 	opts.logLevel = ""
-	opts.logFile = ""
 	opts.logFormat = "text"
-	opts.logTee = false
 	opts.logTimestamp = true
 	opts.verbose = 0
 	opts.cderunLogLevel = ""
-	opts.cderunLogFile = ""
 	opts.cderunLogFormat = ""
-	opts.cderunLogTee = false
 	opts.cderunVerbose = 0
 
 	opts.ports = nil

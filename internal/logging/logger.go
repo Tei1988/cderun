@@ -56,80 +56,35 @@ type Logger struct {
 	Writer    io.Writer
 	Format    string // "text" or "json"
 	Timestamp bool
-	Tee       bool
 }
 
 var (
 	globalLogger = &Logger{
-		Level:     InfoLevel,
+		Level:     WarnLevel,
 		Writer:    os.Stderr,
 		Format:    "text",
 		Timestamp: true,
 	}
-
-	currentLogFile *os.File
 )
 
-func Init(level string, format string, file string, tee bool, timestamp bool) error {
+func Init(level string, format string, timestamp bool) error {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
 
 	globalLogger.Level = ParseLevel(level)
 	globalLogger.Format = strings.ToLower(format)
 	globalLogger.Timestamp = timestamp
-	globalLogger.Tee = tee
 
-	var out io.Writer = os.Stderr
-
-	if file != "" {
-		f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open log file %q: %w", file, err)
-		}
-
-		// Close previous log file if it was open
-		if currentLogFile != nil {
-			_ = currentLogFile.Close()
-		}
-		currentLogFile = f
-
-		if tee {
-			out = io.MultiWriter(os.Stderr, f)
-		} else {
-			out = f
-		}
-	} else {
-		// If switching to no file, close previous log file
-		if currentLogFile != nil {
-			_ = currentLogFile.Close()
-			currentLogFile = nil
-		}
-	}
-
-	globalLogger.Writer = out
 	return nil
 }
 
 func SetOutput(w io.Writer) {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
-	if currentLogFile != nil {
-		globalLogger.Writer = io.MultiWriter(w, currentLogFile)
-	} else {
-		globalLogger.Writer = w
+	if w == nil {
+		w = io.Discard
 	}
-}
-
-func HasFileOutput() bool {
-	globalLogger.mu.Lock()
-	defer globalLogger.mu.Unlock()
-	return currentLogFile != nil
-}
-
-func IsTeeEnabled() bool {
-	globalLogger.mu.Lock()
-	defer globalLogger.mu.Unlock()
-	return globalLogger.Tee
+	globalLogger.Writer = w
 }
 
 func (l *Logger) log(level Level, msg string, args ...interface{}) {

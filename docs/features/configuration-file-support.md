@@ -153,16 +153,9 @@ defaults:
   devices:
     - /dev/fuse
 logging:
-  level: info                      # ログレベル
-  file: ./cderun.log               # ログファイルパス
+  level: warn                      # ログレベル
   format: text                     # ログフォーマット (text/json)
   timestamp: true                  # タイムスタンプの有無
-  tee: false                       # stderrとファイルの両方に出力
-  rotation:                        # ログローテーション設定
-    maxSize: 100mb                 # 最大ファイルサイズ
-    maxAge: 7d                     # 保存期間
-    maxBackups: 10                 # 最大バックアップ数
-    compress: true                 # 圧縮の有無
 ```
 
 ### `.tools.yaml` 例
@@ -265,15 +258,8 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 ログ出力に関する設定。
 
 - `level` (string): ログレベル (`error` | `warn` | `info` | `debug` | `trace`)
-- `file` (string): ログ出力先のファイルパス
 - `format` (string): ログの出力形式 (`text` | `json`)
 - `timestamp` (bool): タイムスタンプを含めるかどうか
-- `tee` (bool): 標準エラー出力とファイルの両方に出力するかどうか
-- `rotation` (object): ログローテーション設定
-  - `maxSize` (string): 最大ファイルサイズ (例: `100mb`, `1gb`)
-  - `maxAge` (string): 保存期間 (例: `7d`, `30d`)
-  - `maxBackups` (int): 最大バックアップ数
-  - `compress` (bool): 圧縮を行うかどうか
 
 ### `.tools.yaml` （サブコマンドの設定）
 

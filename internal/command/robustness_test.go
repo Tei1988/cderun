@@ -146,6 +146,78 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 	})
 
+	t.Run("handles TTY resize via SIGWINCH", func(t *testing.T) {
+		originalFactory := runtimeFactory
+		originalExit := exitFunc
+		originalIsTerminal := isTerminal
+		originalTermGetSize := termGetSize
+		defer func() {
+			runtimeFactory = originalFactory
+			exitFunc = originalExit
+			isTerminal = originalIsTerminal
+			termGetSize = originalTermGetSize
+		}()
+
+		// Mock terminal to always return true
+		isTerminal = func(fd int) bool { return true }
+		// Mock terminal size
+		currentRows, currentCols := 24, 80
+		termGetSize = func(fd int) (int, int, error) {
+			return currentCols, currentRows, nil
+		}
+
+		// Use a mock that blocks in WaitContainer so we have time to send signal
+		mock := &blockingMockRuntime{
+			attachStarted: make(chan struct{}),
+			blockAttach:   make(chan struct{}),
+		}
+		mock.CreatedContainerID = "test-container"
+
+		waitStarted := make(chan struct{})
+		blockWait := make(chan struct{})
+
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &waitBlockingMock{
+				blockingMockRuntime: mock,
+				waitStarted:         waitStarted,
+				blockWait:           blockWait,
+			}, nil
+		}
+		exitFunc = func(code int) {}
+
+		done := make(chan struct{})
+		go func() {
+			_, _ = executeCommand("--image", "alpine", "--tty", "sleep", "60")
+			close(done)
+		}()
+
+		// Wait for start
+		select {
+		case <-waitStarted:
+			// container started
+		case <-time.After(2 * time.Second):
+			t.Fatal("Container did not start in time")
+		}
+
+		// Update terminal size for simulation
+		currentRows, currentCols = 30, 100
+		// Send SIGWINCH
+		_ = syscall.Kill(os.Getpid(), syscall.SIGWINCH)
+
+		// Give it a moment to process the signal
+		time.Sleep(200 * time.Millisecond)
+
+		// Check if mock received resize call
+		if mock.Rows != uint(currentRows) || mock.Cols != uint(currentCols) {
+			t.Errorf("expected resize to %dx%d, got %dx%d", currentRows, currentCols, mock.Rows, mock.Cols)
+		}
+
+		// Cleanup
+		close(blockWait)
+		close(mock.blockAttach)
+		<-done
+	})
+
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
 		originalFactory := runtimeFactory
 		originalExit := exitFunc

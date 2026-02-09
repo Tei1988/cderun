@@ -362,7 +362,6 @@ func TestResolve(t *testing.T) {
 		global := &CDERunConfig{
 			Logging: LoggingConfig{
 				Level: "info",
-				File:  cp("/var/log/cderun.log"),
 			},
 		}
 		tools := ToolsConfig{
@@ -373,9 +372,13 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "debug", res.LogLevel)
 		assert.Equal(t, "json", res.LogFormat)
-		assert.Equal(t, "/var/log/cderun.log", res.LogFile)
 
 		// Verbose override
+		cli.Verbose = 1
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, "info", res.LogLevel)
+
 		cli.Verbose = 2
 		res, err = Resolve("node", cli, tools, global)
 		require.NoError(t, err)
@@ -501,6 +504,24 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/fuse", res.Devices[0].PathOnHost)
+	})
+
+	t.Run("Logging verbose mapping", func(t *testing.T) {
+		cli := CLIOptions{Verbose: 0}
+		res, _ := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		assert.Equal(t, "warn", res.LogLevel)
+
+		cli.Verbose = 1
+		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		assert.Equal(t, "info", res.LogLevel)
+
+		cli.Verbose = 2
+		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		assert.Equal(t, "debug", res.LogLevel)
+
+		cli.Verbose = 3
+		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		assert.Equal(t, "trace", res.LogLevel)
 	})
 
 	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {

@@ -24,7 +24,7 @@
 | 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
 | ポリグロット実行 | `root_test.go` (preprocessArgs) | 良好 |
 | 設定ファイルサポート | `config_test.go` | 良好 |
-| マルチランタイム | `docker_test.go`, `podman_test.go` | **不足** (モック中心) |
+| マルチランタイム | `docker_test.go`, `podman_test.go` | 良好 (リトライ検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime) | 良好 |
 | イメージマッピング | `resolver_test.go` | 良好 |
 | 環境変数パススルー | `resolver_test.go`, `integration_test.go` | 良好 |
@@ -34,16 +34,16 @@
 | バイナリマウント | `root_test.go`, `integration_test.go` | 良好 |
 | ドライランモード | `root_test.go` | 良好 |
 | ログ・デバッグ | `logger_test.go` | 普通 |
-| インタラクティブ | `robustness_test.go` (信号処理) | **不足** (TTYリサイズ未カバー) |
+| インタラクティブ | `robustness_test.go` (信号、リサイズ) | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
-| Nested Execution | `snapshot_test.go`, `path_test.go` | **不足** (E2E未検証) |
+| Nested Execution | `snapshot_test.go`, `path_test.go`, `scenario_nested_test.go` | 良好 |
 | 診断モード | `root_test.go` | 良好 |
 
-## 3. 課題の特定
-1. **ランタイム実装のテスト不足**: `docker.go` 内の Pull/Create/Start/Wait 等の実際のエラーハンドリングやリトライロジックが未検証。
-2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）や、複雑なシグナル伝播がテストされていない。
-3. **Nested Execution の統合検証**: コンテナ内で `cderun` が再帰的に動作し、ホストパスが正しく解決されるかどうかの E2E テストが不足している。
-4. **ログローテーションの未実装**: 設定項目としては存在するが、実装およびテストが存在しない。
+## 3. 課題の特定 (解決済み)
+1. **ランタイム実装のテスト不足**: リトライロジックの検証テストを追加済み。
+2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）の検証テストを追加済み。
+3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み。
+4. **ログローテーション**: 安定性の観点から設計変更により削除済み。
 
 ## 4. テストの体系化案
 

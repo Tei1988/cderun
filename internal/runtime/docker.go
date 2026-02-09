@@ -10,18 +10,34 @@ import (
 
 	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
 
+// dockerClient is an interface that matches the Docker client methods we use.
+type dockerClient interface {
+	ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
+	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
+	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
+	ContainerStart(ctx context.Context, containerID string, options dockercontainer.StartOptions) error
+	ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
+	ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error
+	ContainerResize(ctx context.Context, containerID string, options dockercontainer.ResizeOptions) error
+	ContainerKill(ctx context.Context, containerID string, signal string) error
+	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
+}
+
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
-	client *client.Client
+	client dockerClient
 	socket string
 	name   string
 }

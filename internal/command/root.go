@@ -63,18 +63,14 @@ type rootOptions struct {
 	diagnosisFormat       string
 	cderunDiagnosis       bool
 	cderunDiagnosisFormat string
-	logLevel              string
-	logFile               string
-	logFormat             string
-	logTee                bool
-	logTimestamp          bool
-	verbose               int
-	cderunLogLevel        string
-	cderunLogFile         string
-	cderunLogFormat       string
-	cderunLogTee          bool
-	cderunLogTimestamp    bool
-	cderunVerbose         int
+	logLevel           string
+	logFormat          string
+	logTimestamp       bool
+	verbose            int
+	cderunLogLevel     string
+	cderunLogFormat    string
+	cderunLogTimestamp bool
+	cderunVerbose      int
 
 	// Docker-compatible flags
 	ports            []string
@@ -115,7 +111,13 @@ var (
 	opts rootOptions
 
 	// For testing
-	exitFunc       = os.Exit
+	exitFunc   = os.Exit
+	isTerminal = func(fd int) bool {
+		return term.IsTerminal(fd)
+	}
+	termGetSize = func(fd int) (int, int, error) {
+		return term.GetSize(fd)
+	}
 	runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
 		switch name {
 		case "docker":
@@ -220,28 +222,20 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		DiagnosisFormatSet:       cmd.Flags().Changed("diagnosis-format"),
 		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
 		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
-		LogLevel:                 o.logLevel,
-		LogLevelSet:              cmd.Flags().Changed("log-level"),
-		LogFile:                  o.logFile,
-		LogFileSet:               cmd.Flags().Changed("log-file"),
-		LogFormat:                o.logFormat,
-		LogFormatSet:             cmd.Flags().Changed("log-format"),
-		LogTee:                   o.logTee,
-		LogTeeSet:                cmd.Flags().Changed("log-tee"),
-		LogTimestamp:             o.logTimestamp,
-		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
-		Verbose:                  o.verbose,
-		CderunLogLevel:           o.cderunLogLevel,
-		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
-		CderunLogFile:            o.cderunLogFile,
-		CderunLogFileSet:         cmd.Flags().Changed("cderun-log-file"),
-		CderunLogFormat:          o.cderunLogFormat,
-		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
-		CderunLogTee:             o.cderunLogTee,
-		CderunLogTeeSet:          cmd.Flags().Changed("cderun-log-tee"),
-		CderunLogTimestamp:       o.cderunLogTimestamp,
-		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
-		CderunVerbose:            o.cderunVerbose,
+		LogLevel:              o.logLevel,
+		LogLevelSet:           cmd.Flags().Changed("log-level"),
+		LogFormat:             o.logFormat,
+		LogFormatSet:          cmd.Flags().Changed("log-format"),
+		LogTimestamp:          o.logTimestamp,
+		LogTimestampSet:       cmd.Flags().Changed("log-timestamp"),
+		Verbose:               o.verbose,
+		CderunLogLevel:        o.cderunLogLevel,
+		CderunLogLevelSet:     cmd.Flags().Changed("cderun-log-level"),
+		CderunLogFormat:       o.cderunLogFormat,
+		CderunLogFormatSet:    cmd.Flags().Changed("cderun-log-format"),
+		CderunLogTimestamp:    o.cderunLogTimestamp,
+		CderunLogTimestampSet: cmd.Flags().Changed("cderun-log-timestamp"),
+		CderunVerbose:         o.cderunVerbose,
 
 		// Docker-compatible flags
 		Ports:               o.ports,
@@ -575,7 +569,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if containerConfig.TTY && term.IsTerminal(int(os.Stdin.Fd())) {
+	if containerConfig.TTY && isTerminal(int(os.Stdin.Fd())) {
 		logging.Trace("Setting terminal to raw mode")
 		state, err := term.MakeRaw(int(os.Stdin.Fd()))
 		if err != nil {
@@ -636,7 +630,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Handle window resize synchronization
-	if containerConfig.TTY && term.IsTerminal(int(os.Stdout.Fd())) {
+	if containerConfig.TTY && isTerminal(int(os.Stdout.Fd())) {
 		resizeChan := make(chan os.Signal, 1)
 		setupResizeSignal(resizeChan)
 		defer signal.Stop(resizeChan)
@@ -644,7 +638,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			for {
 				select {
 				case <-resizeChan:
-					w, h, err := term.GetSize(int(os.Stdout.Fd()))
+					w, h, err := termGetSize(int(os.Stdout.Fd()))
 					if err == nil {
 						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 					}
@@ -655,7 +649,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}()
 
 		// Initial resize to match current terminal size
-		w, h, err := term.GetSize(int(os.Stdout.Fd()))
+		w, h, err := termGetSize(int(os.Stdout.Fd()))
 		if err == nil {
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
 		}
@@ -694,7 +688,7 @@ intended for the subcommand.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Early logger initialization with CLI and Environment settings before config loading.
 			// This allows loadConfigs() to use the correct log level.
-			initialLevel := "info"
+			initialLevel := "warn"
 			vLevel := opts.verbose
 			if opts.cderunVerbose > vLevel {
 				vLevel = opts.cderunVerbose
@@ -712,7 +706,7 @@ intended for the subcommand.`,
 			} else if opts.logLevel != "" {
 				initialLevel = opts.logLevel
 			}
-			_ = logging.Init(initialLevel, "text", "", false, true)
+			_ = logging.Init(initialLevel, "text", true)
 
 			// Load configurations
 			toolsCfg, globalCfg, globalPaths, toolsPaths := opts.loadConfigs()
@@ -750,13 +744,11 @@ intended for the subcommand.`,
 			}
 
 			// Re-initialize logger with fully resolved settings including those from config files.
-			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogFile, resolved.LogTee, resolved.LogTimestamp); err != nil {
+			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
 				return fmt.Errorf("failed to initialize logger: %w", err)
 			}
 			// Redirect logging to the command's stderr stream.
-			if !logging.HasFileOutput() && !logging.IsTeeEnabled() {
-				logging.SetOutput(cmd.ErrOrStderr())
-			}
+			logging.SetOutput(cmd.ErrOrStderr())
 			logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 			// Build ContainerConfig
@@ -891,15 +883,11 @@ intended for the subcommand.`,
 
 	cmd.PersistentFlags().CountVar(&opts.verbose, "verbose", "Enable verbose logging (--verbose: info, --verbose --verbose: debug, --verbose --verbose --verbose: trace)")
 	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", "", "Set log level (error, warn, info, debug, trace)")
-	cmd.PersistentFlags().StringVar(&opts.logFile, "log-file", "", "Set log file path")
 	cmd.PersistentFlags().StringVar(&opts.logFormat, "log-format", "text", "Set log format (text, json)")
-	cmd.PersistentFlags().BoolVar(&opts.logTee, "log-tee", false, "Output log to both stderr and log file")
 	cmd.PersistentFlags().BoolVar(&opts.logTimestamp, "log-timestamp", true, "Include timestamp in logs")
 
 	cmd.PersistentFlags().StringVar(&opts.cderunLogLevel, "cderun-log-level", "", "Override log level (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().StringVar(&opts.cderunLogFile, "cderun-log-file", "", "Override log file path (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().BoolVar(&opts.cderunLogTee, "cderun-log-tee", false, "Override log-tee setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunLogTimestamp, "cderun-log-timestamp", true, "Override log-timestamp setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 

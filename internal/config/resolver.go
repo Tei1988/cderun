@@ -36,9 +36,7 @@ type ResolvedConfig struct {
 	Diagnosis       bool
 	DiagnosisFormat string
 	LogLevel        string
-	LogFile         string
 	LogFormat       string
-	LogTee          bool
 	LogTimestamp    bool
 	StrictEnv       bool
 
@@ -136,23 +134,15 @@ type CLIOptions struct {
 	CderunDiagnosisFormatSet bool
 	LogLevel                 string
 	LogLevelSet              bool
-	LogFile                  string
-	LogFileSet               bool
 	LogFormat                string
 	LogFormatSet             bool
-	LogTee                   bool
-	LogTeeSet                bool
 	LogTimestampSet          bool
 	LogTimestamp             bool
 	Verbose                  int
 	CderunLogLevel           string
 	CderunLogLevelSet        bool
-	CderunLogFile            string
-	CderunLogFileSet         bool
 	CderunLogFormat          string
 	CderunLogFormatSet       bool
-	CderunLogTee             bool
-	CderunLogTeeSet          bool
 	CderunLogTimestamp       bool
 	CderunLogTimestampSet    bool
 	CderunVerbose            int
@@ -477,7 +467,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"CDERUN_LOG_LEVEL",
 		"", nil, nil,
 		global, func(g CDERunConfig) string { return g.Logging.Level },
-		"info",
+		"warn",
 		r,
 	)
 	// Handle verbose flag overrides
@@ -491,19 +481,10 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 			res.LogLevel = "trace"
 		} else if vLevel >= 2 {
 			res.LogLevel = "debug"
+		} else if vLevel >= 1 {
+			res.LogLevel = "info"
 		}
 	}
-
-	res.LogFile = resolveConfigPath(
-		cli.CderunLogFileSet, cli.CderunLogFile,
-		cli.LogFileSet, cli.LogFile,
-		"CDERUN_LOG_FILE",
-		"", nil, nil,
-		global, func(g CDERunConfig) ConfigPath { return g.Logging.File },
-		"",
-		r,
-		"path",
-	)
 
 	res.LogFormat = resolveString(
 		cli.CderunLogFormatSet, cli.CderunLogFormat,
@@ -513,15 +494,6 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		global, func(g CDERunConfig) string { return g.Logging.Format },
 		"text",
 		r,
-	)
-
-	res.LogTee = resolveBool(
-		cli.CderunLogTeeSet, cli.CderunLogTee,
-		cli.LogTeeSet, cli.LogTee,
-		"CDERUN_LOG_TEE",
-		"", nil, nil,
-		global, func(g CDERunConfig) *bool { return g.Logging.Tee },
-		false,
 	)
 
 	res.LogTimestamp = resolveBool(

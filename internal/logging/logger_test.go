@@ -59,7 +59,7 @@ func TestParseLevel(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	// Test Init updates globalLogger
-	err := Init("debug", "json", "", false, false)
+	err := Init("debug", "json", false)
 	assert.NoError(t, err)
 	assert.Equal(t, DebugLevel, globalLogger.Level)
 	assert.Equal(t, "json", globalLogger.Format)
