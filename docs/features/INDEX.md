@@ -70,7 +70,7 @@
 
 14. **[ログ・デバッグ (Completed)](./logging-debugging.md)**
   - 詳細ログ出力
-  - レベル別出力、ファイル出力、JSON形式対応
+  - レベル別出力、JSON形式対応
 
 15. **[インタラクティブ・ターミナル (Completed)](./interactive-terminal.md)**
   - シグナル転送
