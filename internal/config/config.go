@@ -145,16 +145,16 @@ var (
 
 // SetRunConfigDir sets the directory for run configuration (used for testing).
 func SetRunConfigDir(path string) func() {
-	old := runConfigDir
+	prevDir := runConfigDir
 	runConfigDir = path
-	return func() { runConfigDir = old }
+	return func() { runConfigDir = prevDir }
 }
 
 // SetSystemConfigDir sets the directory for system configuration (used for testing).
 func SetSystemConfigDir(path string) func() {
-	old := systemConfigDir
+	prevDir := systemConfigDir
 	systemConfigDir = path
-	return func() { systemConfigDir = old }
+	return func() { systemConfigDir = prevDir }
 }
 
 // FindConfigs searches for config files in hierarchical order.

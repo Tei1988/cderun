@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -29,11 +30,11 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 
 func TestExecuteRobustness(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
-		originalFactory := runtimeFactory
-		originalExit := exitFunc
+		prevFactory := runtimeFactory
+		prevExit := exitFunc
 		defer func() {
-			runtimeFactory = originalFactory
-			exitFunc = originalExit
+			runtimeFactory = prevFactory
+			exitFunc = prevExit
 		}()
 
 		mock := &blockingMockRuntime{
@@ -74,11 +75,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
-		originalFactory := runtimeFactory
-		originalExit := exitFunc
+		prevFactory := runtimeFactory
+		prevExit := exitFunc
 		defer func() {
-			runtimeFactory = originalFactory
-			exitFunc = originalExit
+			runtimeFactory = prevFactory
+			exitFunc = prevExit
 		}()
 
 		// Use a mock that blocks in WaitContainer to simulate long running process
@@ -147,22 +148,26 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("handles TTY resize via SIGWINCH", func(t *testing.T) {
-		originalFactory := runtimeFactory
-		originalExit := exitFunc
-		originalIsTerminal := isTerminal
-		originalTermGetSize := termGetSize
+		prevFactory := runtimeFactory
+		prevExit := exitFunc
+		prevIsTerminal := isTerminal
+		prevTermGetSize := termGetSize
 		defer func() {
-			runtimeFactory = originalFactory
-			exitFunc = originalExit
-			isTerminal = originalIsTerminal
-			termGetSize = originalTermGetSize
+			runtimeFactory = prevFactory
+			exitFunc = prevExit
+			isTerminal = prevIsTerminal
+			termGetSize = prevTermGetSize
 		}()
 
 		// Mock terminal to always return true
 		isTerminal = func(fd int) bool { return true }
+
+		var mu sync.Mutex
 		// Mock terminal size
 		currentRows, currentCols := 24, 80
 		termGetSize = func(fd int) (int, int, error) {
+			mu.Lock()
+			defer mu.Unlock()
 			return currentCols, currentRows, nil
 		}
 
@@ -200,7 +205,10 @@ func TestExecuteRobustness(t *testing.T) {
 		}
 
 		// Update terminal size for simulation
+		mu.Lock()
 		currentRows, currentCols = 30, 100
+		mu.Unlock()
+
 		// Send SIGWINCH
 		_ = syscall.Kill(os.Getpid(), syscall.SIGWINCH)
 
@@ -208,8 +216,13 @@ func TestExecuteRobustness(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		// Check if mock received resize call
-		if mock.Rows != uint(currentRows) || mock.Cols != uint(currentCols) {
-			t.Errorf("expected resize to %dx%d, got %dx%d", currentRows, currentCols, mock.Rows, mock.Cols)
+		mu.Lock()
+		expectedRows, expectedCols := currentRows, currentCols
+		mu.Unlock()
+
+		actualRows, actualCols := mock.GetTTYSize()
+		if actualRows != uint(expectedRows) || actualCols != uint(expectedCols) {
+			t.Errorf("expected resize to %dx%d, got %dx%d", expectedRows, expectedCols, actualRows, actualCols)
 		}
 
 		// Cleanup
@@ -219,11 +232,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
-		originalFactory := runtimeFactory
-		originalExit := exitFunc
+		prevFactory := runtimeFactory
+		prevExit := exitFunc
 		defer func() {
-			runtimeFactory = originalFactory
-			exitFunc = originalExit
+			runtimeFactory = prevFactory
+			exitFunc = prevExit
 		}()
 
 		mock := &blockingMockRuntime{

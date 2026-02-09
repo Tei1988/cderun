@@ -508,19 +508,23 @@ func TestResolve(t *testing.T) {
 
 	t.Run("Logging verbose mapping", func(t *testing.T) {
 		cli := CLIOptions{Verbose: 0}
-		res, _ := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
 		assert.Equal(t, "warn", res.LogLevel)
 
 		cli.Verbose = 1
-		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
 		assert.Equal(t, "info", res.LogLevel)
 
 		cli.Verbose = 2
-		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
 		assert.Equal(t, "debug", res.LogLevel)
 
 		cli.Verbose = 3
-		res, _ = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
 		assert.Equal(t, "trace", res.LogLevel)
 	})
 

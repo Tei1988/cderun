@@ -1,14 +1,15 @@
 package runtime
 
 import (
-	"cderun/internal/container"
 	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"cderun/internal/container"
 	"cderun/internal/logging"
+
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -88,8 +89,8 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(time.Duration(i*2) * time.Second):
-				// Exponential backoff
+			case <-time.After(time.Duration(1<<i) * time.Second):
+				// Exponential backoff: 2s, 4s
 			}
 		}
 

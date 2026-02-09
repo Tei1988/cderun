@@ -12,6 +12,9 @@ import (
 )
 
 func TestScenario_NestedExecution(t *testing.T) {
+	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
+	// and changes the working directory. It should not be run in parallel.
+
 	// 1. Setup mock environment
 	tmpDir := t.TempDir()
 
@@ -45,11 +48,11 @@ hostContext:
 	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0644))
 
 	// 2. Setup Mock Runtime
-	originalFactory := runtimeFactory
-	originalExit := exitFunc
+	prevFactory := runtimeFactory
+	prevExit := exitFunc
 	t.Cleanup(func() {
-		runtimeFactory = originalFactory
-		exitFunc = originalExit
+		runtimeFactory = prevFactory
+		exitFunc = prevExit
 	})
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -63,12 +66,12 @@ hostContext:
 	// We want to mount a subdirectory: --mount type=bind,source=./subdir,target=/mnt
 	// /app/subdir should be translated to hostProjectDir/subdir
 
-	originalWd, err := os.Getwd()
+	savedWd, err := os.Getwd()
 	require.NoError(t, err)
 
 	// In the simulated container, PWD is simulatedAppDir
 	require.NoError(t, os.Chdir(simulatedAppDir))
-	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
 	_, err = executeCommand("--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
 	assert.NoError(t, err)

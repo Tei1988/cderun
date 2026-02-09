@@ -39,6 +39,18 @@ func (m *mockDockerClient) ImagePull(ctx context.Context, ref string, options im
 	return io.NopCloser(strings.NewReader("")), nil
 }
 
+type mockOneRetryDockerClient struct {
+	mockDockerClient
+}
+
+func (m *mockOneRetryDockerClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+	m.pullCount++
+	if m.pullCount == 1 {
+		return nil, errors.New("toomanyrequests: too many requests")
+	}
+	return io.NopCloser(strings.NewReader("")), nil
+}
+
 func TestDockerRuntime_PullImage_Retry(t *testing.T) {
 	t.Run("retries on toomanyrequests error", func(t *testing.T) {
 		mock := &mockDockerClient{
@@ -78,16 +90,4 @@ func TestDockerRuntime_PullImage_Retry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, mock.pullCount)
 	})
-}
-
-type mockOneRetryDockerClient struct {
-	mockDockerClient
-}
-
-func (m *mockOneRetryDockerClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
-	m.pullCount++
-	if m.pullCount == 1 {
-		return nil, errors.New("toomanyrequests: too many requests")
-	}
-	return io.NopCloser(strings.NewReader("")), nil
 }
