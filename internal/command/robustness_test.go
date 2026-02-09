@@ -30,11 +30,11 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 
 func TestExecuteRobustness(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
-		prevFactory := runtimeFactory
-		prevExit := exitFunc
+		savedRuntimeFactory := runtimeFactory
+		savedExitFunc := exitFunc
 		defer func() {
-			runtimeFactory = prevFactory
-			exitFunc = prevExit
+			runtimeFactory = savedRuntimeFactory
+			exitFunc = savedExitFunc
 		}()
 
 		mock := &blockingMockRuntime{
@@ -75,11 +75,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
-		prevFactory := runtimeFactory
-		prevExit := exitFunc
+		savedRuntimeFactory := runtimeFactory
+		savedExitFunc := exitFunc
 		defer func() {
-			runtimeFactory = prevFactory
-			exitFunc = prevExit
+			runtimeFactory = savedRuntimeFactory
+			exitFunc = savedExitFunc
 		}()
 
 		// Use a mock that blocks in WaitContainer to simulate long running process
@@ -148,15 +148,15 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("handles TTY resize via SIGWINCH", func(t *testing.T) {
-		prevFactory := runtimeFactory
-		prevExit := exitFunc
-		prevIsTerminal := isTerminal
-		prevTermGetSize := termGetSize
+		savedRuntimeFactory := runtimeFactory
+		savedExitFunc := exitFunc
+		savedIsTerminal := isTerminal
+		savedTermGetSize := termGetSize
 		defer func() {
-			runtimeFactory = prevFactory
-			exitFunc = prevExit
-			isTerminal = prevIsTerminal
-			termGetSize = prevTermGetSize
+			runtimeFactory = savedRuntimeFactory
+			exitFunc = savedExitFunc
+			isTerminal = savedIsTerminal
+			termGetSize = savedTermGetSize
 		}()
 
 		// Mock terminal to always return true
@@ -232,11 +232,11 @@ func TestExecuteRobustness(t *testing.T) {
 	})
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
-		prevFactory := runtimeFactory
-		prevExit := exitFunc
+		savedRuntimeFactory := runtimeFactory
+		savedExitFunc := exitFunc
 		defer func() {
-			runtimeFactory = prevFactory
-			exitFunc = prevExit
+			runtimeFactory = savedRuntimeFactory
+			exitFunc = savedExitFunc
 		}()
 
 		mock := &blockingMockRuntime{

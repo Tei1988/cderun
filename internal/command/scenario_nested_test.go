@@ -29,7 +29,7 @@ func TestScenario_NestedExecution(t *testing.T) {
 	runDir := filepath.Join(tmpDir, "run")
 	require.NoError(t, os.MkdirAll(runDir, 0755))
 
-	restoreRunDir := config.SetRunConfigDir(runDir)
+	restoreRunDir := config.SetRunConfigDirForTest(runDir)
 	defer restoreRunDir()
 
 	simulatedAppDir := filepath.Join(tmpDir, "simulated-app")

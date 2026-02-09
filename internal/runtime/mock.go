@@ -91,6 +91,42 @@ func (m *MockRuntime) GetTTYSize() (uint, uint) {
 	return m.Rows, m.Cols
 }
 
+func (m *MockRuntime) GetPulledImage() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.PulledImage
+}
+
+func (m *MockRuntime) GetCreatedConfig() *container.ContainerConfig {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.CreatedConfig
+}
+
+func (m *MockRuntime) GetStartedContainerID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.StartedContainerID
+}
+
+func (m *MockRuntime) GetWaitedContainerID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.WaitedContainerID
+}
+
+func (m *MockRuntime) GetRemovedContainerID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.RemovedContainerID
+}
+
+func (m *MockRuntime) GetAttachedContainerID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.AttachedContainerID
+}
+
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

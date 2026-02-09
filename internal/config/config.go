@@ -143,18 +143,18 @@ var (
 	runConfigDir    = "/run/cderun"
 )
 
-// SetRunConfigDir sets the directory for run configuration (used for testing).
-func SetRunConfigDir(path string) func() {
-	prevDir := runConfigDir
+// SetRunConfigDirForTest sets the directory for run configuration (used for testing).
+func SetRunConfigDirForTest(path string) func() {
+	restoreDir := runConfigDir
 	runConfigDir = path
-	return func() { runConfigDir = prevDir }
+	return func() { runConfigDir = restoreDir }
 }
 
-// SetSystemConfigDir sets the directory for system configuration (used for testing).
-func SetSystemConfigDir(path string) func() {
-	prevDir := systemConfigDir
+// SetSystemConfigDirForTest sets the directory for system configuration (used for testing).
+func SetSystemConfigDirForTest(path string) func() {
+	restoreDir := systemConfigDir
 	systemConfigDir = path
-	return func() { systemConfigDir = prevDir }
+	return func() { systemConfigDir = restoreDir }
 }
 
 // FindConfigs searches for config files in hierarchical order.

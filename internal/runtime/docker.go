@@ -23,6 +23,18 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const (
+	pullMaxRetries = 3
+)
+
+func isRetryablePullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "Rate exceeded")
+}
+
 // dockerClient is an interface that matches the Docker client methods we use.
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
@@ -91,10 +103,9 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 	// Policy is "always" or "missing" (and not found locally)
 	var lastErr error
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
+	for i := 0; i < pullMaxRetries; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
 			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
 				return err
 			}
@@ -104,7 +115,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
 			lastErr = err
-			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+			if isRetryablePullError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to pull image: %w", err)
@@ -115,7 +126,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		_ = reader.Close()
 		if err != nil {
 			lastErr = err
-			if strings.Contains(err.Error(), "toomanyrequests") || strings.Contains(err.Error(), "Rate exceeded") {
+			if isRetryablePullError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to pull image (stream): %w", err)
@@ -124,7 +135,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", pullMaxRetries, lastErr)
 }
 
 // CreateContainer creates a new container based on the provided config.
