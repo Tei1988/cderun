@@ -203,9 +203,13 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunMountCderunPath:    o.cderunMountCderunPath,
 		CderunMountCderunPathSet: cmd.Flags().Changed("cderun-mount-cderun-path"),
 		MountTools:               o.mountTools,
+		MountToolsSet:            cmd.Flags().Changed("mount-tools"),
 		CderunMountTools:         o.cderunMountTools,
+		CderunMountToolsSet:      cmd.Flags().Changed("cderun-mount-tools"),
 		MountAllTools:            o.mountAllTools,
+		MountAllToolsSet:         cmd.Flags().Changed("mount-all-tools"),
 		CderunMountAllTools:      o.cderunMountAllTools,
+		CderunMountAllToolsSet:   cmd.Flags().Changed("cderun-mount-all-tools"),
 		DryRun:                   o.dryRun,
 		DryRunSet:                cmd.Flags().Changed("dry-run"),
 		CderunDryRun:             o.cderunDryRun,
@@ -330,7 +334,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	}
 
 	// Handle mounting flags
-	if resolved.MountCderun || resolved.MountAllTools || resolved.MountTools != "" {
+	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
 		if !resolved.MountSocket {
 			return nil, fmt.Errorf("--mount-cderun, --mount-tools, or --mount-all-tools requires --mount-socket")
 		}
@@ -388,10 +392,8 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 					ReadOnly: true,
 				})
 			}
-		} else if resolved.MountTools != "" {
-			tools := strings.Split(resolved.MountTools, ",")
-			for _, toolName := range tools {
-				toolName = strings.TrimSpace(toolName)
+		} else if len(resolved.MountTools) > 0 {
+			for _, toolName := range resolved.MountTools {
 				if _, ok := toolsCfg[toolName]; !ok {
 					available := make([]string, 0, len(toolsCfg))
 					for k := range toolsCfg {
@@ -766,7 +768,7 @@ intended for the subcommand.`,
 
 			// Create snapshot if nested execution support is requested or already active
 			var snapshotDir string
-			if resolved.MountCderun || resolved.MountAllTools || resolved.MountTools != "" || (globalCfg != nil && globalCfg.HostContext != nil) {
+			if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
 				logging.Debug("Creating execution snapshot for nested support...")
 				// Ensure globalCfg is initialized for snapshot if it was nil
 				if globalCfg == nil {

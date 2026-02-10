@@ -44,10 +44,13 @@ type ConfigDefaults struct {
 	Network         string         `yaml:"network"`
 	Remove          *bool          `yaml:"remove"`
 	StrictEnv       *bool          `yaml:"strictEnv"`
+	Workdir         string         `yaml:"workdir,omitempty"`
 	MountCderun     *bool          `yaml:"mountCderun"`
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountTools      []string       `yaml:"mountTools,omitempty"`
+	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`
@@ -98,11 +101,13 @@ type ToolConfig struct {
 	StrictEnv       *bool          `yaml:"strictEnv"`
 	Mounts          []MountConfig  `yaml:"mounts"`
 	Env             []string       `yaml:"env"`
-	Workdir         string         `yaml:"workdir"`
+	Workdir         string         `yaml:"workdir,omitempty"`
 	MountCderun     *bool          `yaml:"mountCderun"`
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountTools      []string       `yaml:"mountTools,omitempty"`
+	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`

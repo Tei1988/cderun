@@ -29,7 +29,7 @@ type ResolvedConfig struct {
 	MountSocketPath string
 	MountCderun     bool
 	MountCderunPath string
-	MountTools      string
+	MountTools      []string
 	MountAllTools   bool
 	DryRun          bool
 	DryRunFormat    string
@@ -113,9 +113,13 @@ type CLIOptions struct {
 	CderunMountCderunPath    string
 	CderunMountCderunPathSet bool
 	MountTools               string
+	MountToolsSet            bool
 	CderunMountTools         string
+	CderunMountToolsSet      bool
 	MountAllTools            bool
+	MountAllToolsSet         bool
 	CderunMountAllTools      bool
+	CderunMountAllToolsSet   bool
 	DryRun                   bool
 	DryRunSet                bool
 	CderunDryRun             bool
@@ -287,7 +291,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		cli.WorkdirSet, cli.Workdir,
 		"CDERUN_WORKDIR",
 		subcommand, tools, func(t ToolConfig) string { return t.Workdir },
-		global, func(g CDERunConfig) string { return "" },
+		global, func(g CDERunConfig) string { return g.Defaults.Workdir },
 		"",
 		r,
 	)
@@ -415,18 +419,24 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		"path",
 	)
 
-	// 14. Pass-through other mounting flags
-	if cli.CderunMountTools != "" {
-		res.MountTools = r.resolveString(cli.CderunMountTools)
-	} else {
-		res.MountTools = r.resolveString(cli.MountTools)
-	}
+	// 14. Resolve MountTools and MountAllTools
+	res.MountTools = resolveStringSliceComma(
+		cli.CderunMountToolsSet, cli.CderunMountTools,
+		cli.MountToolsSet, cli.MountTools,
+		"CDERUN_MOUNT_TOOLS",
+		subcommand, tools, func(t ToolConfig) []string { return t.MountTools },
+		global, func(g CDERunConfig) []string { return g.Defaults.MountTools },
+		r,
+	)
 
-	if cli.CderunMountAllTools {
-		res.MountAllTools = true
-	} else {
-		res.MountAllTools = cli.MountAllTools
-	}
+	res.MountAllTools = resolveBool(
+		cli.CderunMountAllToolsSet, cli.CderunMountAllTools,
+		cli.MountAllToolsSet, cli.MountAllTools,
+		"CDERUN_MOUNT_ALL_TOOLS",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountAllTools },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountAllTools },
+		false,
+	)
 
 	// 15. Resolve DryRun (CLI/Env only)
 	res.DryRun = resolveBool(
@@ -678,6 +688,33 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		res = append(res, dc.Resolve(r))
 	}
 	return res, nil
+}
+
+func resolveStringSliceComma(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver) []string {
+	var vals []string
+	if p1Set {
+		vals = strings.Split(p1Val, ",")
+	} else if p2Set {
+		vals = strings.Split(p2Val, ",")
+	} else if env := os.Getenv(envKey); env != "" {
+		vals = strings.Split(env, ",")
+	} else if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			vals = toolGetter(tool)
+		}
+	}
+	if len(vals) == 0 && global != nil {
+		vals = globalGetter(*global)
+	}
+
+	var res []string
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			res = append(res, r.resolveString(v))
+		}
+	}
+	return res
 }
 
 func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver) []string {
