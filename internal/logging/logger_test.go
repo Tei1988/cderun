@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLoggerTextFormat(t *testing.T) {
+func TestUnit_Logging_LoggerTextFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := &Logger{
 		Level:     InfoLevel,
@@ -30,7 +30,7 @@ func TestLoggerTextFormat(t *testing.T) {
 	assert.Contains(t, buf.String(), "[DEBUG] test debug message")
 }
 
-func TestLoggerJSONFormat(t *testing.T) {
+func TestUnit_Logging_LoggerJSONFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := &Logger{
 		Level:     InfoLevel,
@@ -48,7 +48,7 @@ func TestLoggerJSONFormat(t *testing.T) {
 	assert.Equal(t, "test json message 123", entry["msg"])
 }
 
-func TestParseLevel(t *testing.T) {
+func TestUnit_Logging_ParseLevel(t *testing.T) {
 	assert.Equal(t, ErrorLevel, ParseLevel("error"))
 	assert.Equal(t, WarnLevel, ParseLevel("warn"))
 	assert.Equal(t, WarnLevel, ParseLevel("warning"))
@@ -58,7 +58,7 @@ func TestParseLevel(t *testing.T) {
 	assert.Equal(t, InfoLevel, ParseLevel("unknown"))
 }
 
-func TestInit(t *testing.T) {
+func TestUnit_Logging_Init(t *testing.T) {
 	// Test Init updates globalLogger
 	err := Init("debug", "json", false)
 	assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestInit(t *testing.T) {
 	assert.Equal(t, false, globalLogger.Timestamp)
 }
 
-func TestSetOutputNil(t *testing.T) {
+func TestUnit_Logging_SetOutputNil(t *testing.T) {
 	SetOutput(nil)
 	assert.Equal(t, io.Discard, globalLogger.Writer)
 }

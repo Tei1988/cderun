@@ -17,6 +17,20 @@ func executeCommand(args ...string) (string, error) {
 	return executeCommandRaw(append([]string{"cderun"}, args...))
 }
 
+func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
+	t.Helper()
+	savedRuntimeFactory := runtimeFactory
+	savedExitFunc := exitFunc
+	t.Cleanup(func() {
+		runtimeFactory = savedRuntimeFactory
+		exitFunc = savedExitFunc
+	})
+	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		return mock, nil
+	}
+	exitFunc = func(code int) {}
+}
+
 func executeCommandRaw(args []string) (string, error) {
 	// Reset flag variables and Changed state
 	rootCmd = newRootCmd()
@@ -135,7 +149,7 @@ func executeCommandRaw(args []string) (string, error) {
 	return buf.String(), execErr
 }
 
-func TestPreprocessArgs(t *testing.T) {
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -177,7 +191,7 @@ func TestPreprocessArgs(t *testing.T) {
 	}
 }
 
-func TestExecuteEmptyArgs(t *testing.T) {
+func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	assert.NoError(t, err)
@@ -186,25 +200,14 @@ func TestExecuteEmptyArgs(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRootCmd(t *testing.T) {
+func TestUnit_Root_Command(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
-		// Prepare mock runtime
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
-			ExitCode:           0,
-		}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
+			ExitCode:           42,
 		}
 		var capturedExitCode int
+		setupMockRuntime(t, mockRuntime)
 		exitFunc = func(code int) {
 			capturedExitCode = code
 		}
@@ -221,23 +224,11 @@ func TestRootCmd(t *testing.T) {
 		assert.Equal(t, "test-container-id", mockRuntime.StartedContainerID)
 		assert.Equal(t, "test-container-id", mockRuntime.WaitedContainerID)
 		assert.Equal(t, "test-container-id", mockRuntime.RemovedContainerID)
-		assert.Equal(t, 0, capturedExitCode)
+		assert.Equal(t, 42, capturedExitCode)
 	})
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
-		// Prepare mock runtime
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return &runtime.MockRuntime{}, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, &runtime.MockRuntime{})
 
 		output, err := executeCommand("--tty")
 		assert.NoError(t, err)
@@ -247,14 +238,6 @@ func TestRootCmd(t *testing.T) {
 	})
 
 	t.Run("handles symlink execution via Execute", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		// Use a temporary directory for this test
 		restoreWd, err := os.Getwd()
 		require.NoError(t, err)
@@ -275,10 +258,7 @@ node:
 			CreatedContainerID: "test-container-id",
 			ExitCode:           0,
 		}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err = executeCommandRaw([]string{"node", "--version"})
 
@@ -288,14 +268,6 @@ node:
 	})
 
 	t.Run("resolves all settings from tools.yaml", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		// Use a temporary directory for this test
 		restoreWd, err := os.Getwd()
 		require.NoError(t, err)
@@ -319,10 +291,7 @@ node:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
@@ -340,14 +309,6 @@ node:
 	})
 
 	t.Run("P3 environment variable takes priority over tools.yaml (Step 10.1)", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		t.Setenv("CDERUN_IMAGE", "env-image:latest")
 
 		// Use a temporary directory for this test
@@ -365,10 +326,7 @@ node:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
@@ -377,14 +335,6 @@ node:
 	})
 
 	t.Run("resolves base command from tools.yaml", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		// Use a temporary directory for this test
 		restoreWd, err := os.Getwd()
 		require.NoError(t, err)
@@ -401,10 +351,7 @@ node:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err = executeCommand("node", "app.js")
 		assert.NoError(t, err)
@@ -415,19 +362,8 @@ node:
 	})
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
 		assert.NoError(t, err)
@@ -435,19 +371,8 @@ node:
 	})
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err := executeCommand("-t", "--image", "alpine", "sh")
 		assert.NoError(t, err)
@@ -472,14 +397,6 @@ node:
 	})
 
 	t.Run("environment variable pass-through and P1 overrides", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		// Use a temporary directory for this test
 		restoreWd, err := os.Getwd()
 		require.NoError(t, err)
@@ -503,10 +420,7 @@ node:
 		t.Setenv("CLI_HOST_KEY", "CLI_HOST_VALUE")
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		// Execute with CLI overrides and P1 overrides
 		// Note: P1 overrides should use --cderun-flag=value format when placed after subcommand
@@ -535,19 +449,8 @@ node:
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		output, err := executeCommand("--diagnosis")
 		assert.NoError(t, err)
@@ -557,19 +460,8 @@ node:
 	})
 
 	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		output, err := executeCommand("--diagnosis", "node", "--version")
 		assert.NoError(t, err)
@@ -580,19 +472,8 @@ node:
 	})
 
 	t.Run("dry-run requires a subcommand", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err := executeCommand("--dry-run")
 		require.Error(t, err)
@@ -600,19 +481,8 @@ node:
 	})
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		// Dry-run with YAML (default)
 		// Step 10.2: subcommand 'sh' is excluded from command
@@ -654,21 +524,10 @@ node:
 	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
 		}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err := executeCommand("--image", "alpine", "sh")
 		require.Error(t, err)
@@ -676,19 +535,8 @@ node:
 	})
 
 	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err := executeCommand("--image", "alpine", "--env", "MYVAR=a,b", "sh")
 		assert.NoError(t, err)
@@ -698,14 +546,6 @@ node:
 	})
 
 	t.Run("mount-tools not found error message includes available tools", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		// Setup tools config
 		restoreWd, err := os.Getwd()
 		require.NoError(t, err)
@@ -723,10 +563,7 @@ python:
 		require.NoError(t, err)
 
 		mockRuntime := &runtime.MockRuntime{}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		_, err = executeCommand("--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh")
 		require.Error(t, err)
@@ -735,7 +572,7 @@ python:
 	})
 }
 
-func TestCderunInternalOverrides(t *testing.T) {
+func TestUnit_Root_InternalOverrides(t *testing.T) {
 	// Use a temporary directory for this test
 	restoreWd, err := os.Getwd()
 	require.NoError(t, err)
@@ -879,20 +716,9 @@ node:
 	})
 }
 
-func TestPhase3Features(t *testing.T) {
-	// Save and restore package-level state
-	savedRuntimeFactory := runtimeFactory
-	savedExitFunc := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = savedRuntimeFactory
-		exitFunc = savedExitFunc
-	})
-
+func TestUnit_Root_Phase3Features(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
+	setupMockRuntime(t, mockRuntime)
 
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
@@ -1044,20 +870,9 @@ sh:
 	})
 }
 
-func TestPhase10StrictBehavior(t *testing.T) {
-	// Save and restore package-level state
-	savedRuntimeFactory := runtimeFactory
-	savedExitFunc := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = savedRuntimeFactory
-		exitFunc = savedExitFunc
-	})
-
+func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
+	setupMockRuntime(t, mockRuntime)
 
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
@@ -1126,23 +941,12 @@ node:
 	})
 }
 
-func TestRemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		output, err := executeCommand("--image", "alpine", "sh")
 		assert.NoError(t, err)
@@ -1150,21 +954,10 @@ func TestRemoveContainerWarning(t *testing.T) {
 	})
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: nil,
 		}
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		exitFunc = func(code int) {}
+		setupMockRuntime(t, mockRuntime)
 
 		output, err := executeCommand("--image", "alpine", "sh")
 		assert.NoError(t, err)

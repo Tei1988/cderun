@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadCDERunConfig(t *testing.T) {
+func TestUnit_Config_LoadCDERunConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
 	require.NoError(t, err)
@@ -164,7 +164,7 @@ hostContext:
 	})
 }
 
-func TestLoadToolsConfig(t *testing.T) {
+func TestUnit_Config_LoadToolsConfig(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
 	require.NoError(t, err)
