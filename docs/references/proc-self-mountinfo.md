@@ -21,18 +21,18 @@ Linuxシステムにおける `/proc/self/mountinfo` ファイルは、現在の
 各フィールドの意味は以下の通りである。
 
 | No. | フィールド名 | データ型 | 説明 | 例 |
-|---|---|---|---|---|
+| :-- | :--- | :--- | :--- | :--- |
 | 1 | Mount ID | Integer | このマウントの一意なID。 | 36 |
-| 2 | Parent ID | Integer | 親マウントのID（自身がルートの場合は自身のID）。ディレクトリツリー上の親子関係ではなく、マウントの親子関係を示す。 | 35 |
-| 3 | Major:Minor | String | ファイルシステムのデバイス番号（メジャー:マイナー）。 | 98:0 |
-| 4 | Root | Path | マウントされているファイルシステム内のルートディレクトリ。バインドマウント時に、元のFSのサブディレクトリをマウントした場合、ここにはそのパスが入る。 | / または /var/lib |
-| 5 | Mount Point | Path | プロセスのルートからの相対パスでのマウントポイント（実際にアクセスするパス）。 | /mnt |
-| 6 | Mount Options | String | マウントごとのオプション（スーパーブロックのオプションではない）。 | rw,noatime |
-| 7 | Optional Tags | String (可変) | マウントの伝播設定など（詳細は後述）。0個以上のフィールドが存在する。 | shared:1, master:1 |
-| 8 | Separator | Char | オプションフィールドの終了を示す区切り文字。常にハイフン。 | - |
+| 2 | Parent ID | Integer | 親マウントのID（自身がルートの場合は自身のID）。 | 35 |
+| 3 | Major:Minor | String | ファイルシステムのデバイス番号。 | 98:0 |
+| 4 | Root | Path | マウントされているファイルシステム内のルートディレクトリ。 | / または /var/lib |
+| 5 | Mount Point | Path | プロセスのルートからの相対パスでのマウントポイント。 | /mnt |
+| 6 | Mount Options | String | マウントごとのオプション。 | rw,noatime |
+| 7 | Optional Tags | String | マウントの伝播設定など（詳細は後述）。 | shared:1, master:1 |
+| 8 | Separator | Char | オプションフィールドの終了を示す区切り文字。 | - |
 | 9 | FS Type | String | ファイルシステムの種類。 | ext3, tmpfs, nfs |
-| 10 | Mount Source | String | ファイルシステム固有のマウント元情報。デバイス名や「none」。 | /dev/sda1 |
-| 11 | Superblock Options | String | スーパーブロックごとのオプション（ファイルシステム全体に適用される設定）。 | rw,errors=continue |
+| 10 | Mount Source | String | ファイルシステム固有のマウント元情報。 | /dev/sda1 |
+| 11 | Superblock | String | スーパーブロックごとのオプション。 | rw,errors=continue |
 
 ## 4. 特記事項：Optional Tags（フィールド7）について
 

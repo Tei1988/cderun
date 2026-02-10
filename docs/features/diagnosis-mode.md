@@ -7,7 +7,9 @@
 ## 要件
 
 ### 基本動作
+
 `--diagnosis`フラグが指定された場合：
+
 1. システム診断情報と利用可能なツールの一覧を収集
 2. 設定されたフォーマットで情報を表示
 3. コンテナの実行（およびドライラン）をスキップ
@@ -16,12 +18,15 @@
 ## 使用方法
 
 ### 基本的な使用
+
 ```bash
 cderun --diagnosis
 ```
 
 ### サブコマンドとの併用
+
 サブコマンドが指定されていても、診断モードが優先されます。
+
 ```bash
 cderun --diagnosis node --version
 ```
@@ -29,7 +34,9 @@ cderun --diagnosis node --version
 ## 出力フォーマット
 
 ### YAML形式（デフォルト）
+
 `cderun --diagnosis`
+
 ```yaml
 runtime:
   name: docker
@@ -47,7 +54,9 @@ available_tools:
 ```
 
 ### JSON形式
+
 `cderun --diagnosis --diagnosis-format json`
+
 ```json
 {
   "runtime": {
@@ -72,7 +81,9 @@ available_tools:
 ```
 
 ### 簡易形式
+
 `cderun --diagnosis --diagnosis-format simple`
+
 ```text
 Runtime: docker (/var/run/docker.sock)
 Runtime Status: accessible

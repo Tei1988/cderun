@@ -10,7 +10,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 - `--mount-socket`が有効（`true`）であること
 - `.tools.yaml`が存在すること
 
-※ `--mount-tools` または `--mount-all-tools` を使用する場合、`cderun` バイナリ自体も自動的に `/usr/local/bin/cderun` にマウントされます。
+※ `--mount-tools` または `--mount-all-tools` を使用する場合、`cderun` バイナリ自体も自動的に `/usr/local/bin/cderun` にマウントされるため、`--mount-cderun` を明示的に指定する必要はありません。
 
 ## オプション
 
@@ -22,7 +22,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 **使用例**:
 ```bash
-cderun --mount-cderun --mount-socket --mount-all-tools sh
+cderun --mount-socket --mount-all-tools sh
 ```
 
 **動作**:
@@ -53,7 +53,7 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 
 **使用例**:
 ```bash
-cderun --mount-cderun --mount-socket --mount-tools python,node sh
+cderun --mount-socket --mount-tools python,node sh
 ```
 
 **動作イメージ(実際はランタイムAPIで実現)**:
@@ -116,14 +116,12 @@ available tools: node, python, gemini-cli
 
 ```bash
 # .tools.yamlにbashが定義されている場合
-cderun --mount-cderun \
-  --mount-socket \
+cderun --mount-socket \
   --mount-all-tools \
   bash
 
 # または --image で明示的に指定
-cderun --mount-cderun \
-  --mount-socket \
+cderun --mount-socket \
   --mount-all-tools \
   --image ubuntu:22.04 \
   bash
@@ -138,8 +136,7 @@ gemini-cli --version
 
 ```bash
 # .tools.yamlにshが定義されている場合
-cderun --mount-cderun \
-  --mount-socket \
+cderun --mount-socket \
   --mount-tools python,node \
   sh
 ```
@@ -148,8 +145,7 @@ cderun --mount-cderun \
 
 ```bash
 # .tools.yamlに定義されたツールを使用
-cderun --mount-cderun \
-  --mount-socket \
+cderun --mount-socket \
   --mount-tools node,docker \
   sh -c '
     # nodeコマンドはcderun経由で実行される
@@ -178,8 +174,7 @@ npx:
 そうすれば以下のように使用できます：
 
 ```bash
-cderun --mount-cderun \
-  --mount-socket \
+cderun --mount-socket \
   --mount-tools node,npm,npx \
   sh -c '
     node --version

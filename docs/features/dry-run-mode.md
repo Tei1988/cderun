@@ -41,6 +41,30 @@ env:
   - NODE_ENV=development
 workdir: /workspace
 user: ""
+ports:
+  - 8080:80
+publish_all: false
+expose:
+  - "80/tcp"
+hostname: node-app
+dns:
+  - 8.8.8.8
+add_hosts:
+  - "my-server:192.168.1.100"
+privileged: false
+cap_add:
+  - SYS_ADMIN
+cap_drop:
+  - NET_RAW
+entrypoint:
+  - /usr/bin/node
+pull: missing
+memory: 536870912
+cpus: 1.5
+devices:
+  - path_on_host: /dev/fuse
+    path_in_container: /dev/fuse
+    cgroup_permissions: rwm
 ```
 
 ### JSON形式
@@ -62,7 +86,27 @@ user: ""
   ],
   "env": ["NODE_ENV=development"],
   "workdir": "/workspace",
-  "user": ""
+  "user": "",
+  "ports": ["8080:80"],
+  "publish_all": false,
+  "expose": ["80/tcp"],
+  "hostname": "node-app",
+  "dns": ["8.8.8.8"],
+  "add_hosts": ["my-server:192.168.1.100"],
+  "privileged": false,
+  "cap_add": ["SYS_ADMIN"],
+  "cap_drop": ["NET_RAW"],
+  "entrypoint": ["/usr/bin/node"],
+  "pull": "missing",
+  "memory": 536870912,
+  "cpus": 1.5,
+  "devices": [
+    {
+      "path_on_host": "/dev/fuse",
+      "path_in_container": "/dev/fuse",
+      "cgroup_permissions": "rwm"
+    }
+  ]
 }
 ```
 
