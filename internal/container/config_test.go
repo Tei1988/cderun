@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestContainerConfigInitialization(t *testing.T) {
+func TestUnit_Container_ConfigInitialization(t *testing.T) {
 	config := ContainerConfig{
 		Image:       "alpine:latest",
 		Command:     []string{"sh", "-c", "echo hello"},
@@ -43,7 +43,7 @@ func TestContainerConfigInitialization(t *testing.T) {
 	assert.Equal(t, "1000", config.User)
 }
 
-func TestMount(t *testing.T) {
+func TestUnit_Container_Mount(t *testing.T) {
 	mount := Mount{
 		Type:     "bind",
 		Source:   "/etc/hosts",

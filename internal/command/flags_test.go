@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDockerFlags(t *testing.T) {
+func TestUnit_Root_DockerFlags(t *testing.T) {
 	// Save and restore package-level state
 	originalFactory := runtimeFactory
 	originalExit := exitFunc

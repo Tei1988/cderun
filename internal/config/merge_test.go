@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHierarchicalMerge(t *testing.T) {
+func TestUnit_Merge_Hierarchical(t *testing.T) {
 	// Create a temporary directory structure
 	// tmp/
 	//   .cderun.yaml (parent)

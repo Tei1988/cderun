@@ -135,7 +135,7 @@ func executeCommandRaw(args []string) (string, error) {
 	return buf.String(), execErr
 }
 
-func TestPreprocessArgs(t *testing.T) {
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -177,7 +177,7 @@ func TestPreprocessArgs(t *testing.T) {
 	}
 }
 
-func TestExecuteEmptyArgs(t *testing.T) {
+func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	assert.NoError(t, err)
@@ -186,7 +186,7 @@ func TestExecuteEmptyArgs(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRootCmd(t *testing.T) {
+func TestUnit_Root_Command(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		// Save and restore package-level state
 		savedRuntimeFactory := runtimeFactory
@@ -735,7 +735,7 @@ python:
 	})
 }
 
-func TestCderunInternalOverrides(t *testing.T) {
+func TestUnit_Root_InternalOverrides(t *testing.T) {
 	// Use a temporary directory for this test
 	restoreWd, err := os.Getwd()
 	require.NoError(t, err)
@@ -879,7 +879,7 @@ node:
 	})
 }
 
-func TestPhase3Features(t *testing.T) {
+func TestUnit_Root_Phase3Features(t *testing.T) {
 	// Save and restore package-level state
 	savedRuntimeFactory := runtimeFactory
 	savedExitFunc := exitFunc
@@ -1044,7 +1044,7 @@ sh:
 	})
 }
 
-func TestPhase10StrictBehavior(t *testing.T) {
+func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
 	// Save and restore package-level state
 	savedRuntimeFactory := runtimeFactory
 	savedExitFunc := exitFunc
@@ -1126,7 +1126,7 @@ node:
 	})
 }
 
-func TestRemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		// Save and restore package-level state
 		savedRuntimeFactory := runtimeFactory

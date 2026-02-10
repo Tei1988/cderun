@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMockRuntime(t *testing.T) {
+func TestUnit_Runtime_Mock(t *testing.T) {
 	mock := &MockRuntime{
 		CreatedContainerID: "test-id",
 		ExitCode:           42,
