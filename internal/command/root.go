@@ -130,22 +130,22 @@ var (
 	}
 )
 
-func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, []string, []string) {
+func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
 	logging.Trace("Loading configurations...")
 	globalCfg, globalPaths, err := config.LoadCDERunConfig()
 	if err != nil {
-		logging.Warn("failed to load cderun config: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
 	} else if len(globalPaths) > 0 {
 		logging.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
 	}
 
 	toolsCfg, toolsPaths, err := config.LoadToolsConfig()
 	if err != nil {
-		logging.Warn("failed to load tools config: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
 	} else if len(toolsPaths) > 0 {
 		logging.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
 	}
-	return toolsCfg, globalCfg, globalPaths, toolsPaths
+	return toolsCfg, globalCfg, globalPaths, toolsPaths, nil
 }
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
@@ -709,7 +709,10 @@ intended for the subcommand.`,
 			_ = logging.Init(initialLevel, "text", true)
 
 			// Load configurations
-			toolsCfg, globalCfg, globalPaths, toolsPaths := opts.loadConfigs()
+			toolsCfg, globalCfg, globalPaths, toolsPaths, err := opts.loadConfigs()
+			if err != nil {
+				return err
+			}
 
 			subcommand := ""
 			passthroughArgs := []string{}

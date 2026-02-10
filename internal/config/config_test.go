@@ -162,6 +162,30 @@ hostContext:
 		assert.Equal(t, "/container", cfg.HostContext.Mounts[0].Target)
 		assert.Equal(t, 1, cfg.HostContext.Mounts[0].Level)
 	})
+
+	t.Run("invalid yaml syntax", func(t *testing.T) {
+		err := os.WriteFile(".cderun.yaml", []byte("invalid: yaml: ["), 0644)
+		require.NoError(t, err)
+		defer func() { _ = os.Remove(".cderun.yaml") }()
+
+		cfg, paths, err := LoadCDERunConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal")
+		assert.Nil(t, cfg)
+		assert.Nil(t, paths)
+	})
+
+	t.Run("unknown field", func(t *testing.T) {
+		err := os.WriteFile(".cderun.yaml", []byte("unknown_field: value"), 0644)
+		require.NoError(t, err)
+		defer func() { _ = os.Remove(".cderun.yaml") }()
+
+		cfg, paths, err := LoadCDERunConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "field unknown_field not found")
+		assert.Nil(t, cfg)
+		assert.Nil(t, paths)
+	})
 }
 
 func TestUnit_Config_LoadToolsConfig(t *testing.T) {
@@ -226,5 +250,22 @@ node:
 		require.NotEmpty(t, paths)
 		assert.Contains(t, paths[0], ".tools.yaml")
 		assert.Equal(t, "node:18-alpine", cfg["node"].Image)
+	})
+
+	t.Run("unknown field in tool config", func(t *testing.T) {
+		content := `
+node:
+  image: alpine
+  unknown_field: value
+`
+		err := os.WriteFile(".tools.yaml", []byte(content), 0644)
+		require.NoError(t, err)
+		defer func() { _ = os.Remove(".tools.yaml") }()
+
+		cfg, paths, err := LoadToolsConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "field unknown_field not found")
+		assert.Nil(t, cfg)
+		assert.Nil(t, paths)
 	})
 }

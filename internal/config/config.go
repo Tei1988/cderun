@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -208,6 +210,17 @@ func FindConfigs(filename string) []string {
 	return paths
 }
 
+// unmarshalStrict unmarshals YAML data into v with KnownFields enabled.
+func unmarshalStrict(data []byte, v interface{}) error {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	err := dec.Decode(v)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
+}
+
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
 func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	paths := FindConfigs(".cderun.yaml")
@@ -227,7 +240,7 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		}
 
 		var layer CDERunConfig
-		if err := yaml.Unmarshal(data, &layer); err != nil {
+		if err := unmarshalStrict(data, &layer); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
 
@@ -269,7 +282,7 @@ func LoadToolsConfig() (ToolsConfig, []string, error) {
 		}
 
 		var layer ToolsConfig
-		if err := yaml.Unmarshal(data, &layer); err != nil {
+		if err := unmarshalStrict(data, &layer); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
 		}
 
