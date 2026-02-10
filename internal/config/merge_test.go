@@ -12,8 +12,8 @@ func TestUnit_Config_Merge_Hierarchical(t *testing.T) {
 	fs := &mockFileSystem{
 		wd: "/app/child",
 		files: map[string][]byte{
-			"/app/.cderun.yaml": []byte("runtime: docker\ndefaults:\n  tty: false\n  network: bridge"),
-			"/app/.tools.yaml":  []byte("node:\n  image: node:14\n  env: [\"PARENT=1\"]"),
+			"/app/.cderun.yaml":       []byte("runtime: docker\ndefaults:\n  tty: false\n  network: bridge"),
+			"/app/.tools.yaml":        []byte("node:\n  image: node:14\n  env: [\"PARENT=1\"]"),
 			"/app/child/.cderun.yaml": []byte("defaults:\n  tty: true"),
 			"/app/child/.tools.yaml":  []byte("node:\n  image: node:16\npython:\n  image: python:3.9"),
 		},

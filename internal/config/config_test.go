@@ -41,10 +41,10 @@ func TestUnit_Config_LoadCDERunConfig(t *testing.T) {
 			home:  "/home/user",
 			files: make(map[string][]byte),
 			statErr: map[string]error{
-				"/app/.cderun.yaml":                         os.ErrNotExist,
-				"/home/user/.config/cderun/.cderun.yaml":    os.ErrNotExist,
-				"/etc/cderun/.cderun.yaml":                  os.ErrNotExist,
-				"/run/cderun/.cderun.yaml":                  os.ErrNotExist,
+				"/app/.cderun.yaml":                      os.ErrNotExist,
+				"/home/user/.config/cderun/.cderun.yaml": os.ErrNotExist,
+				"/etc/cderun/.cderun.yaml":               os.ErrNotExist,
+				"/run/cderun/.cderun.yaml":               os.ErrNotExist,
 			},
 		}
 		loader := &ConfigLoader{

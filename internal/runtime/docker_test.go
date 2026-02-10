@@ -357,7 +357,6 @@ func (m *mockConn) CloseWrite() error {
 	return nil
 }
 
-
 type mockDockerClientWithReader struct {
 	mockDockerClient
 	pullReader io.ReadCloser
@@ -466,7 +465,7 @@ func TestUnit_Docker_AttachContainer(t *testing.T) {
 		conn := &mockConn{writeError: errors.New("write error")}
 		// Use a reader that doesn't immediately return EOF to ensure stdin error is caught
 		pr, _ := io.Pipe()
-		defer pr.Close()
+		defer func() { _ = pr.Close() }()
 
 		mock := &mockDockerClient{
 			attachResp: types.HijackedResponse{
