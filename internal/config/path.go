@@ -3,7 +3,6 @@ package config
 import (
 	"cderun/internal/container"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -259,9 +258,14 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	prefix := schemeRegex.FindString(p)
 	p = strings.TrimPrefix(p, prefix)
 
+	fs := FileSystem(RealFileSystem{})
+	if r != nil && r.fs != nil {
+		fs = r.fs
+	}
+
 	// Tilde expansion
 	if strings.HasPrefix(p, "~/") || p == "~" {
-		home, err := os.UserHomeDir()
+		home, err := fs.UserHomeDir()
 		if err == nil {
 			if p == "~" {
 				p = home
@@ -279,35 +283,36 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 
 	// Reverse Path Resolution for Nested Execution
 	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
-		abs, err := filepath.Abs(absPath)
-		if err == nil {
-			found := false
-			bestRel := ""
-			bestSource := ""
-			bestTarget := ""
-			maxLevel := -1
+		abs := absPath
+		if !filepath.IsAbs(abs) {
+			wd, err := fs.Getwd()
+			if err == nil {
+				abs = filepath.Join(wd, abs)
+			}
+		}
 
-			for _, m := range r.HostContext.Mounts {
-				rel, err := filepath.Rel(m.Target, abs)
-				if err == nil && !strings.HasPrefix(rel, "..") {
-					// It's a match. Ensure it's not a partial segment match.
-					// filepath.Rel already handles this correctly (if it doesn't start with .. and it's a match).
-					// But we should double check if the match is exact or follows a separator.
+		found := false
+		bestRel := ""
+		bestSource := ""
+		bestTarget := ""
+		maxLevel := -1
 
-					// Longest match and highest level priority
-					if m.Level > maxLevel || (m.Level == maxLevel && len(m.Target) > len(bestTarget)) {
-						maxLevel = m.Level
-						bestTarget = m.Target
-						bestSource = m.Source
-						bestRel = rel
-						found = true
-					}
+		for _, m := range r.HostContext.Mounts {
+			rel, err := filepath.Rel(m.Target, abs)
+			if err == nil && !strings.HasPrefix(rel, "..") {
+				// Longest match and highest level priority
+				if m.Level > maxLevel || (m.Level == maxLevel && len(m.Target) > len(bestTarget)) {
+					maxLevel = m.Level
+					bestTarget = m.Target
+					bestSource = m.Source
+					bestRel = rel
+					found = true
 				}
 			}
+		}
 
-			if found {
-				absPath = filepath.Join(bestSource, bestRel)
-			}
+		if found {
+			absPath = filepath.Join(bestSource, bestRel)
 		}
 	}
 

@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_Path_Resolution(t *testing.T) {
+func TestUnit_Config_Path_Resolution(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	baseDir := "/abs/path"
 	r, err := NewExpressionResolver(nil)
@@ -157,7 +157,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
+func TestUnit_Config_Path_UnmarshalYAMLErrors(t *testing.T) {
 	t.Run("MountConfig", func(t *testing.T) {
 		var mc MountConfig
 
