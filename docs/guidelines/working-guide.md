@@ -79,9 +79,11 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 - **Table-Driven Tests:** 複数のケースを検証する場合は、テーブル駆動テストを使用する。
 
 ## 4. Documentation Standards
+
 ドキュメントを記述する際は、`markdownlint` に準拠し、一貫したフォーマットを維持してください。
 
 ### Markdown Formatting Rules
+
 - **Indentation (MD007):** リストのインデントは一貫して **2スペース** としてください（ネストされたリストや注記を含む）。
 - **Leading Dollar Signs (MD014):** コードフェンス内で、単一のコマンドを示す際に先頭に `$` を付けないでください（シェルプロンプトを模倣する場合を除き、コピー＆ペーストの利便性を優先します）。
 - **Code Block Language (MD040):** すべてのコードブロックの開始フェンス（```）には、必ず言語識別子（`bash`, `yaml`, `json`, `text` 等）を指定してください。

@@ -1,39 +1,54 @@
 # cderun
 
-**Concept**
+## Concept
 
 > "All you need on your local machine is Docker or Podman."
-> `cderun` generates ephemeral containers for commands like `node`, `python`, or `git` on demand using container runtimes (Docker/Podman). It keeps your host clean and ensures reproducible environments defined in a single YAML file.
+> `cderun` generates ephemeral containers for commands like `node`, `python`,
+> or `git` on demand using container runtimes (Docker/Podman). It keeps your
+> host clean and ensures reproducible environments defined in a single YAML file.
 
 ## Usage
 
 `cderun` supports four primary modes of operation:
 
 ### 1. Wrapper Mode
+
 Explicitly call `cderun` followed by the subcommand you want to run.
+
 ```bash
 cderun [cderun-flags] <subcommand> [passthrough-args]
 ```
+
 Example:
+
 ```bash
 cderun --tty node --version
 ```
 
 ### 2. Symlink Mode (Polyglot Entry Point)
-Create a symlink to `cderun` with the name of the tool you want to wrap. `cderun` will automatically detect the tool name from the executable name.
+
+Create a symlink to `cderun` with the name of the tool you want to wrap.
+`cderun` will automatically detect the tool name from the executable name.
+
 ```bash
 ln -s cderun node
 ./node --version  # Effectively runs 'cderun node --version'
 ```
 
 ### 3. Ad-hoc Mode
-You can use `cderun` to run arbitrary commands in a containerized environment by specifying the image.
+
+You can use `cderun` to run arbitrary commands in a containerized environment
+by specifying the image.
+
 ```bash
 cderun --image alpine ls -l
 ```
 
 ### 4. Diagnosis Mode
-Run `cderun` with the `--diagnosis` flag to see system diagnostics and available tools.
+
+Run `cderun` with the `--diagnosis` flag to see system diagnostics
+and available tools.
+
 ```bash
 cderun --diagnosis
 ```
@@ -49,6 +64,7 @@ cderun --diagnosis
 The final command executed in the container is the combination of any `command` defined in `.tools.yaml` for that subcommand plus the `passthrough-args`.
 
 ### Illustration
+
 ```text
 cderun --tty docker --tty
   |      |     |      |
@@ -59,13 +75,17 @@ cderun --tty docker --tty
 ```
 
 ### P1 Internal Overrides
-Flags prefixed with `--cderun-` are "Internal Overrides" (P1). They have the highest priority and **must** be placed **after** the subcommand in standard wrapper mode.
+
+Flags prefixed with `--cderun-` are "Internal Overrides" (P1).
+They have the highest priority and **must** be placed **after**
+the subcommand in standard wrapper mode.
 
 ```bash
 cderun node app.js --cderun-image node:20-alpine
 ```
 
 ### Available Flags
+
 - `--tty`: Allocate a pseudo-TTY.
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--image`: Docker image to use (overrides mapping).
@@ -112,7 +132,9 @@ cderun node app.js --cderun-image node:20-alpine
 `cderun` uses two configuration files to manage its behavior.
 
 ### `.cderun.yaml` (Global Settings)
+
 Used for general settings and defaults.
+
 ```yaml
 runtime: docker
 defaults:
@@ -125,7 +147,9 @@ logging:
 ```
 
 ### `.tools.yaml` (Tool Mappings)
+
 Defines how specific tools should be containerized.
+
 ```yaml
 node:
   image: node:20-alpine
@@ -141,26 +165,34 @@ python:
 ## Features
 
 ### Multi-Runtime Support & Auto-detection
-`cderun` supports both **Docker** and **Podman**. It can automatically detect the available runtime by checking for common Unix socket paths.
+
+`cderun` supports both **Docker** and **Podman**. It can automatically detect
+the available runtime by checking for common Unix socket paths.
 
 ### Intelligent Argument Parsing
+
 - Strict boundary parsing separates `cderun` flags from subcommand arguments.
 - Prevents flag conflicts between `cderun` and wrapped commands.
 - Supports complex command structures with P1 internal overrides.
 
 ### Polyglot Entry Point
+
 - Single binary can act as multiple tools via symlinks.
 - Automatic tool detection from executable name.
 - Seamless integration with existing workflows.
 
 ### Advanced Tool Mounting
+
 - Mount the `cderun` binary and other defined tools into the container.
-- Enables recursive container execution without installing tools in the container image.
+- Enables recursive container execution without installing tools
+  in the container image.
 
 ### Nested Execution Support
+
 - Transparently handles `cderun` execution inside a `cderun`-managed container.
 - Automatically propagates host context and settings via snapshots.
-- Implements "Reverse Path Resolution" to translate container-local paths back to host paths for nested mounts.
+- Implements "Reverse Path Resolution" to translate container-local paths
+  back to host paths for nested mounts.
 - Detects OverlayFS upperdir for automatic root filesystem mapping.
 
 ---

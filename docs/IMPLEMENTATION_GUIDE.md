@@ -8,6 +8,7 @@
 ## 現在の実装状況
 
 ### 実装済み
+
 - 基本的なCLI構造（Cobra使用）
 - 厳密な引数解析（P1/P2分離、Hoisting処理）
 - ポリグロットエントリーポイント（シンボリックリンク検出）
@@ -30,38 +31,49 @@
 - 信頼性向上テスト（TTYリサイズ、プルリトライ、ネストE2E）
 
 ### 未実装
+
 - なし
 
 ## 実装フェーズ
 
 ### Phase 1: コア機能（必須） (Completed)
+
 基本的なコンテナ実行機能を実装
 
 ### Phase 2: 設定管理 (Completed)
+
 設定ファイルとイメージマッピング
 
 ### Phase 3: 高度な機能 (Completed)
+
 環境変数、マウント機能など
 
 ### Phase 4: 利便性向上 (Completed)
+
 ドライラン、インタラクティブ性の向上、ログ、Podmanサポート
 
 ### Phase 5: Docker互換フラグの拡充 (Completed)
+
 ポートマッピング、リソース制限、セキュリティ、プルポリシー等の詳細設定
 
 ### Phase 6: 高度な設定解決機能 (Completed)
+
 このフェーズでは、設定ファイルの検索能力を向上させ、より動的で柔軟な値の解決メカニズムを導入する。
 
 ### Step 6.1: 設定ファイルの検索とマージ (Completed)
+
 **目的**: 親ディレクトリへの探索機能を追加し、見つかった複数の設定ファイルを階層的にマージする。
 
 ### Step 6.2: 値の動的解決 (cderun Expressions) (Completed)
+
 **目的**: 設定ファイル内の値を動的に解決する「cderun Expressions」 (`{{...}}`) を実装する。
 
 ### Step 6.3: パスの解決 (チルダ・相対パス) (Completed)
+
 **目的**: 値解決後のパス文字列に対し、チルダ展開と相対パス解決を行う。
 
 ### Phase 7: 機能改善と拡張 (Completed)
+
 利便性向上、厳密モードの導入
 
 ### Step 7.1: TTYフラグの短縮形 `-t` の追加 (Completed)
@@ -69,12 +81,15 @@
 ### Step 7.2: 環境変数の厳密モード `strictEnv` の実装 (Completed)
 
 ### Phase 8: インテグレーションテスト (Completed)
+
 **目的**: 実際のコンテナランタイム（Docker/Podman）を使用したエンドツーエンドの検証。
 
 ### Phase 9: テストカバレッジ計測 (Completed)
+
 **目的**: テストの網羅率を可視化し、品質を維持する。
 
 ---
+
 ### Phase 10: 引数解釈とコマンド組み立ての改善 (Completed)
 
 このフェーズでは、コマンドライン引数の解釈ルールを改善し、コンテナに渡されるコマンドの組み立て方をより明確にした。
@@ -88,6 +103,7 @@
 **目的**: `subcommand` をコンテナコマンドに含めず、その後の引数のみを渡すようにする。
 
 ---
+
 ### Phase 11: ネスト実行 (Completed)
 
 このフェーズでは、コンテナ内での `cderun` の再帰的な実行をサポートした。
@@ -105,6 +121,7 @@
 **目的**: コンテナ内のパスを基底ホストのパスに翻訳し、ネストされたコンテナでのマウントを可能にする。
 
 ---
+
 ### Phase 12: 信頼性と品質の向上 (Completed)
 
 このフェーズでは、コードの堅牢性を高めるためのテスト拡充と、設計仕様に合わせたクリーンアップを行った。
@@ -128,57 +145,69 @@
 ## 実装チェックリスト
 
 ### Phase 1 (Completed)
+
 - [x] Step 1.1: ContainerConfig定義
 - [x] Step 1.2: Runtimeインターフェース
 - [x] Step 1.3: Docker API実装
 - [x] Step 1.4: 基本実行フロー
 
 ### Phase 2 (Completed)
+
 - [x] Step 2.1: 設定ファイル読み込み
 - [x] Step 2.2: イメージマッピング
 - [x] Step 2.3: 優先順位解決
 
 ### Phase 3 (Completed)
+
 - [x] Step 3.1: 環境変数パススルー
 - [x] Step 3.2: ソケットマウント
 - [x] Step 3.3: cderunバイナリマウント
 - [x] Step 3.4: ツールマウント
 
 ### Phase 4 (Completed)
+
 - [x] Step 4.1: ドライランモード
 - [x] Step 4.2: インタラクティブ性の向上（シグナル、リサイズ）
 - [x] Step 4.3: ログ・デバッグ
 - [x] Step 4.4: Podmanサポート
 
 ### Phase 5 (Completed)
+
 - [x] Step 5.1: Docker互換フラグの追加（ネットワーク、リソース、セキュリティ等）
 
 ### Phase 6 (Completed)
+
 - [x] Step 6.1: 設定ファイルの検索とマージ
 - [x] Step 6.2: 値の動的解決 (cderun Expressions)
 - [x] Step 6.3: パスの解決 (チルダ・相対パス)
 
 ### Phase 7 (Completed)
+
 - [x] Step 7.1: TTYフラグの短縮形 `-t` の追加
 - [x] Step 7.2: 環境変数の厳密モード `strictEnv` の実装
 
 ### Phase 8 (Completed)
+
 - [x] Step 8.1: testcontainers-go の導入
 - [x] Step 8.2: 各種インテグレーションテストの実装
 
 ### Phase 9 (Completed)
+
 - [x] Step 9.1: Makefile の作成とカバレッジ計測の自動化
 
 ### Phase 10 (Completed)
+
 - [x] Step 10.1: サブコマンドのキー化とイメージ解決
 - [x] Step 10.2: コンテナコマンドの組み立て
 
 ### Phase 11 (Completed)
+
 - [x] Step 11.1: ホストコンテキストの定義
 - [x] Step 11.2: スナップショット管理
 - [x] Step 11.3: 逆パス解決
 
 ### Phase 12 (Completed)
+
 - [x] Step 12.1: ロギング仕様の整合
 - [x] Step 12.2: TTYリサイズ (SIGWINCH) の検証
 - [x] Step 12.3: ランタイムエラーとリトライの検証
