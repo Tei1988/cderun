@@ -198,7 +198,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 			imagePullErr: errors.New("toomanyrequests: too many requests"),
 		}
 		runtime := &DockerRuntime{
-			client: mock,
+			client:    mock,
 			sleepFunc: func(ctx context.Context, d time.Duration) error { return nil },
 		}
 
@@ -211,7 +211,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 	t.Run("succeeds after retries", func(t *testing.T) {
 		mock := &mockRetryDockerClient{maxFailures: 2}
 		runtime := &DockerRuntime{
-			client: mock,
+			client:    mock,
 			sleepFunc: func(ctx context.Context, d time.Duration) error { return nil },
 		}
 		err := runtime.PullImage(context.Background(), "test-image", "always")

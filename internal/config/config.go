@@ -156,10 +156,10 @@ type FileSystem interface {
 // RealFileSystem implements FileSystem using standard os and filepath.
 type RealFileSystem struct{}
 
-func (RealFileSystem) Getwd() (string, error) { return os.Getwd() }
+func (RealFileSystem) Getwd() (string, error)                { return os.Getwd() }
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
-func (RealFileSystem) ReadFile(name string) ([]byte, error) { return os.ReadFile(name) }
-func (RealFileSystem) UserHomeDir() (string, error) { return os.UserHomeDir() }
+func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
+func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
 
 // ConfigLoader handles finding and loading configuration files.
 type ConfigLoader struct {

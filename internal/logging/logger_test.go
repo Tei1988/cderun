@@ -113,7 +113,8 @@ func TestUnit_Logging_Init_GlobalLogger(t *testing.T) {
 func TestUnit_Logging_Wrappers_AllLevels(t *testing.T) {
 	buf := &bytes.Buffer{}
 	SetOutput(buf)
-	Init("trace", "text", false)
+	err := Init("trace", "text", false)
+	assert.NoError(t, err)
 
 	Error("err")
 	assert.Contains(t, buf.String(), "[ERROR] err")
