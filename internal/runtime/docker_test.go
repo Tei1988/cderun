@@ -30,7 +30,6 @@ func TestUnit_Docker_New(t *testing.T) {
 }
 
 type mockDockerClient struct {
-	dockerClient
 	imageInspectErr error
 	imagePullErr    error
 	pullCount       int
@@ -306,7 +305,7 @@ func (m *mockConn) Close() error {
 	return nil
 }
 func (m *mockConn) Write(b []byte) (n int, err error) { return len(b), nil }
-func (m *mockConn) CloseWrite() error                { return nil }
+func (m *mockConn) CloseWrite() error                 { return nil }
 
 func TestUnit_Docker_AttachContainer(t *testing.T) {
 	t.Run("TTY mode", func(t *testing.T) {
