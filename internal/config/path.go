@@ -24,6 +24,9 @@ func (cp *ConfigPath) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (cp ConfigPath) MarshalYAML() (interface{}, error) {
+	if cp.Raw == "" {
+		return nil, nil
+	}
 	return cp.Raw, nil
 }
 
@@ -60,10 +63,10 @@ func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
 
 // MountConfig is an intermediate representation for mount points in configuration.
 type MountConfig struct {
-	Type     string
-	Source   ConfigPath
-	Target   ConfigPath
-	ReadOnly bool
+	Type     string     `yaml:"type,omitempty"`
+	Source   ConfigPath `yaml:"source,omitempty"`
+	Target   ConfigPath `yaml:"target,omitempty"`
+	ReadOnly bool       `yaml:"read_only,omitempty"`
 }
 
 func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
@@ -139,6 +142,29 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	}
 	*dc = parsed
 	return nil
+}
+
+func (dc DeviceConfig) MarshalYAML() (interface{}, error) {
+	if dc.IsEmpty() {
+		return nil, nil
+	}
+
+	source := dc.Source.Raw
+	dest := dc.Destination.Raw
+	perms := dc.Permissions
+
+	if perms == "rwm" || perms == "" {
+		if source == dest || dest == "" {
+			return source, nil
+		}
+		return source + ":" + dest, nil
+	}
+
+	// perms is not rwm
+	if dest == "" {
+		dest = source
+	}
+	return source + ":" + dest + ":" + perms, nil
 }
 
 func (dc DeviceConfig) IsEmpty() bool {

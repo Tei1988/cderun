@@ -10,25 +10,25 @@ import (
 )
 
 type CDERunConfig struct {
-	Runtime     string         `yaml:"runtime"`
-	SocketPath  ConfigPath     `yaml:"socketPath"`
-	Defaults    ConfigDefaults `yaml:"defaults"`
-	Logging     LoggingConfig  `yaml:"logging"`
+	Runtime     string         `yaml:"runtime,omitempty"`
+	SocketPath  ConfigPath     `yaml:"socketPath,omitempty"`
+	Defaults    ConfigDefaults `yaml:"defaults,omitempty"`
+	Logging     LoggingConfig  `yaml:"logging,omitempty"`
 	HostContext *HostContext   `yaml:"hostContext,omitempty"`
 }
 
 type HostContext struct {
-	BinPath     string         `yaml:"binPath"`
-	SnapshotDir string         `yaml:"snapshotDir"`
-	WorkingDir  string         `yaml:"workingDir"`
-	Level       int            `yaml:"level"`
-	Mounts      []MountMapping `yaml:"mounts"`
+	BinPath     string         `yaml:"binPath,omitempty"`
+	SnapshotDir string         `yaml:"snapshotDir,omitempty"`
+	WorkingDir  string         `yaml:"workingDir,omitempty"`
+	Level       int            `yaml:"level,omitempty"`
+	Mounts      []MountMapping `yaml:"mounts,omitempty"`
 }
 
 type MountMapping struct {
-	Source string `yaml:"source"`
-	Target string `yaml:"target"`
-	Level  int    `yaml:"level"`
+	Source string `yaml:"source,omitempty"`
+	Target string `yaml:"target,omitempty"`
+	Level  int    `yaml:"level,omitempty"`
 }
 
 func (c *CDERunConfig) SetBaseDir(baseDir string) {
@@ -39,33 +39,33 @@ func (c *CDERunConfig) SetBaseDir(baseDir string) {
 }
 
 type ConfigDefaults struct {
-	TTY             *bool          `yaml:"tty"`
-	Interactive     *bool          `yaml:"interactive"`
-	Network         string         `yaml:"network"`
-	Remove          *bool          `yaml:"remove"`
-	StrictEnv       *bool          `yaml:"strictEnv"`
-	MountCderun     *bool          `yaml:"mountCderun"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
-	MountSocket     *bool          `yaml:"mountSocket"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	Ports           []string       `yaml:"ports"`
-	PublishAll      *bool          `yaml:"publishAll"`
-	Expose          []string       `yaml:"expose"`
-	Hostname        string         `yaml:"hostname"`
-	DNS             []string       `yaml:"dns"`
-	AddHosts        []string       `yaml:"addHosts"`
-	User            string         `yaml:"user"`
-	Privileged      *bool          `yaml:"privileged"`
-	CapAdd          []string       `yaml:"capAdd"`
-	CapDrop         []string       `yaml:"capDrop"`
-	Entrypoint      []string       `yaml:"entrypoint"`
-	Command         []string       `yaml:"command"`
-	Pull            string         `yaml:"pull"`
-	Memory          string         `yaml:"memory"`
-	CPUs            float64        `yaml:"cpus"`
-	Mounts          []MountConfig  `yaml:"mounts"`
-	Devices         []DeviceConfig `yaml:"devices"`
-	Env             []string       `yaml:"env"`
+	TTY             *bool          `yaml:"tty,omitempty"`
+	Interactive     *bool          `yaml:"interactive,omitempty"`
+	Network         string         `yaml:"network,omitempty"`
+	Remove          *bool          `yaml:"remove,omitempty"`
+	StrictEnv       *bool          `yaml:"strictEnv,omitempty"`
+	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
+	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
+	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
+	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
+	Ports           []string       `yaml:"ports,omitempty"`
+	PublishAll      *bool          `yaml:"publishAll,omitempty"`
+	Expose          []string       `yaml:"expose,omitempty"`
+	Hostname        string         `yaml:"hostname,omitempty"`
+	DNS             []string       `yaml:"dns,omitempty"`
+	AddHosts        []string       `yaml:"addHosts,omitempty"`
+	User            string         `yaml:"user,omitempty"`
+	Privileged      *bool          `yaml:"privileged,omitempty"`
+	CapAdd          []string       `yaml:"capAdd,omitempty"`
+	CapDrop         []string       `yaml:"capDrop,omitempty"`
+	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
+	Command         []string       `yaml:"command,omitempty"`
+	Pull            string         `yaml:"pull,omitempty"`
+	Memory          string         `yaml:"memory,omitempty"`
+	CPUs            float64        `yaml:"cpus,omitempty"`
+	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
+	Devices         []DeviceConfig `yaml:"devices,omitempty"`
+	Env             []string       `yaml:"env,omitempty"`
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
@@ -84,41 +84,41 @@ func (c *ConfigDefaults) SetBaseDir(baseDir string) {
 }
 
 type LoggingConfig struct {
-	Level     string `yaml:"level"`
-	Format    string `yaml:"format"`
-	Timestamp *bool  `yaml:"timestamp"`
+	Level     string `yaml:"level,omitempty"`
+	Format    string `yaml:"format,omitempty"`
+	Timestamp *bool  `yaml:"timestamp,omitempty"`
 }
 
 type ToolConfig struct {
-	Image           string         `yaml:"image"`
-	TTY             *bool          `yaml:"tty"`
-	Interactive     *bool          `yaml:"interactive"`
-	Network         string         `yaml:"network"`
-	Remove          *bool          `yaml:"remove"`
-	StrictEnv       *bool          `yaml:"strictEnv"`
-	Mounts          []MountConfig  `yaml:"mounts"`
-	Env             []string       `yaml:"env"`
-	Workdir         string         `yaml:"workdir"`
-	MountCderun     *bool          `yaml:"mountCderun"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
-	MountSocket     *bool          `yaml:"mountSocket"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
-	Ports           []string       `yaml:"ports"`
-	PublishAll      *bool          `yaml:"publishAll"`
-	Expose          []string       `yaml:"expose"`
-	Hostname        string         `yaml:"hostname"`
-	DNS             []string       `yaml:"dns"`
-	AddHosts        []string       `yaml:"addHosts"`
-	User            string         `yaml:"user"`
-	Privileged      *bool          `yaml:"privileged"`
-	CapAdd          []string       `yaml:"capAdd"`
-	CapDrop         []string       `yaml:"capDrop"`
-	Entrypoint      []string       `yaml:"entrypoint"`
-	Command         []string       `yaml:"command"`
-	Pull            string         `yaml:"pull"`
-	Memory          string         `yaml:"memory"`
-	CPUs            float64        `yaml:"cpus"`
-	Devices         []DeviceConfig `yaml:"devices"`
+	Image           string         `yaml:"image,omitempty"`
+	TTY             *bool          `yaml:"tty,omitempty"`
+	Interactive     *bool          `yaml:"interactive,omitempty"`
+	Network         string         `yaml:"network,omitempty"`
+	Remove          *bool          `yaml:"remove,omitempty"`
+	StrictEnv       *bool          `yaml:"strictEnv,omitempty"`
+	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
+	Env             []string       `yaml:"env,omitempty"`
+	Workdir         string         `yaml:"workdir,omitempty"`
+	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
+	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
+	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
+	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
+	Ports           []string       `yaml:"ports,omitempty"`
+	PublishAll      *bool          `yaml:"publishAll,omitempty"`
+	Expose          []string       `yaml:"expose,omitempty"`
+	Hostname        string         `yaml:"hostname,omitempty"`
+	DNS             []string       `yaml:"dns,omitempty"`
+	AddHosts        []string       `yaml:"addHosts,omitempty"`
+	User            string         `yaml:"user,omitempty"`
+	Privileged      *bool          `yaml:"privileged,omitempty"`
+	CapAdd          []string       `yaml:"capAdd,omitempty"`
+	CapDrop         []string       `yaml:"capDrop,omitempty"`
+	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
+	Command         []string       `yaml:"command,omitempty"`
+	Pull            string         `yaml:"pull,omitempty"`
+	Memory          string         `yaml:"memory,omitempty"`
+	CPUs            float64        `yaml:"cpus,omitempty"`
+	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 }
 
 func (c *ToolConfig) SetBaseDir(baseDir string) {
