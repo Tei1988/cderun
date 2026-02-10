@@ -327,8 +327,12 @@ func (m *mockConn) Close() error {
 	m.closed = true
 	return nil
 }
-func (m *mockConn) Write(b []byte) (n int, err error) { return len(b), nil }
-func (m *mockConn) CloseWrite() error                { return nil }
+func (m *mockConn) Write(b []byte) (n int, err error) {
+	return len(b), nil
+}
+func (m *mockConn) CloseWrite() error {
+	return nil
+}
 
 func TestUnit_Docker_AttachContainer(t *testing.T) {
 	t.Run("TTY mode", func(t *testing.T) {
