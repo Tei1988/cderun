@@ -182,9 +182,14 @@ func TestUnit_Config_RealFS_Integration(t *testing.T) {
 	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0644)
 	require.NoError(t, err)
 
-	originalWd, _ := os.Getwd()
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	// Changing the working directory is process-global and can affect parallel tests.
 	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	t.Cleanup(func() {
+		// Restore the original working directory after the test.
+		require.NoError(t, os.Chdir(originalWd))
+	})
 
 	cfg, paths, err := LoadCDERunConfig()
 	assert.NoError(t, err)
