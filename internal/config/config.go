@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -44,10 +46,13 @@ type ConfigDefaults struct {
 	Network         string         `yaml:"network"`
 	Remove          *bool          `yaml:"remove"`
 	StrictEnv       *bool          `yaml:"strictEnv"`
+	Workdir         string         `yaml:"workdir,omitempty"`
 	MountCderun     *bool          `yaml:"mountCderun"`
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountTools      []string       `yaml:"mountTools,omitempty"`
+	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`
@@ -98,11 +103,13 @@ type ToolConfig struct {
 	StrictEnv       *bool          `yaml:"strictEnv"`
 	Mounts          []MountConfig  `yaml:"mounts"`
 	Env             []string       `yaml:"env"`
-	Workdir         string         `yaml:"workdir"`
+	Workdir         string         `yaml:"workdir,omitempty"`
 	MountCderun     *bool          `yaml:"mountCderun"`
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath"`
 	MountSocket     *bool          `yaml:"mountSocket"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath"`
+	MountTools      []string       `yaml:"mountTools,omitempty"`
+	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports"`
 	PublishAll      *bool          `yaml:"publishAll"`
 	Expose          []string       `yaml:"expose"`
@@ -243,6 +250,17 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 	return paths
 }
 
+// unmarshalStrict unmarshals YAML data into v with KnownFields enabled.
+func unmarshalStrict(data []byte, v interface{}) error {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	err := dec.Decode(v)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
+}
+
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
 func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	return defaultLoader.LoadCDERunConfig()
@@ -267,7 +285,7 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		}
 
 		var layer CDERunConfig
-		if err := yaml.Unmarshal(data, &layer); err != nil {
+		if err := unmarshalStrict(data, &layer); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
 
@@ -314,7 +332,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		}
 
 		var layer ToolsConfig
-		if err := yaml.Unmarshal(data, &layer); err != nil {
+		if err := unmarshalStrict(data, &layer); err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
 		}
 

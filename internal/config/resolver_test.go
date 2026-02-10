@@ -747,4 +747,85 @@ func TestUnit_Config_Resolver_Resolve(t *testing.T) {
 		assert.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/p1/path", res.Mounts[0].Source)
 	})
+
+	t.Run("MountTools and MountAllTools resolution", func(t *testing.T) {
+		t.Setenv("CDERUN_MOUNT_TOOLS", "tool1,tool2")
+		t.Setenv("CDERUN_MOUNT_ALL_TOOLS", "true")
+
+		cli := CLIOptions{}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:      "node",
+				MountTools: []string{"tool-tool"},
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				MountTools: []string{"global-tool"},
+			},
+		}
+
+		// Env (P3)
+		res, err := Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"tool1", "tool2"}, res.MountTools)
+		assert.True(t, res.MountAllTools)
+
+		// CLI (P2)
+		cli.MountTools = "cli-tool1, cli-tool2"
+		cli.MountToolsSet = true
+		cli.MountAllTools = false
+		cli.MountAllToolsSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cli-tool1", "cli-tool2"}, res.MountTools)
+		assert.False(t, res.MountAllTools)
+
+		// P1 Override
+		cli.CderunMountTools = "p1-tool"
+		cli.CderunMountToolsSet = true
+		cli.CderunMountAllTools = true
+		cli.CderunMountAllToolsSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"p1-tool"}, res.MountTools)
+		assert.True(t, res.MountAllTools)
+
+		// Tool (P4)
+		t.Setenv("CDERUN_MOUNT_TOOLS", "")
+		t.Setenv("CDERUN_MOUNT_ALL_TOOLS", "")
+		cli = CLIOptions{}
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"tool-tool"}, res.MountTools)
+
+		// Global (P5)
+		delete(tools, "node")
+		cli.Image = "node"
+		cli.ImageSet = true
+		res, err = Resolve("node", cli, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"global-tool"}, res.MountTools)
+
+		// Multiple tools in slice
+		tools["node"] = ToolConfig{
+			Image:      "node",
+			MountTools: []string{"toolA", "toolB"},
+		}
+		res, err = Resolve("node", CLIOptions{}, tools, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"toolA", "toolB"}, res.MountTools)
+	})
+
+	t.Run("Workdir global default resolution", func(t *testing.T) {
+		cli := CLIOptions{}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Workdir: "/global/workdir",
+			},
+		}
+		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, global)
+		require.NoError(t, err)
+		assert.Equal(t, "/global/workdir", res.Workdir)
+	})
 }
