@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"regexp"
 	"strings"
 )
@@ -10,21 +9,27 @@ var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
+	fs          FileSystem
 	Home        string
 	Pwd         string
 	HostContext *HostContext
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
-	home, err := os.UserHomeDir()
+	return NewExpressionResolverWithFS(hostCtx, RealFileSystem{})
+}
+
+func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*ExpressionResolver, error) {
+	home, err := fs.UserHomeDir()
 	if err != nil {
 		home = ""
 	}
-	pwd, err := os.Getwd()
+	pwd, err := fs.Getwd()
 	if err != nil {
 		pwd = ""
 	}
 	return &ExpressionResolver{
+		fs:          fs,
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
@@ -74,13 +79,18 @@ func (r *ExpressionResolver) resolveString(s string) string {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) string {
-	paths := FindConfigs(filename)
+	loader := &ConfigLoader{
+		fs:              r.fs,
+		systemConfigDir: defaultLoader.systemConfigDir,
+		runConfigDir:    defaultLoader.runConfigDir,
+	}
+	paths := loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		return ""
 	}
 
 	// Use the highest priority file
-	data, err := os.ReadFile(paths[0])
+	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		return ""
 	}

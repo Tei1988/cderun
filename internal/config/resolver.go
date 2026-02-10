@@ -200,6 +200,11 @@ type CLIOptions struct {
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
 func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
+	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
+}
+
+// ResolveWithFS combines CLI flags, environment variables, tool-specific config, and global defaults using the provided filesystem.
+func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
@@ -209,7 +214,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		hostCtx = global.HostContext
 	}
 
-	r, err := NewExpressionResolver(hostCtx)
+	r, err := NewExpressionResolverWithFS(hostCtx, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
@@ -351,10 +356,10 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 			}
 		} else {
 			// Check default socket paths
-			if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+			if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
 				res.Runtime = "docker"
 				res.SocketPath = "/var/run/docker.sock"
-			} else if _, err := os.Stat("/run/podman/podman.sock"); err == nil {
+			} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
 				res.Runtime = "podman"
 				res.SocketPath = "/run/podman/podman.sock"
 			} else {
@@ -374,7 +379,7 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 		}
 	}
 
-	// Special handling for unix:// prefix for the host-side socket connection
+	// Special handling for unix:// prefix for the host-side socket path
 	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
 
 	// 12. Resolve MountSocket and MountSocketPath

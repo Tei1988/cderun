@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Expression_Resolver(t *testing.T) {
+func TestUnit_Config_Expression_Resolver(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
