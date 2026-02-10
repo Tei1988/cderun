@@ -182,7 +182,12 @@ func TestUnit_Docker_PullImageRetry(t *testing.T) {
 
 	t.Run("never policy", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock}
+		runtime := &DockerRuntime{
+			client: mock,
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return nil
+			},
+		}
 		err := runtime.PullImage(context.Background(), "test-image", "never")
 		assert.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
@@ -190,7 +195,12 @@ func TestUnit_Docker_PullImageRetry(t *testing.T) {
 
 	t.Run("missing policy - image exists", func(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: nil}
-		runtime := &DockerRuntime{client: mock}
+		runtime := &DockerRuntime{
+			client: mock,
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return nil
+			},
+		}
 		err := runtime.PullImage(context.Background(), "test-image", "missing")
 		assert.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
@@ -258,41 +268,54 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 }
 
 func TestUnit_Docker_Lifecycle(t *testing.T) {
-	mock := &mockDockerClient{
-		waitResp: dockercontainer.WaitResponse{StatusCode: 0},
-	}
-	runtime := &DockerRuntime{client: mock}
-	ctx := context.Background()
 	id := "test-id"
+	ctx := context.Background()
 
-	// Start
-	err := runtime.StartContainer(ctx, id)
-	assert.NoError(t, err)
-	assert.Equal(t, id, mock.startID)
+	t.Run("Start", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.StartContainer(ctx, id)
+		assert.NoError(t, err)
+		assert.Equal(t, id, mock.startID)
+	})
 
-	// Wait
-	code, err := runtime.WaitContainer(ctx, id)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, code)
-	assert.Equal(t, id, mock.waitID)
+	t.Run("Wait", func(t *testing.T) {
+		mock := &mockDockerClient{
+			waitResp: dockercontainer.WaitResponse{StatusCode: 42},
+		}
+		runtime := &DockerRuntime{client: mock}
+		code, err := runtime.WaitContainer(ctx, id)
+		assert.NoError(t, err)
+		assert.Equal(t, 42, code)
+		assert.Equal(t, id, mock.waitID)
+	})
 
-	// Remove
-	err = runtime.RemoveContainer(ctx, id)
-	assert.NoError(t, err)
-	assert.Equal(t, id, mock.removeID)
+	t.Run("Remove", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.RemoveContainer(ctx, id)
+		assert.NoError(t, err)
+		assert.Equal(t, id, mock.removeID)
+	})
 
-	// Resize
-	err = runtime.ResizeContainerTTY(ctx, id, 24, 80)
-	assert.NoError(t, err)
-	assert.Equal(t, id, mock.resizeID)
-	assert.Equal(t, uint(24), mock.resizeOpts.Height)
-	assert.Equal(t, uint(80), mock.resizeOpts.Width)
+	t.Run("Resize", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.ResizeContainerTTY(ctx, id, 24, 80)
+		assert.NoError(t, err)
+		assert.Equal(t, id, mock.resizeID)
+		assert.Equal(t, uint(24), mock.resizeOpts.Height)
+		assert.Equal(t, uint(80), mock.resizeOpts.Width)
+	})
 
-	// Signal
-	err = runtime.SignalContainer(ctx, id, "SIGINT")
-	assert.NoError(t, err)
-	assert.Equal(t, id, mock.killID)
-	assert.Equal(t, "SIGINT", mock.killSignal)
+	t.Run("Signal", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.SignalContainer(ctx, id, "SIGINT")
+		assert.NoError(t, err)
+		assert.Equal(t, id, mock.killID)
+		assert.Equal(t, "SIGINT", mock.killSignal)
+	})
 }
 
 type mockConn struct {
@@ -305,7 +328,7 @@ func (m *mockConn) Close() error {
 	return nil
 }
 func (m *mockConn) Write(b []byte) (n int, err error) { return len(b), nil }
-func (m *mockConn) CloseWrite() error                 { return nil }
+func (m *mockConn) CloseWrite() error                { return nil }
 
 func TestUnit_Docker_AttachContainer(t *testing.T) {
 	t.Run("TTY mode", func(t *testing.T) {
