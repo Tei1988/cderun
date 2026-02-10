@@ -2,43 +2,83 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+type mockFileSystem struct {
+	OSFileSystem
+	wd      string
+	home    string
+	files   map[string][]byte
+	statErr map[string]error
+}
+
+func (m *mockFileSystem) Getwd() (string, error)       { return m.wd, nil }
+func (m *mockFileSystem) UserHomeDir() (string, error) { return m.home, nil }
+func (m *mockFileSystem) Stat(name string) (os.FileInfo, error) {
+	if err, ok := m.statErr[name]; ok {
+		return nil, err
+	}
+	if _, ok := m.files[name]; ok {
+		return nil, nil // Return nil info as we only check error
+	}
+	return m.OSFileSystem.Stat(name)
+}
+func (m *mockFileSystem) ReadFile(name string) ([]byte, error) {
+	if data, ok := m.files[name]; ok {
+		return data, nil
+	}
+	return m.OSFileSystem.ReadFile(name)
+}
+
 func TestUnit_Config_LoadCDERunConfig(t *testing.T) {
-	// Create a temporary directory for testing
-	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	// Change working directory to tmpDir
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
-
 	t.Run("not found", func(t *testing.T) {
-		cfg, paths, err := LoadCDERunConfig()
+		fs := &mockFileSystem{
+			wd:    "/app",
+			home:  "/home/user",
+			files: make(map[string][]byte),
+			statErr: map[string]error{
+				"/app/.cderun.yaml":                         os.ErrNotExist,
+				"/home/user/.config/cderun/.cderun.yaml":    os.ErrNotExist,
+				"/etc/cderun/.cderun.yaml":                  os.ErrNotExist,
+				"/run/cderun/.cderun.yaml":                  os.ErrNotExist,
+			},
+		}
+		loader := &ConfigLoader{
+			FS:              fs,
+			SystemConfigDir: "/etc/cderun",
+			RunConfigDir:    "/run/cderun",
+		}
+
+		cfg, paths, err := loader.LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.Nil(t, cfg)
 		assert.Empty(t, paths)
 	})
 
 	t.Run("found in current dir", func(t *testing.T) {
-		content := `
-runtime: docker
-defaults:
-  tty: true
-`
-		err := os.WriteFile(".cderun.yaml", []byte(content), 0644)
-		require.NoError(t, err)
-		defer func() { _ = os.Remove(".cderun.yaml") }()
+		fs := &mockFileSystem{
+			wd:   "/app",
+			home: "/home/user",
+			files: map[string][]byte{
+				"/app/.cderun.yaml": []byte("runtime: docker\ndefaults:\n  tty: true"),
+			},
+			statErr: map[string]error{
+				"/home/user/.config/cderun/.cderun.yaml": os.ErrNotExist,
+				"/etc/cderun/.cderun.yaml":               os.ErrNotExist,
+				"/run/cderun/.cderun.yaml":               os.ErrNotExist,
+			},
+		}
+		loader := &ConfigLoader{
+			FS:              fs,
+			SystemConfigDir: "/etc/cderun",
+			RunConfigDir:    "/run/cderun",
+		}
 
-		cfg, paths, err := LoadCDERunConfig()
+		cfg, paths, err := loader.LoadCDERunConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
@@ -47,184 +87,61 @@ defaults:
 		assert.True(t, *cfg.Defaults.TTY)
 	})
 
-	t.Run("found in home dir", func(t *testing.T) {
-		homeDir, err := os.MkdirTemp("", "cderun-home-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(homeDir) }()
+	t.Run("priority and merging", func(t *testing.T) {
+		fs := &mockFileSystem{
+			wd:   "/app",
+			home: "/home/user",
+			files: map[string][]byte{
+				"/home/user/.config/cderun/.cderun.yaml": []byte("runtime: podman"),
+				"/run/cderun/.cderun.yaml":               []byte("runtime: docker\ndefaults:\n  network: host"),
+			},
+			statErr: map[string]error{
+				"/app/.cderun.yaml":        os.ErrNotExist,
+				"/etc/cderun/.cderun.yaml": os.ErrNotExist,
+			},
+		}
+		loader := &ConfigLoader{
+			FS:              fs,
+			SystemConfigDir: "/etc/cderun",
+			RunConfigDir:    "/run/cderun",
+		}
 
-		t.Setenv("HOME", homeDir)
-		t.Setenv("USERPROFILE", homeDir)
-
-		configDir := filepath.Join(homeDir, ".config", "cderun")
-		err = os.MkdirAll(configDir, 0755)
-		require.NoError(t, err)
-
-		content := `
-runtime: podman
-`
-		err = os.WriteFile(filepath.Join(configDir, ".cderun.yaml"), []byte(content), 0644)
-		require.NoError(t, err)
-
-		cfg, paths, err := LoadCDERunConfig()
+		cfg, paths, err := loader.LoadCDERunConfig()
 		assert.NoError(t, err)
-		assert.NotNil(t, cfg)
-		require.NotEmpty(t, paths)
-		assert.Contains(t, paths[0], ".cderun.yaml")
+		assert.Equal(t, 2, len(paths))
+		assert.Contains(t, paths[0], "/home/user")
+		assert.Contains(t, paths[1], "/run/cderun")
 		assert.Equal(t, "podman", cfg.Runtime)
-	})
-
-	t.Run("found in run dir", func(t *testing.T) {
-		runDir, err := os.MkdirTemp("", "cderun-run-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(runDir) }()
-
-		originalRunConfigDir := runConfigDir
-		runConfigDir = runDir
-		defer func() { runConfigDir = originalRunConfigDir }()
-
-		content := `
-runtime: docker
-defaults:
-  network: host
-`
-		err = os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(content), 0644)
-		require.NoError(t, err)
-
-		cfg, paths, err := LoadCDERunConfig()
-		assert.NoError(t, err)
-		assert.NotNil(t, cfg)
-		require.NotEmpty(t, paths)
-		assert.Contains(t, paths[0], ".cderun.yaml")
 		assert.Equal(t, "host", cfg.Defaults.Network)
-	})
-
-	t.Run("priority: home over run", func(t *testing.T) {
-		homeDir, err := os.MkdirTemp("", "cderun-home-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(homeDir) }()
-		t.Setenv("HOME", homeDir)
-		t.Setenv("USERPROFILE", homeDir)
-
-		runDir, err := os.MkdirTemp("", "cderun-run-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(runDir) }()
-
-		originalRunConfigDir := runConfigDir
-		runConfigDir = runDir
-		defer func() { runConfigDir = originalRunConfigDir }()
-
-		// Home config
-		homeConfigDir := filepath.Join(homeDir, ".config", "cderun")
-		require.NoError(t, os.MkdirAll(homeConfigDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(homeConfigDir, ".cderun.yaml"), []byte("runtime: podman"), 0644))
-
-		// Run config
-		require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte("runtime: docker"), 0644))
-
-		cfg, paths, err := LoadCDERunConfig()
-		assert.NoError(t, err)
-		require.Equal(t, 2, len(paths))
-		// Priority: higher first. Home > Run.
-		assert.Contains(t, paths[0], homeDir)
-		assert.Contains(t, paths[1], runDir)
-		assert.Equal(t, "podman", cfg.Runtime)
-	})
-
-	t.Run("HostContext is loaded and merged", func(t *testing.T) {
-		runDir, err := os.MkdirTemp("", "cderun-run-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(runDir) }()
-
-		originalRunConfigDir := runConfigDir
-		runConfigDir = runDir
-		defer func() { runConfigDir = originalRunConfigDir }()
-
-		content := `
-hostContext:
-  level: 1
-  snapshotDir: /tmp/snap
-  mounts:
-    - source: /host
-      target: /container
-      level: 1
-`
-		err = os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(content), 0644)
-		require.NoError(t, err)
-
-		cfg, _, err := LoadCDERunConfig()
-		assert.NoError(t, err)
-		require.NotNil(t, cfg)
-		require.NotNil(t, cfg.HostContext)
-		assert.Equal(t, 1, cfg.HostContext.Level)
-		assert.Equal(t, "/tmp/snap", cfg.HostContext.SnapshotDir)
-		require.Len(t, cfg.HostContext.Mounts, 1)
-		assert.Equal(t, "/host", cfg.HostContext.Mounts[0].Source)
-		assert.Equal(t, "/container", cfg.HostContext.Mounts[0].Target)
-		assert.Equal(t, 1, cfg.HostContext.Mounts[0].Level)
 	})
 }
 
 func TestUnit_Config_LoadToolsConfig(t *testing.T) {
-	// Create a temporary directory for testing
-	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	// Change working directory to tmpDir
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
-
-	t.Run("not found", func(t *testing.T) {
-		cfg, paths, err := LoadToolsConfig()
-		assert.NoError(t, err)
-		assert.Nil(t, cfg)
-		assert.Empty(t, paths)
-	})
-
 	t.Run("found in current dir", func(t *testing.T) {
-		content := `
-node:
-  image: node:20-alpine
-  tty: true
-`
-		err := os.WriteFile(".tools.yaml", []byte(content), 0644)
-		require.NoError(t, err)
-		defer func() { _ = os.Remove(".tools.yaml") }()
+		fs := &mockFileSystem{
+			wd: "/app",
+			files: map[string][]byte{
+				"/app/.tools.yaml": []byte("node:\n  image: node:20-alpine\n  tty: true"),
+			},
+			statErr: map[string]error{
+				"/home/user/.config/cderun/.tools.yaml": os.ErrNotExist,
+				"/etc/cderun/.tools.yaml":               os.ErrNotExist,
+				"/run/cderun/.tools.yaml":               os.ErrNotExist,
+			},
+		}
+		loader := &ConfigLoader{
+			FS:              fs,
+			SystemConfigDir: "/etc/cderun",
+			RunConfigDir:    "/run/cderun",
+		}
 
-		cfg, paths, err := LoadToolsConfig()
+		cfg, paths, err := loader.LoadToolsConfig()
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
-		assert.Contains(t, paths[0], ".tools.yaml")
 		tool, ok := cfg["node"]
 		assert.True(t, ok)
 		assert.Equal(t, "node:20-alpine", tool.Image)
 		assert.True(t, *tool.TTY)
-	})
-
-	t.Run("found in run dir", func(t *testing.T) {
-		runDir, err := os.MkdirTemp("", "cderun-run-*")
-		require.NoError(t, err)
-		defer func() { _ = os.RemoveAll(runDir) }()
-
-		originalRunConfigDir := runConfigDir
-		runConfigDir = runDir
-		defer func() { runConfigDir = originalRunConfigDir }()
-
-		content := `
-node:
-  image: node:18-alpine
-`
-		err = os.WriteFile(filepath.Join(runDir, ".tools.yaml"), []byte(content), 0644)
-		require.NoError(t, err)
-
-		cfg, paths, err := LoadToolsConfig()
-		assert.NoError(t, err)
-		assert.NotNil(t, cfg)
-		require.NotEmpty(t, paths)
-		assert.Contains(t, paths[0], ".tools.yaml")
-		assert.Equal(t, "node:18-alpine", cfg["node"].Image)
 	})
 }

@@ -138,35 +138,70 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 
 type ToolsConfig map[string]ToolConfig
 
-var (
-	systemConfigDir = "/etc/cderun"
-	runConfigDir    = "/run/cderun"
-)
+// FileSystem defines the operations needed for configuration discovery and loading.
+type FileSystem interface {
+	Getwd() (string, error)
+	UserHomeDir() (string, error)
+	Stat(name string) (os.FileInfo, error)
+	ReadFile(name string) ([]byte, error)
+}
+
+// OSFileSystem implements FileSystem using the standard os package.
+type OSFileSystem struct{}
+
+func (f OSFileSystem) Getwd() (string, error)                { return os.Getwd() }
+func (f OSFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
+func (f OSFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
+func (f OSFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
+
+// ConfigLoader handles configuration discovery and loading.
+type ConfigLoader struct {
+	FS              FileSystem
+	SystemConfigDir string
+	RunConfigDir    string
+}
+
+// NewConfigLoader creates a new ConfigLoader with default OS-based dependencies.
+func NewConfigLoader() *ConfigLoader {
+	return &ConfigLoader{
+		FS:              OSFileSystem{},
+		SystemConfigDir: "/etc/cderun",
+		RunConfigDir:    "/run/cderun",
+	}
+}
+
+var defaultLoader = NewConfigLoader()
 
 // SetRunConfigDirForTest sets the directory for run configuration (used for testing).
 func SetRunConfigDirForTest(path string) func() {
-	restoreDir := runConfigDir
-	runConfigDir = path
-	return func() { runConfigDir = restoreDir }
+	restoreDir := defaultLoader.RunConfigDir
+	defaultLoader.RunConfigDir = path
+	return func() { defaultLoader.RunConfigDir = restoreDir }
 }
 
 // SetSystemConfigDirForTest sets the directory for system configuration (used for testing).
 func SetSystemConfigDirForTest(path string) func() {
-	restoreDir := systemConfigDir
-	systemConfigDir = path
-	return func() { systemConfigDir = restoreDir }
+	restoreDir := defaultLoader.SystemConfigDir
+	defaultLoader.SystemConfigDir = path
+	return func() { defaultLoader.SystemConfigDir = restoreDir }
 }
 
 // FindConfigs searches for config files in hierarchical order.
 // Priority: Current Dir > Parent Dirs > Home Dir > System Paths.
 // The returned list is ordered by priority (highest first).
 func FindConfigs(filename string) []string {
+	return defaultLoader.FindConfigs(filename)
+}
+
+// FindConfigs searches for config files in hierarchical order.
+func (l *ConfigLoader) FindConfigs(filename string) []string {
 	var paths []string
-	curr, err := os.Getwd()
+	curr, err := l.FS.Getwd()
 	if err == nil {
 		for {
 			p := filepath.Join(curr, filename)
-			if _, err := os.Stat(p); err == nil {
+			if _, err := l.FS.Stat(p); err == nil {
+				// We still use filepath.Abs which is fine as it doesn't hit FS
 				if abs, err := filepath.Abs(p); err == nil {
 					paths = append(paths, abs)
 				} else {
@@ -182,9 +217,9 @@ func FindConfigs(filename string) []string {
 	}
 
 	// Add home dir
-	if home, err := os.UserHomeDir(); err == nil {
+	if home, err := l.FS.UserHomeDir(); err == nil {
 		p := filepath.Join(home, ".config", "cderun", filename)
-		if _, err := os.Stat(p); err == nil {
+		if _, err := l.FS.Stat(p); err == nil {
 			if abs, err := filepath.Abs(p); err == nil {
 				paths = append(paths, abs)
 			} else {
@@ -194,14 +229,14 @@ func FindConfigs(filename string) []string {
 	}
 
 	// Add system path
-	p := filepath.Join(systemConfigDir, filename)
-	if _, err := os.Stat(p); err == nil {
+	p := filepath.Join(l.SystemConfigDir, filename)
+	if _, err := l.FS.Stat(p); err == nil {
 		paths = append(paths, p)
 	}
 
 	// Add run directory path (used for nested execution config injection)
-	p = filepath.Join(runConfigDir, filename)
-	if _, err := os.Stat(p); err == nil {
+	p = filepath.Join(l.RunConfigDir, filename)
+	if _, err := l.FS.Stat(p); err == nil {
 		paths = append(paths, p)
 	}
 
@@ -210,7 +245,12 @@ func FindConfigs(filename string) []string {
 
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
 func LoadCDERunConfig() (*CDERunConfig, []string, error) {
-	paths := FindConfigs(".cderun.yaml")
+	return defaultLoader.LoadCDERunConfig()
+}
+
+// LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
+func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
+	paths := l.FindConfigs(".cderun.yaml")
 	if len(paths) == 0 {
 		return nil, nil, nil
 	}
@@ -221,7 +261,7 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	for i := len(paths) - 1; i >= 0; i-- {
 		path := paths[i]
 		baseDir := filepath.Dir(path)
-		data, err := os.ReadFile(path)
+		data, err := l.FS.ReadFile(path)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 		}
@@ -252,7 +292,12 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 
 // LoadToolsConfig searches for .tools.yaml in hierarchical locations and merges them.
 func LoadToolsConfig() (ToolsConfig, []string, error) {
-	paths := FindConfigs(".tools.yaml")
+	return defaultLoader.LoadToolsConfig()
+}
+
+// LoadToolsConfig searches for .tools.yaml in hierarchical locations and merges them.
+func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
+	paths := l.FindConfigs(".tools.yaml")
 	if len(paths) == 0 {
 		return nil, nil, nil
 	}
@@ -263,7 +308,7 @@ func LoadToolsConfig() (ToolsConfig, []string, error) {
 	for i := len(paths) - 1; i >= 0; i-- {
 		path := paths[i]
 		baseDir := filepath.Dir(path)
-		data, err := os.ReadFile(path)
+		data, err := l.FS.ReadFile(path)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read tools file %s: %w", path, err)
 		}

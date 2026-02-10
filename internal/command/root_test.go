@@ -149,7 +149,7 @@ func executeCommandRaw(args []string) (string, error) {
 	return buf.String(), execErr
 }
 
-func TestUnit_Root_PreprocessArgs(t *testing.T) {
+func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -191,7 +191,7 @@ func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	}
 }
 
-func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
+func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	assert.NoError(t, err)
@@ -200,7 +200,7 @@ func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestUnit_Root_Command(t *testing.T) {
+func TestUnit_Command_Root_Command(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
@@ -572,7 +572,7 @@ python:
 	})
 }
 
-func TestUnit_Root_InternalOverrides(t *testing.T) {
+func TestUnit_Command_Root_InternalOverrides(t *testing.T) {
 	// Use a temporary directory for this test
 	restoreWd, err := os.Getwd()
 	require.NoError(t, err)
@@ -716,7 +716,7 @@ node:
 	})
 }
 
-func TestUnit_Root_Phase3Features(t *testing.T) {
+func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -870,7 +870,7 @@ sh:
 	})
 }
 
-func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
+func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -941,7 +941,7 @@ node:
 	})
 }
 
-func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),

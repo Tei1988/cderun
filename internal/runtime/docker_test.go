@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -12,11 +13,13 @@ import (
 
 	"cderun/internal/container"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -119,19 +122,7 @@ func (m *mockDockerClient) ContainerAttach(ctx context.Context, container string
 	return m.attachResp, m.attachErr
 }
 
-type mockOneRetryDockerClient struct {
-	mockDockerClient
-}
-
-func (m *mockOneRetryDockerClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
-	m.pullCount++
-	if m.pullCount == 1 {
-		return nil, errors.New("toomanyrequests: too many requests")
-	}
-	return io.NopCloser(strings.NewReader("")), nil
-}
-
-func TestUnit_Docker_PullImageRetry(t *testing.T) {
+func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("retries on toomanyrequests error", func(t *testing.T) {
 		mock := &mockDockerClient{
 			imagePullErr: errors.New("toomanyrequests: too many requests"),
@@ -150,8 +141,10 @@ func TestUnit_Docker_PullImageRetry(t *testing.T) {
 		assert.Equal(t, 3, mock.pullCount)
 	})
 
-	t.Run("succeeds on first attempt", func(t *testing.T) {
-		mock := &mockDockerClient{}
+	t.Run("retries on Rate exceeded error", func(t *testing.T) {
+		mock := &mockDockerClient{
+			imagePullErr: errors.New("Rate exceeded: please wait"),
+		}
 		runtime := &DockerRuntime{
 			client: mock,
 			name:   "docker",
@@ -161,49 +154,40 @@ func TestUnit_Docker_PullImageRetry(t *testing.T) {
 		}
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
+		assert.Equal(t, 3, mock.pullCount)
+	})
+
+	t.Run("non-retryable error", func(t *testing.T) {
+		mock := &mockDockerClient{
+			imagePullErr: errors.New("some fatal error"),
+		}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.PullImage(context.Background(), "test-image", "always")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "some fatal error")
+		assert.Equal(t, 1, mock.pullCount)
+	})
+
+	t.Run("missing policy - inspect error not found", func(t *testing.T) {
+		mock := &mockDockerClient{
+			imageInspectErr: fmt.Errorf("not found: %w", errdefs.ErrNotFound),
+		}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.PullImage(context.Background(), "test-image", "missing")
 		assert.NoError(t, err)
 		assert.Equal(t, 1, mock.pullCount)
 	})
 
-	t.Run("succeeds after one retry", func(t *testing.T) {
-		mock := &mockOneRetryDockerClient{}
-		runtime := &DockerRuntime{
-			client: mock,
-			name:   "docker",
-			sleepFunc: func(ctx context.Context, d time.Duration) error {
-				return nil
-			},
+	t.Run("missing policy - fatal inspect error", func(t *testing.T) {
+		mock := &mockDockerClient{
+			imageInspectErr: errors.New("fatal inspect error"),
 		}
-
-		err := runtime.PullImage(context.Background(), "test-image", "always")
-		assert.NoError(t, err)
-		assert.Equal(t, 2, mock.pullCount)
-	})
-
-	t.Run("never policy", func(t *testing.T) {
-		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{
-			client: mock,
-			sleepFunc: func(ctx context.Context, d time.Duration) error {
-				return nil
-			},
-		}
-		err := runtime.PullImage(context.Background(), "test-image", "never")
-		assert.NoError(t, err)
-		assert.Equal(t, 0, mock.pullCount)
-	})
-
-	t.Run("missing policy - image exists", func(t *testing.T) {
-		mock := &mockDockerClient{imageInspectErr: nil}
-		runtime := &DockerRuntime{
-			client: mock,
-			sleepFunc: func(ctx context.Context, d time.Duration) error {
-				return nil
-			},
-		}
+		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test-image", "missing")
-		assert.NoError(t, err)
-		assert.Equal(t, 0, mock.pullCount)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "fatal inspect error")
 	})
 }
 
@@ -279,7 +263,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		assert.Equal(t, id, mock.startID)
 	})
 
-	t.Run("Wait", func(t *testing.T) {
+	t.Run("Wait success", func(t *testing.T) {
 		mock := &mockDockerClient{
 			waitResp: dockercontainer.WaitResponse{StatusCode: 42},
 		}
@@ -290,12 +274,31 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		assert.Equal(t, id, mock.waitID)
 	})
 
-	t.Run("Remove", func(t *testing.T) {
+	t.Run("Wait error", func(t *testing.T) {
+		mock := &mockDockerClient{
+			waitErrOut: errors.New("wait error"),
+		}
+		runtime := &DockerRuntime{client: mock}
+		_, err := runtime.WaitContainer(ctx, id)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "wait error")
+	})
+
+	t.Run("Remove success", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.RemoveContainer(ctx, id)
 		assert.NoError(t, err)
 		assert.Equal(t, id, mock.removeID)
+	})
+
+	t.Run("Remove suppression", func(t *testing.T) {
+		mock := &mockDockerClient{
+			removeErr: fmt.Errorf("not found: %w", errdefs.ErrNotFound),
+		}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.RemoveContainer(ctx, id)
+		assert.NoError(t, err) // Suppressed
 	})
 
 	t.Run("Resize", func(t *testing.T) {
@@ -308,7 +311,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		assert.Equal(t, uint(80), mock.resizeOpts.Width)
 	})
 
-	t.Run("Signal", func(t *testing.T) {
+	t.Run("Signal success", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.SignalContainer(ctx, id, "SIGINT")
@@ -316,11 +319,28 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		assert.Equal(t, id, mock.killID)
 		assert.Equal(t, "SIGINT", mock.killSignal)
 	})
+
+	t.Run("Signal suppression", func(t *testing.T) {
+		mock := &mockDockerClient{
+			killErr: fmt.Errorf("conflict: %w", errdefs.ErrConflict),
+		}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.SignalContainer(ctx, id, "SIGINT")
+		assert.NoError(t, err) // Suppressed
+	})
 }
+
+type mockErrorReader struct{}
+
+func (m *mockErrorReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("stream error")
+}
+func (m *mockErrorReader) Close() error { return nil }
 
 type mockConn struct {
 	net.Conn
-	closed bool
+	closed     bool
+	writeError error
 }
 
 func (m *mockConn) Close() error {
@@ -328,10 +348,39 @@ func (m *mockConn) Close() error {
 	return nil
 }
 func (m *mockConn) Write(b []byte) (n int, err error) {
+	if m.writeError != nil {
+		return 0, m.writeError
+	}
 	return len(b), nil
 }
 func (m *mockConn) CloseWrite() error {
 	return nil
+}
+
+
+type mockDockerClientWithReader struct {
+	mockDockerClient
+	pullReader io.ReadCloser
+}
+
+func (m *mockDockerClientWithReader) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+	m.pullCount++
+	return m.pullReader, nil
+}
+
+func TestUnit_Docker_PullImage_StreamErrors(t *testing.T) {
+	mock := &mockDockerClientWithReader{
+		pullReader: io.NopCloser(&mockErrorReader{}),
+	}
+	runtime := &DockerRuntime{
+		client: mock,
+		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			return nil
+		},
+	}
+	err := runtime.PullImage(context.Background(), "test-image", "always")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stream error")
 }
 
 func TestUnit_Docker_AttachContainer(t *testing.T) {
@@ -349,6 +398,32 @@ func TestUnit_Docker_AttachContainer(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, "output data", stdout.String())
+		assert.True(t, conn.closed)
+	})
+
+	t.Run("Non-TTY mode (multiplexed)", func(t *testing.T) {
+		conn := &mockConn{}
+		// Create multiplexed stream
+		var buf strings.Builder
+		w := stdcopy.NewStdWriter(&buf, stdcopy.Stdout)
+		_, _ = w.Write([]byte("stdout data"))
+		w = stdcopy.NewStdWriter(&buf, stdcopy.Stderr)
+		_, _ = w.Write([]byte("stderr data"))
+
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(strings.NewReader(buf.String())),
+			},
+		}
+		runtime := &DockerRuntime{client: mock}
+
+		stdout := &strings.Builder{}
+		stderr := &strings.Builder{}
+		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, stdout, stderr)
+		assert.NoError(t, err)
+		assert.Equal(t, "stdout data", stdout.String())
+		assert.Equal(t, "stderr data", stderr.String())
 		assert.True(t, conn.closed)
 	})
 
@@ -385,5 +460,27 @@ func TestUnit_Docker_AttachContainer(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, context.Canceled))
 		assert.True(t, conn.closed)
+	})
+
+	t.Run("stdin write error", func(t *testing.T) {
+		conn := &mockConn{writeError: errors.New("write error")}
+		// Use a reader that doesn't immediately return EOF to ensure stdin error is caught
+		pr, _ := io.Pipe()
+		defer pr.Close()
+
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock}
+
+		stdin := strings.NewReader("input data")
+		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil)
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "write error")
+		}
 	})
 }

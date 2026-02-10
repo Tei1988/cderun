@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUnit_Root_SnapshotImmutability(t *testing.T) {
+func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
 		HostContext: &config.HostContext{
@@ -41,7 +41,7 @@ func TestUnit_Root_SnapshotImmutability(t *testing.T) {
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
-func TestUnit_Root_SnapshotWithNilHostContext(t *testing.T) {
+func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
 	}

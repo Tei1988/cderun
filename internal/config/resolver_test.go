@@ -43,7 +43,7 @@ func cp(s string) ConfigPath {
 	return ConfigPath{Raw: s}
 }
 
-func TestUnit_Resolver_Resolve(t *testing.T) {
+func TestUnit_Config_Resolver_Resolve(t *testing.T) {
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
 		cli := CLIOptions{
 			TTY:    true,

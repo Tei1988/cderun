@@ -28,7 +28,7 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	}
 }
 
-func TestRobustness_Root_Execute(t *testing.T) {
+func TestRobustness_Command_Root_Execute(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		savedRuntimeFactory := runtimeFactory
 		savedExitFunc := exitFunc

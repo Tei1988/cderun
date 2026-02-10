@@ -88,7 +88,7 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	}
 }
 
-func TestIntegration_Root_Basic(t *testing.T) {
+func TestIntegration_Command_Root_Basic(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}

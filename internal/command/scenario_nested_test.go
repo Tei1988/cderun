@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScenario_NestedExecution(t *testing.T) {
+func TestScenario_Command_NestedExecution(t *testing.T) {
 	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
 	// and changes the working directory. It should not be run in parallel.
 
