@@ -31,10 +31,11 @@ cderun node --version
 #    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'node --version' が実行される。
 
 # --image フラグと、サブコマンドがある場合 (サブコマンド 'go' はツール定義なし)
-cderun go --image=golang:1.22 --version
-# => サブコマンド 'go' がキーとして使われるがツール定義は見つからない。イメージは 'golang:1.22' が指定される。
-#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'go --version' が実行される
-#    (golang:1.22 イメージのデフォルト ENTRYPOINT が 'go' であると仮定)。
+# サブコマンド自体を実行したい場合は --entrypoint を使用します。
+cderun go --image=golang:1.22 --entrypoint=go --version
+# => サブコマンド 'go' がキーとして使われるがツール定義は見つからない。イメージは 'golang:1.22'、
+#    ENTRYPOINT は 'go' が指定される。
+#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'go --version' が実行される。
 ```
 
 ### インタラクティブシェル
@@ -45,10 +46,11 @@ cderun --tty --interactive bash
 #    コンテナに渡されるコマンドは空となり、インタラクティブbashシェルが開かれる。
 
 # --image フラグと、サブコマンドがある場合 (サブコマンド 'sh' はツール定義なし)
-cderun --tty --interactive sh --image=alpine
-# => サブコマンド 'sh' がキーとして使われるがツール定義は見つからない。イメージは 'alpine' が指定される。
-#    コンテナに渡されるコマンドは空となり、インタラクティブshシェルが開かれる
-#    (alpine イメージのデフォルト ENTRYPOINT が 'sh' であると仮定)。
+# サブコマンド自体を実行したい場合は --entrypoint を使用します。
+cderun --tty --interactive sh --image=alpine --entrypoint=sh
+# => サブコマンド 'sh' がキーとして使われるがツール定義は見つからない。イメージは 'alpine'、
+#    ENTRYPOINT は 'sh' が指定される。
+#    コンテナに渡されるコマンドは空となり、インタラクティブshシェルが開かれる。
 ```
 
 ## メリット
