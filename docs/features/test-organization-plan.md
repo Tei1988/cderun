@@ -13,7 +13,7 @@
 | `internal/command` | 88.9% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
 | `internal/config` | 83.4% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 100.0% | ロギングシステムの全面的なテスト拡充により 100% を達成。 |
-| `internal/runtime` | 92.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 92.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実. |
 | **Total** | **87.1%** | 全体として極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
@@ -48,13 +48,13 @@
 
 ## 3. 課題の特定 (解決済み)
 
-1. **ランタイム実装のテスト不足**: リトライロジックの検証テストを追加済み。
-2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）の検証テストを追加済み。
-3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み。
-4. **ログローテーション**: 安定性の観点から設計変更により削除済み。
-5. **テスト用モックの不足**: 汎用的な `MockRuntime` および `sleepFunc` の導入により解決済み。
-6. **テストにおけるデータレース**: `robustness_test.go` 等での信号ハンドラとテスト本体間の共有変数へのアクセスを `sync.Mutex` で保護し、`go test -race` での検出を回避。
-7. **グローバル状態（カレントディレクトリ等）の汚染**: `os.Chdir` を使用するテストでの `t.Cleanup` による復元を徹底し、テストの実行順序や並列実行による不安定性を排除。
+  1. **ランタイム実装のテスト不足**: リトライロジックの検証テストを追加済み。
+  2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）の検証テストを追加済み。
+  3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み.
+  4. **ログローテーション**: 安定性の観点から設計変更により削除済み。
+  5. **テスト用モックの不足**: 汎用的な `MockRuntime` および `sleepFunc` の導入により解決済み。
+  6. **テストにおけるデータレース**: `robustness_test.go` 等での信号ハンドラとテスト本体間の共有変数へのアクセスを `sync.Mutex` で保護し、`go test -race` での検出を回避。
+  7. **グローバル状態（カレントディレクトリ等）の汚染**: `os.Chdir` を使用するテストでの `t.Cleanup` による復元を徹底し、テストの実行順序や並列実行による不安定性を排除。
 
 ## 4. テストの体系化案
 
@@ -71,23 +71,23 @@
 
 `Test[Category]_[Feature]_[Scenario]` の形式を推奨する。
 
-- 例: `TestUnit_Config_TildeExpansion`
-- 例: `TestIntegration_Docker_PortMapping`
-- 例: `TestRobustness_Signal_DoubleCtrlC`
+  - 例: `TestUnit_Config_TildeExpansion`
+  - 例: `TestIntegration_Docker_PortMapping`
+  - 例: `TestRobustness_Signal_DoubleCtrlC`
 
 ## 5. 改善計画
 
 ### 5.1. テスト容易性の向上 (完了および継続)
 
-1. **ファイルシステムの抽象化**: `runConfigDir` や `systemConfigDir` の差し替えメカニズムを導入済み。さらなる抽象化（`fs.FS`等）は将来の検討事項。
-2. **ランタイムモックの強化 (完了)**: スレッドセーフかつ全操作を記録可能な `MockRuntime` を実装済み。
-3. **コマンド実行のラップ (完了)**: `cderun` バイナリ自体のパスを `MountCderunPath` 等で制御可能にし、テストの柔軟性を向上。
-4. **設定の不変性 (Immutability) の確保**: `createSnapshot` 等での設定情報のディープコピーを徹底し、副作用による不具合やテストの干渉を防止。
+  1. **ファイルシステムの抽象化**: `runConfigDir` や `systemConfigDir` の差し替えメカニズムを導入済み。さらなる抽象化（`fs.FS`等）は将来の検討事項。
+  2. **ランタイムモックの強化 (完了)**: スレッドセーフかつ全操作を記録可能な `MockRuntime` を実装済み。
+  3. **コマンド実行のラップ (完了)**: `cderun` バイナリ自体のパスを `MountCderunPath` 等で制御可能にし、テストの柔軟性を向上。
+  4. **設定の不変性 (Immutability) の確保**: `createSnapshot` 等での設定情報のディープコピーを徹底し、副作用による不具合やテストの干渉を防止。
 
 ### 5.2. カバレッジの継続的計測と記録
 
-1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.0% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。
-2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
+  1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.0% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。
+  2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
 ## 6. テストマトリックス (2026-02時点)
 

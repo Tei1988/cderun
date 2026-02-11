@@ -63,11 +63,9 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 
 1. `--runtime` または `CDERUN_RUNTIME` が指定されている場合はそれを使用。
 2. 指定がない場合、以下のデフォルトパスを順に確認し、最初に見つかったものを使用。
-
-- `/var/run/docker.sock` (Runtime: `docker`)
-- `/run/podman/podman.sock` (Runtime: `podman`)
-
-1. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
+   - `/var/run/docker.sock` (Runtime: `docker`)
+   - `/run/podman/podman.sock` (Runtime: `podman`)
+3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
 
 ### 明示的な指定 (Completed)
 
@@ -94,7 +92,7 @@ cderun --runtime podman node app.js
 ## ランタイム固有の実装ポイント
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman**: Docker 互換の API を使用。Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
+- **Podman**: Docker 互換の API を使用. Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
 
 ## ランタイム情報の表示 (Completed)
 
