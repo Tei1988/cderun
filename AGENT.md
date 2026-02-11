@@ -1,11 +1,13 @@
 # Project Context for AI Agents
 
 ## 1. Introduction
+
 このリポジトリは、Go言語（Golang）によるCLIツールの開発プロジェクトです。
 
 あなたはAI開発パートナーとして、このプロジェクトの実装、リファクタリング、テスト、ドキュメント作成を支援します。
 
 ## 2. Directory Structure & Knowledge Base
+
 プロジェクトのルールと知識は、以下のドキュメントに分割されています。
 
 作業を開始する前に、必ずこれらを参照してください。

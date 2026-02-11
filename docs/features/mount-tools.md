@@ -21,11 +21,13 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 **説明**: `.tools.yaml`に定義されているすべてのツールをマウント
 
 **使用例**:
+
 ```bash
 cderun --mount-socket --mount-all-tools sh
 ```
 
 **動作**:
+
 ```bash
 # .tools.yamlに node, python, gemini-cli が定義されている場合
 docker run --rm \
@@ -38,6 +40,7 @@ docker run --rm \
 ```
 
 **コンテナ内での使用**:
+
 ```bash
 # コンテナ内で
 node --version    # cderunがnodeとして実行される
@@ -52,11 +55,13 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 **説明**: 指定したツールのみをマウント（カンマ区切り）
 
 **使用例**:
+
 ```bash
 cderun --mount-socket --mount-tools python,node sh
 ```
 
 **動作イメージ(実際はランタイムAPIで実現)**:
+
 ```bash
 docker run --rm \
   --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
@@ -67,6 +72,7 @@ docker run --rm \
 ```
 
 **コンテナ内での使用**:
+
 ```bash
 # コンテナ内で
 python --version  # OK

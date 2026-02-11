@@ -31,6 +31,7 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 | `ResizeContainerTTY` | implemented | implemented |
 
 **メリット:**
+
 - コマンド生成不要
 - プログラマティックな制御
 - エラーハンドリングが容易
@@ -82,27 +83,32 @@ CRIを直接使うことで、コンテナ内からcderunを実行しても、�
 ## ロードマップ
 
 ### Phase 1: コア機能 (Completed)
+
 - 中間表現（ContainerConfig）の定義
 - Docker CRI実装
 - 基本的な実行フロー
 
 ### Phase 2: 設定管理 (Completed)
+
 - 設定ファイル読み込み
 - イメージマッピング
 - 優先順位解決
 - ドライランモード (Phase 4から前倒しで完了)
 
 ### Phase 3: 高度な機能 (Completed)
+
 - 環境変数パススルー
 - ソケット・バイナリマウント・ツールマウント
 
 ### Phase 4: 利便性向上 (Completed)
+
 - Podman CRI実装
 - エラーハンドリングの強化
 - シグナル転送・リサイズ同期
 - 詳細ログ機能
 
 ### Phase 5: Docker互換フラグの拡充 (Completed)
+
 - 詳細なコンテナ設定（ネットワーク、リソース、セキュリティ等）のIRへの追加と各ランタイムでの実装。
 
 ## 依存ライブラリ

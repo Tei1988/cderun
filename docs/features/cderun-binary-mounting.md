@@ -51,12 +51,14 @@ Python 3.11.0
 ### 自動マウント
 
 #### フラグによる指定
+
 ```bash
 # 明示的に指定
 cderun --mount-cderun --mount-socket gemini-cli
 ```
 
 #### 設定ファイルによる指定
+
 ```yaml
 # .tools.yaml
 gemini-cli:
@@ -65,6 +67,7 @@ gemini-cli:
 ```
 
 #### グローバル設定
+
 ```yaml
 # .cderun.yaml
 defaults:
@@ -88,6 +91,7 @@ defaults:
 ### 例1: gemini-cliからMCPサーバーを呼び出す
 
 #### ホスト側の設定
+
 ```yaml
 # .tools.yaml
 gemini-cli:
@@ -103,6 +107,7 @@ python:
 ```
 
 #### 実行
+
 ```bash
 # 基底ホストでgemini-cliを起動
 cderun --mount-socket gemini-cli
@@ -148,6 +153,7 @@ cderun docker ps
 ### 対策
 
 #### read-onlyマウント
+
 - cderunバイナリはread-onlyでマウントされます。
 - `/usr/local/bin/cderun:/usr/local/bin/cderun:ro`
 
@@ -180,10 +186,12 @@ None  # ← 環境変数は引き継がれない！
 - ✅ **基底ホストのdockerデーモン**: 同じdockerデーモンを使用
 
 ### 2. プラットフォーム依存
+
 - cderunバイナリは実行ホストと同じアーキテクチャである必要がある
 - Linux/amd64の実行ホストから、Linux/arm64のコンテナでは動作しない
 
 ### 3. バイナリの互換性
+
 - コンテナ内のライブラリとの互換性が必要
 - 静的リンクされたバイナリが推奨
 
