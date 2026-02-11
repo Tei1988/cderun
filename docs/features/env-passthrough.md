@@ -19,6 +19,7 @@
 ## 設定方法
 
 ### ツール設定
+
 ```yaml
 # .tools.yaml
 node:
@@ -29,6 +30,7 @@ node:
 ```
 
 ### コマンドライン
+
 ```bash
 # 明示的な値を設定
 cderun --env NODE_ENV=production node app.js
@@ -41,6 +43,7 @@ cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 ```
 
 ### 環境変数 (P3)
+
 `CDERUN_ENV` 環境変数を使用して、複数の環境変数を一度に指定できます。セパレータとしてセミコロン (`;`) を使用します。
 
 ```bash
@@ -79,6 +82,7 @@ node:
 ## 実行例
 
 ### 例1: 明示的な値の設定
+
 ```yaml
 # .tools.yaml
 node:
@@ -93,6 +97,7 @@ cderun node app.js
 ```
 
 ### 例2: 実行ホストから取得
+
 ```yaml
 # .tools.yaml
 node:
@@ -110,6 +115,7 @@ cderun node app.js
 ```
 
 ### 例3: 混在
+
 ```yaml
 # .tools.yaml
 node:
@@ -132,6 +138,7 @@ cderun node app.js
 ## 環境変数が存在しない場合
 
 ### デフォルト動作
+
 実行ホストに存在しない環境変数は空文字列として渡される：
 
 ```bash
@@ -141,9 +148,11 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 ```
 
 ### 厳密モード (Strict Mode)
+
 `strictEnv` を `true` に設定すると、指定された環境変数が実行ホストに存在しない場合にエラーを返します。
 
 #### 設定方法
+
 `.cderun.yaml`（グローバル）または `.tools.yaml`（ツール固有）で設定可能です。
 
 ```yaml
@@ -153,11 +162,13 @@ defaults:
 ```
 
 または環境変数で指定：
+
 ```bash
 export CDERUN_STRICT_ENV=true
 ```
 
 #### 挙動
+
 ```bash
 cderun node app.js
 Error: required environment variable not found: NPM_TOKEN
@@ -172,6 +183,7 @@ Error: required environment variable not found: NPM_TOKEN
 デフォルト動作と厳密モード（Strict Mode）の使い分けの指針を以下に示します。
 
 ### デフォルト動作 (strictEnv: false)
+
 - **特徴**: 指定した変数がホストになくてもエラーにせず、空文字としてコンテナに渡します。
 - **メリット**: 柔軟性が高く、一部の環境変数が欠けていても動作が継続できる場合に便利です。
 - **推奨されるユースケース**:
@@ -179,6 +191,7 @@ Error: required environment variable not found: NPM_TOKEN
   - オプショナルな設定（ログレベルの変更など）をパススルーする場合。
 
 ### 厳密モード (strictEnv: true)
+
 - **特徴**: 指定した変数がホストに存在しない場合、即座にエラーで停止します（Fail Fast）。
 - **メリット**: 設定漏れによるサイレントな失敗（意図しないデフォルト値での動作など）を確実に防げます。
 - **推奨されるユースケース**:
@@ -189,6 +202,7 @@ Error: required environment variable not found: NPM_TOKEN
 ## デバッグ
 
 ### dry-runでの確認
+
 ```bash
 cderun --dry-run node app.js
 env:

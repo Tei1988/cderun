@@ -19,6 +19,7 @@ custom-tool:
 ```
 
 ### エラーハンドリング
+
 - マッピングが存在しない場合、エラーを出力して終了
 - 例: `cderun unknown-tool` → `Error: no image mapping found for tool: unknown-tool`
 - ユーザーは明示的に `--image` フラグでイメージを指定する必要がある

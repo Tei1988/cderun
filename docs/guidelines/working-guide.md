@@ -1,7 +1,9 @@
 # Working Guide & Coding Standards
+
 開発を進める上でのワークフロー、ディレクトリ構成、コーディング規約です。
 
 ## 1. Development Workflow
+
 機能追加や修正を行う際は、以下の **"Spec-First" サイクル** を回してください。
 
 1. **Understand Specs (要件理解)**
@@ -19,6 +21,7 @@
    - 修正する場合は、変更理由をコミットメッセージに明記する。
 
 ## 2. Project Layout
+
 Standard Go Project Layout に準拠しつつ、小規模な構成をとります。
 
 ```text
@@ -37,7 +40,9 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 ```
 
 ## 3. Coding Guidelines
+
 ### General
+
 - **Effective Go:** Goの公式スタイルガイドに従う。
 - **Naming Conventions:**
   - 時間軸に依存した命名（`new`, `old`, `current`, `latest` など）を避ける。
@@ -50,6 +55,7 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 - **Structs:** 構造体のフィールドには適切なタグ（`json:"..."`, `yaml:"..."`）を付与する。
 
 ### CLI Best Practices
+
 - **Stdout vs Stderr:**
   - 正常な出力結果（パイプで渡すデータなど）: `Stdout`
   - ログ、警告、エラーメッセージ、進捗バー: `Stderr`
@@ -68,6 +74,7 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
   - エラー: `1` (または適切な非ゼロの値)
 
 ### Testing
+
 - **Test Isolation:**
   - テスト間で状態（グローバル変数、パッケージ変数、フラグなど）が漏洩しないようにする。
   - サブテスト内で変数を変更した場合は、必ず `t.Cleanup()` を使用して元の値に復元する。
