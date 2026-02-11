@@ -373,7 +373,9 @@ cderun --diagnosis --diagnosis-format json
 
 - **型**: count
 - **説明**: ログ出力の詳細度を上げる。デフォルトのログレベルは `WARN` です。
+- **注意**: `-v` 短縮フラグはサポートされていません。
 - **用途**:
+
   - 指定なし: `WARN` (警告とエラーのみ)
   - `--verbose`: `INFO` ("Running: ..." 等の情報を表示)
   - `--verbose --verbose`: `DEBUG`
@@ -418,6 +420,7 @@ cderun --log-timestamp=false node app.js
 
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
 - **カテゴリ別の対応フラグ例**:
+
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
     `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
@@ -435,6 +438,7 @@ cderun --log-timestamp=false node app.js
     `--cderun-diagnosis`, `--cderun-diagnosis-format`,
     `--cderun-log-level`, `--cderun-log-format`,
     `--cderun-log-timestamp`, `--cderun-verbose`
+
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 
 ## その他の設定オプション
