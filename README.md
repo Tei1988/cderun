@@ -38,10 +38,12 @@ ln -s cderun node
 ### 3. Ad-hoc Mode
 
 You can use `cderun` to run arbitrary commands in a containerized environment
-by specifying the image.
+by specifying the image. Since the first non-flag argument is always consumed
+as a subcommand (lookup key), you must explicitly specify the entrypoint
+if you want to execute a command that is not the default entrypoint of the image.
 
 ```bash
-cderun --image alpine ls -l
+cderun --image=alpine --entrypoint=ls ls -l
 ```
 
 ### 4. Diagnosis Mode

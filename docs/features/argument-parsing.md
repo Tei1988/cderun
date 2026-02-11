@@ -56,14 +56,16 @@ cderun my-tool -l -a
 
 **例2: ツール定義がない場合 (`go` は `.tools.yaml` に定義なし)**
 
+アドホックな実行を行う場合、サブコマンドは常に設定のキーとして消費されることに注意してください。イメージ内のデフォルト `ENTRYPOINT` に指定されていないコマンドを実行したい場合は、`--entrypoint` フラグで明示的に指定する必要があります。
+
 ```bash
-cderun --image=golang:1.22 go --version
+cderun --image=golang:1.22 --entrypoint=go go --version
 ```
 - `<subcommand>`: `go`
 - イメージ: `golang:1.22` (`--image` フラグから)
-- コンテナ `ENTRYPOINT`: (イメージのデフォルト。golangイメージの場合は通常 `["go"]` または空)
+- コンテナ `ENTRYPOINT`: `go` (`--entrypoint` フラグから)
 - コンテナ `CMD`: `["--version"]` (`go` はキーとして消費され、含まれない)
-- 結果: コンテナ内で `go --version` が実行される（イメージの `ENTRYPOINT` が `go` の場合）。
+- 結果: コンテナ内で `go --version` が実行される。
 
 **例3: ツール定義がなく、かつ `--image` もない場合**
 
