@@ -7,6 +7,7 @@ cderunの動作を詳細に確認するためのログ出力とデバッグ機�
 ## ログレベル
 
 ### レベル定義
+
 - `ERROR`: エラーのみ
 - `WARN`: 警告とエラー（デフォルト）
 - `INFO`: 一般的な情報
@@ -16,11 +17,16 @@ cderunの動作を詳細に確認するためのログ出力とデバッグ機�
 ### 設定方法
 
 #### コマンドライン
+
 ```bash
 # 情報の表示 (INFO)
 cderun --verbose node app.js
 cderun --log-level info node app.js
+```
 
+> **Note**: `-v` 短縮フラグはサポートされていません（`--verbose` の短縮形としては機能しません）。意図的に標準的なフラグのみをサポートしています。
+
+```bash
 # 詳細ログ (DEBUG)
 cderun --verbose --verbose node app.js
 cderun --log-level debug node app.js
@@ -30,9 +36,8 @@ cderun --verbose --verbose --verbose node app.js
 cderun --log-level trace node app.js
 ```
 
-> **Note**: `-v` shorthand is not supported (it is not used for `--verbose`).
-
 #### 設定ファイル
+
 ```yaml
 # .cderun.yaml
 logging:
@@ -42,6 +47,7 @@ logging:
 ```
 
 #### 環境変数
+
 ```bash
 export CDERUN_LOG_LEVEL=debug
 export CDERUN_LOG_TIMESTAMP=true
@@ -59,13 +65,16 @@ export CDERUN_LOG_TIMESTAMP=true
 ## ログ出力例
 
 ### デフォルト（WARNレベル）
+
 ```bash
 cderun node app.js
 Hello, World!
 ```
+
 > **Note**: デフォルトでは `INFO` レベルの "Running: ..." 等のメッセージは表示されず、コマンドの出力のみが表示されます。
 
 ### INFO レベル
+
 ```bash
 cderun --verbose node app.js
 2024-01-15 10:30:45 [INFO] Running: node app.js
@@ -73,6 +82,7 @@ Hello, World!
 ```
 
 ### DEBUG レベル
+
 ```bash
 cderun --log-level debug node app.js
 2024-01-15 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
@@ -86,6 +96,7 @@ Hello, World!
 ```
 
 ### TRACE レベル
+
 ```bash
 cderun --log-level trace node app.js
 2024-01-15 10:30:45 [TRACE] Loading configurations...
@@ -103,11 +114,13 @@ cderun --log-level trace node app.js
 ## フォーマット
 
 ### テキスト形式（デフォルト）
+
 ```text
 2024-01-15 10:30:45 [INFO] Running: node app.js
 ```
 
 ### JSON形式
+
 ```bash
 cderun --log-format json --verbose node app.js
 {"level":"info","msg":"Running: node app.js","time":"2024-01-15T10:30:45Z"}
@@ -116,6 +129,7 @@ cderun --log-format json --verbose node app.js
 ## デバッグ機能
 
 ### 1. ドライラン
+
 実行せずにコンテナ構成を表示します。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
 
 ```bash
