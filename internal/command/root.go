@@ -979,31 +979,16 @@ func preprocessArgs(args []string) ([]string, error) {
 
 		if strings.HasPrefix(arg, "--cderun-") {
 			shouldHoist = true
-		} else if isPolyglot && strings.HasPrefix(arg, "-") {
-			// In polyglot mode, also hoist known cderun flags even without prefix.
-			// This improves usability for symlinked tools.
-			if strings.HasPrefix(arg, "--") {
-				name := strings.SplitN(arg[2:], "=", 2)[0]
-				f := rootCmd.PersistentFlags().Lookup(name)
-				if f == nil {
-					f = rootCmd.Flags().Lookup(name)
-				}
-				if f != nil {
-					shouldHoist = true
-				}
-			} else {
-				// Check if any shorthand in the group is a known cderun flag
-				for j := 1; j < len(arg); j++ {
-					sh := string(arg[j])
-					f := rootCmd.PersistentFlags().ShorthandLookup(sh)
-					if f == nil {
-						f = rootCmd.Flags().ShorthandLookup(sh)
-					}
-					if f != nil {
-						shouldHoist = true
-						break
-					}
-				}
+		} else if isPolyglot && strings.HasPrefix(arg, "--") {
+			// In polyglot mode, also hoist known long-form cderun flags.
+			// Shorthands are skipped to avoid conflicts with tool-specific shorthands.
+			name := strings.SplitN(arg[2:], "=", 2)[0]
+			f := rootCmd.PersistentFlags().Lookup(name)
+			if f == nil {
+				f = rootCmd.Flags().Lookup(name)
+			}
+			if f != nil {
+				shouldHoist = true
 			}
 		}
 
@@ -1021,16 +1006,6 @@ func preprocessArgs(args []string) ([]string, error) {
 						overrides = append(overrides, args[i+1])
 						i++
 					}
-				}
-			} else if len(arg) > 1 {
-				lastChar := string(arg[len(arg)-1])
-				f := rootCmd.PersistentFlags().ShorthandLookup(lastChar)
-				if f == nil {
-					f = rootCmd.Flags().ShorthandLookup(lastChar)
-				}
-				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
 				}
 			}
 		} else {

@@ -59,12 +59,22 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			return mock, nil
 		}
 
-		// Setup a tool mapping for 'node' so it doesn't fail
-		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		// Use a temporary directory for this test
+		restoreWd, err := os.Getwd()
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { _ = os.Remove(".tools.yaml") })
+		tmpDir := t.TempDir()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+
+		// Setup a tool mapping for 'node' so it doesn't fail
+		err = os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rootCmd = newRootCmd()
 		rootCmd.SetOut(io.Discard)
