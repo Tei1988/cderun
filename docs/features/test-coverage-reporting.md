@@ -90,9 +90,10 @@ coverage-html: coverage
 	@echo "Generated coverage.html"
 ```
 
-## 5. CIへの統合 (将来的な展望)
+## 5. CIへの統合 (既実装)
 
-継続的インテグレーション (CI) プロセスにカバレッジ計測を組み込む。
+継続的インテグレーション (CI) プロセスにカバレッジ計測が組み込まれています。
 
-- 各ビルドでカバレッジレポートを生成し、アーティファクトとして保存する。
-- [Codecov](https://about.codecov.io/) や [Coveralls](https://coveralls.io/) のような外部サービスにレポートをアップロードし、プルリクエスト上でカバレッジの変動を可視化する。これにより、カバレッジが低下するような変更をマージ前に検出できる。
+- GitHub Actions (`.github/workflows/ci.yaml`) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
+- カバレッジ率が 87.0%（設定値）を下回った場合、CIジョブは失敗します。
+- `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。
