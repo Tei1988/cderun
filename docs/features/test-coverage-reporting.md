@@ -95,5 +95,5 @@ coverage-html: coverage
 継続的インテグレーション (CI) プロセスにカバレッジ計測が組み込まれています。
 
 - GitHub Actions (`.github/workflows/ci.yaml`) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
-- カバレッジ率が 87.0%（設定値）を下回った場合、CIジョブは失敗します。
+- カバレッジ率が 86.5%（設定値）を下回った場合、CIジョブは失敗します。
 - `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。
