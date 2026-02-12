@@ -102,7 +102,7 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 - **説明**: cderunバイナリをコンテナ内の `/usr/local/bin/cderun` にマウント
 - **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
 - **制約**: `--mount-socket`との併用が必須
-- **補足**: `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になるため、明示的な指定は不要です。
+- **補足**: `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になるため、明示的な指定は不要です。また、ネスト実行が検出された場合も自動的にマウントが構成されます。
 
 ```bash
 cderun --mount-cderun --mount-socket alpine sh
@@ -376,6 +376,7 @@ cderun --diagnosis --diagnosis-format json
 - **デフォルト**: `warn`
 - **説明**: ログレベルを直接指定
 - **値**: `error`, `warn`, `info`, `debug`, `trace`
+- **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
 
 ```bash
 cderun --log-level info node app.js

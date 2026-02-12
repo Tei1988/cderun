@@ -165,6 +165,7 @@ defaults:
   user: "1000:1000"
   memory: "1g"
   cpus: 1.5
+  command: ["--version"]           # デフォルトのコマンド引数
   mounts:
     - type: tmpfs
       target: /tmp
@@ -201,6 +202,9 @@ node:
   mountCderun: true
   privileged: false
   memory: "512m"
+  command: ["app.js"]              # デフォルトの実行引数
+  devices:
+    - /dev/fuse                    # コンテナに追加するデバイス
 
 python:
   image: python:3.11-slim
@@ -266,6 +270,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `capAdd` ([]string): ケーパビリティ追加
 - `capDrop` ([]string): ケーパビリティ削除
 - `entrypoint` ([]string): エントリーポイント
+- `command` ([]string): デフォルトのコマンド引数。サブコマンドの後に結合されます。
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
@@ -274,8 +279,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
   - `source` (string): ホスト側のパス（bindの場合）
   - `target` (string, 必須): コンテナ内のパス
   - `read_only` (bool): 読み取り専用
-- `devices` ([]string): デバイス追加
-  - 形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`
+- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`
 - `env` ([]string): 環境変数
 
 #### `logging` サブセクション
@@ -321,6 +325,7 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `capAdd` ([]string): ケーパビリティ追加
 - `capDrop` ([]string): ケーパビリティ削除
 - `entrypoint` ([]string): エントリーポイント
+- `command` ([]string): デフォルトのコマンド引数
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
