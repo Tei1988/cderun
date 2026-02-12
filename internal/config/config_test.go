@@ -172,6 +172,24 @@ node:
 	})
 }
 
+func TestUnit_Config_Loader_SetDirs(t *testing.T) {
+	t.Run("SetRunConfigDirForTest", func(t *testing.T) {
+		original := defaultLoader.runConfigDir
+		cleanup := SetRunConfigDirForTest("/tmp/run")
+		assert.Equal(t, "/tmp/run", defaultLoader.runConfigDir)
+		cleanup()
+		assert.Equal(t, original, defaultLoader.runConfigDir)
+	})
+
+	t.Run("SetSystemConfigDirForTest", func(t *testing.T) {
+		original := defaultLoader.systemConfigDir
+		cleanup := SetSystemConfigDirForTest("/tmp/system")
+		assert.Equal(t, "/tmp/system", defaultLoader.systemConfigDir)
+		cleanup()
+		assert.Equal(t, original, defaultLoader.systemConfigDir)
+	})
+}
+
 func TestUnit_Config_RealFS_Integration(t *testing.T) {
 	// Keep one test with real filesystem to ensure RealFileSystem works
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")

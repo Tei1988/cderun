@@ -23,6 +23,9 @@ func (cp *ConfigPath) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (cp ConfigPath) MarshalYAML() (interface{}, error) {
+	if cp.IsEmpty() {
+		return nil, nil
+	}
 	return cp.Raw, nil
 }
 
@@ -95,6 +98,24 @@ func (mc MountConfig) IsEmpty() bool {
 	return mc.Target.IsEmpty()
 }
 
+func (mc MountConfig) MarshalYAML() (interface{}, error) {
+	if mc.IsEmpty() {
+		return nil, nil
+	}
+	// We use an anonymous struct to avoid infinite recursion
+	var a struct {
+		Type     string     `yaml:"type,omitempty"`
+		Source   ConfigPath `yaml:"source,omitempty"`
+		Target   ConfigPath `yaml:"target"`
+		ReadOnly bool       `yaml:"read_only,omitempty"`
+	}
+	a.Type = mc.Type
+	a.Source = mc.Source
+	a.Target = mc.Target
+	a.ReadOnly = mc.ReadOnly
+	return a, nil
+}
+
 func (mc *MountConfig) SetBaseDir(baseDir string) {
 	if mc.Source.Raw != "" {
 		mc.Source.BaseDir = baseDir
@@ -142,6 +163,18 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 
 func (dc DeviceConfig) IsEmpty() bool {
 	return dc.Source.IsEmpty() && dc.Destination.IsEmpty()
+}
+
+func (dc DeviceConfig) MarshalYAML() (interface{}, error) {
+	if dc.IsEmpty() {
+		return nil, nil
+	}
+	// Marshal back to string format host:container[:perms]
+	res := dc.Source.Raw + ":" + dc.Destination.Raw
+	if dc.Permissions != "" && dc.Permissions != "rwm" {
+		res += ":" + dc.Permissions
+	}
+	return res, nil
 }
 
 func (dc *DeviceConfig) SetBaseDir(baseDir string) {
@@ -258,7 +291,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	prefix := schemeRegex.FindString(p)
 	p = strings.TrimPrefix(p, prefix)
 
-	fs := FileSystem(RealFileSystem{})
+	var fs FileSystem = RealFileSystem{}
 	if r != nil && r.fs != nil {
 		fs = r.fs
 	}

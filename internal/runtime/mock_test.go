@@ -64,3 +64,8 @@ func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {
 
 	assert.Equal(t, "mock", mock.Name())
 }
+
+func TestUnit_Runtime_Mock_New(t *testing.T) {
+	m := NewMockRuntime()
+	assert.NotNil(t, m)
+}

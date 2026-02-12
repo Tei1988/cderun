@@ -157,6 +157,110 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 	})
 }
 
+func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
+	t.Run("ConfigPath", func(t *testing.T) {
+		cp := ConfigPath{Raw: "/path"}
+		data, err := yaml.Marshal(cp)
+		assert.NoError(t, err)
+		assert.Equal(t, "/path\n", string(data))
+
+		cp = ConfigPath{}
+		data, err = yaml.Marshal(cp)
+		assert.NoError(t, err)
+		assert.Equal(t, "null\n", string(data))
+	})
+
+	t.Run("MountConfig", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/host"},
+			Target: ConfigPath{Raw: "/container"},
+		}
+		data, err := yaml.Marshal(mc)
+		assert.NoError(t, err)
+		assert.Contains(t, string(data), "type: bind")
+		assert.Contains(t, string(data), "source: /host")
+		assert.Contains(t, string(data), "target: /container")
+
+		mc = MountConfig{}
+		data, err = yaml.Marshal(mc)
+		assert.NoError(t, err)
+		assert.Equal(t, "null\n", string(data))
+	})
+
+	t.Run("DeviceConfig", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/video0"},
+			Destination: ConfigPath{Raw: "/dev/video1"},
+			Permissions: "rw",
+		}
+		data, err := yaml.Marshal(dc)
+		assert.NoError(t, err)
+		assert.Equal(t, "/dev/video0:/dev/video1:rw\n", string(data))
+
+		dc = DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/fuse"},
+			Destination: ConfigPath{Raw: "/dev/fuse"},
+			Permissions: "rwm",
+		}
+		data, err = yaml.Marshal(dc)
+		assert.NoError(t, err)
+		assert.Equal(t, "/dev/fuse:/dev/fuse\n", string(data))
+
+		dc = DeviceConfig{}
+		data, err = yaml.Marshal(dc)
+		assert.NoError(t, err)
+		assert.Equal(t, "null\n", string(data))
+	})
+
+	t.Run("omitempty behavior", func(t *testing.T) {
+		type TestConfig struct {
+			Path    ConfigPath     `yaml:"path,omitempty"`
+			Mounts  []MountConfig  `yaml:"mounts,omitempty"`
+			Devices []DeviceConfig `yaml:"devices,omitempty"`
+		}
+
+		cfg := TestConfig{}
+		data, err := yaml.Marshal(cfg)
+		assert.NoError(t, err)
+		assert.Equal(t, "{}\n", string(data))
+
+		cfg.Path = ConfigPath{Raw: "/foo"}
+		data, err = yaml.Marshal(cfg)
+		assert.NoError(t, err)
+		assert.Contains(t, string(data), "path: /foo")
+	})
+}
+
+func TestUnit_Config_Path_Helpers(t *testing.T) {
+	baseDir := "/base"
+	r, _ := NewExpressionResolver(nil)
+
+	t.Run("resolveVolumePath", func(t *testing.T) {
+		assert.Equal(t, "/base/host:/container", resolveVolumePath("./host:/container", baseDir, r))
+		assert.Equal(t, "named-volume:/container", resolveVolumePath("named-volume:/container", baseDir, r))
+	})
+
+	t.Run("resolveDevicePath", func(t *testing.T) {
+		assert.Equal(t, "/base/dev:/dev:rw", resolveDevicePath("./dev:/dev:rw", baseDir, r))
+	})
+
+	t.Run("SplitHostRemainder", func(t *testing.T) {
+		host, rem, ok := SplitHostRemainder("/host:/container")
+		assert.True(t, ok)
+		assert.Equal(t, "/host", host)
+		assert.Equal(t, "/container", rem)
+
+		host, rem, ok = SplitHostRemainder("C:\\host:/container")
+		assert.True(t, ok)
+		assert.Equal(t, "C:\\host", host)
+		assert.Equal(t, "/container", rem)
+
+		_, _, ok = SplitHostRemainder("/no-sep")
+		assert.False(t, ok)
+	})
+}
+
 func TestUnit_Config_Path_UnmarshalYAMLErrors(t *testing.T) {
 	t.Run("MountConfig", func(t *testing.T) {
 		var mc MountConfig
