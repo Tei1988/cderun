@@ -63,12 +63,12 @@ type rootOptions struct {
 	diagnosisFormat       string
 	cderunDiagnosis       bool
 	cderunDiagnosisFormat string
-	logLevel           string
-	logFormat          string
-	logTimestamp       bool
-	cderunLogLevel     string
-	cderunLogFormat    string
-	cderunLogTimestamp bool
+	logLevel              string
+	logFormat             string
+	logTimestamp          bool
+	cderunLogLevel        string
+	cderunLogFormat       string
+	cderunLogTimestamp    bool
 
 	// Docker-compatible flags
 	ports            []string
@@ -225,17 +225,17 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
 		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
 		LogLevel:                 o.logLevel,
-		LogLevelSet:           cmd.Flags().Changed("log-level"),
-		LogFormat:             o.logFormat,
-		LogFormatSet:          cmd.Flags().Changed("log-format"),
-		LogTimestamp:          o.logTimestamp,
-		LogTimestampSet:       cmd.Flags().Changed("log-timestamp"),
-		CderunLogLevel:        o.cderunLogLevel,
-		CderunLogLevelSet:     cmd.Flags().Changed("cderun-log-level"),
-		CderunLogFormat:       o.cderunLogFormat,
-		CderunLogFormatSet:    cmd.Flags().Changed("cderun-log-format"),
-		CderunLogTimestamp:    o.cderunLogTimestamp,
-		CderunLogTimestampSet: cmd.Flags().Changed("cderun-log-timestamp"),
+		LogLevelSet:              cmd.Flags().Changed("log-level"),
+		LogFormat:                o.logFormat,
+		LogFormatSet:             cmd.Flags().Changed("log-format"),
+		LogTimestamp:             o.logTimestamp,
+		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
+		CderunLogLevel:           o.cderunLogLevel,
+		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
+		CderunLogFormat:          o.cderunLogFormat,
+		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
+		CderunLogTimestamp:       o.cderunLogTimestamp,
+		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
 
 		// Docker-compatible flags
 		Ports:               o.ports,

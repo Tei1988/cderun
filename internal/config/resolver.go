@@ -139,15 +139,15 @@ type CLIOptions struct {
 	LogLevel                 string
 	LogLevelSet              bool
 	LogFormat                string
-	LogFormatSet          bool
-	LogTimestampSet       bool
-	LogTimestamp          bool
-	CderunLogLevel        string
-	CderunLogLevelSet     bool
-	CderunLogFormat       string
-	CderunLogFormatSet    bool
-	CderunLogTimestamp    bool
-	CderunLogTimestampSet bool
+	LogFormatSet             bool
+	LogTimestampSet          bool
+	LogTimestamp             bool
+	CderunLogLevel           string
+	CderunLogLevelSet        bool
+	CderunLogFormat          string
+	CderunLogFormatSet       bool
+	CderunLogTimestamp       bool
+	CderunLogTimestampSet    bool
 
 	// Docker-compatible flags
 	Ports               []string
