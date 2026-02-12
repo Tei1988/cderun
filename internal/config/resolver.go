@@ -142,14 +142,12 @@ type CLIOptions struct {
 	LogFormatSet             bool
 	LogTimestampSet          bool
 	LogTimestamp             bool
-	Verbose                  int
 	CderunLogLevel           string
 	CderunLogLevelSet        bool
 	CderunLogFormat          string
 	CderunLogFormatSet       bool
 	CderunLogTimestamp       bool
 	CderunLogTimestampSet    bool
-	CderunVerbose            int
 
 	// Docker-compatible flags
 	Ports               []string
@@ -485,21 +483,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"warn",
 		r,
 	)
-	// Handle verbose flag overrides
-	vLevel := cli.Verbose
-	if cli.CderunVerbose > vLevel {
-		vLevel = cli.CderunVerbose
-	}
-
-	if !cli.CderunLogLevelSet {
-		if vLevel >= 3 {
-			res.LogLevel = "trace"
-		} else if vLevel >= 2 {
-			res.LogLevel = "debug"
-		} else if vLevel >= 1 {
-			res.LogLevel = "info"
-		}
-	}
 
 	res.LogFormat = resolveString(
 		cli.CderunLogFormatSet, cli.CderunLogFormat,

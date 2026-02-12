@@ -75,10 +75,8 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.logLevel = ""
 	opts.logFormat = "text"
 	opts.logTimestamp = true
-	opts.verbose = 0
 	opts.cderunLogLevel = ""
 	opts.cderunLogFormat = ""
-	opts.cderunVerbose = 0
 
 	opts.ports = nil
 	opts.publishAll = false

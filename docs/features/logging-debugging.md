@@ -20,19 +20,12 @@ cderunの動作を詳細に確認するためのログ出力とデバッグ機�
 
 ```bash
 # 情報の表示 (INFO)
-cderun --verbose node app.js
 cderun --log-level info node app.js
-```
 
-> **Note**: `-v` 短縮フラグはサポートされていません（`--verbose` の短縮形としては機能しません）。意図的に標準的なフラグのみをサポートしています。
-
-```bash
 # 詳細ログ (DEBUG)
-cderun --verbose --verbose node app.js
 cderun --log-level debug node app.js
 
 # 最も詳細 (TRACE)
-cderun --verbose --verbose --verbose node app.js
 cderun --log-level trace node app.js
 ```
 
@@ -60,7 +53,6 @@ export CDERUN_LOG_TIMESTAMP=true
 - `--cderun-log-level`
 - `--cderun-log-format`
 - `--cderun-log-timestamp`
-- `--cderun-verbose`
 
 ## ログ出力例
 
@@ -76,7 +68,7 @@ Hello, World!
 ### INFO レベル
 
 ```bash
-cderun --verbose node app.js
+cderun --log-level info node app.js
 2024-01-15 10:30:45 [INFO] Running: node app.js
 Hello, World!
 ```
@@ -122,7 +114,7 @@ cderun --log-level trace node app.js
 ### JSON形式
 
 ```bash
-cderun --log-format json --verbose node app.js
+cderun --log-format json --log-level info node app.js
 {"level":"info","msg":"Running: node app.js","time":"2024-01-15T10:30:45Z"}
 ```
 

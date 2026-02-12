@@ -180,10 +180,10 @@ cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
 
 ## 他のフラグとの組み合わせ
 
-### --verboseとの組み合わせ
+### --log-levelとの組み合わせ
 
 ```bash
-cderun --dry-run --verbose node app.js
+cderun --dry-run --log-level info node app.js
 [INFO] Loading configuration from: /home/user/project/.cderun.yaml
 [INFO] Resolved image: node:20-alpine
 [INFO] Working directory: /home/user/project

@@ -369,22 +369,6 @@ cderun --diagnosis
 cderun --diagnosis --diagnosis-format json
 ```
 
-### `--verbose`
-
-- **型**: count
-- **説明**: ログ出力の詳細度を上げる。デフォルトのログレベルは `WARN` です。
-- **注意**: `-v` 短縮フラグはサポートされていません。
-- **用途**:
-
-  - 指定なし: `WARN` (警告とエラーのみ)
-  - `--verbose`: `INFO` ("Running: ..." 等の情報を表示)
-  - `--verbose --verbose`: `DEBUG`
-  - `--verbose --verbose --verbose`: `TRACE`
-
-```bash
-cderun --verbose node app.js
-```
-
 ### `--log-level`
 
 - **型**: string
@@ -403,7 +387,7 @@ cderun --log-level info node app.js
 - **説明**: ログの出力形式 (`text` | `json`)
 
 ```bash
-cderun --log-format json --verbose node app.js
+cderun --log-format json --log-level info node app.js
 ```
 
 ### `--log-timestamp`
@@ -437,7 +421,7 @@ cderun --log-timestamp=false node app.js
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`,
     `--cderun-diagnosis`, `--cderun-diagnosis-format`,
     `--cderun-log-level`, `--cderun-log-format`,
-    `--cderun-log-timestamp`, `--cderun-verbose`
+    `--cderun-log-timestamp`
 
 - **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
 

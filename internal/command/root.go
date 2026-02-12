@@ -66,11 +66,9 @@ type rootOptions struct {
 	logLevel              string
 	logFormat             string
 	logTimestamp          bool
-	verbose               int
 	cderunLogLevel        string
 	cderunLogFormat       string
 	cderunLogTimestamp    bool
-	cderunVerbose         int
 
 	// Docker-compatible flags
 	ports            []string
@@ -232,14 +230,12 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		LogFormatSet:             cmd.Flags().Changed("log-format"),
 		LogTimestamp:             o.logTimestamp,
 		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
-		Verbose:                  o.verbose,
 		CderunLogLevel:           o.cderunLogLevel,
 		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
 		CderunLogFormat:          o.cderunLogFormat,
 		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
 		CderunLogTimestamp:       o.cderunLogTimestamp,
 		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
-		CderunVerbose:            o.cderunVerbose,
 
 		// Docker-compatible flags
 		Ports:               o.ports,
@@ -691,22 +687,14 @@ intended for the subcommand.`,
 			// Early logger initialization with CLI and Environment settings before config loading.
 			// This allows loadConfigs() to use the correct log level.
 			initialLevel := "warn"
-			vLevel := opts.verbose
-			if opts.cderunVerbose > vLevel {
-				vLevel = opts.cderunVerbose
-			}
-			if vLevel >= 3 {
-				initialLevel = "trace"
-			} else if vLevel >= 2 {
-				initialLevel = "debug"
-			}
 			if env := os.Getenv("CDERUN_LOG_LEVEL"); env != "" {
 				initialLevel = env
 			}
+			if opts.logLevel != "" {
+				initialLevel = opts.logLevel
+			}
 			if opts.cderunLogLevel != "" {
 				initialLevel = opts.cderunLogLevel
-			} else if opts.logLevel != "" {
-				initialLevel = opts.logLevel
 			}
 			_ = logging.Init(initialLevel, "text", true)
 
@@ -886,7 +874,6 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().BoolVar(&opts.cderunDiagnosis, "cderun-diagnosis", false, "Override diagnosis setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunDiagnosisFormat, "cderun-diagnosis-format", "", "Override diagnosis-format setting (highest priority, can be used after subcommand)")
 
-	cmd.PersistentFlags().CountVar(&opts.verbose, "verbose", "Enable verbose logging (--verbose: info, --verbose --verbose: debug, --verbose --verbose --verbose: trace)")
 	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", "", "Set log level (error, warn, info, debug, trace)")
 	cmd.PersistentFlags().StringVar(&opts.logFormat, "log-format", "text", "Set log format (text, json)")
 	cmd.PersistentFlags().BoolVar(&opts.logTimestamp, "log-timestamp", true, "Include timestamp in logs")
@@ -894,7 +881,6 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&opts.cderunLogLevel, "cderun-log-level", "", "Override log level (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&opts.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&opts.cderunLogTimestamp, "cderun-log-timestamp", true, "Override log-timestamp setting (highest priority, can be used after subcommand)")
-	cmd.PersistentFlags().CountVar(&opts.cderunVerbose, "cderun-verbose", "Override verbose level (highest priority, can be used after subcommand)")
 
 	cmd.Flags().SetInterspersed(false)
 	return cmd
