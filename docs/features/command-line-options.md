@@ -102,6 +102,7 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 - **説明**: cderunバイナリをコンテナ内の `/usr/local/bin/cderun` にマウント
 - **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
 - **制約**: `--mount-socket`との併用が必須
+- **補足**: `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になるため、明示的な指定は不要です。
 
 ```bash
 cderun --mount-cderun --mount-socket alpine sh
@@ -125,7 +126,7 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun --mount-socket alpine 
   に定義されている必要があります。
 
 ```bash
-cderun --mount-cderun --mount-socket --mount-tools node,python alpine sh
+cderun --mount-socket --mount-tools node,python alpine sh
 ```
 
 ### `--mount-all-tools`
@@ -135,7 +136,7 @@ cderun --mount-cderun --mount-socket --mount-tools node,python alpine sh
 - **制約**: `--mount-socket`との併用が必須
 
 ```bash
-cderun --mount-cderun --mount-socket --mount-all-tools alpine sh
+cderun --mount-socket --mount-all-tools alpine sh
 ```
 
 ### `--image`
