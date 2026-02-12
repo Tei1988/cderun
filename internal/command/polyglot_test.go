@@ -80,9 +80,10 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		rootCmd.SetErr(io.Discard)
 
 		done := make(chan struct{})
+		var execErr error
 		go func() {
 			// Simulating "node --cderun-interactive=true --cderun-image=alpine cat"
-			_ = Execute([]string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
+			execErr = Execute([]string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
 			close(done)
 		}()
 
@@ -91,6 +92,8 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("Test timed out")
 		}
+
+		assert.NoError(t, execErr)
 
 		requireConfig := mock.GetCreatedConfig()
 		assert.NotNil(t, requireConfig)
