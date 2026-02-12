@@ -41,6 +41,8 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
+		// Reset global state
+		opts = rootOptions{}
 		rootCmd = newRootCmd()
 		rootCmd.SetIn(pr)
 		rootCmd.SetOut(&stdout)
@@ -84,6 +86,8 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
+		// Reset global state
+		opts = rootOptions{}
 		rootCmd = newRootCmd()
 		rootCmd.SetIn(pr)
 		rootCmd.SetOut(&stdout)

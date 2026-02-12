@@ -20,6 +20,17 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			return mock, nil
 		}
 
+		// Use a temporary directory for this test
+		restoreWd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		tmpDir := t.TempDir()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+
 		// Simulate symlink execution: node --interactive=true --image alpine cat
 		// Specification: only --cderun- prefixed flags are hoisted.
 
