@@ -7,6 +7,11 @@ import (
 	"sync"
 )
 
+// NewMockRuntime creates a new MockRuntime.
+func NewMockRuntime() *MockRuntime {
+	return &MockRuntime{}
+}
+
 // MockRuntime is a mock implementation of ContainerRuntime for testing purposes.
 type MockRuntime struct {
 	mu                  sync.RWMutex

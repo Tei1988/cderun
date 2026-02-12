@@ -99,8 +99,22 @@ func cleanupSnapshot(snapshotDir string) error {
 	return os.RemoveAll(snapshotDir)
 }
 
+// mountInfoReader is an interface for reading mount information (e.g., from /proc/self/mountinfo).
+type mountInfoReader interface {
+	ReadMountInfo() ([]byte, error)
+}
+
+// realMountInfoReader reads from /proc/self/mountinfo.
+type realMountInfoReader struct{}
+
+func (realMountInfoReader) ReadMountInfo() ([]byte, error) {
+	return os.ReadFile("/proc/self/mountinfo")
+}
+
+var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
+
 func discoverOverlayUpperDir() (string, error) {
-	data, err := os.ReadFile("/proc/self/mountinfo")
+	data, err := defaultMountInfoReader.ReadMountInfo()
 	if err != nil {
 		return "", err
 	}

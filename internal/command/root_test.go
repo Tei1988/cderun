@@ -2,8 +2,10 @@ package command
 
 import (
 	"bytes"
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 	"errors"
+	"github.com/spf13/cobra"
 	"io"
 	"os"
 	"strings"
@@ -936,6 +938,45 @@ node:
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		// 'node' and '--no-warnings' come from tool config, 'app.js' from passthrough
 		assert.Equal(t, []string{"node", "--no-warnings", "app.js"}, mockRuntime.CreatedConfig.Command)
+	})
+}
+
+func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
+	mockRuntime := runtime.NewMockRuntime()
+	setupMockRuntime(t, mockRuntime)
+
+	t.Run("JSON format", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/var/run/docker.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "json",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "\"name\": \"docker\"")
+	})
+
+	t.Run("Simple format", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "podman",
+			SocketPath:      "/run/podman/podman.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "simple",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "Runtime: podman")
 	})
 }
 

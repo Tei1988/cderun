@@ -59,3 +59,44 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	// Verify that globalCfg.HostContext is still nil
 	assert.Nil(t, globalCfg.HostContext)
 }
+
+type mockMountInfoReader struct {
+	Content []byte
+	Err     error
+}
+
+func (m *mockMountInfoReader) ReadMountInfo() ([]byte, error) {
+	return m.Content, m.Err
+}
+
+func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
+	originalReader := defaultMountInfoReader
+	defer func() { defaultMountInfoReader = originalReader }()
+
+	t.Run("successfully discover upperdir", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+
+		upperdir, err := discoverOverlayUpperDir()
+		assert.NoError(t, err)
+		assert.Equal(t, "/u", upperdir)
+	})
+
+	t.Run("no overlay found", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+
+		upperdir, err := discoverOverlayUpperDir()
+		assert.NoError(t, err)
+		assert.Equal(t, "", upperdir)
+	})
+
+	t.Run("malformed mountinfo", func(t *testing.T) {
+		mountinfo := "too few fields\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+
+		upperdir, err := discoverOverlayUpperDir()
+		assert.NoError(t, err)
+		assert.Equal(t, "", upperdir)
+	})
+}
