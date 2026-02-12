@@ -62,9 +62,11 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
+			_ = pr.Close()
 			t.Fatal("Test timed out")
 		}
 
+		_ = pr.Close()
 		assert.NoError(t, execErr)
 		assert.Equal(t, testData, stdout.String())
 	})

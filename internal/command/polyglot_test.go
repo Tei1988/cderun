@@ -12,7 +12,7 @@ import (
 )
 
 func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
-	t.Run("flags without cderun-prefix ARE picked up in polyglot mode (hoisting)", func(t *testing.T) {
+	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 		setupMockRuntime(t, &mock.MockRuntime)
@@ -21,7 +21,7 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		}
 
 		// Simulate symlink execution: node --interactive=true --image alpine cat
-		// preprocessArgs should now hoist these even without prefix.
+		// Specification: only --cderun- prefixed flags are hoisted.
 
 		var stdout bytes.Buffer
 		rootCmd = newRootCmd()
@@ -42,13 +42,12 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			t.Fatal("Test timed out")
 		}
 
-		assert.NoError(t, execErr)
+		// It should fail because no image mapping for 'node' exists, and --image was not hoisted.
+		assert.Error(t, execErr)
+		assert.Contains(t, execErr.Error(), "no image mapping found for tool: node")
 
 		requireConfig := mock.GetCreatedConfig()
-		assert.NotNil(t, requireConfig)
-		assert.True(t, requireConfig.Interactive)
-		assert.Equal(t, "alpine", requireConfig.Image)
-		assert.Equal(t, []string{"cat"}, requireConfig.Command)
+		assert.Nil(t, requireConfig)
 	})
 
 	t.Run("flags WITH cderun-prefix ARE picked up in polyglot mode", func(t *testing.T) {

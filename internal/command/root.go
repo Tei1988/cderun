@@ -979,33 +979,21 @@ func preprocessArgs(args []string) ([]string, error) {
 
 		if strings.HasPrefix(arg, "--cderun-") {
 			shouldHoist = true
-		} else if isPolyglot && strings.HasPrefix(arg, "--") {
-			// In polyglot mode, also hoist known long-form cderun flags.
-			// Shorthands are skipped to avoid conflicts with tool-specific shorthands.
-			name := strings.SplitN(arg[2:], "=", 2)[0]
-			f := rootCmd.PersistentFlags().Lookup(name)
-			if f == nil {
-				f = rootCmd.Flags().Lookup(name)
-			}
-			if f != nil {
-				shouldHoist = true
-			}
 		}
 
 		if shouldHoist {
 			overrides = append(overrides, arg)
 			// Handle flags that take arguments (skip next arg if it's the value)
-			if strings.HasPrefix(arg, "--") {
-				if !strings.Contains(arg, "=") {
-					name := arg[2:]
-					f := rootCmd.PersistentFlags().Lookup(name)
-					if f == nil {
-						f = rootCmd.Flags().Lookup(name)
-					}
-					if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-						overrides = append(overrides, args[i+1])
-						i++
-					}
+			// Note: only --cderun- flags are hoisted here.
+			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
+				name := arg[2:]
+				f := rootCmd.PersistentFlags().Lookup(name)
+				if f == nil {
+					f = rootCmd.Flags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
+					overrides = append(overrides, args[i+1])
+					i++
 				}
 			}
 		} else {
