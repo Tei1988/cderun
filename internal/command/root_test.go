@@ -34,6 +34,13 @@ func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
 func executeCommandRaw(args []string) (string, error) {
 	// Reset flag variables and Changed state
 	rootCmd = newRootCmd()
+
+	// Default to terminal mode for tests to avoid auto-detection of pipes
+	// unless specifically overridden in a test.
+	savedIsTerminal := isTerminal
+	isTerminal = func(fd int) bool { return true }
+	defer func() { isTerminal = savedIsTerminal }()
+
 	opts.tty = false
 	opts.interactive = false
 	opts.network = "bridge"

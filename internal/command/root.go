@@ -717,6 +717,7 @@ intended for the subcommand.`,
 				return fmt.Errorf("configuration error: %w", err)
 			}
 
+
 			// Validate pull policy
 			switch resolved.Pull {
 			case "always", "missing", "never":
@@ -974,10 +975,67 @@ func preprocessArgs(args []string) ([]string, error) {
 	}
 
 	for i := startIdx; i < len(args); i++ {
-		if strings.HasPrefix(args[i], "--cderun-") {
-			overrides = append(overrides, args[i])
+		arg := args[i]
+		shouldHoist := false
+
+		if strings.HasPrefix(arg, "--cderun-") {
+			shouldHoist = true
+		} else if isPolyglot && strings.HasPrefix(arg, "-") {
+			// In polyglot mode, also hoist known cderun flags even without prefix.
+			// This improves usability for symlinked tools.
+			if strings.HasPrefix(arg, "--") {
+				name := strings.SplitN(arg[2:], "=", 2)[0]
+				f := rootCmd.PersistentFlags().Lookup(name)
+				if f == nil {
+					f = rootCmd.Flags().Lookup(name)
+				}
+				if f != nil {
+					shouldHoist = true
+				}
+			} else {
+				// Check if any shorthand in the group is a known cderun flag
+				for j := 1; j < len(arg); j++ {
+					sh := string(arg[j])
+					f := rootCmd.PersistentFlags().ShorthandLookup(sh)
+					if f == nil {
+						f = rootCmd.Flags().ShorthandLookup(sh)
+					}
+					if f != nil {
+						shouldHoist = true
+						break
+					}
+				}
+			}
+		}
+
+		if shouldHoist {
+			overrides = append(overrides, arg)
+			// Handle flags that take arguments (skip next arg if it's the value)
+			if strings.HasPrefix(arg, "--") {
+				if !strings.Contains(arg, "=") {
+					name := arg[2:]
+					f := rootCmd.PersistentFlags().Lookup(name)
+					if f == nil {
+						f = rootCmd.Flags().Lookup(name)
+					}
+					if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
+						overrides = append(overrides, args[i+1])
+						i++
+					}
+				}
+			} else if len(arg) > 1 {
+				lastChar := string(arg[len(arg)-1])
+				f := rootCmd.PersistentFlags().ShorthandLookup(lastChar)
+				if f == nil {
+					f = rootCmd.Flags().ShorthandLookup(lastChar)
+				}
+				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
+					overrides = append(overrides, args[i+1])
+					i++
+				}
+			}
 		} else {
-			others = append(others, args[i])
+			others = append(others, arg)
 		}
 	}
 
