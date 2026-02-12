@@ -974,10 +974,30 @@ func preprocessArgs(args []string) ([]string, error) {
 	}
 
 	for i := startIdx; i < len(args); i++ {
-		if strings.HasPrefix(args[i], "--cderun-") {
-			overrides = append(overrides, args[i])
+		arg := args[i]
+		shouldHoist := false
+
+		if strings.HasPrefix(arg, "--cderun-") {
+			shouldHoist = true
+		}
+
+		if shouldHoist {
+			overrides = append(overrides, arg)
+			// Handle flags that take arguments (skip next arg if it's the value)
+			// Note: only --cderun- flags are hoisted here.
+			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
+				name := arg[2:]
+				f := rootCmd.PersistentFlags().Lookup(name)
+				if f == nil {
+					f = rootCmd.Flags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
+					overrides = append(overrides, args[i+1])
+					i++
+				}
+			}
 		} else {
-			others = append(others, args[i])
+			others = append(others, arg)
 		}
 	}
 
