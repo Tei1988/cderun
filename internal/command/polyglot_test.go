@@ -61,8 +61,10 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 
 		// Setup a tool mapping for 'node' so it doesn't fail
 		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
-		if err != nil { t.Fatal(err) }
-		defer os.Remove(".tools.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(".tools.yaml") })
 
 		rootCmd = newRootCmd()
 		rootCmd.SetOut(io.Discard)

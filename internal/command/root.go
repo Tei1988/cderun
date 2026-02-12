@@ -717,7 +717,6 @@ intended for the subcommand.`,
 				return fmt.Errorf("configuration error: %w", err)
 			}
 
-
 			// Validate pull policy
 			switch resolved.Pull {
 			case "always", "missing", "never":
