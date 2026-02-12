@@ -126,7 +126,7 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun --mount-socket alpine 
   に定義されている必要があります。
 
 ```bash
-cderun --mount-cderun --mount-socket --mount-tools node,python alpine sh
+cderun --mount-socket --mount-tools node,python alpine sh
 ```
 
 ### `--mount-all-tools`
@@ -136,7 +136,7 @@ cderun --mount-cderun --mount-socket --mount-tools node,python alpine sh
 - **制約**: `--mount-socket`との併用が必須
 
 ```bash
-cderun --mount-cderun --mount-socket --mount-all-tools alpine sh
+cderun --mount-socket --mount-all-tools alpine sh
 ```
 
 ### `--image`
