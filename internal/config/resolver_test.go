@@ -351,13 +351,12 @@ func TestUnit_Config_Resolver_Resolve(t *testing.T) {
 		assert.Equal(t, "/global/path/cderun", res.MountCderunPath)
 	})
 
-	t.Run("Logging resolution and verbose mapping", func(t *testing.T) {
+	t.Run("Logging resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			LogLevel:     "debug",
 			LogLevelSet:  true,
 			LogFormat:    "json",
 			LogFormatSet: true,
-			Verbose:      0,
 		}
 		global := &CDERunConfig{
 			Logging: LoggingConfig{
@@ -368,7 +367,7 @@ func TestUnit_Config_Resolver_Resolve(t *testing.T) {
 			"node": ToolConfig{Image: "node"},
 		}
 
-		// Explicit LogLevel (P2) takes priority over global and verbose
+		// Explicit LogLevel (P2) takes priority over global
 		res, err := Resolve("node", cli, tools, global)
 		require.NoError(t, err)
 		assert.Equal(t, "debug", res.LogLevel)
@@ -380,34 +379,6 @@ func TestUnit_Config_Resolver_Resolve(t *testing.T) {
 		res, err = Resolve("node", cli, tools, global)
 		require.NoError(t, err)
 		assert.Equal(t, "error", res.LogLevel)
-
-		// When LogLevel is not set, verbose flags map to levels
-		cli.LogLevelSet = false
-		cli.CderunLogLevelSet = false
-
-		// verbose 0 -> warn (fallback)
-		cli.Verbose = 0
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "warn", res.LogLevel)
-
-		// verbose 1 -> info
-		cli.Verbose = 1
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "info", res.LogLevel)
-
-		// verbose 2 -> debug
-		cli.Verbose = 2
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "debug", res.LogLevel)
-
-		// verbose 3 -> trace
-		cli.Verbose = 3
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "trace", res.LogLevel)
 	})
 
 	t.Run("Strict environment variable resolution", func(t *testing.T) {

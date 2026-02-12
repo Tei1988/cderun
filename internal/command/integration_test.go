@@ -130,8 +130,8 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
 		require.NoError(t, err)
 
-		// Use --verbose to get more info in CI if it fails
-		stdout, stderr, exitCode, err := runCderun("--verbose", "--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
+		// Use --log-level info to get more info in CI if it fails
+		stdout, stderr, exitCode, err := runCderun("--log-level", "info", "--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, exitCode, "cat failed with exit code %d, stderr: %s", exitCode, stderr)
