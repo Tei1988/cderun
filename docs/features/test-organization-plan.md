@@ -10,11 +10,11 @@
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 87.9% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 83.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/command` | 91.9% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 88.1% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 100.0% | ロギングシステムの全面的なテスト拡充により 100% を達成。 |
-| `internal/runtime` | 92.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実. |
-| **Total** | **86.7%** | 全体として極めて高いカバレッジを維持。 |
+| `internal/runtime` | 93.5% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| **Total** | **90.4%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -24,7 +24,7 @@
 | :--- | :--- | :--- |
 | 引数解析 | `root_test.go`, `flags_test.go` | 良好 |
 | 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
-| ポリグロット実行 | `root_test.go` (preprocessArgs) | 良好 |
+| ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go` | 良好 |
 | 設定ファイルサポート | `config_test.go`, `merge_test.go` | 良好 |
 | マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
@@ -36,7 +36,8 @@
 | cderunバイナリマウント | `root_test.go`, `integration_test.go` | 良好 |
 | ドライランモード | `root_test.go` | 良好 |
 | ログ・デバッグ | `logger_test.go` | 良好 |
-| インタラクティブ | `robustness_test.go` (信号、リサイズ) | 良好 |
+| インタラクティブ | `robustness_test.go` (信号、リサイズ), `stdin_test.go` | 良好 |
+| 信号処理 | `signals_test.go`, `robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `snapshot_test.go`, `path_test.go`, `scenario_nested_test.go` | 良好 |
 | 診断モード | `root_test.go` | 良好 |
@@ -98,8 +99,9 @@
 | イメージプル(リトライ) | ✅ | ✅ | ✅ | - |
 | ボリュームマウント | ✅ | ✅ | - | ✅ |
 | ポート転送 | ✅ | ✅ | - | - |
-| 信号処理(Ctrl+C) | - | - | ✅ | - |
+| 信号処理(Ctrl+C) | ✅ | - | ✅ | - |
 | TTYリサイズ | - | - | ✅ | - |
+| インタラクティブ(Stdin) | ✅ | ✅ | - | - |
 | Nested Execution | ✅ | ✅ | - | ✅ |
 | Expressions | ✅ | ✅ | - | - |
 | 厳密モード | ✅ | ✅ | - | - |
