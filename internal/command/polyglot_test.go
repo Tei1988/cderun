@@ -25,6 +25,12 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			Dirs: map[string]bool{"/project": true},
 			WD:   "/project",
 		}
+		originalFS := opts.fs
+		originalLoader := opts.configLoader
+		t.Cleanup(func() {
+			opts.fs = originalFS
+			opts.configLoader = originalLoader
+		})
 		opts.fs = mfs
 		opts.configLoader = config.NewConfigLoaderWithFS(mfs)
 
@@ -74,6 +80,12 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 				"/project/.tools.yaml": []byte("node:\n  image: node:20"),
 			},
 		}
+		originalFS := opts.fs
+		originalLoader := opts.configLoader
+		t.Cleanup(func() {
+			opts.fs = originalFS
+			opts.configLoader = originalLoader
+		})
 		opts.fs = mfs
 		opts.configLoader = config.NewConfigLoaderWithFS(mfs)
 
