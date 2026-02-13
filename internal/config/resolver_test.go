@@ -889,8 +889,8 @@ func TestUnit_Config_Resolver_TransitiveAutoEnablement(t *testing.T) {
 
 	t.Run("Explicit MountCderun=false prevents transitive socket enablement", func(t *testing.T) {
 		cli := CLIOptions{
-			MountAllTools:       true,
-			MountAllToolsSet:    true,
+			MountAllTools:        true,
+			MountAllToolsSet:     true,
 			CderunMountCderun:    false,
 			CderunMountCderunSet: true,
 		}
