@@ -194,6 +194,7 @@ func NewConfigLoader() *ConfigLoader {
 }
 
 // NewConfigLoaderWithFS creates a new ConfigLoader with the specified FileSystem and current default directories.
+// Note: This depends on defaultLoader being initialized (which happens at the package level).
 func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 	return &ConfigLoader{
 		fs:              fs,

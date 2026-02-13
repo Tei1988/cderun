@@ -2,6 +2,8 @@ package config
 
 import (
 	"os"
+	"strings"
+	"time"
 )
 
 // MockFileSystem is a mock implementation of FileSystem for testing.
@@ -26,18 +28,26 @@ func (m *MockFileSystem) Getwd() (string, error) {
 }
 
 type mockFileInfo struct {
-	os.FileInfo
+	name  string
+	isDir bool
 }
+
+func (m *mockFileInfo) Name() string       { return m.name }
+func (m *mockFileInfo) Size() int64        { return 0 }
+func (m *mockFileInfo) Mode() os.FileMode  { return 0 }
+func (m *mockFileInfo) ModTime() time.Time { return time.Time{} }
+func (m *mockFileInfo) IsDir() bool        { return m.isDir }
+func (m *mockFileInfo) Sys() interface{}   { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}
 	if _, ok := m.Files[name]; ok {
-		return &mockFileInfo{}, nil
+		return &mockFileInfo{name: name, isDir: false}, nil
 	}
 	if m.Dirs[name] {
-		return &mockFileInfo{}, nil
+		return &mockFileInfo{name: name, isDir: true}, nil
 	}
 	return nil, os.ErrNotExist
 }
@@ -104,12 +114,12 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 		return m.RemoveAllErr
 	}
 	for d := range m.Dirs {
-		if d == path || (len(d) > len(path) && d[:len(path)] == path && (d[len(path)] == '/' || d[len(path)] == '\\')) {
+		if d == path || (strings.HasPrefix(d, path) && (d[len(path)] == '/' || d[len(path)] == '\\')) {
 			delete(m.Dirs, d)
 		}
 	}
 	for f := range m.Files {
-		if f == path || (len(f) > len(path) && f[:len(path)] == path && (f[len(path)] == '/' || f[len(path)] == '\\')) {
+		if f == path || (strings.HasPrefix(f, path) && (f[len(path)] == '/' || f[len(path)] == '\\')) {
 			delete(m.Files, f)
 		}
 	}
