@@ -7,10 +7,12 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 ## 前提条件
 
-- `--mount-socket`が有効（`true`）であること
-- `.tools.yaml`が存在すること
+- `.tools.yaml` が存在し、対象のツールが定義されていること
 
-※ `--mount-tools` または `--mount-all-tools` を使用する場合、`cderun` バイナリ自体も自動的に `/usr/local/bin/cderun` にマウントされるため、`--mount-cderun` を明示的に指定する必要はありません。
+※ `--mount-tools` または `--mount-all-tools` を使用する場合、以下の設定が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
+
+- `--mount-cderun`: `cderun` バイナリ自体を `/usr/local/bin/cderun` にマウント。
+- `--mount-socket`: コンテナランタイムのソケットをマウント（ネストされた `cderun` がホストのデーモンと通信するために必要）。
 
 ## オプション
 
@@ -23,7 +25,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 **使用例**:
 
 ```bash
-cderun --mount-socket --mount-all-tools sh
+cderun --mount-all-tools sh
 ```
 
 **動作**:
@@ -57,7 +59,7 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 **使用例**:
 
 ```bash
-cderun --mount-socket --mount-tools python,node sh
+cderun --mount-tools python,node sh
 ```
 
 **動作イメージ(実際はランタイムAPIで実現)**:
@@ -122,13 +124,10 @@ available tools: node, python, gemini-cli
 
 ```bash
 # .tools.yamlにbashが定義されている場合
-cderun --mount-socket \
-  --mount-all-tools \
-  bash
+cderun --mount-all-tools bash
 
 # または --image で明示的に指定
-cderun --mount-socket \
-  --mount-all-tools \
+cderun --mount-all-tools \
   --image ubuntu:22.04 \
   bash
 
@@ -142,17 +141,14 @@ gemini-cli --version
 
 ```bash
 # .tools.yamlにshが定義されている場合
-cderun --mount-socket \
-  --mount-tools python,node \
-  sh
+cderun --mount-tools python,node sh
 ```
 
 ### CI/CDパイプライン
 
 ```bash
 # .tools.yamlに定義されたツールを使用
-cderun --mount-socket \
-  --mount-tools node,docker \
+cderun --mount-tools node,docker \
   sh -c '
     # nodeコマンドはcderun経由で実行される
     node --version
@@ -180,8 +176,7 @@ npx:
 そうすれば以下のように使用できます：
 
 ```bash
-cderun --mount-socket \
-  --mount-tools node,npm,npx \
+cderun --mount-tools node,npm,npx \
   sh -c '
     node --version
     npm install
@@ -191,7 +186,7 @@ cderun --mount-socket \
 
 ## 制限事項
 
-1. **依存性**: `--mount-socket`が必須
+1. **依存性**: 動作にはホストのコンテナランタイムソケットへのアクセスが必要（通常は `--mount-socket` によって自動的にマウントされます）
 2. **読み取り専用**: マウントされたツールは読み取り専用
 3. **パスの上書き**: コンテナ内に同名のツールがある場合、上書きされる
 4. **アーキテクチャ一致**: コンテナのアーキテクチャに合ったcderunバイナリが必要（実行中のバイナリがそのままマウントされるため）
