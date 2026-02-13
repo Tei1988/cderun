@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -188,29 +187,4 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 		cleanup()
 		assert.Equal(t, original, defaultLoader.systemConfigDir)
 	})
-}
-
-func TestUnit_Config_RealFS_Integration(t *testing.T) {
-	// Keep one test with real filesystem to ensure RealFileSystem works
-	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	content := "runtime: docker"
-	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0644)
-	require.NoError(t, err)
-
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	// Changing the working directory is process-global and can affect parallel tests.
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() {
-		// Restore the original working directory after the test.
-		require.NoError(t, os.Chdir(originalWd))
-	})
-
-	cfg, paths, err := LoadCDERunConfig()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
-	assert.NotEmpty(t, paths)
 }

@@ -930,3 +930,110 @@ func TestUnit_Config_Resolver_TransitiveAutoEnablement(t *testing.T) {
 		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled by MountCderun")
 	})
 }
+
+func TestUnit_Config_Resolver_StringSlice(t *testing.T) {
+	t.Run("resolveStringSlice with various inputs", func(t *testing.T) {
+		t.Setenv("CDERUN_DNS", "8.8.8.8,1.1.1.1")
+		res, err := Resolve("", CLIOptions{}, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
+
+		t.Setenv("CDERUN_DNS", "")
+		res, err = Resolve("", CLIOptions{}, nil, nil)
+		require.NoError(t, err)
+		assert.Empty(t, res.DNS)
+	})
+}
+
+func TestUnit_Config_Resolver_Devices_Env(t *testing.T) {
+	t.Run("Multiple devices in CDERUN_DEVICE", func(t *testing.T) {
+		t.Setenv("CDERUN_DEVICE", "/dev/video0:/dev/video0,/dev/fuse:/dev/fuse:rm")
+		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		require.NoError(t, err)
+		require.Len(t, res.Devices, 2)
+		assert.Equal(t, "/dev/video0", res.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", res.Devices[1].PathOnHost)
+		assert.Equal(t, "rm", res.Devices[1].CgroupPermissions)
+	})
+
+	t.Run("Invalid device in CDERUN_DEVICE", func(t *testing.T) {
+		t.Setenv("CDERUN_DEVICE", ":/invalid")
+		_, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
+	})
+}
+
+func TestUnit_Config_Resolver_Float64_Precedence(t *testing.T) {
+	t.Run("Tool returns 0, should fallback to global", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node",
+				CPUs:  0,
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				CPUs: 2.0,
+			},
+		}
+
+		res, err := Resolve("node", CLIOptions{}, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, 2.0, res.CPUs)
+	})
+}
+
+func TestUnit_Config_Resolver_StringSlice_Precedence(t *testing.T) {
+	t.Run("Tool returns empty, should fallback to global", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node",
+				DNS:   []string{},
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				DNS: []string{"1.1.1.1"},
+			},
+		}
+
+		res, err := Resolve("node", CLIOptions{}, tools, global)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"1.1.1.1"}, res.DNS)
+	})
+}
+
+func TestUnit_Config_Resolver_Devices_Invalid(t *testing.T) {
+	t.Run("Invalid device in P1 override", func(t *testing.T) {
+		cli := CLIOptions{
+			CderunDevices: []string{":/invalid"},
+		}
+		tools := ToolsConfig{"node": {Image: "node"}}
+		_, err := Resolve("node", cli, tools, nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device config (override)")
+	})
+}
+
+func TestUnit_Config_Resolver_StringSlice_P1P2(t *testing.T) {
+	t.Run("P1 takes priority", func(t *testing.T) {
+		cli := CLIOptions{
+			CderunDNS: []string{"1.1.1.1"},
+			DNS:       []string{"8.8.8.8"},
+		}
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"1.1.1.1"}, res.DNS)
+	})
+
+	t.Run("P2 takes priority over Env", func(t *testing.T) {
+		t.Setenv("CDERUN_DNS", "1.1.1.1")
+		cli := CLIOptions{
+			DNS: []string{"8.8.8.8"},
+		}
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"8.8.8.8"}, res.DNS)
+	})
+}

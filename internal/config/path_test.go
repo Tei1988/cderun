@@ -316,3 +316,31 @@ source: ./data
 		assert.Contains(t, err.Error(), "invalid device config")
 	})
 }
+
+func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
+	baseDir := "/base"
+	r, _ := NewExpressionResolver(nil)
+
+	t.Run("ResolveVolume", func(t *testing.T) {
+		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
+		assert.Equal(t, "/base/host:/container", cp.ResolveVolume(r))
+
+		cp = ConfigPath{Raw: ""}
+		assert.Equal(t, "", cp.ResolveVolume(r))
+	})
+
+	t.Run("ResolveDevice", func(t *testing.T) {
+		cp := ConfigPath{Raw: "./dev:/dev:rw", BaseDir: baseDir}
+		assert.Equal(t, "/base/dev:/dev:rw", cp.ResolveDevice(r))
+
+		cp = ConfigPath{Raw: ""}
+		assert.Equal(t, "", cp.ResolveDevice(r))
+	})
+}
+
+func TestUnit_Config_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
+	t.Run("Windows path without separator", func(t *testing.T) {
+		_, _, ok := SplitHostRemainder(`C:\only-path`)
+		assert.False(t, ok)
+	})
+}
