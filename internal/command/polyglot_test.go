@@ -2,9 +2,9 @@ package command
 
 import (
 	"bytes"
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -20,16 +20,13 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			return mock, nil
 		}
 
-		// Use a temporary directory for this test
-		restoreWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
+		// Use MockFileSystem
+		mfs := &config.MockFileSystem{
+			Dirs: map[string]bool{"/project": true},
+			WD:   "/project",
 		}
-		tmpDir := t.TempDir()
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+		opts.fs = mfs
+		opts.configLoader = config.NewConfigLoaderWithFS(mfs)
 
 		// Simulate symlink execution: node --interactive=true --image alpine cat
 		// Specification: only --cderun- prefixed flags are hoisted.
@@ -69,22 +66,16 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			return mock, nil
 		}
 
-		// Use a temporary directory for this test
-		restoreWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
+		// Use MockFileSystem
+		mfs := &config.MockFileSystem{
+			Dirs: map[string]bool{"/project": true},
+			WD:   "/project",
+			Files: map[string][]byte{
+				"/project/.tools.yaml": []byte("node:\n  image: node:20"),
+			},
 		}
-		tmpDir := t.TempDir()
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chdir(restoreWd) })
-
-		// Setup a tool mapping for 'node' so it doesn't fail
-		err = os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
-		if err != nil {
-			t.Fatal(err)
-		}
+		opts.fs = mfs
+		opts.configLoader = config.NewConfigLoaderWithFS(mfs)
 
 		rootCmd = newRootCmd()
 		rootCmd.SetOut(io.Discard)

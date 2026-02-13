@@ -1,48 +1,11 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type MockFileSystem struct {
-	Files   map[string][]byte
-	Dirs    map[string]bool
-	WD      string
-	HomeDir string
-}
-
-func (m *MockFileSystem) Getwd() (string, error) {
-	return m.WD, nil
-}
-
-type mockFileInfo struct {
-	os.FileInfo
-}
-
-func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
-	if _, ok := m.Files[name]; ok {
-		return &mockFileInfo{}, nil
-	}
-	if m.Dirs[name] {
-		return &mockFileInfo{}, nil
-	}
-	return nil, os.ErrNotExist
-}
-
-func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
-	if data, ok := m.Files[name]; ok {
-		return data, nil
-	}
-	return nil, os.ErrNotExist
-}
-
-func (m *MockFileSystem) UserHomeDir() (string, error) {
-	return m.HomeDir, nil
-}
 
 func TestUnit_Config_Load_CDERunConfig(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {

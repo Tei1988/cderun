@@ -151,6 +151,12 @@ type FileSystem interface {
 	Stat(name string) (os.FileInfo, error)
 	ReadFile(name string) ([]byte, error)
 	UserHomeDir() (string, error)
+	Executable() (string, error)
+	Getenv(key string) string
+	TempDir() string
+	MkdirAll(path string, perm os.FileMode) error
+	WriteFile(filename string, data []byte, perm os.FileMode) error
+	RemoveAll(path string) error
 }
 
 // RealFileSystem implements FileSystem using standard os and filepath.
@@ -160,6 +166,16 @@ func (RealFileSystem) Getwd() (string, error)                { return os.Getwd()
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
 func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
+func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
+func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
+func (RealFileSystem) TempDir() string                       { return os.TempDir() }
+func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(filename, data, perm)
+}
+func (RealFileSystem) RemoveAll(path string) error { return os.RemoveAll(path) }
 
 // ConfigLoader handles finding and loading configuration files.
 type ConfigLoader struct {
@@ -174,6 +190,15 @@ func NewConfigLoader() *ConfigLoader {
 		fs:              RealFileSystem{},
 		systemConfigDir: "/etc/cderun",
 		runConfigDir:    "/run/cderun",
+	}
+}
+
+// NewConfigLoaderWithFS creates a new ConfigLoader with the specified FileSystem and current default directories.
+func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
+	return &ConfigLoader{
+		fs:              fs,
+		systemConfigDir: defaultLoader.systemConfigDir,
+		runConfigDir:    defaultLoader.runConfigDir,
 	}
 }
 
