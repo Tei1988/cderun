@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestUnit_Config_Load_CDERunConfig(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		mfs := &MockFileSystem{
