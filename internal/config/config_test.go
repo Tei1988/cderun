@@ -188,4 +188,3 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 		assert.Equal(t, original, defaultLoader.systemConfigDir)
 	})
 }
-

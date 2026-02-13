@@ -102,7 +102,6 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 		assert.Equal(t, 2.0, mockRuntime.CreatedConfig.CPUs)
 	})
 
-
 	t.Run("Invalid pull policy returns error", func(t *testing.T) {
 		_, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
 		require.Error(t, err)

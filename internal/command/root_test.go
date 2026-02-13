@@ -244,7 +244,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "Usage:")
 	})
 
-
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
@@ -279,7 +278,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
 	})
-
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
@@ -380,7 +378,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 
 }
 
-
 func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
@@ -438,7 +435,6 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		}
 		assert.False(t, socketFound, "Socket should NOT be mounted when CDERUN_MOUNT_SOCKET=false")
 	})
-
 
 	t.Run("mount-cderun logic", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
