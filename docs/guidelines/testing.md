@@ -14,13 +14,13 @@
 ```go
 func TestFeature(t *testing.T) {
 	// 元の状態を保存
-	oldFS := opts.fs
-	oldLoader := opts.configLoader
+	originalFS := opts.fs
+	originalLoader := opts.configLoader
 
 	// テスト終了時に必ず復元
 	t.Cleanup(func() {
-		opts.fs = oldFS
-		opts.configLoader = oldLoader
+		opts.fs = originalFS
+		opts.configLoader = originalLoader
 	})
 
 	// テスト用のモックをセット

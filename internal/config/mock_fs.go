@@ -113,6 +113,9 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 	if m.RemoveAllErr != nil {
 		return m.RemoveAllErr
 	}
+	if path == "" {
+		return nil
+	}
 	for d := range m.Dirs {
 		if d == path || (strings.HasPrefix(d, path) && (d[len(path)] == '/' || d[len(path)] == '\\')) {
 			delete(m.Dirs, d)
