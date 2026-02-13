@@ -3,13 +3,13 @@ package command
 import (
 	"cderun/internal/config"
 	"cderun/internal/container"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
+	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
 		HostContext: &config.HostContext{
@@ -29,10 +29,10 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
 	if snapshotDir != "" {
-		t.Cleanup(func() { _ = os.RemoveAll(snapshotDir) })
+		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
 
 	// Verify that globalCfg was NOT mutated
@@ -42,6 +42,7 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 }
 
 func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
+	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
 	}
@@ -50,10 +51,10 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	snapshotDir, err := createSnapshot(globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
 	assert.NoError(t, err)
 	if snapshotDir != "" {
-		t.Cleanup(func() { _ = os.RemoveAll(snapshotDir) })
+		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
 
 	// Verify that globalCfg.HostContext is still nil
@@ -65,11 +66,12 @@ type mockMountInfoReader struct {
 	Err     error
 }
 
-func (m *mockMountInfoReader) ReadMountInfo() ([]byte, error) {
+func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 	return m.Content, m.Err
 }
 
 func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
+	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()
 
@@ -77,7 +79,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir()
+		upperdir, err := discoverOverlayUpperDir(mfs)
 		assert.NoError(t, err)
 		assert.Equal(t, "/u", upperdir)
 	})
@@ -86,7 +88,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir()
+		upperdir, err := discoverOverlayUpperDir(mfs)
 		assert.NoError(t, err)
 		assert.Equal(t, "", upperdir)
 	})
@@ -95,7 +97,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		mountinfo := "too few fields\n"
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir()
+		upperdir, err := discoverOverlayUpperDir(mfs)
 		assert.NoError(t, err)
 		assert.Equal(t, "", upperdir)
 	})

@@ -101,6 +101,10 @@ type rootOptions struct {
 	cderunMemory     string
 	cderunCPUs       float64
 	cderunDevices    []string
+
+	// Dependencies
+	fs           config.FileSystem
+	configLoader *config.ConfigLoader
 }
 
 const attachGracePeriod = 5 * time.Second
@@ -130,14 +134,14 @@ var (
 
 func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
 	logging.Trace("Loading configurations...")
-	globalCfg, globalPaths, err := config.LoadCDERunConfig()
+	globalCfg, globalPaths, err := o.configLoader.LoadCDERunConfig()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
 	} else if len(globalPaths) > 0 {
 		logging.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
 	}
 
-	toolsCfg, toolsPaths, err := config.LoadToolsConfig()
+	toolsCfg, toolsPaths, err := o.configLoader.LoadToolsConfig()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
 	} else if len(toolsPaths) > 0 {
@@ -284,7 +288,7 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunDevices:       o.cderunDevices,
 	}
 
-	return config.Resolve(subcommand, cliOpts, toolsCfg, globalCfg)
+	return config.ResolveWithFS(subcommand, cliOpts, toolsCfg, globalCfg, o.fs)
 }
 
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
@@ -334,7 +338,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		exePath := resolved.MountCderunPath
 		if exePath == "" {
 			var err error
-			exePath, err = os.Executable()
+			exePath, err = o.fs.Executable()
 			if err != nil {
 				return nil, fmt.Errorf("failed to get executable path: %w", err)
 			}
@@ -427,7 +431,7 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	info := diagnosticsInfo{}
 	info.Runtime.Name = resolved.Runtime
 	info.Runtime.Socket = resolved.SocketPath
-	if _, err := os.Stat(resolved.SocketPath); err == nil {
+	if _, err := o.fs.Stat(resolved.SocketPath); err == nil {
 		info.Runtime.Status = "accessible"
 	} else {
 		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
@@ -674,11 +678,19 @@ func newRootCmd() *cobra.Command {
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
 intended for the subcommand.`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if opts.fs == nil {
+				opts.fs = config.RealFileSystem{}
+			}
+			if opts.configLoader == nil {
+				opts.configLoader = config.NewConfigLoaderWithFS(opts.fs)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Early logger initialization with CLI and Environment settings before config loading.
 			// This allows loadConfigs() to use the correct log level.
 			initialLevel := "warn"
-			if env := os.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+			if env := opts.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
 				initialLevel = env
 			}
 			if opts.logLevel != "" {
@@ -756,14 +768,14 @@ intended for the subcommand.`,
 				if globalCfg == nil {
 					globalCfg = &config.CDERunConfig{}
 				}
-				sDir, err := createSnapshot(globalCfg, toolsCfg, containerConfig.Mounts)
+				sDir, err := createSnapshot(opts.fs, globalCfg, toolsCfg, containerConfig.Mounts)
 				if err != nil {
 					logging.Warn("failed to create snapshot: %v", err)
 				} else {
 					snapshotDir = sDir
 					defer func() {
 						logging.Trace("Cleaning up snapshot: %s", snapshotDir)
-						if err := cleanupSnapshot(snapshotDir); err != nil {
+						if err := cleanupSnapshot(opts.fs, snapshotDir); err != nil {
 							logging.Warn("failed to cleanup snapshot: %v", err)
 						}
 					}()

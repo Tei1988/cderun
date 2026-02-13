@@ -5,7 +5,6 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,11 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
+func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
 	id := uuid.New().String()
-	snapshotDir := filepath.Join(os.TempDir(), "cderun-snap-"+id)
+	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
-	if err := os.MkdirAll(snapshotDir, 0755); err != nil {
+	if err := fs.MkdirAll(snapshotDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
@@ -32,12 +31,12 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 
 	hostCtx.SnapshotDir = snapshotDir
 
-	exePath, err := os.Executable()
+	exePath, err := fs.Executable()
 	if err == nil {
 		hostCtx.BinPath = exePath
 	}
 
-	pwd, err := os.Getwd()
+	pwd, err := fs.Getwd()
 	if err == nil {
 		hostCtx.WorkingDir = pwd
 	}
@@ -58,7 +57,7 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 
 	// OverlayFS root discovery (only at level 1 if we want to find the host root)
 	// Actually, it can be done at any level if we want to find the "upperdir" of the current container.
-	if upperDir, err := discoverOverlayUpperDir(); err == nil && upperDir != "" {
+	if upperDir, err := discoverOverlayUpperDir(fs); err == nil && upperDir != "" {
 		logging.Debug("Discovered OverlayFS upperdir: %s", upperDir)
 		hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
 			Source: upperDir,
@@ -76,7 +75,7 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0644); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0644); err != nil {
 		return "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
 	}
 
@@ -85,36 +84,36 @@ func createSnapshot(globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig,
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tools config: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0644); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0644); err != nil {
 		return "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 
 	return snapshotDir, nil
 }
 
-func cleanupSnapshot(snapshotDir string) error {
+func cleanupSnapshot(fs config.FileSystem, snapshotDir string) error {
 	if snapshotDir == "" {
 		return nil
 	}
-	return os.RemoveAll(snapshotDir)
+	return fs.RemoveAll(snapshotDir)
 }
 
 // mountInfoReader is an interface for reading mount information (e.g., from /proc/self/mountinfo).
 type mountInfoReader interface {
-	ReadMountInfo() ([]byte, error)
+	ReadMountInfo(fs config.FileSystem) ([]byte, error)
 }
 
 // realMountInfoReader reads from /proc/self/mountinfo.
 type realMountInfoReader struct{}
 
-func (realMountInfoReader) ReadMountInfo() ([]byte, error) {
-	return os.ReadFile("/proc/self/mountinfo")
+func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
+	return fs.ReadFile("/proc/self/mountinfo")
 }
 
 var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
 
-func discoverOverlayUpperDir() (string, error) {
-	data, err := defaultMountInfoReader.ReadMountInfo()
+func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
+	data, err := defaultMountInfoReader.ReadMountInfo(fs)
 	if err != nil {
 		return "", err
 	}

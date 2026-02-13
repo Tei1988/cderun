@@ -87,6 +87,10 @@ func executeCommandRaw(args []string) (string, error) {
 	opts.cderunLogLevel = ""
 	opts.cderunLogFormat = ""
 
+	// Reset dependencies
+	opts.fs = nil
+	opts.configLoader = nil
+
 	opts.ports = nil
 	opts.publishAll = false
 	opts.expose = nil
@@ -186,6 +190,16 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 			name:     "empty args",
 			args:     []string{},
 			expected: []string{},
+		},
+		{
+			name:     "shorthand with argument",
+			args:     []string{"cderun", "-p", "80:80", "sh", "--cderun-tty"},
+			expected: []string{"cderun", "--cderun-tty", "-p", "80:80", "sh"},
+		},
+		{
+			name:     "multiple shorthands, last takes argument",
+			args:     []string{"cderun", "-itp", "80:80", "sh", "--cderun-interactive"},
+			expected: []string{"cderun", "--cderun-interactive", "-itp", "80:80", "sh"},
 		},
 	}
 
@@ -506,7 +520,9 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
-		opts := &rootOptions{}
+		opts := &rootOptions{
+			fs: config.RealFileSystem{},
+		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
 			SocketPath:      "/var/run/docker.sock",
@@ -523,7 +539,9 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 
 	t.Run("Simple format", func(t *testing.T) {
 		out := &bytes.Buffer{}
-		opts := &rootOptions{}
+		opts := &rootOptions{
+			fs: config.RealFileSystem{},
+		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "podman",
 			SocketPath:      "/run/podman/podman.sock",
@@ -536,6 +554,23 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime: podman")
+	})
+}
+
+func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
+	t.Run("fails when os.Executable fails", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecErr: errors.New("exec error"),
+		}
+		opts.fs = mfs
+		// We need to trigger binary mount logic
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+		}
+		_, err := opts.buildContainerConfig(resolved, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
+		opts.fs = nil // Reset
 	})
 }
 
