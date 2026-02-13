@@ -162,7 +162,9 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 		}
 
 		// Map iteration order is random, but values should match
-		actual := resolver.Resolve(input).(map[string]any)
+		resolved := resolver.Resolve(input)
+		actual, ok := resolved.(map[string]any)
+		require.True(t, ok, "Resolve should return map[string]any, got %T", resolved)
 		assert.Equal(t, expected["image"], actual["image"])
 		assert.Equal(t, expected["env"], actual["env"])
 	})

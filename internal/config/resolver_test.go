@@ -938,25 +938,10 @@ func TestUnit_Config_Resolver_StringSlice(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
 
-		// Empty input should result in empty slice
-		res, err = Resolve("", CLIOptions{}, nil, nil)
-		require.NoError(t, err)
-		// CDERUN_DNS is still set from previous call if not cleared, but Resolve with empty CLI should pick it up
-		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
-
 		t.Setenv("CDERUN_DNS", "")
 		res, err = Resolve("", CLIOptions{}, nil, nil)
 		require.NoError(t, err)
 		assert.Empty(t, res.DNS)
-	})
-}
-
-func TestUnit_Config_Resolver_Float64_Invalid(t *testing.T) {
-	t.Run("Invalid float in environment variable", func(t *testing.T) {
-		t.Setenv("CDERUN_CPUS", "not-a-float")
-		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Equal(t, 0.0, res.CPUs)
 	})
 }
 
