@@ -9,7 +9,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_Merge_Hierarchical(t *testing.T) {
+func TestIntegration_Config_Load_RealFS(t *testing.T) {
+	// Keep one test with real filesystem to ensure RealFileSystem works
+	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	content := "runtime: docker"
+	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	// Changing the working directory is process-global and can affect parallel tests.
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() {
+		// Restore the original working directory after the test.
+		require.NoError(t, os.Chdir(originalWd))
+	})
+
+	cfg, paths, err := LoadCDERunConfig()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.NotEmpty(t, paths)
+}
+
+func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
 	// Create a temporary directory structure
 	// tmp/
 	//   .cderun.yaml (parent)
@@ -90,5 +115,55 @@ python:
 
 		python := cfg["python"]
 		assert.Equal(t, "python:3.9", python.Image) // From child
+	})
+}
+
+func TestIntegration_Config_Expression_Resolve(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
+
+	resolver, err := NewExpressionResolver(nil)
+	require.NoError(t, err)
+
+	t.Run("Magic Words", func(t *testing.T) {
+		assert.Equal(t, resolver.Pwd, resolver.Resolve("{{PWD}}"))
+		assert.Equal(t, resolver.Home, resolver.Resolve("{{HOME}}"))
+		assert.Equal(t, resolver.Pwd+"/src", resolver.Resolve("{{PWD}}/src"))
+	})
+
+	t.Run("File Directive", func(t *testing.T) {
+		err := os.WriteFile("version.txt", []byte(" 1.2.3 \n"), 0644)
+		require.NoError(t, err)
+
+		assert.Equal(t, "golang:1.2.3", resolver.Resolve("golang:{{file:version.txt}}"))
+		assert.Equal(t, "", resolver.Resolve("{{file:nonexistent.txt}}"))
+	})
+
+	t.Run("Nested Structures", func(t *testing.T) {
+		input := map[string]any{
+			"image": "node:{{PWD}}",
+			"env": []any{
+				"HOME={{HOME}}",
+				"OTHER=fixed",
+			},
+		}
+		expected := map[string]any{
+			"image": "node:" + resolver.Pwd,
+			"env": []any{
+				"HOME=" + resolver.Home,
+				"OTHER=fixed",
+			},
+		}
+
+		// Map iteration order is random, but values should match
+		actual := resolver.Resolve(input).(map[string]any)
+		assert.Equal(t, expected["image"], actual["image"])
+		assert.Equal(t, expected["env"], actual["env"])
 	})
 }

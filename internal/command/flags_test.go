@@ -2,7 +2,6 @@ package command
 
 import (
 	"cderun/internal/runtime"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -103,36 +102,6 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 		assert.Equal(t, 2.0, mockRuntime.CreatedConfig.CPUs)
 	})
 
-	t.Run("Resolve from .tools.yaml for Docker-compatible features", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
-
-		originalWd, err := os.Getwd()
-		require.NoError(t, err)
-		tmpDir := t.TempDir()
-		require.NoError(t, os.Chdir(tmpDir))
-		t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
-
-		toolsContent := `
-node:
-  image: node:20
-  ports: ["8080:80"]
-  privileged: true
-  memory: 1g
-  cpus: 1.5
-`
-		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
-		require.NoError(t, err)
-
-		_, err = executeCommand("node", "app.js")
-		assert.NoError(t, err)
-
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
-		assert.Equal(t, []string{"8080:80"}, mockRuntime.CreatedConfig.Ports)
-		assert.True(t, mockRuntime.CreatedConfig.Privileged)
-		assert.Equal(t, int64(1024*1024*1024), mockRuntime.CreatedConfig.Memory)
-		assert.Equal(t, 1.5, mockRuntime.CreatedConfig.CPUs)
-	})
 
 	t.Run("Invalid pull policy returns error", func(t *testing.T) {
 		_, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
