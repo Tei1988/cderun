@@ -11,10 +11,10 @@
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
 | `internal/command` | 91.8% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 88.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/config` | 91.0% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 100.0% | ロギングシステムの全面的なテスト拡充により 100% を達成。 |
 | `internal/runtime` | 91.3% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| **Total** | **90.2%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| **Total** | **91.5%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -25,7 +25,7 @@
 | 引数解析 | `root_test.go`, `flags_test.go` | 良好 |
 | 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
 | ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go` | 良好 |
-| 設定ファイルサポート | `config_test.go`, `merge_test.go` | 良好 |
+| 設定ファイルサポート | `config_test.go`, `integration_test.go` | 良好 |
 | マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
 | イメージマッピング | `resolver_test.go` | 良好 |
@@ -39,11 +39,11 @@
 | インタラクティブ | `robustness_test.go` (信号、リサイズ), `stdin_test.go` | 良好 |
 | 信号処理 | `signals_test.go`, `robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
-| Nested Execution | `snapshot_test.go`, `path_test.go`, `scenario_nested_test.go` | 良好 |
+| Nested Execution | `snapshot_test.go`, `scenario_nested_test.go`, `path_test.go` | 良好 |
 | 診断モード | `root_test.go` | 良好 |
 | 統合テスト(Docker) | `integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
-| Expressions | `expression_test.go`, `resolver_test.go` | 良好 |
+| Expressions | `resolver_test.go`, `integration_test.go` | 良好 |
 | パス解決(チルダ・相対) | `path_test.go` | 良好 |
 | 厳密モード(strictEnv) | `integration_test.go`, `resolver_test.go` | 良好 |
 
@@ -80,7 +80,7 @@
 
 ### 5.1. テスト容易性の向上 (完了および継続)
 
-  1. **ファイルシステムの抽象化**: `runConfigDir` や `systemConfigDir` の差し替えメカニズムを導入済み。さらなる抽象化（`fs.FS`等）は将来の検討事項。
+  1. **ファイルシステムの抽象化**: `FileSystem` インターフェースおよび `ConfigLoader` 構造体を導入し、Getwd, Stat, ReadFile, UserHomeDir 等の操作を抽象化済み。これにより、グローバル状態に依存しないテストが可能となった。
   2. **ランタイムモックの強化 (完了)**: スレッドセーフかつ全操作を記録可能な `MockRuntime` を実装済み。
   3. **コマンド実行のラップ (完了)**: `cderun` バイナリ自体のパスを `MountCderunPath` 等で制御可能にし、テストの柔軟性を向上。
   4. **設定の不変性 (Immutability) の確保**: `createSnapshot` 等での設定情報のディープコピーを徹底し、副作用による不具合やテストの干渉を防止。
