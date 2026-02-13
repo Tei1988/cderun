@@ -56,6 +56,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 - 見つかったすべての設定ファイルの内容がマージされます。
 - 設定値が重複した場合、上記の検索順序でより優先度の高いファイルの値が採用されます。
   - 例えば、`./.cderun.yaml` に `runtime: podman` があり、`~/.config/cderun/.cderun.yaml` に `runtime: docker` がある場合、`podman` が使用されます。
+- **リスト型の設定について**: `mounts`, `env`, `ports`, `devices` などのリスト形式の設定は、**「上書き（完全置き換え）」**となります。マージ（追加）はされません。より優先度の高いファイルに定義がある場合、それより低優先度のファイルにある同項目のリストはすべて無視されます。
 
 ### 値の解決 (Value Resolution)
 
@@ -264,11 +265,11 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `expose` ([]string): ポート露出
 - `hostname` (string): ホスト名
 - `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマップ
+- `addHosts` ([]string): ホストマップ (YAMLキー: `addHosts`)
 - `user` (string): 実行ユーザー
 - `privileged` (bool): 特権モード
-- `capAdd` ([]string): ケーパビリティ追加
-- `capDrop` ([]string): ケーパビリティ削除
+- `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
+- `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
 - `entrypoint` ([]string): エントリーポイント
 - `command` ([]string): デフォルトのコマンド引数。サブコマンドの後に結合されます。
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
@@ -319,11 +320,11 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `expose` ([]string): ポート露出
 - `hostname` (string): ホスト名
 - `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマップ
+- `addHosts` ([]string): ホストマップ (YAMLキー: `addHosts`)
 - `user` (string): 実行ユーザー
 - `privileged` (bool): 特権モード
-- `capAdd` ([]string): ケーパビリティ追加
-- `capDrop` ([]string): ケーパビリティ削除
+- `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
+- `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
 - `entrypoint` ([]string): エントリーポイント
 - `command` ([]string): デフォルトのコマンド引数
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)

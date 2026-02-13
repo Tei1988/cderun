@@ -101,11 +101,13 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 - **デフォルト**: `false`
 - **説明**: cderunバイナリをコンテナ内の `/usr/local/bin/cderun` にマウント
 - **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
-- **制約**: `--mount-socket`との併用が必須
-- **補足**: `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になるため、明示的な指定は不要です。また、ネスト実行が検出された場合も自動的にマウントが構成されます。
+- **補足**:
+  - `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になります。
+  - ネスト実行が検出された場合も自動的にマウントが構成されます。
+  - このフラグが有効な場合、`--mount-socket` が明示的に `false` に設定されていない限り、`--mount-socket` も自動的に有効になります。
 
 ```bash
-cderun --mount-cderun --mount-socket alpine sh
+cderun --mount-cderun alpine sh
 ```
 
 ### `--mount-cderun-path`
@@ -122,21 +124,23 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun --mount-socket alpine 
 
 - **型**: string
 - **説明**: 指定したツール（カンマ区切り）のエイリアスをコンテナ内にマウント
-- **制約**: `--mount-socket`との併用が必須。対象のツールは `.tools.yaml`
-  に定義されている必要があります。
+- **補足**:
+  - 対象のツールは `.tools.yaml` に定義されている必要があります。
+  - このオプションを使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
 
 ```bash
-cderun --mount-socket --mount-tools node,python alpine sh
+cderun --mount-tools node,python alpine sh
 ```
 
 ### `--mount-all-tools`
 
 - **型**: bool
 - **説明**: `.tools.yaml` に定義されているすべてのツールのエイリアスをコンテナ内にマウント
-- **制約**: `--mount-socket`との併用が必須
+- **補足**:
+  - このオプションを使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
 
 ```bash
-cderun --mount-socket --mount-all-tools alpine sh
+cderun --mount-all-tools alpine sh
 ```
 
 ### `--image`
@@ -556,17 +560,4 @@ cderun --tty node
 
 ```bash
 cderun node --version --cderun-tty
-```
-
-### --mount-cderunが動作しない
-
-```bash
-cderun --mount-cderun node
-Error: --mount-cderun requires --mount-socket
-```
-
-**解決策**: `--mount-socket`を併用
-
-```bash
-cderun --mount-cderun --mount-socket node
 ```
