@@ -746,18 +746,71 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
 	})
 
-	t.Run("mounting flags require explicit cderun socket settings", func(t *testing.T) {
+	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
 		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
-		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
+		// If unspecified, --mount-cderun should auto-enable --mount-socket
+		t.Setenv("CDERUN_MOUNT_SOCKET", "")
 
+		mockRuntime.CreatedConfig = nil
 		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "requires --mount-socket")
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.True(t, mockRuntime.CreatedConfig.Mounts[1].Source == "/var/run/docker.sock")
 
-		// CDERUN_MOUNT_SOCKET should work
-		t.Setenv("CDERUN_MOUNT_SOCKET", "true")
+		// If explicitly set to false, it should NOT mount the socket but NOT fail
+		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
+		mockRuntime.CreatedConfig = nil
 		_, err = executeCommand("--image", "alpine", "--mount-cderun", "sh")
 		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
+				socketFound = true
+			}
+		}
+		assert.False(t, socketFound, "Socket should NOT be mounted when CDERUN_MOUNT_SOCKET=false")
+	})
+
+	t.Run("mount-tools auto-enables mount-cderun and mount-socket", func(t *testing.T) {
+		// Setup tools config
+		restoreWd, err := os.Getwd()
+		require.NoError(t, err)
+		tmpDir := t.TempDir()
+		require.NoError(t, os.Chdir(tmpDir))
+		t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+
+		toolsContent := `
+node:
+  image: node:20
+`
+		err = os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+		require.NoError(t, err)
+
+		mockRuntime.CreatedConfig = nil
+		// No --mount-socket, no --mount-cderun
+		_, err = executeCommand("--image", "alpine", "--mount-tools", "node", "sh")
+		assert.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+
+		cderunFound := false
+		socketFound := false
+		nodeFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Target == "/usr/local/bin/cderun" {
+				cderunFound = true
+			}
+			if v.Target == "/usr/local/bin/node" {
+				nodeFound = true
+			}
+			if strings.Contains(v.Target, "docker.sock") {
+				socketFound = true
+			}
+		}
+		assert.True(t, cderunFound, "cderun should be auto-mounted")
+		assert.True(t, nodeFound, "node should be mounted")
+		assert.True(t, socketFound, "socket should be auto-mounted")
 	})
 
 	t.Run("mount-cderun logic", func(t *testing.T) {

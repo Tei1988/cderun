@@ -331,9 +331,6 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 
 	// Handle mounting flags
 	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
-		if !resolved.MountSocket {
-			return nil, fmt.Errorf("--mount-cderun, --mount-tools, or --mount-all-tools requires --mount-socket")
-		}
 		exePath := resolved.MountCderunPath
 		if exePath == "" {
 			var err error
@@ -358,14 +355,6 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			Source:   exePath,
 			Target:   "/usr/local/bin/cderun",
 			ReadOnly: true,
-		})
-
-		// Add socket mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-			Type:     "bind",
-			Source:   resolved.SocketPath,
-			Target:   resolved.MountSocketPath,
-			ReadOnly: false, // Socket needs to be writable
 		})
 
 		// Handle MountTools / MountAllTools
@@ -406,13 +395,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 				})
 			}
 		}
-	} else if resolved.MountSocket {
-		// Just mount the socket if requested even if no other mounting flags are set
+	}
+
+	if resolved.MountSocket {
+		// Add socket mount
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 			Type:     "bind",
 			Source:   resolved.SocketPath,
 			Target:   resolved.MountSocketPath,
-			ReadOnly: false,
+			ReadOnly: false, // Socket needs to be writable
 		})
 	}
 

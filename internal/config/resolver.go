@@ -380,48 +380,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	// Special handling for unix:// prefix for the host-side socket path
 	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
 
-	// 12. Resolve MountSocket and MountSocketPath
-	res.MountSocket = resolveBool(
-		cli.CderunMountSocketSet, cli.CderunMountSocket,
-		cli.MountSocketSet, cli.MountSocket,
-		"CDERUN_MOUNT_SOCKET",
-		subcommand, tools, func(t ToolConfig) *bool { return t.MountSocket },
-		global, func(g CDERunConfig) *bool { return g.Defaults.MountSocket },
-		false,
-	)
-
-	res.MountSocketPath = resolveConfigPath(
-		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
-		cli.MountSocketPathSet, cli.MountSocketPath,
-		"CDERUN_MOUNT_SOCKET_PATH",
-		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-		res.SocketPath, // Default to host-side socket path
-		r,
-		"path",
-	)
-
-	// 13. Resolve MountCderun
-	res.MountCderun = resolveBool(
-		cli.CderunMountCderunSet, cli.CderunMountCderun,
-		cli.MountCderunSet, cli.MountCderun,
-		"CDERUN_MOUNT_CDERUN",
-		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
-		global, func(g CDERunConfig) *bool { return g.Defaults.MountCderun },
-		false,
-	)
-
-	res.MountCderunPath = resolveConfigPath(
-		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
-		cli.MountCderunPathSet, cli.MountCderunPath,
-		"CDERUN_MOUNT_CDERUN_PATH",
-		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-		"",
-		r,
-		"path",
-	)
-
 	// 14. Resolve MountTools and MountAllTools
 	res.MountTools = resolveStringSliceComma(
 		cli.CderunMountToolsSet, cli.CderunMountTools,
@@ -439,6 +397,56 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.MountAllTools },
 		global, func(g CDERunConfig) *bool { return g.Defaults.MountAllTools },
 		false,
+	)
+
+	// 13. Resolve MountCderun
+	var mountCderunSpecified bool
+	res.MountCderun, mountCderunSpecified = resolveBoolInfo(
+		cli.CderunMountCderunSet, cli.CderunMountCderun,
+		cli.MountCderunSet, cli.MountCderun,
+		"CDERUN_MOUNT_CDERUN",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountCderun },
+	)
+	if !mountCderunSpecified {
+		// Transitive auto-enablement: tools -> cderun
+		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
+	}
+
+	res.MountCderunPath = resolveConfigPath(
+		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
+		cli.MountCderunPathSet, cli.MountCderunPath,
+		"CDERUN_MOUNT_CDERUN_PATH",
+		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		"",
+		r,
+		"path",
+	)
+
+	// 12. Resolve MountSocket and MountSocketPath
+	var mountSocketSpecified bool
+	res.MountSocket, mountSocketSpecified = resolveBoolInfo(
+		cli.CderunMountSocketSet, cli.CderunMountSocket,
+		cli.MountSocketSet, cli.MountSocket,
+		"CDERUN_MOUNT_SOCKET",
+		subcommand, tools, func(t ToolConfig) *bool { return t.MountSocket },
+		global, func(g CDERunConfig) *bool { return g.Defaults.MountSocket },
+	)
+	if !mountSocketSpecified {
+		// Transitive auto-enablement: cderun -> socket
+		res.MountSocket = res.MountCderun
+	}
+
+	res.MountSocketPath = resolveConfigPath(
+		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
+		cli.MountSocketPathSet, cli.MountSocketPath,
+		"CDERUN_MOUNT_SOCKET_PATH",
+		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+		res.SocketPath, // Default to host-side socket path
+		r,
+		"path",
 	)
 
 	// 15. Resolve DryRun (CLI/Env only)
@@ -541,30 +549,40 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 }
 
 func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool) bool {
+	val, specified := resolveBoolInfo(p1Set, p1Val, p2Set, p2Val, envKey, subcommand, tools, toolGetter, global, globalGetter)
+	if specified {
+		return val
+	}
+	return fallback
+}
+
+func resolveBoolInfo(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool) (bool, bool) {
 	if p1Set {
-		return p1Val
+		return p1Val, true
 	}
 	if p2Set {
-		return p2Val
+		return p2Val, true
 	}
-	if env := os.Getenv(envKey); env != "" {
-		if b, err := strconv.ParseBool(env); err == nil {
-			return b
+	if envKey != "" {
+		if env := os.Getenv(envKey); env != "" {
+			if b, err := strconv.ParseBool(env); err == nil {
+				return b, true
+			}
 		}
 	}
 	if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			if b := toolGetter(tool); b != nil {
-				return *b
+				return *b, true
 			}
 		}
 	}
 	if global != nil {
 		if b := globalGetter(*global); b != nil {
-			return *b
+			return *b, true
 		}
 	}
-	return fallback
+	return false, false
 }
 
 func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string, r *ExpressionResolver) string {
