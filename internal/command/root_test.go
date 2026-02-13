@@ -755,7 +755,15 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
-		assert.True(t, mockRuntime.CreatedConfig.Mounts[1].Source == "/var/run/docker.sock")
+
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Target == "/var/run/docker.sock" {
+				assert.Equal(t, "/var/run/docker.sock", v.Source)
+				socketFound = true
+			}
+		}
+		assert.True(t, socketFound, "Socket should be automatically mounted")
 
 		// If explicitly set to false, it should NOT mount the socket but NOT fail
 		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
@@ -764,7 +772,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		assert.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 
-		socketFound := false
+		socketFound = false
 		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
 				socketFound = true

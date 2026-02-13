@@ -380,7 +380,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	// Special handling for unix:// prefix for the host-side socket path
 	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
 
-	// 14. Resolve MountTools and MountAllTools
+	// 13. Resolve MountTools and MountAllTools
 	res.MountTools = resolveStringSliceComma(
 		cli.CderunMountToolsSet, cli.CderunMountTools,
 		cli.MountToolsSet, cli.MountTools,
@@ -399,7 +399,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		false,
 	)
 
-	// 13. Resolve MountCderun
+	// 14. Resolve MountCderun
 	var mountCderunSpecified bool
 	res.MountCderun, mountCderunSpecified = resolveBoolInfo(
 		cli.CderunMountCderunSet, cli.CderunMountCderun,
@@ -424,7 +424,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"path",
 	)
 
-	// 12. Resolve MountSocket and MountSocketPath
+	// 15. Resolve MountSocket and MountSocketPath
 	var mountSocketSpecified bool
 	res.MountSocket, mountSocketSpecified = resolveBoolInfo(
 		cli.CderunMountSocketSet, cli.CderunMountSocket,
@@ -449,7 +449,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"path",
 	)
 
-	// 15. Resolve DryRun (CLI/Env only)
+	// 16. Resolve DryRun (CLI/Env only)
 	res.DryRun = resolveBool(
 		cli.CderunDryRunSet, cli.CderunDryRun,
 		cli.DryRunSet, cli.DryRun,
@@ -459,7 +459,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		false,
 	)
 
-	// 16. Resolve DryRunFormat (CLI/Env only)
+	// 17. Resolve DryRunFormat (CLI/Env only)
 	res.DryRunFormat = resolveString(
 		cli.CderunDryRunFormatSet, cli.CderunDryRunFormat,
 		cli.DryRunFormatSet, cli.DryRunFormat,
@@ -470,7 +470,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 	)
 
-	// 17. Resolve DiagnosisFormat (CLI/Env only)
+	// 18. Resolve DiagnosisFormat (CLI/Env only)
 	res.DiagnosisFormat = resolveString(
 		cli.CderunDiagnosisFormatSet, cli.CderunDiagnosisFormat,
 		cli.DiagnosisFormatSet, cli.DiagnosisFormat,
@@ -481,7 +481,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 	)
 
-	// 18. Resolve Logging
+	// 19. Resolve Logging
 	res.LogLevel = resolveString(
 		cli.CderunLogLevelSet, cli.CderunLogLevel,
 		cli.LogLevelSet, cli.LogLevel,
