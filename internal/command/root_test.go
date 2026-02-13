@@ -563,6 +563,8 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 			ExecErr: errors.New("exec error"),
 		}
 		opts.fs = mfs
+		t.Cleanup(func() { opts.fs = nil })
+
 		// We need to trigger binary mount logic
 		resolved := &config.ResolvedConfig{
 			MountCderun: true,
@@ -570,7 +572,6 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 		_, err := opts.buildContainerConfig(resolved, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
-		opts.fs = nil // Reset
 	})
 }
 
