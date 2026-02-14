@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -79,6 +80,12 @@ func (r *ExpressionResolver) resolveString(s string) string {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) string {
+	// Security: Prevent path traversal by disallowing absolute paths or parent directory references.
+	// Since FindConfigs searches parent directories automatically, ".." is not needed for legitimate use.
+	if filepath.IsAbs(filename) || strings.Contains(filename, "..") {
+		return ""
+	}
+
 	loader := &ConfigLoader{
 		fs:              r.fs,
 		systemConfigDir: defaultLoader.systemConfigDir,
