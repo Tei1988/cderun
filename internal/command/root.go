@@ -26,6 +26,7 @@ import (
 const (
 	attachGracePeriod = 5 * time.Second
 )
+
 type rootOptions struct {
 	tty                   bool
 	interactive           bool

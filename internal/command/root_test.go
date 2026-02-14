@@ -16,6 +16,7 @@ import (
 )
 
 var testOptions *rootOptions
+
 func executeCommand(args ...string) (string, error) {
 	return executeCommandContext(context.Background(), args...)
 }
