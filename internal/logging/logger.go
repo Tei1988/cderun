@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -68,26 +69,35 @@ func (l Level) LowerString() string {
 
 type Logger struct {
 	mu        sync.Mutex
-	Level     Level
+	level     atomic.Int32
 	Writer    io.Writer
 	Format    string // "text" or "json"
 	Timestamp bool
 }
 
-var (
-	globalLogger = &Logger{
-		Level:     WarnLevel,
+func (l *Logger) SetLevel(level Level) {
+	l.level.Store(int32(level))
+}
+
+func (l *Logger) GetLevel() Level {
+	return Level(l.level.Load())
+}
+
+var globalLogger = func() *Logger {
+	l := &Logger{
 		Writer:    os.Stderr,
 		Format:    "text",
 		Timestamp: true,
 	}
-)
+	l.SetLevel(WarnLevel)
+	return l
+}()
 
 func Init(level string, format string, timestamp bool) error {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
 
-	globalLogger.Level = ParseLevel(level)
+	globalLogger.SetLevel(ParseLevel(level))
 	globalLogger.Format = strings.ToLower(format)
 	globalLogger.Timestamp = timestamp
 
@@ -105,9 +115,8 @@ func SetOutput(w io.Writer) {
 
 func (l *Logger) log(level Level, msg string, args ...interface{}) {
 	// Optimization: Check level before locking to avoid contention for filtered logs.
-	// While reading l.Level without a lock is technically a race, it's acceptable for logging
-	// as the level changes very rarely (only during initialization).
-	if level > l.Level {
+	// We use atomic load to avoid data races.
+	if level > l.GetLevel() {
 		return
 	}
 
@@ -119,7 +128,7 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 	defer l.mu.Unlock()
 
 	// Re-check level inside the lock for absolute consistency.
-	if level > l.Level {
+	if level > l.GetLevel() {
 		return
 	}
 

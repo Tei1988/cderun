@@ -12,11 +12,11 @@ import (
 func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := &Logger{
-		Level:     InfoLevel,
 		Writer:    buf,
 		Format:    "text",
 		Timestamp: false,
 	}
+	logger.SetLevel(InfoLevel)
 
 	logger.log(InfoLevel, "test info message")
 	assert.Contains(t, buf.String(), "[INFO] test info message")
@@ -25,7 +25,7 @@ func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
 	logger.log(DebugLevel, "test debug message")
 	assert.Empty(t, buf.String())
 
-	logger.Level = DebugLevel
+	logger.SetLevel(DebugLevel)
 	logger.log(DebugLevel, "test debug message")
 	assert.Contains(t, buf.String(), "[DEBUG] test debug message")
 }
@@ -33,11 +33,11 @@ func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
 func TestUnit_Logging_Logger_JSONFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := &Logger{
-		Level:     InfoLevel,
 		Writer:    buf,
 		Format:    "json",
 		Timestamp: false,
 	}
+	logger.SetLevel(InfoLevel)
 
 	logger.log(InfoLevel, "test json message %d", 123)
 
@@ -54,11 +54,11 @@ func TestUnit_Logging_Logger_WithTimestamp(t *testing.T) {
 	t.Run("text format", func(t *testing.T) {
 		buf.Reset()
 		logger := &Logger{
-			Level:     InfoLevel,
 			Writer:    buf,
 			Format:    "text",
 			Timestamp: true,
 		}
+		logger.SetLevel(InfoLevel)
 		logger.log(InfoLevel, "msg")
 		// Format: 2006-01-02 15:04:05 [INFO] msg
 		assert.Regexp(t, `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] msg`, buf.String())
@@ -67,11 +67,11 @@ func TestUnit_Logging_Logger_WithTimestamp(t *testing.T) {
 	t.Run("json format", func(t *testing.T) {
 		buf.Reset()
 		logger := &Logger{
-			Level:     InfoLevel,
 			Writer:    buf,
 			Format:    "json",
 			Timestamp: true,
 		}
+		logger.SetLevel(InfoLevel)
 		logger.log(InfoLevel, "msg")
 		var entry map[string]string
 		err := json.Unmarshal(buf.Bytes(), &entry)
@@ -105,7 +105,7 @@ func TestUnit_Logging_Init_GlobalLogger(t *testing.T) {
 	// Test Init updates globalLogger
 	err := Init("debug", "json", false)
 	assert.NoError(t, err)
-	assert.Equal(t, DebugLevel, globalLogger.Level)
+	assert.Equal(t, DebugLevel, globalLogger.GetLevel())
 	assert.Equal(t, "json", globalLogger.Format)
 	assert.Equal(t, false, globalLogger.Timestamp)
 }
