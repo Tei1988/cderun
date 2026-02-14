@@ -929,6 +929,37 @@ func TestUnit_Config_Resolver_TransitiveAutoEnablement(t *testing.T) {
 		assert.True(t, res.MountCderun)
 		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled by MountCderun")
 	})
+
+	t.Run("Transitive enablement chain: MountTools -> MountCderun -> MountSocket", func(t *testing.T) {
+		// Only MountTools is set
+		cli := CLIOptions{
+			MountTools:    "node",
+			MountToolsSet: true,
+		}
+		tools := ToolsConfig{"node": {Image: "node"}, "sh": {Image: "alpine"}}
+
+		res, err := Resolve("sh", cli, tools, nil)
+		require.NoError(t, err)
+		assert.True(t, res.MountCderun, "MountCderun should be auto-enabled")
+		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled")
+
+		// Explicitly disable the middle of the chain
+		cli.CderunMountCderun = false
+		cli.CderunMountCderunSet = true
+		res, err = Resolve("sh", cli, tools, nil)
+		require.NoError(t, err)
+		assert.False(t, res.MountCderun)
+		assert.False(t, res.MountSocket, "MountSocket should NOT be auto-enabled if MountCderun is explicitly false")
+
+		// Explicitly disable the end of the chain
+		cli.CderunMountCderunSet = false // back to auto
+		cli.CderunMountSocket = false
+		cli.CderunMountSocketSet = true
+		res, err = Resolve("sh", cli, tools, nil)
+		require.NoError(t, err)
+		assert.True(t, res.MountCderun)
+		assert.False(t, res.MountSocket, "MountSocket should NOT be auto-enabled if explicitly false")
+	})
 }
 
 func TestUnit_Config_Resolver_StringSlice(t *testing.T) {

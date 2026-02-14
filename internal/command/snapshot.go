@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
+func createSnapshot(fs config.FileSystem, reader mountInfoReader, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
@@ -57,7 +57,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 
 	// OverlayFS root discovery (only at level 1 if we want to find the host root)
 	// Actually, it can be done at any level if we want to find the "upperdir" of the current container.
-	if upperDir, err := discoverOverlayUpperDir(fs); err == nil && upperDir != "" {
+	if upperDir, err := discoverOverlayUpperDir(fs, reader); err == nil && upperDir != "" {
 		logging.Debug("Discovered OverlayFS upperdir: %s", upperDir)
 		hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
 			Source: upperDir,
@@ -110,10 +110,11 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 	return fs.ReadFile("/proc/self/mountinfo")
 }
 
-var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
-
-func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
-	data, err := defaultMountInfoReader.ReadMountInfo(fs)
+func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (string, error) {
+	if reader == nil {
+		return "", nil
+	}
+	data, err := reader.ReadMountInfo(fs)
 	if err != nil {
 		return "", err
 	}

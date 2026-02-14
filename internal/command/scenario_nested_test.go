@@ -48,18 +48,12 @@ hostContext:
 	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0o644))
 
 	// 2. Setup Mock Runtime
-	prevFactory := runtimeFactory
-	prevExit := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = prevFactory
-		exitFunc = prevExit
-	})
-
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+	setupTestOptions(t)
+	testOptions.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 		return mockRuntime, nil
 	}
-	exitFunc = func(code int) {}
+	testOptions.exitFunc = func(code int) {}
 
 	// 3. Run cderun as if we are in the container
 	// Current working directory is /app (simulated)

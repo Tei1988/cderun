@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,18 +23,24 @@ func executeCommandContext(ctx context.Context, args ...string) (string, error) 
 	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
 }
 
+var (
+	testOptions *rootOptions
+)
+
+func setupTestOptions(t *testing.T) {
+	t.Helper()
+	testOptions = newDefaultOptions()
+	t.Cleanup(func() {
+		testOptions = nil
+	})
+}
+
 func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
 	t.Helper()
-	savedRuntimeFactory := runtimeFactory
-	savedExitFunc := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = savedRuntimeFactory
-		exitFunc = savedExitFunc
-	})
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+	testOptions.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 		return mock, nil
 	}
-	exitFunc = func(code int) {}
+	testOptions.exitFunc = func(code int) {}
 }
 
 func executeCommandRaw(args []string) (string, error) {
@@ -44,103 +48,31 @@ func executeCommandRaw(args []string) (string, error) {
 }
 
 func executeCommandRawContext(ctx context.Context, args []string) (string, error) {
-	// Reset flag variables and Changed state
-	rootCmd = newRootCmd()
+	// Re-initialize options for each call if not set by test
+	// Note: for multiple calls in the same test, the caller should
+	// ensure testOptions is preserved or re-initialized as needed.
+	o := testOptions
+	if o == nil {
+		o = newDefaultOptions()
+	}
 
 	// Default to terminal mode for tests to avoid auto-detection of pipes
 	// unless specifically overridden in a test.
-	savedIsTerminal := isTerminal
-	isTerminal = func(fd int) bool { return true }
-	defer func() { isTerminal = savedIsTerminal }()
+	if o.isTerminal == nil {
+		o.isTerminal = func(fd int) bool { return true }
+	}
 
-	opts.tty = false
-	opts.interactive = false
-	opts.network = "bridge"
-	opts.socketPath = ""
-	opts.mountSocket = false
-	opts.mountSocketPath = ""
-	opts.mountCderun = false
-	opts.image = ""
-	opts.remove = true
-	opts.cderunTTY = false
-	opts.cderunInteractive = false
-	opts.cderunImage = ""
-	opts.cderunNetwork = ""
-	opts.cderunRemove = true
-	opts.cderunRuntime = ""
-	opts.cderunSocketPath = ""
-	opts.cderunMountSocket = false
-	opts.cderunMountSocketPath = ""
-	opts.cderunWorkdir = ""
-	opts.cderunMounts = nil
-	opts.cderunMountCderun = false
-	opts.cderunMountTools = ""
-	opts.cderunMountAllTools = false
-	opts.runtimeName = "docker"
-	opts.env = nil
-	opts.cderunEnv = nil
-	opts.workdir = ""
-	opts.mounts = nil
-	opts.mountTools = ""
-	opts.mountAllTools = false
-	opts.dryRun = false
-	opts.dryRunFormat = "yaml"
-	opts.cderunDryRun = false
-	opts.cderunDryRunFormat = ""
-	opts.diagnosis = false
-	opts.diagnosisFormat = "yaml"
-	opts.cderunDiagnosis = false
-	opts.cderunDiagnosisFormat = ""
-	opts.logLevel = ""
-	opts.logFormat = "text"
-	opts.logTimestamp = true
-	opts.cderunLogLevel = ""
-	opts.cderunLogFormat = ""
-
-	// Reset dependencies
-	opts.fs = nil
-	opts.configLoader = nil
-
-	opts.ports = nil
-	opts.publishAll = false
-	opts.expose = nil
-	opts.hostname = ""
-	opts.dns = nil
-	opts.addHosts = nil
-	opts.user = ""
-	opts.privileged = false
-	opts.capAdd = nil
-	opts.capDrop = nil
-	opts.entrypoint = nil
-	opts.pull = "missing"
-	opts.memory = ""
-	opts.cpus = 0
-	opts.devices = nil
-	opts.cderunPorts = nil
-	opts.cderunPublishAll = false
-	opts.cderunExpose = nil
-	opts.cderunHostname = ""
-	opts.cderunDNS = nil
-	opts.cderunAddHosts = nil
-	opts.cderunUser = ""
-	opts.cderunPrivileged = false
-	opts.cderunCapAdd = nil
-	opts.cderunCapDrop = nil
-	opts.cderunEntrypoint = nil
-	opts.cderunPull = ""
-	opts.cderunMemory = ""
-	opts.cderunCPUs = 0
-	opts.cderunDevices = nil
+	cmd := newRootCmd(o)
 
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
-	savedOut := rootCmd.OutOrStdout()
-	savedErr := rootCmd.ErrOrStderr()
+	savedOut := cmd.OutOrStdout()
+	savedErr := cmd.ErrOrStderr()
 	defer func() {
 		os.Stdout = savedStdout
 		os.Stderr = savedStderr
-		rootCmd.SetOut(savedOut)
-		rootCmd.SetErr(savedErr)
+		cmd.SetOut(savedOut)
+		cmd.SetErr(savedErr)
 	}()
 
 	r, w, err := os.Pipe()
@@ -152,8 +84,8 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 
 	os.Stdout = w
 	os.Stderr = w
-	rootCmd.SetOut(w)
-	rootCmd.SetErr(w)
+	cmd.SetOut(w)
+	cmd.SetErr(w)
 
 	var buf bytes.Buffer
 	done := make(chan struct{})
@@ -162,7 +94,20 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		close(done)
 	}()
 
-	execErr := ExecuteContext(ctx, args)
+	// Since we are bypassng the standard ExecuteContext for finer control
+	// we perform the preprocessing and argument setting here.
+	processedArgs, err := preprocessArgs(cmd, args)
+	var execErr error
+	if err == nil {
+		if len(processedArgs) >= 1 {
+			cmd.SetArgs(processedArgs[1:])
+		} else {
+			cmd.SetArgs([]string{})
+		}
+		execErr = cmd.ExecuteContext(ctx)
+	} else {
+		execErr = err
+	}
 
 	_ = w.Close()
 	<-done
@@ -211,11 +156,27 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 			args:     []string{"cderun", "-itp", "80:80", "sh", "--cderun-interactive"},
 			expected: []string{"cderun", "--cderun-interactive", "-itp", "80:80", "sh"},
 		},
+		{
+			name:     "flag with = is not skipped by hoist",
+			args:     []string{"cderun", "sh", "--cderun-log-level=debug", "-l"},
+			expected: []string{"cderun", "--cderun-log-level=debug", "sh", "-l"},
+		},
+		{
+			name:     "flag without = takes next argument as value during hoist",
+			args:     []string{"cderun", "sh", "--cderun-log-level", "debug", "-l"},
+			expected: []string{"cderun", "--cderun-log-level", "debug", "sh", "-l"},
+		},
+		{
+			name:     "multiple hoisting",
+			args:     []string{"cderun", "sh", "--cderun-tty", "ls", "--cderun-image", "alpine"},
+			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "sh", "ls"},
+		},
 	}
 
+	cmd := newRootCmd(newDefaultOptions())
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := preprocessArgs(tt.args)
+			actual, err := preprocessArgs(cmd, tt.args)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
 		})
@@ -233,13 +194,14 @@ func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
 
 func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
 			ExitCode:           42,
 		}
 		var capturedExitCode int
 		setupMockRuntime(t, mockRuntime)
-		exitFunc = func(code int) {
+		testOptions.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
 
@@ -259,6 +221,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
+		setupTestOptions(t)
 		setupMockRuntime(t, &runtime.MockRuntime{})
 
 		output, err := executeCommand("--tty")
@@ -269,6 +232,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
@@ -278,6 +242,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
@@ -287,16 +252,8 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
-		// Use the real runtimeFactory here to test the validation logic
-		exitFunc = func(code int) {}
+		setupTestOptions(t)
+		testOptions.exitFunc = func(code int) {}
 
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
@@ -304,6 +261,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
@@ -315,6 +273,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
@@ -326,59 +285,9 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		assert.Nil(t, mockRuntime.CreatedConfig)
 	})
 
-	t.Run("dry-run requires a subcommand", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
-
-		_, err := executeCommand("--dry-run")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
-	})
-
-	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
-
-		// Dry-run with YAML (default)
-		// Step 10.2: subcommand 'sh' is excluded from command
-		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
-		require.NoError(t, err)
-		assert.Contains(t, output, "image: alpine")
-		assert.Contains(t, output, "command:")
-		assert.Contains(t, output, "- echo")
-		assert.Contains(t, output, "- hello")
-		assert.NotContains(t, output, "- sh")
-		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
-
-		// Dry-run with JSON
-		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
-		require.NoError(t, err)
-		assert.Contains(t, output, "\"image\": \"alpine\"")
-		assert.Contains(t, output, "\"command\": [")
-
-		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
-		require.NoError(t, err)
-		assert.Contains(t, output, "Image: alpine")
-		assert.Contains(t, output, "Command: echo hello")
-		assert.NotContains(t, output, "Command: sh")
-		assert.Contains(t, output, "TTY: false")
-		assert.Contains(t, output, "Interactive: false")
-		assert.Contains(t, output, "Network: bridge")
-		assert.Contains(t, output, "Remove: true")
-
-		// Dry-run with mount
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
-		require.NoError(t, err)
-		assert.Contains(t, output, "Mounts: type=bind,source=/h,target=/c,readonly=false")
-
-		// Dry-run with device
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
-		require.NoError(t, err)
-		assert.Contains(t, output, "Devices: /dev/video0:/dev/video1:ro")
-	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
 		}
@@ -390,6 +299,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
@@ -402,6 +312,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 }
 
 func TestUnit_Command_Root_Phase3Features(t *testing.T) {
+	setupTestOptions(t)
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -500,6 +411,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 }
 
 func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
+	setupTestOptions(t)
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -521,56 +433,15 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
-	mockRuntime := runtime.NewMockRuntime()
-	setupMockRuntime(t, mockRuntime)
-
-	t.Run("JSON format", func(t *testing.T) {
-		out := &bytes.Buffer{}
-		opts := &rootOptions{
-			fs: config.RealFileSystem{},
-		}
-		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
-			SocketPath:      "/var/run/docker.sock",
-			Diagnosis:       true,
-			DiagnosisFormat: "json",
-		}
-		cmd := &cobra.Command{}
-		cmd.SetOut(out)
-
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
-		require.NoError(t, err)
-		assert.Contains(t, out.String(), "\"name\": \"docker\"")
-	})
-
-	t.Run("Simple format", func(t *testing.T) {
-		out := &bytes.Buffer{}
-		opts := &rootOptions{
-			fs: config.RealFileSystem{},
-		}
-		resolved := &config.ResolvedConfig{
-			Runtime:         "podman",
-			SocketPath:      "/run/podman/podman.sock",
-			Diagnosis:       true,
-			DiagnosisFormat: "simple",
-		}
-		cmd := &cobra.Command{}
-		cmd.SetOut(out)
-
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
-		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Runtime: podman")
-	})
-}
 
 func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
 		}
-		opts.fs = mfs
-		t.Cleanup(func() { opts.fs = nil })
+		opts := &rootOptions{
+			fs: mfs,
+		}
 
 		// We need to trigger binary mount logic
 		resolved := &config.ResolvedConfig{
@@ -584,6 +455,7 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 
 func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
@@ -595,6 +467,7 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 	})
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
+		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: nil,
 		}

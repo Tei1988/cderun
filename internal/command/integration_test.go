@@ -479,23 +479,9 @@ node:
 	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
-	// Save and restore package-level state
-	savedTTY := opts.tty
-	savedCderunTTY := opts.cderunTTY
-	savedRuntimeFactory := runtimeFactory
-	savedExitFunc := exitFunc
-	t.Cleanup(func() {
-		opts.tty = savedTTY
-		opts.cderunTTY = savedCderunTTY
-		runtimeFactory = savedRuntimeFactory
-		exitFunc = savedExitFunc
-	})
-
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
+	setupTestOptions(t)
+	setupMockRuntime(t, mockRuntime)
 
 	t.Run("cderun-tty overrides tty even if placed after subcommand", func(t *testing.T) {
 		_, err := executeCommandRaw([]string{"cderun", "--tty=true", "node", "--cderun-tty=false", "--version"})

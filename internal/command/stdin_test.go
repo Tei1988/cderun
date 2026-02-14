@@ -34,20 +34,20 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		setupTestOptions(t)
+		o := testOptions
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mock, nil
 		}
+		o.exitFunc = func(code int) {}
 
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
+		cmd := newRootCmd(o)
+		cmd.SetIn(pr)
+		cmd.SetOut(&stdout)
+		cmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -55,7 +55,17 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			execErr = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+			args, err := preprocessArgs(cmd, []string{"cderun", "--image", "alpine", "-i", "cat"})
+			if err != nil {
+				execErr = err
+			} else {
+				if len(args) >= 1 {
+					cmd.SetArgs(args[1:])
+				} else {
+					cmd.SetArgs([]string{})
+				}
+				execErr = cmd.ExecuteContext(ctx)
+			}
 			close(done)
 		}()
 
@@ -82,27 +92,35 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		setupTestOptions(t)
+		o := testOptions
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mock, nil
 		}
+		o.exitFunc = func(code int) {}
 
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
+		cmd := newRootCmd(o)
+		cmd.SetIn(pr)
+		cmd.SetOut(&stdout)
+		cmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "cat"})
+			args, err := preprocessArgs(cmd, []string{"cderun", "--image", "alpine", "cat"})
+			if err == nil {
+				if len(args) >= 1 {
+					cmd.SetArgs(args[1:])
+				} else {
+					cmd.SetArgs([]string{})
+				}
+				_ = cmd.ExecuteContext(ctx)
+			}
 			close(done)
 		}()
 

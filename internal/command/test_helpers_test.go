@@ -12,10 +12,7 @@ import (
 
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
-// and is NOT safe for parallel execution with t.Parallel().
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	// Re-use logic from root_test.go but simplified
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
@@ -54,23 +51,33 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 		stderrChan <- buf.String()
 	}()
 
-	// Reset global state
-	opts = rootOptions{}
-	rootCmd = newRootCmd()
-	rootCmd.SetOut(wOut)
-	rootCmd.SetErr(wErr)
+	// Use fresh options and command
+	o := newDefaultOptions()
+	cmd := newRootCmd(o)
+	cmd.SetOut(wOut)
+	cmd.SetErr(wErr)
 
 	// Mock exitFunc to capture exit code
 	capturedExitCode := 0
-	savedExitFunc := exitFunc
-	exitFunc = func(code int) {
+	o.exitFunc = func(code int) {
 		capturedExitCode = code
 	}
-	defer func() {
-		exitFunc = savedExitFunc
-	}()
 
-	execErr := Execute(append([]string{"cderun"}, args...))
+	rawArgs := append([]string{"cderun"}, args...)
+	processedArgs, err := preprocessArgs(cmd, rawArgs)
+	if err != nil {
+		_ = wOut.Close()
+		_ = wErr.Close()
+		return "", "", 0, err
+	}
+
+	if len(processedArgs) >= 1 {
+		cmd.SetArgs(processedArgs[1:])
+	} else {
+		cmd.SetArgs([]string{})
+	}
+
+	execErr := cmd.Execute()
 
 	_ = wOut.Close()
 	_ = wErr.Close()

@@ -9,19 +9,9 @@ import (
 )
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
-	// Save and restore package-level state
-	originalFactory := runtimeFactory
-	originalExit := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = originalFactory
-		exitFunc = originalExit
-	})
-
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
+	testOptions = newDefaultOptions()
+	setupMockRuntime(t, mockRuntime)
 
 	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
