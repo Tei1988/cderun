@@ -196,5 +196,31 @@ the available runtime by checking for common Unix socket paths.
   back to host paths for nested mounts.
 - Detects OverlayFS upperdir for automatic root filesystem mapping.
 
+## Development & Testing
+
+### Running Tests
+
+To run the unit tests:
+
+```bash
+make test
+# or
+go test ./...
+```
+
+To run the End-to-End (E2E) tests which require a running Docker or Podman environment:
+
+```bash
+go test -tags=e2e ./...
+```
+
+### Generating Coverage Report
+
+To generate a test coverage report:
+
+```bash
+make coverage
+```
+
 ---
 *This project is under active development.*
