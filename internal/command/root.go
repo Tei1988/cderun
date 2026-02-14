@@ -450,7 +450,7 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "simple":
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
