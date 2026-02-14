@@ -117,7 +117,7 @@ cderun --mount-cderun alpine sh
 - **用途**: 明示的に特定のcderunバイナリをマウントしたい場合に使用
 
 ```bash
-cderun --mount-cderun --mount-cderun-path /path/to/cderun --mount-socket alpine sh
+cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 ```
 
 ### `--mount-tools`
@@ -483,8 +483,8 @@ cderun --network none python script.py
 # Dockerソケットマウント
 cderun --mount-socket docker ps
 
-# cderunの入れ子実行
-cderun --mount-cderun --mount-socket alpine sh
+# cderunの入れ子実行（ソケットは自動的にマウントされます）
+cderun --mount-cderun alpine sh
 
 # Mac等でホストとコンテナのマウントパスを変える場合
 cderun --socket-path ~/.rd/docker.sock --mount-socket \

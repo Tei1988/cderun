@@ -25,12 +25,12 @@ gemini> use mcp server "python-tools"
 ### 基本的な仕組み
 
 ```bash
-cderun --mount-cderun --mount-socket gemini-cli
+cderun --mount-cderun gemini-cli
 
 # 生成されるコマンド (イメージ):
 # docker run --rm -t -i \
 #   -v /usr/local/bin/cderun:/usr/local/bin/cderun:ro \  # cderunバイナリをマウント
-#   -v /var/run/docker.sock:/var/run/docker.sock \       # dockerソケットをマウント
+#   -v /var/run/docker.sock:/var/run/docker.sock \       # dockerソケットをマウント（自動的に有効化）
 #   gemini-cli:latest gemini-cli
 ```
 
@@ -54,7 +54,7 @@ Python 3.11.0
 
 ```bash
 # 明示的に指定
-cderun --mount-cderun --mount-socket gemini-cli
+cderun --mount-cderun gemini-cli
 ```
 
 #### 設定ファイルによる指定
@@ -96,7 +96,7 @@ defaults:
 # .tools.yaml
 gemini-cli:
   image: gemini-cli:latest
-  mountCderun: true
+  mountCderun: true  # mountSocketも自動的にtrueになります
   tty: true
   interactive: true
 
@@ -110,7 +110,7 @@ python:
 
 ```bash
 # 基底ホストでgemini-cliを起動
-cderun --mount-socket gemini-cli
+cderun gemini-cli
 
 # gemini-cliコンテナ内
 gemini> use mcp server "python-tools"
@@ -125,7 +125,7 @@ cderun python script.py
 
 ```bash
 # 基底ホストでdevコンテナを起動
-cderun --mount-cderun --mount-socket dev-env
+cderun --mount-cderun dev-env
 
 # dev-envコンテナ内で、さらに別のツールを起動
 cderun node --version

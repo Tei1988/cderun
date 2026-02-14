@@ -10,11 +10,12 @@
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 91.8% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 91.0% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
-| `internal/logging` | 100.0% | ロギングシステムの全面的なテスト拡充により 100% を達成。 |
-| `internal/runtime` | 91.3% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| **Total** | **91.5%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| `internal/command` | 92.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 90.4% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/logging` | 96.1% | 高いカバレッジを維持。 |
+| `internal/runtime` | 93.4% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみのため (正常)。 |
+| **Total** | **91.8%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -22,17 +23,17 @@
 
 | 機能 | 対応テストコード | 状態 |
 | :--- | :--- | :--- |
-| 引数解析 | `root_test.go`, `flags_test.go` | 良好 |
+| 引数解析 | `root_test.go`, `flags_test.go`, `test_helpers_test.go` | 良好 |
 | 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
 | ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go` | 良好 |
-| 設定ファイルサポート | `config_test.go`, `integration_test.go` | 良好 |
+| 設定ファイルサポート | `config_test.go`, `integration_test.go`, `fs_test.go` | 良好 |
 | マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
 | イメージマッピング | `resolver_test.go` | 良好 |
 | 環境変数パススルー | `resolver_test.go`, `integration_test.go` | 良好 |
 | Mount Tools | `root_test.go`, `integration_test.go` | 良好 |
 | コンテナコマンド実行 | `integration_test.go`, `root_test.go` | 良好 |
-| Docker互換フラグ | `flags_test.go`, `root_test.go` | 良好 |
+| Docker互換フラグ | `flags_test.go`, `root_test.go`, `e2e_device_test.go` | 良好 |
 | cderunバイナリマウント | `root_test.go`, `integration_test.go` | 良好 |
 | ドライランモード | `root_test.go` | 良好 |
 | ログ・デバッグ | `logger_test.go` | 良好 |

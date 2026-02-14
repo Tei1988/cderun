@@ -54,7 +54,7 @@
    - Docker CLI互換のオプションサポート
 2. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
    - `--mount-cderun`でコンテナ内でcderunを使用
-   - `--mount-socket` (boolean) との併用必須
+   - `--mount-socket` は自動的に有効化されます
 3. **[ドライランモード (Completed)](./dry-run-mode.md)**
    - 実行前のコマンドプレビュー
    - JSON/YAML/Simple形式での出力
