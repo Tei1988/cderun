@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testOptions *rootOptions
+
 func executeCommand(args ...string) (string, error) {
 	return executeCommandContext(context.Background(), args...)
 }
@@ -23,7 +25,6 @@ func executeCommandContext(ctx context.Context, args ...string) (string, error) 
 	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
 }
 
-var testOptions *rootOptions
 func setupTestOptions(t *testing.T) {
 	t.Helper()
 	testOptions = newDefaultOptions()

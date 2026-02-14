@@ -23,6 +23,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const attachGracePeriod = 5 * time.Second
+
 type rootOptions struct {
 	tty                   bool
 	interactive           bool
@@ -115,7 +117,6 @@ type rootOptions struct {
 	mountInfoReader mountInfoReader
 }
 
-const attachGracePeriod = 5 * time.Second
 func defaultRuntimeFactory(name string, socket string) (runtime.ContainerRuntime, error) {
 	switch name {
 	case "docker":
