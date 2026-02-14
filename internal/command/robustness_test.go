@@ -227,22 +227,17 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 			return mock, nil
 		}
 
-		var capturedExitCode int
-		testOptions.exitFunc = func(code int) {
-			capturedExitCode = code
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		// runCderunWithOptions calls ExecuteContext -> RunE which calls exitFunc(exitCode)
-		_, _, _, err := runCderunWithOptions(ctx, testOptions, "--image", "alpine", "false")
+		_, _, exitCode, err := runCderunWithOptions(ctx, testOptions, "--image", "alpine", "false")
 		if err != nil {
 			t.Fatalf("executeCommand failed: %v", err)
 		}
 
-		if capturedExitCode != 42 {
-			t.Errorf("expected exit code 42, got %d", capturedExitCode)
+		if exitCode != 42 {
+			t.Errorf("expected exit code 42, got %d", exitCode)
 		}
 	})
 }

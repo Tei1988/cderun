@@ -72,14 +72,11 @@ func runCderunRawWithOptions(ctx context.Context, o *rootOptions, rawArgs []stri
 	cmd.SetOut(wOut)
 	cmd.SetErr(wErr)
 
-	// Mock exitFunc to capture exit code if not already mocked
+	// Mock exitFunc to capture exit code.
+	// We do NOT call the original exitFunc (which might be os.Exit) to avoid terminating the test process.
 	capturedExitCode := 0
-	originalExitFunc := o.exitFunc
 	o.exitFunc = func(code int) {
 		capturedExitCode = code
-		if originalExitFunc != nil {
-			originalExitFunc(code)
-		}
 	}
 
 	processedArgs, err := preprocessArgs(cmd, rawArgs)
