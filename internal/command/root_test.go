@@ -63,19 +63,6 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		o.isTerminal = func(fd int) bool { return true }
 	}
 
-	cmd := newRootCmd(o)
-
-	savedStdout := os.Stdout
-	savedStderr := os.Stderr
-	savedOut := cmd.OutOrStdout()
-	savedErr := cmd.ErrOrStderr()
-	defer func() {
-		os.Stdout = savedStdout
-		os.Stderr = savedStderr
-		cmd.SetOut(savedOut)
-		cmd.SetErr(savedErr)
-	}()
-
 	r, w, err := os.Pipe()
 	if err != nil {
 		return "", err
@@ -83,10 +70,22 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	defer func() { _ = r.Close() }()
 	defer func() { _ = w.Close() }()
 
-	os.Stdout = w
-	os.Stderr = w
+	o.stdout = w
+	o.stderr = w
+
+	cmd := newRootCmd(o)
 	cmd.SetOut(w)
 	cmd.SetErr(w)
+
+	savedStdout := os.Stdout
+	savedStderr := os.Stderr
+	defer func() {
+		os.Stdout = savedStdout
+		os.Stderr = savedStderr
+	}()
+
+	os.Stdout = w
+	os.Stderr = w
 
 	var buf bytes.Buffer
 	done := make(chan struct{})
@@ -95,7 +94,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		close(done)
 	}()
 
-	// Since we are bypassng the standard ExecuteContext for finer control
+	// Since we are bypassing the standard ExecuteContext for finer control
 	// we perform the preprocessing and argument setting here.
 	processedArgs, err := preprocessArgs(cmd, args)
 	var execErr error

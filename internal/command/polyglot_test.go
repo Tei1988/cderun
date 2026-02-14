@@ -36,9 +36,8 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		// Simulate symlink execution: node --interactive=true --image alpine cat
 		// Specification: only --cderun- prefixed flags are hoisted.
 
-		cmd := newRootCmd(o)
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
+		o.stdout = io.Discard
+		o.stderr = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -47,18 +46,7 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		var execErr error
 		go func() {
 			// Simulating "node --interactive=true --image alpine cat"
-			// We bypass ExecuteContext to use our fresh cmd and o.
-			args, err := preprocessArgs(cmd, []string{"node", "--interactive=true", "--image", "alpine", "cat"})
-			if err != nil {
-				execErr = err
-			} else {
-				if len(args) >= 1 {
-					cmd.SetArgs(args[1:])
-				} else {
-					cmd.SetArgs([]string{})
-				}
-				execErr = cmd.ExecuteContext(ctx)
-			}
+			_, _, _, execErr = runCderunRawWithOptions(ctx, o, []string{"node", "--interactive=true", "--image", "alpine", "cat"})
 			close(done)
 		}()
 
@@ -99,9 +87,8 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		}
 		o.exitFunc = func(code int) {}
 
-		cmd := newRootCmd(o)
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
+		o.stdout = io.Discard
+		o.stderr = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -110,17 +97,7 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		var execErr error
 		go func() {
 			// Simulating "node --cderun-interactive=true --cderun-image=alpine cat"
-			args, err := preprocessArgs(cmd, []string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
-			if err != nil {
-				execErr = err
-			} else {
-				if len(args) >= 1 {
-					cmd.SetArgs(args[1:])
-				} else {
-					cmd.SetArgs([]string{})
-				}
-				execErr = cmd.ExecuteContext(ctx)
-			}
+			_, _, _, execErr = runCderunRawWithOptions(ctx, o, []string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
 			close(done)
 		}()
 

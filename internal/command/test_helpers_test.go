@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"strings"
@@ -13,6 +14,19 @@ import (
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
+	o := newDefaultOptions()
+	return runCderunWithOptions(context.Background(), o, args...)
+}
+
+// runCderunWithOptions runs the cderun command with specific options and context.
+// It automatically prepends "cderun" to the arguments.
+func runCderunWithOptions(ctx context.Context, o *rootOptions, args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunRawWithOptions(ctx, o, append([]string{"cderun"}, args...))
+}
+
+// runCderunRawWithOptions runs the cderun command with specific options and context.
+// It uses the provided arguments as-is.
+func runCderunRawWithOptions(ctx context.Context, o *rootOptions, rawArgs []string) (stdout, stderr string, exitCode int, err error) {
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
@@ -51,24 +65,28 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 		stderrChan <- buf.String()
 	}()
 
-	// Use fresh options and command
-	o := newDefaultOptions()
+	o.stdout = wOut
+	o.stderr = wErr
+
 	cmd := newRootCmd(o)
 	cmd.SetOut(wOut)
 	cmd.SetErr(wErr)
 
-	// Mock exitFunc to capture exit code
+	// Mock exitFunc to capture exit code if not already mocked
 	capturedExitCode := 0
+	originalExitFunc := o.exitFunc
 	o.exitFunc = func(code int) {
 		capturedExitCode = code
+		if originalExitFunc != nil {
+			originalExitFunc(code)
+		}
 	}
 
-	rawArgs := append([]string{"cderun"}, args...)
 	processedArgs, err := preprocessArgs(cmd, rawArgs)
 	if err != nil {
 		_ = wOut.Close()
 		_ = wErr.Close()
-		return "", "", 0, err
+		return "", "", capturedExitCode, err
 	}
 
 	if len(processedArgs) >= 1 {
@@ -77,7 +95,7 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 		cmd.SetArgs([]string{})
 	}
 
-	execErr := cmd.Execute()
+	execErr := cmd.ExecuteContext(ctx)
 
 	_ = wOut.Close()
 	_ = wErr.Close()

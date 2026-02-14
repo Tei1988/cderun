@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"cderun/internal/runtime"
 	"context"
 	"io"
@@ -42,30 +41,17 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		o.exitFunc = func(code int) {}
 
 		pr, pw := io.Pipe()
-		var stdout bytes.Buffer
 
-		cmd := newRootCmd(o)
-		cmd.SetIn(pr)
-		cmd.SetOut(&stdout)
-		cmd.SetErr(io.Discard)
+		o.stdin = pr
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
 		var execErr error
+		var capturedStdout string
 		go func() {
-			args, err := preprocessArgs(cmd, []string{"cderun", "--image", "alpine", "-i", "cat"})
-			if err != nil {
-				execErr = err
-			} else {
-				if len(args) >= 1 {
-					cmd.SetArgs(args[1:])
-				} else {
-					cmd.SetArgs([]string{})
-				}
-				execErr = cmd.ExecuteContext(ctx)
-			}
+			capturedStdout, _, _, execErr = runCderunWithOptions(ctx, o, "--image", "alpine", "-i", "cat")
 			close(done)
 		}()
 
@@ -84,7 +70,7 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		_ = pr.Close()
 		require.NoError(t, execErr)
-		assert.Equal(t, testData, stdout.String())
+		assert.Equal(t, testData, capturedStdout)
 	})
 
 	t.Run("piped stdin does NOT reach container when interactive is false", func(t *testing.T) {
@@ -100,27 +86,16 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		o.exitFunc = func(code int) {}
 
 		pr, pw := io.Pipe()
-		var stdout bytes.Buffer
 
-		cmd := newRootCmd(o)
-		cmd.SetIn(pr)
-		cmd.SetOut(&stdout)
-		cmd.SetErr(io.Discard)
+		o.stdin = pr
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
+		var capturedStdout string
 		go func() {
-			args, err := preprocessArgs(cmd, []string{"cderun", "--image", "alpine", "cat"})
-			if err == nil {
-				if len(args) >= 1 {
-					cmd.SetArgs(args[1:])
-				} else {
-					cmd.SetArgs([]string{})
-				}
-				_ = cmd.ExecuteContext(ctx)
-			}
+			capturedStdout, _, _, _ = runCderunWithOptions(ctx, o, "--image", "alpine", "cat")
 			close(done)
 		}()
 
@@ -138,6 +113,6 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		}
 
 		_ = pr.Close() // Unblock writer to allow it to finish
-		assert.Empty(t, stdout.String())
+		assert.Empty(t, capturedStdout)
 	})
 }

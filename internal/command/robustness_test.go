@@ -49,7 +49,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		// Run execute in a goroutine because we want to check if it finishes
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "ls")
+			_, _, _, _ = runCderunWithOptions(ctx, testOptions, "--image", "alpine", "ls")
 			close(done)
 		}()
 
@@ -98,7 +98,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "sleep", "60")
+			_, _, _, _ = runCderunWithOptions(ctx, testOptions, "--image", "alpine", "sleep", "60")
 			close(done)
 		}()
 
@@ -175,7 +175,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "--tty", "sleep", "60")
+			_, _, _, _ = runCderunWithOptions(ctx, testOptions, "--image", "alpine", "--tty", "sleep", "60")
 			close(done)
 		}()
 
@@ -235,8 +235,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// executeCommand calls Execute -> RunE which calls exitFunc(exitCode)
-		_, err := executeCommandContext(ctx, "--image", "alpine", "false")
+		// runCderunWithOptions calls ExecuteContext -> RunE which calls exitFunc(exitCode)
+		_, _, _, err := runCderunWithOptions(ctx, testOptions, "--image", "alpine", "false")
 		if err != nil {
 			t.Fatalf("executeCommand failed: %v", err)
 		}

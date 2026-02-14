@@ -12,10 +12,11 @@ import (
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
+		setupTestOptions(t)
 		out := &bytes.Buffer{}
-		opts := &rootOptions{
-			fs: config.RealFileSystem{},
-		}
+		opts := testOptions
+		opts.stdout = out
+		opts.fs = config.RealFileSystem{}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
 			SocketPath:      "/var/run/docker.sock",
@@ -31,10 +32,11 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 	})
 
 	t.Run("Simple format", func(t *testing.T) {
+		setupTestOptions(t)
 		out := &bytes.Buffer{}
-		opts := &rootOptions{
-			fs: config.RealFileSystem{},
-		}
+		opts := testOptions
+		opts.stdout = out
+		opts.fs = config.RealFileSystem{}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "podman",
 			SocketPath:      "/run/podman/podman.sock",

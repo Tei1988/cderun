@@ -23,7 +23,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const attachGracePeriod = 5 * time.Second
+const (
+	attachGracePeriod = 5 * time.Second
+)
 
 type rootOptions struct {
 	tty                   bool
@@ -115,6 +117,11 @@ type rootOptions struct {
 	termGetSize     func(int) (int, int, error)
 	runtimeFactory  func(string, string) (runtime.ContainerRuntime, error)
 	mountInfoReader mountInfoReader
+	stdin           io.Reader
+	stdout          io.Writer
+	stderr          io.Writer
+	stdinFd         int
+	stdoutFd        int
 }
 
 func defaultRuntimeFactory(name string, socket string) (runtime.ContainerRuntime, error) {
@@ -139,6 +146,11 @@ func newDefaultOptions() *rootOptions {
 		},
 		runtimeFactory:  defaultRuntimeFactory,
 		mountInfoReader: realMountInfoReader{},
+		stdin:           os.Stdin,
+		stdout:          os.Stdout,
+		stderr:          os.Stderr,
+		stdinFd:         int(os.Stdin.Fd()),
+		stdoutFd:        int(os.Stdout.Fd()),
 	}
 }
 
@@ -459,59 +471,59 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprintln(o.stdout, string(data))
 	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
+		_, _ = fmt.Fprintf(o.stdout, "Runtime Status: %s\n", info.Runtime.Status)
+		_, _ = fmt.Fprintf(o.stdout, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(info)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprint(o.stdout, string(data))
 	}
 	return nil
 }
 
-func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
+func (o *rootOptions) handleDryRun(containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	switch strings.ToLower(resolved.DryRunFormat) {
 	case "json":
 		data, err := json.MarshalIndent(containerConfig, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprintln(o.stdout, string(data))
 	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Remove: %v\n", containerConfig.Remove)
+		_, _ = fmt.Fprintf(o.stdout, "Image: %s\n", containerConfig.Image)
+		_, _ = fmt.Fprintf(o.stdout, "Command: %s\n", strings.Join(containerConfig.Command, " "))
+		_, _ = fmt.Fprintf(o.stdout, "TTY: %v\n", containerConfig.TTY)
+		_, _ = fmt.Fprintf(o.stdout, "Interactive: %v\n", containerConfig.Interactive)
+		_, _ = fmt.Fprintf(o.stdout, "Network: %s\n", containerConfig.Network)
+		_, _ = fmt.Fprintf(o.stdout, "Remove: %v\n", containerConfig.Remove)
 		var mounts []string
 		for _, m := range containerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "PublishAll: %v\n", containerConfig.PublishAll)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Hostname: %s\n", containerConfig.Hostname)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Privileged: %v\n", containerConfig.Privileged)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
+		_, _ = fmt.Fprintf(o.stdout, "Mounts: %s\n", strings.Join(mounts, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Workdir: %s\n", containerConfig.Workdir)
+		_, _ = fmt.Fprintf(o.stdout, "User: %s\n", containerConfig.User)
+		_, _ = fmt.Fprintf(o.stdout, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "PublishAll: %v\n", containerConfig.PublishAll)
+		_, _ = fmt.Fprintf(o.stdout, "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Hostname: %s\n", containerConfig.Hostname)
+		_, _ = fmt.Fprintf(o.stdout, "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Privileged: %v\n", containerConfig.Privileged)
+		_, _ = fmt.Fprintf(o.stdout, "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Pull: %s\n", containerConfig.Pull)
+		_, _ = fmt.Fprintf(o.stdout, "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
+		_, _ = fmt.Fprintf(o.stdout, "CPUs: %g\n", containerConfig.CPUs)
 		var devices []string
 		for _, d := range containerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
@@ -520,13 +532,13 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 			}
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
+		_, _ = fmt.Fprintf(o.stdout, "Devices: %s\n", strings.Join(devices, ", "))
 	default: // Default to YAML
 		data, err := yaml.Marshal(containerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprint(o.stdout, string(data))
 	}
 	return nil
 }
@@ -572,13 +584,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if containerConfig.TTY && o.isTerminal(int(os.Stdin.Fd())) {
+	if containerConfig.TTY && o.isTerminal(o.stdinFd) {
 		logging.Trace("Setting terminal to raw mode")
-		state, err := term.MakeRaw(int(os.Stdin.Fd()))
+		state, err := term.MakeRaw(o.stdinFd)
 		if err != nil {
 			logging.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }() //nolint:errcheck
+			defer func() { _ = term.Restore(o.stdinFd, state) }() //nolint:errcheck
 		}
 	}
 
@@ -612,7 +624,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Attach to container IO concurrently
 	var stdin io.Reader
 	if containerConfig.Interactive {
-		stdin = cmd.InOrStdin()
+		stdin = o.stdin
 	}
 
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
@@ -620,7 +632,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
+		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, o.stdout, o.stderr)
 	}()
 
 	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
@@ -633,7 +645,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Handle window resize synchronization
-	if containerConfig.TTY && o.isTerminal(int(os.Stdout.Fd())) {
+	if containerConfig.TTY && o.isTerminal(o.stdoutFd) {
 		resizeChan := make(chan os.Signal, 1)
 		setupResizeSignal(resizeChan)
 		defer signal.Stop(resizeChan)
@@ -641,7 +653,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			for {
 				select {
 				case <-resizeChan:
-					w, h, err := o.termGetSize(int(os.Stdout.Fd()))
+					w, h, err := o.termGetSize(o.stdoutFd)
 					if err == nil && h >= 0 && w >= 0 {
 						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 					}
@@ -652,7 +664,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}()
 
 		// Initial resize to match current terminal size
-		w, h, err := o.termGetSize(int(os.Stdout.Fd()))
+		w, h, err := o.termGetSize(o.stdoutFd)
 		if err == nil && h >= 0 && w >= 0 {
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 		}
@@ -767,7 +779,7 @@ intended for the subcommand.`,
 			}
 
 			if resolved.DryRun {
-				return o.handleDryRun(cmd, containerConfig, resolved)
+				return o.handleDryRun(containerConfig, resolved)
 			}
 
 			// Create snapshot if nested execution support is requested or already active
@@ -909,6 +921,9 @@ func Execute(rawArgs []string) error {
 func ExecuteContext(ctx context.Context, rawArgs []string) error {
 	opts := newDefaultOptions()
 	cmd := newRootCmd(opts)
+	cmd.SetIn(opts.stdin)
+	cmd.SetOut(opts.stdout)
+	cmd.SetErr(opts.stderr)
 
 	args, err := preprocessArgs(cmd, rawArgs)
 	if err != nil {
@@ -1030,8 +1045,4 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	processedArgs = append(processedArgs, others...)
 
 	return processedArgs, nil
-}
-
-func init() {
-	// Intentionally empty. All initialization is done in newRootCmd.
 }

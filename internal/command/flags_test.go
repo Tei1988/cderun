@@ -10,7 +10,7 @@ import (
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
-	testOptions = newDefaultOptions()
+	setupTestOptions(t)
 	setupMockRuntime(t, mockRuntime)
 
 	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {

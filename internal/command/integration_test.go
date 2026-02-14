@@ -1,8 +1,9 @@
 package command
 
 import (
-	"cderun/internal/runtime"
+	"context"
 	"os"
+	"cderun/internal/runtime"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -119,6 +120,7 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 func TestIntegration_Command_Root_SymlinkExecution(t *testing.T) {
 	// Use a temporary directory for this test
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	// Create a temporary .tools.yaml for image mapping
 	toolsContent := `
@@ -135,7 +137,7 @@ node:
 	}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommandRaw([]string{"node", "--version"})
+	_, _, _, err = runCderunRawWithOptions(context.Background(), testOptions, []string{"node", "--version"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
@@ -145,6 +147,7 @@ node:
 func TestIntegration_Command_Root_ToolsYAML(t *testing.T) {
 	// Use a temporary directory for this test
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -164,7 +167,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -184,6 +187,7 @@ func TestIntegration_Command_Root_Priority_EnvOverTools(t *testing.T) {
 
 	// Use a temporary directory for this test
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -195,7 +199,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 	// Should use image from environment variable (P3 > P4)
 	assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
@@ -204,6 +208,7 @@ node:
 func TestIntegration_Command_Root_BaseCommandFromTools(t *testing.T) {
 	// Use a temporary directory for this test
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -216,7 +221,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -227,6 +232,7 @@ node:
 func TestIntegration_Command_Root_EnvPassThrough(t *testing.T) {
 	// Use a temporary directory for this test
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -247,7 +253,7 @@ node:
 	setupMockRuntime(t, mockRuntime)
 
 	// Execute with CLI overrides and P1 overrides
-	_, err = executeCommand(
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions,
 		"--env", "OVERRIDE_KEY=CLI_VALUE",
 		"--env", "P1_OVERRIDE_KEY=CLI_VALUE",
 		"--env", "CLI_KEY=CLI_VALUE",
@@ -268,6 +274,7 @@ node:
 func TestIntegration_Command_Root_MountToolsNotFound(t *testing.T) {
 	// Setup tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -281,7 +288,7 @@ python:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "tool \"unknown\" not found in .tools.yaml")
 	assert.Contains(t, err.Error(), "available tools: node, python")
@@ -290,6 +297,7 @@ python:
 func TestIntegration_Command_Root_MountTools_AutoEnable(t *testing.T) {
 	// Setup tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -302,7 +310,7 @@ node:
 	setupMockRuntime(t, mockRuntime)
 
 	// No --mount-socket, no --mount-cderun
-	_, err = executeCommand("--image", "alpine", "--mount-tools", "node", "sh")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--image", "alpine", "--mount-tools", "node", "sh")
 	require.NoError(t, err)
 	require.NotNil(t, mockRuntime.CreatedConfig)
 
@@ -328,6 +336,7 @@ node:
 func TestIntegration_Command_Root_MountTools_Logic(t *testing.T) {
 	// Setup tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -347,7 +356,7 @@ sh:
 		t.Fatalf("os.Executable failed: %v", err)
 	}
 
-	_, err = executeCommand("--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -367,7 +376,7 @@ sh:
 
 	// Test mount-all-tools
 	mockRuntime.CreatedConfig = nil
-	_, err = executeCommand("--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "sh")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "sh")
 	require.NoError(t, err)
 
 	nodeFound = false
@@ -387,18 +396,20 @@ sh:
 func TestIntegration_Command_Root_MountAllTools_EmptyConfig(t *testing.T) {
 	// Setup empty tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	output, err := executeCommand("--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh")
+	stdout, stderr, _, err := runCderunWithOptions(context.Background(), testOptions, "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh")
 	require.NoError(t, err)
-	assert.Contains(t, output, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
+	assert.Contains(t, stdout+stderr, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 }
 
 func TestIntegration_Command_Root_ExcludeToolSubcommand(t *testing.T) {
 	// Setup tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -410,7 +421,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -420,6 +431,7 @@ node:
 func TestIntegration_Command_Root_IncludeExplicitToolSubcommand(t *testing.T) {
 	// Setup tools config
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -432,7 +444,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -441,6 +453,7 @@ node:
 
 func TestIntegration_Command_Flags_ToolsYAML_DockerCompatible(t *testing.T) {
 	setupTestDir(t)
+	setupTestOptions(t)
 
 	toolsContent := `
 node:
@@ -456,7 +469,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
-	_, err = executeCommand("node", "app.js")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "node", "app.js")
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -484,7 +497,7 @@ node:
 	setupMockRuntime(t, mockRuntime)
 
 	t.Run("cderun-tty overrides tty even if placed after subcommand", func(t *testing.T) {
-		_, err := executeCommandRaw([]string{"cderun", "--tty=true", "node", "--cderun-tty=false", "--version"})
+		_, _, _, err := runCderunRawWithOptions(context.Background(), testOptions, []string{"cderun", "--tty=true", "node", "--cderun-tty=false", "--version"})
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -493,7 +506,7 @@ node:
 
 	t.Run("cderun-tty works in polyglot mode", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		_, err := executeCommandRaw([]string{"node", "--cderun-tty=true", "--version"})
+		_, _, _, err := runCderunRawWithOptions(context.Background(), testOptions, []string{"node", "--cderun-tty=true", "--version"})
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -501,14 +514,14 @@ node:
 	})
 
 	t.Run("cderun internal overrides before subcommand result in error", func(t *testing.T) {
-		_, err := executeCommandRaw([]string{"cderun", "--cderun-image=alpine:latest", "sh"})
+		_, _, _, err := runCderunRawWithOptions(context.Background(), testOptions, []string{"cderun", "--cderun-image=alpine:latest", "sh"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be placed after the subcommand")
 	})
 
 	t.Run("cderun internal overrides after subcommand work correctly", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		_, err := executeCommandRaw([]string{"cderun", "--image=alpine:stable", "sh", "--cderun-image=alpine:latest"})
+		_, _, _, err := runCderunRawWithOptions(context.Background(), testOptions, []string{"cderun", "--image=alpine:stable", "sh", "--cderun-image=alpine:latest"})
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "alpine:latest", mockRuntime.CreatedConfig.Image)
@@ -516,7 +529,7 @@ node:
 
 	t.Run("cderun internal overrides for network, remove, workdir and mount", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		_, err := executeCommand("--image=alpine", "--network=bridge", "--remove=false", "--workdir=/initial", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/override", "--cderun-mount=type=bind,source=/h2,target=/c2")
+		_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--image=alpine", "--network=bridge", "--remove=false", "--workdir=/initial", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/override", "--cderun-mount=type=bind,source=/h2,target=/c2")
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
@@ -533,7 +546,7 @@ node:
 		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
 		require.NoError(t, err)
 
-		_, err = executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
+		_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 
@@ -558,7 +571,7 @@ node:
 
 	t.Run("cderun internal override can turn off remove", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		_, err := executeCommand("--image=alpine", "--remove=true", "sh", "--cderun-remove=false")
+		_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--image=alpine", "--remove=true", "sh", "--cderun-remove=false")
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.False(t, mockRuntime.CreatedConfig.Remove)
@@ -566,7 +579,7 @@ node:
 
 	t.Run("cderun internal overrides for dry-run", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		output, err := executeCommandRaw([]string{"cderun", "--image=alpine", "sh", "echo", "hello", "--cderun-dry-run", "--cderun-dry-run-format=simple"})
+		output, _, _, err := runCderunRawWithOptions(context.Background(), testOptions, []string{"cderun", "--image=alpine", "sh", "echo", "hello", "--cderun-dry-run", "--cderun-dry-run-format=simple"})
 		require.NoError(t, err)
 		assert.Nil(t, mockRuntime.CreatedConfig)
 		assert.Contains(t, output, "Image: alpine")

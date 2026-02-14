@@ -1,19 +1,20 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/runtime"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
-	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
-	// and changes the working directory. It should not be run in parallel.
+	// This test modifies global state (runConfigDir) and changes the working directory.
+	// It should not be run in parallel.
 
 	// 1. Setup mock environment
 	tmpDir := t.TempDir()
@@ -67,7 +68,7 @@ hostContext:
 	require.NoError(t, os.Chdir(simulatedAppDir))
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
-	_, err = executeCommand("--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
+	_, _, _, err = runCderunWithOptions(context.Background(), testOptions, "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
 	require.NoError(t, err)
 
 	// 4. Verify path translation
