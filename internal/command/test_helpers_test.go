@@ -32,6 +32,10 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 
 	os.Stdout = wOut
 	os.Stderr = wErr
+	defer func() {
+		os.Stdout = savedStdout
+		os.Stderr = savedStderr
+	}()
 
 	stdoutChan := make(chan string)
 	stderrChan := make(chan string)
@@ -74,13 +78,11 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 	stdout = <-stdoutChan
 	stderr = <-stderrChan
 
-	os.Stdout = savedStdout
-	os.Stderr = savedStderr
-
 	return stdout, stderr, capturedExitCode, execErr
 }
 
 func skipIfDockerBroken(t *testing.T, err error) {
+	t.Helper()
 	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
 		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
 	}
