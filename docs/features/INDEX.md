@@ -74,10 +74,12 @@
 ### 開発・検証機能
 
 1. **[インテグレーションテスト (Completed)](./integration-testing-with-docker.md)**
-   - testcontainers-go を利用した実ランタイムでの検証
-2. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
+   - MockRuntime や実ランタイムを利用した検証
+2. **[E2E テスト (Completed)](./e2e-testing.md)**
+   - 実際の Docker/Podman を利用したエンドツーエンド検証
+3. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
    - コードカバレッジの可視化と自動計測
-3. **[診断モード (Completed)](./diagnosis-mode.md)**
+4. **[診断モード (Completed)](./diagnosis-mode.md)**
    - システム診断情報と利用可能なツールの表示
 
 ## 技術リファレンス
