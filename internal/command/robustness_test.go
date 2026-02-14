@@ -264,8 +264,11 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 			capturedExitCode = code
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		// executeCommand calls Execute -> RunE which calls exitFunc(exitCode)
-		_, err := executeCommand("--image", "alpine", "false")
+		_, err := executeCommandContext(ctx, "--image", "alpine", "false")
 		if err != nil {
 			t.Fatalf("executeCommand failed: %v", err)
 		}

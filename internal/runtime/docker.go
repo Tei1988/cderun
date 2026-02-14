@@ -201,7 +201,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 			PathInContainer:   dev.PathInContainer,
 			CgroupPermissions: dev.CgroupPermissions,
 		}
-		hostConfig.Devices = append(hostConfig.Devices, dMapping)
+		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
 	}
 
 	for _, m := range config.Mounts {
