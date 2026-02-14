@@ -23,10 +23,7 @@ func executeCommandContext(ctx context.Context, args ...string) (string, error) 
 	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
 }
 
-var (
-	testOptions *rootOptions
-)
-
+var testOptions *rootOptions
 func setupTestOptions(t *testing.T) {
 	t.Helper()
 	testOptions = newDefaultOptions()
@@ -37,6 +34,9 @@ func setupTestOptions(t *testing.T) {
 
 func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
 	t.Helper()
+	if testOptions == nil {
+		setupTestOptions(t)
+	}
 	testOptions.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 		return mock, nil
 	}
@@ -285,7 +285,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		assert.Nil(t, mockRuntime.CreatedConfig)
 	})
 
-
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
 		setupTestOptions(t)
 		mockRuntime := &runtime.MockRuntime{
@@ -432,7 +431,6 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
 	})
 }
-
 
 func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 	t.Run("fails when os.Executable fails", func(t *testing.T) {

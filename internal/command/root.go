@@ -116,7 +116,6 @@ type rootOptions struct {
 }
 
 const attachGracePeriod = 5 * time.Second
-
 func defaultRuntimeFactory(name string, socket string) (runtime.ContainerRuntime, error) {
 	switch name {
 	case "docker":
