@@ -143,6 +143,13 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 
 		assert.Equal(t, "golang:1.2.3", resolver.Resolve("golang:{{file:version.txt}}"))
 		assert.Equal(t, "", resolver.Resolve("{{file:nonexistent.txt}}"))
+
+		t.Run("Path Traversal Protection", func(t *testing.T) {
+			// Absolute path should be blocked
+			assert.Equal(t, "", resolver.Resolve("{{file:/etc/passwd}}"))
+			// Parent directory reference should be blocked
+			assert.Equal(t, "", resolver.Resolve("{{file:../etc/passwd}}"))
+		})
 	})
 
 	t.Run("Nested Structures", func(t *testing.T) {

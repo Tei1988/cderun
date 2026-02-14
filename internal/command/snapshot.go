@@ -16,7 +16,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
-	if err := fs.MkdirAll(snapshotDir, 0755); err != nil {
+	if err := fs.MkdirAll(snapshotDir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
@@ -75,7 +75,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
-	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0644); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0600); err != nil {
 		return "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
 	}
 
@@ -84,7 +84,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tools config: %w", err)
 	}
-	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0644); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0600); err != nil {
 		return "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 

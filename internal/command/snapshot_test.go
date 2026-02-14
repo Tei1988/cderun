@@ -3,6 +3,8 @@ package command
 import (
 	"cderun/internal/config"
 	"cderun/internal/container"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,6 +61,26 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 
 	// Verify that globalCfg.HostContext is still nil
 	assert.Nil(t, globalCfg.HostContext)
+}
+
+func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
+	mfs := &config.MockFileSystem{}
+	globalCfg := &config.CDERunConfig{}
+	toolsCfg := config.ToolsConfig{}
+	currentMounts := []container.Mount{}
+
+	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
+	assert.NoError(t, err)
+	if snapshotDir != "" {
+		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
+	}
+
+	// Verify snapshot directory permissions (0700)
+	assert.Equal(t, os.FileMode(0700), mfs.Perms[snapshotDir])
+
+	// Verify configuration file permissions (0600)
+	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
+	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
 }
 
 type mockMountInfoReader struct {

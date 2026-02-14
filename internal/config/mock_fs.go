@@ -21,6 +21,7 @@ type MockFileSystem struct {
 	WriteFileErr error
 	RemoveAllErr error
 	TempDirValue string
+	Perms        map[string]os.FileMode
 }
 
 func (m *MockFileSystem) Getwd() (string, error) {
@@ -94,7 +95,11 @@ func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	if m.Dirs == nil {
 		m.Dirs = make(map[string]bool)
 	}
+	if m.Perms == nil {
+		m.Perms = make(map[string]os.FileMode)
+	}
 	m.Dirs[path] = true
+	m.Perms[path] = perm
 	return nil
 }
 
@@ -105,7 +110,11 @@ func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMod
 	if m.Files == nil {
 		m.Files = make(map[string][]byte)
 	}
+	if m.Perms == nil {
+		m.Perms = make(map[string]os.FileMode)
+	}
 	m.Files[filename] = data
+	m.Perms[filename] = perm
 	return nil
 }
 
