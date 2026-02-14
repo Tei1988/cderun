@@ -115,7 +115,7 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 		// Let's use a temporary .tools.yaml for this test to be realistic.
 		setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0644)
+		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0o644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
@@ -128,11 +128,11 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	t.Run("volume mounting", func(t *testing.T) {
 		tmpDir := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0644)
+		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0o644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
-		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0644)
+		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0o644)
 		require.NoError(t, err)
 
 		// Use --log-level info to get more info in CI if it fails
@@ -146,7 +146,7 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	t.Run("environment variables", func(t *testing.T) {
 		setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0644)
+		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0o644)
 		require.NoError(t, err)
 
 		t.Setenv("HOST_VAR", "host-value")
@@ -168,7 +168,7 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	t.Run("cderun expressions", func(t *testing.T) {
 		tmpDir := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0644)
+		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0o644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "env")
@@ -182,10 +182,10 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 		tmpDir := setupTestDir(t)
 
 		subDir := filepath.Join(tmpDir, "subdir")
-		err := os.MkdirAll(subDir, 0755)
+		err := os.MkdirAll(subDir, 0o755)
 		require.NoError(t, err)
 
-		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0644)
+		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0o644)
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
@@ -213,7 +213,7 @@ func TestIntegration_Command_Root_SymlinkExecution(t *testing.T) {
 node:
   image: node:20-alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	// Prepare mock runtime
@@ -246,7 +246,7 @@ node:
       source: /host
       target: /container
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -277,7 +277,7 @@ func TestIntegration_Command_Root_Priority_EnvOverTools(t *testing.T) {
 node:
   image: node:20-alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -298,7 +298,7 @@ node:
   image: node:20-alpine
   command: ["node", "--no-warnings"]
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -325,7 +325,7 @@ node:
     - P1_OVERRIDE_KEY=TOOL_VALUE
     - HOST_KEY
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	t.Setenv("HOST_KEY", "HOST_VALUE")
@@ -363,7 +363,7 @@ node:
 python:
   image: python:3
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -383,7 +383,7 @@ func TestIntegration_Command_Root_MountTools_AutoEnable(t *testing.T) {
 node:
   image: node:20
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -425,7 +425,7 @@ python:
 sh:
   image: alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -492,7 +492,7 @@ func TestIntegration_Command_Root_ExcludeToolSubcommand(t *testing.T) {
 node:
   image: node:20
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -514,7 +514,7 @@ node:
   image: node:20
   command: ["node", "--no-warnings"]
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -538,7 +538,7 @@ node:
   memory: 1g
   cpus: 1.5
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -564,7 +564,7 @@ func TestIntegration_Command_Root_InternalOverrides(t *testing.T) {
 node:
   image: node:20-alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0644)
+	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	// Save and restore package-level state
@@ -632,7 +632,7 @@ node:
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 		setupTestDir(t)
-		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0644)
+		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
 		require.NoError(t, err)
 
 		_, err = executeCommand("--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node")

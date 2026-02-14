@@ -31,10 +31,10 @@ func TestUnit_Config_RealFileSystem(t *testing.T) {
 		tmp := t.TempDir()
 		path := filepath.Join(tmp, "subdir", "file.txt")
 
-		err := fs.MkdirAll(filepath.Dir(path), 0755)
+		err := fs.MkdirAll(filepath.Dir(path), 0o755)
 		require.NoError(t, err)
 
-		err = fs.WriteFile(path, []byte("hello"), 0644)
+		err = fs.WriteFile(path, []byte("hello"), 0o644)
 		require.NoError(t, err)
 
 		data, err := fs.ReadFile(path)
@@ -68,7 +68,7 @@ func TestUnit_Config_MockFileSystem_NewMethods(t *testing.T) {
 
 	t.Run("Getenv", func(t *testing.T) {
 		assert.Equal(t, "V", mfs.Getenv("K"))
-		assert.Equal(t, "", mfs.Getenv("UNKNOWN"))
+		assert.Empty(t, mfs.Getenv("UNKNOWN"))
 	})
 
 	t.Run("TempDir", func(t *testing.T) {
@@ -78,26 +78,26 @@ func TestUnit_Config_MockFileSystem_NewMethods(t *testing.T) {
 	})
 
 	t.Run("MkdirAll and Stat", func(t *testing.T) {
-		err := mfs.MkdirAll("/a/b", 0755)
+		err := mfs.MkdirAll("/a/b", 0o755)
 		require.NoError(t, err)
 		_, err = mfs.Stat("/a/b")
 		require.NoError(t, err)
 
 		mfs.MkdirAllErr = os.ErrPermission
-		err = mfs.MkdirAll("/c", 0755)
+		err = mfs.MkdirAll("/c", 0o755)
 		require.Error(t, err)
 		mfs.MkdirAllErr = nil
 	})
 
 	t.Run("WriteFile and ReadFile", func(t *testing.T) {
-		err := mfs.WriteFile("/f", []byte("d"), 0644)
+		err := mfs.WriteFile("/f", []byte("d"), 0o644)
 		require.NoError(t, err)
 		data, err := mfs.ReadFile("/f")
 		require.NoError(t, err)
 		assert.Equal(t, "d", string(data))
 
 		mfs.WriteFileErr = os.ErrPermission
-		err = mfs.WriteFile("/g", []byte("d"), 0644)
+		err = mfs.WriteFile("/g", []byte("d"), 0o644)
 		require.Error(t, err)
 		mfs.WriteFileErr = nil
 
@@ -108,9 +108,9 @@ func TestUnit_Config_MockFileSystem_NewMethods(t *testing.T) {
 	})
 
 	t.Run("RemoveAll", func(t *testing.T) {
-		require.NoError(t, mfs.WriteFile("/d/f1", []byte("1"), 0644))
-		require.NoError(t, mfs.WriteFile("/d/f2", []byte("2"), 0644))
-		require.NoError(t, mfs.MkdirAll("/d", 0755))
+		require.NoError(t, mfs.WriteFile("/d/f1", []byte("1"), 0o644))
+		require.NoError(t, mfs.WriteFile("/d/f2", []byte("2"), 0o644))
+		require.NoError(t, mfs.MkdirAll("/d", 0o755))
 
 		err := mfs.RemoveAll("/d")
 		require.NoError(t, err)

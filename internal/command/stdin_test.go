@@ -114,6 +114,6 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		}
 
 		_ = pr.Close() // Unblock writer to allow it to finish
-		assert.Equal(t, "", stdout.String())
+		assert.Empty(t, stdout.String())
 	})
 }

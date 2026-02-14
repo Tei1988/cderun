@@ -326,7 +326,7 @@ func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
 		assert.Equal(t, "/base/host:/container", cp.ResolveVolume(r))
 
 		cp = ConfigPath{Raw: ""}
-		assert.Equal(t, "", cp.ResolveVolume(r))
+		assert.Empty(t, cp.ResolveVolume(r))
 	})
 
 	t.Run("ResolveDevice", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
 		assert.Equal(t, "/base/dev:/dev:rw", cp.ResolveDevice(r))
 
 		cp = ConfigPath{Raw: ""}
-		assert.Equal(t, "", cp.ResolveDevice(r))
+		assert.Empty(t, cp.ResolveDevice(r))
 	})
 }
 

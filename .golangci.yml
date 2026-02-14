@@ -14,7 +14,7 @@ linters:
     - bodyclose
     - unconvert
     - usestdlibvars
-    # - modernize # unknown linter in v1.64.5?
+    - modernize
     - exhaustive
     - testifylint
   exclusions:
@@ -31,8 +31,20 @@ linters:
     errcheck:
       check-type-assertions: true
       check-blank: true
-    unused:
-      parameters-are-used: false
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Print
+        - fmt.Printf
+        - fmt.Println
+        - io.Copy
+        - (*github.com/docker/docker/api/types.HijackedResponse).CloseWrite
+        - (github.com/docker/docker/api/types.HijackedResponse).CloseWrite
+        - (*io.ReadCloser).Close
+        - io.Closer.Close
+    # unused:
+    #   parameters-are-used: false
     testifylint:
       enable:
         - require-error

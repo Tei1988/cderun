@@ -77,11 +77,11 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	}
 
 	// Verify snapshot directory permissions (0700)
-	assert.Equal(t, os.FileMode(0700), mfs.Perms[snapshotDir])
+	assert.Equal(t, os.FileMode(0o700), mfs.Perms[snapshotDir])
 
 	// Verify configuration file permissions (0600)
-	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
-	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
+	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
+	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
 }
 
 type mockMountInfoReader struct {
@@ -113,7 +113,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "", upperdir)
+		assert.Empty(t, upperdir)
 	})
 
 	t.Run("malformed mountinfo", func(t *testing.T) {
@@ -122,6 +122,6 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "", upperdir)
+		assert.Empty(t, upperdir)
 	})
 }

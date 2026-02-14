@@ -70,8 +70,8 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		// 2. Directives
-		if strings.HasPrefix(content, "file:") {
-			filename := strings.TrimPrefix(content, "file:")
+		if after, ok := strings.CutPrefix(content, "file:"); ok {
+			filename := after
 			return r.resolveFile(filename)
 		}
 

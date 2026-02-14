@@ -3,6 +3,7 @@ package runtime
 import (
 	"bufio"
 	"bytes"
+	"cderun/internal/container"
 	"context"
 	"errors"
 	"io"
@@ -10,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"cderun/internal/container"
 
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -268,10 +267,10 @@ func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
 		assert.Equal(t, "test-image", mock.createConfig.Image)
 		assert.Equal(t, []string{"ls", "-l"}, []string(mock.createConfig.Cmd))
 		assert.Equal(t, []string{"K=V"}, mock.createConfig.Env)
-		assert.Equal(t, int64(0.5*1e9), mock.createHostConfig.Resources.NanoCPUs)
-		assert.Equal(t, int64(1024*1024), mock.createHostConfig.Resources.Memory)
+		assert.Equal(t, int64(0.5*1e9), mock.createHostConfig.NanoCPUs)
+		assert.Equal(t, int64(1024*1024), mock.createHostConfig.Memory)
 		assert.Len(t, mock.createHostConfig.Mounts, 4)
-		assert.Len(t, mock.createHostConfig.Resources.Devices, 1)
+		assert.Len(t, mock.createHostConfig.Devices, 1)
 		assert.NotNil(t, mock.createConfig.ExposedPorts)
 	})
 
@@ -404,9 +403,11 @@ func (m *mockConn) Close() error {
 	m.closed = true
 	return nil
 }
+
 func (m *mockConn) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
+
 func (m *mockConn) CloseWrite() error {
 	return nil
 }

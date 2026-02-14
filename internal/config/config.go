@@ -165,7 +165,7 @@ type RealFileSystem struct{}
 
 func (RealFileSystem) Getwd() (string, error)                { return os.Getwd() }
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
-func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
+func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } // nolint:gosec
 func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
 func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
 func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
@@ -173,6 +173,7 @@ func (RealFileSystem) TempDir() string                       { return os.TempDir
 func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
+
 func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(filename, data, perm)
 }
@@ -277,7 +278,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 }
 
 // unmarshalStrict unmarshals YAML data into v with KnownFields enabled.
-func unmarshalStrict(data []byte, v interface{}) error {
+func unmarshalStrict(data []byte, v any) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	err := dec.Decode(v)

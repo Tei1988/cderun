@@ -16,7 +16,7 @@ func TestIntegration_Config_Load_RealFS(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	content := "runtime: docker"
-	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0644)
+	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0o644)
 	require.NoError(t, err)
 
 	originalWd, err := os.Getwd()
@@ -48,7 +48,7 @@ func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	childDir := filepath.Join(tmpDir, "child")
-	err = os.MkdirAll(childDir, 0755)
+	err = os.MkdirAll(childDir, 0o755)
 	require.NoError(t, err)
 
 	// Parent configs
@@ -63,9 +63,9 @@ node:
   image: node:14
   env: ["PARENT=1"]
 `
-	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(parentCDERun), 0644)
+	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(parentCDERun), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(parentTools), 0644)
+	err = os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(parentTools), 0o644)
 	require.NoError(t, err)
 
 	// Child configs
@@ -79,9 +79,9 @@ node:
 python:
   image: python:3.9
 `
-	err = os.WriteFile(filepath.Join(childDir, ".cderun.yaml"), []byte(childCDERun), 0644)
+	err = os.WriteFile(filepath.Join(childDir, ".cderun.yaml"), []byte(childCDERun), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(childDir, ".tools.yaml"), []byte(childTools), 0644)
+	err = os.WriteFile(filepath.Join(childDir, ".tools.yaml"), []byte(childTools), 0o644)
 	require.NoError(t, err)
 
 	// Change working directory to childDir
@@ -138,17 +138,17 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 	})
 
 	t.Run("File Directive", func(t *testing.T) {
-		err := os.WriteFile("version.txt", []byte(" 1.2.3 \n"), 0644)
+		err := os.WriteFile("version.txt", []byte(" 1.2.3 \n"), 0o644)
 		require.NoError(t, err)
 
 		assert.Equal(t, "golang:1.2.3", resolver.Resolve("golang:{{file:version.txt}}"))
-		assert.Equal(t, "", resolver.Resolve("{{file:nonexistent.txt}}"))
+		assert.Empty(t, resolver.Resolve("{{file:nonexistent.txt}}"))
 
 		t.Run("Path Traversal Protection", func(t *testing.T) {
 			// Absolute path should be blocked
-			assert.Equal(t, "", resolver.Resolve("{{file:/etc/passwd}}"))
+			assert.Empty(t, resolver.Resolve("{{file:/etc/passwd}}"))
 			// Parent directory reference should be blocked
-			assert.Equal(t, "", resolver.Resolve("{{file:../etc/passwd}}"))
+			assert.Empty(t, resolver.Resolve("{{file:../etc/passwd}}"))
 		})
 	})
 

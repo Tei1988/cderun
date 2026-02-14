@@ -147,7 +147,7 @@ func TestUnit_Config_Resolver_Image(t *testing.T) {
 		cli := CLIOptions{}
 		res, err := Resolve("", cli, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "", res.Image)
+		assert.Empty(t, res.Image)
 	})
 }
 

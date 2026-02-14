@@ -390,7 +390,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
 	})
-
 }
 
 func TestUnit_Command_Root_Phase3Features(t *testing.T) {
@@ -489,7 +488,6 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		}
 		assert.True(t, socketFound, "socket should be mounted to custom path")
 	})
-
 }
 
 func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
@@ -512,7 +510,6 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 		// 'ls' should be excluded, only '-l' and '/tmp' remain
 		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
 	})
-
 }
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {

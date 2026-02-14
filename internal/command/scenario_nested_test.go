@@ -20,20 +20,20 @@ func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
 
 	// Create a dummy project on "host"
 	hostProjectDir := filepath.Join(tmpDir, "host-project")
-	require.NoError(t, os.MkdirAll(hostProjectDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(hostProjectDir, "hello.txt"), []byte("hello from host"), 0644))
+	require.NoError(t, os.MkdirAll(hostProjectDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(hostProjectDir, "hello.txt"), []byte("hello from host"), 0o644))
 
 	// Simulate being inside a container (Level 1)
 	// Current directory in container is /app
 	// Host mapping: /home/user/project -> /app
 	runDir := filepath.Join(tmpDir, "run")
-	require.NoError(t, os.MkdirAll(runDir, 0755))
+	require.NoError(t, os.MkdirAll(runDir, 0o755))
 
 	restoreRunDir := config.SetRunConfigDirForTest(runDir)
 	defer restoreRunDir()
 
 	simulatedAppDir := filepath.Join(tmpDir, "simulated-app")
-	require.NoError(t, os.MkdirAll(filepath.Join(simulatedAppDir, "subdir"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(simulatedAppDir, "subdir"), 0o755))
 
 	nestedConfig := `
 hostContext:
@@ -45,7 +45,7 @@ hostContext:
       target: "` + simulatedAppDir + `"
       level: 1
 `
-	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0o644))
 
 	// 2. Setup Mock Runtime
 	prevFactory := runtimeFactory
