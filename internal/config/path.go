@@ -260,7 +260,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	if lastColon != -1 {
 		perms := remainder[lastColon+1:]
 		// Basic check for permissions format (usually combinations of r, w, m)
-		if regexp.MustCompile(`^[rwm]+$`).MatchString(perms) {
+		if permsRegex.MatchString(perms) {
 			permissions = perms
 			containerPath = remainder[:lastColon]
 		} else {
@@ -281,7 +281,10 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	}, true
 }
 
-var schemeRegex = regexp.MustCompile(`^[a-z]+://`)
+var (
+	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
+	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
+)
 
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	if p == "" {

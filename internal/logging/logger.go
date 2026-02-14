@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,43 +36,68 @@ func ParseLevel(s string) Level {
 	}
 }
 
+var (
+	levelNames = []string{
+		"ERROR",
+		"WARN",
+		"INFO",
+		"DEBUG",
+		"TRACE",
+	}
+	levelLowerNames = []string{
+		"error",
+		"warn",
+		"info",
+		"debug",
+		"trace",
+	}
+)
+
 func (l Level) String() string {
-	switch l {
-	case ErrorLevel:
-		return "ERROR"
-	case WarnLevel:
-		return "WARN"
-	case DebugLevel:
-		return "DEBUG"
-	case TraceLevel:
-		return "TRACE"
-	default:
+	if l < 0 || int(l) >= len(levelNames) {
 		return "INFO"
 	}
+	return levelNames[l]
+}
+
+func (l Level) LowerString() string {
+	if l < 0 || int(l) >= len(levelLowerNames) {
+		return "info"
+	}
+	return levelLowerNames[l]
 }
 
 type Logger struct {
 	mu        sync.Mutex
-	Level     Level
+	level     atomic.Int32
 	Writer    io.Writer
 	Format    string // "text" or "json"
 	Timestamp bool
 }
 
-var (
-	globalLogger = &Logger{
-		Level:     WarnLevel,
+func (l *Logger) SetLevel(level Level) {
+	l.level.Store(int32(level))
+}
+
+func (l *Logger) GetLevel() Level {
+	return Level(l.level.Load())
+}
+
+var globalLogger = func() *Logger {
+	l := &Logger{
 		Writer:    os.Stderr,
 		Format:    "text",
 		Timestamp: true,
 	}
-)
+	l.SetLevel(WarnLevel)
+	return l
+}()
 
 func Init(level string, format string, timestamp bool) error {
 	globalLogger.mu.Lock()
 	defer globalLogger.mu.Unlock()
 
-	globalLogger.Level = ParseLevel(level)
+	globalLogger.SetLevel(ParseLevel(level))
 	globalLogger.Format = strings.ToLower(format)
 	globalLogger.Timestamp = timestamp
 
@@ -88,24 +114,33 @@ func SetOutput(w io.Writer) {
 }
 
 func (l *Logger) log(level Level, msg string, args ...interface{}) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if level > l.Level {
+	// Optimization: Check level before locking to avoid contention for filtered logs.
+	// We use atomic load to avoid data races.
+	if level > l.GetLevel() {
 		return
 	}
 
+	// Prepare the message and timestamp outside of the lock to reduce critical section time.
 	message := fmt.Sprintf(msg, args...)
 	now := time.Now()
 
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Re-check level inside the lock for absolute consistency.
+	if level > l.GetLevel() {
+		return
+	}
+
 	if l.Format == "json" {
 		entry := map[string]interface{}{
-			"level": strings.ToLower(level.String()),
+			"level": level.LowerString(),
 			"msg":   message,
 		}
 		if l.Timestamp {
 			entry["time"] = now.Format(time.RFC3339)
 		}
+		// JSON marshaling and writing are done inside the lock to ensure atomic log lines.
 		data, _ := json.Marshal(entry)
 		_, _ = fmt.Fprintln(l.Writer, string(data))
 	} else {
