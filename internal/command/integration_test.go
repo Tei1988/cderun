@@ -1,9 +1,7 @@
 package command
 
 import (
-	"bytes"
 	"cderun/internal/runtime"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,92 +12,6 @@ import (
 )
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
-
-// runCderun runs the cderun command in-process for integration testing.
-// It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
-// and is NOT safe for parallel execution with t.Parallel().
-func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	// Re-use logic from root_test.go but simplified
-	savedStdout := os.Stdout
-	savedStderr := os.Stderr
-
-	rOut, wOut, err := os.Pipe()
-	if err != nil {
-		return "", "", 0, err
-	}
-	rErr, wErr, err := os.Pipe()
-	if err != nil {
-		_ = rOut.Close()
-		_ = wOut.Close()
-		return "", "", 0, err
-	}
-
-	os.Stdout = wOut
-	os.Stderr = wErr
-
-	stdoutChan := make(chan string)
-	stderrChan := make(chan string)
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rOut)
-		_ = rOut.Close()
-		stdoutChan <- buf.String()
-	}()
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rErr)
-		_ = rErr.Close()
-		stderrChan <- buf.String()
-	}()
-
-	// Reset global state
-	opts = rootOptions{}
-	rootCmd = newRootCmd()
-	rootCmd.SetOut(wOut)
-	rootCmd.SetErr(wErr)
-
-	// Mock exitFunc to capture exit code
-	capturedExitCode := 0
-	savedExitFunc := exitFunc
-	exitFunc = func(code int) {
-		capturedExitCode = code
-	}
-	defer func() {
-		exitFunc = savedExitFunc
-	}()
-
-	execErr := Execute(append([]string{"cderun"}, args...))
-
-	_ = wOut.Close()
-	_ = wErr.Close()
-
-	stdout = <-stdoutChan
-	stderr = <-stderrChan
-
-	os.Stdout = savedStdout
-	os.Stderr = savedStderr
-
-	return stdout, stderr, capturedExitCode, execErr
-}
-
-func skipIfDockerBroken(t *testing.T, err error) {
-	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
-		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
-	}
-}
-
-func setupTestDir(t *testing.T) string {
-	t.Helper()
-	restoreWd, err := os.Getwd()
-	require.NoError(t, err)
-	tmpDir := t.TempDir()
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
-	return tmpDir
-}
 
 func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	if testing.Short() {
