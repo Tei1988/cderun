@@ -1,0 +1,33 @@
+//go:build e2e
+
+package command
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E test in short mode")
+	}
+
+	// We use Alpine image for testing
+	// Command: ls /dev/null2 && echo "test" > /dev/null2
+	// This verifies the device exists and is writable.
+	stdout, stderr, exitCode, err := runCderun(
+		"--image", "public.ecr.aws/docker/library/alpine:latest",
+		"--device", "/dev/null:/dev/null2:rw",
+		"--entrypoint", "sh",
+		"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2",
+	)
+
+	// Handle environment-specific Docker issues
+	skipIfDockerBroken(t, err)
+
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
+}
