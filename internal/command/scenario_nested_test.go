@@ -74,7 +74,7 @@ hostContext:
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
 	_, err = executeCommand("--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// 4. Verify path translation
 	require.NotNil(t, mockRuntime.CreatedConfig)

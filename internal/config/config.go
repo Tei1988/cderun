@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -280,7 +281,7 @@ func unmarshalStrict(data []byte, v interface{}) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	err := dec.Decode(v)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

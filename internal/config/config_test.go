@@ -16,7 +16,7 @@ func TestUnit_Config_Load_CDERunConfig(t *testing.T) {
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, cfg)
 		assert.Empty(t, paths)
 	})
@@ -36,7 +36,7 @@ defaults:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/project/.cderun.yaml", paths[0])
@@ -55,7 +55,7 @@ defaults:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/home/user/.config/cderun/.cderun.yaml", paths[0])
@@ -72,7 +72,7 @@ defaults:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/run/cderun/.cderun.yaml", paths[0])
@@ -98,7 +98,7 @@ hostContext:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, _, err := loader.LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, cfg)
 		require.NotNil(t, cfg.HostContext)
 		assert.Equal(t, 1, cfg.HostContext.Level)
@@ -124,7 +124,7 @@ node:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadToolsConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/project/.tools.yaml", paths[0])

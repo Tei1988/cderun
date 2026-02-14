@@ -29,7 +29,7 @@ func TestIntegration_Config_Load_RealFS(t *testing.T) {
 	})
 
 	cfg, paths, err := LoadCDERunConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, cfg)
 	assert.NotEmpty(t, paths)
 }
@@ -92,7 +92,7 @@ python:
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
 		cfg, paths, err := LoadCDERunConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.Len(t, paths, 2)
 		assert.Contains(t, paths[0], filepath.Join("child", ".cderun.yaml"))
 		assert.Contains(t, paths[1], filepath.Join(".cderun.yaml"))
@@ -104,7 +104,7 @@ python:
 
 	t.Run("ToolsConfig Merge", func(t *testing.T) {
 		cfg, paths, err := LoadToolsConfig()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.Len(t, paths, 2)
 
 		node := cfg["node"]

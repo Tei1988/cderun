@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
@@ -57,7 +58,7 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		}
 
 		// It should fail because no image mapping for 'node' exists, and --image was not hoisted.
-		assert.Error(t, execErr)
+		require.Error(t, execErr)
 		assert.Contains(t, execErr.Error(), "no image mapping found for tool: node")
 
 		requireConfig := mock.GetCreatedConfig()
@@ -107,7 +108,7 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 			t.Fatal("Test timed out")
 		}
 
-		assert.NoError(t, execErr)
+		require.NoError(t, execErr)
 
 		requireConfig := mock.GetCreatedConfig()
 		assert.NotNil(t, requireConfig)

@@ -1,18 +1,55 @@
+version: "2"
+
 linters:
   enable:
-    - errcheck
-    - gosimple
+    # Defaults
     - govet
-    - ineffassign
     - staticcheck
+    - errcheck
     - unused
-    - misspell
-    - gofmt
+    # Additional
+    - gosec
+    - bidichk
+    - errorlint
+    - bodyclose
+    - unconvert
+    - usestdlibvars
+    # - modernize # unknown linter in v1.64.5?
+    - exhaustive
+    - testifylint
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+  settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-ST1000"
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    unused:
+      parameters-are-used: false
+    testifylint:
+      enable:
+        - require-error
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Tei1988/cderun
 
 run:
   timeout: 5m
+  modules-download-mode: readonly
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0

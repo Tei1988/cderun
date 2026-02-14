@@ -7,6 +7,7 @@ import (
 	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -632,8 +633,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				select {
 				case <-resizeChan:
 					w, h, err := termGetSize(int(os.Stdout.Fd()))
-					if err == nil {
-						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
+					if err == nil && h >= 0 && w >= 0 {
+						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) // nolint:gosec
 					}
 				case <-ctxG.Done():
 					return
@@ -643,8 +644,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 		// Initial resize to match current terminal size
 		w, h, err := termGetSize(int(os.Stdout.Fd()))
-		if err == nil {
-			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
+		if err == nil && h >= 0 && w >= 0 {
+			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) // nolint:gosec
 		}
 	}
 
@@ -657,7 +658,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// After container exits, wait a short grace period for remaining output
 	select {
 	case err := <-attachDone:
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
 	case <-time.After(attachGracePeriod):

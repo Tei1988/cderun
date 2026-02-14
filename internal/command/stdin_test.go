@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type pipeMockRuntime struct {
@@ -69,7 +70,7 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		}
 
 		_ = pr.Close()
-		assert.NoError(t, execErr)
+		require.NoError(t, execErr)
 		assert.Equal(t, testData, stdout.String())
 	})
 

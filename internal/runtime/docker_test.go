@@ -21,17 +21,18 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Runtime_Docker_New(t *testing.T) {
 	// This should succeed even without docker daemon as it just creates the client
 	runtime, err := NewDockerRuntime("/var/run/docker.sock")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, runtime)
 	assert.Equal(t, "docker", runtime.Name())
 
 	runtimeWithName, err := NewDockerRuntimeWithName("/var/run/docker.sock", "custom")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "custom", runtimeWithName.Name())
 }
 
@@ -154,7 +155,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test", "never")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
 	})
 
@@ -162,7 +163,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: nil}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test", "missing")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
 	})
 
@@ -170,7 +171,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: errors.New("boom")}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test", "missing")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
 
@@ -178,7 +179,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test", "always")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image")
 		assert.Equal(t, 1, mock.pullCount)
 	})
@@ -189,7 +190,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.PullImage(context.Background(), "test", "always")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image (stream)")
 	})
 
@@ -203,7 +204,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 		}
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
 		assert.Equal(t, 3, mock.pullCount)
 	})
@@ -215,7 +216,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 			sleepFunc: func(ctx context.Context, d time.Duration) error { return nil },
 		}
 		err := runtime.PullImage(context.Background(), "test-image", "always")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 3, mock.pullCount)
 	})
 
@@ -230,8 +231,8 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 			},
 		}
 		err := runtime.PullImage(context.Background(), "test", "always")
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, context.Canceled))
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
 	})
 }
 
@@ -262,7 +263,7 @@ func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
 		}
 
 		id, err := runtime.CreateContainer(context.Background(), config)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "created-id", id)
 		assert.Equal(t, "test-image", mock.createConfig.Image)
 		assert.Equal(t, []string{"ls", "-l"}, []string(mock.createConfig.Cmd))
@@ -279,7 +280,7 @@ func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Ports: []string{"invalid"},
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("invalid expose port", func(t *testing.T) {
@@ -287,7 +288,7 @@ func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Expose: []string{"invalid"},
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -299,7 +300,7 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.StartContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, id, mock.startID)
 	})
 
@@ -309,7 +310,7 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock}
 		code, err := runtime.WaitContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 0, code)
 		assert.Equal(t, id, mock.waitID)
 	})
@@ -320,14 +321,14 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock}
 		_, err := runtime.WaitContainer(ctx, id)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("Remove", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.RemoveContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, id, mock.removeID)
 	})
 
@@ -335,7 +336,7 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.ResizeContainerTTY(ctx, id, 24, 80)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, id, mock.resizeID)
 		assert.Equal(t, uint(24), mock.resizeOpts.Height)
 		assert.Equal(t, uint(80), mock.resizeOpts.Width)
@@ -345,7 +346,7 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.SignalContainer(ctx, id, "SIGINT")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, id, mock.killID)
 		assert.Equal(t, "SIGINT", mock.killSignal)
 	})
@@ -380,7 +381,7 @@ func TestUnit_Runtime_Docker_AttachContainer_Multiplexed(t *testing.T) {
 		runtime := &DockerRuntime{client: mock}
 
 		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, stdoutBuf, stderrBuf)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, msgStdout, stdoutBuf.String())
 		assert.Equal(t, msgStderr, stderrBuf.String())
 		assert.True(t, conn.closed)
@@ -390,7 +391,7 @@ func TestUnit_Runtime_Docker_AttachContainer_Multiplexed(t *testing.T) {
 		mock := &mockDockerClient{attachErr: errors.New("attach failed")}
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -423,7 +424,7 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 
 		stdout := &strings.Builder{}
 		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "output data", stdout.String())
 		assert.True(t, conn.closed)
 	})
@@ -440,7 +441,7 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 
 		stdin := strings.NewReader("input data")
 		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, conn.closed)
 	})
 
@@ -458,8 +459,8 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 		cancel() // Cancel immediately
 
 		err := runtime.AttachContainer(ctx, "test-id", true, nil, nil, nil)
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, context.Canceled))
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
 		assert.True(t, conn.closed)
 	})
 }

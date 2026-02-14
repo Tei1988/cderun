@@ -71,26 +71,26 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 
 	t.Run("ParseMountFlag", func(t *testing.T) {
 		mc, err := ParseMountFlag("type=bind,source=./data,target=/app/data,readonly")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "./data", mc.Source.Raw)
 		assert.Equal(t, "/app/data", mc.Target.Raw)
 		assert.True(t, mc.ReadOnly)
 
 		mc, err = ParseMountFlag("source=/host/path,target=/container/path")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "/host/path", mc.Source.Raw)
 		assert.Equal(t, "/container/path", mc.Target.Raw)
 		assert.False(t, mc.ReadOnly)
 
 		_, err = ParseMountFlag("invalid-format")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
 		mc, err := ParseMountFlag(`type=bind,source=C:\host\path,target=/container`)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, `C:\host\path`, mc.Source.Raw)
 		assert.Equal(t, `/container`, mc.Target.Raw)
 
@@ -161,12 +161,12 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 	t.Run("ConfigPath", func(t *testing.T) {
 		cp := ConfigPath{Raw: "/path"}
 		data, err := yaml.Marshal(cp)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/path\n", string(data))
 
 		cp = ConfigPath{}
 		data, err = yaml.Marshal(cp)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "null\n", string(data))
 	})
 
@@ -177,14 +177,14 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 			Target: ConfigPath{Raw: "/container"},
 		}
 		data, err := yaml.Marshal(mc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Contains(t, string(data), "type: bind")
 		assert.Contains(t, string(data), "source: /host")
 		assert.Contains(t, string(data), "target: /container")
 
 		mc = MountConfig{}
 		data, err = yaml.Marshal(mc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "null\n", string(data))
 	})
 
@@ -195,7 +195,7 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 			Permissions: "rw",
 		}
 		data, err := yaml.Marshal(dc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0:/dev/video1:rw\n", string(data))
 
 		dc = DeviceConfig{
@@ -204,12 +204,12 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 			Permissions: "rwm",
 		}
 		data, err = yaml.Marshal(dc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/dev/fuse:/dev/fuse\n", string(data))
 
 		dc = DeviceConfig{}
 		data, err = yaml.Marshal(dc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "null\n", string(data))
 	})
 
@@ -222,12 +222,12 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 
 		cfg := TestConfig{}
 		data, err := yaml.Marshal(cfg)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "{}\n", string(data))
 
 		cfg.Path = ConfigPath{Raw: "/foo"}
 		data, err = yaml.Marshal(cfg)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Contains(t, string(data), "path: /foo")
 	})
 }
@@ -273,7 +273,7 @@ target: /app/data
 read_only: true
 `
 		err := yaml.Unmarshal([]byte(yamlStr), &mc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "./data", mc.Source.Raw)
 
@@ -283,13 +283,13 @@ source: ./implicit
 target: /app/implicit
 `
 		err = yaml.Unmarshal([]byte(yamlStr), &mc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "./implicit", mc.Source.Raw)
 
 		// Invalid
 		err = yaml.Unmarshal([]byte("invalid-mount"), &mc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config")
 
 		// Missing target
@@ -298,7 +298,7 @@ type: bind
 source: ./data
 `
 		err = yaml.Unmarshal([]byte(yamlStr), &mc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target is required")
 	})
 
@@ -307,12 +307,12 @@ source: ./data
 
 		// Valid
 		err := yaml.Unmarshal([]byte("/dev/video0:/dev/video0:rwm"), &dc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0", dc.Source.Raw)
 
 		// Invalid
 		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
@@ -32,14 +33,14 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 	}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
 
 	// Verify that globalCfg was NOT mutated
 	assert.Equal(t, initialLevel, globalCfg.HostContext.Level)
-	assert.Equal(t, initialMountsCount, len(globalCfg.HostContext.Mounts))
+	assert.Len(t, globalCfg.HostContext.Mounts, initialMountsCount)
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
@@ -54,7 +55,7 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	currentMounts := []container.Mount{}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
@@ -70,7 +71,7 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	currentMounts := []container.Mount{}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
@@ -102,7 +103,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/u", upperdir)
 	})
 
@@ -111,7 +112,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "", upperdir)
 	})
 
@@ -120,7 +121,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "", upperdir)
 	})
 }

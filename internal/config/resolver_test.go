@@ -139,7 +139,7 @@ func TestUnit_Config_Resolver_Image(t *testing.T) {
 	t.Run("Error if no image found", func(t *testing.T) {
 		cli := CLIOptions{}
 		_, err := Resolve("unknown", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found")
 	})
 
@@ -282,7 +282,7 @@ func TestUnit_Config_Resolver_Mounts(t *testing.T) {
 			Mounts: []string{"invalid"},
 		}
 		_, err := Resolve("", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("MountTools and MountAllTools resolution", func(t *testing.T) {
@@ -617,11 +617,11 @@ func TestUnit_Config_Resolver_Devices(t *testing.T) {
 	t.Run("Invalid device config errors", func(t *testing.T) {
 		cli := CLIOptions{Devices: []string{":/container"}}
 		_, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		t.Setenv("CDERUN_DEVICE", ":/container")
 		_, err = Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -630,18 +630,18 @@ func TestUnit_Config_Resolver_Float64(t *testing.T) {
 		cli := CLIOptions{CPUs: 2.5, CPUsSet: true}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, 2.5, res.CPUs)
+		assert.InDelta(t, 2.5, res.CPUs, 0.0001)
 
 		cli.CPUsSet = false
 		t.Setenv("CDERUN_CPUS", "1.5")
 		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, 1.5, res.CPUs)
+		assert.InDelta(t, 1.5, res.CPUs, 0.0001)
 
 		t.Setenv("CDERUN_CPUS", "invalid")
 		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
 		require.NoError(t, err)
-		assert.Equal(t, 0.0, res.CPUs) // Should fallback
+		assert.InDelta(t, 0.0, res.CPUs, 0.0001) // Should fallback
 	})
 }
 
@@ -959,7 +959,7 @@ func TestUnit_Config_Resolver_Devices_Env(t *testing.T) {
 	t.Run("Invalid device in CDERUN_DEVICE", func(t *testing.T) {
 		t.Setenv("CDERUN_DEVICE", ":/invalid")
 		_, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
 	})
 }
@@ -980,7 +980,7 @@ func TestUnit_Config_Resolver_Float64_Precedence(t *testing.T) {
 
 		res, err := Resolve("node", CLIOptions{}, tools, global)
 		require.NoError(t, err)
-		assert.Equal(t, 2.0, res.CPUs)
+		assert.InDelta(t, 2.0, res.CPUs, 0.0001)
 	})
 }
 
@@ -1011,7 +1011,7 @@ func TestUnit_Config_Resolver_Devices_Invalid(t *testing.T) {
 		}
 		tools := ToolsConfig{"node": {Image: "node"}}
 		_, err := Resolve("node", cli, tools, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config (override)")
 	})
 }

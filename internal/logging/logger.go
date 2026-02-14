@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type Level int
+type Level int32
 
 const (
 	ErrorLevel Level = iota
@@ -57,14 +57,14 @@ func (l Level) String() string {
 	if l < 0 || int(l) >= len(levelNames) {
 		return "INFO"
 	}
-	return levelNames[l]
+	return levelNames[int(l)]
 }
 
 func (l Level) LowerString() string {
 	if l < 0 || int(l) >= len(levelLowerNames) {
 		return "info"
 	}
-	return levelLowerNames[l]
+	return levelLowerNames[int(l)]
 }
 
 type Logger struct {
