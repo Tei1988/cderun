@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type pipeMockRuntime struct {
@@ -48,10 +49,13 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		rootCmd.SetOut(&stdout)
 		rootCmd.SetErr(io.Discard)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			execErr = Execute([]string{"cderun", "--image", "alpine", "-i", "cat"})
+			execErr = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
 			close(done)
 		}()
 
@@ -63,13 +67,13 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		select {
 		case <-done:
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			_ = pr.Close()
 			t.Fatal("Test timed out")
 		}
 
 		_ = pr.Close()
-		assert.NoError(t, execErr)
+		require.NoError(t, execErr)
 		assert.Equal(t, testData, stdout.String())
 	})
 
@@ -93,9 +97,12 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		rootCmd.SetOut(&stdout)
 		rootCmd.SetErr(io.Discard)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		go func() {
-			_ = Execute([]string{"cderun", "--image", "alpine", "cat"})
+			_ = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "cat"})
 			close(done)
 		}()
 
@@ -107,12 +114,12 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		select {
 		case <-done:
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			_ = pr.Close() // Unblock writer if it's still running
 			t.Fatal("Test timed out")
 		}
 
 		_ = pr.Close() // Unblock writer to allow it to finish
-		assert.Equal(t, "", stdout.String())
+		assert.Empty(t, stdout.String())
 	})
 }

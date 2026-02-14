@@ -22,7 +22,7 @@ func (cp *ConfigPath) UnmarshalYAML(node *yaml.Node) error {
 	return node.Decode(&cp.Raw)
 }
 
-func (cp ConfigPath) MarshalYAML() (interface{}, error) {
+func (cp ConfigPath) MarshalYAML() (any, error) {
 	if cp.IsEmpty() {
 		return nil, nil
 	}
@@ -98,7 +98,7 @@ func (mc MountConfig) IsEmpty() bool {
 	return mc.Target.IsEmpty()
 }
 
-func (mc MountConfig) MarshalYAML() (interface{}, error) {
+func (mc MountConfig) MarshalYAML() (any, error) {
 	if mc.IsEmpty() {
 		return nil, nil
 	}
@@ -165,7 +165,7 @@ func (dc DeviceConfig) IsEmpty() bool {
 	return dc.Source.IsEmpty() && dc.Destination.IsEmpty()
 }
 
-func (dc DeviceConfig) MarshalYAML() (interface{}, error) {
+func (dc DeviceConfig) MarshalYAML() (any, error) {
 	if dc.IsEmpty() {
 		return nil, nil
 	}

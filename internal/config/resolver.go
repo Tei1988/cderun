@@ -671,7 +671,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			dcs = append(dcs, parsed)
 		}
 	} else if env := os.Getenv("CDERUN_DEVICE"); env != "" {
-		for _, d := range strings.Split(env, ",") {
+		for d := range strings.SplitSeq(env, ",") {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
 				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
@@ -782,7 +782,7 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	} else if len(p2) > 0 {
 		envs = p2
 	} else if env := os.Getenv(envKey); env != "" {
-		for _, e := range strings.Split(env, ";") {
+		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
 			if e != "" {
 				envs = append(envs, e)
@@ -869,7 +869,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			mcs = append(mcs, parsed)
 		}
 	} else if env := os.Getenv("CDERUN_MOUNT"); env != "" {
-		for _, m := range strings.Split(env, ";") {
+		for m := range strings.SplitSeq(env, ";") {
 			m = strings.TrimSpace(m)
 			if m == "" {
 				continue

@@ -16,7 +16,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
-	if err := fs.MkdirAll(snapshotDir, 0700); err != nil {
+	if err := fs.MkdirAll(snapshotDir, 0o700); err != nil {
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
@@ -75,7 +75,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
-	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0600); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0o600); err != nil {
 		return "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
 	}
 
@@ -84,7 +84,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tools config: %w", err)
 	}
-	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0600); err != nil {
+	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0o600); err != nil {
 		return "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 
@@ -118,8 +118,8 @@ func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
 		return "", err
 	}
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -152,10 +152,10 @@ func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
 
 		// Superblock options are at the end
 		sbOptions := fields[len(fields)-1]
-		options := strings.Split(sbOptions, ",")
-		for _, opt := range options {
-			if strings.HasPrefix(opt, "upperdir=") {
-				return strings.TrimPrefix(opt, "upperdir="), nil
+		options := strings.SplitSeq(sbOptions, ",")
+		for opt := range options {
+			if after, ok := strings.CutPrefix(opt, "upperdir="); ok {
+				return after, nil
 			}
 		}
 	}

@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"cderun/internal/config"
 	"cderun/internal/runtime"
+	"context"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
@@ -42,22 +44,25 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		rootCmd.SetOut(&stdout)
 		rootCmd.SetErr(io.Discard)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		var execErr error
 		go func() {
 			// Simulating "node --interactive=true --image alpine cat"
-			execErr = Execute([]string{"node", "--interactive=true", "--image", "alpine", "cat"})
+			execErr = ExecuteContext(ctx, []string{"node", "--interactive=true", "--image", "alpine", "cat"})
 			close(done)
 		}()
 
 		select {
 		case <-done:
-		case <-time.After(2 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("Test timed out")
 		}
 
 		// It should fail because no image mapping for 'node' exists, and --image was not hoisted.
-		assert.Error(t, execErr)
+		require.Error(t, execErr)
 		assert.Contains(t, execErr.Error(), "no image mapping found for tool: node")
 
 		requireConfig := mock.GetCreatedConfig()
@@ -93,21 +98,24 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		rootCmd.SetOut(io.Discard)
 		rootCmd.SetErr(io.Discard)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		var execErr error
 		go func() {
 			// Simulating "node --cderun-interactive=true --cderun-image=alpine cat"
-			execErr = Execute([]string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
+			execErr = ExecuteContext(ctx, []string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"})
 			close(done)
 		}()
 
 		select {
 		case <-done:
-		case <-time.After(2 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("Test timed out")
 		}
 
-		assert.NoError(t, execErr)
+		require.NoError(t, execErr)
 
 		requireConfig := mock.GetCreatedConfig()
 		assert.NotNil(t, requireConfig)

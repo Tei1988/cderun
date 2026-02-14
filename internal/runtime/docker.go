@@ -1,14 +1,14 @@
 package runtime
 
 import (
+	"cderun/internal/container"
+	"cderun/internal/logging"
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"time"
-
-	"cderun/internal/container"
-	"cderun/internal/logging"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
@@ -103,7 +103,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 	// Policy is "always" or "missing" (and not found locally)
 	var lastErr error
-	for i := 0; i < pullMaxRetries; i++ {
+	for i := range pullMaxRetries {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
 			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
@@ -123,7 +123,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 		// Wait for pull to complete and check for errors in the stream
 		err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
-		_ = reader.Close()
+		_ = reader.Close() //nolint:errcheck
 		if err != nil {
 			lastErr = err
 			if isRetryablePullError(err) {
@@ -191,9 +191,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 			return "", fmt.Errorf("failed to parse port specs: %w", err)
 		}
 		hostConfig.PortBindings = bindings
-		for k, v := range exposedPorts {
-			containerConfig.ExposedPorts[k] = v
-		}
+		maps.Copy(containerConfig.ExposedPorts, exposedPorts)
 	}
 
 	// Handle Devices
@@ -203,7 +201,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 			PathInContainer:   dev.PathInContainer,
 			CgroupPermissions: dev.CgroupPermissions,
 		}
-		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
+		hostConfig.Devices = append(hostConfig.Devices, dMapping)
 	}
 
 	for _, m := range config.Mounts {
@@ -313,7 +311,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	if stdin != nil {
 		go func() {
 			_, stdinErr = io.Copy(resp.Conn, stdin)
-			_ = resp.CloseWrite()
+			_ = resp.CloseWrite() //nolint:errcheck
 			close(stdinDone)
 		}()
 	} else {

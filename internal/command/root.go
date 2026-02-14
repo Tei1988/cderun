@@ -7,6 +7,7 @@ import (
 	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -568,7 +569,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		if err != nil {
 			logging.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }()
+			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }() //nolint:errcheck
 		}
 	}
 
@@ -632,8 +633,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				select {
 				case <-resizeChan:
 					w, h, err := termGetSize(int(os.Stdout.Fd()))
-					if err == nil {
-						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
+					if err == nil && h >= 0 && w >= 0 {
+						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 					}
 				case <-ctxG.Done():
 					return
@@ -643,8 +644,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 		// Initial resize to match current terminal size
 		w, h, err := termGetSize(int(os.Stdout.Fd()))
-		if err == nil {
-			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w))
+		if err == nil && h >= 0 && w >= 0 {
+			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 		}
 	}
 
@@ -657,7 +658,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// After container exits, wait a short grace period for remaining output
 	select {
 	case err := <-attachDone:
-		if err != nil && err != context.Canceled {
+		if err != nil && !errors.Is(err, context.Canceled) {
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
 	case <-time.After(attachGracePeriod):
@@ -699,7 +700,7 @@ intended for the subcommand.`,
 			if opts.cderunLogLevel != "" {
 				initialLevel = opts.cderunLogLevel
 			}
-			_ = logging.Init(initialLevel, "text", true)
+			_ = logging.Init(initialLevel, "text", true) //nolint:errcheck
 
 			// Load configurations
 			toolsCfg, globalCfg, globalPaths, toolsPaths, err := opts.loadConfigs()
@@ -895,6 +896,11 @@ var rootCmd = newRootCmd()
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(rawArgs []string) error {
+	return ExecuteContext(context.Background(), rawArgs)
+}
+
+// ExecuteContext adds all child commands to the root command and sets flags appropriately, using the provided context.
+func ExecuteContext(ctx context.Context, rawArgs []string) error {
 	args, err := preprocessArgs(rawArgs)
 	if err != nil {
 		return err
@@ -904,7 +910,7 @@ func Execute(rawArgs []string) error {
 	} else {
 		rootCmd.SetArgs([]string{})
 	}
-	return rootCmd.Execute()
+	return rootCmd.ExecuteContext(ctx)
 }
 
 func preprocessArgs(args []string) ([]string, error) {

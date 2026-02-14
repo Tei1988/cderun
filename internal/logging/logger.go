@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type Level int
+type Level int32
 
 const (
 	ErrorLevel Level = iota
@@ -57,14 +57,14 @@ func (l Level) String() string {
 	if l < 0 || int(l) >= len(levelNames) {
 		return "INFO"
 	}
-	return levelNames[l]
+	return levelNames[int(l)]
 }
 
 func (l Level) LowerString() string {
 	if l < 0 || int(l) >= len(levelLowerNames) {
 		return "info"
 	}
-	return levelLowerNames[l]
+	return levelLowerNames[int(l)]
 }
 
 type Logger struct {
@@ -113,7 +113,7 @@ func SetOutput(w io.Writer) {
 	globalLogger.Writer = w
 }
 
-func (l *Logger) log(level Level, msg string, args ...interface{}) {
+func (l *Logger) log(level Level, msg string, args ...any) {
 	// Optimization: Check level before locking to avoid contention for filtered logs.
 	// We use atomic load to avoid data races.
 	if level > l.GetLevel() {
@@ -133,7 +133,7 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 	}
 
 	if l.Format == "json" {
-		entry := map[string]interface{}{
+		entry := map[string]any{
 			"level": level.LowerString(),
 			"msg":   message,
 		}
@@ -141,7 +141,7 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 			entry["time"] = now.Format(time.RFC3339)
 		}
 		// JSON marshaling and writing are done inside the lock to ensure atomic log lines.
-		data, _ := json.Marshal(entry)
+		data, _ := json.Marshal(entry) //nolint:errcheck
 		_, _ = fmt.Fprintln(l.Writer, string(data))
 	} else {
 		ts := ""
@@ -152,8 +152,8 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 	}
 }
 
-func Error(msg string, args ...interface{}) { globalLogger.log(ErrorLevel, msg, args...) }
-func Warn(msg string, args ...interface{})  { globalLogger.log(WarnLevel, msg, args...) }
-func Info(msg string, args ...interface{})  { globalLogger.log(InfoLevel, msg, args...) }
-func Debug(msg string, args ...interface{}) { globalLogger.log(DebugLevel, msg, args...) }
-func Trace(msg string, args ...interface{}) { globalLogger.log(TraceLevel, msg, args...) }
+func Error(msg string, args ...any) { globalLogger.log(ErrorLevel, msg, args...) }
+func Warn(msg string, args ...any)  { globalLogger.log(WarnLevel, msg, args...) }
+func Info(msg string, args ...any)  { globalLogger.log(InfoLevel, msg, args...) }
+func Debug(msg string, args ...any) { globalLogger.log(DebugLevel, msg, args...) }
+func Trace(msg string, args ...any) { globalLogger.log(TraceLevel, msg, args...) }

@@ -46,7 +46,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 			"--image", "alpine",
 			"sh", "ls", "-l",
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, []string{"ls", "-l"}, mockRuntime.CreatedConfig.Command)
@@ -63,7 +63,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 		assert.Equal(t, []string{"/bin/sh"}, mockRuntime.CreatedConfig.Entrypoint)
 		assert.Equal(t, "always", mockRuntime.CreatedConfig.Pull)
 		assert.Equal(t, int64(512*1024*1024), mockRuntime.CreatedConfig.Memory)
-		assert.Equal(t, 2.5, mockRuntime.CreatedConfig.CPUs)
+		assert.InDelta(t, 2.5, mockRuntime.CreatedConfig.CPUs, 0.0001)
 		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
 		assert.Equal(t, "tmpfs", mockRuntime.CreatedConfig.Mounts[0].Type)
 		assert.Equal(t, "/tmp", mockRuntime.CreatedConfig.Mounts[0].Target)
@@ -90,7 +90,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 			"--cderun-memory=2g",
 			"--cderun-cpus=2.0",
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
 		assert.Equal(t, []string{"ls", "-l"}, mockRuntime.CreatedConfig.Command)
@@ -99,7 +99,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 		assert.False(t, mockRuntime.CreatedConfig.Privileged)
 		assert.Equal(t, "always", mockRuntime.CreatedConfig.Pull)
 		assert.Equal(t, int64(2*1024*1024*1024), mockRuntime.CreatedConfig.Memory)
-		assert.Equal(t, 2.0, mockRuntime.CreatedConfig.CPUs)
+		assert.InDelta(t, 2.0, mockRuntime.CreatedConfig.CPUs, 0.0001)
 	})
 
 	t.Run("Invalid pull policy returns error", func(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
@@ -32,14 +33,14 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 	}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
 
 	// Verify that globalCfg was NOT mutated
 	assert.Equal(t, initialLevel, globalCfg.HostContext.Level)
-	assert.Equal(t, initialMountsCount, len(globalCfg.HostContext.Mounts))
+	assert.Len(t, globalCfg.HostContext.Mounts, initialMountsCount)
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
@@ -54,7 +55,7 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	currentMounts := []container.Mount{}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
@@ -70,17 +71,17 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	currentMounts := []container.Mount{}
 
 	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
 	}
 
 	// Verify snapshot directory permissions (0700)
-	assert.Equal(t, os.FileMode(0700), mfs.Perms[snapshotDir])
+	assert.Equal(t, os.FileMode(0o700), mfs.Perms[snapshotDir])
 
 	// Verify configuration file permissions (0600)
-	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
-	assert.Equal(t, os.FileMode(0600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
+	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
+	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
 }
 
 type mockMountInfoReader struct {
@@ -102,7 +103,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/u", upperdir)
 	})
 
@@ -111,8 +112,8 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
-		assert.Equal(t, "", upperdir)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
 	})
 
 	t.Run("malformed mountinfo", func(t *testing.T) {
@@ -120,7 +121,7 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
 
 		upperdir, err := discoverOverlayUpperDir(mfs)
-		assert.NoError(t, err)
-		assert.Equal(t, "", upperdir)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
 	})
 }

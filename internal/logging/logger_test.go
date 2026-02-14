@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
@@ -43,7 +44,7 @@ func TestUnit_Logging_Logger_JSONFormat(t *testing.T) {
 
 	var entry map[string]string
 	err := json.Unmarshal(buf.Bytes(), &entry)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "info", entry["level"])
 	assert.Equal(t, "test json message 123", entry["msg"])
 }
@@ -75,7 +76,7 @@ func TestUnit_Logging_Logger_WithTimestamp(t *testing.T) {
 		logger.log(InfoLevel, "msg")
 		var entry map[string]string
 		err := json.Unmarshal(buf.Bytes(), &entry)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, entry["time"])
 		assert.Equal(t, "info", entry["level"])
 		assert.Equal(t, "msg", entry["msg"])
@@ -104,17 +105,17 @@ func TestUnit_Logging_Level_Parse(t *testing.T) {
 func TestUnit_Logging_Init_GlobalLogger(t *testing.T) {
 	// Test Init updates globalLogger
 	err := Init("debug", "json", false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, DebugLevel, globalLogger.GetLevel())
 	assert.Equal(t, "json", globalLogger.Format)
-	assert.Equal(t, false, globalLogger.Timestamp)
+	assert.False(t, globalLogger.Timestamp)
 }
 
 func TestUnit_Logging_Wrappers_AllLevels(t *testing.T) {
 	buf := &bytes.Buffer{}
 	SetOutput(buf)
 	err := Init("trace", "text", false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	Error("err")
 	assert.Contains(t, buf.String(), "[ERROR] err")
