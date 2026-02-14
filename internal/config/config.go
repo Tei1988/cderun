@@ -165,7 +165,7 @@ type RealFileSystem struct{}
 
 func (RealFileSystem) Getwd() (string, error)                { return os.Getwd() }
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
-func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } // nolint:gosec
+func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } //nolint:gosec
 func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
 func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
 func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
