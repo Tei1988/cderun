@@ -896,6 +896,11 @@ var rootCmd = newRootCmd()
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(rawArgs []string) error {
+	return ExecuteContext(context.Background(), rawArgs)
+}
+
+// ExecuteContext adds all child commands to the root command and sets flags appropriately, using the provided context.
+func ExecuteContext(ctx context.Context, rawArgs []string) error {
 	args, err := preprocessArgs(rawArgs)
 	if err != nil {
 		return err
@@ -905,7 +910,7 @@ func Execute(rawArgs []string) error {
 	} else {
 		rootCmd.SetArgs([]string{})
 	}
-	return rootCmd.Execute()
+	return rootCmd.ExecuteContext(ctx)
 }
 
 func preprocessArgs(args []string) ([]string, error) {

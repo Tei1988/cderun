@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cderun/internal/config"
 	"cderun/internal/runtime"
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -17,7 +18,11 @@ import (
 )
 
 func executeCommand(args ...string) (string, error) {
-	return executeCommandRaw(append([]string{"cderun"}, args...))
+	return executeCommandContext(context.Background(), args...)
+}
+
+func executeCommandContext(ctx context.Context, args ...string) (string, error) {
+	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
 }
 
 func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
@@ -35,6 +40,10 @@ func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
 }
 
 func executeCommandRaw(args []string) (string, error) {
+	return executeCommandRawContext(context.Background(), args)
+}
+
+func executeCommandRawContext(ctx context.Context, args []string) (string, error) {
 	// Reset flag variables and Changed state
 	rootCmd = newRootCmd()
 
@@ -153,7 +162,7 @@ func executeCommandRaw(args []string) (string, error) {
 		close(done)
 	}()
 
-	execErr := Execute(args)
+	execErr := ExecuteContext(ctx, args)
 
 	_ = w.Close()
 	<-done

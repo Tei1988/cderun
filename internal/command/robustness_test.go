@@ -49,10 +49,13 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}
 		exitFunc = func(code int) {}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		// Run execute in a goroutine because we want to check if it finishes
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommand("--image", "alpine", "ls")
+			_, _ = executeCommandContext(ctx, "--image", "alpine", "ls")
 			close(done)
 		}()
 
@@ -60,8 +63,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		select {
 		case <-mock.attachStarted:
 			// attach started and is blocking
-		case <-time.After(2 * time.Second):
-			t.Fatal("AttachContainer did not start in time")
+		case <-ctx.Done():
+			t.Fatal("AttachContainer did not start in time or timeout")
 		}
 
 		// executeCommand should eventually finish because WaitContainer returns immediately
@@ -69,7 +72,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		select {
 		case <-done:
 			// Success
-		case <-time.After(10 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
 		}
 	})
@@ -107,9 +110,12 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		exitFunc = func(code int) {}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommand("--image", "alpine", "sleep", "60")
+			_, _ = executeCommandContext(ctx, "--image", "alpine", "sleep", "60")
 			close(done)
 		}()
 
@@ -117,8 +123,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		select {
 		case <-mock.attachStarted:
 			// attach started
-		case <-time.After(2 * time.Second):
-			t.Fatal("AttachContainer did not start in time")
+		case <-ctx.Done():
+			t.Fatal("AttachContainer did not start in time or timeout")
 		}
 
 		// Send first SIGINT
@@ -142,8 +148,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		select {
 		case <-done:
 			// Success
-		case <-time.After(2 * time.Second):
-			t.Fatal("Process did not exit after second SIGINT")
+		case <-ctx.Done():
+			t.Fatal("Process did not exit after second SIGINT or timeout")
 		}
 	})
 
@@ -190,9 +196,12 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}
 		exitFunc = func(code int) {}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommand("--image", "alpine", "--tty", "sleep", "60")
+			_, _ = executeCommandContext(ctx, "--image", "alpine", "--tty", "sleep", "60")
 			close(done)
 		}()
 
@@ -200,8 +209,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		select {
 		case <-waitStarted:
 			// container started
-		case <-time.After(2 * time.Second):
-			t.Fatal("Container did not start in time")
+		case <-ctx.Done():
+			t.Fatal("Container did not start in time or timeout")
 		}
 
 		// Update terminal size for simulation

@@ -47,6 +47,10 @@ linters:
     #   parameters-are-used: false
     testifylint:
       enable:
+        - bool-compare
+        - expected-actual
+        - float-compare
+        - len
         - require-error
 
 formatters:
