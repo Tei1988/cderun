@@ -201,7 +201,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 			PathInContainer:   dev.PathInContainer,
 			CgroupPermissions: dev.CgroupPermissions,
 		}
-		hostConfig.Resources.Devices = append(hostConfig.Resources.Devices, dMapping)
+		hostConfig.Devices = append(hostConfig.Devices, dMapping)
 	}
 
 	for _, m := range config.Mounts {
@@ -311,7 +311,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	if stdin != nil {
 		go func() {
 			_, stdinErr = io.Copy(resp.Conn, stdin)
-			_ = resp.CloseWrite()
+			_ = resp.CloseWrite() //nolint:errcheck
 			close(stdinDone)
 		}()
 	} else {

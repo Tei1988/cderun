@@ -141,7 +141,7 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 			entry["time"] = now.Format(time.RFC3339)
 		}
 		// JSON marshaling and writing are done inside the lock to ensure atomic log lines.
-		data, _ := json.Marshal(entry)
+		data, _ := json.Marshal(entry) //nolint:errcheck
 		_, _ = fmt.Fprintln(l.Writer, string(data))
 	} else {
 		ts := ""
