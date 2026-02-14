@@ -13,7 +13,6 @@ import (
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
-
 func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
