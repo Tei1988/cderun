@@ -7,46 +7,36 @@
 
 ## 2. ツール選定
 
-### testcontainers-go
-
-テストコードからプログラム的にコンテナのライフサイクルを管理するため、[testcontainers-go](https://github.com/testcontainers/testcontainers-go) を採用する。
-
-#### 採用理由
-
-- **宣言的なAPI**: テストに必要なコンテナ（イメージ、ポート、待機条件など）をコードで簡単に定義できる。
-- **自動クリーンアップ**: テスト終了後、起動したコンテナを自動的に破棄してくれるため、リソースリークを防げる。
-- **移植性**: ローカル開発環境でもCI環境でも同じテストコードを実行できる。
-
 ### stretchr/testify
 
-アサーションライブラリとして、プロジェクトで既に利用されている（または標準的な）[stretchr/testify](https://github.com/stretchr/testify) を引き続き使用する。
+アサーションライブラリとして、[stretchr/testify](https://github.com/stretchr/testify) を使用する。
 
 ## 3. テストの基本構造
 
-テストは、`internal/command` パッケージ内に `integration_test.go` のようなファイル名で作成する。
+テストは、`internal/command` パッケージ内に `integration_test.go` および `test_helpers_test.go` を利用して作成する。
 
 ### テストライフサイクル
 
-1. **セットアップ (`setup` or `TestMain`)**:
-    - `testcontainers-go` を使用して、テストに必要なコンテナ（例: `nginx:alpine`）をバックグラウンドで起動する。
-    - コンテナが利用可能になるまで待機する（例: ログ出力や特定のポートが開くまで）。
+1. **セットアップ**:
+    - `setupTestDir` ヘルパーを使用して、テスト用の一時ディレクトリを作成し、カレントディレクトリを移動する。
+    - 必要に応じて、`.tools.yaml` や `.cderun.yaml` を作成する。
 2. **テストケース実行 (`Test...` functions)**:
-    - `cderun` のコマンドを、テスト対象の引数と共にプログラム的に実行する。
-    - 実行結果（標準出力、標準エラー出力、終了コード）をキャプチャする。
-    - `testify/assert` や `testify/require` を使って、実行結果が期待通りであることを検証する。
-    - 必要に応じて、Dockerクライアントを直接使用してコンテナの状態（マウント、環境変数など）を検査する。
+    - `runCderun(args ...string)` ヘルパーを使用し、`cderun` のエントリーポイント（`Execute` 関数）をプロセス内で直接呼び出す。
+    - `os.Pipe` を利用して、標準出力・標準エラー出力をキャプチャする。
+    - `testify/assert` や `testify/require` を使って、実行結果（出力、終了コード）が期待通りであることを検証する。
+    - 実際の Docker/Podman ランタイムが必要なテストでは、環境が整っていない場合に `skipIfDockerBroken` でスキップする。
 3. **クリーンアップ**:
-    - `testcontainers-go` の機能により、テストプロセス終了時にコンテナは自動的に破棄される。
+    - `t.Cleanup` を使用して、カレントディレクトリの復元や一時ファイルの削除を自動的に行う。
 
 ### ヘルパー関数
 
-テストの記述を簡潔にするため、以下のようなヘルパー関数を `integration_test.go` 内に用意する。
-
-- `runCderun(args ...string) (stdout, stderr string, exitCode int)`: 指定された引数で `cderun` のテスト用バイナリを実行し、結果を返す。
+- `runCderun(args ...string) (stdout, stderr string, exitCode int, err error)`: 指定された引数で `cderun` のロジックを実行し、結果を返す。
+- `setupTestDir(t *testing.T) string`: テスト用の一時ディレクトリをセットアップする。
+- `skipIfDockerBroken(t *testing.T, err error)`: ランタイム環境の不備によるエラー時にテストをスキップする。
 
 ## 4. 実装ステップ
 
-1. **依存関係の追加**: `go.mod` に `github.com/testcontainers/testcontainers-go` を追加する。
+1. **テストヘルパーの作成**: `internal/command/test_helpers_test.go` を作成し、in-process 実行ロジックを実装する。
 2. **最初のテストファイルの作成**: `internal/command/integration_test.go` を作成する。
 3. **基本的なテストケースの実装**: `cderun alpine echo "hello"` のような単純なコマンドが成功することを検証するテストを実装する。
 4. **テストカバレッジの拡充**: 以下の「主なテストシナリオ」で挙げる項目について、テストケースを追加していく。
