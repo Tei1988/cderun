@@ -13,15 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/go-units"
-	"github.com/spf13/cobra"
-	"golang.org/x/term"
-	"gopkg.in/yaml.v3"
-
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
+
+	"github.com/docker/go-units"
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
+	"gopkg.in/yaml.v3"
 )
 
 type rootOptions struct {

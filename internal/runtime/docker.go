@@ -1,14 +1,15 @@
 package runtime
 
 import (
-	"cderun/internal/container"
-	"cderun/internal/logging"
 	"context"
 	"fmt"
 	"io"
 	"maps"
 	"strings"
 	"time"
+
+	"cderun/internal/container"
+	"cderun/internal/logging"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
