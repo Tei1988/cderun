@@ -1,10 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +12,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
+	"cderun/internal/runtime"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -903,7 +904,7 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // defaultOptions returns the default rootOptions.
 func defaultOptions() *rootOptions {
 	return &rootOptions{
-		fs: config.RealFileSystem{},
+		fs:       config.RealFileSystem{},
 		exitFunc: os.Exit,
 		isTerminal: func(fd int) bool {
 			return term.IsTerminal(fd)
