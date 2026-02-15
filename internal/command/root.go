@@ -1,10 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,15 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
+	"cderun/internal/runtime"
+
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	attachGracePeriod = 5 * time.Second
-)
+const attachGracePeriod = 5 * time.Second
 
 type rootOptions struct {
 	tty                   bool

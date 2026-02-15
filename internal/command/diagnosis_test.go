@@ -2,8 +2,9 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/config"
 	"testing"
+
+	"cderun/internal/config"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"

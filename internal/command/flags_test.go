@@ -1,8 +1,9 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"testing"
+
+	"cderun/internal/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand(
+		_, _, err := executeCommand(
 			"--publish", "8080:80",
 			"--publish-all",
 			"--expose", "80",
@@ -64,7 +65,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 
-		_, err := executeCommand(
+		_, _, err := executeCommand(
 			"--publish", "8080:80",
 			"--user", "initialUser",
 			"--privileged=true",
@@ -93,14 +94,14 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	})
 
 	t.Run("Invalid pull policy returns error", func(t *testing.T) {
-		_, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
+		_, _, err := executeCommand("--pull", "invalid", "--image", "alpine", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
 		assert.Contains(t, err.Error(), "allowed values are \"always\", \"missing\", or \"never\"")
 	})
 
 	t.Run("Invalid pull policy in P1 returns error", func(t *testing.T) {
-		_, err := executeCommand("--image", "alpine", "sh", "--cderun-pull=invalid")
+		_, _, err := executeCommand("--image", "alpine", "sh", "--cderun-pull=invalid")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
 	})

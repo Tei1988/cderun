@@ -15,6 +15,8 @@ import (
 // It captures stdout and stderr and returns the exit code.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	o := newDefaultOptions()
+	// Override exit behavior to avoid terminating the test process.
+	o.exitFunc = func(code int) {}
 	return runCderunWithOptions(context.Background(), o, args...)
 }
 
@@ -73,7 +75,6 @@ func runCderunRawWithOptions(ctx context.Context, o *rootOptions, rawArgs []stri
 	cmd.SetErr(wErr)
 
 	// Mock exitFunc to capture exit code.
-	// We do NOT call the original exitFunc (which might be os.Exit) to avoid terminating the test process.
 	capturedExitCode := 0
 	o.exitFunc = func(code int) {
 		capturedExitCode = code

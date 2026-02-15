@@ -1,8 +1,9 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"testing"
+
+	"cderun/internal/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ func TestUnit_Command_Root_DryRun(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		setupMockRuntime(t, mockRuntime)
 
-		_, err := executeCommand("--dry-run")
+		_, _, err := executeCommand("--dry-run")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 	})
@@ -26,7 +27,7 @@ func TestUnit_Command_Root_DryRun(t *testing.T) {
 
 		// Dry-run with YAML (default)
 		// Step 10.2: subcommand 'sh' is excluded from command
-		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
+		output, _, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
 		assert.Contains(t, output, "command:")
@@ -36,13 +37,13 @@ func TestUnit_Command_Root_DryRun(t *testing.T) {
 		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
 
 		// Dry-run with JSON
-		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
+		output, _, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "\"image\": \"alpine\"")
 		assert.Contains(t, output, "\"command\": [")
 
 		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
+		output, _, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
@@ -53,12 +54,12 @@ func TestUnit_Command_Root_DryRun(t *testing.T) {
 		assert.Contains(t, output, "Remove: true")
 
 		// Dry-run with mount
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
+		output, _, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Mounts: type=bind,source=/h,target=/c,readonly=false")
 
 		// Dry-run with device
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
+		output, _, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Devices: /dev/video0:/dev/video1:ro")
 	})
