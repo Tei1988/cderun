@@ -2,7 +2,7 @@ package command
 
 import (
 	"bytes"
-	"io"
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -12,73 +12,31 @@ import (
 
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
-// and is NOT safe for parallel execution with t.Parallel().
+// Note: This function is now safe for parallel execution.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	// Re-use logic from root_test.go but simplified
-	savedStdout := os.Stdout
-	savedStderr := os.Stderr
+	return runCderunWithOptions(nil, args...)
+}
 
-	rOut, wOut, err := os.Pipe()
-	if err != nil {
-		return "", "", 0, err
-	}
-	rErr, wErr, err := os.Pipe()
-	if err != nil {
-		_ = rOut.Close()
-		_ = wOut.Close()
-		return "", "", 0, err
+// runCderunWithOptions runs the cderun command in-process with custom options.
+func runCderunWithOptions(o *rootOptions, args ...string) (stdout, stderr string, exitCode int, err error) {
+	if o == nil {
+		o = defaultOptions()
 	}
 
-	os.Stdout = wOut
-	os.Stderr = wErr
-	defer func() {
-		os.Stdout = savedStdout
-		os.Stderr = savedStderr
-	}()
-
-	stdoutChan := make(chan string)
-	stderrChan := make(chan string)
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rOut)
-		_ = rOut.Close()
-		stdoutChan <- buf.String()
-	}()
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rErr)
-		_ = rErr.Close()
-		stderrChan <- buf.String()
-	}()
-
-	// Reset global state
-	opts = rootOptions{}
-	rootCmd = newRootCmd()
-	rootCmd.SetOut(wOut)
-	rootCmd.SetErr(wErr)
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+	o.out = stdoutBuf
+	o.err = stderrBuf
 
 	// Mock exitFunc to capture exit code
 	capturedExitCode := 0
-	savedExitFunc := exitFunc
-	exitFunc = func(code int) {
+	o.exitFunc = func(code int) {
 		capturedExitCode = code
 	}
-	defer func() {
-		exitFunc = savedExitFunc
-	}()
 
-	execErr := Execute(append([]string{"cderun"}, args...))
+	execErr := ExecuteWithOptions(context.Background(), append([]string{"cderun"}, args...), o)
 
-	_ = wOut.Close()
-	_ = wErr.Close()
-
-	stdout = <-stdoutChan
-	stderr = <-stderrChan
-
-	return stdout, stderr, capturedExitCode, execErr
+	return stdoutBuf.String(), stderrBuf.String(), capturedExitCode, execErr
 }
 
 func skipIfDockerBroken(t *testing.T, err error) {

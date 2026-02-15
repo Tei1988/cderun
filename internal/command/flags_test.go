@@ -1,7 +1,9 @@
 package command
 
 import (
+	"bytes"
 	"cderun/internal/runtime"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,24 +11,12 @@ import (
 )
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
-	// Save and restore package-level state
-	originalFactory := runtimeFactory
-	originalExit := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = originalFactory
-		exitFunc = originalExit
-	})
-
-	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
-
 	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
+		mockRuntime := &runtime.MockRuntime{}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mockRuntime)
 
-		_, err := executeCommand(
+		_, err := executeCommandContextWithOptions(o,
 			"--publish", "8080:80",
 			"--publish-all",
 			"--expose", "80",
@@ -72,9 +62,11 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	})
 
 	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
+		mockRuntime := &runtime.MockRuntime{}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mockRuntime)
 
-		_, err := executeCommand(
+		_, err := executeCommandContextWithOptions(o,
 			"--publish", "8080:80",
 			"--user", "initialUser",
 			"--privileged=true",
@@ -114,4 +106,17 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
 	})
+}
+
+// Helper to use ExecuteWithOptions in tests easily
+func executeCommandContextWithOptions(o *rootOptions, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	if o.out == nil {
+		o.out = buf
+	}
+	if o.err == nil {
+		o.err = buf
+	}
+	err := ExecuteWithOptions(context.Background(), append([]string{"cderun"}, args...), o)
+	return buf.String(), err
 }

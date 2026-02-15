@@ -34,20 +34,15 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mock)
 
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
+		o.in = pr
+		o.out = &stdout
+		o.err = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -55,7 +50,7 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			execErr = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+			execErr = ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, o)
 			close(done)
 		}()
 
@@ -82,27 +77,22 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mock)
 
 		pr, pw := io.Pipe()
 		var stdout bytes.Buffer
 
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
+		o.in = pr
+		o.out = &stdout
+		o.err = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "cat"})
+			_ = ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, o)
 			close(done)
 		}()
 

@@ -30,13 +30,6 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 
 func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		defer func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		}()
-
 		mock := &blockingMockRuntime{
 			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
@@ -44,10 +37,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
-		exitFunc = func(code int) {}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mock)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -55,7 +46,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		// Run execute in a goroutine because we want to check if it finishes
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "ls")
+			_ = ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "ls"}, o)
 			close(done)
 		}()
 
@@ -67,24 +58,17 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 			t.Fatal("AttachContainer did not start in time or timeout")
 		}
 
-		// executeCommand should eventually finish because WaitContainer returns immediately
-		// and AttachContainer will be canceled after 500ms grace period.
+		// ExecuteWithOptions should eventually finish because WaitContainer returns immediately
+		// and AttachContainer will be canceled after grace period.
 		select {
 		case <-done:
 			// Success
 		case <-ctx.Done():
-			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
+			t.Fatal("ExecuteWithOptions did not finish even though WaitContainer should have completed")
 		}
 	})
 
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		defer func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		}()
-
 		// Use a mock that blocks in WaitContainer to simulate long running process
 		mock := &blockingMockRuntime{
 			attachStarted: make(chan struct{}),
@@ -96,11 +80,8 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		waitStarted := make(chan struct{})
 		blockWait := make(chan struct{})
 
-		// We need a way to override WaitContainer.
-		// Since blockingMockRuntime embeds MockRuntime, we can't easily override just one method
-		// if we want to use the embedded one's fields, but here we can just define it.
-
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o := setupTestOptions(t)
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &waitBlockingMock{
 				blockingMockRuntime: mock,
 				waitStarted:         waitStarted,
@@ -108,14 +89,12 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 			}, nil
 		}
 
-		exitFunc = func(code int) {}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "sleep", "60")
+			_ = ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "sleep", "60"}, o)
 			close(done)
 		}()
 
@@ -154,24 +133,14 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	})
 
 	t.Run("handles TTY resize via SIGWINCH", func(t *testing.T) {
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		savedIsTerminal := isTerminal
-		savedTermGetSize := termGetSize
-		defer func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-			isTerminal = savedIsTerminal
-			termGetSize = savedTermGetSize
-		}()
-
+		o := setupTestOptions(t)
 		// Mock terminal to always return true
-		isTerminal = func(fd int) bool { return true }
+		o.isTerminal = func(fd int) bool { return true }
 
 		var mu sync.Mutex
 		// Mock terminal size
 		currentRows, currentCols := 24, 80
-		termGetSize = func(fd int) (int, int, error) {
+		o.termGetSize = func(fd int) (int, int, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			return currentCols, currentRows, nil
@@ -187,21 +156,20 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		waitStarted := make(chan struct{})
 		blockWait := make(chan struct{})
 
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &waitBlockingMock{
 				blockingMockRuntime: mock,
 				waitStarted:         waitStarted,
 				blockWait:           blockWait,
 			}, nil
 		}
-		exitFunc = func(code int) {}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		done := make(chan struct{})
 		go func() {
-			_, _ = executeCommandContext(ctx, "--image", "alpine", "--tty", "sleep", "60")
+			_ = ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sleep", "60"}, o)
 			close(done)
 		}()
 
@@ -241,13 +209,6 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	})
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		defer func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		}()
-
 		mock := &blockingMockRuntime{
 			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
@@ -255,22 +216,20 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 42 // Non-zero exit code
 
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
+		o := setupTestOptions(t)
+		setupMockRuntime(t, o, mock)
 
 		var capturedExitCode int
-		exitFunc = func(code int) {
+		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// executeCommand calls Execute -> RunE which calls exitFunc(exitCode)
-		_, err := executeCommandContext(ctx, "--image", "alpine", "false")
+		err := ExecuteWithOptions(ctx, []string{"cderun", "--image", "alpine", "false"}, o)
 		if err != nil {
-			t.Fatalf("executeCommand failed: %v", err)
+			t.Fatalf("ExecuteWithOptions failed: %v", err)
 		}
 
 		if capturedExitCode != 42 {
@@ -290,7 +249,7 @@ func (m *waitBlockingMock) WaitContainer(ctx context.Context, containerID string
 	close(m.waitStarted)
 	select {
 	case <-m.blockWait:
-		return 0, nil
+		return m.ExitCode, nil
 	case <-ctx.Done():
 		return 0, ctx.Err()
 	}
