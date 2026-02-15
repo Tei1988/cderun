@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"cderun/internal/runtime"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/runtime"
 )
 
 type pipeMockRuntime struct {

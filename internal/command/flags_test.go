@@ -5,10 +5,10 @@ import (
 	"context"
 	"testing"
 
-	"cderun/internal/runtime"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/runtime"
 )
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
