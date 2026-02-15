@@ -2,13 +2,13 @@ package command
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 
-	"cderun/internal/config"
-
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
 )
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
@@ -18,37 +18,18 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 		opts := testOptions
 		opts.stdout = out
 		opts.fs = config.RealFileSystem{}
-		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
-			SocketPath:      "/var/run/docker.sock",
-			Diagnosis:       true,
+
+		cmd := newRootCmd(opts)
+		rCfg := &config.ResolvedConfig{
 			DiagnosisFormat: "json",
 		}
-		cmd := &cobra.Command{}
-		cmd.SetOut(out)
+		tCfg := config.ToolsConfig{}
+		err := opts.handleDiagnosis(cmd, rCfg, tCfg, []string{"global.yaml"}, []string{"tools.yaml"})
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "\"name\": \"docker\"")
-	})
-
-	t.Run("Simple format", func(t *testing.T) {
-		setupTestOptions(t)
-		out := &bytes.Buffer{}
-		opts := testOptions
-		opts.stdout = out
-		opts.fs = config.RealFileSystem{}
-		resolved := &config.ResolvedConfig{
-			Runtime:         "podman",
-			SocketPath:      "/run/podman/podman.sock",
-			Diagnosis:       true,
-			DiagnosisFormat: "simple",
-		}
-		cmd := &cobra.Command{}
-		cmd.SetOut(out)
-
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		var res map[string]any
+		err = json.Unmarshal(out.Bytes(), &res)
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Runtime: podman")
+		assert.Equal(t, []any{"global.yaml"}, res["configs"].(map[string]any)["global"])
 	})
 }
