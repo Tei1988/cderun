@@ -16,9 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	testOptions *rootOptions
-)
+var testOptions *rootOptions
 
 func executeCommand(args ...string) (string, int, error) {
 	return executeCommandContext(context.Background(), args...)

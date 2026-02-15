@@ -1,12 +1,13 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"

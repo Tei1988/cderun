@@ -3,7 +3,6 @@ package runtime
 import (
 	"bufio"
 	"bytes"
-	"cderun/internal/container"
 	"context"
 	"errors"
 	"io"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"cderun/internal/container"
 
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
