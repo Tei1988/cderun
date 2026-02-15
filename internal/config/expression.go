@@ -14,6 +14,8 @@ type ExpressionResolver struct {
 	Home        string
 	Pwd         string
 	HostContext *HostContext
+	fileCache   map[string]string
+	loader      *ConfigLoader
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
@@ -34,6 +36,12 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
+		fileCache:   make(map[string]string),
+		loader: &ConfigLoader{
+			fs:              fs,
+			systemConfigDir: defaultLoader.systemConfigDir,
+			runConfigDir:    defaultLoader.runConfigDir,
+		},
 	}, nil
 }
 
@@ -58,6 +66,9 @@ func (r *ExpressionResolver) Resolve(v any) any {
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
+	if !strings.Contains(s, "{{") {
+		return s
+	}
 	return exprRegex.ReplaceAllStringFunc(s, func(match string) string {
 		content := strings.TrimSpace(match[2 : len(match)-2])
 
@@ -86,21 +97,24 @@ func (r *ExpressionResolver) resolveFile(filename string) string {
 		return ""
 	}
 
-	loader := &ConfigLoader{
-		fs:              r.fs,
-		systemConfigDir: defaultLoader.systemConfigDir,
-		runConfigDir:    defaultLoader.runConfigDir,
+	if cached, ok := r.fileCache[filename]; ok {
+		return cached
 	}
-	paths := loader.FindConfigs(filename)
+
+	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
+		r.fileCache[filename] = ""
 		return ""
 	}
 
 	// Use the highest priority file
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
+		r.fileCache[filename] = ""
 		return ""
 	}
 
-	return strings.TrimSpace(string(data))
+	result := strings.TrimSpace(string(data))
+	r.fileCache[filename] = result
+	return result
 }
