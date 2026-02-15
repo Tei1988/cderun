@@ -149,7 +149,7 @@
 
 ### Phase 8: インテグレーションテスト (Completed)
 
-- testcontainers-go の導入
+- テストヘルパー（`runCderun`, `setupTestDir`）の導入
 - 各種インテグレーションテストの実装
 
 ### Phase 9: テストカバレッジ計測 (Completed)

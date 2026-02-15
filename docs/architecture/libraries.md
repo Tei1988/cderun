@@ -21,6 +21,7 @@
 現在プロジェクトで使用が承認されている主要ライブラリ：
 
 - **CLI Framework:** [cobra](https://github.com/spf13/cobra)
-- **Container Runtime API:** [moby (Docker)](https://github.com/moby/moby)
-- **YAML Parsing:** [yaml.v3](https://gopkg.in/yaml.v3)
-- **Testing:** [testify](https://github.com/stretchr/testify), [testcontainers-go](https://github.com/testcontainers/testcontainers-go)
+- **Container Runtime API:** [moby (Docker)](https://github.com/moby/moby), [containerd/errdefs](https://github.com/containerd/errdefs)
+- **YAML & Config Utilities:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://github.com/darccio/mergo)
+- **Utilities:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [x/term](https://golang.org/x/term)
+- **Testing:** [testify](https://github.com/stretchr/testify)

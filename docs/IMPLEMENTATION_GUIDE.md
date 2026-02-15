@@ -82,7 +82,7 @@
 
 ### Phase 8: インテグレーションテスト (Completed)
 
-**目的**: 実際のコンテナランタイム（Docker/Podman）を使用したエンドツーエンドの検証。
+**目的**: インプロセス実行ヘルパーを利用した、実際のコンテナランタイム（Docker/Podman）連携の検証。
 
 ### Phase 9: テストカバレッジ計測 (Completed)
 
@@ -188,7 +188,7 @@
 
 ### Phase 8 (Completed)
 
-- [x] Step 8.1: testcontainers-go の導入
+- [x] Step 8.1: テストヘルパー（`runCderun`, `setupTestDir`）の導入
 - [x] Step 8.2: 各種インテグレーションテストの実装
 
 ### Phase 9 (Completed)
