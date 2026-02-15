@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
-	"gopkg.in/yaml.v3"
-
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
+
+	"github.com/google/uuid"
+	"gopkg.in/yaml.v3"
 )
 
 func createSnapshot(fs config.FileSystem, reader mountInfoReader, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {

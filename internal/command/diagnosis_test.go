@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"cderun/internal/config"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"cderun/internal/config"
 )
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
