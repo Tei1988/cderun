@@ -14,7 +14,7 @@
 | `internal/config` | 90.4% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 96.1% | 高いカバレッジを維持。 |
 | `internal/runtime` | 92.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみのため (正常)。 |
+| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
 | **Total** | **91.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
