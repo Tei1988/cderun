@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
@@ -26,8 +27,8 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 
-		o.out = nil // discard
-		o.err = nil // discard
+		o.out = io.Discard
+		o.err = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -71,8 +72,8 @@ func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 
-		o.out = nil
-		o.err = nil
+		o.out = io.Discard
+		o.err = io.Discard
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()

@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"cderun/internal/config"
-	"cderun/internal/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
