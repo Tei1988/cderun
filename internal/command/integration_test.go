@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testImage = "public.ecr.aws/docker/library/alpine:latest"
+const (
+	testImage = "public.ecr.aws/docker/library/alpine:latest"
+)
 
 func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	if testing.Short() {
@@ -404,7 +406,9 @@ func TestIntegration_Command_Root_MountAllTools_EmptyConfig(t *testing.T) {
 
 	stdout, stderr, _, err := runCderunWithOptions(context.Background(), testOptions, "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh")
 	require.NoError(t, err)
-	assert.Contains(t, stdout+stderr, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
+	// Verify warning appears specifically in stderr
+	assert.Contains(t, stderr, "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
+	_ = stdout // Silence lint if necessary
 }
 
 func TestIntegration_Command_Root_ExcludeToolSubcommand(t *testing.T) {
@@ -482,6 +486,7 @@ node:
 }
 
 func TestIntegration_Command_Root_InternalOverrides(t *testing.T) {
+	// NOTE: This test uses the shared package-level testOptions and is not safe for parallel execution.
 	// Use a temporary directory for this test
 	setupTestDir(t)
 

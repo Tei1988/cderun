@@ -29,6 +29,8 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	}
 }
 
+// TestRobustness_Command_Root_SignalHandling tests signal forwarding and termination logic.
+// NOTE: This test uses syscall.Kill(os.Getpid(), ...) and is NOT safe for parallel tests.
 func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{

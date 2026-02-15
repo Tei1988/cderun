@@ -24,7 +24,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const attachGracePeriod = 5 * time.Second
+const (
+	attachGracePeriod = 5 * time.Second
+)
 
 type rootOptions struct {
 	tty                   bool
@@ -956,6 +958,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 				break
 			}
 			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
+			// Note: cmd.Flags() includes both local and PersistentFlags.
 			if strings.HasPrefix(arg, "--") {
 				name := strings.SplitN(arg[2:], "=", 2)[0]
 				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {

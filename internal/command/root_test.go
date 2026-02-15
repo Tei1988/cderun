@@ -16,7 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testOptions *rootOptions
+var (
+	testOptions *rootOptions
+)
 
 func executeCommand(args ...string) (string, int, error) {
 	return executeCommandContext(context.Background(), args...)
@@ -51,6 +53,8 @@ func executeCommandRaw(args []string) (string, int, error) {
 	return executeCommandRawContext(context.Background(), args)
 }
 
+// executeCommandRawContext runs the command and captures output and exit code.
+// NOTE: This function mutates os.Stdout/os.Stderr and is NOT safe for parallel tests.
 func executeCommandRawContext(ctx context.Context, args []string) (string, int, error) {
 	// Re-initialize options for each call if not set by test
 	// Note: for multiple calls in the same test, the caller should
