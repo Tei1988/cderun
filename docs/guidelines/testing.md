@@ -35,6 +35,15 @@ func TestFeature(t *testing.T) {
 
 共通のセットアップ処理は `setupMockRuntime` のような補助関数にまとめ、その中で `t.Cleanup` を呼び出すことで、復元の漏れを防いでください。
 
+### 1.3. 並列実行の安全性 (Parallel Execution Safety)
+
+`t.Parallel()` を使用してテストを並列実行する場合は、以下の点に注意してください。
+
+- **並列実行可能なテスト**: `runCderun` ヘルパーを使用するテストは、内部で新しいコマンドインスタンスを生成するため、通常は並列実行が可能です。
+- **並列実行不可なテスト**: 以下の操作を行うテストは、プロセス全体の状態に影響を与えるため、`t.Parallel()` を使用しないでください。
+  - `syscall.Kill(os.Getpid(), ...)` による自プロセスへのシグナル送信（例: `robustness_test.go`）。
+  - `os.Stdout` や `os.Stderr` などのグローバルなストリームの直接的な置換。
+
 ## 2. モック実装の原則 (Mocking Principles)
 
 ### 2.1. 可読性の高いロジック

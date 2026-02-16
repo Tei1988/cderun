@@ -93,6 +93,7 @@ cderun --runtime podman node app.js
 
 - **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
 - **Podman**: Docker 互換の API を使用. Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
+- **イメージプルのリトライ**: ネットワークの不安定さやレート制限（`toomanyrequests` 等）に対応するため、指数バックオフを伴うリトライロジック（最大3回）を実装。
 
 ## ランタイム情報の表示 (Completed)
 
@@ -104,7 +105,7 @@ cderun --runtime podman node app.js
 cderun --diagnosis
 ```
 
-診断情報の出力フォーマットは `--diagnosis-format`（または `-f`）で指定可能です（`yaml`, `json`, `simple`）。
+診断情報の出力フォーマットは `--diagnosis-format` で指定可能です（`yaml`, `json`, `simple`）。
 
 ```bash
 cderun --diagnosis --diagnosis-format simple

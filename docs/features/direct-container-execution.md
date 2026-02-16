@@ -55,10 +55,11 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 - **ライフサイクル**: 作成、起動、待機、削除の各フェーズをメソッド化。
 - **IO制御**: 標準入出力（stdin/stdout/stderr）のアタッチ。
 - **操作**: シグナル送信（SignalContainer）、TTYリサイズ（ResizeContainerTTY）。
+- **ストリーム処理**: TTYが無効な場合、標準出力と標準エラー出力が多重化されたストリーム（`stdcopy` 形式）を適切に分離して処理。
 
 ### ランタイム実装のポイント
 
-- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
+- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用.
 - **Podman実装**: Docker 互換 API を使用。Docker クライアントライブラリを共通の基盤として利用。
 - **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
 
