@@ -123,3 +123,40 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		assert.Empty(t, stdout.String())
 	})
 }
+
+func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
+	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
+		mock := &pipeMockRuntime{}
+		mock.CreatedContainerID = "test-container"
+		mock.ExitCode = 0
+
+		setupMockRuntime(t, &mock.MockRuntime)
+		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+
+		var stdout bytes.Buffer
+		stdinData := "hello extended\n"
+		pr, pw := io.Pipe()
+		go func() {
+			_, _ = pw.Write([]byte(stdinData))
+			_ = pw.Close()
+		}()
+
+		rootCmd = newRootCmd()
+		opts = rootOptions{}
+		rootCmd.SetIn(pr)
+		rootCmd.SetOut(&stdout)
+
+		originalExitFunc := exitFunc
+		exitFunc = func(code int) {}
+		defer func() { exitFunc = originalExitFunc }()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		err := ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+		require.NoError(t, err)
+		assert.Equal(t, stdinData, stdout.String())
+	})
+}

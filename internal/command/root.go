@@ -530,6 +530,9 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	logging.Info("Running: %s", fullCmdStr)
 	logging.Debug("Image: %s", containerConfig.Image)
+	logging.Debug("Command: %v", containerConfig.Command)
+	logging.Debug("Entrypoint: %v", containerConfig.Entrypoint)
+	logging.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
 	logging.Debug("Runtime: %s", resolved.Runtime)
 	logging.Debug("Socket: %s", resolved.SocketPath)
 
