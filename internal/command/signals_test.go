@@ -9,6 +9,7 @@ import (
 )
 
 func TestUnit_Command_Signals_GetSignalName(t *testing.T) {
+	setupNoOverlay(t)
 	assert.Equal(t, "SIGINT", getSignalName(os.Interrupt))
 	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
 

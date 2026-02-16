@@ -12,6 +12,7 @@ import (
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
+	setupNoOverlay(t)
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -45,6 +46,7 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 }
 
 func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
+	setupNoOverlay(t)
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -65,6 +67,7 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 }
 
 func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
+	setupNoOverlay(t)
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
@@ -84,44 +87,3 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
 }
 
-type mockMountInfoReader struct {
-	Content []byte
-	Err     error
-}
-
-func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
-	return m.Content, m.Err
-}
-
-func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
-	mfs := &config.MockFileSystem{}
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
-
-	t.Run("successfully discover upperdir", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "/u", upperdir)
-	})
-
-	t.Run("no overlay found", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("malformed mountinfo", func(t *testing.T) {
-		mountinfo := "too few fields\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-}

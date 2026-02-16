@@ -12,6 +12,7 @@ import (
 )
 
 func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
+	setupNoOverlay(t)
 	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
 	// and changes the working directory. It should not be run in parallel.
 

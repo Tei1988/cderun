@@ -9,6 +9,7 @@ import (
 )
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
+	setupNoOverlay(t)
 	// Save and restore package-level state
 	originalFactory := runtimeFactory
 	originalExit := exitFunc

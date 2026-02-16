@@ -15,6 +15,7 @@ import (
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
 func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
+	setupNoOverlay(t)
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -118,6 +119,7 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 }
 
 func TestIntegration_Command_Root_SymlinkExecution(t *testing.T) {
+	setupNoOverlay(t)
 	// Use a temporary directory for this test
 	setupTestDir(t)
 
@@ -144,6 +146,7 @@ node:
 }
 
 func TestIntegration_Command_Root_ToolsYAML(t *testing.T) {
+	setupNoOverlay(t)
 	// Use a temporary directory for this test
 	setupTestDir(t)
 
@@ -181,6 +184,7 @@ node:
 }
 
 func TestIntegration_Command_Root_Priority_EnvOverTools(t *testing.T) {
+	setupNoOverlay(t)
 	t.Setenv("CDERUN_IMAGE", "env-image:latest")
 
 	// Use a temporary directory for this test
@@ -203,6 +207,7 @@ node:
 }
 
 func TestIntegration_Command_Root_BaseCommandFromTools(t *testing.T) {
+	setupNoOverlay(t)
 	// Use a temporary directory for this test
 	setupTestDir(t)
 
@@ -226,6 +231,7 @@ node:
 }
 
 func TestIntegration_Command_Root_EnvPassThrough(t *testing.T) {
+	setupNoOverlay(t)
 	// Use a temporary directory for this test
 	setupTestDir(t)
 
@@ -267,6 +273,7 @@ node:
 }
 
 func TestIntegration_Command_Root_MountToolsNotFound(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup tools config
 	setupTestDir(t)
 
@@ -289,6 +296,7 @@ python:
 }
 
 func TestIntegration_Command_Root_MountTools_AutoEnable(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup tools config
 	setupTestDir(t)
 
@@ -327,6 +335,7 @@ node:
 }
 
 func TestIntegration_Command_Root_MountTools_Logic(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup tools config
 	setupTestDir(t)
 
@@ -386,6 +395,7 @@ sh:
 }
 
 func TestIntegration_Command_Root_MountAllTools_EmptyConfig(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup empty tools config
 	setupTestDir(t)
 
@@ -398,6 +408,7 @@ func TestIntegration_Command_Root_MountAllTools_EmptyConfig(t *testing.T) {
 }
 
 func TestIntegration_Command_Root_ExcludeToolSubcommand(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup tools config
 	setupTestDir(t)
 
@@ -419,6 +430,7 @@ node:
 }
 
 func TestIntegration_Command_Root_IncludeExplicitToolSubcommand(t *testing.T) {
+	setupNoOverlay(t)
 	// Setup tools config
 	setupTestDir(t)
 
@@ -441,6 +453,7 @@ node:
 }
 
 func TestIntegration_Command_Flags_ToolsYAML_DockerCompatible(t *testing.T) {
+	setupNoOverlay(t)
 	setupTestDir(t)
 
 	toolsContent := `
@@ -469,6 +482,7 @@ node:
 }
 
 func TestIntegration_Command_Root_InternalOverrides(t *testing.T) {
+	setupNoOverlay(t)
 	// Use a temporary directory for this test
 	setupTestDir(t)
 
@@ -590,6 +604,7 @@ node:
 }
 
 func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
+	setupNoOverlay(t)
 	mock := &pipeMockRuntime{}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0

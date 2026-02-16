@@ -29,6 +29,7 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 }
 
 func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
+	setupNoOverlay(t)
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		savedRuntimeFactory := runtimeFactory
 		savedExitFunc := exitFunc

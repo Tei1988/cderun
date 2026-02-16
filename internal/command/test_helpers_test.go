@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"cderun/internal/config"
 
 	"github.com/stretchr/testify/require"
 )
@@ -108,4 +109,20 @@ func setupTestDir(t *testing.T) string {
 	require.NoError(t, os.Chdir(tmpDir))
 	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
 	return tmpDir
+}
+
+func setupNoOverlay(t *testing.T) {
+	t.Helper()
+	originalReader := config.DefaultMountInfoReader
+	config.DefaultMountInfoReader = &mockMountInfoReader{Content: []byte("")}
+	t.Cleanup(func() { config.DefaultMountInfoReader = originalReader })
+}
+
+type mockMountInfoReader struct {
+	Content []byte
+	Err     error
+}
+
+func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
+	return m.Content, m.Err
 }

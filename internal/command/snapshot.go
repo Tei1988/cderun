@@ -6,7 +6,6 @@ import (
 	"cderun/internal/logging"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -57,7 +56,7 @@ func createSnapshot(fs config.FileSystem, globalCfg *config.CDERunConfig, toolsC
 
 	// OverlayFS root discovery (only at level 1 if we want to find the host root)
 	// Actually, it can be done at any level if we want to find the "upperdir" of the current container.
-	if upperDir, err := discoverOverlayUpperDir(fs); err == nil && upperDir != "" {
+	if upperDir, err := config.DiscoverOverlayUpperDir(fs); err == nil && upperDir != "" {
 		logging.Debug("Discovered OverlayFS upperdir: %s", upperDir)
 		hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
 			Source: upperDir,
@@ -98,67 +97,3 @@ func cleanupSnapshot(fs config.FileSystem, snapshotDir string) error {
 	return fs.RemoveAll(snapshotDir)
 }
 
-// mountInfoReader is an interface for reading mount information (e.g., from /proc/self/mountinfo).
-type mountInfoReader interface {
-	ReadMountInfo(fs config.FileSystem) ([]byte, error)
-}
-
-// realMountInfoReader reads from /proc/self/mountinfo.
-type realMountInfoReader struct{}
-
-func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
-	return fs.ReadFile("/proc/self/mountinfo")
-}
-
-var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
-
-func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
-	data, err := defaultMountInfoReader.ReadMountInfo(fs)
-	if err != nil {
-		return "", err
-	}
-
-	lines := strings.SplitSeq(string(data), "\n")
-	for line := range lines {
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 10 {
-			continue
-		}
-
-		// Find separator "-"
-		sepIdx := -1
-		for i, f := range fields {
-			if f == "-" {
-				sepIdx = i
-				break
-			}
-		}
-		if sepIdx == -1 || len(fields) <= sepIdx+3 {
-			continue
-		}
-
-		fsType := fields[sepIdx+1]
-		if fsType != "overlay" {
-			continue
-		}
-
-		mountPoint := fields[4]
-		if mountPoint != "/" {
-			continue
-		}
-
-		// Superblock options are at the end
-		sbOptions := fields[len(fields)-1]
-		options := strings.SplitSeq(sbOptions, ",")
-		for opt := range options {
-			if after, ok := strings.CutPrefix(opt, "upperdir="); ok {
-				return after, nil
-			}
-		}
-	}
-
-	return "", nil
-}

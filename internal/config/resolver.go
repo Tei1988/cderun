@@ -212,6 +212,18 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		hostCtx = global.HostContext
 	}
 
+	if hostCtx == nil {
+		if upperDir, err := DiscoverOverlayUpperDir(fs); err == nil && upperDir != "" {
+			logging.Debug("Detected OverlayFS root, enabling sibling execution mode with upperdir: %s", upperDir)
+			hostCtx = &HostContext{
+				Level: 1,
+				Mounts: []MountMapping{
+					{Source: upperDir, Target: "/", Level: 1},
+				},
+			}
+		}
+	}
+
 	r, err := NewExpressionResolverWithFS(hostCtx, fs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)

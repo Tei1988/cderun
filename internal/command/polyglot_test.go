@@ -14,6 +14,7 @@ import (
 )
 
 func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {
+	setupNoOverlay(t)
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"

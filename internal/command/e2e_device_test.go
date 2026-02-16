@@ -11,6 +11,7 @@ import (
 )
 
 func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
+	setupNoOverlay(t)
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}
@@ -34,6 +35,7 @@ func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
 }
 
 func TestE2E_Command_Stdin_Piped(t *testing.T) {
+	setupNoOverlay(t)
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}

@@ -171,6 +171,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 }
 
 func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
+	setupNoOverlay(t)
 	tests := []struct {
 		name     string
 		args     []string
@@ -223,6 +224,7 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 }
 
 func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
+	setupNoOverlay(t)
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	require.NoError(t, err)
@@ -232,6 +234,7 @@ func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
 }
 
 func TestUnit_Command_Root_CommandResolution(t *testing.T) {
+	setupNoOverlay(t)
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
@@ -402,6 +405,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 }
 
 func TestUnit_Command_Root_Phase3Features(t *testing.T) {
+	setupNoOverlay(t)
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -500,6 +504,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 }
 
 func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
+	setupNoOverlay(t)
 	mockRuntime := &runtime.MockRuntime{}
 	setupMockRuntime(t, mockRuntime)
 
@@ -522,6 +527,7 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 }
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
+	setupNoOverlay(t)
 	mockRuntime := runtime.NewMockRuntime()
 	setupMockRuntime(t, mockRuntime)
 
@@ -565,6 +571,7 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 }
 
 func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
+	setupNoOverlay(t)
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -583,6 +590,7 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 }
 
 func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
+	setupNoOverlay(t)
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
