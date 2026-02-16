@@ -77,14 +77,14 @@ defaults:
 ### マウントされるもの
 
 1. **cderunバイナリ**
-   - 実行ホストの`cderun`バイナリをread-onlyでマウント。以下の優先順位でホスト側のパスを特定します：
-     1. 明示的な指定（`--mount-cderun-path` フラグ、環境変数、または設定ファイル）
-     2. `os.Executable()` による現在実行中のバイナリパス
-   - コンテナ内パス: `/usr/local/bin/cderun`
+     - 実行ホストの`cderun`バイナリをread-onlyでマウント。以下の優先順位でホスト側のパスを特定します：
+         1. 明示的な指定（`--mount-cderun-path` フラグ、環境変数、または設定ファイル）
+         2. `os.Executable()` による現在実行中のバイナリパス
+     - コンテナ内パス: `/usr/local/bin/cderun`
 
 2. **ランタイムソケット**
-   - コンテナ内のcderunが基底ホストのコンテナランタイム（Docker等）と通信できるように
-   - 指定されたソケットパスを同じパスでコンテナ内にマウント
+     - コンテナ内のcderunが基底ホストのコンテナランタイム（Docker等）と通信できるように
+     - 指定されたソケットパスを同じパスでコンテナ内にマウント
 
 > **Note**: 設定ファイル（`.cderun.yaml` や `.tools.yaml`）は自動的にはマウントされませんが、ネスト実行を支援するため動的に生成された設定が `/run/cderun/` に注入される仕組みがあります。詳細は [Nested Execution (Specification)](./nested-execution.md) を参照してください。
 
