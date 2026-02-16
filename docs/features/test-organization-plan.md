@@ -29,7 +29,7 @@
 | 設定ファイルサポート | `config_test.go`, `integration_test.go`, `fs_test.go` | 良好 |
 | マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
-| コンテナ設定初期化 | `config_test.go` (internal/container) | 良好 |
+| コンテナ設定初期化 | `internal/container/config_test.go` | 良好 |
 | イメージマッピング | `resolver_test.go` | 良好 |
 | 環境変数パススルー | `resolver_test.go`, `integration_test.go` | 良好 |
 | Mount Tools | `root_test.go`, `integration_test.go` | 良好 |

@@ -35,7 +35,7 @@ cderun --diagnosis node --version
 
 ### YAML形式（デフォルト）
 
-`cderun --diagnosis`
+`cderun --diagnosis` または `cderun --diagnosis --diagnosis-format yaml`
 
 ```yaml
 runtime:
@@ -55,7 +55,7 @@ available_tools:
 
 ### JSON形式
 
-`cderun --diagnosis --diagnosis-format json`
+`cderun --diagnosis --diagnosis-format json` または `cderun <subcommand> --cderun-diagnosis-format json`
 
 ```json
 {
