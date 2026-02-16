@@ -13,9 +13,9 @@
 | `internal/command` | 92.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
 | `internal/config` | 90.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 96.1% | 高いカバレッジを維持。 |
-| `internal/runtime` | 93.4% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 91.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
-| **Total** | **91.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| **Total** | **91.5%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -43,6 +43,7 @@
 | 信号処理 | `signals_test.go`, `robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `snapshot_test.go`, `scenario_nested_test.go`, `path_test.go` | 良好 |
+| Snapshot管理 | `snapshot_test.go` | 良好 |
 | 診断モード | `root_test.go` | 良好 |
 | 統合テスト(Docker) | `integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
@@ -73,11 +74,12 @@
 
 ### 4.2. 命名規則
 
-`Test[Category]_[Feature]_[Scenario]` の形式を推奨する。
+`Test[Category]_[Package]_[Feature]_[Scenario]` の形式を推奨する。
 
-  - 例: `TestUnit_Config_TildeExpansion`
-  - 例: `TestIntegration_Docker_PortMapping`
-  - 例: `TestRobustness_Signal_DoubleCtrlC`
+  - 例: `TestUnit_Logging_Logger_TextFormat`
+  - 例: `TestUnit_Command_Root_HandleDiagnosis`
+  - 例: `TestIntegration_Config_Resolver_Resolve`
+  - 例: `TestE2E_Command_Device_MountNullAsNull2`
 
 ## 5. 改善計画
 
