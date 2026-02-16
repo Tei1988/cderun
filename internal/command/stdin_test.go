@@ -40,6 +40,7 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		}
 
 		pr, pw := io.Pipe()
+		defer pr.Close()
 		var stdout bytes.Buffer
 
 		// Reset global state
@@ -51,6 +52,11 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
+		go func() {
+			<-ctx.Done()
+			_ = pr.Close()
+		}()
 
 		done := make(chan struct{})
 		var execErr error
@@ -68,11 +74,9 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		select {
 		case <-done:
 		case <-ctx.Done():
-			_ = pr.Close()
 			t.Fatal("Test timed out")
 		}
 
-		_ = pr.Close()
 		require.NoError(t, execErr)
 		assert.Equal(t, testData, stdout.String())
 	})
@@ -88,6 +92,7 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		}
 
 		pr, pw := io.Pipe()
+		defer pr.Close()
 		var stdout bytes.Buffer
 
 		// Reset global state
@@ -99,6 +104,11 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
+		go func() {
+			<-ctx.Done()
+			_ = pr.Close()
+		}()
 
 		done := make(chan struct{})
 		go func() {
@@ -115,11 +125,9 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		select {
 		case <-done:
 		case <-ctx.Done():
-			_ = pr.Close() // Unblock writer if it's still running
 			t.Fatal("Test timed out")
 		}
 
-		_ = pr.Close() // Unblock writer to allow it to finish
 		assert.Empty(t, stdout.String())
 	})
 }
@@ -138,10 +146,7 @@ func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
 		var stdout bytes.Buffer
 		stdinData := "hello extended\n"
 		pr, pw := io.Pipe()
-		go func() {
-			_, _ = pw.Write([]byte(stdinData))
-			_ = pw.Close()
-		}()
+		defer pr.Close()
 
 		rootCmd = newRootCmd()
 		opts = rootOptions{}
@@ -154,6 +159,16 @@ func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+
+		go func() {
+			<-ctx.Done()
+			_ = pr.Close()
+		}()
+
+		go func() {
+			_, _ = pw.Write([]byte(stdinData))
+			_ = pw.Close()
+		}()
 
 		err := ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
 		require.NoError(t, err)

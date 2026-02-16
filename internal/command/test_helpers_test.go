@@ -97,3 +97,63 @@ func setupTestDir(t *testing.T) string {
 	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
 	return tmpDir
 }
+
+// runCderunWithStdin runs the cderun command in-process with a custom stdin.
+func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+	savedStdout := os.Stdout
+	savedStderr := os.Stderr
+
+	rOut, wOut, _ := os.Pipe()
+	rErr, wErr, _ := os.Pipe()
+
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	defer func() {
+		os.Stdout = savedStdout
+		os.Stderr = savedStderr
+	}()
+
+	stdoutChan := make(chan string)
+	stderrChan := make(chan string)
+
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rOut)
+		_ = rOut.Close()
+		stdoutChan <- buf.String()
+	}()
+
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, rErr)
+		_ = rErr.Close()
+		stderrChan <- buf.String()
+	}()
+
+	// Reset global state
+	opts = rootOptions{}
+	rootCmd = newRootCmd()
+	rootCmd.SetIn(stdin)
+	rootCmd.SetOut(wOut)
+	rootCmd.SetErr(wErr)
+
+	capturedExitCode := 0
+	savedExitFunc := exitFunc
+	exitFunc = func(code int) {
+		capturedExitCode = code
+	}
+	defer func() {
+		exitFunc = savedExitFunc
+	}()
+
+	execErr := Execute(append([]string{"cderun"}, args...))
+
+	_ = wOut.Close()
+	_ = wErr.Close()
+
+	stdout = <-stdoutChan
+	stderr = <-stderrChan
+
+	return stdout, stderr, capturedExitCode, execErr
+}

@@ -2,6 +2,7 @@ package command
 
 import (
 	"cderun/internal/runtime"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -586,4 +587,31 @@ node:
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
 	})
+}
+
+func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
+	mock := &pipeMockRuntime{}
+	mock.CreatedContainerID = "test-integration-container"
+	mock.ExitCode = 0
+
+	// Mock the factory globally for this test
+	savedFactory := runtimeFactory
+	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		return mock, nil
+	}
+	defer func() { runtimeFactory = savedFactory }()
+
+	stdinData := "integration test data"
+	pr, pw := io.Pipe()
+	go func() {
+		_, _ = pw.Write([]byte(stdinData))
+		_ = pw.Close()
+	}()
+
+	stdout, stderr, exitCode, err := runCderunWithStdin(pr, "--image", "alpine", "-i", "cat")
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, stdinData, stdout)
+	assert.Empty(t, stderr)
 }
