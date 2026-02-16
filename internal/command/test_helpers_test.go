@@ -103,8 +103,16 @@ func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string,
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
+	rOut, wOut, err := os.Pipe()
+	if err != nil {
+		return "", "", 0, err
+	}
+	rErr, wErr, err := os.Pipe()
+	if err != nil {
+		_ = rOut.Close()
+		_ = wOut.Close()
+		return "", "", 0, err
+	}
 
 	os.Stdout = wOut
 	os.Stderr = wErr

@@ -599,7 +599,7 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 		return mock, nil
 	}
-	defer func() { runtimeFactory = savedFactory }()
+	t.Cleanup(func() { runtimeFactory = savedFactory })
 
 	stdinData := "integration test data"
 	pr, pw := io.Pipe()
