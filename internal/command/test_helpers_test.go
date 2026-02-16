@@ -15,7 +15,16 @@ import (
 // Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
 // and is NOT safe for parallel execution with t.Parallel().
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	// Re-use logic from root_test.go but simplified
+	return runCderunCore(nil, args...)
+}
+
+// runCderunWithStdin runs the cderun command in-process with a custom stdin.
+func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCore(stdin, args...)
+}
+
+// runCderunCore is the shared implementation for in-process command execution.
+func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
@@ -57,6 +66,9 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 	// Reset global state
 	opts = rootOptions{}
 	rootCmd = newRootCmd()
+	if stdin != nil {
+		rootCmd.SetIn(stdin)
+	}
 	rootCmd.SetOut(wOut)
 	rootCmd.SetErr(wErr)
 

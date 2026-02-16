@@ -3,6 +3,7 @@
 package command
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,4 +31,32 @@ func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
+}
+
+func TestE2E_Command_Stdin_Piped(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping E2E test in short mode")
+	}
+
+	stdinData := "hello e2e stdin"
+
+	// Create a pipe for stdin
+	pr, pw := io.Pipe()
+	go func() {
+		_, _ = pw.Write([]byte(stdinData))
+		_ = pw.Close()
+	}()
+
+	stdout, stderr, exitCode, err := runCderunWithStdin(pr,
+		"--image", "public.ecr.aws/docker/library/alpine:latest",
+		"--interactive",
+		"--entrypoint", "cat",
+		"cat",
+	)
+
+	skipIfDockerBroken(t, err)
+
+	require.NoError(t, err, "stderr: %s", stderr)
+	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	assert.Equal(t, stdinData, stdout)
 }

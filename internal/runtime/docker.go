@@ -286,6 +286,7 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 
 // AttachContainer attaches to a container's IO streams.
 func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+	logging.Debug("Attaching to container %s (tty=%v, stdin=%v)", containerID, tty, stdin != nil)
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -310,7 +311,14 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	if stdin != nil {
 		go func() {
-			_, stdinErr = io.Copy(resp.Conn, stdin)
+			logging.Debug("Starting to copy STDIN to container %s", containerID)
+			var n int64
+			n, stdinErr = io.Copy(resp.Conn, stdin)
+			if stdinErr != nil {
+				logging.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
+			} else {
+				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+			}
 			_ = resp.CloseWrite() //nolint:errcheck
 			close(stdinDone)
 		}()
@@ -319,14 +327,28 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	}
 
 	outputDone := make(chan error, 1)
+	logging.Debug("Starting to copy output from container %s", containerID)
 	go func() {
 		var err error
+		logging.Debug("Output goroutine started")
+		if !tty {
+			if peek, err := resp.Reader.Peek(8); err == nil {
+				logging.Debug("Output stream starts with: %v", peek)
+			} else {
+				logging.Debug("Failed to peek output stream: %v", err)
+			}
+		}
 		if tty {
 			// When TTY is enabled, the stream is raw (not multiplexed).
 			_, err = io.Copy(stdout, resp.Reader)
 		} else {
 			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
 			_, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+		}
+		if err != nil {
+			logging.Debug("Output copy from container %s finished with error: %v", containerID, err)
+		} else {
+			logging.Debug("Output copy from container %s finished", containerID)
 		}
 		outputDone <- err
 	}()
