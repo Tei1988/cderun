@@ -53,7 +53,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/Tei1988/cderun
+        - cderun
 
 run:
   timeout: 5m
