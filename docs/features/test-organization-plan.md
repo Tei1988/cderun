@@ -13,9 +13,9 @@
 | `internal/command` | 92.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
 | `internal/config` | 90.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 96.1% | 高いカバレッジを維持。 |
-| `internal/runtime` | 93.4% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
-| **Total** | **91.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| `internal/runtime` | 91.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/container` | [no statements] | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` で初期化を検証。 |
+| **Total** | **91.5%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -39,7 +39,7 @@
 | cderunバイナリマウント | `root_test.go`, `integration_test.go` | 良好 |
 | ドライランモード | `root_test.go` | 良好 |
 | ログ・デバッグ | `logger_test.go` | 良好 |
-| インタラクティブ | `robustness_test.go` (信号、リサイズ), `stdin_test.go` | 良好 |
+| インタラクティブ | `robustness_test.go` (信号、リサイズ), `stdin_test.go`, `e2e_device_test.go` | 良好 |
 | 信号処理 | `signals_test.go`, `robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `snapshot_test.go`, `scenario_nested_test.go`, `path_test.go` | 良好 |
@@ -54,11 +54,13 @@
 
   1. **ランタイム実装のテスト不足**: リトライロジックの検証テストを追加済み。
   2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）の検証テストを追加済み。
-  3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み.
+  3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み。
   4. **ログローテーション**: 安定性の観点から設計変更により削除済み。
   5. **テスト用モックの不足**: 汎用的な `MockRuntime` および `sleepFunc` の導入により解決済み。
   6. **テストにおけるデータレース**: `robustness_test.go` 等での信号ハンドラとテスト本体間の共有変数へのアクセスを `sync.Mutex` で保護し、`go test -race` での検出を回避。
   7. **グローバル状態（カレントディレクトリ等）の汚染**: `os.Chdir` を使用するテストでの `t.Cleanup` による復元を徹底し、テストの実行順序や並列実行による不安定性を排除。
+  8. **MockFileSystem の防衛的設計**: `mockFileInfo` で最小限のメソッドを実装し、パニックを防止するように改善済み。
+  9. **統合テスト戦略の転換**: `testcontainers-go` からプロセス内実行ヘルパー（`runCderun`, `setupTestDir`）へ移行し、効率化と安定性を向上。
 
 ## 4. テストの体系化案
 
@@ -105,7 +107,7 @@
 | ポート転送 | ✅ | ✅ | - | - |
 | 信号処理(Ctrl+C) | ✅ | - | ✅ | - |
 | TTYリサイズ | - | - | ✅ | - |
-| インタラクティブ(Stdin) | ✅ | ✅ | - | - |
+| インタラクティブ(Stdin) | ✅ | ✅ | - | ✅ |
 | Nested Execution | ✅ | ✅ | - | ✅ |
 | Expressions | ✅ | ✅ | - | - |
 | 厳密モード | ✅ | ✅ | - | - |
