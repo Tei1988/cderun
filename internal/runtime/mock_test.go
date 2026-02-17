@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"cderun/internal/container"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/container"
 )
 
 func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {

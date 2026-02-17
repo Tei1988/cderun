@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"cderun/internal/container"
-
 	"gopkg.in/yaml.v3"
+
+	"cderun/internal/container"
 )
 
 // ConfigPath is an intermediate representation for paths in configuration.

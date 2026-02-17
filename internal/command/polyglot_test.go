@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"cderun/internal/config"
-	"cderun/internal/runtime"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 )
 
 func TestUnit_Command_Root_PolyglotFlags(t *testing.T) {

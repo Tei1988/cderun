@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"cderun/internal/container"
-
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -22,6 +20,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/container"
 )
 
 func TestUnit_Runtime_Docker_New(t *testing.T) {

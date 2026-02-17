@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"cderun/internal/container"
-	"cderun/internal/logging"
-
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -22,6 +19,9 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"cderun/internal/container"
+	"cderun/internal/logging"
 )
 
 const (

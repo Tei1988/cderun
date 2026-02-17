@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/go-units"
+
 	"cderun/internal/container"
 	"cderun/internal/logging"
-
-	"github.com/docker/go-units"
 )
 
 // ResolvedConfig contains the final values after resolution.
