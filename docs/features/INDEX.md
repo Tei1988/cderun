@@ -79,7 +79,9 @@
    - 実際の Docker/Podman を利用したエンドツーエンド検証
 3. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
    - コードカバレッジの可視化と自動計測
-4. **[診断モード (Completed)](./diagnosis-mode.md)**
+4. **[テスト構成・網羅性計画 (Completed)](./test-organization-plan.md)**
+   - テストの体系化とカバレッジ分析
+5. **[診断モード (Completed)](./diagnosis-mode.md)**
    - システム診断情報と利用可能なツールの表示
 
 ## 技術リファレンス
