@@ -39,12 +39,12 @@ func TestUnit_Runtime_Docker_New(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 	err = runtimeWithName.sleepFunc(ctx, 1*time.Millisecond)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx2, cancel2 := context.WithCancel(context.Background())
 	cancel2()
 	err = runtimeWithName.sleepFunc(ctx2, 1*time.Second)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 type mockDockerClient struct {
@@ -356,13 +356,13 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 			mock := &mockDockerClient{removeErr: errNotFound{errors.New("not found")}}
 			runtime := &DockerRuntime{client: mock}
 			err := runtime.RemoveContainer(ctx, id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 		t.Run("Conflict", func(t *testing.T) {
 			mock := &mockDockerClient{removeErr: errConflict{errors.New("conflict")}}
 			runtime := &DockerRuntime{client: mock}
 			err := runtime.RemoveContainer(ctx, id)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	})
 
@@ -390,13 +390,13 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 			mock := &mockDockerClient{killErr: errNotFound{errors.New("not found")}}
 			runtime := &DockerRuntime{client: mock}
 			err := runtime.SignalContainer(ctx, id, "SIGKILL")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 		t.Run("Conflict", func(t *testing.T) {
 			mock := &mockDockerClient{killErr: errConflict{errors.New("conflict")}}
 			runtime := &DockerRuntime{client: mock}
 			err := runtime.SignalContainer(ctx, id, "SIGKILL")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	})
 }

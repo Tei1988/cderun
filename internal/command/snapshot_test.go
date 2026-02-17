@@ -138,5 +138,5 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 func TestUnit_Command_Snapshot_CleanupEmpty(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	err := cleanupSnapshot(mfs, "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
