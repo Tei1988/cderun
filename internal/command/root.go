@@ -1,10 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +12,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
+	"cderun/internal/runtime"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -1024,8 +1025,4 @@ func preprocessArgs(args []string) ([]string, error) {
 	processedArgs = append(processedArgs, others...)
 
 	return processedArgs, nil
-}
-
-func init() {
-	// Intentionally empty. All initialization is done in newRootCmd.
 }

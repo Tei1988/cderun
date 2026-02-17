@@ -1,10 +1,11 @@
 package runtime
 
 import (
-	"cderun/internal/container"
 	"context"
 	"io"
 	"sync"
+
+	"cderun/internal/container"
 )
 
 // NewMockRuntime creates a new MockRuntime.

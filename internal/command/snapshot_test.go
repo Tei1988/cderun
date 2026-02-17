@@ -1,11 +1,12 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,4 +125,18 @@ func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, upperdir)
 	})
+
+	t.Run("read error", func(t *testing.T) {
+		defaultMountInfoReader = &mockMountInfoReader{Err: assert.AnError}
+
+		upperdir, err := discoverOverlayUpperDir(mfs)
+		require.Error(t, err)
+		assert.Empty(t, upperdir)
+	})
+}
+
+func TestUnit_Command_Snapshot_CleanupEmpty(t *testing.T) {
+	mfs := &config.MockFileSystem{}
+	err := cleanupSnapshot(mfs, "")
+	assert.NoError(t, err)
 }

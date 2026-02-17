@@ -151,3 +151,49 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 		assert.Equal(t, original, defaultLoader.systemConfigDir)
 	})
 }
+
+func TestUnit_Config_SetBaseDir(t *testing.T) {
+	t.Run("CDERunConfig", func(t *testing.T) {
+		cfg := &CDERunConfig{
+			SocketPath: ConfigPath{Raw: "./socket"},
+		}
+		cfg.SetBaseDir("/base")
+		assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
+	})
+
+	t.Run("ConfigDefaults", func(t *testing.T) {
+		cfg := &ConfigDefaults{
+			MountSocketPath: ConfigPath{Raw: "./socket"},
+			MountCderunPath: ConfigPath{Raw: "./cderun"},
+			Mounts: []MountConfig{
+				{Source: ConfigPath{Raw: "./src"}},
+			},
+			Devices: []DeviceConfig{
+				{Source: ConfigPath{Raw: "./dev"}},
+			},
+		}
+		cfg.SetBaseDir("/base")
+		assert.Equal(t, "/base", cfg.MountSocketPath.BaseDir)
+		assert.Equal(t, "/base", cfg.MountCderunPath.BaseDir)
+		assert.Equal(t, "/base", cfg.Mounts[0].Source.BaseDir)
+		assert.Equal(t, "/base", cfg.Devices[0].Source.BaseDir)
+	})
+
+	t.Run("ToolConfig", func(t *testing.T) {
+		cfg := &ToolConfig{
+			MountSocketPath: ConfigPath{Raw: "./socket"},
+			MountCderunPath: ConfigPath{Raw: "./cderun"},
+			Mounts: []MountConfig{
+				{Source: ConfigPath{Raw: "./src"}},
+			},
+			Devices: []DeviceConfig{
+				{Source: ConfigPath{Raw: "./dev"}},
+			},
+		}
+		cfg.SetBaseDir("/base")
+		assert.Equal(t, "/base", cfg.MountSocketPath.BaseDir)
+		assert.Equal(t, "/base", cfg.MountCderunPath.BaseDir)
+		assert.Equal(t, "/base", cfg.Mounts[0].Source.BaseDir)
+		assert.Equal(t, "/base", cfg.Devices[0].Source.BaseDir)
+	})
+}

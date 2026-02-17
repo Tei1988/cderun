@@ -25,6 +25,10 @@ func getSignalName(sig os.Signal) string {
 		return "SIGINT"
 	case syscall.SIGTERM:
 		return "SIGTERM"
+	case syscall.SIGHUP:
+		return "SIGHUP"
+	case syscall.SIGQUIT:
+		return "SIGQUIT"
 	default:
 		return sig.String()
 	}
