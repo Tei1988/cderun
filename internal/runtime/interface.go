@@ -1,9 +1,10 @@
 package runtime
 
 import (
-	"cderun/internal/container"
 	"context"
 	"io"
+
+	"cderun/internal/container"
 )
 
 // ContainerRuntime defines the interface for interacting with container runtimes.

@@ -1,12 +1,13 @@
 package config
 
 import (
-	"cderun/internal/container"
-	"cderun/internal/logging"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+
+	"cderun/internal/container"
+	"cderun/internal/logging"
 
 	"github.com/docker/go-units"
 )

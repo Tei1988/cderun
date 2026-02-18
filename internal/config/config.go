@@ -14,11 +14,11 @@ import (
 )
 
 type CDERunConfig struct {
-	Runtime     string         `yaml:"runtime"`
-	SocketPath  ConfigPath     `yaml:"socketPath"`
-	Defaults    ConfigDefaults `yaml:"defaults"`
-	Logging     LoggingConfig  `yaml:"logging"`
-	HostContext *HostContext   `yaml:"hostContext,omitempty"`
+	Runtime          string         `yaml:"runtime"`
+	SocketPath       ConfigPath     `yaml:"socketPath"`
+	Defaults         ConfigDefaults `yaml:"defaults"`
+	Logging          LoggingConfig  `yaml:"logging"`
+	HostContext      *HostContext   `yaml:"hostContext,omitempty"`
 	SiblingExecution bool           `yaml:"siblingExecution,omitempty"`
 }
 

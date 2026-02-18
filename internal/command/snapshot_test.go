@@ -1,11 +1,12 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,4 +87,3 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".cderun.yaml")])
 	assert.Equal(t, os.FileMode(0o600), mfs.Perms[filepath.Join(snapshotDir, ".tools.yaml")])
 }
-

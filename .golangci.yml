@@ -46,13 +46,6 @@ linters:
         - len
         - require-error
 
-formatters:
-  enable:
-    - goimports
-  settings:
-    goimports:
-      local-prefixes:
-        - github.com/Tei1988/cderun
 
 run:
   timeout: 5m

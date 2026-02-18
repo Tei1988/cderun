@@ -1,9 +1,10 @@
 package runtime
 
 import (
-	"cderun/internal/container"
 	"context"
 	"testing"
+
+	"cderun/internal/container"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

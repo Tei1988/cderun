@@ -1,11 +1,12 @@
 package command
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
-	"fmt"
-	"path/filepath"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -96,4 +97,3 @@ func cleanupSnapshot(fs config.FileSystem, snapshotDir string) error {
 	}
 	return fs.RemoveAll(snapshotDir)
 }
-
