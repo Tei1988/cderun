@@ -330,16 +330,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	logging.Debug("Starting to copy output from container %s", containerID)
 	go func() {
 		var err error
-		logging.Debug("Output goroutine started")
-		if !tty {
-			if peek, err := resp.Reader.Peek(8); err == nil {
-				logging.Debug("Output stream starts with: %v", peek)
-			} else {
-				logging.Debug("Failed to peek output stream: %v", err)
-			}
-		}
 		if tty {
-			// When TTY is enabled, the stream is raw (not multiplexed).
 			_, err = io.Copy(stdout, resp.Reader)
 		} else {
 			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).

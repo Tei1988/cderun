@@ -607,11 +607,17 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	var stdin io.Reader
 	if containerConfig.Interactive {
 		stdin = cmd.InOrStdin()
+		isTerm := false
+		if f, ok := stdin.(*os.File); ok {
+			isTerm = term.IsTerminal(int(f.Fd()))
+		}
+		if !isTerm {
+			stdin = &loggingReader{r: stdin}
+		}
 	}
 
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
 	defer cancelAttach()
-
 	attachDone := make(chan error, 1)
 	go func() {
 		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
@@ -1028,4 +1034,28 @@ func preprocessArgs(args []string) ([]string, error) {
 
 func init() {
 	// Intentionally empty. All initialization is done in newRootCmd.
+}
+
+type loggingReader struct {
+	r    io.Reader
+	peek []byte
+	done bool
+}
+
+func (l *loggingReader) Read(p []byte) (n int, err error) {
+	n, err = l.r.Read(p)
+	if !l.done && (n > 0 || err != nil) {
+		l.done = true
+		if n > 0 {
+			toLog := n
+			if toLog > 32 {
+				toLog = 32
+			}
+			logging.Debug("STDIN first %d bytes: %q", toLog, string(p[:toLog]))
+		}
+		if err != nil && err != io.EOF {
+			logging.Debug("STDIN read error: %v", err)
+		}
+	}
+	return n, err
 }
