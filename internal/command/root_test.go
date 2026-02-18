@@ -20,10 +20,6 @@ func executeCommand(args ...string) (string, error) {
 	return executeCommandWithOptions(context.Background(), append([]string{"cderun"}, args...), nil)
 }
 
-func executeCommandContext(ctx context.Context, args ...string) (string, error) {
-	return executeCommandWithOptions(ctx, append([]string{"cderun"}, args...), nil)
-}
-
 func executeCommandRaw(args []string) (string, error) {
 	return executeCommandWithOptions(context.Background(), args, nil)
 }

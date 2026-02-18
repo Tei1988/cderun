@@ -17,13 +17,8 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 }
 
 // runCderunWithStdin runs the cderun command in-process with a custom stdin.
-func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) { //nolint:unused
 	return runCderunCore(stdin, args...)
-}
-
-// runCderunWithOptions runs the cderun command with custom options setup.
-func runCderunWithOptions(setup func(*rootOptions), args ...string) (stdout, stderr string, exitCode int, err error) {
-	return runCderunCoreWithOptions(nil, setup, args...)
 }
 
 // runCderunCore is the shared implementation for in-process command execution.
