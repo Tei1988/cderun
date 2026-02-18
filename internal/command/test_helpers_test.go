@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"strings"
@@ -11,9 +12,6 @@ import (
 )
 
 // runCderun runs the cderun command in-process for integration testing.
-// It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
-// and is NOT safe for parallel execution with t.Parallel().
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, args...)
 }
@@ -23,8 +21,18 @@ func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string,
 	return runCderunCore(stdin, args...)
 }
 
+// runCderunWithOptions runs the cderun command with custom options setup.
+func runCderunWithOptions(setup func(*rootOptions), args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCoreWithOptions(nil, setup, args...)
+}
+
 // runCderunCore is the shared implementation for in-process command execution.
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCoreWithOptions(stdin, nil, args...)
+}
+
+// runCderunCoreWithOptions is the shared implementation with custom options support.
+func runCderunCoreWithOptions(stdin io.Reader, setup func(*rootOptions), args ...string) (stdout, stderr string, exitCode int, err error) {
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
@@ -63,26 +71,20 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		stderrChan <- buf.String()
 	}()
 
-	// Reset global state
-	opts = rootOptions{}
-	rootCmd = newRootCmd()
-	if stdin != nil {
-		rootCmd.SetIn(stdin)
-	}
-	rootCmd.SetOut(wOut)
-	rootCmd.SetErr(wErr)
-
-	// Mock exitFunc to capture exit code
 	capturedExitCode := 0
-	savedExitFunc := exitFunc
-	exitFunc = func(code int) {
-		capturedExitCode = code
+	internalSetup := func(o *rootOptions) {
+		o.in = stdin
+		o.out = wOut
+		o.err = wErr
+		o.exitFunc = func(code int) {
+			capturedExitCode = code
+		}
+		if setup != nil {
+			setup(o)
+		}
 	}
-	defer func() {
-		exitFunc = savedExitFunc
-	}()
 
-	execErr := Execute(append([]string{"cderun"}, args...))
+	execErr := ExecuteContextWithOptions(context.Background(), append([]string{"cderun"}, args...), internalSetup)
 
 	_ = wOut.Close()
 	_ = wErr.Close()

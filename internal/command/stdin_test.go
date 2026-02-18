@@ -34,21 +34,16 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
+		setup := func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
 		}
 
 		pr, pw := io.Pipe()
 		defer pr.Close()
 		var stdout bytes.Buffer
-
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -61,7 +56,12 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			execErr = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions) {
+				setup(o)
+				o.in = pr
+				o.out = &stdout
+				o.err = io.Discard
+			})
 			close(done)
 		}()
 
@@ -86,21 +86,16 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
+		setup := func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
 		}
 
 		pr, pw := io.Pipe()
 		defer pr.Close()
 		var stdout bytes.Buffer
-
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -112,7 +107,12 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "cat"})
+			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, func(o *rootOptions) {
+				setup(o)
+				o.in = pr
+				o.out = &stdout
+				o.err = io.Discard
+			})
 			close(done)
 		}()
 
@@ -138,24 +138,10 @@ func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
-
 		var stdout bytes.Buffer
 		stdinData := "hello extended\n"
 		pr, pw := io.Pipe()
 		defer pr.Close()
-
-		rootCmd = newRootCmd()
-		opts = rootOptions{}
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-
-		originalExitFunc := exitFunc
-		exitFunc = func(code int) {}
-		defer func() { exitFunc = originalExitFunc }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -170,7 +156,14 @@ func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
 			_ = pw.Close()
 		}()
 
-		err := ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.in = pr
+			o.out = &stdout
+			o.exitFunc = func(code int) {}
+		})
 		require.NoError(t, err)
 		assert.Equal(t, stdinData, stdout.String())
 	})

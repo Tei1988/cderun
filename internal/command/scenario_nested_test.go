@@ -3,6 +3,7 @@ package command
 import (
 	"cderun/internal/config"
 	"cderun/internal/runtime"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,8 +13,7 @@ import (
 )
 
 func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
-	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
-	// and changes the working directory. It should not be run in parallel.
+	// This test changes the working directory. It should not be run in parallel.
 
 	// 1. Setup mock environment
 	tmpDir := t.TempDir()
@@ -48,18 +48,13 @@ hostContext:
 	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0o644))
 
 	// 2. Setup Mock Runtime
-	prevFactory := runtimeFactory
-	prevExit := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = prevFactory
-		exitFunc = prevExit
-	})
-
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
+	setup := func(o *rootOptions) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
 	}
-	exitFunc = func(code int) {}
 
 	// 3. Run cderun as if we are in the container
 	// Current working directory is /app (simulated)
@@ -73,7 +68,7 @@ hostContext:
 	require.NoError(t, os.Chdir(simulatedAppDir))
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
-	_, err = executeCommand("--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
+	_, err = executeCommandWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh"}, setup)
 	require.NoError(t, err)
 
 	// 4. Verify path translation
