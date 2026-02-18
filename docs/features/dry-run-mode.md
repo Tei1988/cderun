@@ -141,11 +141,11 @@ AddHosts:
 Privileged: false
 CapAdd:
 CapDrop:
-Entrypoint:
+Entrypoint: /usr/bin/node
 Pull: missing
-Memory: 0 B
-CPUs: 0
-Devices:
+Memory: 512MiB
+CPUs: 1.5
+Devices: /dev/fuse
 ```
 
 ## ユースケース
