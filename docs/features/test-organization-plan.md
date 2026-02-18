@@ -13,9 +13,9 @@
 | `internal/command` | 92.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
 | `internal/config` | 90.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 96.1% | 高いカバレッジを維持。 |
-| `internal/runtime` | 93.4% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 92.4% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
-| **Total** | **91.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| **Total** | **91.6%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -25,7 +25,7 @@
 | :--- | :--- | :--- |
 | 引数解析 | `root_test.go`, `flags_test.go`, `test_helpers_test.go` | 良好 |
 | 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
-| ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go` | 良好 |
+| ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go`, `integration_test.go` | 良好 |
 | 設定ファイルサポート | `config_test.go`, `integration_test.go`, `fs_test.go` | 良好 |
 | マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
@@ -112,7 +112,7 @@
 | cderunバイナリマウント | ✅ | ✅ | - | ✅ |
 | 診断モード | ✅ | - | - | - |
 | Mount Tools | ✅ | ✅ | - | ✅ |
-| ポリグロット実行 | ✅ | - | - | - |
+| ポリグロット実行 | ✅ | ✅ | - | - |
 
 ---
 *本計画書は、cderun のテスト戦略の Source of Truth として、実装の進展に合わせて随時更新されるべきである。*
