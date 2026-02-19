@@ -95,8 +95,14 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 
 func skipIfDockerBroken(t *testing.T, err error) {
 	t.Helper()
-	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
-		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
+	if err == nil {
+		return
+	}
+	msg := err.Error()
+	if (strings.Contains(msg, "failed to mount") && strings.Contains(msg, "invalid argument")) ||
+		strings.Contains(msg, "Data limit exceeded") ||
+		strings.Contains(msg, "i/o timeout") {
+		t.Skipf("Skipping test due to environment/runtime limitation: %v", err)
 	}
 }
 
