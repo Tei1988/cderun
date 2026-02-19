@@ -88,7 +88,7 @@ cderun node app.js --cderun-image node:20-alpine
 
 ### Available Flags
 
-- `--tty`: Allocate a pseudo-TTY.
+- `--tty`, `-t`: Allocate a pseudo-TTY.
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--image`: Docker image to use (overrides mapping).
 - `--env`, `-e`: Set environment variables (KEY=VALUE or KEY).
