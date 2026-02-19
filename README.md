@@ -116,6 +116,7 @@ cderun node app.js --cderun-image node:20-alpine
 - `--mount-socket`: Mount the container runtime socket into the container.
 - `--mount-socket-path`: Path where the socket should be mounted inside the container.
 - `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
+- `--mount-cderun-path`: Host path to cderun binary to mount inside container.
 - `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
 - `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
 - `--dry-run`: Preview container configuration without execution. Requires a subcommand.
