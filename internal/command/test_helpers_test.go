@@ -2,6 +2,9 @@ package command
 
 import (
 	"bytes"
+	"cderun/internal/config"
+	"cderun/internal/runtime"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -12,7 +15,8 @@ import (
 
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
+// Note: This function no longer modifies global state for rootCmd and opts,
+// but it still modifies process-global streams (os.Stdout, os.Stderr)
 // and is NOT safe for parallel execution with t.Parallel().
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, args...)
@@ -23,8 +27,18 @@ func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string,
 	return runCderunCore(stdin, args...)
 }
 
+// runCderunWithOptions runs the cderun command in-process with a custom setup for options.
+func runCderunWithOptions(stdin io.Reader, setup func(*rootOptions), args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCoreFull(stdin, setup, args...)
+}
+
 // runCderunCore is the shared implementation for in-process command execution.
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCoreFull(stdin, nil, args...)
+}
+
+// runCderunCoreFull is the full implementation for in-process command execution.
+func runCderunCoreFull(stdin io.Reader, setup func(*rootOptions), args ...string) (stdout, stderr string, exitCode int, err error) {
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
 
@@ -63,26 +77,33 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		stderrChan <- buf.String()
 	}()
 
-	// Reset global state
-	opts = rootOptions{}
-	rootCmd = newRootCmd()
-	if stdin != nil {
-		rootCmd.SetIn(stdin)
-	}
-	rootCmd.SetOut(wOut)
-	rootCmd.SetErr(wErr)
-
-	// Mock exitFunc to capture exit code
 	capturedExitCode := 0
-	savedExitFunc := exitFunc
-	exitFunc = func(code int) {
-		capturedExitCode = code
-	}
-	defer func() {
-		exitFunc = savedExitFunc
-	}()
+	execErr := ExecuteContextWithOptions(nil, append([]string{"cderun"}, args...), func(o *rootOptions) {
+		o.exitFunc = func(code int) {
+			capturedExitCode = code
+		}
+		if stdin != nil {
+			o.in = stdin
+		}
+		o.out = wOut
+		o.err = wErr
 
-	execErr := Execute(append([]string{"cderun"}, args...))
+		// Use the real runtime factory by default for integration tests
+		o.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+			switch name {
+			case "docker":
+				return runtime.NewDockerRuntime(socket)
+			case "podman":
+				return runtime.NewPodmanRuntime(socket)
+			default:
+				return nil, fmt.Errorf("unsupported runtime %q", name)
+			}
+		}
+
+		if setup != nil {
+			setup(o)
+		}
+	})
 
 	_ = wOut.Close()
 	_ = wErr.Close()
@@ -98,6 +119,9 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	if err != nil && strings.Contains(err.Error(), "failed to mount") && strings.Contains(err.Error(), "invalid argument") {
 		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
 	}
+	if err != nil && strings.Contains(err.Error(), "Data limit exceeded") {
+		t.Skip("Skipping test due to Docker Hub rate limit")
+	}
 }
 
 func setupTestDir(t *testing.T) string {
@@ -108,4 +132,26 @@ func setupTestDir(t *testing.T) string {
 	require.NoError(t, os.Chdir(tmpDir))
 	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
 	return tmpDir
+}
+
+// setupTestOptions provides a helper for setting up rootOptions in unit tests.
+func setupTestOptions(t *testing.T) (*rootOptions, func(int)) {
+	capturedExitCode := 0
+	o := &rootOptions{
+		fs: config.RealFileSystem{},
+		exitFunc: func(code int) {
+			capturedExitCode = code
+		},
+		isTerminal:  func(fd int) bool { return false },
+		termGetSize: func(fd int) (int, int, error) { return 80, 24, nil },
+		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		},
+	}
+	o.configLoader = config.NewConfigLoaderWithFS(o.fs)
+	return o, func(expected int) {
+		if capturedExitCode != expected {
+			t.Errorf("expected exit code %d, got %d", expected, capturedExitCode)
+		}
+	}
 }

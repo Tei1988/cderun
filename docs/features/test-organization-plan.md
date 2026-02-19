@@ -10,12 +10,12 @@
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 92.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 90.3% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
-| `internal/logging` | 96.1% | 高いカバレッジを維持。 |
-| `internal/runtime` | 91.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
-| **Total** | **91.5%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| `internal/command` | 91.2% | グローバル状態の排除によるリファクタリング後も高い網羅性を維持。 |
+| `internal/config` | 90.1% | OverlayFS discovery の集約後も良好なカバレッジ。 |
+| `internal/logging` | 96.1% | 非常に高いカバレッジを維持。 |
+| `internal/runtime` | 92.4% | モックおよび実ランタイムのテストにより安定。 |
+| `internal/container` | 0% | 構造体定義のみ。 |
+| **Total** | **90.9%** | 全体として 90% 超を維持し、テスト容易性が大幅に向上。 |
 
 ### 2.2. 機能別テストマッピング
 

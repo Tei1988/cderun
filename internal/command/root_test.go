@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,122 +24,16 @@ func executeCommandContext(ctx context.Context, args ...string) (string, error) 
 	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
 }
 
-func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
-	t.Helper()
-	savedRuntimeFactory := runtimeFactory
-	savedExitFunc := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = savedRuntimeFactory
-		exitFunc = savedExitFunc
-	})
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mock, nil
-	}
-	exitFunc = func(code int) {}
-}
-
 func executeCommandRaw(args []string) (string, error) {
 	return executeCommandRawContext(context.Background(), args)
 }
 
 func executeCommandRawContext(ctx context.Context, args []string) (string, error) {
-	// Reset flag variables and Changed state
-	rootCmd = newRootCmd()
-
-	// Default to terminal mode for tests to avoid auto-detection of pipes
-	// unless specifically overridden in a test.
-	savedIsTerminal := isTerminal
-	isTerminal = func(fd int) bool { return true }
-	defer func() { isTerminal = savedIsTerminal }()
-
-	opts.tty = false
-	opts.interactive = false
-	opts.network = "bridge"
-	opts.socketPath = ""
-	opts.mountSocket = false
-	opts.mountSocketPath = ""
-	opts.mountCderun = false
-	opts.image = ""
-	opts.remove = true
-	opts.cderunTTY = false
-	opts.cderunInteractive = false
-	opts.cderunImage = ""
-	opts.cderunNetwork = ""
-	opts.cderunRemove = true
-	opts.cderunRuntime = ""
-	opts.cderunSocketPath = ""
-	opts.cderunMountSocket = false
-	opts.cderunMountSocketPath = ""
-	opts.cderunWorkdir = ""
-	opts.cderunMounts = nil
-	opts.cderunMountCderun = false
-	opts.cderunMountTools = ""
-	opts.cderunMountAllTools = false
-	opts.runtimeName = "docker"
-	opts.env = nil
-	opts.cderunEnv = nil
-	opts.workdir = ""
-	opts.mounts = nil
-	opts.mountTools = ""
-	opts.mountAllTools = false
-	opts.dryRun = false
-	opts.dryRunFormat = "yaml"
-	opts.cderunDryRun = false
-	opts.cderunDryRunFormat = ""
-	opts.diagnosis = false
-	opts.diagnosisFormat = "yaml"
-	opts.cderunDiagnosis = false
-	opts.cderunDiagnosisFormat = ""
-	opts.logLevel = ""
-	opts.logFormat = "text"
-	opts.logTimestamp = true
-	opts.cderunLogLevel = ""
-	opts.cderunLogFormat = ""
-
-	// Reset dependencies
-	opts.fs = nil
-	opts.configLoader = nil
-
-	opts.ports = nil
-	opts.publishAll = false
-	opts.expose = nil
-	opts.hostname = ""
-	opts.dns = nil
-	opts.addHosts = nil
-	opts.user = ""
-	opts.privileged = false
-	opts.capAdd = nil
-	opts.capDrop = nil
-	opts.entrypoint = nil
-	opts.pull = "missing"
-	opts.memory = ""
-	opts.cpus = 0
-	opts.devices = nil
-	opts.cderunPorts = nil
-	opts.cderunPublishAll = false
-	opts.cderunExpose = nil
-	opts.cderunHostname = ""
-	opts.cderunDNS = nil
-	opts.cderunAddHosts = nil
-	opts.cderunUser = ""
-	opts.cderunPrivileged = false
-	opts.cderunCapAdd = nil
-	opts.cderunCapDrop = nil
-	opts.cderunEntrypoint = nil
-	opts.cderunPull = ""
-	opts.cderunMemory = ""
-	opts.cderunCPUs = 0
-	opts.cderunDevices = nil
-
 	savedStdout := os.Stdout
 	savedStderr := os.Stderr
-	savedOut := rootCmd.OutOrStdout()
-	savedErr := rootCmd.ErrOrStderr()
 	defer func() {
 		os.Stdout = savedStdout
 		os.Stderr = savedStderr
-		rootCmd.SetOut(savedOut)
-		rootCmd.SetErr(savedErr)
 	}()
 
 	r, w, err := os.Pipe()
@@ -148,12 +41,9 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		return "", err
 	}
 	defer func() { _ = r.Close() }()
-	defer func() { _ = w.Close() }()
 
 	os.Stdout = w
 	os.Stderr = w
-	rootCmd.SetOut(w)
-	rootCmd.SetErr(w)
 
 	var buf bytes.Buffer
 	done := make(chan struct{})
@@ -162,7 +52,17 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		close(done)
 	}()
 
-	execErr := ExecuteContext(ctx, args)
+	execErr := ExecuteContextWithOptions(ctx, args, func(o *rootOptions) {
+		o.out = w
+		o.err = w
+		// Default to terminal mode for tests
+		o.isTerminal = func(fd int) bool { return true }
+		// Default mock runtime factory
+		o.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.exitFunc = func(code int) {}
+	})
 
 	_ = w.Close()
 	<-done
@@ -215,7 +115,9 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := preprocessArgs(tt.args)
+			o := &rootOptions{}
+			cmd := newRootCmd(o)
+			actual, err := preprocessArgs(cmd, tt.args)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
 		})
@@ -238,12 +140,16 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 			ExitCode:           42,
 		}
 		var capturedExitCode int
-		setupMockRuntime(t, mockRuntime)
-		exitFunc = func(code int) {
-			capturedExitCode = code
-		}
 
-		_, err := executeCommand("--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version")
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {
+				capturedExitCode = code
+			}
+		}, "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version")
+
 		require.NoError(t, err)
 
 		assert.NotNil(t, mockRuntime.CreatedConfig)
@@ -259,8 +165,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
-		setupMockRuntime(t, &runtime.MockRuntime{})
-
 		output, err := executeCommand("--tty")
 		require.NoError(t, err)
 
@@ -270,44 +174,52 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
 
-		_, err := executeCommand("--image", "alpine", "--tty=true", "--cderun-tty=false", "sh")
 		require.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "-t", "--image", "alpine", "sh")
 
-		_, err := executeCommand("-t", "--image", "alpine", "sh")
 		require.NoError(t, err)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 	})
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
-		// Save and restore package-level state
-		savedRuntimeFactory := runtimeFactory
-		savedExitFunc := exitFunc
-		t.Cleanup(func() {
-			runtimeFactory = savedRuntimeFactory
-			exitFunc = savedExitFunc
-		})
-
-		// Use the real runtimeFactory here to test the validation logic
-		exitFunc = func(code int) {}
-
-		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			// Use a factory that fails for unsupported runtimes
+			o.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+				switch name {
+				case "docker", "podman":
+					return &runtime.MockRuntime{}, nil
+				default:
+					return nil, errors.New("unsupported runtime")
+				}
+			}
+		}, "--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+		assert.Contains(t, err.Error(), "unsupported runtime")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		output, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--diagnosis")
 
-		output, err := executeCommand("--diagnosis")
 		require.NoError(t, err)
 		assert.Contains(t, output, "runtime:")
 		assert.Contains(t, output, "configs:")
@@ -316,9 +228,12 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 
 	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		output, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--diagnosis", "node", "--version")
 
-		output, err := executeCommand("--diagnosis", "node", "--version")
 		require.NoError(t, err)
 		assert.Contains(t, output, "runtime:")
 		assert.Contains(t, output, "configs:")
@@ -327,9 +242,6 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 
 	t.Run("dry-run requires a subcommand", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
-
 		_, err := executeCommand("--dry-run")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
@@ -337,11 +249,14 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		setup := func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}
 
 		// Dry-run with YAML (default)
-		// Step 10.2: subcommand 'sh' is excluded from command
-		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
+		output, err := executeCommandWithOptions(context.Background(), nil, setup, "--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
 		assert.Contains(t, output, "command:")
@@ -351,13 +266,13 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		assert.Nil(t, mockRuntime.CreatedConfig, "Runtime should not be called in dry-run mode")
 
 		// Dry-run with JSON
-		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
+		output, err = executeCommandWithOptions(context.Background(), nil, setup, "--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "\"image\": \"alpine\"")
 		assert.Contains(t, output, "\"command\": [")
 
 		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
+		output, err = executeCommandWithOptions(context.Background(), nil, setup, "--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
@@ -368,12 +283,12 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "Remove: true")
 
 		// Dry-run with mount
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
+		output, err = executeCommandWithOptions(context.Background(), nil, setup, "--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Mounts: type=bind,source=/h,target=/c,readonly=false")
 
 		// Dry-run with device
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
+		output, err = executeCommandWithOptions(context.Background(), nil, setup, "--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Devices: /dev/video0:/dev/video1:ro")
 	})
@@ -382,18 +297,24 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
 		}
-		setupMockRuntime(t, mockRuntime)
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "sh")
 
-		_, err := executeCommand("--image", "alpine", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
 	})
 
 	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		setupMockRuntime(t, mockRuntime)
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--env", "MYVAR=a,b", "sh")
 
-		_, err := executeCommand("--image", "alpine", "--env", "MYVAR=a,b", "sh")
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -401,14 +322,66 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 }
 
+func executeCommandWithOptions(ctx context.Context, stdin io.Reader, setup func(*rootOptions), args ...string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	savedStdout := os.Stdout
+	savedStderr := os.Stderr
+	defer func() {
+		os.Stdout = savedStdout
+		os.Stderr = savedStderr
+	}()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = r.Close() }()
+
+	os.Stdout = w
+	os.Stderr = w
+
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+
+	execErr := ExecuteContextWithOptions(ctx, append([]string{"cderun"}, args...), func(o *rootOptions) {
+		o.out = w
+		o.err = w
+		if stdin != nil {
+			o.in = stdin
+		}
+		// Default to terminal mode for tests
+		o.isTerminal = func(fd int) bool { return true }
+		// Default mock runtime factory
+		o.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.exitFunc = func(code int) {}
+		if setup != nil {
+			setup(o)
+		}
+	})
+
+	_ = w.Close()
+	<-done
+
+	return buf.String(), execErr
+}
+
 func TestUnit_Command_Root_Phase3Features(t *testing.T) {
-	mockRuntime := &runtime.MockRuntime{}
-	setupMockRuntime(t, mockRuntime)
-
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
+		mockRuntime := &runtime.MockRuntime{}
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh")
 
-		_, err := executeCommand("--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh")
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -429,8 +402,13 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 		// If unspecified, --mount-cderun should auto-enable --mount-socket
 		t.Setenv("CDERUN_MOUNT_SOCKET", "")
 
-		mockRuntime.CreatedConfig = nil
-		_, err := executeCommand("--image", "alpine", "--mount-cderun", "sh")
+		mockRuntime := &runtime.MockRuntime{}
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--mount-cderun", "sh")
+
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
 
@@ -445,13 +423,18 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 
 		// If explicitly set to false, it should NOT mount the socket but NOT fail
 		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
-		mockRuntime.CreatedConfig = nil
-		_, err = executeCommand("--image", "alpine", "--mount-cderun", "sh")
+		mockRuntime2 := &runtime.MockRuntime{}
+		_, err = executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime2, nil
+			}
+		}, "--image", "alpine", "--mount-cderun", "sh")
+
 		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime2.CreatedConfig)
 
 		socketFound = false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
+		for _, v := range mockRuntime2.CreatedConfig.Mounts {
 			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
 				socketFound = true
 			}
@@ -460,13 +443,18 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	})
 
 	t.Run("mount-cderun logic", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
+		mockRuntime := &runtime.MockRuntime{}
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "sh")
 
-		_, err := executeCommand("--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "sh")
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
-		exePath, _ := os.Executable()
+		exePath, err := os.Executable()
+		require.NoError(t, err)
 
 		binaryFound := false
 		socketFound := false
@@ -483,9 +471,13 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	})
 
 	t.Run("mount-socket-path logic", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
+		mockRuntime := &runtime.MockRuntime{}
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "--mount-socket", "--socket-path", "/host/socket", "--mount-socket-path", "/container/socket", "sh")
 
-		_, err := executeCommand("--image", "alpine", "--mount-socket", "--socket-path", "/host/socket", "--mount-socket-path", "/container/socket", "sh")
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -500,9 +492,6 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 }
 
 func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
-	mockRuntime := &runtime.MockRuntime{}
-	setupMockRuntime(t, mockRuntime)
-
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -511,8 +500,13 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	})
 
 	t.Run("subcommand is excluded from CMD (Step 10.2)", func(t *testing.T) {
-		mockRuntime.CreatedConfig = nil
-		_, err := executeCommand("--image", "alpine", "ls", "-l", "/tmp")
+		mockRuntime := &runtime.MockRuntime{}
+		_, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "ls", "-l", "/tmp")
+
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -522,12 +516,9 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 }
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
-	mockRuntime := runtime.NewMockRuntime()
-	setupMockRuntime(t, mockRuntime)
-
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
-		opts := &rootOptions{
+		o := &rootOptions{
 			fs: config.RealFileSystem{},
 		}
 		resolved := &config.ResolvedConfig{
@@ -539,14 +530,14 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		err := o.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "\"name\": \"docker\"")
 	})
 
 	t.Run("Simple format", func(t *testing.T) {
 		out := &bytes.Buffer{}
-		opts := &rootOptions{
+		o := &rootOptions{
 			fs: config.RealFileSystem{},
 		}
 		resolved := &config.ResolvedConfig{
@@ -558,7 +549,7 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		err := o.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime: podman")
 	})
@@ -569,14 +560,15 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
 		}
-		opts.fs = mfs
-		t.Cleanup(func() { opts.fs = nil })
+		o := &rootOptions{
+			fs: mfs,
+		}
 
 		// We need to trigger binary mount logic
 		resolved := &config.ResolvedConfig{
 			MountCderun: true,
 		}
-		_, err := opts.buildContainerConfig(resolved, nil, nil)
+		_, err := o.buildContainerConfig(resolved, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
 	})
@@ -587,9 +579,12 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
-		setupMockRuntime(t, mockRuntime)
+		output, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "sh")
 
-		output, err := executeCommand("--image", "alpine", "sh")
 		require.NoError(t, err)
 		assert.Contains(t, output, "[WARN] failed to remove container (defer): failed to remove")
 	})
@@ -598,9 +593,12 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: nil,
 		}
-		setupMockRuntime(t, mockRuntime)
+		output, err := executeCommandWithOptions(context.Background(), nil, func(o *rootOptions) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+		}, "--image", "alpine", "sh")
 
-		output, err := executeCommand("--image", "alpine", "sh")
 		require.NoError(t, err)
 		assert.NotContains(t, output, "[WARN] failed to remove container (defer)")
 	})

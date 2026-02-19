@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -387,4 +388,71 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 	}
 
 	return merged, loadedPaths, nil
+}
+
+// MountInfoReader is an interface for reading mount information (e.g., from /proc/self/mountinfo).
+type MountInfoReader interface {
+	ReadMountInfo(fs FileSystem) ([]byte, error)
+}
+
+// RealMountInfoReader reads from /proc/self/mountinfo.
+type RealMountInfoReader struct{}
+
+func (RealMountInfoReader) ReadMountInfo(fs FileSystem) ([]byte, error) {
+	return fs.ReadFile("/proc/self/mountinfo")
+}
+
+// DefaultMountInfoReader is the default implementation for reading mount info.
+var DefaultMountInfoReader MountInfoReader = RealMountInfoReader{}
+
+// DiscoverOverlayUpperDir attempts to find the upperdir of the root OverlayFS, if any.
+// This is used to translate container-side paths back to host paths in sibling container execution.
+func DiscoverOverlayUpperDir(fs FileSystem) (string, error) {
+	data, err := DefaultMountInfoReader.ReadMountInfo(fs)
+	if err != nil {
+		return "", err
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 10 {
+			continue
+		}
+
+		// Find separator "-"
+		sepIdx := -1
+		for i, f := range fields {
+			if f == "-" {
+				sepIdx = i
+				break
+			}
+		}
+		if sepIdx == -1 || len(fields) <= sepIdx+3 {
+			continue
+		}
+
+		fsType := fields[sepIdx+1]
+		if fsType != "overlay" {
+			continue
+		}
+
+		mountPoint := fields[4]
+		if mountPoint != "/" {
+			continue
+		}
+
+		// Superblock options are at the end
+		sbOptions := fields[len(fields)-1]
+		options := strings.Split(sbOptions, ",")
+		for _, opt := range options {
+			if after, ok := strings.CutPrefix(opt, "upperdir="); ok {
+				return after, nil
+			}
+		}
+	}
+
+	return "", nil
 }
