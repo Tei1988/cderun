@@ -1,7 +1,6 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"context"
 	"io"
 	"os"
@@ -9,6 +8,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"cderun/internal/runtime"
 
 	"github.com/stretchr/testify/require"
 )

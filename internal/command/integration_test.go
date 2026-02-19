@@ -1,12 +1,13 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"cderun/internal/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

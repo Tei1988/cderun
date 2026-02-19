@@ -1,10 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +12,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
+	"cderun/internal/runtime"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -902,10 +903,10 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // using the provided context and allowing custom options setup (useful for testing).
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(*rootOptions)) error {
 	o := &rootOptions{
-		fs:           config.RealFileSystem{},
-		exitFunc:     os.Exit,
-		isTerminal:   func(fd int) bool { return term.IsTerminal(fd) },
-		termGetSize:  func(fd int) (int, int, error) { return term.GetSize(fd) },
+		fs:          config.RealFileSystem{},
+		exitFunc:    os.Exit,
+		isTerminal:  func(fd int) bool { return term.IsTerminal(fd) },
+		termGetSize: func(fd int) (int, int, error) { return term.GetSize(fd) },
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":

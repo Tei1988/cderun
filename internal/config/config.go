@@ -413,7 +413,7 @@ func DiscoverOverlayUpperDir(fs FileSystem) (string, error) {
 		return "", err
 	}
 
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if line == "" {
 			continue
 		}
@@ -446,8 +446,7 @@ func DiscoverOverlayUpperDir(fs FileSystem) (string, error) {
 
 		// Superblock options are at the end
 		sbOptions := fields[len(fields)-1]
-		options := strings.Split(sbOptions, ",")
-		for _, opt := range options {
+		for opt := range strings.SplitSeq(sbOptions, ",") {
 			if after, ok := strings.CutPrefix(opt, "upperdir="); ok {
 				return after, nil
 			}

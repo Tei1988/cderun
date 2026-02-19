@@ -1,9 +1,10 @@
 package main
 
 import (
-	"cderun/internal/command"
 	"fmt"
 	"os"
+
+	"cderun/internal/command"
 )
 
 func main() {

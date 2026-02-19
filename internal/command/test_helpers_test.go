@@ -2,8 +2,8 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/config"
 	"cderun/internal/runtime"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -20,11 +20,6 @@ import (
 // and is NOT safe for parallel execution with t.Parallel().
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, args...)
-}
-
-// runCderunWithStdin runs the cderun command in-process with a custom stdin.
-func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
-	return runCderunCore(stdin, args...)
 }
 
 // runCderunWithOptions runs the cderun command in-process with a custom setup for options.
@@ -78,7 +73,7 @@ func runCderunCoreFull(stdin io.Reader, setup func(*rootOptions), args ...string
 	}()
 
 	capturedExitCode := 0
-	execErr := ExecuteContextWithOptions(nil, append([]string{"cderun"}, args...), func(o *rootOptions) {
+	execErr := ExecuteContextWithOptions(context.Background(), append([]string{"cderun"}, args...), func(o *rootOptions) {
 		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
@@ -132,26 +127,4 @@ func setupTestDir(t *testing.T) string {
 	require.NoError(t, os.Chdir(tmpDir))
 	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
 	return tmpDir
-}
-
-// setupTestOptions provides a helper for setting up rootOptions in unit tests.
-func setupTestOptions(t *testing.T) (*rootOptions, func(int)) {
-	capturedExitCode := 0
-	o := &rootOptions{
-		fs: config.RealFileSystem{},
-		exitFunc: func(code int) {
-			capturedExitCode = code
-		},
-		isTerminal:  func(fd int) bool { return false },
-		termGetSize: func(fd int) (int, int, error) { return 80, 24, nil },
-		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
-			return &runtime.MockRuntime{}, nil
-		},
-	}
-	o.configLoader = config.NewConfigLoaderWithFS(o.fs)
-	return o, func(expected int) {
-		if capturedExitCode != expected {
-			t.Errorf("expected exit code %d, got %d", expected, capturedExitCode)
-		}
-	}
 }
