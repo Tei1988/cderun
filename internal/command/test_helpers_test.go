@@ -2,13 +2,14 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/runtime"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"cderun/internal/runtime"
 
 	"github.com/stretchr/testify/require"
 )
