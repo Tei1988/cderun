@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/runtime"
 )
 
 // runCderun runs the cderun command in-process for integration testing.
@@ -103,6 +105,19 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	}
 	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
 		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
+	}
+}
+
+func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOptions, cmd *cobra.Command)) func(o *rootOptions, cmd *cobra.Command) {
+	return func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.exitFunc = func(code int) {}
+
+		for _, extra := range extras {
+			extra(o, cmd)
+		}
 	}
 }
 

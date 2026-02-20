@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +32,7 @@ func TestScenario_Command_Nested_ExecutionFlow(t *testing.T) {
 	require.NoError(t, os.MkdirAll(runDir, 0o755))
 
 	restoreRunDir := config.SetRunConfigDirForTest(runDir)
-	defer restoreRunDir()
+	t.Cleanup(restoreRunDir)
 
 	simulatedAppDir := filepath.Join(tmpDir, "simulated-app")
 	require.NoError(t, os.MkdirAll(filepath.Join(simulatedAppDir, "subdir"), 0o755))
@@ -65,12 +64,7 @@ hostContext:
 	require.NoError(t, os.Chdir(simulatedAppDir))
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		o.exitFunc = func(code int) {}
-	})
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh"}, withMockRuntime(mockRuntime))
 	require.NoError(t, err)
 
 	// 4. Verify path translation
