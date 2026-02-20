@@ -1,19 +1,21 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/runtime"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 )
 
-func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
-	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
-	// and changes the working directory. It should not be run in parallel.
+func TestScenario_Command_Nested_ExecutionFlow(t *testing.T) {
+	// This test mutates runConfigDir and the current working directory, and therefore must not run in parallel.
+	// It uses ExecuteContextWithOptions to inject dependencies locally.
 
 	// 1. Setup mock environment
 	tmpDir := t.TempDir()
@@ -30,7 +32,7 @@ func TestScenario_Command_Nested_NestedExecutionFlow(t *testing.T) {
 	require.NoError(t, os.MkdirAll(runDir, 0o755))
 
 	restoreRunDir := config.SetRunConfigDirForTest(runDir)
-	defer restoreRunDir()
+	t.Cleanup(restoreRunDir)
 
 	simulatedAppDir := filepath.Join(tmpDir, "simulated-app")
 	require.NoError(t, os.MkdirAll(filepath.Join(simulatedAppDir, "subdir"), 0o755))
@@ -48,18 +50,7 @@ hostContext:
 	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0o644))
 
 	// 2. Setup Mock Runtime
-	prevFactory := runtimeFactory
-	prevExit := exitFunc
-	t.Cleanup(func() {
-		runtimeFactory = prevFactory
-		exitFunc = prevExit
-	})
-
 	mockRuntime := &runtime.MockRuntime{}
-	runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-		return mockRuntime, nil
-	}
-	exitFunc = func(code int) {}
 
 	// 3. Run cderun as if we are in the container
 	// Current working directory is /app (simulated)
@@ -73,7 +64,7 @@ hostContext:
 	require.NoError(t, os.Chdir(simulatedAppDir))
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
-	_, err = executeCommand("--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh")
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh"}, withMockRuntime(mockRuntime))
 	require.NoError(t, err)
 
 	// 4. Verify path translation
