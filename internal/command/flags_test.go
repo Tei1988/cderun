@@ -2,6 +2,7 @@ package command
 
 import (
 	"cderun/internal/runtime"
+	"context"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -13,7 +14,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 	t.Run("P2 flags for Docker-compatible features", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		// We use ExecuteContextWithOptions directly to inject mockRuntime
-		err := ExecuteContextWithOptions(nil, []string{"cderun",
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
 			"--publish", "8080:80",
 			"--publish-all",
 			"--expose", "80",
@@ -65,7 +66,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 
 	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(nil, []string{"cderun",
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
 			"--publish", "8080:80",
 			"--user", "initialUser",
 			"--privileged=true",

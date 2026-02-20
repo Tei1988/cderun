@@ -139,9 +139,8 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		}
 		var capturedExitCode int
 
-		_, err := executeCommandRawContext(context.Background(), append([]string{"cderun", "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version"}, ""))
-		// Wait, I should use ExecuteContextWithOptions directly if I want to capture exit code or use mock runtime
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
+		// Use ExecuteContextWithOptions directly to capture exit code and use mock runtime
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}

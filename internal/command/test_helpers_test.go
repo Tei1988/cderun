@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"github.com/spf13/cobra"
 	"io"
 	"os"
@@ -20,6 +21,8 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 }
 
 // runCderunWithStdin runs the cderun command in-process with a custom stdin.
+//
+//nolint:unused
 func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(stdin, args...)
 }
@@ -65,7 +68,7 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 	}()
 
 	capturedExitCode := 0
-	execErr := ExecuteContextWithOptions(nil, append([]string{"cderun"}, args...), func(o *rootOptions, cmd *cobra.Command) {
+	execErr := ExecuteContextWithOptions(context.TODO(), append([]string{"cderun"}, args...), func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
