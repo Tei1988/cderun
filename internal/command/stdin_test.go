@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,27 +29,15 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Root_PipedStdin(t *testing.T) {
+func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
-
 		pr, pw := io.Pipe()
 		defer pr.Close()
 		var stdout bytes.Buffer
-
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -61,7 +50,15 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			execErr = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				cmd.SetIn(pr)
+				cmd.SetOut(&stdout)
+				cmd.SetErr(io.Discard)
+			})
 			close(done)
 		}()
 
@@ -86,21 +83,9 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
-
 		pr, pw := io.Pipe()
 		defer pr.Close()
 		var stdout bytes.Buffer
-
-		// Reset global state
-		opts = rootOptions{}
-		rootCmd = newRootCmd()
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-		rootCmd.SetErr(io.Discard)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -112,7 +97,15 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "cat"})
+			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				cmd.SetIn(pr)
+				cmd.SetOut(&stdout)
+				cmd.SetErr(io.Discard)
+			})
 			close(done)
 		}()
 
@@ -132,30 +125,16 @@ func TestUnit_Command_Root_PipedStdin(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
+func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
-		setupMockRuntime(t, &mock.MockRuntime)
-		runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
-
 		var stdout bytes.Buffer
 		stdinData := "hello extended\n"
 		pr, pw := io.Pipe()
 		defer pr.Close()
-
-		rootCmd = newRootCmd()
-		opts = rootOptions{}
-		rootCmd.SetIn(pr)
-		rootCmd.SetOut(&stdout)
-
-		originalExitFunc := exitFunc
-		exitFunc = func(code int) {}
-		defer func() { exitFunc = originalExitFunc }()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -170,7 +149,14 @@ func TestUnit_Command_Root_StdinFlow_Extended(t *testing.T) {
 			_ = pw.Close()
 		}()
 
-		err := ExecuteContext(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"})
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(pr)
+			cmd.SetOut(&stdout)
+		})
 		require.NoError(t, err)
 		assert.Equal(t, stdinData, stdout.String())
 	})
