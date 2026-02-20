@@ -22,6 +22,6 @@
 
 - **CLI Framework:** [cobra](https://github.com/spf13/cobra)
 - **Container Runtime API:** [moby (Docker)](https://github.com/moby/moby), [containerd/errdefs](https://github.com/containerd/errdefs)
-- **YAML & Config Utilities:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://github.com/darccio/mergo)
+- **YAML & Config Utilities:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://dario.cat/mergo)
 - **Utilities:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [x/term](https://golang.org/x/term)
 - **Testing:** [testify](https://github.com/stretchr/testify)
