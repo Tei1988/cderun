@@ -136,7 +136,6 @@ func TestIntegration_Command_Root_SymlinkExecution(t *testing.T) {
 
 	err = ExecuteContextWithOptions(context.Background(), []string{"node", "--version"}, withMockRuntime(mockRuntime))
 
-	skipIfDockerBroken(t, err)
 	require.NoError(t, err)
 	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
 	assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
@@ -162,7 +161,6 @@ node:
 
 	mockRuntime := &runtime.MockRuntime{}
 	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
-	skipIfDockerBroken(t, err)
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)

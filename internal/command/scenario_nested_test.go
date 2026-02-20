@@ -15,8 +15,8 @@ import (
 )
 
 func TestScenario_Command_Nested_ExecutionFlow(t *testing.T) {
-	// This test modifies global state (runtimeFactory, exitFunc, runConfigDir)
-	// and changes the working directory. It should not be run in parallel.
+	// This test mutates runConfigDir and the current working directory, and therefore must not run in parallel.
+	// It uses ExecuteContextWithOptions to inject dependencies locally.
 
 	// 1. Setup mock environment
 	tmpDir := t.TempDir()
