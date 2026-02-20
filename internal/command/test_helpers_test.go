@@ -113,6 +113,8 @@ func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOption
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mock, nil
 		}
+		// Default exitFunc to a no-op to prevent tests from terminating the process.
+		// Callers can still override this behavior by providing an extra setup function.
 		o.exitFunc = func(code int) {}
 
 		for _, extra := range extras {

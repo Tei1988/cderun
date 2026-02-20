@@ -529,26 +529,13 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	var outBuf bytes.Buffer
 	var exitCode int
 
-	// Capture original values before overriding and register a t.Cleanup that restores them.
-	// Note: ExecuteContextWithOptions with a setup function creates a fresh rootOptions instance,
-	// so mutation is already isolated. These explicit saves/restores are for extra safety.
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-		origFactory := o.runtimeFactory
-		origExit := o.exitFunc
-		t.Cleanup(func() {
-			o.runtimeFactory = origFactory
-			o.exitFunc = origExit
-		})
-
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mock, nil
-		}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "-i", "cat"}, withMockRuntime(mock, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(code int) {
 			exitCode = code
 		}
 		cmd.SetIn(pr)
 		cmd.SetOut(&outBuf)
-	})
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
