@@ -3,19 +3,20 @@ package command
 import (
 	"bytes"
 	"context"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr, opts, rootCmd)
+// Note: This function modifies global state (os.Stdout, os.Stderr)
 // and is NOT safe for parallel execution with t.Parallel().
+// It uses ExecuteContextWithOptions to isolate command execution.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, args...)
 }
@@ -72,9 +73,11 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
-		// Note: We don't set cmd.SetIn/Out/Err here because we are capturing via os.Pipe
+		if stdin != nil {
+			cmd.SetIn(stdin)
+		}
+		// Note: We don't set cmd.SetOut/Err here because we are capturing via os.Pipe
 		// and ExecuteContextWithOptions uses newRootCmd which defaults to os.Stdin/Out/Err.
-		// However, for consistency, if stdin is provided, we might want to set it.
 	})
 
 	_ = wOut.Close()

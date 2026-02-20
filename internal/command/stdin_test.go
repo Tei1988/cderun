@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/runtime"
 	"context"
 	"io"
 	"testing"
@@ -11,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/runtime"
 )
 
 type pipeMockRuntime struct {

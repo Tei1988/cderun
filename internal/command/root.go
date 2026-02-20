@@ -923,16 +923,14 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	var localOpts rootOptions
 	var cmd *cobra.Command
 
 	if setup == nil {
 		// Use global state for standard execution
-		localOpts = opts
 		cmd = rootCmd
 	} else {
 		// Create fresh state for testing
-		localOpts = defaultOptions()
+		localOpts := defaultOptions()
 		cmd = newRootCmd(&localOpts)
 		setup(&localOpts, cmd)
 	}

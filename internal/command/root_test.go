@@ -2,8 +2,6 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/config"
-	"cderun/internal/runtime"
 	"context"
 	"errors"
 	"io"
@@ -12,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 )
 
 func executeCommand(args ...string) (string, error) {
@@ -23,11 +23,6 @@ func executeCommand(args ...string) (string, error) {
 
 func executeCommandContext(ctx context.Context, args ...string) (string, error) {
 	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
-}
-
-func setupMockRuntime(t *testing.T, mock *runtime.MockRuntime) {
-	t.Helper()
-	// No longer need to save/restore global state as we use ExecuteContextWithOptions
 }
 
 func executeCommandRaw(args []string) (string, error) {
@@ -432,9 +427,6 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 }
 
 func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
-	mockRuntime := runtime.NewMockRuntime()
-	setupMockRuntime(t, mockRuntime)
-
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
 		opts := &rootOptions{
@@ -479,17 +471,39 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
 		}
-		opts.fs = mfs
-		t.Cleanup(func() { opts.fs = nil })
+		o := defaultOptions()
+		o.fs = mfs
 
 		// We need to trigger binary mount logic
 		resolved := &config.ResolvedConfig{
 			MountCderun: true,
 		}
-		_, err := opts.buildContainerConfig(resolved, nil, nil)
+		_, err := o.buildContainerConfig(resolved, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
 	})
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stderr
+	os.Stderr = w
+	defer func() {
+		os.Stderr = saved
+		_ = r.Close()
+	}()
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+	fn()
+	_ = w.Close()
+	<-done
+	return buf.String()
 }
 
 func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
@@ -497,70 +511,37 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
-		// Since executeCommandRawContext doesn't allow injecting mockRuntime easily,
-		// and it uses ExecuteContextWithOptions with default setup that doesn't inject it.
-		// Wait, I should probably update executeCommandRawContext to allow setup.
 
-		// Actually, for this specific test, let's just use ExecuteContextWithOptions directly.
-		var buf bytes.Buffer
-		r, w, _ := os.Pipe()
-		savedErr := os.Stderr
-		os.Stderr = w
-		defer func() {
-			os.Stderr = savedErr
-			_ = r.Close()
-		}()
-
-		done := make(chan struct{})
-		go func() {
-			_, _ = io.Copy(&buf, r)
-			close(done)
-		}()
-
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.isTerminal = func(fd int) bool { return true }
+		stderr := captureStderr(t, func() {
+			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mockRuntime, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return true }
+			})
+			require.NoError(t, err)
 		})
-		_ = w.Close()
-		<-done
 
-		require.NoError(t, err)
-		assert.Contains(t, buf.String(), "[WARN] failed to remove container (defer): failed to remove")
+		assert.Contains(t, stderr, "[WARN] failed to remove container (defer): failed to remove")
 	})
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: nil,
 		}
-		var buf bytes.Buffer
-		r, w, _ := os.Pipe()
-		savedErr := os.Stderr
-		os.Stderr = w
-		defer func() {
-			os.Stderr = savedErr
-			_ = r.Close()
-		}()
 
-		done := make(chan struct{})
-		go func() {
-			_, _ = io.Copy(&buf, r)
-			close(done)
-		}()
-
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.isTerminal = func(fd int) bool { return true }
+		stderr := captureStderr(t, func() {
+			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mockRuntime, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return true }
+			})
+			require.NoError(t, err)
 		})
-		_ = w.Close()
-		<-done
 
-		require.NoError(t, err)
-		assert.NotContains(t, buf.String(), "[WARN] failed to remove container (defer)")
+		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
 	})
 }

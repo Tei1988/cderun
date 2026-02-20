@@ -2,8 +2,6 @@ package command
 
 import (
 	"bytes"
-	"cderun/internal/config"
-	"cderun/internal/runtime"
 	"context"
 	"io"
 	"testing"
@@ -12,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 )
 
 func TestUnit_Command_Polyglot_Flags(t *testing.T) {

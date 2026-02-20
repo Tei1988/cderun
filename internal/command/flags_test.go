@@ -1,13 +1,14 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"context"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/runtime"
 )
 
 func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
@@ -38,6 +39,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
 
@@ -86,6 +88,7 @@ func TestUnit_Command_Flags_DockerCompatible(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
 

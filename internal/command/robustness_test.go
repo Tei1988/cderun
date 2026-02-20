@@ -1,15 +1,17 @@
 package command
 
 import (
-	"cderun/internal/runtime"
 	"context"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
+
+	"cderun/internal/runtime"
 )
 
 type blockingMockRuntime struct {

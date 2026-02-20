@@ -1,8 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/runtime"
 	"context"
 	"os"
 	"path/filepath"
@@ -11,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"cderun/internal/config"
+	"cderun/internal/runtime"
 )
 
 func TestScenario_Command_Nested_ExecutionFlow(t *testing.T) {
