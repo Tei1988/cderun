@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Runtime_Docker_New(t *testing.T) {
+func TestUnit_Docker_New(t *testing.T) {
 	// This should succeed even without docker daemon as it just creates the client
 	runtime, err := NewDockerRuntime("/var/run/docker.sock")
 	require.NoError(t, err)
@@ -130,7 +130,7 @@ func (m *mockDockerClient) ContainerAttach(ctx context.Context, container string
 	return m.attachResp, m.attachErr
 }
 
-func TestUnit_Runtime_Docker_IsRetryablePullError(t *testing.T) {
+func TestUnit_Docker_RetryablePullError(t *testing.T) {
 	assert.False(t, isRetryablePullError(nil))
 	assert.True(t, isRetryablePullError(errors.New("toomanyrequests")))
 	assert.True(t, isRetryablePullError(errors.New("Rate exceeded")))
@@ -150,7 +150,7 @@ func (m *mockRetryDockerClient) ImagePull(ctx context.Context, ref string, optio
 	return io.NopCloser(strings.NewReader("")), nil
 }
 
-func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
+func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("never policy", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock}
@@ -236,7 +236,7 @@ func TestUnit_Runtime_Docker_PullImage(t *testing.T) {
 	})
 }
 
-func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
+func TestUnit_Docker_CreateContainer(t *testing.T) {
 	t.Run("basic and complex config", func(t *testing.T) {
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "created-id"},
@@ -292,7 +292,7 @@ func TestUnit_Runtime_Docker_CreateContainer(t *testing.T) {
 	})
 }
 
-func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
+func TestUnit_Docker_Lifecycle(t *testing.T) {
 	id := "test-id"
 	ctx := context.Background()
 
@@ -352,7 +352,7 @@ func TestUnit_Runtime_Docker_Lifecycle(t *testing.T) {
 	})
 }
 
-func TestUnit_Runtime_Docker_AttachContainer_Multiplexed(t *testing.T) {
+func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 	t.Run("non-TTY mode (multiplexed)", func(t *testing.T) {
 		// Use stdcopy to create a multiplexed stream
 		stdoutBuf := &bytes.Buffer{}
@@ -413,7 +413,7 @@ func (m *mockConn) CloseWrite() error {
 	return nil
 }
 
-func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
+func TestUnit_Docker_Attach(t *testing.T) {
 	t.Run("TTY mode", func(t *testing.T) {
 		conn := &mockConn{}
 		mock := &mockDockerClient{

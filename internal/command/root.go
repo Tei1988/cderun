@@ -117,6 +117,8 @@ type rootOptions struct {
 	exitFunc       func(int)
 	isTerminal     func(int) bool
 	termGetSize    func(int) (int, int, error)
+	makeRaw        func(int) (*term.State, error)
+	restore        func(int, *term.State) error
 	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
 }
 
@@ -141,6 +143,12 @@ func defaultOptions() rootOptions {
 		},
 		termGetSize: func(fd int) (int, int, error) {
 			return term.GetSize(fd)
+		},
+		makeRaw: func(fd int) (*term.State, error) {
+			return term.MakeRaw(fd)
+		},
+		restore: func(fd int, state *term.State) error {
+			return term.Restore(fd, state)
 		},
 		logger: logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
@@ -581,6 +589,13 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 	return nil
 }
 
+func getFd(r any) (int, bool) {
+	if f, ok := r.(interface{ Fd() uintptr }); ok {
+		return int(f.Fd()), true
+	}
+	return -1, false
+}
+
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
@@ -625,13 +640,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if containerConfig.TTY && o.isTerminal(int(os.Stdin.Fd())) {
+	if fd, ok := getFd(cmd.InOrStdin()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		o.logger.Trace("Setting terminal to raw mode")
-		state, err := term.MakeRaw(int(os.Stdin.Fd()))
+		state, err := o.makeRaw(fd)
 		if err != nil {
 			o.logger.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }() //nolint:errcheck
+			defer func() { _ = o.restore(fd, state) }() //nolint:errcheck
 		}
 	}
 
@@ -695,7 +710,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	// Handle window resize synchronization
-	if containerConfig.TTY && o.isTerminal(int(os.Stdout.Fd())) {
+	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
 		setupResizeSignal(resizeChan)
 		defer signal.Stop(resizeChan)
@@ -703,7 +718,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			for {
 				select {
 				case <-resizeChan:
-					w, h, err := o.termGetSize(int(os.Stdout.Fd()))
+					w, h, err := o.termGetSize(fd)
 					if err == nil && h >= 0 && w >= 0 {
 						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 					}
@@ -714,7 +729,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}()
 
 		// Initial resize to match current terminal size
-		w, h, err := o.termGetSize(int(os.Stdout.Fd()))
+		w, h, err := o.termGetSize(fd)
 		if err == nil && h >= 0 && w >= 0 {
 			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
 		}

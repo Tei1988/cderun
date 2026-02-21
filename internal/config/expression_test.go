@@ -161,4 +161,29 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 		assert.Contains(t, r.Error().Error(), "absolute paths")
 		assert.Contains(t, r.Error().Error(), "are not allowed")
 	})
+
+	t.Run("invalid directive", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ unknown:value }}")
+		require.NoError(t, r.Error())
+		// Unknown directive is returned as is (but trimmed)
+		assert.Equal(t, "{{unknown:value}}", val)
+	})
+
+	t.Run("unclosed expression", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ PWD")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{ PWD", val)
+	})
+
+	t.Run("empty expression", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{}}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{}}", val)
+	})
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_Load_CDERunConfig(t *testing.T) {
+func TestUnit_Config_LoadCDERun(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
@@ -108,7 +108,7 @@ hostContext:
 	})
 }
 
-func TestUnit_Config_Load_ToolsConfig(t *testing.T) {
+func TestUnit_Config_LoadTools(t *testing.T) {
 	t.Run("found in current dir", func(t *testing.T) {
 		content := `
 node:
@@ -134,7 +134,7 @@ node:
 	})
 }
 
-func TestUnit_Config_Loader_SetDirs(t *testing.T) {
+func TestUnit_Config_SetDirs(t *testing.T) {
 	t.Run("SetRunConfigDirForTest", func(t *testing.T) {
 		original := defaultLoader.runConfigDir
 		cleanup := SetRunConfigDirForTest("/tmp/run")
@@ -152,7 +152,7 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Load_FromPath(t *testing.T) {
+func TestUnit_Config_LoadPath(t *testing.T) {
 	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
 		content := `
 runtime: podman
@@ -213,5 +213,145 @@ node:
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("/missing.yaml")
 		require.Error(t, err)
+	})
+
+}
+
+func TestUnit_Config_LoadCDERun_MalformedAndUnknownField(t *testing.T) {
+	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/.cderun.yaml": []byte("invalid: yaml: ["),
+			},
+			WD: "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal")
+	})
+
+	t.Run("LoadCDERunConfig - unknown field", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/.cderun.yaml": []byte("unknown_field: true"),
+			},
+			WD: "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found in type config.CDERunConfig")
+	})
+}
+
+func TestUnit_Config_DeepCopy(t *testing.T) {
+	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
+		tty := true
+		orig := CDERunConfig{
+			Runtime: "docker",
+			Defaults: ConfigDefaults{
+				TTY: &tty,
+				Env: []string{"A=1"},
+			},
+			HostContext: &HostContext{
+				Level:  1,
+				Mounts: []MountMapping{{Source: "/a", Target: "/b"}},
+			},
+		}
+
+		cloned := orig.DeepCopy()
+
+		// Verify deep copy of HostContext
+		assert.NotSame(t, orig.HostContext, cloned.HostContext)
+		assert.Equal(t, orig.HostContext.Level, cloned.HostContext.Level)
+		assert.NotSame(t, &orig.HostContext.Mounts[0], &cloned.HostContext.Mounts[0])
+
+		// Verify deep copy of *bool
+		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
+		assert.Equal(t, *orig.Defaults.TTY, *cloned.Defaults.TTY)
+
+		// Verify deep copy of slice
+		assert.NotSame(t, &orig.Defaults.Env[0], &cloned.Defaults.Env[0])
+		assert.Equal(t, orig.Defaults.Env, cloned.Defaults.Env)
+
+		// Mutate cloned and ensure original is unchanged
+		*cloned.Defaults.TTY = false
+		cloned.Defaults.Env[0] = "A=2"
+		cloned.HostContext.Level = 2
+
+		assert.True(t, *orig.Defaults.TTY)
+		assert.Equal(t, "A=1", orig.Defaults.Env[0])
+		assert.Equal(t, 1, orig.HostContext.Level)
+	})
+
+	t.Run("ToolsConfig DeepCopy", func(t *testing.T) {
+		orig := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node:20",
+				Env:   []string{"NODE_ENV=dev"},
+			},
+		}
+
+		cloned := orig.DeepCopy()
+
+		nodeOrig := orig["node"]
+		nodeCloned := cloned["node"]
+		assert.NotSame(t, &nodeOrig.Env[0], &nodeCloned.Env[0])
+
+		nodeCloned.Env[0] = "NODE_ENV=prod"
+		cloned["node"] = nodeCloned
+
+		assert.Equal(t, "NODE_ENV=dev", orig["node"].Env[0])
+	})
+
+	t.Run("DeepCopy all fields", func(t *testing.T) {
+		b := true
+		orig := CDERunConfig{
+			Logging: LoggingConfig{
+				Timestamp: &b,
+			},
+			Defaults: ConfigDefaults{
+				TTY:             &b,
+				Interactive:     &b,
+				Remove:          &b,
+				StrictEnv:       &b,
+				MountCderun:     &b,
+				MountSocket:     &b,
+				MountAllTools:   &b,
+				PublishAll:      &b,
+				Privileged:      &b,
+				MountTools:      []string{"t"},
+				Ports:           []string{"p"},
+				Expose:          []string{"e"},
+				DNS:             []string{"d"},
+				AddHosts:        []string{"a"},
+				CapAdd:          []string{"ca"},
+				CapDrop:         []string{"cd"},
+				Entrypoint:      []string{"ep"},
+				Command:         []string{"c"},
+				Env:             []string{"ev"},
+				Mounts:          []MountConfig{{Type: "bind"}},
+				Devices:         []DeviceConfig{{Permissions: "r"}},
+				MountCderunPath: ConfigPath{Raw: "rcp"},
+				MountSocketPath: ConfigPath{Raw: "rsp"},
+			},
+		}
+
+		cloned := orig.DeepCopy()
+		assert.Equal(t, orig, cloned)
+		assert.NotSame(t, orig.Logging.Timestamp, cloned.Logging.Timestamp)
+		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
+		assert.NotSame(t, orig.Defaults.Interactive, cloned.Defaults.Interactive)
+		assert.NotSame(t, orig.Defaults.Remove, cloned.Defaults.Remove)
+		assert.NotSame(t, orig.Defaults.StrictEnv, cloned.Defaults.StrictEnv)
+		assert.NotSame(t, orig.Defaults.MountCderun, cloned.Defaults.MountCderun)
+		assert.NotSame(t, orig.Defaults.MountSocket, cloned.Defaults.MountSocket)
+		assert.NotSame(t, orig.Defaults.MountAllTools, cloned.Defaults.MountAllTools)
+		assert.NotSame(t, orig.Defaults.PublishAll, cloned.Defaults.PublishAll)
+		assert.NotSame(t, orig.Defaults.Privileged, cloned.Defaults.Privileged)
+		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
+		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
+		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
 	})
 }

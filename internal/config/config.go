@@ -20,6 +20,17 @@ type CDERunConfig struct {
 	HostContext *HostContext   `yaml:"hostContext,omitempty"`
 }
 
+func (c CDERunConfig) DeepCopy() CDERunConfig {
+	res := c
+	res.Defaults = c.Defaults.DeepCopy()
+	res.Logging.Timestamp = copyBoolPtr(c.Logging.Timestamp)
+	if c.HostContext != nil {
+		hostCtx := c.HostContext.DeepCopy()
+		res.HostContext = &hostCtx
+	}
+	return res
+}
+
 type HostContext struct {
 	BinPath     string         `yaml:"binPath"`
 	SnapshotDir string         `yaml:"snapshotDir"`
@@ -28,10 +39,23 @@ type HostContext struct {
 	Mounts      []MountMapping `yaml:"mounts"`
 }
 
+func (h HostContext) DeepCopy() HostContext {
+	res := h
+	if h.Mounts != nil {
+		res.Mounts = make([]MountMapping, len(h.Mounts))
+		copy(res.Mounts, h.Mounts)
+	}
+	return res
+}
+
 type MountMapping struct {
 	Source string `yaml:"source"`
 	Target string `yaml:"target"`
 	Level  int    `yaml:"level"`
+}
+
+func (m MountMapping) DeepCopy() MountMapping {
+	return m
 }
 
 func (c *CDERunConfig) SetBaseDir(baseDir string) {
@@ -72,6 +96,44 @@ type ConfigDefaults struct {
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
+}
+
+func (c ConfigDefaults) DeepCopy() ConfigDefaults {
+	res := c
+	res.TTY = copyBoolPtr(c.TTY)
+	res.Interactive = copyBoolPtr(c.Interactive)
+	res.Remove = copyBoolPtr(c.Remove)
+	res.StrictEnv = copyBoolPtr(c.StrictEnv)
+	res.MountCderun = copyBoolPtr(c.MountCderun)
+	res.MountSocket = copyBoolPtr(c.MountSocket)
+	res.MountAllTools = copyBoolPtr(c.MountAllTools)
+	res.PublishAll = copyBoolPtr(c.PublishAll)
+	res.Privileged = copyBoolPtr(c.Privileged)
+
+	res.MountTools = copyStringSlice(c.MountTools)
+	res.Ports = copyStringSlice(c.Ports)
+	res.Expose = copyStringSlice(c.Expose)
+	res.DNS = copyStringSlice(c.DNS)
+	res.AddHosts = copyStringSlice(c.AddHosts)
+	res.CapAdd = copyStringSlice(c.CapAdd)
+	res.CapDrop = copyStringSlice(c.CapDrop)
+	res.Entrypoint = copyStringSlice(c.Entrypoint)
+	res.Command = copyStringSlice(c.Command)
+	res.Env = copyStringSlice(c.Env)
+
+	if c.Mounts != nil {
+		res.Mounts = make([]MountConfig, len(c.Mounts))
+		for i, m := range c.Mounts {
+			res.Mounts[i] = m.DeepCopy()
+		}
+	}
+	if c.Devices != nil {
+		res.Devices = make([]DeviceConfig, len(c.Devices))
+		for i, d := range c.Devices {
+			res.Devices[i] = d.DeepCopy()
+		}
+	}
+	return res
 }
 
 func (c *ConfigDefaults) SetBaseDir(baseDir string) {
@@ -129,6 +191,44 @@ type ToolConfig struct {
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 }
 
+func (c ToolConfig) DeepCopy() ToolConfig {
+	res := c
+	res.TTY = copyBoolPtr(c.TTY)
+	res.Interactive = copyBoolPtr(c.Interactive)
+	res.Remove = copyBoolPtr(c.Remove)
+	res.StrictEnv = copyBoolPtr(c.StrictEnv)
+	res.MountCderun = copyBoolPtr(c.MountCderun)
+	res.MountSocket = copyBoolPtr(c.MountSocket)
+	res.MountAllTools = copyBoolPtr(c.MountAllTools)
+	res.PublishAll = copyBoolPtr(c.PublishAll)
+	res.Privileged = copyBoolPtr(c.Privileged)
+
+	res.MountTools = copyStringSlice(c.MountTools)
+	res.Ports = copyStringSlice(c.Ports)
+	res.Expose = copyStringSlice(c.Expose)
+	res.DNS = copyStringSlice(c.DNS)
+	res.AddHosts = copyStringSlice(c.AddHosts)
+	res.CapAdd = copyStringSlice(c.CapAdd)
+	res.CapDrop = copyStringSlice(c.CapDrop)
+	res.Entrypoint = copyStringSlice(c.Entrypoint)
+	res.Command = copyStringSlice(c.Command)
+	res.Env = copyStringSlice(c.Env)
+
+	if c.Mounts != nil {
+		res.Mounts = make([]MountConfig, len(c.Mounts))
+		for i, m := range c.Mounts {
+			res.Mounts[i] = m.DeepCopy()
+		}
+	}
+	if c.Devices != nil {
+		res.Devices = make([]DeviceConfig, len(c.Devices))
+		for i, d := range c.Devices {
+			res.Devices[i] = d.DeepCopy()
+		}
+	}
+	return res
+}
+
 func (c *ToolConfig) SetBaseDir(baseDir string) {
 	if c.MountSocketPath.Raw != "" {
 		c.MountSocketPath.BaseDir = baseDir
@@ -145,6 +245,35 @@ func (c *ToolConfig) SetBaseDir(baseDir string) {
 }
 
 type ToolsConfig map[string]ToolConfig
+
+func (t ToolsConfig) DeepCopy() ToolsConfig {
+	if t == nil {
+		return nil
+	}
+	res := make(ToolsConfig, len(t))
+	for k, v := range t {
+		res[k] = v.DeepCopy()
+	}
+	return res
+}
+
+func copyBoolPtr(b *bool) *bool {
+	if b == nil {
+		return nil
+	}
+	res := new(bool)
+	*res = *b
+	return res
+}
+
+func copyStringSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	res := make([]string, len(s))
+	copy(res, s)
+	return res
+}
 
 // FileSystem defines the interface for filesystem operations.
 type FileSystem interface {
