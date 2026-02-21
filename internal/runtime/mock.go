@@ -39,17 +39,13 @@ type MockRuntime struct {
 	SignalErr           error
 }
 
-// Lock locks the mock's mutex.
-func (m *MockRuntime) Lock() { m.mu.Lock() }
-
-// Unlock unlocks the mock's mutex.
-func (m *MockRuntime) Unlock() { m.mu.Unlock() }
-
-// RLock locks the mock's mutex for reading.
-func (m *MockRuntime) RLock() { m.mu.RLock() }
-
-// RUnlock unlocks the mock's mutex for reading.
-func (m *MockRuntime) RUnlock() { m.mu.RUnlock() }
+// WithLockedMock executes the provided function while holding the mock's mutex.
+// This is intended for test-only use.
+func (m *MockRuntime) WithLockedMock(f func(m *MockRuntime)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f(m)
+}
 
 func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string) error {
 	m.mu.Lock()
@@ -89,8 +85,8 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.AttachedContainerID = containerID
+	m.mu.Unlock()
 	if ready != nil {
 		close(ready)
 	}
@@ -146,6 +142,12 @@ func (m *MockRuntime) GetAttachedContainerID() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.AttachedContainerID
+}
+
+func (m *MockRuntime) GetExitCode() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.ExitCode
 }
 
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {

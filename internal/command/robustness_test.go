@@ -10,26 +10,22 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 
 	"cderun/internal/runtime"
 )
 
 type blockingMockRuntime struct {
 	runtime.MockRuntime
-	attachStarted chan struct{}
 	blockAttach   chan struct{}
 }
 
 func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	m.Lock()
-	m.AttachedContainerID = containerID
-	m.Unlock()
+	m.WithLockedMock(func(base *runtime.MockRuntime) {
+		base.AttachedContainerID = containerID
+	})
 	if ready != nil {
 		close(ready)
-	}
-	// Also close the legacy channel for existing tests
-	if m.attachStarted != nil {
-		close(m.attachStarted)
 	}
 	select {
 	case <-m.blockAttach:
@@ -42,7 +38,6 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
-			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
@@ -64,12 +59,9 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}()
 
 		// Wait for attach to start
-		select {
-		case <-mock.attachStarted:
-			// attach started and is blocking
-		case <-ctx.Done():
-			t.Fatal("AttachContainer did not start in time or timeout")
-		}
+		assert.Eventually(t, func() bool {
+			return mock.GetAttachedContainerID() != ""
+		}, 5*time.Second, 10*time.Millisecond, "AttachContainer did not start in time")
 
 		// executeCommand should eventually finish because WaitContainer returns immediately
 		// and AttachContainer will be canceled after 500ms grace period.
@@ -84,13 +76,11 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
 		// Use a mock that blocks in WaitContainer to simulate long running process
 		mock := &blockingMockRuntime{
-			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 
 		// Custom WaitContainer that blocks
-		waitStarted := make(chan struct{})
 		blockWait := make(chan struct{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -102,7 +92,6 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return &waitBlockingMock{
 						blockingMockRuntime: mock,
-						waitStarted:         waitStarted,
 						blockWait:           blockWait,
 					}, nil
 				}
@@ -112,12 +101,9 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}()
 
 		// Wait for attach to start
-		select {
-		case <-mock.attachStarted:
-			// attach started
-		case <-ctx.Done():
-			t.Fatal("AttachContainer did not start in time or timeout")
-		}
+		assert.Eventually(t, func() bool {
+			return mock.GetAttachedContainerID() != ""
+		}, 5*time.Second, 10*time.Millisecond, "AttachContainer did not start in time")
 
 		// Send first SIGINT
 		_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
@@ -152,12 +138,10 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		// Use a mock that blocks in WaitContainer so we have time to send signal
 		mock := &blockingMockRuntime{
-			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 
-		waitStarted := make(chan struct{})
 		blockWait := make(chan struct{})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -169,7 +153,6 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return &waitBlockingMock{
 						blockingMockRuntime: mock,
-						waitStarted:         waitStarted,
 						blockWait:           blockWait,
 					}, nil
 				}
@@ -184,13 +167,10 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 			close(done)
 		}()
 
-		// Wait for start
-		select {
-		case <-waitStarted:
-			// container started
-		case <-ctx.Done():
-			t.Fatal("Container did not start in time or timeout")
-		}
+		// Wait for wait to start
+		assert.Eventually(t, func() bool {
+			return mock.GetWaitedContainerID() != ""
+		}, 5*time.Second, 10*time.Millisecond, "Container did not start wait in time")
 
 		// Update terminal size for simulation
 		mu.Lock()
@@ -202,21 +182,10 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		// Poll for resize with timeout
 		expectedRows, expectedCols := 30, 100
-		deadline := time.Now().Add(1 * time.Second)
-		success := false
-		for time.Now().Before(deadline) {
+		assert.Eventually(t, func() bool {
 			actualRows, actualCols := mock.GetTTYSize()
-			if actualRows == uint(expectedRows) && actualCols == uint(expectedCols) {
-				success = true
-				break
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-
-		if !success {
-			actualRows, actualCols := mock.GetTTYSize()
-			t.Errorf("expected resize to %dx%d, got %dx%d (timed out)", expectedRows, expectedCols, actualRows, actualCols)
-		}
+			return actualRows == uint(expectedRows) && actualCols == uint(expectedCols)
+		}, 1*time.Second, 20*time.Millisecond, "expected resize to %dx%d", expectedRows, expectedCols)
 
 		// Cleanup
 		close(blockWait)
@@ -226,7 +195,6 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
 		mock := &blockingMockRuntime{
-			attachStarted: make(chan struct{}),
 			blockAttach:   make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
@@ -257,16 +225,15 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 type waitBlockingMock struct {
 	*blockingMockRuntime
-	waitStarted chan struct{}
 	blockWait   chan struct{}
 }
 
 func (m *waitBlockingMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	m.Lock()
-	m.WaitedContainerID = containerID
-	exitCode := m.ExitCode
-	m.Unlock()
-	close(m.waitStarted)
+	var exitCode int
+	m.WithLockedMock(func(base *runtime.MockRuntime) {
+		base.WaitedContainerID = containerID
+		exitCode = base.ExitCode
+	})
 	select {
 	case <-m.blockWait:
 		return exitCode, nil

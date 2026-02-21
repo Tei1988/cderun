@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"regexp"
 	"strings"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 )
 
 const pullMaxRetries = 3
+
+var eofRegex = regexp.MustCompile(`\beof\b`)
 
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
@@ -292,6 +295,9 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		Stderr: true,
 	})
 	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
 		return err
 	}
 	defer resp.Close()
@@ -377,5 +383,5 @@ func isRetryablePullError(err error) bool {
 		strings.Contains(msg, "data limit exceeded") ||
 		strings.Contains(msg, "i/o timeout") ||
 		strings.Contains(msg, "connection refused") ||
-		strings.Contains(msg, "eof")
+		eofRegex.MatchString(msg)
 }
