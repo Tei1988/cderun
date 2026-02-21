@@ -331,6 +331,26 @@ cderun --entrypoint /bin/sh node -c "ls"
 cderun --device /dev/fuse alpine ls /dev/fuse
 ```
 
+### `--config`
+
+- **型**: string
+- **説明**: cderun自体の設定ファイル（`.cderun.yaml` 相当）を明示的に指定
+- **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+
+```bash
+cderun --config my-cderun.yaml node app.js
+```
+
+### `--tool-config`
+
+- **型**: string
+- **説明**: ツール実行設定ファイル（`.tools.yaml` 相当）を明示的に指定
+- **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+
+```bash
+cderun --tool-config my-tools.yaml node app.js
+```
+
 ### `--dry-run`
 
 - **型**: bool
@@ -424,6 +444,7 @@ cderun --log-timestamp=false node app.js
     `--cderun-mount-socket`, `--cderun-mount-socket-path`,
     `--cderun-mount-cderun`, `--cderun-mount-cderun-path`,
     `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
+  - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`,
     `--cderun-diagnosis`, `--cderun-diagnosis-format`,
     `--cderun-log-level`, `--cderun-log-format`,

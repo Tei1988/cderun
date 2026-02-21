@@ -10,7 +10,7 @@ import (
 func TestUnit_Config_Expression_FindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/modules/foo": []byte("bar"),
+			"/project/modules/foo":                      []byte("bar"),
 			"/project/services/production/.cderun.yaml": []byte("runtime: docker"),
 		},
 		Dirs: map[string]bool{
@@ -78,7 +78,7 @@ func TestUnit_Config_Expression_File_Error(t *testing.T) {
 func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/empty.txt": []byte("   "),
+			"/project/empty.txt":  []byte("   "),
 			"/project/normal.txt": []byte("content"),
 		},
 		Dirs: map[string]bool{
