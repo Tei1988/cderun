@@ -170,6 +170,7 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 
 	stdinData := "integration test data"
 	pr, pw := io.Pipe()
+	defer pr.Close()
 	go func() {
 		_, _ = pw.Write([]byte(stdinData))
 		_ = pw.Close()
@@ -178,7 +179,10 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	var outBuf bytes.Buffer
 	var exitCode int
 
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "-i", "cat"}, withMockRuntime(mock, func(o *rootOptions, cmd *cobra.Command) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, withMockRuntime(mock, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(code int) {
 			exitCode = code
 		}

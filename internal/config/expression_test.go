@@ -166,24 +166,24 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ unknown:value }}")
+		require.NoError(t, r.Error())
 		// Unknown directive is returned as is (but trimmed)
 		assert.Equal(t, "{{unknown:value}}", val)
-		require.NoError(t, r.Error())
 	})
 
 	t.Run("unclosed expression", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ PWD")
-		assert.Equal(t, "{{ PWD", val)
 		require.NoError(t, r.Error())
+		assert.Equal(t, "{{ PWD", val)
 	})
 
 	t.Run("empty expression", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{}}")
-		assert.Equal(t, "{{}}", val)
 		require.NoError(t, r.Error())
+		assert.Equal(t, "{{}}", val)
 	})
 }

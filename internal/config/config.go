@@ -23,6 +23,10 @@ type CDERunConfig struct {
 func (c CDERunConfig) DeepCopy() CDERunConfig {
 	res := c
 	res.Defaults = c.Defaults.DeepCopy()
+	if c.Logging.Timestamp != nil {
+		res.Logging.Timestamp = new(bool)
+		*res.Logging.Timestamp = *c.Logging.Timestamp
+	}
 	if c.HostContext != nil {
 		hostCtx := c.HostContext.DeepCopy()
 		res.HostContext = &hostCtx
@@ -126,6 +130,10 @@ func (c ConfigDefaults) DeepCopy() ConfigDefaults {
 	if c.MountAllTools != nil {
 		res.MountAllTools = new(bool)
 		*res.MountAllTools = *c.MountAllTools
+	}
+	if c.PublishAll != nil {
+		res.PublishAll = new(bool)
+		*res.PublishAll = *c.PublishAll
 	}
 	if c.Privileged != nil {
 		res.Privileged = new(bool)
@@ -270,6 +278,10 @@ func (c ToolConfig) DeepCopy() ToolConfig {
 	if c.MountAllTools != nil {
 		res.MountAllTools = new(bool)
 		*res.MountAllTools = *c.MountAllTools
+	}
+	if c.PublishAll != nil {
+		res.PublishAll = new(bool)
+		*res.PublishAll = *c.PublishAll
 	}
 	if c.Privileged != nil {
 		res.Privileged = new(bool)

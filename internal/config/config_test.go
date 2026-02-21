@@ -257,25 +257,25 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 			},
 		}
 
-		copy := orig.DeepCopy()
+		cloned := orig.DeepCopy()
 
 		// Verify deep copy of HostContext
-		assert.NotSame(t, orig.HostContext, copy.HostContext)
-		assert.Equal(t, orig.HostContext.Level, copy.HostContext.Level)
-		assert.NotSame(t, &orig.HostContext.Mounts[0], &copy.HostContext.Mounts[0])
+		assert.NotSame(t, orig.HostContext, cloned.HostContext)
+		assert.Equal(t, orig.HostContext.Level, cloned.HostContext.Level)
+		assert.NotSame(t, &orig.HostContext.Mounts[0], &cloned.HostContext.Mounts[0])
 
 		// Verify deep copy of *bool
-		assert.NotSame(t, orig.Defaults.TTY, copy.Defaults.TTY)
-		assert.Equal(t, *orig.Defaults.TTY, *copy.Defaults.TTY)
+		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
+		assert.Equal(t, *orig.Defaults.TTY, *cloned.Defaults.TTY)
 
 		// Verify deep copy of slice
-		assert.NotSame(t, &orig.Defaults.Env[0], &copy.Defaults.Env[0])
-		assert.Equal(t, orig.Defaults.Env, copy.Defaults.Env)
+		assert.NotSame(t, &orig.Defaults.Env[0], &cloned.Defaults.Env[0])
+		assert.Equal(t, orig.Defaults.Env, cloned.Defaults.Env)
 
-		// Mutate copy and ensure original is unchanged
-		*copy.Defaults.TTY = false
-		copy.Defaults.Env[0] = "A=2"
-		copy.HostContext.Level = 2
+		// Mutate cloned and ensure original is unchanged
+		*cloned.Defaults.TTY = false
+		cloned.Defaults.Env[0] = "A=2"
+		cloned.HostContext.Level = 2
 
 		assert.True(t, *orig.Defaults.TTY)
 		assert.Equal(t, "A=1", orig.Defaults.Env[0])
@@ -290,15 +290,14 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 			},
 		}
 
-		copy := orig.DeepCopy()
+		cloned := orig.DeepCopy()
 
-		assert.NotSame(t, &orig, &copy)
 		nodeOrig := orig["node"]
-		nodeCopy := copy["node"]
-		assert.NotSame(t, &nodeOrig.Env[0], &nodeCopy.Env[0])
+		nodeCloned := cloned["node"]
+		assert.NotSame(t, &nodeOrig.Env[0], &nodeCloned.Env[0])
 
-		nodeCopy.Env[0] = "NODE_ENV=prod"
-		copy["node"] = nodeCopy
+		nodeCloned.Env[0] = "NODE_ENV=prod"
+		cloned["node"] = nodeCloned
 
 		assert.Equal(t, "NODE_ENV=dev", orig["node"].Env[0])
 	})
@@ -306,6 +305,9 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	t.Run("DeepCopy all fields", func(t *testing.T) {
 		b := true
 		orig := CDERunConfig{
+			Logging: LoggingConfig{
+				Timestamp: &b,
+			},
 			Defaults: ConfigDefaults{
 				TTY:             &b,
 				Interactive:     &b,
@@ -314,6 +316,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				MountCderun:     &b,
 				MountSocket:     &b,
 				MountAllTools:   &b,
+				PublishAll:      &b,
 				Privileged:      &b,
 				MountTools:      []string{"t"},
 				Ports:           []string{"p"},
@@ -332,11 +335,13 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 			},
 		}
 
-		copy := orig.DeepCopy()
-		assert.Equal(t, orig, copy)
-		assert.NotSame(t, orig.Defaults.TTY, copy.Defaults.TTY)
-		assert.NotSame(t, &orig.Defaults.MountTools[0], &copy.Defaults.MountTools[0])
-		assert.NotSame(t, &orig.Defaults.Mounts[0], &copy.Defaults.Mounts[0])
-		assert.NotSame(t, &orig.Defaults.Devices[0], &copy.Defaults.Devices[0])
+		cloned := orig.DeepCopy()
+		assert.Equal(t, orig, cloned)
+		assert.NotSame(t, orig.Logging.Timestamp, cloned.Logging.Timestamp)
+		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
+		assert.NotSame(t, orig.Defaults.PublishAll, cloned.Defaults.PublishAll)
+		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
+		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
+		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
 	})
 }
