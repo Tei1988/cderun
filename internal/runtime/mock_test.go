@@ -78,19 +78,19 @@ func TestUnit_Mock_ConcurrentAccess(t *testing.T) {
 	wg.Add(goroutines)
 
 	for i := range goroutines {
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 			for j := range iterations {
 				_ = mock.PullImage(ctx, "img", "always")
 				_ = mock.GetPulledImage()
 				_, _ = mock.CreateContainer(ctx, &container.ContainerConfig{})
 				_ = mock.GetCreatedConfig()
-				_ = mock.ResizeContainerTTY(ctx, "c", uint(id), uint(j))
+				_ = mock.ResizeContainerTTY(ctx, "c", uint(i), uint(j))
 				r, c := mock.GetTTYSize()
 				assert.Less(t, r, uint(goroutines))
 				assert.Less(t, c, uint(iterations))
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()
