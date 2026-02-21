@@ -111,11 +111,14 @@ cderun node app.js --cderun-image node:20-alpine
 - `--cpus`: Number of CPUs.
 - `--device`: Add a host device to the container.
 - `--remove`: Automatically remove the container when it exits (default: true).
+- `--config`: Path to cderun config file.
+- `--tool-config`: Path to tools config file.
 - `--runtime`: Container runtime to use (docker/podman).
 - `--socket-path`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
 - `--mount-socket`: Mount the container runtime socket into the container.
 - `--mount-socket-path`: Path where the socket should be mounted inside the container.
 - `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
+- `--mount-cderun-path`: Host path to cderun binary to mount inside container.
 - `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
 - `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
 - `--dry-run`: Preview container configuration without execution. Requires a subcommand.
