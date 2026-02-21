@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
@@ -540,4 +541,75 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, stdinData, outBuf.String())
+}
+
+func TestIntegration_Command_ConfigFlags(t *testing.T) {
+	setupTestDir(t)
+
+	mockRuntime := &runtime.MockRuntime{}
+
+	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
+		// Create hierarchical config that should be skipped
+		err := os.WriteFile(".cderun.yaml", []byte("runtime: podman"), 0o644)
+		require.NoError(t, err)
+
+		// Create custom config
+		err = os.MkdirAll("custom", 0o755)
+		require.NoError(t, err)
+		err = os.WriteFile("custom/my.yaml", []byte("runtime: docker\ndefaults:\n  network: host"), 0o644)
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "custom/my.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime))
+		require.NoError(t, err)
+
+		// Check if docker (from custom) is used instead of podman (from hierarchical)
+		// Note: runtime name is passed to runtimeFactory, but in our mock it is stored in resolved config if we can access it.
+		// Actually, we can check network which is in CreatedConfig.
+		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
+	})
+
+	t.Run("--cderun-config overrides standard config flag", func(t *testing.T) {
+		err := os.WriteFile("config1.yaml", []byte("defaults:\n  network: net1"), 0o644)
+		require.NoError(t, err)
+		err = os.WriteFile("config2.yaml", []byte("defaults:\n  network: net2"), 0o644)
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "config1.yaml", "--image", "alpine", "sh", "--cderun-config", "config2.yaml"}, withMockRuntime(mockRuntime))
+		require.NoError(t, err)
+		assert.Equal(t, "net2", mockRuntime.CreatedConfig.Network)
+	})
+
+	t.Run("CDERUN_CONFIG env var works", func(t *testing.T) {
+		err := os.WriteFile("env-config.yaml", []byte("defaults:\n  network: env-net"), 0o644)
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = &config.MockFileSystem{
+				Files: map[string][]byte{
+					"env-config.yaml": []byte("defaults:\n  network: env-net"),
+				},
+				WD: ".",
+				Env: map[string]string{
+					"CDERUN_CONFIG": "env-config.yaml",
+				},
+			}
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, "env-net", mockRuntime.CreatedConfig.Network)
+	})
+
+	t.Run("Missing config file results in error", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "non-existent.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load cderun config")
+	})
+
+	t.Run("--tool-config flag works", func(t *testing.T) {
+		err := os.WriteFile("custom-tools.yaml", []byte("node:\n  image: node:custom"), 0o644)
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--tool-config", "custom-tools.yaml", "node", "--version"}, withMockRuntime(mockRuntime))
+		require.NoError(t, err)
+		assert.Equal(t, "node:custom", mockRuntime.CreatedConfig.Image)
+	})
 }

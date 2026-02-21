@@ -1,12 +1,13 @@
 package config
 
 import (
-	"cderun/internal/container"
 	"fmt"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"cderun/internal/container"
 
 	"gopkg.in/yaml.v3"
 )

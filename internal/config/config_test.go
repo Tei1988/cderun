@@ -151,3 +151,67 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 		assert.Equal(t, original, defaultLoader.systemConfigDir)
 	})
 }
+
+func TestUnit_Config_LoadFromPath(t *testing.T) {
+	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
+		content := `
+runtime: podman
+defaults:
+  tty: true
+`
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/custom/cderun.yaml": []byte(content),
+			},
+			Dirs: map[string]bool{"/custom": true},
+			WD:   "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		cfg, paths, err := loader.LoadCDERunConfigFromPath("/custom/cderun.yaml")
+		require.NoError(t, err)
+		assert.NotNil(t, cfg)
+		assert.Equal(t, []string{"/custom/cderun.yaml"}, paths)
+		assert.Equal(t, "podman", cfg.Runtime)
+		assert.True(t, *cfg.Defaults.TTY)
+	})
+
+	t.Run("LoadCDERunConfigFromPath - missing", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: make(map[string][]byte),
+			WD:    "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfigFromPath("/missing.yaml")
+		require.Error(t, err)
+	})
+
+	t.Run("LoadToolsConfigFromPath", func(t *testing.T) {
+		content := `
+node:
+  image: node:20-alpine
+`
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/custom/tools.yaml": []byte(content),
+			},
+			Dirs: map[string]bool{"/custom": true},
+			WD:   "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		cfg, paths, err := loader.LoadToolsConfigFromPath("/custom/tools.yaml")
+		require.NoError(t, err)
+		assert.NotNil(t, cfg)
+		assert.Equal(t, []string{"/custom/tools.yaml"}, paths)
+		assert.Equal(t, "node:20-alpine", cfg["node"].Image)
+	})
+
+	t.Run("LoadToolsConfigFromPath - missing", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: make(map[string][]byte),
+			WD:    "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfigFromPath("/missing.yaml")
+		require.Error(t, err)
+	})
+}

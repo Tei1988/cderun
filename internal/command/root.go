@@ -1,10 +1,6 @@
 package command
 
 import (
-	"cderun/internal/config"
-	"cderun/internal/container"
-	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +12,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
+	"cderun/internal/runtime"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -56,6 +57,10 @@ type rootOptions struct {
 	mounts                []string
 	mountTools            string
 	mountAllTools         bool
+	configPath            string
+	cderunConfigPath      string
+	toolConfigPath        string
+	cderunToolConfigPath  string
 	dryRun                bool
 	dryRunFormat          string
 	cderunDryRun          bool
@@ -149,16 +154,52 @@ func defaultOptions() rootOptions {
 	}
 }
 
-func (o *rootOptions) loadConfigs() (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
+func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
 	logging.Trace("Loading configurations...")
-	globalCfg, globalPaths, err := o.configLoader.LoadCDERunConfig()
+
+	// Determine CDERun config path
+	cderunPath := ""
+	if o.cderunConfigPath != "" {
+		cderunPath = o.cderunConfigPath
+	} else if cmd.Flags().Changed("config") {
+		cderunPath = o.configPath
+	} else if env := o.fs.Getenv("CDERUN_CONFIG"); env != "" {
+		cderunPath = env
+	}
+
+	var globalCfg *config.CDERunConfig
+	var globalPaths []string
+	var err error
+	if cderunPath != "" {
+		globalCfg, globalPaths, err = o.configLoader.LoadCDERunConfigFromPath(cderunPath)
+	} else {
+		globalCfg, globalPaths, err = o.configLoader.LoadCDERunConfig()
+	}
+
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
 	} else if len(globalPaths) > 0 {
 		logging.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
 	}
 
-	toolsCfg, toolsPaths, err := o.configLoader.LoadToolsConfig()
+	// Determine Tools config path
+	toolsPath := ""
+	if o.cderunToolConfigPath != "" {
+		toolsPath = o.cderunToolConfigPath
+	} else if cmd.Flags().Changed("tool-config") {
+		toolsPath = o.toolConfigPath
+	} else if env := o.fs.Getenv("CDERUN_TOOL_CONFIG"); env != "" {
+		toolsPath = env
+	}
+
+	var toolsCfg config.ToolsConfig
+	var toolsPaths []string
+	if toolsPath != "" {
+		toolsCfg, toolsPaths, err = o.configLoader.LoadToolsConfigFromPath(toolsPath)
+	} else {
+		toolsCfg, toolsPaths, err = o.configLoader.LoadToolsConfig()
+	}
+
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
 	} else if len(toolsPaths) > 0 {
@@ -722,7 +763,7 @@ intended for the subcommand.`,
 			_ = logging.Init(initialLevel, "text", true) //nolint:errcheck
 
 			// Load configurations
-			toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs()
+			toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
 			if err != nil {
 				return err
 			}
@@ -869,6 +910,11 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&o.cderunMountCderunPath, "cderun-mount-cderun-path", "", "Override mount-cderun-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&o.cderunMountTools, "cderun-mount-tools", "", "Override mount-tools setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&o.cderunMountAllTools, "cderun-mount-all-tools", false, "Override mount-all-tools setting (highest priority, can be used after subcommand)")
+
+	cmd.PersistentFlags().StringVar(&o.configPath, "config", "", "Path to cderun config file")
+	cmd.PersistentFlags().StringVar(&o.cderunConfigPath, "cderun-config", "", "Override cderun config file (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().StringVar(&o.toolConfigPath, "tool-config", "", "Path to tools config file")
+	cmd.PersistentFlags().StringVar(&o.cderunToolConfigPath, "cderun-tool-config", "", "Override tools config file (highest priority, can be used after subcommand)")
 
 	// Priority 1 overrides
 	cmd.PersistentFlags().StringArrayVar(&o.cderunPorts, "cderun-publish", nil, "Override publish setting (highest priority, can be used after subcommand)")

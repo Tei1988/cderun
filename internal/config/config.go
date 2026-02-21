@@ -388,3 +388,42 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 	return merged, loadedPaths, nil
 }
+
+// LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
+func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
+	data, err := l.fs.ReadFile(path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+	}
+
+	var cfg CDERunConfig
+	if err := unmarshalStrict(data, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
+	}
+
+	baseDir := filepath.Dir(path)
+	cfg.SetBaseDir(baseDir)
+
+	return &cfg, []string{path}, nil
+}
+
+// LoadToolsConfigFromPath loads .tools.yaml from a specific path.
+func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
+	data, err := l.fs.ReadFile(path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read tools file %s: %w", path, err)
+	}
+
+	cfg := make(ToolsConfig)
+	if err := unmarshalStrict(data, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+	}
+
+	baseDir := filepath.Dir(path)
+	for k, v := range cfg {
+		v.SetBaseDir(baseDir)
+		cfg[k] = v
+	}
+
+	return cfg, []string{path}, nil
+}
