@@ -215,6 +215,9 @@ node:
 		require.Error(t, err)
 	})
 
+}
+
+func TestUnit_Config_LoadCDERun_MalformedAndUnknownField(t *testing.T) {
 	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{

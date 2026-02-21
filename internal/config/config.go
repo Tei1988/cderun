@@ -23,10 +23,7 @@ type CDERunConfig struct {
 func (c CDERunConfig) DeepCopy() CDERunConfig {
 	res := c
 	res.Defaults = c.Defaults.DeepCopy()
-	if c.Logging.Timestamp != nil {
-		res.Logging.Timestamp = new(bool)
-		*res.Logging.Timestamp = *c.Logging.Timestamp
-	}
+	res.Logging.Timestamp = copyBoolPtr(c.Logging.Timestamp)
 	if c.HostContext != nil {
 		hostCtx := c.HostContext.DeepCopy()
 		res.HostContext = &hostCtx
@@ -103,78 +100,27 @@ type ConfigDefaults struct {
 
 func (c ConfigDefaults) DeepCopy() ConfigDefaults {
 	res := c
-	if c.TTY != nil {
-		res.TTY = new(bool)
-		*res.TTY = *c.TTY
-	}
-	if c.Interactive != nil {
-		res.Interactive = new(bool)
-		*res.Interactive = *c.Interactive
-	}
-	if c.Remove != nil {
-		res.Remove = new(bool)
-		*res.Remove = *c.Remove
-	}
-	if c.StrictEnv != nil {
-		res.StrictEnv = new(bool)
-		*res.StrictEnv = *c.StrictEnv
-	}
-	if c.MountCderun != nil {
-		res.MountCderun = new(bool)
-		*res.MountCderun = *c.MountCderun
-	}
-	if c.MountSocket != nil {
-		res.MountSocket = new(bool)
-		*res.MountSocket = *c.MountSocket
-	}
-	if c.MountAllTools != nil {
-		res.MountAllTools = new(bool)
-		*res.MountAllTools = *c.MountAllTools
-	}
-	if c.PublishAll != nil {
-		res.PublishAll = new(bool)
-		*res.PublishAll = *c.PublishAll
-	}
-	if c.Privileged != nil {
-		res.Privileged = new(bool)
-		*res.Privileged = *c.Privileged
-	}
-	if c.MountTools != nil {
-		res.MountTools = make([]string, len(c.MountTools))
-		copy(res.MountTools, c.MountTools)
-	}
-	if c.Ports != nil {
-		res.Ports = make([]string, len(c.Ports))
-		copy(res.Ports, c.Ports)
-	}
-	if c.Expose != nil {
-		res.Expose = make([]string, len(c.Expose))
-		copy(res.Expose, c.Expose)
-	}
-	if c.DNS != nil {
-		res.DNS = make([]string, len(c.DNS))
-		copy(res.DNS, c.DNS)
-	}
-	if c.AddHosts != nil {
-		res.AddHosts = make([]string, len(c.AddHosts))
-		copy(res.AddHosts, c.AddHosts)
-	}
-	if c.CapAdd != nil {
-		res.CapAdd = make([]string, len(c.CapAdd))
-		copy(res.CapAdd, c.CapAdd)
-	}
-	if c.CapDrop != nil {
-		res.CapDrop = make([]string, len(c.CapDrop))
-		copy(res.CapDrop, c.CapDrop)
-	}
-	if c.Entrypoint != nil {
-		res.Entrypoint = make([]string, len(c.Entrypoint))
-		copy(res.Entrypoint, c.Entrypoint)
-	}
-	if c.Command != nil {
-		res.Command = make([]string, len(c.Command))
-		copy(res.Command, c.Command)
-	}
+	res.TTY = copyBoolPtr(c.TTY)
+	res.Interactive = copyBoolPtr(c.Interactive)
+	res.Remove = copyBoolPtr(c.Remove)
+	res.StrictEnv = copyBoolPtr(c.StrictEnv)
+	res.MountCderun = copyBoolPtr(c.MountCderun)
+	res.MountSocket = copyBoolPtr(c.MountSocket)
+	res.MountAllTools = copyBoolPtr(c.MountAllTools)
+	res.PublishAll = copyBoolPtr(c.PublishAll)
+	res.Privileged = copyBoolPtr(c.Privileged)
+
+	res.MountTools = copyStringSlice(c.MountTools)
+	res.Ports = copyStringSlice(c.Ports)
+	res.Expose = copyStringSlice(c.Expose)
+	res.DNS = copyStringSlice(c.DNS)
+	res.AddHosts = copyStringSlice(c.AddHosts)
+	res.CapAdd = copyStringSlice(c.CapAdd)
+	res.CapDrop = copyStringSlice(c.CapDrop)
+	res.Entrypoint = copyStringSlice(c.Entrypoint)
+	res.Command = copyStringSlice(c.Command)
+	res.Env = copyStringSlice(c.Env)
+
 	if c.Mounts != nil {
 		res.Mounts = make([]MountConfig, len(c.Mounts))
 		for i, m := range c.Mounts {
@@ -186,10 +132,6 @@ func (c ConfigDefaults) DeepCopy() ConfigDefaults {
 		for i, d := range c.Devices {
 			res.Devices[i] = d.DeepCopy()
 		}
-	}
-	if c.Env != nil {
-		res.Env = make([]string, len(c.Env))
-		copy(res.Env, c.Env)
 	}
 	return res
 }
@@ -251,78 +193,27 @@ type ToolConfig struct {
 
 func (c ToolConfig) DeepCopy() ToolConfig {
 	res := c
-	if c.TTY != nil {
-		res.TTY = new(bool)
-		*res.TTY = *c.TTY
-	}
-	if c.Interactive != nil {
-		res.Interactive = new(bool)
-		*res.Interactive = *c.Interactive
-	}
-	if c.Remove != nil {
-		res.Remove = new(bool)
-		*res.Remove = *c.Remove
-	}
-	if c.StrictEnv != nil {
-		res.StrictEnv = new(bool)
-		*res.StrictEnv = *c.StrictEnv
-	}
-	if c.MountCderun != nil {
-		res.MountCderun = new(bool)
-		*res.MountCderun = *c.MountCderun
-	}
-	if c.MountSocket != nil {
-		res.MountSocket = new(bool)
-		*res.MountSocket = *c.MountSocket
-	}
-	if c.MountAllTools != nil {
-		res.MountAllTools = new(bool)
-		*res.MountAllTools = *c.MountAllTools
-	}
-	if c.PublishAll != nil {
-		res.PublishAll = new(bool)
-		*res.PublishAll = *c.PublishAll
-	}
-	if c.Privileged != nil {
-		res.Privileged = new(bool)
-		*res.Privileged = *c.Privileged
-	}
-	if c.MountTools != nil {
-		res.MountTools = make([]string, len(c.MountTools))
-		copy(res.MountTools, c.MountTools)
-	}
-	if c.Ports != nil {
-		res.Ports = make([]string, len(c.Ports))
-		copy(res.Ports, c.Ports)
-	}
-	if c.Expose != nil {
-		res.Expose = make([]string, len(c.Expose))
-		copy(res.Expose, c.Expose)
-	}
-	if c.DNS != nil {
-		res.DNS = make([]string, len(c.DNS))
-		copy(res.DNS, c.DNS)
-	}
-	if c.AddHosts != nil {
-		res.AddHosts = make([]string, len(c.AddHosts))
-		copy(res.AddHosts, c.AddHosts)
-	}
-	if c.CapAdd != nil {
-		res.CapAdd = make([]string, len(c.CapAdd))
-		copy(res.CapAdd, c.CapAdd)
-	}
-	if c.CapDrop != nil {
-		res.CapDrop = make([]string, len(c.CapDrop))
-		copy(res.CapDrop, c.CapDrop)
-	}
-	if c.Entrypoint != nil {
-		res.Entrypoint = make([]string, len(c.Entrypoint))
-		copy(res.Entrypoint, c.Entrypoint)
-	}
-	if c.Command != nil {
-		res.Command = make([]string, len(c.Command))
-		copy(res.Command, c.Command)
-	}
+	res.TTY = copyBoolPtr(c.TTY)
+	res.Interactive = copyBoolPtr(c.Interactive)
+	res.Remove = copyBoolPtr(c.Remove)
+	res.StrictEnv = copyBoolPtr(c.StrictEnv)
+	res.MountCderun = copyBoolPtr(c.MountCderun)
+	res.MountSocket = copyBoolPtr(c.MountSocket)
+	res.MountAllTools = copyBoolPtr(c.MountAllTools)
+	res.PublishAll = copyBoolPtr(c.PublishAll)
+	res.Privileged = copyBoolPtr(c.Privileged)
+
+	res.MountTools = copyStringSlice(c.MountTools)
+	res.Ports = copyStringSlice(c.Ports)
+	res.Expose = copyStringSlice(c.Expose)
+	res.DNS = copyStringSlice(c.DNS)
+	res.AddHosts = copyStringSlice(c.AddHosts)
+	res.CapAdd = copyStringSlice(c.CapAdd)
+	res.CapDrop = copyStringSlice(c.CapDrop)
+	res.Entrypoint = copyStringSlice(c.Entrypoint)
+	res.Command = copyStringSlice(c.Command)
+	res.Env = copyStringSlice(c.Env)
+
 	if c.Mounts != nil {
 		res.Mounts = make([]MountConfig, len(c.Mounts))
 		for i, m := range c.Mounts {
@@ -334,10 +225,6 @@ func (c ToolConfig) DeepCopy() ToolConfig {
 		for i, d := range c.Devices {
 			res.Devices[i] = d.DeepCopy()
 		}
-	}
-	if c.Env != nil {
-		res.Env = make([]string, len(c.Env))
-		copy(res.Env, c.Env)
 	}
 	return res
 }
@@ -367,6 +254,24 @@ func (t ToolsConfig) DeepCopy() ToolsConfig {
 	for k, v := range t {
 		res[k] = v.DeepCopy()
 	}
+	return res
+}
+
+func copyBoolPtr(b *bool) *bool {
+	if b == nil {
+		return nil
+	}
+	res := new(bool)
+	*res = *b
+	return res
+}
+
+func copyStringSlice(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	res := make([]string, len(s))
+	copy(res, s)
 	return res
 }
 

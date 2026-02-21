@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -70,7 +71,9 @@ func TestUnit_Mock_New(t *testing.T) {
 
 func TestUnit_Mock_ConcurrentAccess(t *testing.T) {
 	mock := NewMockRuntime()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	const goroutines = 10
 	const iterations = 100
 
