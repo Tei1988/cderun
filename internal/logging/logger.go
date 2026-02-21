@@ -167,6 +167,10 @@ func Info(msg string, args ...any)  { globalLogger.Info(msg, args...) }
 func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
 func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
 
+// GetGlobalLogger returns the global logger instance.
+// Note: Callers should not mutate the exported fields (Writer, Format, Timestamp)
+// of the returned Logger directly as it may lead to data races. Use Init() and
+// SetOutput() methods instead, which are thread-safe.
 func GetGlobalLogger() *Logger {
 	return globalLogger
 }

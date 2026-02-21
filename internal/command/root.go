@@ -142,6 +142,7 @@ func defaultOptions() rootOptions {
 		termGetSize: func(fd int) (int, int, error) {
 			return term.GetSize(fd)
 		},
+		logger: logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -746,9 +747,6 @@ intended for the subcommand.`,
 			}
 			if o.configLoader == nil {
 				o.configLoader = config.NewConfigLoaderWithFS(o.fs)
-			}
-			if o.logger == nil {
-				o.logger = logging.GetGlobalLogger()
 			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

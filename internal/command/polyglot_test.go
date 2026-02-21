@@ -124,7 +124,9 @@ func TestIntegration_Command_Polyglot_Symlink(t *testing.T) {
 		ExitCode:           0,
 	}
 
-	err = ExecuteContextWithOptions(context.Background(), []string{"node", "--version"}, withMockRuntime(mockRuntime))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
 
 	require.NoError(t, err)
 	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)

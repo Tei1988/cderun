@@ -21,9 +21,9 @@ type blockingMockRuntime struct {
 }
 
 func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
-	m.Mu.Lock()
+	m.Lock()
 	m.AttachedContainerID = containerID
-	m.Mu.Unlock()
+	m.Unlock()
 	close(m.attachStarted)
 	select {
 	case <-m.blockAttach:
@@ -194,17 +194,22 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		// Send SIGWINCH
 		_ = syscall.Kill(os.Getpid(), syscall.SIGWINCH)
 
-		// Give it a moment to process the signal
-		time.Sleep(200 * time.Millisecond)
+		// Poll for resize with timeout
+		expectedRows, expectedCols := 30, 100
+		deadline := time.Now().Add(1 * time.Second)
+		success := false
+		for time.Now().Before(deadline) {
+			actualRows, actualCols := mock.GetTTYSize()
+			if actualRows == uint(expectedRows) && actualCols == uint(expectedCols) {
+				success = true
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 
-		// Check if mock received resize call
-		mu.Lock()
-		expectedRows, expectedCols := currentRows, currentCols
-		mu.Unlock()
-
-		actualRows, actualCols := mock.GetTTYSize()
-		if actualRows != uint(expectedRows) || actualCols != uint(expectedCols) {
-			t.Errorf("expected resize to %dx%d, got %dx%d", expectedRows, expectedCols, actualRows, actualCols)
+		if !success {
+			actualRows, actualCols := mock.GetTTYSize()
+			t.Errorf("expected resize to %dx%d, got %dx%d (timed out)", expectedRows, expectedCols, actualRows, actualCols)
 		}
 
 		// Cleanup
@@ -251,10 +256,10 @@ type waitBlockingMock struct {
 }
 
 func (m *waitBlockingMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	m.Mu.Lock()
+	m.Lock()
 	m.WaitedContainerID = containerID
 	exitCode := m.ExitCode
-	m.Mu.Unlock()
+	m.Unlock()
 	close(m.waitStarted)
 	select {
 	case <-m.blockWait:

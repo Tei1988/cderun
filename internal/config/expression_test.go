@@ -39,7 +39,8 @@ func TestUnit_Config_Expression_FindDir(t *testing.T) {
 	})
 
 	t.Run("find_dir not found", func(t *testing.T) {
-		r2, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r2.resolveString("{{ find_dir:nonexistent }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: nonexistent")
@@ -68,7 +69,8 @@ func TestUnit_Config_Expression_File_Error(t *testing.T) {
 	})
 
 	t.Run("file not found", func(t *testing.T) {
-		r2, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r2.resolveString("{{ file:missing }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "file not found: missing")
@@ -126,7 +128,8 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 	hostCtx := &HostContext{}
 
 	t.Run("nested expressions (partial match due to non-recursive regex)", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		val := r.resolveString("{{ file:{{ file:inner.txt }} }}")
 		// Matches "{{ file:{{ file:inner.txt }}" and fails to find such file
 		require.Error(t, r.Error())
@@ -135,21 +138,24 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("multiple expressions", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		val := r.resolveString("{{ PWD }}/{{ file:inner.txt }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "/project/outer.txt", val)
 	})
 
 	t.Run("path traversal attempt in file", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ file:../../etc/passwd }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "parent directory references are not allowed")
 	})
 
 	t.Run("absolute path attempt in file", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ file:/etc/passwd }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "absolute paths")
