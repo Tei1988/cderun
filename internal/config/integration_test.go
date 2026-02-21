@@ -142,17 +142,26 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "golang:1.2.3", resolver.Resolve("golang:{{file:version.txt}}"))
-		assert.Empty(t, resolver.Resolve("{{file:nonexistent.txt}}"))
+		require.NoError(t, resolver.Error())
+		resolver.Resolve("{{file:nonexistent.txt}}")
+		require.Error(t, resolver.Error())
+		resolver, _ = NewExpressionResolver(nil) // Reset
 
 		t.Run("Path Traversal Protection", func(t *testing.T) {
 			// Absolute path should be blocked
-			assert.Empty(t, resolver.Resolve("{{file:/etc/passwd}}"))
+			resolver, _ = NewExpressionResolver(nil)
+			resolver.Resolve("{{file:/etc/passwd}}")
+			require.Error(t, resolver.Error())
+
 			// Parent directory reference should be blocked
-			assert.Empty(t, resolver.Resolve("{{file:../etc/passwd}}"))
+			resolver, _ = NewExpressionResolver(nil)
+			resolver.Resolve("{{file:../etc/passwd}}")
+			require.Error(t, resolver.Error())
 		})
 	})
 
 	t.Run("Nested Structures", func(t *testing.T) {
+		resolver, _ = NewExpressionResolver(nil) // Reset
 		input := map[string]any{
 			"image": "node:{{PWD}}",
 			"env": []any{

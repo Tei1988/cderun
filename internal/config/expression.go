@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -8,14 +9,20 @@ import (
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
+type fileCacheEntry struct {
+	content string
+	err     error
+}
+
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
 	Home        string
 	Pwd         string
 	HostContext *HostContext
-	fileCache   map[string]string
+	fileCache   map[string]fileCacheEntry
 	loader      *ConfigLoader
+	err         error
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
@@ -36,7 +43,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]string),
+		fileCache:   make(map[string]fileCacheEntry),
 		loader: &ConfigLoader{
 			fs:              fs,
 			systemConfigDir: defaultLoader.systemConfigDir,
@@ -45,8 +52,22 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 	}, nil
 }
 
+// Error returns the first error encountered during expression resolution.
+func (r *ExpressionResolver) Error() error {
+	return r.err
+}
+
+func (r *ExpressionResolver) setError(err error) {
+	if r.err == nil {
+		r.err = err
+	}
+}
+
 // Resolve processes a value (string, slice, or map) and resolves any expressions found.
 func (r *ExpressionResolver) Resolve(v any) any {
+	if r.err != nil {
+		return v
+	}
 	switch val := v.(type) {
 	case string:
 		return r.resolveString(val)
@@ -70,51 +91,89 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 	return exprRegex.ReplaceAllStringFunc(s, func(match string) string {
+		if r.err != nil {
+			return match
+		}
 		content := strings.TrimSpace(match[2 : len(match)-2])
 
-		// 1. Magic Words
-		switch content {
-		case "HOME":
-			return r.Home
-		case "PWD":
-			return r.Pwd
+		resolved, err := r.resolveDirective(content)
+		if err != nil {
+			r.setError(err)
+			return match
 		}
-
-		// 2. Directives
-		if after, ok := strings.CutPrefix(content, "file:"); ok {
-			filename := after
-			return r.resolveFile(filename)
-		}
-
-		return match // Keep as is if unknown
+		return resolved
 	})
 }
 
-func (r *ExpressionResolver) resolveFile(filename string) string {
+func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
+	// 1. Magic Words
+	switch content {
+	case "HOME":
+		return r.Home, nil
+	case "PWD":
+		return r.Pwd, nil
+	}
+
+	// 2. Directives
+	if after, ok := strings.CutPrefix(content, "file:"); ok {
+		return r.resolveFile(after)
+	}
+
+	if after, ok := strings.CutPrefix(content, "find_dir:"); ok {
+		return r.resolveFindDir(after)
+	}
+
+	return "{{" + content + "}}", nil // Keep as is if unknown
+}
+
+func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	// Security: Prevent path traversal by disallowing absolute paths or parent directory references.
 	// Since FindConfigs searches parent directories automatically, ".." is not needed for legitimate use.
 	if filepath.IsAbs(filename) || strings.Contains(filename, "..") {
-		return ""
+		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
 	if cached, ok := r.fileCache[filename]; ok {
-		return cached
+		return cached.content, cached.err
 	}
 
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
-		r.fileCache[filename] = ""
-		return ""
+		err := fmt.Errorf("file not found: %s", filename)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
 	}
 
 	// Use the highest priority file
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
-		r.fileCache[filename] = ""
-		return ""
+		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
+		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		return "", wrappedErr
 	}
 
 	result := strings.TrimSpace(string(data))
-	r.fileCache[filename] = result
-	return result
+	r.fileCache[filename] = fileCacheEntry{content: result}
+	return result, nil
+}
+
+func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
+	if filepath.IsAbs(name) || strings.Contains(name, "..") {
+		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
+	}
+
+	paths := r.loader.FindConfigs(name)
+	if len(paths) == 0 {
+		return "", fmt.Errorf("item not found for find_dir: %s", name)
+	}
+
+	// paths[0] is the full path to the found item
+	dir := filepath.Dir(paths[0])
+
+	rel, err := filepath.Rel(r.Pwd, dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate relative path for %s: %w", dir, err)
+	}
+
+	return rel, nil
 }

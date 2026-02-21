@@ -535,6 +535,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	if memStr != "" {
 		bytes, err := units.RAMInBytes(memStr)
 		if err != nil {
+			if exprErr := r.Error(); exprErr != nil {
+				return nil, exprErr
+			}
 			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
 		}
 		res.Memory = bytes
@@ -544,6 +547,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
 
 	res.HostContext = hostCtx
+
+	if err := r.Error(); err != nil {
+		return nil, err
+	}
 
 	return res, nil
 }
@@ -834,6 +841,9 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 	var res []string
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
+		if err := r.Error(); err != nil {
+			return nil, err
+		}
 		if strings.Contains(resolvedE, "=") {
 			res = append(res, resolvedE)
 		} else {
