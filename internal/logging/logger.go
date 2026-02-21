@@ -70,9 +70,9 @@ func (l Level) LowerString() string {
 type Logger struct {
 	mu        sync.Mutex
 	level     atomic.Int32
-	Writer    io.Writer
-	Format    string // "text" or "json"
-	Timestamp bool
+	writer    io.Writer
+	format    string // "text" or "json"
+	timestamp bool
 }
 
 func (l *Logger) SetLevel(level Level) {
@@ -83,11 +83,29 @@ func (l *Logger) GetLevel() Level {
 	return Level(l.level.Load())
 }
 
+func (l *Logger) GetFormat() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.format
+}
+
+func (l *Logger) GetTimestamp() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.timestamp
+}
+
+func (l *Logger) GetWriter() io.Writer {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.writer
+}
+
 func newDefaultLogger() *Logger {
 	l := &Logger{
-		Writer:    os.Stderr,
-		Format:    "text",
-		Timestamp: true,
+		writer:    os.Stderr,
+		format:    "text",
+		timestamp: true,
 	}
 	l.SetLevel(WarnLevel)
 	return l
@@ -104,8 +122,8 @@ func (l *Logger) Init(level string, format string, timestamp bool) error {
 	defer l.mu.Unlock()
 
 	l.SetLevel(ParseLevel(level))
-	l.Format = strings.ToLower(format)
-	l.Timestamp = timestamp
+	l.format = strings.ToLower(format)
+	l.timestamp = timestamp
 
 	return nil
 }
@@ -120,7 +138,7 @@ func (l *Logger) SetOutput(w io.Writer) {
 	if w == nil {
 		w = io.Discard
 	}
-	l.Writer = w
+	l.writer = w
 }
 
 func (l *Logger) log(level Level, msg string, args ...any) {
@@ -134,26 +152,27 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// Re-check level inside lock
 	if level > l.GetLevel() {
 		return
 	}
 
-	if l.Format == "json" {
+	if l.format == "json" {
 		entry := map[string]any{
 			"level": level.LowerString(),
 			"msg":   message,
 		}
-		if l.Timestamp {
+		if l.timestamp {
 			entry["time"] = now.Format(time.RFC3339)
 		}
 		data, _ := json.Marshal(entry) //nolint:errcheck
-		_, _ = fmt.Fprintln(l.Writer, string(data))
+		_, _ = fmt.Fprintln(l.writer, string(data))
 	} else {
 		ts := ""
-		if l.Timestamp {
+		if l.timestamp {
 			ts = now.Format("2006-01-02 15:04:05") + " "
 		}
-		_, _ = fmt.Fprintf(l.Writer, "%s[%s] %s\n", ts, level.String(), message)
+		_, _ = fmt.Fprintf(l.writer, "%s[%s] %s\n", ts, level.String(), message)
 	}
 }
 
@@ -170,9 +189,8 @@ func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
 func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
 
 // GetGlobalLogger returns the global logger instance.
-// Note: Callers should not mutate the exported fields (Writer, Format, Timestamp)
-// of the returned Logger directly as it may lead to data races. Use Init() and
-// SetOutput() methods instead, which are thread-safe.
+// Callers should use Init() and SetOutput() methods to configure it,
+// as they are thread-safe and properly handle internal state.
 func GetGlobalLogger() *Logger {
 	return globalLogger
 }

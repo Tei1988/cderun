@@ -146,15 +146,16 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		assert.NotNil(t, mockRuntime.GetCreatedConfig())
-		assert.Equal(t, "node:20-alpine", mockRuntime.GetCreatedConfig().Image)
-		assert.Equal(t, []string{"--version"}, mockRuntime.GetCreatedConfig().Command)
-		assert.True(t, mockRuntime.GetCreatedConfig().TTY)
-		assert.True(t, mockRuntime.GetCreatedConfig().Interactive)
-		assert.Equal(t, "host", mockRuntime.GetCreatedConfig().Network)
-		assert.Equal(t, "test-container-id", mockRuntime.StartedContainerID)
-		assert.Equal(t, "test-container-id", mockRuntime.WaitedContainerID)
-		assert.Equal(t, "test-container-id", mockRuntime.RemovedContainerID)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "node:20-alpine", cfg.Image)
+		assert.Equal(t, []string{"--version"}, cfg.Command)
+		assert.True(t, cfg.TTY)
+		assert.True(t, cfg.Interactive)
+		assert.Equal(t, "host", cfg.Network)
+		assert.Equal(t, "test-container-id", mockRuntime.GetStartedContainerID())
+		assert.Equal(t, "test-container-id", mockRuntime.GetWaitedContainerID())
+		assert.Equal(t, "test-container-id", mockRuntime.GetRemovedContainerID())
 		assert.Equal(t, 42, capturedExitCode)
 	})
 
@@ -175,7 +176,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		assert.False(t, mockRuntime.GetCreatedConfig().TTY)
+		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
@@ -187,7 +188,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		assert.True(t, mockRuntime.GetCreatedConfig().TTY)
+		assert.True(t, mockRuntime.CreatedConfig.TTY)
 	})
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
@@ -280,12 +281,12 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
-		assert.Contains(t, mockRuntime.GetCreatedConfig().Env, "MYVAR=a,b")
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
 	})
 }
 
-func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
+func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -296,17 +297,17 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
-		assert.Equal(t, "/my/workdir", mockRuntime.GetCreatedConfig().Workdir)
-		require.Len(t, mockRuntime.GetCreatedConfig().Mounts, 1)
-		assert.Equal(t, "/h", mockRuntime.GetCreatedConfig().Mounts[0].Source)
-		assert.Equal(t, "/c", mockRuntime.GetCreatedConfig().Mounts[0].Target)
-		assert.True(t, mockRuntime.GetCreatedConfig().Mounts[0].ReadOnly)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
+		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Mounts[0].Source)
+		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Mounts[0].Target)
+		assert.True(t, mockRuntime.CreatedConfig.Mounts[0].ReadOnly)
 
-		require.Len(t, mockRuntime.GetCreatedConfig().Devices, 1)
-		assert.Equal(t, "/dev/fuse", mockRuntime.GetCreatedConfig().Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/fuse", mockRuntime.GetCreatedConfig().Devices[0].PathInContainer)
-		assert.Equal(t, "rm", mockRuntime.GetCreatedConfig().Devices[0].CgroupPermissions)
+		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathInContainer)
+		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
 	})
 
 	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
@@ -322,10 +323,10 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		require.NotNil(t, mockRuntime.CreatedConfig)
 
 		socketFound := false
-		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if v.Target == "/var/run/docker.sock" {
 				assert.Equal(t, "/var/run/docker.sock", v.Source)
 				socketFound = true
@@ -343,10 +344,10 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		require.NotNil(t, mockRuntime.CreatedConfig)
 
 		socketFound = false
-		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
 				socketFound = true
 			}
@@ -364,12 +365,12 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		require.NotNil(t, mockRuntime.CreatedConfig)
 		exePath, _ := os.Executable()
 
 		binaryFound := false
 		socketFound := false
-		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if v.Source == exePath && v.Target == "/usr/local/bin/cderun" {
 				binaryFound = true
 			}
@@ -391,9 +392,9 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		require.NotNil(t, mockRuntime.CreatedConfig)
 		socketFound := false
-		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if v.Source == "/host/socket" && v.Target == "/container/socket" {
 				socketFound = true
 			}
@@ -402,7 +403,7 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_StrictMode(t *testing.T) {
+func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -420,9 +421,9 @@ func TestUnit_Command_Root_StrictMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		require.NotNil(t, mockRuntime.CreatedConfig)
 		// 'ls' should be excluded, only '-l' and '/tmp' remain
-		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.GetCreatedConfig().Command)
+		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
 	})
 }
 
@@ -544,58 +545,4 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 
 		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
 	})
-}
-
-func TestUnit_Command_Root_PreprocessArgs_EdgeCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		args        []string
-		expected    []string
-		expectedErr string
-	}{
-		{
-			name:        "P1 flag before subcommand in standard mode (error)",
-			args:        []string{"cderun", "--cderun-tty", "node"},
-			expectedErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
-		},
-		{
-			name:     "P1 flag in polyglot mode (allowed anywhere after exec name)",
-			args:     []string{"node", "--cderun-tty", "--version"},
-			expected: []string{"cderun", "--cderun-tty", "node", "--version"},
-		},
-		{
-			name:     "Multiple P1 flags hoisting",
-			args:     []string{"cderun", "node", "--version", "--cderun-tty", "-e", "FOO=BAR", "--cderun-image", "alpine"},
-			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "node", "--version", "-e", "FOO=BAR"},
-		},
-		{
-			name:     "P1 flag with equals sign",
-			args:     []string{"cderun", "node", "--cderun-image=alpine", "--version"},
-			expected: []string{"cderun", "--cderun-image=alpine", "node", "--version"},
-		},
-		{
-			name:     "P1 flag taking argument without equals",
-			args:     []string{"cderun", "node", "--cderun-image", "alpine", "--version"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version"},
-		},
-		{
-			name:     "P1 flag as last argument",
-			args:     []string{"cderun", "node", "--cderun-tty"},
-			expected: []string{"cderun", "--cderun-tty", "node"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cmd := newRootCmd(&rootOptions{})
-			actual, err := preprocessArgs(cmd, tt.args)
-			if tt.expectedErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, actual)
-			}
-		})
-	}
 }

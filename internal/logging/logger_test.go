@@ -12,12 +12,9 @@ import (
 
 func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := &Logger{
-		Writer:    buf,
-		Format:    "text",
-		Timestamp: false,
-	}
-	logger.SetLevel(InfoLevel)
+	logger := NewLogger()
+	logger.SetOutput(buf)
+	_ = logger.Init("info", "text", false)
 
 	logger.log(InfoLevel, "test info message")
 	assert.Contains(t, buf.String(), "[INFO] test info message")
@@ -33,12 +30,9 @@ func TestUnit_Logging_Logger_TextFormat(t *testing.T) {
 
 func TestUnit_Logging_Logger_JSONFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
-	logger := &Logger{
-		Writer:    buf,
-		Format:    "json",
-		Timestamp: false,
-	}
-	logger.SetLevel(InfoLevel)
+	logger := NewLogger()
+	logger.SetOutput(buf)
+	_ = logger.Init("info", "json", false)
 
 	logger.log(InfoLevel, "test json message %d", 123)
 
@@ -54,12 +48,10 @@ func TestUnit_Logging_Logger_WithTimestamp(t *testing.T) {
 
 	t.Run("text format", func(t *testing.T) {
 		buf.Reset()
-		logger := &Logger{
-			Writer:    buf,
-			Format:    "text",
-			Timestamp: true,
-		}
-		logger.SetLevel(InfoLevel)
+		logger := NewLogger()
+		logger.SetOutput(buf)
+		_ = logger.Init("info", "text", true)
+
 		logger.log(InfoLevel, "msg")
 		// Format: 2006-01-02 15:04:05 [INFO] msg
 		assert.Regexp(t, `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] msg`, buf.String())
@@ -67,12 +59,10 @@ func TestUnit_Logging_Logger_WithTimestamp(t *testing.T) {
 
 	t.Run("json format", func(t *testing.T) {
 		buf.Reset()
-		logger := &Logger{
-			Writer:    buf,
-			Format:    "json",
-			Timestamp: true,
-		}
-		logger.SetLevel(InfoLevel)
+		logger := NewLogger()
+		logger.SetOutput(buf)
+		_ = logger.Init("info", "json", true)
+
 		logger.log(InfoLevel, "msg")
 		var entry map[string]string
 		err := json.Unmarshal(buf.Bytes(), &entry)
@@ -106,9 +96,9 @@ func TestUnit_Logging_Init_GlobalLogger(t *testing.T) {
 	// Test Init updates globalLogger
 	err := Init("debug", "json", false)
 	require.NoError(t, err)
-	assert.Equal(t, DebugLevel, globalLogger.GetLevel())
-	assert.Equal(t, "json", globalLogger.Format)
-	assert.False(t, globalLogger.Timestamp)
+	assert.Equal(t, DebugLevel, GetGlobalLogger().GetLevel())
+	assert.Equal(t, "json", GetGlobalLogger().GetFormat())
+	assert.False(t, GetGlobalLogger().GetTimestamp())
 }
 
 func TestUnit_Logging_Wrappers_Levels(t *testing.T) {
@@ -139,5 +129,5 @@ func TestUnit_Logging_Wrappers_Levels(t *testing.T) {
 
 func TestUnit_Logging_Output_NilGuard(t *testing.T) {
 	SetOutput(nil)
-	assert.Equal(t, io.Discard, globalLogger.Writer)
+	assert.Equal(t, io.Discard, GetGlobalLogger().GetWriter())
 }

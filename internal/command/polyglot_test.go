@@ -113,6 +113,7 @@ func TestUnit_Command_Polyglot_Flags(t *testing.T) {
 		assert.Equal(t, "alpine", requireConfig.Image)
 	})
 }
+
 func TestIntegration_Command_Polyglot_Symlink(t *testing.T) {
 	setupTestDir(t)
 
@@ -129,6 +130,8 @@ func TestIntegration_Command_Polyglot_Symlink(t *testing.T) {
 	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
 
 	require.NoError(t, err)
-	assert.Equal(t, "node:20-alpine", mockRuntime.GetCreatedConfig().Image)
-	assert.Equal(t, []string{"--version"}, mockRuntime.GetCreatedConfig().Command)
+	cfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, cfg)
+	assert.Equal(t, "node:20-alpine", cfg.Image)
+	assert.Equal(t, []string{"--version"}, cfg.Command)
 }
