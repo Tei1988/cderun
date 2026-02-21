@@ -293,7 +293,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `expose` ([]string): ポート露出
 - `hostname` (string): ホスト名
 - `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマップ (YAMLキー: `addHosts`)
+- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip` (YAMLキー: `addHosts`)。
 - `user` (string): 実行ユーザー
 - `privileged` (bool): 特権モード
 - `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
@@ -308,7 +308,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
   - `source` (string): ホスト側のパス（bindの場合）
   - `target` (string, 必須): コンテナ内のパス
   - `read_only` (bool): 読み取り専用
-- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`
+- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`。
 - `env` ([]string): 環境変数
 
 #### `logging` サブセクション
@@ -327,6 +327,8 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 #### 共通オプション
 
 - `image` (string, 必須): 使用するコンテナイメージ
+- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip`。
+- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`。
 - `tty` (bool): TTYを割り当てる（`--tty`フラグに相当）
 - `interactive` (bool): STDINを開く（`--interactive`フラグに相当）
 - `network` (string): ネットワーク設定（`--network`フラグに相当）
@@ -348,7 +350,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `expose` ([]string): ポート露出
 - `hostname` (string): ホスト名
 - `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマップ (YAMLキー: `addHosts`)
 - `user` (string): 実行ユーザー
 - `privileged` (bool): 特権モード
 - `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
@@ -358,7 +359,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
-- `devices` ([]string): デバイス追加（上述）
 
 ## 優先順位
 

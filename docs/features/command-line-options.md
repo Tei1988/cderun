@@ -467,8 +467,9 @@ cderun --log-timestamp=false node app.js
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
 3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`,
    `CDERUN_TTY` 等。
-   - **セパレータ**: `CDERUN_ENV` および `CDERUN_MOUNT` はセミコロン (`;`) を、
-     `CDERUN_DEVICE` はカンマ (`,`) をセパレータとして使用します。
+   - **セパレータ**:
+     - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
+     - カンマ (`,`): `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)
