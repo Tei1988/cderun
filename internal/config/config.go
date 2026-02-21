@@ -391,39 +391,49 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
-	data, err := l.fs.ReadFile(path)
+	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+	}
+
+	data, err := l.fs.ReadFile(absPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read config file %s: %w", absPath, err)
 	}
 
 	var cfg CDERunConfig
 	if err := unmarshalStrict(data, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", absPath, err)
 	}
 
-	baseDir := filepath.Dir(path)
+	baseDir := filepath.Dir(absPath)
 	cfg.SetBaseDir(baseDir)
 
-	return &cfg, []string{path}, nil
+	return &cfg, []string{absPath}, nil
 }
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
-	data, err := l.fs.ReadFile(path)
+	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read tools file %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+	}
+
+	data, err := l.fs.ReadFile(absPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read tools file %s: %w", absPath, err)
 	}
 
 	cfg := make(ToolsConfig)
 	if err := unmarshalStrict(data, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", absPath, err)
 	}
 
-	baseDir := filepath.Dir(path)
+	baseDir := filepath.Dir(absPath)
 	for k, v := range cfg {
 		v.SetBaseDir(baseDir)
 		cfg[k] = v
 	}
 
-	return cfg, []string{path}, nil
+	return cfg, []string{absPath}, nil
 }

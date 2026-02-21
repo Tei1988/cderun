@@ -159,7 +159,7 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 
 	// Determine CDERun config path
 	cderunPath := ""
-	if o.cderunConfigPath != "" {
+	if cmd.Flags().Changed("cderun-config") {
 		cderunPath = o.cderunConfigPath
 	} else if cmd.Flags().Changed("config") {
 		cderunPath = o.configPath
@@ -184,7 +184,7 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 
 	// Determine Tools config path
 	toolsPath := ""
-	if o.cderunToolConfigPath != "" {
+	if cmd.Flags().Changed("cderun-tool-config") {
 		toolsPath = o.cderunToolConfigPath
 	} else if cmd.Flags().Changed("tool-config") {
 		toolsPath = o.toolConfigPath
