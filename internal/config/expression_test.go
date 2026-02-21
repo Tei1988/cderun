@@ -94,7 +94,7 @@ func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 	t.Run("empty file resolves to empty string", func(t *testing.T) {
 		val := r.resolveString("{{ file:empty.txt }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "", val)
+		assert.Empty(t, val)
 	})
 
 	t.Run("normal file still works", func(t *testing.T) {
@@ -107,6 +107,6 @@ func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 		// Second call should hit cache
 		val := r.resolveString("{{ file:empty.txt }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "", val)
+		assert.Empty(t, val)
 	})
 }
