@@ -9,13 +9,18 @@ import (
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
+type fileCacheEntry struct {
+	content string
+	err     error
+}
+
 // ExpressionResolver handles resolution of {{...}} expressions in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
 	Home        string
 	Pwd         string
 	HostContext *HostContext
-	fileCache   map[string]string
+	fileCache   map[string]fileCacheEntry
 	loader      *ConfigLoader
 	err         error
 }
@@ -38,7 +43,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]string),
+		fileCache:   make(map[string]fileCacheEntry),
 		loader: &ConfigLoader{
 			fs:              fs,
 			systemConfigDir: defaultLoader.systemConfigDir,
@@ -129,29 +134,26 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	}
 
 	if cached, ok := r.fileCache[filename]; ok {
-		if cached == "" && r.err == nil {
-			// This was a failed attempt previously cached as empty string
-			// Re-finding to get a proper error message if needed, or just error
-			return "", fmt.Errorf("file not found: %s", filename)
-		}
-		return cached, nil
+		return cached.content, cached.err
 	}
 
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
-		r.fileCache[filename] = ""
-		return "", fmt.Errorf("file not found: %s", filename)
+		err := fmt.Errorf("file not found: %s", filename)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
 	}
 
 	// Use the highest priority file
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
-		r.fileCache[filename] = ""
-		return "", fmt.Errorf("failed to read file %s: %w", paths[0], err)
+		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
+		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		return "", wrappedErr
 	}
 
 	result := strings.TrimSpace(string(data))
-	r.fileCache[filename] = result
+	r.fileCache[filename] = fileCacheEntry{content: result}
 	return result, nil
 }
 
