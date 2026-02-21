@@ -151,12 +151,12 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 			// Absolute path should be blocked
 			resolver, _ = NewExpressionResolver(nil)
 			resolver.Resolve("{{file:/etc/passwd}}")
-			assert.Error(t, resolver.Error())
+			require.Error(t, resolver.Error())
 
 			// Parent directory reference should be blocked
 			resolver, _ = NewExpressionResolver(nil)
 			resolver.Resolve("{{file:../etc/passwd}}")
-			assert.Error(t, resolver.Error())
+			require.Error(t, resolver.Error())
 		})
 	})
 
