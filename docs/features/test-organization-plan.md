@@ -11,7 +11,7 @@
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
 | `internal/command` | 93.1% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 89.5% | 設定の読み込み、マージ、Expression解決、パス解決等はやや低下（89.5%）。 |
+| `internal/config` | 89.5% | 設定の読み込み、マージ、Expression解決、パス解決等はやや低下。 |
 | `internal/logging` | 96.1% | 高いカバレッジを維持。 |
 | `internal/runtime` | 91.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
