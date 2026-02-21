@@ -49,7 +49,7 @@ func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {
 	assert.Equal(t, id, mock.GetRemovedContainerID())
 
 	// Test AttachContainer
-	err = mock.AttachContainer(ctx, id, true, nil, nil, nil)
+	err = mock.AttachContainer(ctx, id, true, nil, nil, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, id, mock.GetAttachedContainerID())
 

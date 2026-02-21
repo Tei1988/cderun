@@ -380,7 +380,7 @@ func TestUnit_Runtime_Docker_AttachContainer_Multiplexed(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock}
 
-		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, stdoutBuf, stderrBuf)
+		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, stdoutBuf, stderrBuf, nil)
 		require.NoError(t, err)
 		assert.Equal(t, msgStdout, stdoutBuf.String())
 		assert.Equal(t, msgStderr, stderrBuf.String())
@@ -390,7 +390,7 @@ func TestUnit_Runtime_Docker_AttachContainer_Multiplexed(t *testing.T) {
 	t.Run("attach error", func(t *testing.T) {
 		mock := &mockDockerClient{attachErr: errors.New("attach failed")}
 		runtime := &DockerRuntime{client: mock}
-		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil)
+		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil, nil)
 		require.Error(t, err)
 	})
 }
@@ -425,7 +425,7 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 		runtime := &DockerRuntime{client: mock}
 
 		stdout := &strings.Builder{}
-		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil)
+		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "output data", stdout.String())
 		assert.True(t, conn.closed)
@@ -442,7 +442,7 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 		runtime := &DockerRuntime{client: mock}
 
 		stdin := strings.NewReader("input data")
-		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil)
+		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil, nil)
 		require.NoError(t, err)
 		assert.True(t, conn.closed)
 	})
@@ -460,7 +460,7 @@ func TestUnit_Runtime_Docker_AttachContainer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
-		err := runtime.AttachContainer(ctx, "test-id", true, nil, nil, nil)
+		err := runtime.AttachContainer(ctx, "test-id", true, nil, nil, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
 		assert.True(t, conn.closed)

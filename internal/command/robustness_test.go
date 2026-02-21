@@ -20,11 +20,17 @@ type blockingMockRuntime struct {
 	blockAttach   chan struct{}
 }
 
-func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.Lock()
 	m.AttachedContainerID = containerID
 	m.Unlock()
-	close(m.attachStarted)
+	if ready != nil {
+		close(ready)
+	}
+	// Also close the legacy channel for existing tests
+	if m.attachStarted != nil {
+		close(m.attachStarted)
+	}
 	select {
 	case <-m.blockAttach:
 		return nil
