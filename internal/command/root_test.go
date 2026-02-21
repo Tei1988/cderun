@@ -285,7 +285,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase3Features(t *testing.T) {
+func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -402,7 +402,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
+func TestUnit_Command_Root_StrictMode(t *testing.T) {
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -544,4 +544,58 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 
 		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
 	})
+}
+
+func TestUnit_Command_Root_PreprocessArgs_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		args        []string
+		expected    []string
+		expectedErr string
+	}{
+		{
+			name:        "P1 flag before subcommand in standard mode (error)",
+			args:        []string{"cderun", "--cderun-tty", "node"},
+			expectedErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
+		},
+		{
+			name:     "P1 flag in polyglot mode (allowed anywhere after exec name)",
+			args:     []string{"node", "--cderun-tty", "--version"},
+			expected: []string{"cderun", "--cderun-tty", "node", "--version"},
+		},
+		{
+			name:     "Multiple P1 flags hoisting",
+			args:     []string{"cderun", "node", "--version", "--cderun-tty", "-e", "FOO=BAR", "--cderun-image", "alpine"},
+			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "node", "--version", "-e", "FOO=BAR"},
+		},
+		{
+			name:     "P1 flag with equals sign",
+			args:     []string{"cderun", "node", "--cderun-image=alpine", "--version"},
+			expected: []string{"cderun", "--cderun-image=alpine", "node", "--version"},
+		},
+		{
+			name:     "P1 flag taking argument without equals",
+			args:     []string{"cderun", "node", "--cderun-image", "alpine", "--version"},
+			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version"},
+		},
+		{
+			name:     "P1 flag as last argument",
+			args:     []string{"cderun", "node", "--cderun-tty"},
+			expected: []string{"cderun", "--cderun-tty", "node"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := newRootCmd(&rootOptions{})
+			actual, err := preprocessArgs(cmd, tt.args)
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
 }

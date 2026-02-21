@@ -110,3 +110,49 @@ func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 		assert.Empty(t, val)
 	})
 }
+
+func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
+	fs := &MockFileSystem{
+		Files: map[string][]byte{
+			"/project/inner.txt": []byte("outer.txt"),
+			"/project/outer.txt": []byte("content"),
+		},
+		Dirs: map[string]bool{
+			"/project": true,
+		},
+		WD: "/project",
+	}
+
+	hostCtx := &HostContext{}
+
+	t.Run("nested expressions (partial match due to non-recursive regex)", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		val := r.resolveString("{{ file:{{ file:inner.txt }} }}")
+		// Matches "{{ file:{{ file:inner.txt }}" and fails to find such file
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "file not found")
+		assert.Equal(t, "{{ file:{{ file:inner.txt }} }}", val)
+	})
+
+	t.Run("multiple expressions", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		val := r.resolveString("{{ PWD }}/{{ file:inner.txt }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "/project/outer.txt", val)
+	})
+
+	t.Run("path traversal attempt in file", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r.resolveString("{{ file:../../etc/passwd }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "parent directory references are not allowed")
+	})
+
+	t.Run("absolute path attempt in file", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r.resolveString("{{ file:/etc/passwd }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "absolute paths")
+		assert.Contains(t, r.Error().Error(), "are not allowed")
+	})
+}

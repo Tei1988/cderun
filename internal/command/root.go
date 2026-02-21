@@ -111,6 +111,7 @@ type rootOptions struct {
 	// Dependencies
 	fs           config.FileSystem
 	configLoader *config.ConfigLoader
+	logger       *logging.Logger
 
 	// Testing hooks
 	exitFunc       func(int)
@@ -155,7 +156,7 @@ func defaultOptions() rootOptions {
 }
 
 func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
-	logging.Trace("Loading configurations...")
+	o.logger.Trace("Loading configurations...")
 
 	// Determine CDERun config path
 	cderunPath := ""
@@ -179,7 +180,7 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
 	} else if len(globalPaths) > 0 {
-		logging.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
+		o.logger.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
 	}
 
 	// Determine Tools config path
@@ -203,7 +204,7 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
 	} else if len(toolsPaths) > 0 {
-		logging.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
+		o.logger.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
 	}
 	return toolsCfg, globalCfg, globalPaths, toolsPaths, nil
 }
@@ -422,7 +423,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// Handle MountTools / MountAllTools
 		if resolved.MountAllTools {
 			if len(toolsCfg) == 0 {
-				logging.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
+				o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
 			}
 			// Sort tool names to ensure deterministic mount order
 			toolNames := make([]string, 0, len(toolsCfg))
@@ -585,13 +586,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if len(containerConfig.Entrypoint) > 0 {
 		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
 	}
-	logging.Info("Running: %s", fullCmdStr)
-	logging.Debug("Image: %s", containerConfig.Image)
-	logging.Debug("Command: %v", containerConfig.Command)
-	logging.Debug("Entrypoint: %v", containerConfig.Entrypoint)
-	logging.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
-	logging.Debug("Runtime: %s", resolved.Runtime)
-	logging.Debug("Socket: %s", resolved.SocketPath)
+	o.logger.Info("Running: %s", fullCmdStr)
+	o.logger.Debug("Image: %s", containerConfig.Image)
+	o.logger.Debug("Command: %v", containerConfig.Command)
+	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
+	o.logger.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
+	o.logger.Debug("Runtime: %s", resolved.Runtime)
+	o.logger.Debug("Socket: %s", resolved.SocketPath)
 
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -602,7 +603,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
 	}
 
-	logging.Trace("Creating container...")
+	o.logger.Trace("Creating container...")
 	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull); err != nil {
 		return 0, fmt.Errorf("failed to pull image: %w", err)
 	}
@@ -615,19 +616,19 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if containerConfig.Remove {
 		cleanupCtx := context.WithoutCancel(ctx)
 		defer func() {
-			logging.Trace("Removing container: %s", containerID)
+			o.logger.Trace("Removing container: %s", containerID)
 			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
-				logging.Warn("failed to remove container (defer): %v", err)
+				o.logger.Warn("failed to remove container (defer): %v", err)
 			}
 		}()
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
 	if containerConfig.TTY && o.isTerminal(int(os.Stdin.Fd())) {
-		logging.Trace("Setting terminal to raw mode")
+		o.logger.Trace("Setting terminal to raw mode")
 		state, err := term.MakeRaw(int(os.Stdin.Fd()))
 		if err != nil {
-			logging.Warn("failed to set terminal to raw mode: %v", err)
+			o.logger.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
 			defer func() { _ = term.Restore(int(os.Stdin.Fd()), state) }() //nolint:errcheck
 		}
@@ -644,13 +645,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			case sig := <-sigChan:
 				if firstSignal {
 					sigName := getSignalName(sig)
-					logging.Debug("Forwarding signal %v to container", sig)
+					o.logger.Debug("Forwarding signal %v to container", sig)
 					if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
-						logging.Warn("failed to forward signal %v: %v", sig, err)
+						o.logger.Warn("failed to forward signal %v: %v", sig, err)
 					}
 					firstSignal = false
 				} else {
-					logging.Info("Received second signal, terminating...")
+					o.logger.Info("Received second signal, terminating...")
 					cancel()
 					return
 				}
@@ -678,7 +679,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// reducing race condition where container starts and finishes before attachment.
 	time.Sleep(100 * time.Millisecond)
 
-	logging.Trace("Starting container: %s", containerID)
+	o.logger.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
@@ -709,7 +710,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}
 	}
 
-	logging.Trace("Waiting for container: %s", containerID)
+	o.logger.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
@@ -722,12 +723,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
 	case <-time.After(attachGracePeriod):
-		logging.Debug("AttachContainer timed out after container exit, forcing close")
+		o.logger.Debug("AttachContainer timed out after container exit, forcing close")
 		cancelAttach()
 		<-attachDone
 	}
 
-	logging.Debug("Container exited with code: %d", exitCode)
+	o.logger.Debug("Container exited with code: %d", exitCode)
 	return exitCode, nil
 }
 
@@ -746,6 +747,9 @@ intended for the subcommand.`,
 			if o.configLoader == nil {
 				o.configLoader = config.NewConfigLoaderWithFS(o.fs)
 			}
+			if o.logger == nil {
+				o.logger = logging.GetGlobalLogger()
+			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Early logger initialization with CLI and Environment settings before config loading.
@@ -760,7 +764,7 @@ intended for the subcommand.`,
 			if o.cderunLogLevel != "" {
 				initialLevel = o.cderunLogLevel
 			}
-			_ = logging.Init(initialLevel, "text", true) //nolint:errcheck
+			_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
 
 			// Load configurations
 			toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
@@ -801,12 +805,12 @@ intended for the subcommand.`,
 			}
 
 			// Re-initialize logger with fully resolved settings including those from config files.
-			if err := logging.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+			if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
 				return fmt.Errorf("failed to initialize logger: %w", err)
 			}
 			// Redirect logging to the command's stderr stream.
-			logging.SetOutput(cmd.ErrOrStderr())
-			logging.Debug("Logger initialized with level: %s", resolved.LogLevel)
+			o.logger.SetOutput(cmd.ErrOrStderr())
+			o.logger.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 			// Build ContainerConfig
 			var containerConfig *container.ContainerConfig
@@ -824,20 +828,20 @@ intended for the subcommand.`,
 			// Create snapshot if nested execution support is requested or already active
 			var snapshotDir string
 			if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
-				logging.Debug("Creating execution snapshot for nested support...")
+				o.logger.Debug("Creating execution snapshot for nested support...")
 				// Ensure globalCfg is initialized for snapshot if it was nil
 				if globalCfg == nil {
 					globalCfg = &config.CDERunConfig{}
 				}
-				sDir, err := createSnapshot(o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+				sDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
 				if err != nil {
-					logging.Warn("failed to create snapshot: %v", err)
+					o.logger.Warn("failed to create snapshot: %v", err)
 				} else {
 					snapshotDir = sDir
 					defer func() {
-						logging.Trace("Cleaning up snapshot: %s", snapshotDir)
+						o.logger.Trace("Cleaning up snapshot: %s", snapshotDir)
 						if err := cleanupSnapshot(o.fs, snapshotDir); err != nil {
-							logging.Warn("failed to cleanup snapshot: %v", err)
+							o.logger.Warn("failed to cleanup snapshot: %v", err)
 						}
 					}()
 					// Mount the snapshot directory

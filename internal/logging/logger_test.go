@@ -111,7 +111,7 @@ func TestUnit_Logging_Init_GlobalLogger(t *testing.T) {
 	assert.False(t, globalLogger.Timestamp)
 }
 
-func TestUnit_Logging_Wrappers_AllLevels(t *testing.T) {
+func TestUnit_Logging_Wrappers_Levels(t *testing.T) {
 	buf := &bytes.Buffer{}
 	SetOutput(buf)
 	err := Init("trace", "text", false)

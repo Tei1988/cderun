@@ -115,23 +115,6 @@ func TestIntegration_Command_Root_BasicExecution(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_Root_SymlinkExecution(t *testing.T) {
-	setupTestDir(t)
-
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
-	require.NoError(t, err)
-
-	mockRuntime := &runtime.MockRuntime{
-		CreatedContainerID: "test-container-id",
-		ExitCode:           0,
-	}
-
-	err = ExecuteContextWithOptions(context.Background(), []string{"node", "--version"}, withMockRuntime(mockRuntime))
-
-	require.NoError(t, err)
-	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-	assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
-}
 
 func TestIntegration_Command_Root_ToolsYAML(t *testing.T) {
 	setupTestDir(t)
@@ -515,7 +498,7 @@ func TestIntegration_Command_Root_InternalOverrides(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
+func TestIntegration_Command_Stdin_MockRuntime(t *testing.T) {
 	mock := &pipeMockRuntime{}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0
@@ -543,7 +526,7 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	assert.Equal(t, stdinData, outBuf.String())
 }
 
-func TestIntegration_Command_ConfigFlags(t *testing.T) {
+func TestIntegration_Command_Root_ConfigFlags(t *testing.T) {
 	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
 		setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}

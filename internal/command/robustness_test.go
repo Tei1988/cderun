@@ -21,7 +21,9 @@ type blockingMockRuntime struct {
 }
 
 func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+	m.Mu.Lock()
 	m.AttachedContainerID = containerID
+	m.Mu.Unlock()
 	close(m.attachStarted)
 	select {
 	case <-m.blockAttach:
@@ -249,12 +251,15 @@ type waitBlockingMock struct {
 }
 
 func (m *waitBlockingMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	m.Mu.Lock()
 	m.WaitedContainerID = containerID
+	exitCode := m.ExitCode
+	m.Mu.Unlock()
 	close(m.waitStarted)
 	select {
 	case <-m.blockWait:
-		return 0, nil
+		return exitCode, nil
 	case <-ctx.Done():
-		return 0, ctx.Err()
+		return exitCode, ctx.Err()
 	}
 }

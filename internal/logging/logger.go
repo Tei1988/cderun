@@ -94,40 +94,44 @@ var globalLogger = func() *Logger {
 }()
 
 func Init(level string, format string, timestamp bool) error {
-	globalLogger.mu.Lock()
-	defer globalLogger.mu.Unlock()
+	return globalLogger.Init(level, format, timestamp)
+}
 
-	globalLogger.SetLevel(ParseLevel(level))
-	globalLogger.Format = strings.ToLower(format)
-	globalLogger.Timestamp = timestamp
+func (l *Logger) Init(level string, format string, timestamp bool) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.SetLevel(ParseLevel(level))
+	l.Format = strings.ToLower(format)
+	l.Timestamp = timestamp
 
 	return nil
 }
 
 func SetOutput(w io.Writer) {
-	globalLogger.mu.Lock()
-	defer globalLogger.mu.Unlock()
+	globalLogger.SetOutput(w)
+}
+
+func (l *Logger) SetOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if w == nil {
 		w = io.Discard
 	}
-	globalLogger.Writer = w
+	l.Writer = w
 }
 
 func (l *Logger) log(level Level, msg string, args ...any) {
-	// Optimization: Check level before locking to avoid contention for filtered logs.
-	// We use atomic load to avoid data races.
 	if level > l.GetLevel() {
 		return
 	}
 
-	// Prepare the message and timestamp outside of the lock to reduce critical section time.
 	message := fmt.Sprintf(msg, args...)
 	now := time.Now()
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Re-check level inside the lock for absolute consistency.
 	if level > l.GetLevel() {
 		return
 	}
@@ -140,7 +144,6 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 		if l.Timestamp {
 			entry["time"] = now.Format(time.RFC3339)
 		}
-		// JSON marshaling and writing are done inside the lock to ensure atomic log lines.
 		data, _ := json.Marshal(entry) //nolint:errcheck
 		_, _ = fmt.Fprintln(l.Writer, string(data))
 	} else {
@@ -152,8 +155,28 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 	}
 }
 
-func Error(msg string, args ...any) { globalLogger.log(ErrorLevel, msg, args...) }
-func Warn(msg string, args ...any)  { globalLogger.log(WarnLevel, msg, args...) }
-func Info(msg string, args ...any)  { globalLogger.log(InfoLevel, msg, args...) }
-func Debug(msg string, args ...any) { globalLogger.log(DebugLevel, msg, args...) }
-func Trace(msg string, args ...any) { globalLogger.log(TraceLevel, msg, args...) }
+func (l *Logger) Error(msg string, args ...any) { l.log(ErrorLevel, msg, args...) }
+func (l *Logger) Warn(msg string, args ...any)  { l.log(WarnLevel, msg, args...) }
+func (l *Logger) Info(msg string, args ...any)  { l.log(InfoLevel, msg, args...) }
+func (l *Logger) Debug(msg string, args ...any) { l.log(DebugLevel, msg, args...) }
+func (l *Logger) Trace(msg string, args ...any) { l.log(TraceLevel, msg, args...) }
+
+func Error(msg string, args ...any) { globalLogger.Error(msg, args...) }
+func Warn(msg string, args ...any)  { globalLogger.Warn(msg, args...) }
+func Info(msg string, args ...any)  { globalLogger.Info(msg, args...) }
+func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
+func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
+
+func GetGlobalLogger() *Logger {
+	return globalLogger
+}
+
+func NewLogger() *Logger {
+	l := &Logger{
+		Writer:    os.Stderr,
+		Format:    "text",
+		Timestamp: true,
+	}
+	l.SetLevel(WarnLevel)
+	return l
+}
