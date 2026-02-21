@@ -1,0 +1,17 @@
+<<<<<<< SEARCH
+- `--remove`: Automatically remove the container when it exits (default: true).
+- `--runtime`: Container runtime to use (docker/podman).
+=======
+- `--remove`: Automatically remove the container when it exits (default: true).
+- `--config`: Path to cderun config file.
+- `--tool-config`: Path to tools config file.
+- `--runtime`: Container runtime to use (docker/podman).
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+- `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
+- `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
+=======
+- `--mount-cderun`: Mount the cderun binary into the container. Requires `--mount-socket`.
+- `--mount-cderun-path`: Host path to cderun binary to mount inside container.
+- `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
+>>>>>>> REPLACE
