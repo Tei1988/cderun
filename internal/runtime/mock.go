@@ -39,6 +39,14 @@ type MockRuntime struct {
 	SignalErr           error
 }
 
+// WithLockedMock executes the provided function while holding the mock's mutex.
+// This is intended for test-only use.
+func (m *MockRuntime) WithLockedMock(f func(m *MockRuntime)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f(m)
+}
+
 func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -75,10 +83,13 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 	return m.RemoveErr
 }
 
-func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.AttachedContainerID = containerID
+	m.mu.Unlock()
+	if ready != nil {
+		close(ready)
+	}
 	return m.AttachErr
 }
 
@@ -133,6 +144,12 @@ func (m *MockRuntime) GetAttachedContainerID() string {
 	return m.AttachedContainerID
 }
 
+func (m *MockRuntime) GetExitCode() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.ExitCode
+}
+
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -143,4 +160,11 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 
 func (m *MockRuntime) Name() string {
 	return "mock"
+}
+
+// ResetCreatedConfig resets the created config to nil.
+func (m *MockRuntime) ResetCreatedConfig() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CreatedConfig = nil
 }

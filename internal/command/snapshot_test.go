@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/container"
 )
 
@@ -33,7 +34,7 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
@@ -55,7 +56,7 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
@@ -71,7 +72,7 @@ func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	snapshotDir, err := createSnapshot(mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })

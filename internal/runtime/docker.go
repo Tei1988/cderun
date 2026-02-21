@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,21 +25,12 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const (
-	pullMaxRetries = 3
-)
+const pullMaxRetries = 3
 
-func isRetryablePullError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "Rate exceeded")
-}
+var eofRegex = regexp.MustCompile(`\beof\b`)
 
-// dockerClient is an interface that matches the Docker client methods we use.
 type dockerClient interface {
-	ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
+	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options dockercontainer.StartOptions) error
@@ -286,7 +278,7 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 }
 
 // AttachContainer attaches to a container's IO streams.
-func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	logging.Debug("Attaching to container %s (tty=%v, stdin=%v)", containerID, tty, stdin != nil)
 	if stdout == nil {
 		stdout = io.Discard
@@ -303,9 +295,16 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		Stderr: true,
 	})
 	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
 		return err
 	}
 	defer resp.Close()
+
+	if ready != nil {
+		close(ready)
+	}
 
 	var stdinErr error
 	stdinDone := make(chan struct{})
@@ -332,13 +331,6 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	go func() {
 		var err error
 		logging.Debug("Output goroutine started")
-		if !tty {
-			if peek, err := resp.Reader.Peek(8); err == nil {
-				logging.Debug("Output stream starts with: %v", peek)
-			} else {
-				logging.Debug("Failed to peek output stream: %v", err)
-			}
-		}
 		if tty {
 			// When TTY is enabled, the stream is raw (not multiplexed).
 			_, err = io.Copy(stdout, resp.Reader)
@@ -378,4 +370,18 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
+}
+
+func isRetryablePullError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "toomanyrequests") ||
+		strings.Contains(msg, "rate exceeded") ||
+		strings.Contains(msg, "rate limit") ||
+		strings.Contains(msg, "data limit exceeded") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "connection refused") ||
+		eofRegex.MatchString(msg)
 }

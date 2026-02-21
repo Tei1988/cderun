@@ -152,7 +152,7 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_LoadFromPath(t *testing.T) {
+func TestUnit_Config_Load_FromPath(t *testing.T) {
 	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
 		content := `
 runtime: podman

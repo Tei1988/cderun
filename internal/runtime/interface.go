@@ -19,7 +19,7 @@ type ContainerRuntime interface {
 	RemoveContainer(ctx context.Context, containerID string) error
 
 	// Container communication
-	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error
+	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
 	SignalContainer(ctx context.Context, containerID string, sig string) error
 

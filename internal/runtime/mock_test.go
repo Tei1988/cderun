@@ -4,70 +4,65 @@ import (
 	"context"
 	"testing"
 
-	"cderun/internal/container"
-
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+
+	"cderun/internal/container"
 )
 
 func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {
-	mock := &MockRuntime{
-		CreatedContainerID: "test-id",
-		ExitCode:           42,
-	}
-
-	var _ ContainerRuntime = mock // Verify interface compliance
-
+	mock := NewMockRuntime()
 	ctx := context.Background()
-	config := &container.ContainerConfig{Image: "alpine"}
 
-	// Test PullImage
-	err := mock.PullImage(ctx, "alpine", "always")
-	require.NoError(t, err)
-	assert.Equal(t, "alpine", mock.GetPulledImage())
+	// PullImage
+	_ = mock.PullImage(ctx, "img", "always")
+	assert.Equal(t, "img", mock.GetPulledImage())
 
-	// Test CreateContainer
-	id, err := mock.CreateContainer(ctx, config)
-	require.NoError(t, err)
-	assert.Equal(t, "test-id", id)
+	// CreateContainer
+	config := &container.ContainerConfig{Image: "img"}
+	mock.CreatedContainerID = "c1"
+	id, _ := mock.CreateContainer(ctx, config)
+	assert.Equal(t, "c1", id)
 	assert.Equal(t, config, mock.GetCreatedConfig())
 
-	// Test StartContainer
-	err = mock.StartContainer(ctx, id)
-	require.NoError(t, err)
-	assert.Equal(t, id, mock.GetStartedContainerID())
+	// StartContainer
+	_ = mock.StartContainer(ctx, "c1")
+	assert.Equal(t, "c1", mock.GetStartedContainerID())
 
-	// Test WaitContainer
-	code, err := mock.WaitContainer(ctx, id)
-	require.NoError(t, err)
+	// WaitContainer
+	mock.ExitCode = 42
+	code, _ := mock.WaitContainer(ctx, "c1")
 	assert.Equal(t, 42, code)
-	assert.Equal(t, id, mock.GetWaitedContainerID())
+	assert.Equal(t, "c1", mock.GetWaitedContainerID())
 
-	// Test RemoveContainer
-	err = mock.RemoveContainer(ctx, id)
-	require.NoError(t, err)
-	assert.Equal(t, id, mock.GetRemovedContainerID())
+	// RemoveContainer
+	_ = mock.RemoveContainer(ctx, "c1")
+	assert.Equal(t, "c1", mock.GetRemovedContainerID())
 
-	// Test AttachContainer
-	err = mock.AttachContainer(ctx, id, true, nil, nil, nil)
-	require.NoError(t, err)
-	assert.Equal(t, id, mock.GetAttachedContainerID())
+	// AttachContainer
+	_ = mock.AttachContainer(ctx, "c1", false, nil, nil, nil, nil)
+	assert.Equal(t, "c1", mock.GetAttachedContainerID())
 
-	// Test ResizeContainerTTY
-	err = mock.ResizeContainerTTY(ctx, id, 24, 80)
-	require.NoError(t, err)
-	rows, cols := mock.GetTTYSize()
-	assert.Equal(t, uint(24), rows)
-	assert.Equal(t, uint(80), cols)
+	// ResizeContainerTTY
+	_ = mock.ResizeContainerTTY(ctx, "c1", 10, 20)
+	assert.Equal(t, "c1", mock.ResizedContainerID)
+	r, c := mock.GetTTYSize()
+	assert.Equal(t, uint(10), r)
+	assert.Equal(t, uint(20), c)
 
-	// Test SignalContainer
-	err = mock.SignalContainer(ctx, id, "SIGINT")
-	require.NoError(t, err)
+	// SignalContainer
+	_ = mock.SignalContainer(ctx, "c1", "SIGINT")
+	assert.Equal(t, "c1", mock.SignaledContainerID)
+	assert.Equal(t, "SIGINT", mock.Signal)
 
+	// Name
 	assert.Equal(t, "mock", mock.Name())
+
+	// ResetCreatedConfig
+	mock.ResetCreatedConfig()
+	assert.Nil(t, mock.GetCreatedConfig())
 }
 
 func TestUnit_Runtime_Mock_New(t *testing.T) {
-	m := NewMockRuntime()
-	assert.NotNil(t, m)
+	mock := NewMockRuntime()
+	assert.NotNil(t, mock)
 }

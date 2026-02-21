@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
+func TestScenario_Command_Device_MountNull(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}
@@ -33,7 +33,7 @@ func TestE2E_Command_Device_MountNullAsNull2(t *testing.T) {
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
-func TestE2E_Command_Stdin_Piped(t *testing.T) {
+func TestScenario_Command_Stdin_Piped(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}

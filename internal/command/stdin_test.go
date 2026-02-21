@@ -18,9 +18,9 @@ type pipeMockRuntime struct {
 	runtime.MockRuntime
 }
 
-func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer) error {
+func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	// Call embedded mock for record keeping
-	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr)
+	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
 
 	if stdin != nil && stdout != nil {
 		// Simulate container that echoes back stdin to stdout

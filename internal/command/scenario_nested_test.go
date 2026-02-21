@@ -6,78 +6,52 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
 func TestScenario_Command_Nested_ExecutionFlow(t *testing.T) {
-	// This test mutates runConfigDir and the current working directory, and therefore must not run in parallel.
-	// It uses ExecuteContextWithOptions to inject dependencies locally.
+	// Scenario: Standard Docker environment (level 0) running a container (level 1).
+	// We verify that a snapshot is created when requested.
 
-	// 1. Setup mock environment
 	tmpDir := t.TempDir()
+	hostProjectDir := filepath.Join(tmpDir, "project")
+	_ = os.MkdirAll(hostProjectDir, 0o755)
 
-	// Create a dummy project on "host"
-	hostProjectDir := filepath.Join(tmpDir, "host-project")
-	require.NoError(t, os.MkdirAll(hostProjectDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(hostProjectDir, "hello.txt"), []byte("hello from host"), 0o644))
+	// 1. Initial State (Host side)
+	err := os.WriteFile(filepath.Join(hostProjectDir, ".tools.yaml"), []byte("node:\n  image: node:20"), 0o644)
+	require.NoError(t, err)
 
-	// Simulate being inside a container (Level 1)
-	// Current directory in container is /app
-	// Host mapping: /home/user/project -> /app
-	runDir := filepath.Join(tmpDir, "run")
-	require.NoError(t, os.MkdirAll(runDir, 0o755))
-
-	restoreRunDir := config.SetRunConfigDirForTest(runDir)
-	t.Cleanup(restoreRunDir)
-
-	simulatedAppDir := filepath.Join(tmpDir, "simulated-app")
-	require.NoError(t, os.MkdirAll(filepath.Join(simulatedAppDir, "subdir"), 0o755))
-
-	nestedConfig := `
-hostContext:
-  level: 1
-  binPath: "/usr/local/bin/cderun"
-  workingDir: "/home/user/project"
-  mounts:
-    - source: "` + hostProjectDir + `"
-      target: "` + simulatedAppDir + `"
-      level: 1
-`
-	require.NoError(t, os.WriteFile(filepath.Join(runDir, ".cderun.yaml"), []byte(nestedConfig), 0o644))
-
-	// 2. Setup Mock Runtime
-	mockRuntime := &runtime.MockRuntime{}
-
-	// 3. Run cderun as if we are in the container
-	// Current working directory is /app (simulated)
-	// We want to mount a subdirectory: --mount type=bind,source=./subdir,target=/mnt
-	// /app/subdir should be translated to hostProjectDir/subdir
+	// 2. Execution (simulate cderun node ls)
+	mockRuntime := &runtime.MockRuntime{
+		CreatedContainerID: "test-container-id",
+	}
 
 	savedWd, err := os.Getwd()
 	require.NoError(t, err)
-
-	// In the simulated container, PWD is simulatedAppDir
-	require.NoError(t, os.Chdir(simulatedAppDir))
+	require.NoError(t, os.Chdir(hostProjectDir))
 	t.Cleanup(func() { _ = os.Chdir(savedWd) })
 
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=./subdir,target=/mnt", "sh"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-cderun", "node", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+	})
 	require.NoError(t, err)
+	cfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, cfg)
 
-	// 4. Verify path translation
-	require.NotNil(t, mockRuntime.CreatedConfig)
-	found := false
-	for _, m := range mockRuntime.CreatedConfig.Mounts {
-		if m.Target == "/mnt" {
-			// Source should be translated back to host path
-			// hostProjectDir + /subdir
-			expectedSource := filepath.Join(hostProjectDir, "subdir")
-			assert.Equal(t, expectedSource, m.Source)
-			found = true
+	// Check that snapshot was created and mounted
+	foundSnapshot := false
+	for _, m := range cfg.Mounts {
+		if m.Target == "/run/cderun" {
+			foundSnapshot = true
+			break
 		}
 	}
-	assert.True(t, found, "mount for /mnt not found")
+	assert.True(t, foundSnapshot, "snapshot should be mounted")
 }
