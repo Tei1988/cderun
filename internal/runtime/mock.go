@@ -156,3 +156,10 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 func (m *MockRuntime) Name() string {
 	return "mock"
 }
+
+// ResetCreatedConfig resets the created config to nil.
+func (m *MockRuntime) ResetCreatedConfig() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CreatedConfig = nil
+}

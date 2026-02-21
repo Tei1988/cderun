@@ -146,12 +146,12 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		assert.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-		assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
-		assert.True(t, mockRuntime.CreatedConfig.TTY)
-		assert.True(t, mockRuntime.CreatedConfig.Interactive)
-		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
+		assert.NotNil(t, mockRuntime.GetCreatedConfig())
+		assert.Equal(t, "node:20-alpine", mockRuntime.GetCreatedConfig().Image)
+		assert.Equal(t, []string{"--version"}, mockRuntime.GetCreatedConfig().Command)
+		assert.True(t, mockRuntime.GetCreatedConfig().TTY)
+		assert.True(t, mockRuntime.GetCreatedConfig().Interactive)
+		assert.Equal(t, "host", mockRuntime.GetCreatedConfig().Network)
 		assert.Equal(t, "test-container-id", mockRuntime.StartedContainerID)
 		assert.Equal(t, "test-container-id", mockRuntime.WaitedContainerID)
 		assert.Equal(t, "test-container-id", mockRuntime.RemovedContainerID)
@@ -175,7 +175,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		assert.False(t, mockRuntime.CreatedConfig.TTY)
+		assert.False(t, mockRuntime.GetCreatedConfig().TTY)
 	})
 
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		assert.True(t, mockRuntime.CreatedConfig.TTY)
+		assert.True(t, mockRuntime.GetCreatedConfig().TTY)
 	})
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
@@ -280,8 +280,8 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		assert.Contains(t, mockRuntime.GetCreatedConfig().Env, "MYVAR=a,b")
 	})
 }
 
@@ -296,17 +296,17 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
-		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
-		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Mounts[0].Source)
-		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Mounts[0].Target)
-		assert.True(t, mockRuntime.CreatedConfig.Mounts[0].ReadOnly)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
+		assert.Equal(t, "/my/workdir", mockRuntime.GetCreatedConfig().Workdir)
+		require.Len(t, mockRuntime.GetCreatedConfig().Mounts, 1)
+		assert.Equal(t, "/h", mockRuntime.GetCreatedConfig().Mounts[0].Source)
+		assert.Equal(t, "/c", mockRuntime.GetCreatedConfig().Mounts[0].Target)
+		assert.True(t, mockRuntime.GetCreatedConfig().Mounts[0].ReadOnly)
 
-		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
-		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathInContainer)
-		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
+		require.Len(t, mockRuntime.GetCreatedConfig().Devices, 1)
+		assert.Equal(t, "/dev/fuse", mockRuntime.GetCreatedConfig().Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", mockRuntime.GetCreatedConfig().Devices[0].PathInContainer)
+		assert.Equal(t, "rm", mockRuntime.GetCreatedConfig().Devices[0].CgroupPermissions)
 	})
 
 	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
@@ -322,10 +322,10 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
 
 		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
+		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
 			if v.Target == "/var/run/docker.sock" {
 				assert.Equal(t, "/var/run/docker.sock", v.Source)
 				socketFound = true
@@ -343,10 +343,10 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
 
 		socketFound = false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
+		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
 			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
 				socketFound = true
 			}
@@ -364,12 +364,12 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
 		exePath, _ := os.Executable()
 
 		binaryFound := false
 		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
+		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
 			if v.Source == exePath && v.Target == "/usr/local/bin/cderun" {
 				binaryFound = true
 			}
@@ -391,9 +391,9 @@ func TestUnit_Command_Root_MountingAndBinary(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
 		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
+		for _, v := range mockRuntime.GetCreatedConfig().Mounts {
 			if v.Source == "/host/socket" && v.Target == "/container/socket" {
 				socketFound = true
 			}
@@ -420,9 +420,9 @@ func TestUnit_Command_Root_StrictMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.NotNil(t, mockRuntime.CreatedConfig)
+		require.NotNil(t, mockRuntime.GetCreatedConfig())
 		// 'ls' should be excluded, only '-l' and '/tmp' remain
-		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
+		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.GetCreatedConfig().Command)
 	})
 }
 

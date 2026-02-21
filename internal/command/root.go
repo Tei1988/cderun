@@ -671,14 +671,15 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
 	defer cancelAttach()
 
+	attachReady := make(chan struct{})
 	attachDone := make(chan error, 1)
 	go func() {
+		close(attachReady)
 		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr())
 	}()
-
 	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
 	// reducing race condition where container starts and finishes before attachment.
-	time.Sleep(100 * time.Millisecond)
+	<-attachReady
 
 	o.logger.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {

@@ -83,7 +83,7 @@ func (l *Logger) GetLevel() Level {
 	return Level(l.level.Load())
 }
 
-var globalLogger = func() *Logger {
+func newDefaultLogger() *Logger {
 	l := &Logger{
 		Writer:    os.Stderr,
 		Format:    "text",
@@ -91,7 +91,9 @@ var globalLogger = func() *Logger {
 	}
 	l.SetLevel(WarnLevel)
 	return l
-}()
+}
+
+var globalLogger = newDefaultLogger()
 
 func Init(level string, format string, timestamp bool) error {
 	return globalLogger.Init(level, format, timestamp)
@@ -176,11 +178,5 @@ func GetGlobalLogger() *Logger {
 }
 
 func NewLogger() *Logger {
-	l := &Logger{
-		Writer:    os.Stderr,
-		Format:    "text",
-		Timestamp: true,
-	}
-	l.SetLevel(WarnLevel)
-	return l
+	return newDefaultLogger()
 }

@@ -129,6 +129,6 @@ func TestIntegration_Command_Polyglot_Symlink(t *testing.T) {
 	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
 
 	require.NoError(t, err)
-	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-	assert.Equal(t, []string{"--version"}, mockRuntime.CreatedConfig.Command)
+	assert.Equal(t, "node:20-alpine", mockRuntime.GetCreatedConfig().Image)
+	assert.Equal(t, []string{"--version"}, mockRuntime.GetCreatedConfig().Command)
 }

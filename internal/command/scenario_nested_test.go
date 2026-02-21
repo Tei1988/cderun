@@ -68,9 +68,9 @@ hostContext:
 	require.NoError(t, err)
 
 	// 4. Verify path translation
-	require.NotNil(t, mockRuntime.CreatedConfig)
+	require.NotNil(t, mockRuntime.GetCreatedConfig())
 	found := false
-	for _, m := range mockRuntime.CreatedConfig.Mounts {
+	for _, m := range mockRuntime.GetCreatedConfig().Mounts {
 		if m.Target == "/mnt" {
 			// Source should be translated back to host path
 			// hostProjectDir + /subdir
