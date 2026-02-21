@@ -23,32 +23,32 @@
 
 | 機能 | 対応テストコード | 状態 |
 | :--- | :--- | :--- |
-| 引数解析 | `root_test.go`, `flags_test.go`, `test_helpers_test.go` | 良好 |
-| 引数・設定優先順位 | `resolver_test.go`, `root_test.go` | 良好 |
-| ポリグロット実行 | `root_test.go` (preprocessArgs), `polyglot_test.go` | 良好 |
-| 設定ファイルサポート | `config_test.go`, `integration_test.go`, `fs_test.go` | 良好 |
-| マルチランタイム | `docker_test.go`, `podman_test.go`, `mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
-| 直接コンテナ実行 | `root_test.go` (MockRuntime), `integration_test.go` | 良好 |
+| 引数解析 | `internal/command/root_test.go`, `internal/command/flags_test.go`, `internal/command/test_helpers_test.go` | 良好 |
+| 引数・設定優先順位 | `internal/config/resolver_test.go`, `internal/command/root_test.go` | 良好 |
+| ポリグロット実行 | `internal/command/root_test.go` (preprocessArgs), `internal/command/polyglot_test.go` | 良好 |
+| 設定ファイルサポート | `internal/config/config_test.go`, `internal/command/integration_test.go`, `internal/config/fs_test.go` | 良好 |
+| マルチランタイム | `internal/runtime/docker_test.go`, `internal/runtime/podman_test.go`, `internal/runtime/mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
+| 直接コンテナ実行 | `internal/command/root_test.go` (MockRuntime), `internal/command/integration_test.go` | 良好 |
 | コンテナ設定初期化 | `internal/container/config_test.go` | 良好 |
-| イメージマッピング | `resolver_test.go` | 良好 |
-| 環境変数パススルー | `resolver_test.go`, `integration_test.go` | 良好 |
-| Mount Tools | `root_test.go`, `integration_test.go` | 良好 |
-| コンテナコマンド実行 | `integration_test.go`, `root_test.go` | 良好 |
-| Docker互換フラグ | `flags_test.go`, `root_test.go`, `e2e_device_test.go` | 良好 |
-| デバイスマウント | `path_test.go`, `resolver_test.go`, `docker_test.go`, `e2e_device_test.go` | 良好 |
-| cderunバイナリマウント | `root_test.go`, `integration_test.go` | 良好 |
-| ドライランモード | `root_test.go` | 良好 |
-| ログ・デバッグ | `logger_test.go` | 良好 |
-| インタラクティブ | `robustness_test.go` (信号、リサイズ), `stdin_test.go` | 良好 |
-| 信号処理 | `signals_test.go`, `robustness_test.go` | 良好 |
+| イメージマッピング | `internal/config/resolver_test.go` | 良好 |
+| 環境変数パススルー | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
+| Mount Tools | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
+| コンテナコマンド実行 | `internal/command/integration_test.go`, `internal/command/root_test.go` | 良好 |
+| Docker互換フラグ | `internal/command/flags_test.go`, `internal/command/root_test.go`, `internal/command/e2e_device_test.go` | 良好 |
+| デバイスマウント | `internal/config/path_test.go`, `internal/config/resolver_test.go`, `internal/runtime/docker_test.go`, `internal/command/e2e_device_test.go` | 良好 |
+| cderunバイナリマウント | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
+| ドライランモード | `internal/command/root_test.go` | 良好 |
+| ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
+| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go` | 良好 |
+| 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
-| Nested Execution | `snapshot_test.go`, `scenario_nested_test.go`, `path_test.go` | 良好 |
-| 診断モード | `root_test.go` | 良好 |
-| 統合テスト(Docker) | `integration_test.go` | 良好 |
+| Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` | 良好 |
+| 診断モード | `internal/command/root_test.go` | 良好 |
+| 統合テスト(Docker) | `internal/command/integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
-| Expressions | `resolver_test.go`, `integration_test.go` | 良好 |
-| パス解決(チルダ・相対) | `path_test.go` | 良好 |
-| 厳密モード(strictEnv) | `integration_test.go`, `resolver_test.go` | 良好 |
+| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
+| パス解決(チルダ・相対) | `internal/config/path_test.go` | 良好 |
+| 厳密モード(strictEnv) | `internal/command/integration_test.go`, `internal/config/resolver_test.go` | 良好 |
 
 ## 3. 課題の特定 (解決済み)
 
