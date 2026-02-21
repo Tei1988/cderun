@@ -19,6 +19,10 @@ type ConfigPath struct {
 	BaseDir string
 }
 
+func (cp ConfigPath) DeepCopy() ConfigPath {
+	return cp
+}
+
 func (cp *ConfigPath) UnmarshalYAML(node *yaml.Node) error {
 	return node.Decode(&cp.Raw)
 }
@@ -67,6 +71,10 @@ type MountConfig struct {
 	Source   ConfigPath
 	Target   ConfigPath
 	ReadOnly bool
+}
+
+func (mc MountConfig) DeepCopy() MountConfig {
+	return mc
 }
 
 func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
@@ -147,6 +155,10 @@ type DeviceConfig struct {
 	Source      ConfigPath
 	Destination ConfigPath
 	Permissions string
+}
+
+func (dc DeviceConfig) DeepCopy() DeviceConfig {
+	return dc
 }
 
 func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {

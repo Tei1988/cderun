@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 	"cderun/internal/container"
 )
 
-func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {
+func TestUnit_Mock_Methods(t *testing.T) {
 	mock := NewMockRuntime()
 	ctx := context.Background()
 
@@ -62,7 +63,35 @@ func TestUnit_Runtime_Mock_AllMethods(t *testing.T) {
 	assert.Nil(t, mock.GetCreatedConfig())
 }
 
-func TestUnit_Runtime_Mock_New(t *testing.T) {
+func TestUnit_Mock_New(t *testing.T) {
 	mock := NewMockRuntime()
 	assert.NotNil(t, mock)
+}
+
+func TestUnit_Mock_ConcurrentAccess(t *testing.T) {
+	mock := NewMockRuntime()
+	ctx := context.Background()
+	const goroutines = 10
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				_ = mock.PullImage(ctx, "img", "always")
+				_ = mock.GetPulledImage()
+				_, _ = mock.CreateContainer(ctx, &container.ContainerConfig{})
+				_ = mock.GetCreatedConfig()
+				_ = mock.ResizeContainerTTY(ctx, "c", uint(id), uint(j))
+				r, c := mock.GetTTYSize()
+				assert.True(t, r < goroutines)
+				assert.True(t, c < iterations)
+			}
+		}(i)
+	}
+
+	wg.Wait()
 }

@@ -24,10 +24,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	// Prepare HostContext (copy to avoid mutating the caller's config)
 	var hostCtx config.HostContext
 	if globalCfg.HostContext != nil {
-		hostCtx = *globalCfg.HostContext
-		// Deep copy Mounts slice
-		hostCtx.Mounts = make([]config.MountMapping, len(globalCfg.HostContext.Mounts))
-		copy(hostCtx.Mounts, globalCfg.HostContext.Mounts)
+		hostCtx = globalCfg.HostContext.DeepCopy()
 	}
 
 	hostCtx.SnapshotDir = snapshotDir
@@ -68,8 +65,11 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	}
 
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
-	snapshotCfg := *globalCfg
+	snapshotCfg := globalCfg.DeepCopy()
 	snapshotCfg.HostContext = &hostCtx
+
+	// Create a copy of toolsCfg to avoid side effects
+	snapshotToolsCfg := toolsCfg.DeepCopy()
 
 	// Save .cderun.yaml
 	cderunData, err := yaml.Marshal(snapshotCfg)
@@ -81,7 +81,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	}
 
 	// Save .tools.yaml
-	toolsData, err := yaml.Marshal(toolsCfg)
+	toolsData, err := yaml.Marshal(snapshotToolsCfg)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tools config: %w", err)
 	}
