@@ -293,7 +293,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `expose` ([]string): ポート露出
 - `hostname` (string): ホスト名
 - `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip` (YAMLキー: `addHosts`)
+- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip` (YAMLキー: `addHosts`)。
 - `user` (string): 実行ユーザー
 - `privileged` (bool): 特権モード
 - `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
