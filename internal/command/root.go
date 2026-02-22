@@ -417,8 +417,10 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
 			r, err := config.NewExpressionResolver(resolved.HostContext)
 			if err == nil {
-				resolvedPath, _ := config.ResolvePath(exePath, "", r)
-				exePath = resolvedPath
+				resolvedPath, err := config.ResolvePath(exePath, "", r)
+				if err == nil {
+					exePath = resolvedPath
+				}
 			}
 		}
 
