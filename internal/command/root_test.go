@@ -557,7 +557,7 @@ func TestUnit_Command_Root_StrictEnvFlags(t *testing.T) {
 			o.exitFunc = func(code int) {}
 		})
 		// Should fail because NONEXISTENT env is not on host and strict-env is true
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
 	})
 
