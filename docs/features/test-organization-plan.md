@@ -10,12 +10,12 @@
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 93.1% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 89.5% | 設定の読み込み、マージ、Expression解決、パス解決等はやや低下。 |
-| `internal/logging` | 96.1% | 高いカバレッジを維持。 |
-| `internal/runtime` | 91.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| `internal/container` | 0% | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` の `TestUnit_Container_ConfigInitialization` 等で初期化を検証。 |
-| **Total** | **91.2%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| `internal/command` | 92.2% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 89.8% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/logging` | 97.1% | 極めて高いカバレッジを維持。 |
+| `internal/runtime` | 88.5% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/container` | 0% (no statements) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
+| **Total** | **90.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -90,7 +90,7 @@
 
 ### 5.2. カバレッジの継続的計測と記録
 
-  1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。
+  1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
 ## 6. テストマトリックス (2026-02時点)
@@ -112,7 +112,7 @@
 | cderunバイナリマウント | ✅ | ✅ | - | ✅ |
 | 診断モード | ✅ | - | - | - |
 | Mount Tools | ✅ | ✅ | - | ✅ |
-| ポリグロット実行 | ✅ | - | - | - |
+| ポリグロット実行 | ✅ | ✅ | - | - |
 
 ---
 *本計画書は、cderun のテスト戦略の Source of Truth として、実装の進展に合わせて随時更新されるべきである。*
