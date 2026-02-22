@@ -6,16 +6,16 @@
 
 ## 2. 現状の分析
 
-### 2.1. パッケージ別カバレッジ (2026-02時点)
+### 2.1. パッケージ別カバレッジ (2026-03時点)
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 92.2% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 89.8% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/command` | 91.6% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 88.7% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 97.1% | 極めて高いカバレッジを維持。 |
-| `internal/runtime` | 88.5% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 89.0% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% (no statements) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
-| **Total** | **90.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| **Total** | **90.0%** | 全体として 90% を維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -26,7 +26,7 @@
 | 引数解析 | `internal/command/root_test.go`, `internal/command/flags_test.go`, `internal/command/test_helpers_test.go` | 良好 |
 | 引数・設定優先順位 | `internal/config/resolver_test.go`, `internal/command/root_test.go` | 良好 |
 | ポリグロット実行 | `internal/command/root_test.go` (preprocessArgs), `internal/command/polyglot_test.go` | 良好 |
-| 設定ファイルサポート | `internal/config/config_test.go`, `internal/command/integration_test.go`, `internal/config/fs_test.go` | 良好 |
+| 設定ファイルサポート | `internal/config/config_test.go`, `internal/command/integration_test.go`, `internal/config/fs_test.go`, `internal/config/integration_test.go` | 良好 |
 | マルチランタイム | `internal/runtime/docker_test.go`, `internal/runtime/podman_test.go`, `internal/runtime/mock_test.go` | 良好 (リトライ検証追加、MockRuntime検証追加) |
 | 直接コンテナ実行 | `internal/command/root_test.go` (MockRuntime), `internal/command/integration_test.go` | 良好 |
 | コンテナ設定初期化 | `internal/container/config_test.go` | 良好 |
@@ -46,7 +46,7 @@
 | 診断モード | `internal/command/root_test.go` | 良好 |
 | 統合テスト(Docker) | `internal/command/integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
-| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
+| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go`, `internal/config/expression_test.go`, `internal/config/integration_test.go` | 良好 |
 | パス解決(チルダ・相対) | `internal/config/path_test.go` | 良好 |
 | 厳密モード(strictEnv) | `internal/command/integration_test.go`, `internal/config/resolver_test.go` | 良好 |
 
@@ -93,7 +93,7 @@
   1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
-## 6. テストマトリックス (2026-02時点)
+## 6. テストマトリックス (2026-03時点)
 
 | 機能 | Unit | Integration | Robustness | Scenario |
 | :--- | :---: | :---: | :---: | :---: |
