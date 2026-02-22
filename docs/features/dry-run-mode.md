@@ -143,9 +143,9 @@ CapAdd:
 CapDrop:
 Entrypoint:
 Pull: missing
-Memory: 0 B
-CPUs: 0
-Devices:
+Memory: 512 MiB
+CPUs: 1.5
+Devices: /dev/fuse
 ```
 
 ## ユースケース

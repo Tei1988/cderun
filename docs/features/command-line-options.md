@@ -461,15 +461,23 @@ cderun --log-timestamp=false node app.js
   または環境変数 `CDERUN_STRICT_ENV=true` で指定します。
 - **注意**: このオプションには直接のコマンドラインフラグはありません。
 
+### `command` (環境変数)
+
+- **説明**: ツール定義の `command` フィールドを環境変数で設定します。
+- **指定方法**: 環境変数 `CDERUN_COMMAND` で指定します（カンマ区切り）。
+
 ## オプションの優先順位
 
 1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
 2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
-3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`,
-   `CDERUN_TTY` 等。
+3. **環境変数 (P3)**: `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`,
+   `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`,
+   `CDERUN_MOUNT_SOCKET`, `CDERUN_STRICT_ENV`, `CDERUN_LOG_LEVEL`,
+   `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP` 等。
+   - **対応**: 原則として、すべての `cderun` フラグには対応する `CDERUN_` プレフィックス付きの環境変数が存在します（例: `--tty` -> `CDERUN_TTY`）。
    - **セパレータ**:
      - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-     - カンマ (`,`): `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`
+     - カンマ (`,`): `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`, `CDERUN_COMMAND`
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)
