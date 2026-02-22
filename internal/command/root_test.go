@@ -64,7 +64,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	return buf.String(), execErr
 }
 
-func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -117,7 +117,7 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 	}
 }
 
-func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
+func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Command_Root_CommandResolution(t *testing.T) {
+func TestUnit_Root_CommandResolution(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
@@ -286,7 +286,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase3Features(t *testing.T) {
+func TestUnit_Root_Phase3Features(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -403,7 +403,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
+func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -427,7 +427,7 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
+func TestUnit_Root_HandleDiagnosis(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
 		opts := &rootOptions{
@@ -467,7 +467,7 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
+func TestUnit_Root_BuildContainerConfig_Failures(t *testing.T) {
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -507,7 +507,7 @@ func captureStderr(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
-func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
@@ -544,5 +544,34 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 		})
 
 		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
+	})
+}
+
+func TestUnit_Root_StrictEnvFlags(t *testing.T) {
+	t.Run("--strict-env flag", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+		})
+		// Should fail because NONEXISTENT env is not on host and strict-env is true
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
+
+	t.Run("--cderun-strict-env override", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		// Set global strictEnv to true via mock? No, just use flags.
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = config.RealFileSystem{} // Ensure we use real FS to check env
+		})
+		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
+		require.NoError(t, err)
 	})
 }

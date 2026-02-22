@@ -43,7 +43,7 @@ func cp(s string) ConfigPath {
 	return ConfigPath{Raw: s}
 }
 
-func TestUnit_Config_Resolver_Priority(t *testing.T) {
+func TestUnit_Resolver_Priority(t *testing.T) {
 	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
 		cli := CLIOptions{
 			TTY:    true,
@@ -122,7 +122,7 @@ func TestUnit_Config_Resolver_Priority(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Image(t *testing.T) {
+func TestUnit_Resolver_Image(t *testing.T) {
 	t.Run("Image resolution from ToolConfig", func(t *testing.T) {
 		cli := CLIOptions{}
 		tools := ToolsConfig{
@@ -151,7 +151,7 @@ func TestUnit_Config_Resolver_Image(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Mounts(t *testing.T) {
+func TestUnit_Resolver_Mounts(t *testing.T) {
 	t.Run("Mount parsing", func(t *testing.T) {
 		cli := CLIOptions{}
 		tools := ToolsConfig{
@@ -355,7 +355,7 @@ func TestUnit_Config_Resolver_Mounts(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Env(t *testing.T) {
+func TestUnit_Resolver_Env(t *testing.T) {
 	t.Run("Strict environment variable resolution", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -455,7 +455,7 @@ func TestUnit_Config_Resolver_Env(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_AutoDetection(t *testing.T) {
+func TestUnit_Resolver_AutoDetection(t *testing.T) {
 	t.Run("SocketPath resolution from CDERUN_SOCKET_PATH", func(t *testing.T) {
 		t.Setenv("CDERUN_SOCKET_PATH", "/custom/socket.sock")
 		cli := CLIOptions{}
@@ -532,7 +532,7 @@ func TestUnit_Config_Resolver_AutoDetection(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Logging(t *testing.T) {
+func TestUnit_Resolver_Logging(t *testing.T) {
 	t.Run("Logging resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			LogLevel:     "debug",
@@ -564,7 +564,7 @@ func TestUnit_Config_Resolver_Logging(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Devices(t *testing.T) {
+func TestUnit_Resolver_Devices(t *testing.T) {
 	t.Run("Device resolution (overwrite logic)", func(t *testing.T) {
 		cli := CLIOptions{
 			Devices: []string{"/dev/video0:/dev/video0:rw"},
@@ -625,7 +625,7 @@ func TestUnit_Config_Resolver_Devices(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Float64(t *testing.T) {
+func TestUnit_Resolver_Float64(t *testing.T) {
 	t.Run("CPUs resolution", func(t *testing.T) {
 		cli := CLIOptions{CPUs: 2.5, CPUsSet: true}
 		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
@@ -645,7 +645,7 @@ func TestUnit_Config_Resolver_Float64(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Misc(t *testing.T) {
+func TestUnit_Resolver_Misc(t *testing.T) {
 	t.Run("Workdir resolution", func(t *testing.T) {
 		cli := CLIOptions{
 			Workdir:    "/cli/workdir",
@@ -853,7 +853,7 @@ func TestUnit_Config_Resolver_Misc(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_TransitiveAutoEnablement(t *testing.T) {
+func TestUnit_Resolver_TransitiveAutoEnablement(t *testing.T) {
 	t.Run("MountTools enables MountCderun and MountSocket transitively", func(t *testing.T) {
 		cli := CLIOptions{
 			MountTools:    "node",
@@ -931,7 +931,7 @@ func TestUnit_Config_Resolver_TransitiveAutoEnablement(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_StringSlice(t *testing.T) {
+func TestUnit_Resolver_StringSlice(t *testing.T) {
 	t.Run("resolveStringSlice with various inputs", func(t *testing.T) {
 		t.Setenv("CDERUN_DNS", "8.8.8.8,1.1.1.1")
 		res, err := Resolve("", CLIOptions{}, nil, nil)
@@ -945,7 +945,7 @@ func TestUnit_Config_Resolver_StringSlice(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Devices_Env(t *testing.T) {
+func TestUnit_Resolver_Devices_Env(t *testing.T) {
 	t.Run("Multiple devices in CDERUN_DEVICE", func(t *testing.T) {
 		t.Setenv("CDERUN_DEVICE", "/dev/video0:/dev/video0,/dev/fuse:/dev/fuse:rm")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
@@ -964,7 +964,7 @@ func TestUnit_Config_Resolver_Devices_Env(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Float64_Precedence(t *testing.T) {
+func TestUnit_Resolver_Float64_Precedence(t *testing.T) {
 	t.Run("Tool returns 0, should fallback to global", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -984,7 +984,7 @@ func TestUnit_Config_Resolver_Float64_Precedence(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_StringSlice_Precedence(t *testing.T) {
+func TestUnit_Resolver_StringSlice_Precedence(t *testing.T) {
 	t.Run("Tool returns empty, should fallback to global", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -1004,7 +1004,7 @@ func TestUnit_Config_Resolver_StringSlice_Precedence(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_Devices_Invalid(t *testing.T) {
+func TestUnit_Resolver_Devices_Invalid(t *testing.T) {
 	t.Run("Invalid device in P1 override", func(t *testing.T) {
 		cli := CLIOptions{
 			CderunDevices: []string{":/invalid"},
@@ -1016,7 +1016,7 @@ func TestUnit_Config_Resolver_Devices_Invalid(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_StringSlice_P1P2(t *testing.T) {
+func TestUnit_Resolver_StringSlice_P1P2(t *testing.T) {
 	t.Run("P1 takes priority", func(t *testing.T) {
 		cli := CLIOptions{
 			CderunDNS: []string{"1.1.1.1"},
@@ -1038,7 +1038,7 @@ func TestUnit_Config_Resolver_StringSlice_P1P2(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
+func TestUnit_Resolver_ExpressionsInCLI(t *testing.T) {
 	home := "/home/user"
 	mfs := &MockFileSystem{
 		WD:      "/app",
@@ -1069,4 +1069,62 @@ func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(home, "docker.sock"), res.SocketPath)
 	})
+}
+
+func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
+	t.Run("cli-strictenv-only", func(t *testing.T) {
+		cliStrictEnv := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			StrictEnv:    true,
+			StrictEnvSet: true,
+		}
+		res, err := Resolve("node", cliStrictEnv, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, res.StrictEnv)
+	})
+
+	t.Run("cli-cderun-overrides-strictenv", func(t *testing.T) {
+		cliCderunOverrides := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			StrictEnv:          true,
+			StrictEnvSet:       true,
+			CderunStrictEnv:    false,
+			CderunStrictEnvSet: true,
+		}
+		res, err := Resolve("node", cliCderunOverrides, nil, nil)
+		require.NoError(t, err)
+		assert.False(t, res.StrictEnv)
+	})
+}
+
+func TestUnit_Resolver_Env_Strict_Missing(t *testing.T) {
+	mfs := &MockFileSystem{
+		Env: map[string]string{},
+	}
+	r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+	// StrictEnv = true
+	res, err := resolveEnvValues([]string{"REQUIRED_VAR"}, true, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required environment variable not found: REQUIRED_VAR")
+	assert.Nil(t, res)
+
+	// StrictEnv = false
+	res, err = resolveEnvValues([]string{"OPTIONAL_VAR"}, false, r, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"OPTIONAL_VAR="}, res)
+}
+
+func TestUnit_Resolver_Memory_Invalid(t *testing.T) {
+	cli := CLIOptions{
+		Memory:    "invalid",
+		MemorySet: true,
+		Image:     "alpine",
+		ImageSet:  true,
+	}
+	_, err := ResolveWithFS("sh", cli, nil, nil, &RealFileSystem{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid memory value")
 }

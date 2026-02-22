@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_Config_Path_Resolution(t *testing.T) {
+func TestUnit_Path_Resolution(t *testing.T) {
 	home := "/home/user"
 	baseDir := "/abs/path"
 	mfs := &MockFileSystem{
@@ -114,6 +114,22 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 
 		_, err = ParseMountFlag("invalid-format")
 		require.Error(t, err)
+
+		mc, err = ParseMountFlag("source=foo,target=/bar,readonly=invalid")
+		require.Error(t, err)
+	})
+
+	t.Run("Non-bind Mount Resolution", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "volume",
+			Source: ConfigPath{Raw: "my-vol"},
+			Target: ConfigPath{Raw: "/data"},
+		}
+		mount, err := mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "volume", mount.Type)
+		assert.Equal(t, "my-vol", mount.Source)
+		assert.Equal(t, "/data", mount.Target)
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
@@ -208,7 +224,7 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
+func TestUnit_Path_MarshalYAML(t *testing.T) {
 	t.Run("ConfigPath", func(t *testing.T) {
 		cp := ConfigPath{Raw: "/path"}
 		data, err := yaml.Marshal(cp)
@@ -283,9 +299,10 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_Helpers(t *testing.T) {
+func TestUnit_Path_Helpers(t *testing.T) {
 	baseDir := "/base"
-	r, _ := NewExpressionResolver(nil)
+	mfs := &MockFileSystem{WD: baseDir}
+	r, _ := NewExpressionResolverWithFS(nil, mfs)
 
 	t.Run("resolveVolumePath", func(t *testing.T) {
 		val, err := resolveVolumePath("./host:/container", baseDir, r)
@@ -301,6 +318,17 @@ func TestUnit_Config_Path_Helpers(t *testing.T) {
 		val, err := resolveDevicePath("./dev:/dev:rw", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/dev:/dev:rw", val)
+	})
+
+	t.Run("resolveVolumePath with Windows Drive", func(t *testing.T) {
+		val, err := resolveVolumePath(`C:\data:/data`, baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, `C:\data:/data`, val)
+
+		// With expression (using magic word PWD)
+		val, err = resolveVolumePath(`{{PWD}}/host:/data`, baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, baseDir+`/host:/data`, val)
 	})
 
 	t.Run("SplitHostRemainder", func(t *testing.T) {
@@ -319,7 +347,7 @@ func TestUnit_Config_Path_Helpers(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_UnmarshalYAMLErrors(t *testing.T) {
+func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
 	t.Run("MountConfig", func(t *testing.T) {
 		var mc MountConfig
 
@@ -375,7 +403,7 @@ source: ./data
 	})
 }
 
-func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
+func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
@@ -404,9 +432,34 @@ func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
+func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 	t.Run("Windows path without separator", func(t *testing.T) {
 		_, _, ok := SplitHostRemainder(`C:\only-path`)
 		assert.False(t, ok)
 	})
+
+	t.Run("Short Windows path", func(t *testing.T) {
+		// SplitHostRemainder requires a separator. For "C:", it finds ":" at index 1.
+		// Since "C:" doesn't match winDriveRegex (needs slash after colon),
+		// it treats it as host="C", remainder="".
+		host, rem, ok := SplitHostRemainder(`C:`)
+		assert.True(t, ok)
+		assert.Equal(t, "C", host)
+		assert.Equal(t, "", rem)
+	})
+}
+
+func TestUnit_Path_HostContext_NoMatch(t *testing.T) {
+	hostCtx := &HostContext{
+		Level: 1,
+		Mounts: []MountMapping{
+			{Source: "/host/a", Target: "/container/a", Level: 1},
+		},
+	}
+	r, _ := NewExpressionResolver(hostCtx)
+
+	// Path NOT in any mount mapping
+	val, err := ResolvePath("/other/path", "/base", r)
+	require.NoError(t, err)
+	assert.Equal(t, "/other/path", val)
 }

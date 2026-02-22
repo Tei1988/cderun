@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Logging_TextFormat(t *testing.T) {
+func TestUnit_Logger_TextFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := NewLogger()
 	logger.SetOutput(buf)
@@ -28,7 +28,7 @@ func TestUnit_Logging_TextFormat(t *testing.T) {
 	assert.Contains(t, buf.String(), "[DEBUG] test debug message")
 }
 
-func TestUnit_Logging_JSONFormat(t *testing.T) {
+func TestUnit_Logger_JSONFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	logger := NewLogger()
 	logger.SetOutput(buf)
@@ -43,7 +43,7 @@ func TestUnit_Logging_JSONFormat(t *testing.T) {
 	assert.Equal(t, "test json message 123", entry["msg"])
 }
 
-func TestUnit_Logging_WithTimestamp(t *testing.T) {
+func TestUnit_Logger_WithTimestamp(t *testing.T) {
 	buf := &bytes.Buffer{}
 
 	t.Run("text format", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestUnit_Logging_WithTimestamp(t *testing.T) {
 	})
 }
 
-func TestUnit_Logging_LevelString(t *testing.T) {
+func TestUnit_Logger_LevelString(t *testing.T) {
 	assert.Equal(t, "ERROR", ErrorLevel.String())
 	assert.Equal(t, "WARN", WarnLevel.String())
 	assert.Equal(t, "INFO", InfoLevel.String())
@@ -82,7 +82,7 @@ func TestUnit_Logging_LevelString(t *testing.T) {
 	assert.Equal(t, "INFO", Level(-1).String())
 }
 
-func TestUnit_Logging_LevelParse(t *testing.T) {
+func TestUnit_Logger_LevelParse(t *testing.T) {
 	assert.Equal(t, ErrorLevel, ParseLevel("error"))
 	assert.Equal(t, WarnLevel, ParseLevel("warn"))
 	assert.Equal(t, WarnLevel, ParseLevel("warning"))
@@ -92,7 +92,7 @@ func TestUnit_Logging_LevelParse(t *testing.T) {
 	assert.Equal(t, InfoLevel, ParseLevel("unknown"))
 }
 
-func TestUnit_Logging_InitGlobal(t *testing.T) {
+func TestUnit_Logger_InitGlobal(t *testing.T) {
 	// Test Init updates globalLogger
 	err := Init("debug", "json", false)
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestUnit_Logging_InitGlobal(t *testing.T) {
 	assert.False(t, GetGlobalLogger().GetTimestamp())
 }
 
-func TestUnit_Logging_Wrappers(t *testing.T) {
+func TestUnit_Logger_Wrappers(t *testing.T) {
 	buf := &bytes.Buffer{}
 	SetOutput(buf)
 	err := Init("trace", "text", false)
@@ -127,7 +127,7 @@ func TestUnit_Logging_Wrappers(t *testing.T) {
 	assert.Contains(t, buf.String(), "[TRACE] trace")
 }
 
-func TestUnit_Logging_OutputNil(t *testing.T) {
+func TestUnit_Logger_OutputNil(t *testing.T) {
 	SetOutput(nil)
 	assert.Equal(t, io.Discard, GetGlobalLogger().GetWriter())
 }

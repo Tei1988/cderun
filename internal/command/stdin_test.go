@@ -30,7 +30,7 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Stdin_Piped(t *testing.T) {
+func TestUnit_Stdin_Piped(t *testing.T) {
 	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
@@ -126,7 +126,7 @@ func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
+func TestUnit_Stdin_FlowExtended(t *testing.T) {
 	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"

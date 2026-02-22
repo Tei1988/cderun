@@ -31,7 +31,6 @@ cderun --dry-run node --version
 
 ```yaml
 image: node:latest
-command:
   - node
   - app.js
 tty: true
@@ -190,7 +189,6 @@ cderun --dry-run --log-level info node app.js
 [INFO] Environment variables: NODE_ENV=development
 [INFO] Generated ContainerConfig:
 image: node:20-alpine
-command: [node, app.js]
 ...
 ```
 

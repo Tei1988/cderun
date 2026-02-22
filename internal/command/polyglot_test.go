@@ -16,7 +16,7 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestUnit_Command_Polyglot_Flags(t *testing.T) {
+func TestUnit_Polyglot_Flags(t *testing.T) {
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
