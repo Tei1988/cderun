@@ -17,7 +17,7 @@ import (
 
 type blockingMockRuntime struct {
 	runtime.MockRuntime
-	blockAttach   chan struct{}
+	blockAttach chan struct{}
 }
 
 func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
@@ -38,7 +38,7 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
-			blockAttach:   make(chan struct{}),
+			blockAttach: make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
@@ -76,7 +76,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
 		// Use a mock that blocks in WaitContainer to simulate long running process
 		mock := &blockingMockRuntime{
-			blockAttach:   make(chan struct{}),
+			blockAttach: make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 
@@ -138,7 +138,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 		// Use a mock that blocks in WaitContainer so we have time to send signal
 		mock := &blockingMockRuntime{
-			blockAttach:   make(chan struct{}),
+			blockAttach: make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 
@@ -195,7 +195,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
 		mock := &blockingMockRuntime{
-			blockAttach:   make(chan struct{}),
+			blockAttach: make(chan struct{}),
 		}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 42 // Non-zero exit code
@@ -225,7 +225,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 
 type waitBlockingMock struct {
 	*blockingMockRuntime
-	blockWait   chan struct{}
+	blockWait chan struct{}
 }
 
 func (m *waitBlockingMock) WaitContainer(ctx context.Context, containerID string) (int, error) {

@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
-	"cderun/internal/logging"
 	"cderun/internal/container"
+	"cderun/internal/logging"
 )
 
 func TestUnit_Command_Snapshot_Immutability(t *testing.T) {

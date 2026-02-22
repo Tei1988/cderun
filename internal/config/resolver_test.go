@@ -837,7 +837,7 @@ func TestUnit_Config_Resolver_Misc(t *testing.T) {
 
 		// Should be an absolute path
 		assert.True(t, filepath.IsAbs(res.Mounts[0].Source))
-		assert.Equal(t, ResolvePath("./data", r.Pwd, r), res.Mounts[0].Source)
+		assert.Equal(t, func() string { s, _ := ResolvePath("./data", r.Pwd, r); return s }(), res.Mounts[0].Source)
 	})
 
 	t.Run("Workdir global default resolution", func(t *testing.T) {
@@ -1035,5 +1035,38 @@ func TestUnit_Config_Resolver_StringSlice_P1P2(t *testing.T) {
 		res, err := Resolve("", cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"8.8.8.8"}, res.DNS)
+	})
+}
+
+func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
+	home := "/home/user"
+	mfs := &MockFileSystem{
+		WD:      "/app",
+		HomeDir: home,
+		Files: map[string][]byte{
+			"/app/.go-version": []byte("golang:1.25"),
+		},
+	}
+
+	t.Run("Expressions in CLI flags", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:    "{{file:.go-version}}",
+			ImageSet: true,
+		}
+		res, err := ResolveWithFS("go", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "golang:1.25", res.Image)
+	})
+
+	t.Run("Tilde expansion in CLI flags", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:         "alpine",
+			ImageSet:      true,
+			SocketPath:    "~/docker.sock",
+			SocketPathSet: true,
+		}
+		res, err := ResolveWithFS("go", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(home, "docker.sock"), res.SocketPath)
 	})
 }

@@ -416,8 +416,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// (MountCderunPath is already resolved during resolution if it came from config/flags)
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
 			r, err := config.NewExpressionResolver(resolved.HostContext)
-			if err == nil {
-				exePath = config.ResolvePath(exePath, "", r)
+			if err != nil {
+				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
+			} else {
+				resolvedPath, err := config.ResolvePath(exePath, "", r)
+				if err != nil {
+					o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
+				} else {
+					exePath = resolvedPath
+				}
 			}
 		}
 
@@ -759,9 +766,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "cderun",
-		SilenceUsage: true,
-		Short:        "A wrapper tool to run commands in a containerized environment.",
+		Use:           "cderun",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Short:         "A wrapper tool to run commands in a containerized environment.",
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
 intended for the subcommand.`,

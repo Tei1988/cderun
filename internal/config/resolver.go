@@ -333,7 +333,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 	)
 
-	res.SocketPath = resolveConfigPath(
+	res.SocketPath, err = resolveConfigPath(
 		cli.CderunSocketPathSet, cli.CderunSocketPath,
 		cli.SocketPathSet, cli.SocketPath,
 		"CDERUN_SOCKET_PATH",
@@ -343,6 +343,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 		"path",
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Auto-detection logic
 	if res.Runtime == "" {
@@ -414,7 +417,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
 	}
 
-	res.MountCderunPath = resolveConfigPath(
+	res.MountCderunPath, err = resolveConfigPath(
 		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
 		cli.MountCderunPathSet, cli.MountCderunPath,
 		"CDERUN_MOUNT_CDERUN_PATH",
@@ -424,6 +427,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 		"path",
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	// 15. Resolve MountSocket and MountSocketPath
 	var mountSocketSpecified bool
@@ -439,7 +445,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		res.MountSocket = res.MountCderun
 	}
 
-	res.MountSocketPath = resolveConfigPath(
+	res.MountSocketPath, err = resolveConfigPath(
 		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
 		cli.MountSocketPathSet, cli.MountSocketPath,
 		"CDERUN_MOUNT_SOCKET_PATH",
@@ -449,6 +455,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		r,
 		"path",
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	// 16. Resolve DryRun (CLI/Env only)
 	res.DryRun = resolveBool(
@@ -530,7 +539,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	if err != nil {
 		return nil, err
 	}
-
 	// Memory resolution (string to bytes)
 	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "", r)
 	if memStr != "" {
@@ -618,7 +626,7 @@ func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey 
 	return r.resolveString(fallback)
 }
 
-func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string) string {
+func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string) (string, error) {
 	var cp ConfigPath
 	if p1Set {
 		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
@@ -699,7 +707,11 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 
 	var res []container.DeviceMapping
 	for _, dc := range dcs {
-		res = append(res, dc.Resolve(r))
+		resolved, err := dc.Resolve(r)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, resolved)
 	}
 	return res, nil
 }
@@ -904,7 +916,11 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 
 	var res []container.Mount
 	for _, mc := range mcs {
-		res = append(res, mc.Resolve(r))
+		resolved, err := mc.Resolve(r)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, resolved)
 	}
 	return res, nil
 }

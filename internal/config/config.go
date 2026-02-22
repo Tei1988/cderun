@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -23,46 +24,29 @@ type CDERunConfig struct {
 func (c CDERunConfig) DeepCopy() CDERunConfig {
 	res := c
 	res.Defaults = c.Defaults.DeepCopy()
-	res.Logging.Timestamp = copyBoolPtr(c.Logging.Timestamp)
+	res.Logging = c.Logging.DeepCopy()
 	if c.HostContext != nil {
-		hostCtx := c.HostContext.DeepCopy()
-		res.HostContext = &hostCtx
+		copy := c.HostContext.DeepCopy()
+		res.HostContext = &copy
 	}
 	return res
 }
 
-type HostContext struct {
-	BinPath     string         `yaml:"binPath"`
-	SnapshotDir string         `yaml:"snapshotDir"`
-	WorkingDir  string         `yaml:"workingDir"`
-	Level       int            `yaml:"level"`
-	Mounts      []MountMapping `yaml:"mounts"`
-}
-
-func (h HostContext) DeepCopy() HostContext {
-	res := h
-	if h.Mounts != nil {
-		res.Mounts = make([]MountMapping, len(h.Mounts))
-		copy(res.Mounts, h.Mounts)
-	}
-	return res
-}
-
-type MountMapping struct {
-	Source string `yaml:"source"`
-	Target string `yaml:"target"`
-	Level  int    `yaml:"level"`
-}
-
-func (m MountMapping) DeepCopy() MountMapping {
-	return m
-}
-
-func (c *CDERunConfig) SetBaseDir(baseDir string) {
+func (c *CDERunConfig) SetBaseDir(baseDir string) error {
 	if c.SocketPath.Raw != "" {
 		c.SocketPath.BaseDir = baseDir
 	}
 	c.Defaults.SetBaseDir(baseDir)
+	if c.HostContext != nil {
+		for i := range c.HostContext.Mounts {
+			s, err := ResolvePath(c.HostContext.Mounts[i].Source, baseDir, nil)
+			if err != nil {
+				return err
+			}
+			c.HostContext.Mounts[i].Source = s
+		}
+	}
+	return nil
 }
 
 type ConfigDefaults struct {
@@ -93,84 +77,107 @@ type ConfigDefaults struct {
 	Pull            string         `yaml:"pull,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
-	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
+	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
 }
 
-func (c ConfigDefaults) DeepCopy() ConfigDefaults {
-	res := c
-	res.TTY = copyBoolPtr(c.TTY)
-	res.Interactive = copyBoolPtr(c.Interactive)
-	res.Remove = copyBoolPtr(c.Remove)
-	res.StrictEnv = copyBoolPtr(c.StrictEnv)
-	res.MountCderun = copyBoolPtr(c.MountCderun)
-	res.MountSocket = copyBoolPtr(c.MountSocket)
-	res.MountAllTools = copyBoolPtr(c.MountAllTools)
-	res.PublishAll = copyBoolPtr(c.PublishAll)
-	res.Privileged = copyBoolPtr(c.Privileged)
+func (d ConfigDefaults) DeepCopy() ConfigDefaults {
+	res := d
+	res.TTY = copyBoolPtr(d.TTY)
+	res.Interactive = copyBoolPtr(d.Interactive)
+	res.Remove = copyBoolPtr(d.Remove)
+	res.StrictEnv = copyBoolPtr(d.StrictEnv)
+	res.MountSocket = copyBoolPtr(d.MountSocket)
+	res.MountCderun = copyBoolPtr(d.MountCderun)
+	res.MountAllTools = copyBoolPtr(d.MountAllTools)
+	res.PublishAll = copyBoolPtr(d.PublishAll)
+	res.Privileged = copyBoolPtr(d.Privileged)
 
-	res.MountTools = copyStringSlice(c.MountTools)
-	res.Ports = copyStringSlice(c.Ports)
-	res.Expose = copyStringSlice(c.Expose)
-	res.DNS = copyStringSlice(c.DNS)
-	res.AddHosts = copyStringSlice(c.AddHosts)
-	res.CapAdd = copyStringSlice(c.CapAdd)
-	res.CapDrop = copyStringSlice(c.CapDrop)
-	res.Entrypoint = copyStringSlice(c.Entrypoint)
-	res.Command = copyStringSlice(c.Command)
-	res.Env = copyStringSlice(c.Env)
+	res.MountTools = copyStringSlice(d.MountTools)
+	res.Ports = copyStringSlice(d.Ports)
+	res.Expose = copyStringSlice(d.Expose)
+	res.DNS = copyStringSlice(d.DNS)
+	res.AddHosts = copyStringSlice(d.AddHosts)
+	res.CapAdd = copyStringSlice(d.CapAdd)
+	res.CapDrop = copyStringSlice(d.CapDrop)
+	res.Entrypoint = copyStringSlice(d.Entrypoint)
+	res.Command = copyStringSlice(d.Command)
+	res.Env = copyStringSlice(d.Env)
 
-	if c.Mounts != nil {
-		res.Mounts = make([]MountConfig, len(c.Mounts))
-		for i, m := range c.Mounts {
-			res.Mounts[i] = m.DeepCopy()
+	if d.Devices != nil {
+		res.Devices = make([]DeviceConfig, len(d.Devices))
+		for i, v := range d.Devices {
+			res.Devices[i] = v.DeepCopy()
 		}
 	}
-	if c.Devices != nil {
-		res.Devices = make([]DeviceConfig, len(c.Devices))
-		for i, d := range c.Devices {
-			res.Devices[i] = d.DeepCopy()
+	if d.Mounts != nil {
+		res.Mounts = make([]MountConfig, len(d.Mounts))
+		for i, v := range d.Mounts {
+			res.Mounts[i] = v.DeepCopy()
 		}
 	}
 	return res
 }
 
-func (c *ConfigDefaults) SetBaseDir(baseDir string) {
-	if c.MountSocketPath.Raw != "" {
-		c.MountSocketPath.BaseDir = baseDir
+func (d *ConfigDefaults) SetBaseDir(baseDir string) {
+	d.MountCderunPath.BaseDir = baseDir
+	d.MountSocketPath.BaseDir = baseDir
+	for i := range d.Mounts {
+		d.Mounts[i].SetBaseDir(baseDir)
 	}
-	if c.MountCderunPath.Raw != "" {
-		c.MountCderunPath.BaseDir = baseDir
-	}
-	for i := range c.Mounts {
-		c.Mounts[i].SetBaseDir(baseDir)
-	}
-	for i := range c.Devices {
-		c.Devices[i].SetBaseDir(baseDir)
+	for i := range d.Devices {
+		d.Devices[i].SetBaseDir(baseDir)
 	}
 }
 
 type LoggingConfig struct {
-	Level     string `yaml:"level"`
-	Format    string `yaml:"format"`
-	Timestamp *bool  `yaml:"timestamp"`
+	Level     string `yaml:"level,omitempty"`
+	Format    string `yaml:"format,omitempty"`
+	Timestamp *bool  `yaml:"timestamp,omitempty"`
+}
+
+func (l LoggingConfig) DeepCopy() LoggingConfig {
+	res := l
+	res.Timestamp = copyBoolPtr(l.Timestamp)
+	return res
+}
+
+type HostContext struct {
+	Level       int            `yaml:"level"`
+	SnapshotDir string         `yaml:"snapshotDir"`
+	BinPath     string         `yaml:"binPath"`
+	WorkingDir  string         `yaml:"workingDir"`
+	Mounts      []MountMapping `yaml:"mounts"`
+}
+
+func (h HostContext) DeepCopy() HostContext {
+	res := h
+	if h.Mounts != nil {
+		res.Mounts = make([]MountMapping, len(h.Mounts))
+		copy(res.Mounts, h.Mounts)
+	}
+	return res
+}
+
+type MountMapping struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
+	Level  int    `yaml:"level"`
 }
 
 type ToolConfig struct {
-	Image           string         `yaml:"image,omitempty"`
+	Image           string         `yaml:"image"`
 	TTY             *bool          `yaml:"tty,omitempty"`
 	Interactive     *bool          `yaml:"interactive,omitempty"`
 	Network         string         `yaml:"network,omitempty"`
 	Remove          *bool          `yaml:"remove,omitempty"`
 	StrictEnv       *bool          `yaml:"strictEnv,omitempty"`
-	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
-	Env             []string       `yaml:"env,omitempty"`
 	Workdir         string         `yaml:"workdir,omitempty"`
-	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
 	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
+	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
+	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
 	MountTools      []string       `yaml:"mountTools,omitempty"`
 	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports,omitempty"`
@@ -189,58 +196,56 @@ type ToolConfig struct {
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
+	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
+	Env             []string       `yaml:"env,omitempty"`
 }
 
-func (c ToolConfig) DeepCopy() ToolConfig {
-	res := c
-	res.TTY = copyBoolPtr(c.TTY)
-	res.Interactive = copyBoolPtr(c.Interactive)
-	res.Remove = copyBoolPtr(c.Remove)
-	res.StrictEnv = copyBoolPtr(c.StrictEnv)
-	res.MountCderun = copyBoolPtr(c.MountCderun)
-	res.MountSocket = copyBoolPtr(c.MountSocket)
-	res.MountAllTools = copyBoolPtr(c.MountAllTools)
-	res.PublishAll = copyBoolPtr(c.PublishAll)
-	res.Privileged = copyBoolPtr(c.Privileged)
+func (t ToolConfig) DeepCopy() ToolConfig {
+	res := t
+	res.TTY = copyBoolPtr(t.TTY)
+	res.Interactive = copyBoolPtr(t.Interactive)
+	res.Remove = copyBoolPtr(t.Remove)
+	res.StrictEnv = copyBoolPtr(t.StrictEnv)
+	res.MountSocket = copyBoolPtr(t.MountSocket)
+	res.MountCderun = copyBoolPtr(t.MountCderun)
+	res.MountAllTools = copyBoolPtr(t.MountAllTools)
+	res.PublishAll = copyBoolPtr(t.PublishAll)
+	res.Privileged = copyBoolPtr(t.Privileged)
 
-	res.MountTools = copyStringSlice(c.MountTools)
-	res.Ports = copyStringSlice(c.Ports)
-	res.Expose = copyStringSlice(c.Expose)
-	res.DNS = copyStringSlice(c.DNS)
-	res.AddHosts = copyStringSlice(c.AddHosts)
-	res.CapAdd = copyStringSlice(c.CapAdd)
-	res.CapDrop = copyStringSlice(c.CapDrop)
-	res.Entrypoint = copyStringSlice(c.Entrypoint)
-	res.Command = copyStringSlice(c.Command)
-	res.Env = copyStringSlice(c.Env)
+	res.MountTools = copyStringSlice(t.MountTools)
+	res.Ports = copyStringSlice(t.Ports)
+	res.Expose = copyStringSlice(t.Expose)
+	res.DNS = copyStringSlice(t.DNS)
+	res.AddHosts = copyStringSlice(t.AddHosts)
+	res.CapAdd = copyStringSlice(t.CapAdd)
+	res.CapDrop = copyStringSlice(t.CapDrop)
+	res.Entrypoint = copyStringSlice(t.Entrypoint)
+	res.Command = copyStringSlice(t.Command)
+	res.Env = copyStringSlice(t.Env)
 
-	if c.Mounts != nil {
-		res.Mounts = make([]MountConfig, len(c.Mounts))
-		for i, m := range c.Mounts {
-			res.Mounts[i] = m.DeepCopy()
+	if t.Devices != nil {
+		res.Devices = make([]DeviceConfig, len(t.Devices))
+		for i, v := range t.Devices {
+			res.Devices[i] = v.DeepCopy()
 		}
 	}
-	if c.Devices != nil {
-		res.Devices = make([]DeviceConfig, len(c.Devices))
-		for i, d := range c.Devices {
-			res.Devices[i] = d.DeepCopy()
+	if t.Mounts != nil {
+		res.Mounts = make([]MountConfig, len(t.Mounts))
+		for i, v := range t.Mounts {
+			res.Mounts[i] = v.DeepCopy()
 		}
 	}
 	return res
 }
 
-func (c *ToolConfig) SetBaseDir(baseDir string) {
-	if c.MountSocketPath.Raw != "" {
-		c.MountSocketPath.BaseDir = baseDir
+func (t *ToolConfig) SetBaseDir(baseDir string) {
+	t.MountCderunPath.BaseDir = baseDir
+	t.MountSocketPath.BaseDir = baseDir
+	for i := range t.Mounts {
+		t.Mounts[i].SetBaseDir(baseDir)
 	}
-	if c.MountCderunPath.Raw != "" {
-		c.MountCderunPath.BaseDir = baseDir
-	}
-	for i := range c.Mounts {
-		c.Mounts[i].SetBaseDir(baseDir)
-	}
-	for i := range c.Devices {
-		c.Devices[i].SetBaseDir(baseDir)
+	for i := range t.Devices {
+		t.Devices[i].SetBaseDir(baseDir)
 	}
 }
 
@@ -273,6 +278,20 @@ func copyStringSlice(s []string) []string {
 	res := make([]string, len(s))
 	copy(res, s)
 	return res
+}
+
+func expandHome(p string, fs FileSystem) (string, error) {
+	if strings.HasPrefix(p, "~/") || p == "~" {
+		home, err := fs.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		if p == "~" {
+			return home, nil
+		}
+		return filepath.Join(home, p[2:]), nil
+	}
+	return p, nil
 }
 
 // FileSystem defines the interface for filesystem operations.
@@ -325,7 +344,6 @@ func NewConfigLoader() *ConfigLoader {
 }
 
 // NewConfigLoaderWithFS creates a new ConfigLoader with the specified FileSystem and current default directories.
-// Note: This depends on defaultLoader being initialized (which happens at the package level).
 func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 	return &ConfigLoader{
 		fs:              fs,
@@ -351,8 +369,6 @@ func SetSystemConfigDirForTest(path string) func() {
 }
 
 // FindConfigs searches for config files in hierarchical order.
-// Priority: Current Dir > Parent Dirs > Home Dir > System Paths.
-// The returned list is ordered by priority (highest first).
 func FindConfigs(filename string) []string {
 	return defaultLoader.FindConfigs(filename)
 }
@@ -431,7 +447,6 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 
 	var merged CDERunConfig
 	var loadedPaths []string
-	// Merge from lowest priority to highest (reverse of paths)
 	for i := len(paths) - 1; i >= 0; i-- {
 		path := paths[i]
 		baseDir := filepath.Dir(path)
@@ -445,9 +460,9 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
 
-		// Assign baseDir for relative path resolution later
-		// Only for non-empty paths to avoid creating non-zero values for mergo
-		layer.SetBaseDir(baseDir)
+		if err := layer.SetBaseDir(baseDir); err != nil {
+			return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", path, err)
+		}
 
 		if err := mergo.Merge(&merged, &layer, mergo.WithOverride); err != nil {
 			return nil, nil, fmt.Errorf("failed to merge config from %s: %w", path, err)
@@ -456,7 +471,6 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		loadedPaths = append(loadedPaths, path)
 	}
 
-	// Reverse loadedPaths to match priority (highest first)
 	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
 		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
 	}
@@ -478,7 +492,6 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 	merged := make(ToolsConfig)
 	var loadedPaths []string
-	// Merge from lowest priority to highest (reverse of paths)
 	for i := len(paths) - 1; i >= 0; i-- {
 		path := paths[i]
 		baseDir := filepath.Dir(path)
@@ -492,10 +505,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 			return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
 		}
 
-		// Merge ToolsConfig to ensure deep merge of ToolConfig
 		for k, v := range layer {
-			// Assign baseDir for relative path resolution later
-			// Only for non-empty paths to avoid creating non-zero values for mergo
 			v.SetBaseDir(baseDir)
 
 			if existing, ok := merged[k]; ok {
@@ -510,7 +520,6 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		loadedPaths = append(loadedPaths, path)
 	}
 
-	// Reverse loadedPaths to match priority (highest first)
 	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
 		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
 	}
@@ -520,6 +529,11 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
+	expanded, err := expandHome(path, l.fs)
+	if err != nil {
+		return nil, nil, err
+	}
+	path = expanded
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
@@ -536,13 +550,20 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 	}
 
 	baseDir := filepath.Dir(absPath)
-	cfg.SetBaseDir(baseDir)
+	if err := cfg.SetBaseDir(baseDir); err != nil {
+		return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", absPath, err)
+	}
 
 	return &cfg, []string{absPath}, nil
 }
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
+	expanded, err := expandHome(path, l.fs)
+	if err != nil {
+		return nil, nil, err
+	}
+	path = expanded
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
