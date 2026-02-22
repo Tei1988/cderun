@@ -42,7 +42,7 @@
 
 ### 4. 挙動の詳細
 
-**例1: ツール定義がある場合 (`.tools.yaml` に `my-tool` があり `image: alpine`, `entrypoint: ["/usr/bin/my-tool-impl"]` と定義)**
+#### 例1: ツール定義がある場合 (`.tools.yaml` に `my-tool` があり `image: alpine`, `entrypoint: ["/usr/bin/my-tool-impl"]` と定義)
 
 ```bash
 cderun my-tool -l -a
@@ -54,7 +54,7 @@ cderun my-tool -l -a
 - コンテナ `CMD`: `["-l", "-a"]` (`passthrough args`)のみ
 - 結果: コンテナ内で `/usr/bin/my-tool-impl -l -a` が実行される。
 
-**例2: アドホックな実行の場合**
+#### 例2: アドホックな実行の場合
 
 アドホックな実行を行う場合、サブコマンドは常に設定のキーとして消費されることに注意してください。イメージ内のデフォルト `ENTRYPOINT` に指定されていないコマンドを実行したい場合は、`--entrypoint` フラグで明示的に指定する必要があります。
 
@@ -68,7 +68,7 @@ cderun --image=golang:1.22 --entrypoint=go go --version
 - コンテナ `CMD`: `["--version"]` (`go` はキーとして消費され、含まれない)
 - 結果: コンテナ内で `go --version` が実行される。
 
-**例3: ツール定義がなく、かつ `--image` もない場合**
+#### 例3: ツール定義がなく、かつ `--image` もない場合
 
 ```bash
 cderun go --version
@@ -82,7 +82,7 @@ cderun go --version
 
 `--cderun-` で始まるフラグ（P1内部オーバーライド）は、サブコマンド名より後に指定された場合でも、前処理（Hoisting）によってサブコマンドの前に移動され、`cderun` 自体の設定として常に解釈される。
 
-**ポリグロットモード（シンボリックリンク等での実行）における注意:**
+#### ポリグロットモード（シンボリックリンク等での実行）における注意
 ポリグロットモードでは、この `--cderun-` プレフィックスが付いたフラグのみがホイスト（前方への移動）の対象となります。`--interactive` や `--tty` といったプレフィックスなしの標準フラグは、たとえ `cderun` がサポートしているものであっても、サブコマンドへの引数として扱われ、ホイストされません。これにより、ラップされたコマンドが持つ同名のフラグとの衝突を避けています。詳細は [polyglot-entry.md](polyglot-entry.md) を参照。
 
 ## テストケース要件

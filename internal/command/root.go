@@ -371,8 +371,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	// the passthrough arguments provided after the subcommand are used.
 	var fullCommand []string
 	if len(passthroughArgs) > 0 {
-		fullCommand = make([]string, 0, len(passthroughArgs))
-		fullCommand = append(fullCommand, passthroughArgs...)
+		fullCommand = append([]string{}, passthroughArgs...)
 	}
 
 	// Build ContainerConfig

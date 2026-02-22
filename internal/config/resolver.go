@@ -141,11 +141,11 @@ type CLIOptions struct {
 	LogFormat                string
 	LogFormatSet             bool
 	LogTimestampSet          bool
+	LogTimestamp             bool
 	StrictEnv                bool
 	StrictEnvSet             bool
 	CderunStrictEnv          bool
 	CderunStrictEnvSet       bool
-	LogTimestamp             bool
 	CderunLogLevel           string
 	CderunLogLevelSet        bool
 	CderunLogFormat          string

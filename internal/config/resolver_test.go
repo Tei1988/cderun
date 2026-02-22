@@ -1072,25 +1072,29 @@ func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
 }
 
 func TestUnit_Config_Resolver_StrictEnvFlags(t *testing.T) {
-	cli := CLIOptions{
-		Image: "alpine",
-		ImageSet: true,
-		StrictEnv: true,
-		StrictEnvSet: true,
-	}
-	res, err := Resolve("node", cli, nil, nil)
-	require.NoError(t, err)
-	assert.True(t, res.StrictEnv)
+	t.Run("cli-strictenv-only", func(t *testing.T) {
+		cliStrictEnv := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			StrictEnv:    true,
+			StrictEnvSet: true,
+		}
+		res, err := Resolve("node", cliStrictEnv, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, res.StrictEnv)
+	})
 
-	cli2 := CLIOptions{
-		Image: "alpine",
-		ImageSet: true,
-		StrictEnv: true,
-		StrictEnvSet: true,
-		CderunStrictEnv: false,
-		CderunStrictEnvSet: true,
-	}
-	res2, err := Resolve("node", cli2, nil, nil)
-	require.NoError(t, err)
-	assert.False(t, res2.StrictEnv)
+	t.Run("cli-cderun-overrides-strictenv", func(t *testing.T) {
+		cliCderunOverrides := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			StrictEnv:          true,
+			StrictEnvSet:       true,
+			CderunStrictEnv:    false,
+			CderunStrictEnvSet: true,
+		}
+		res, err := Resolve("node", cliCderunOverrides, nil, nil)
+		require.NoError(t, err)
+		assert.False(t, res.StrictEnv)
+	})
 }
