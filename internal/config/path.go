@@ -39,30 +39,27 @@ func (cp ConfigPath) IsEmpty() bool {
 }
 
 // Resolve expands expressions and resolves the path relative to BaseDir.
-func (cp ConfigPath) Resolve(r *ExpressionResolver) string {
+func (cp ConfigPath) Resolve(r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
-		return ""
+		return "", nil
 	}
-	resolved := r.resolveString(cp.Raw)
-	return ResolvePath(resolved, cp.BaseDir, r)
+	return ResolvePath(cp.Raw, cp.BaseDir, r)
 }
 
 // ResolveVolume expands expressions and resolves the volume host path relative to BaseDir.
-func (cp ConfigPath) ResolveVolume(r *ExpressionResolver) string {
+func (cp ConfigPath) ResolveVolume(r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
-		return ""
+		return "", nil
 	}
-	resolved := r.resolveString(cp.Raw)
-	return resolveVolumePath(resolved, cp.BaseDir, r)
+	return resolveVolumePath(cp.Raw, cp.BaseDir, r)
 }
 
 // ResolveDevice expands expressions and resolves the device host path relative to BaseDir.
-func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) string {
+func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
-		return ""
+		return "", nil
 	}
-	resolved := r.resolveString(cp.Raw)
-	return resolveDevicePath(resolved, cp.BaseDir, r)
+	return resolveDevicePath(cp.Raw, cp.BaseDir, r)
 }
 
 // MountConfig is an intermediate representation for mount points in configuration.
@@ -134,20 +131,35 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	}
 }
 
-func (mc MountConfig) Resolve(r *ExpressionResolver) container.Mount {
+func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	source := ""
 	if mc.Type == "bind" {
-		source = mc.Source.Resolve(r)
+		s, err := mc.Source.Resolve(r)
+		if err != nil {
+			return container.Mount{}, err
+		}
+		source = s
 	} else {
-		source = r.resolveString(mc.Source.Raw)
+		if !mc.Source.IsEmpty() {
+			s, err := mc.Source.Resolve(r)
+			if err != nil {
+				return container.Mount{}, err
+			}
+			source = s
+		}
+	}
+
+	target, err := mc.Target.Resolve(r)
+	if err != nil {
+		return container.Mount{}, err
 	}
 
 	return container.Mount{
 		Type:     mc.Type,
 		Source:   source,
-		Target:   mc.Target.Resolve(r),
+		Target:   target,
 		ReadOnly: mc.ReadOnly,
-	}
+	}, nil
 }
 
 // DeviceConfig is an intermediate representation for device mappings.
@@ -199,12 +211,20 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	}
 }
 
-func (dc DeviceConfig) Resolve(r *ExpressionResolver) container.DeviceMapping {
-	return container.DeviceMapping{
-		PathOnHost:        dc.Source.Resolve(r),
-		PathInContainer:   dc.Destination.Resolve(r),
-		CgroupPermissions: dc.Permissions,
+func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
+	host, err := dc.Source.Resolve(r)
+	if err != nil {
+		return container.DeviceMapping{}, err
 	}
+	containerPath, err := dc.Destination.Resolve(r)
+	if err != nil {
+		return container.DeviceMapping{}, err
+	}
+	return container.DeviceMapping{
+		PathOnHost:        host,
+		PathInContainer:   containerPath,
+		CgroupPermissions: dc.Permissions,
+	}, nil
 }
 
 func ParseMountFlag(s string) (MountConfig, error) {
@@ -240,7 +260,6 @@ func ParseMountFlag(s string) (MountConfig, error) {
 			}
 			res.ReadOnly = b
 		default:
-			// Ignore unknown options for now (like tmpfs-size)
 		}
 	}
 
@@ -258,7 +277,6 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
-		// Support single path like /dev/fuse
 		return DeviceConfig{
 			Source:      ConfigPath{Raw: d},
 			Destination: ConfigPath{Raw: d},
@@ -272,7 +290,6 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	lastColon := strings.LastIndex(remainder, ":")
 	if lastColon != -1 {
 		perms := remainder[lastColon+1:]
-		// Basic check for permissions format (usually combinations of r, w, m)
 		if permsRegex.MatchString(perms) {
 			permissions = perms
 			containerPath = remainder[:lastColon]
@@ -299,9 +316,10 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 )
 
-func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
+// ResolvePath resolves expressions, expands tilde, and handles relative paths.
+func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
 	if p == "" {
-		return p
+		return p, nil
 	}
 
 	prefix := schemeRegex.FindString(p)
@@ -312,17 +330,26 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 		fs = r.fs
 	}
 
-	// Tilde expansion
-	p = expandHome(p, fs)
+	if r != nil {
+		resolved, err := r.ResolveString(p)
+		if err != nil {
+			return "", err
+		}
+		p = resolved
+	} else {
+		expanded, err := expandHome(p, fs)
+		if err != nil {
+			return "", err
+		}
+		p = expanded
+	}
 
-	// Relative path resolution
 	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
 		p = filepath.Join(baseDir, p)
 	}
 
 	absPath := filepath.Clean(p)
 
-	// Reverse Path Resolution for Nested Execution
 	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
 		abs := absPath
 		if !filepath.IsAbs(abs) {
@@ -341,7 +368,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 		for _, m := range r.HostContext.Mounts {
 			rel, err := filepath.Rel(m.Target, abs)
 			if err == nil && !strings.HasPrefix(rel, "..") {
-				// Longest match and highest level priority
 				if m.Level > maxLevel || (m.Level == maxLevel && len(m.Target) > len(bestTarget)) {
 					maxLevel = m.Level
 					bestTarget = m.Target
@@ -357,26 +383,33 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 		}
 	}
 
-	return prefix + absPath
+	return prefix + absPath, nil
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
-func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) string {
+func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
-		return v
+		return ResolvePath(v, baseDir, r)
 	}
-	return ResolvePath(host, baseDir, r) + ":" + remainder
+	resolvedHost, err := ResolvePath(host, baseDir, r)
+	if err != nil {
+		return "", err
+	}
+	return resolvedHost + ":" + remainder, nil
 }
 
-func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) string {
-	// host-path:container-path[:permissions]
+func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
-		return d
+		return ResolvePath(d, baseDir, r)
 	}
-	return ResolvePath(host, baseDir, r) + ":" + remainder
+	resolvedHost, err := ResolvePath(host, baseDir, r)
+	if err != nil {
+		return "", err
+	}
+	return resolvedHost + ":" + remainder, nil
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {
@@ -385,8 +418,6 @@ func SplitHostRemainder(s string) (string, string, bool) {
 		return "", "", false
 	}
 
-	// If it's a Windows drive letter (e.g. C:\ or C:/), the first colon is part of the path.
-	// We need to look for the separator colon after the drive letter (index > 1).
 	if winDriveRegex.MatchString(s) {
 		nextSep := strings.Index(s[sepIdx+1:], ":")
 		if nextSep == -1 {

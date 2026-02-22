@@ -417,7 +417,8 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
 			r, err := config.NewExpressionResolver(resolved.HostContext)
 			if err == nil {
-				exePath = config.ResolvePath(exePath, "", r)
+				resolvedPath, _ := config.ResolvePath(exePath, "", r)
+				exePath = resolvedPath
 			}
 		}
 
@@ -759,10 +760,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "cderun",
-		SilenceUsage: true,
+		Use:           "cderun",
+		SilenceUsage:  true,
 		SilenceErrors: true,
-		Short:        "A wrapper tool to run commands in a containerized environment.",
+		Short:         "A wrapper tool to run commands in a containerized environment.",
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
 intended for the subcommand.`,

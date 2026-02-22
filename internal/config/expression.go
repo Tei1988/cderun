@@ -14,7 +14,7 @@ type fileCacheEntry struct {
 	err     error
 }
 
-// ExpressionResolver handles resolution of {{...}} expressions in config values.
+// ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
 	Home        string
@@ -63,7 +63,7 @@ func (r *ExpressionResolver) setError(err error) {
 	}
 }
 
-// Resolve processes a value (string, slice, or map) and resolves any expressions found.
+// Resolve processes a value (string, slice, or map) and resolves any expressions or tilde expansion found.
 func (r *ExpressionResolver) Resolve(v any) any {
 	if r.err != nil {
 		return v
@@ -86,23 +86,47 @@ func (r *ExpressionResolver) Resolve(v any) any {
 	}
 }
 
+// ResolveString resolves expressions and tilde expansion in a string.
+func (r *ExpressionResolver) ResolveString(s string) (string, error) {
+	res := r.resolveString(s)
+	return res, r.err
+}
+
 func (r *ExpressionResolver) resolveString(s string) string {
-	if !strings.Contains(s, "{{") {
+	if r.err != nil {
 		return s
 	}
-	return exprRegex.ReplaceAllStringFunc(s, func(match string) string {
-		if r.err != nil {
-			return match
-		}
-		content := strings.TrimSpace(match[2 : len(match)-2])
 
-		resolved, err := r.resolveDirective(content)
-		if err != nil {
-			r.setError(err)
-			return match
-		}
+	// 1. Resolve {{...}} expressions
+	resolved := s
+	if strings.Contains(s, "{{") {
+		resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
+			if r.err != nil {
+				return match
+			}
+			content := strings.TrimSpace(match[2 : len(match)-2])
+
+			res, err := r.resolveDirective(content)
+			if err != nil {
+				r.setError(err)
+				return match
+			}
+			return res
+		})
+	}
+
+	if r.err != nil {
 		return resolved
-	})
+	}
+
+	// 2. Expand ~ if it's at the beginning
+	expanded, err := expandHome(resolved, r.fs)
+	if err != nil {
+		r.setError(err)
+		return resolved
+	}
+
+	return expanded
 }
 
 func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
@@ -127,8 +151,6 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
-	// Security: Prevent path traversal by disallowing absolute paths or parent directory references.
-	// Since FindConfigs searches parent directories automatically, ".." is not needed for legitimate use.
 	if filepath.IsAbs(filename) || strings.Contains(filename, "..") {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
@@ -144,7 +166,6 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", err
 	}
 
-	// Use the highest priority file
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
@@ -167,7 +188,6 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 		return "", fmt.Errorf("item not found for find_dir: %s", name)
 	}
 
-	// paths[0] is the full path to the found item
 	dir := filepath.Dir(paths[0])
 
 	rel, err := filepath.Rel(r.Pwd, dir)

@@ -191,6 +191,15 @@ the available runtime by checking for common Unix socket paths.
 - Enables recursive container execution without installing tools
   in the container image.
 
+### Unified Value Resolution
+
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
+  in configuration files and CLI flags.
+- **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
+- **Relative Path Handling**: Intelligent absolute path resolution based on the
+  origin of the setting (config file location vs. current directory).
+- See [Value Resolution](docs/features/value-resolution.md) for details.
+
 ### Nested Execution Support
 
 - Transparently handles `cderun` execution inside a `cderun`-managed container.

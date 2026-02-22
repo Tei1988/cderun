@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -11,25 +10,51 @@ import (
 )
 
 func TestUnit_Config_Path_Resolution(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	home := "/home/user"
 	baseDir := "/abs/path"
-	r, err := NewExpressionResolver(nil)
+	mfs := &MockFileSystem{
+		WD:      baseDir,
+		HomeDir: home,
+	}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 
-	t.Run("resolvePath", func(t *testing.T) {
-		assert.Equal(t, "/abs/path/file", ResolvePath("./file", baseDir, r))
-		assert.Equal(t, "/abs/file", ResolvePath("../file", baseDir, r))
-		assert.Equal(t, filepath.Join(home, ".ssh"), ResolvePath("~/.ssh", baseDir, r))
-		assert.Equal(t, "/other/abs/path", ResolvePath("/other/abs/path", baseDir, r))
-		assert.Equal(t, "just-name", ResolvePath("just-name", baseDir, r)) // No ./ prefix, no resolution
+	t.Run("ResolvePath", func(t *testing.T) {
+		val, err := ResolvePath("./file", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "/abs/path/file", val)
+
+		val, err = ResolvePath("../file", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "/abs/file", val)
+
+		val, err = ResolvePath("~/.ssh", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(home, ".ssh"), val)
+
+		val, err = ResolvePath("~", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, home, val)
+
+		val, err = ResolvePath("/other/abs/path", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "/other/abs/path", val)
+
+		val, err = ResolvePath("just-name", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "just-name", val) // No ./ prefix, no resolution
 	})
 
 	t.Run("ConfigPath.Resolve", func(t *testing.T) {
 		cp := ConfigPath{Raw: "./data", BaseDir: baseDir}
-		assert.Equal(t, "/abs/path/data", cp.Resolve(r))
+		val, err := cp.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "/abs/path/data", val)
 
 		cp = ConfigPath{Raw: "{{HOME}}/config", BaseDir: baseDir}
-		assert.Equal(t, filepath.Join(home, "config"), cp.Resolve(r))
+		val, err = cp.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(home, "config"), val)
 	})
 
 	t.Run("MountConfig.Resolve", func(t *testing.T) {
@@ -39,7 +64,8 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 			Target:   ConfigPath{Raw: "/app/data", BaseDir: baseDir},
 			ReadOnly: false,
 		}
-		mount := mc.Resolve(r)
+		mount, err := mc.Resolve(r)
+		require.NoError(t, err)
 		assert.Equal(t, "bind", mount.Type)
 		assert.Equal(t, "/abs/path/data", mount.Source)
 		assert.Equal(t, "/app/data", mount.Target)
@@ -51,7 +77,8 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 			Target:   ConfigPath{Raw: "/root/config", BaseDir: baseDir},
 			ReadOnly: true,
 		}
-		mount = mc.Resolve(r)
+		mount, err = mc.Resolve(r)
+		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(home, "config"), mount.Source)
 		assert.Equal(t, "/root/config", mount.Target)
 		assert.True(t, mount.ReadOnly)
@@ -63,7 +90,8 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 			Destination: ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
 			Permissions: "rwm",
 		}
-		mapping := dc.Resolve(r)
+		mapping, err := dc.Resolve(r)
+		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0", mapping.PathOnHost)
 		assert.Equal(t, "/dev/video0", mapping.PathInContainer)
 		assert.Equal(t, "rwm", mapping.CgroupPermissions)
@@ -102,9 +130,17 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Scheme Preservation", func(t *testing.T) {
-		assert.Equal(t, "unix:///var/run/docker.sock", ResolvePath("unix:///var/run/docker.sock", baseDir, r))
-		assert.Equal(t, "unix:///var/run/docker.sock", ResolvePath("unix:////var/run/docker.sock", baseDir, r))
-		assert.Equal(t, "http://example.com/path", ResolvePath("http://example.com/path", baseDir, r))
+		val, err := ResolvePath("unix:///var/run/docker.sock", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "unix:///var/run/docker.sock", val)
+
+		val, err = ResolvePath("unix:////var/run/docker.sock", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "unix:///var/run/docker.sock", val)
+
+		val, err = ResolvePath("http://example.com/path", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "http://example.com/path", val)
 	})
 
 	t.Run("Reverse Path Resolution (Nested)", func(t *testing.T) {
@@ -118,9 +154,14 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 		require.NoError(t, err)
 
 		// Inside container /app/src should resolve to host /home/user/project/src
-		assert.Equal(t, "/home/user/project/src", ResolvePath("/app/src", baseDir, rn))
+		val, err := ResolvePath("/app/src", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/project/src", val)
+
 		// Path outside mapping should stay same
-		assert.Equal(t, "/tmp/other", ResolvePath("/tmp/other", baseDir, rn))
+		val, err = ResolvePath("/tmp/other", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/tmp/other", val)
 	})
 
 	t.Run("Reverse Path Resolution (Nested Priority)", func(t *testing.T) {
@@ -135,9 +176,14 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 		require.NoError(t, err)
 
 		// /src should match level 2 mapping
-		assert.Equal(t, "/home/user/project/src/file", ResolvePath("/src/file", baseDir, rn))
+		val, err := ResolvePath("/src/file", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/project/src/file", val)
+
 		// /app should match level 1 mapping
-		assert.Equal(t, "/home/user/project/file", ResolvePath("/app/file", baseDir, rn))
+		val, err = ResolvePath("/app/file", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/project/file", val)
 	})
 
 	t.Run("Reverse Path Resolution (Partial Segment Match)", func(t *testing.T) {
@@ -151,9 +197,14 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 		require.NoError(t, err)
 
 		// /apple should NOT match /app
-		assert.Equal(t, "/apple", ResolvePath("/apple", baseDir, rn))
+		val, err := ResolvePath("/apple", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/apple", val)
+
 		// /app/le should match /app
-		assert.Equal(t, "/host/app/le", ResolvePath("/app/le", baseDir, rn))
+		val, err = ResolvePath("/app/le", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/app/le", val)
 	})
 }
 
@@ -237,12 +288,19 @@ func TestUnit_Config_Path_Helpers(t *testing.T) {
 	r, _ := NewExpressionResolver(nil)
 
 	t.Run("resolveVolumePath", func(t *testing.T) {
-		assert.Equal(t, "/base/host:/container", resolveVolumePath("./host:/container", baseDir, r))
-		assert.Equal(t, "named-volume:/container", resolveVolumePath("named-volume:/container", baseDir, r))
+		val, err := resolveVolumePath("./host:/container", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "/base/host:/container", val)
+
+		val, err = resolveVolumePath("named-volume:/container", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "named-volume:/container", val)
 	})
 
 	t.Run("resolveDevicePath", func(t *testing.T) {
-		assert.Equal(t, "/base/dev:/dev:rw", resolveDevicePath("./dev:/dev:rw", baseDir, r))
+		val, err := resolveDevicePath("./dev:/dev:rw", baseDir, r)
+		require.NoError(t, err)
+		assert.Equal(t, "/base/dev:/dev:rw", val)
 	})
 
 	t.Run("SplitHostRemainder", func(t *testing.T) {
@@ -323,18 +381,26 @@ func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
 
 	t.Run("ResolveVolume", func(t *testing.T) {
 		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
-		assert.Equal(t, "/base/host:/container", cp.ResolveVolume(r))
+		val, err := cp.ResolveVolume(r)
+		require.NoError(t, err)
+		assert.Equal(t, "/base/host:/container", val)
 
 		cp = ConfigPath{Raw: ""}
-		assert.Empty(t, cp.ResolveVolume(r))
+		val, err = cp.ResolveVolume(r)
+		require.NoError(t, err)
+		assert.Empty(t, val)
 	})
 
 	t.Run("ResolveDevice", func(t *testing.T) {
 		cp := ConfigPath{Raw: "./dev:/dev:rw", BaseDir: baseDir}
-		assert.Equal(t, "/base/dev:/dev:rw", cp.ResolveDevice(r))
+		val, err := cp.ResolveDevice(r)
+		require.NoError(t, err)
+		assert.Equal(t, "/base/dev:/dev:rw", val)
 
 		cp = ConfigPath{Raw: ""}
-		assert.Empty(t, cp.ResolveDevice(r))
+		val, err = cp.ResolveDevice(r)
+		require.NoError(t, err)
+		assert.Empty(t, val)
 	})
 }
 
