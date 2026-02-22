@@ -72,6 +72,8 @@ type rootOptions struct {
 	logLevel              string
 	logFormat             string
 	logTimestamp          bool
+	strictEnv             bool
+	cderunStrictEnv       bool
 	cderunLogLevel        string
 	cderunLogFormat       string
 	cderunLogTimestamp    bool
@@ -308,6 +310,10 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
 		CderunLogTimestamp:       o.cderunLogTimestamp,
 		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
+		StrictEnv:                o.strictEnv,
+		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
+		CderunStrictEnv:          o.cderunStrictEnv,
+		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
 
 		// Docker-compatible flags
 		Ports:               o.ports,
@@ -362,12 +368,10 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.
-	// Only the command defined in configuration (resolved.Command) and
 	// the passthrough arguments provided after the subcommand are used.
 	var fullCommand []string
-	if len(resolved.Command) > 0 || len(passthroughArgs) > 0 {
-		fullCommand = make([]string, 0, len(resolved.Command)+len(passthroughArgs))
-		fullCommand = append(fullCommand, resolved.Command...)
+	if len(passthroughArgs) > 0 {
+		fullCommand = make([]string, 0, len(passthroughArgs))
 		fullCommand = append(fullCommand, passthroughArgs...)
 	}
 
@@ -939,6 +943,8 @@ intended for the subcommand.`,
 	cmd.PersistentFlags().StringVar(&o.cderunMountSocketPath, "cderun-mount-socket-path", "", "Override mount-socket-path setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringArrayVar(&o.cderunEnv, "cderun-env", nil, "Override environment variables (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&o.cderunWorkdir, "cderun-workdir", "", "Override workdir setting (highest priority, can be used after subcommand)")
+	cmd.PersistentFlags().BoolVar(&o.strictEnv, "strict-env", false, "Require all environment variables to be present on the host")
+	cmd.PersistentFlags().BoolVar(&o.cderunStrictEnv, "cderun-strict-env", false, "Override strict-env setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringArrayVar(&o.cderunMounts, "cderun-mount", nil, "Override mounts (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&o.cderunMountCderun, "cderun-mount-cderun", false, "Override mount-cderun setting (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&o.cderunMountCderunPath, "cderun-mount-cderun-path", "", "Override mount-cderun-path setting (highest priority, can be used after subcommand)")

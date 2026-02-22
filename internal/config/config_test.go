@@ -329,7 +329,6 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				CapAdd:          []string{"ca"},
 				CapDrop:         []string{"cd"},
 				Entrypoint:      []string{"ep"},
-				Command:         []string{"c"},
 				Env:             []string{"ev"},
 				Mounts:          []MountConfig{{Type: "bind"}},
 				Devices:         []DeviceConfig{{Permissions: "r"}},

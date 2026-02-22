@@ -1070,3 +1070,27 @@ func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
 		assert.Equal(t, filepath.Join(home, "docker.sock"), res.SocketPath)
 	})
 }
+
+func TestUnit_Config_Resolver_StrictEnvFlags(t *testing.T) {
+	cli := CLIOptions{
+		Image: "alpine",
+		ImageSet: true,
+		StrictEnv: true,
+		StrictEnvSet: true,
+	}
+	res, err := Resolve("node", cli, nil, nil)
+	require.NoError(t, err)
+	assert.True(t, res.StrictEnv)
+
+	cli2 := CLIOptions{
+		Image: "alpine",
+		ImageSet: true,
+		StrictEnv: true,
+		StrictEnvSet: true,
+		CderunStrictEnv: false,
+		CderunStrictEnvSet: true,
+	}
+	res2, err := Resolve("node", cli2, nil, nil)
+	require.NoError(t, err)
+	assert.False(t, res2.StrictEnv)
+}

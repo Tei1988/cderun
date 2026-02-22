@@ -546,3 +546,32 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
 	})
 }
+
+func TestUnit_Command_Root_StrictEnvFlags(t *testing.T) {
+	t.Run("--strict-env flag", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+		})
+		// Should fail because NONEXISTENT env is not on host and strict-env is true
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
+
+	t.Run("--cderun-strict-env override", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		// Set global strictEnv to true via mock? No, just use flags.
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = config.RealFileSystem{} // Ensure we use real FS to check env
+		})
+		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
+		require.NoError(t, err)
+	})
+}

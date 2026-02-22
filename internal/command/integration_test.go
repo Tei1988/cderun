@@ -167,7 +167,6 @@ func TestIntegration_Command_BaseCommandFromTools(t *testing.T) {
 	toolsContent := `
 node:
   image: node:20-alpine
-  command: ["node", "--no-warnings"]
 `
 	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
@@ -178,7 +177,7 @@ node:
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
 	assert.Equal(t, "node:20-alpine", mockRuntime.CreatedConfig.Image)
-	assert.Equal(t, []string{"node", "--no-warnings", "app.js"}, mockRuntime.CreatedConfig.Command)
+	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
 func TestIntegration_Command_EnvPassThrough(t *testing.T) {
@@ -354,7 +353,6 @@ func TestIntegration_Command_IncludeExplicitToolSubcommand(t *testing.T) {
 	toolsContent := `
 node:
   image: node:20
-  command: ["node", "--no-warnings"]
 `
 	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
 	require.NoError(t, err)
@@ -362,7 +360,7 @@ node:
 	mockRuntime := &runtime.MockRuntime{}
 	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"node", "--no-warnings", "app.js"}, mockRuntime.CreatedConfig.Command)
+	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
 func TestIntegration_Command_DockerCompatible(t *testing.T) {

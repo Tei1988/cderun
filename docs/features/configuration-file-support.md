@@ -107,7 +107,6 @@ defaults:
   user: "1000:1000"
   memory: "1g"
   cpus: 1.5
-  command: ["--version"]           # デフォルトのコマンド引数
   mounts:
     - type: tmpfs
       target: /tmp
@@ -144,7 +143,6 @@ node:
   mountCderun: true
   privileged: false
   memory: "512m"
-  command: ["app.js"]              # デフォルトの実行引数
   devices:
     - /dev/fuse                    # コンテナに追加するデバイス
 

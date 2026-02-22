@@ -195,6 +195,16 @@ cderun --mount type=tmpfs,target=/tmp alpine
 cderun --workdir /app node server.js
 ```
 
+### `--strict-env`
+
+- **型**: bool
+- **デフォルト**: `false`
+- **説明**: 指定された環境変数がホストに存在しない場合にエラーとする
+
+```bash
+cderun --strict-env --env NPM_TOKEN node app.js
+```
+
 ### `--runtime`
 
 - **型**: string
@@ -436,7 +446,7 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
     `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
-    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-cap-add`,
+    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`,
     `--cderun-cap-drop`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`,
     `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`,
@@ -460,8 +470,7 @@ cderun --log-timestamp=false node app.js
 
 - **説明**: 指定された環境変数がホストに存在しない場合にエラーとする設定。
 - **指定方法**: `.cderun.yaml`, `.tools.yaml` の `strictEnv` フィールド、
-  または環境変数 `CDERUN_STRICT_ENV=true` で指定します。
-- **注意**: このオプションには直接のコマンドラインフラグはありません。
+  環境変数 `CDERUN_STRICT_ENV=true`、またはコマンドラインフラグ `--strict-env` で指定します。
 
 ## オプションの優先順位
 

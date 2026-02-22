@@ -42,7 +42,6 @@
 
 ### 4. 挙動の詳細
 
-**例1: ツール定義がある場合 (`.tools.yaml` に `my-tool` があり `image: alpine`, `entrypoint: ["/usr/bin/my-tool-impl"]`, `command: ["my-tool"]` と定義)**
 
 ```bash
 cderun my-tool -l -a
