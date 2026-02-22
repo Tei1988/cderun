@@ -52,7 +52,6 @@ type ResolvedConfig struct {
 	CapAdd     []string
 	CapDrop    []string
 	Entrypoint []string
-	Command    []string
 	Pull       string
 	Memory     int64
 	CPUs       float64
@@ -143,6 +142,10 @@ type CLIOptions struct {
 	LogFormatSet             bool
 	LogTimestampSet          bool
 	LogTimestamp             bool
+	StrictEnv                bool
+	StrictEnvSet             bool
+	CderunStrictEnv          bool
+	CderunStrictEnvSet       bool
 	CderunLogLevel           string
 	CderunLogLevelSet        bool
 	CderunLogFormat          string
@@ -308,8 +311,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	// 10. Resolve StrictEnv
 	res.StrictEnv = resolveBool(
-		false, false, // No P1 for strictEnv yet
-		false, false, // No P2 for strictEnv yet
+		cli.CderunStrictEnvSet, cli.CderunStrictEnv,
+		cli.StrictEnvSet, cli.StrictEnv,
 		"CDERUN_STRICT_ENV",
 		subcommand, tools, func(t ToolConfig) *bool { return t.StrictEnv },
 		global, func(g CDERunConfig) *bool { return g.Defaults.StrictEnv },
@@ -533,7 +536,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	res.CapAdd = resolveStringSlice(cli.CderunCapAdd, cli.CapAdd, "CDERUN_CAP_ADD", subcommand, tools, func(t ToolConfig) []string { return t.CapAdd }, global, func(g CDERunConfig) []string { return g.Defaults.CapAdd }, r)
 	res.CapDrop = resolveStringSlice(cli.CderunCapDrop, cli.CapDrop, "CDERUN_CAP_DROP", subcommand, tools, func(t ToolConfig) []string { return t.CapDrop }, global, func(g CDERunConfig) []string { return g.Defaults.CapDrop }, r)
 	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r)
-	res.Command = resolveStringSlice(nil, nil, "CDERUN_COMMAND", subcommand, tools, func(t ToolConfig) []string { return t.Command }, global, func(g CDERunConfig) []string { return g.Defaults.Command }, r)
 	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
 	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
 	if err != nil {

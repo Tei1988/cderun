@@ -153,12 +153,18 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 
 #### 設定方法
 
-`.cderun.yaml`（グローバル）または `.tools.yaml`（ツール固有）で設定可能です。
+.cderun.yaml（グローバル）、.tools.yaml（ツール固有）、またはコマンドラインフラグ `--strict-env` で設定可能です。
 
 ```yaml
 # .cderun.yaml
 defaults:
   strictEnv: true
+```
+
+またはコマンドラインフラグで指定：
+
+```bash
+cderun --strict-env node app.js
 ```
 
 または環境変数で指定：

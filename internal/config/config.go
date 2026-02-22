@@ -73,7 +73,6 @@ type ConfigDefaults struct {
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
-	Command         []string       `yaml:"command,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
@@ -102,7 +101,6 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.CapAdd = copyStringSlice(d.CapAdd)
 	res.CapDrop = copyStringSlice(d.CapDrop)
 	res.Entrypoint = copyStringSlice(d.Entrypoint)
-	res.Command = copyStringSlice(d.Command)
 	res.Env = copyStringSlice(d.Env)
 
 	if d.Devices != nil {
@@ -191,7 +189,6 @@ type ToolConfig struct {
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
-	Command         []string       `yaml:"command,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
@@ -220,7 +217,6 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.CapAdd = copyStringSlice(t.CapAdd)
 	res.CapDrop = copyStringSlice(t.CapDrop)
 	res.Entrypoint = copyStringSlice(t.Entrypoint)
-	res.Command = copyStringSlice(t.Command)
 	res.Env = copyStringSlice(t.Env)
 
 	if t.Devices != nil {

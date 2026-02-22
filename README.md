@@ -63,7 +63,7 @@ cderun --diagnosis
 - **\<subcommand\>**: The lookup key (e.g., `node`, `python`). It is NOT included in the final container command by default.
 - **[passthrough-args]**: All arguments after the subcommand are passed directly to the container.
 
-The final command executed in the container is the combination of any `command` defined in `.tools.yaml` for that subcommand plus the `passthrough-args`.
+The final command executed in the container consists of the passthrough-args.
 
 ### Illustration
 
