@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -274,6 +275,19 @@ func copyStringSlice(s []string) []string {
 	copy(res, s)
 	return res
 }
+func expandHome(p string, fs FileSystem) string {
+	if strings.HasPrefix(p, "~/") || p == "~" {
+		home, err := fs.UserHomeDir()
+		if err == nil {
+			if p == "~" {
+				return home
+			}
+			return filepath.Join(home, p[2:])
+		}
+	}
+	return p
+}
+
 
 // FileSystem defines the interface for filesystem operations.
 type FileSystem interface {
@@ -520,6 +534,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
+	path = expandHome(path, l.fs)
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
@@ -543,6 +558,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
+	path = expandHome(path, l.fs)
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)

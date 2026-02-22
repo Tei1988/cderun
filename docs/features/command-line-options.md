@@ -334,21 +334,23 @@ cderun --device /dev/fuse alpine ls /dev/fuse
 ### `--config`
 
 - **型**: string
-- **説明**: cderun自体の設定ファイル（`.cderun.yaml` 相当）を明示的に指定
+- **説明**: cderun自体の設定ファイル（`.cderun.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます
 - **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
 
 ```bash
 cderun --config my-cderun.yaml node app.js
+cderun --config ~/.config/cderun/custom.yaml node app.js
 ```
 
 ### `--tool-config`
 
 - **型**: string
-- **説明**: ツール実行設定ファイル（`.tools.yaml` 相当）を明示的に指定
+- **説明**: ツール実行設定ファイル（`.tools.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます
 - **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
 
 ```bash
 cderun --tool-config my-tools.yaml node app.js
+cderun --tool-config ~/tools-config.yaml node app.js
 ```
 
 ### `--dry-run`

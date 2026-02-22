@@ -313,16 +313,8 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) string {
 	}
 
 	// Tilde expansion
-	if strings.HasPrefix(p, "~/") || p == "~" {
-		home, err := fs.UserHomeDir()
-		if err == nil {
-			if p == "~" {
-				p = home
-			} else {
-				p = filepath.Join(home, p[2:])
-			}
-		}
-	}
+	p = expandHome(p, fs)
+
 	// Relative path resolution
 	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
 		p = filepath.Join(baseDir, p)

@@ -761,6 +761,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "cderun",
 		SilenceUsage: true,
+		SilenceErrors: true,
 		Short:        "A wrapper tool to run commands in a containerized environment.",
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
