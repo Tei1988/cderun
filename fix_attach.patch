@@ -1,0 +1,14 @@
+--- internal/runtime/docker.go
++++ internal/runtime/docker.go
+@@ -321,6 +321,11 @@
+			} else {
+				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+			}
++			// Give a small grace period before closing the write side.
++			// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
++			// after io.Copy can cause the entire connection to be closed or
++			// the EOF to be processed before the data has been fully consumed by the daemon.
++			time.Sleep(50 * time.Millisecond)
+			if err := resp.CloseWrite(); err != nil {
+				logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+			}
