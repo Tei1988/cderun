@@ -69,10 +69,12 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 		socket: socket,
 		name:   name,
 		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			t := time.NewTimer(d)
+			defer t.Stop()
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(d):
+			case <-t.C:
 				return nil
 			}
 		},
