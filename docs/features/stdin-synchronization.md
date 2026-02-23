@@ -45,11 +45,11 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 }
 ```
 
-### 3. Disabling Logs in Attach
+### 3. Handling Initial Output with Logs: true
 
-In `internal/runtime/docker.go`, the `AttachContainer` call now sets `Logs: false`.
+In `internal/runtime/docker.go`, the `AttachContainer` call uses `Logs: true`.
 
-Since `cderun` always attaches to the container *before* starting it, there are no existing logs to fetch. Setting `Logs: true` can sometimes cause the Docker daemon to send an initial (empty) log stream and then close or misbehave if the container hasn't started yet, especially under heavy load or specific Docker versions. Disabling it ensures a cleaner stream connection dedicated to real-time IO.
+While `Logs: false` was previously considered to avoid potential stream instability, it was found that `Logs: true` is necessary to ensure that no output is lost if the container starts and produces output very quickly after the attachment. Any potential instability is handled by the `attachReady` signal and proper synchronization of the container start. For more details on why `Logs: true` is maintained, see [Logging and Debugging](logging-debugging.md).
 
 ## Benefits
 
