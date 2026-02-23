@@ -124,7 +124,10 @@ type rootOptions struct {
 	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
 }
 
-const attachGracePeriod = 5 * time.Second
+const (
+	attachGracePeriod = 5 * time.Second
+	hangTimeout       = 2 * time.Second
+)
 
 var (
 	opts = defaultOptions()
@@ -769,26 +772,92 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	o.logger.Trace("Waiting for container: %s", containerID)
-	exitCode, err := rt.WaitContainer(ctxG, containerID)
-	if err != nil {
-		o.logger.Debug("WaitContainer for %s failed or was interrupted: %v", containerID, err)
-		return 0, fmt.Errorf("failed to wait for container: %w", err)
-	}
-	o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
-	// After container exits, wait a short grace period for remaining output
-	o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+	type waitResult struct {
+		code int
+		err  error
+	}
+	waitDone := make(chan waitResult, 1)
+	go func() {
+		code, err := rt.WaitContainer(ctxG, containerID)
+		waitDone <- waitResult{code, err}
+	}()
+
+	var exitCode int
 	select {
+	case result := <-waitDone:
+		if result.err != nil {
+			o.logger.Debug("WaitContainer for %s failed or was interrupted: %v", containerID, result.err)
+			return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+		}
+		exitCode = result.code
+		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
+
+		// After container exits, wait a short grace period for remaining output
+		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+		select {
+		case err := <-attachDone:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				o.logger.Warn("AttachContainer finished with error after container exit for %s: %v", containerID, err)
+				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
+			}
+			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
+		case <-time.After(attachGracePeriod):
+			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
+			cancelAttach()
+			<-attachDone
+		}
+
 	case err := <-attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
-			o.logger.Warn("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-			return 0, fmt.Errorf("failed to attach to container: %w", err)
+			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
+			// Wait for container to finish (best effort)
+			cancel()
+			select {
+			case res := <-waitDone:
+				exitCode = res.code
+			case <-time.After(hangTimeout):
+				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+			}
+			return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 		}
-		o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-	case <-time.After(attachGracePeriod):
-		o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-		cancelAttach()
-		<-attachDone
+		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
+
+		// IO finished before container exited.
+		// In non-TTY mode, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
+		if !containerConfig.TTY {
+			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", hangTimeout, containerID)
+			select {
+			case result := <-waitDone:
+				if result.err != nil {
+					return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+				}
+				exitCode = result.code
+			case <-time.After(hangTimeout):
+				o.logger.Warn("Container %s did not exit after IO completion, forcing termination", containerID)
+				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
+				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
+					o.logger.Warn("failed to force terminate container %s: %v", containerID, err)
+				}
+
+				select {
+				case result := <-waitDone:
+					if result.err != nil && !errors.Is(result.err, context.Canceled) {
+						return 0, fmt.Errorf("failed to wait for container after kill: %w", result.err)
+					}
+					exitCode = result.code
+				case <-time.After(hangTimeout):
+					return 0, fmt.Errorf("timeout waiting for container %s to exit after SIGKILL", containerID)
+				}
+			}
+		} else {
+			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
+			result := <-waitDone
+			if result.err != nil {
+				return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+			}
+			exitCode = result.code
+		}
 	}
 
 	o.logger.Debug("Total execution finished for container: %s", containerID)
