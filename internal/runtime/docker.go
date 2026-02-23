@@ -292,10 +292,10 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
-		// Logs: true with Stream: true replays initial logs then switches to live stream for default
-		// drivers (json-file/journald). While ignored by some external drivers, this ensures all
-		// output is captured from the start, suitable for cderun's local development focus.
-		Logs:   true,
+		// Logs: false is used here because we ensure the container is started only after
+		// attachment is established (via the ready channel). Using Logs: true can cause
+		// early EOF in some Docker versions if the container hasn't started yet.
+		Logs:   false,
 		Stdin:  stdin != nil,
 		Stdout: true,
 		Stderr: true,
@@ -358,14 +358,17 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	select {
 	case err := <-outputDone:
+		logging.Trace("AttachContainer: output goroutine finished")
 		return err
 	case <-stdinDone:
 		if stdinErr != nil {
+			logging.Trace("AttachContainer: stdin goroutine finished with error")
 			return stdinErr
 		}
 		// If stdin is done, wait for the remaining output or context cancellation
 		select {
 		case err := <-outputDone:
+			logging.Trace("AttachContainer: output goroutine finished after stdin done")
 			return err
 		case <-ctx.Done():
 			return ctx.Err()
