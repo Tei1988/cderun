@@ -483,5 +483,23 @@ func TestUnit_Docker_AttachOptions(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, mock.attachOpts.Logs, "Logs should be false")
 		assert.True(t, mock.attachOpts.Stream, "Stream should be true")
+		assert.False(t, mock.attachOpts.Stdin, "Stdin should be false when stdin is nil")
+		assert.True(t, mock.attachOpts.Stdout, "Stdout should be true")
+		assert.True(t, mock.attachOpts.Stderr, "Stderr should be true")
+	})
+
+	t.Run("verify Stdin is true when stdin is provided", func(t *testing.T) {
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   &mockConn{},
+				Reader: bufio.NewReader(strings.NewReader("")),
+			},
+		}
+		runtime := &DockerRuntime{client: mock}
+
+		stdin := strings.NewReader("input")
+		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, nil, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, mock.attachOpts.Stdin, "Stdin should be true when stdin is provided")
 	})
 }
