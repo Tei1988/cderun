@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_Config_Path_Resolution(t *testing.T) {
+func TestUnit_Path_Resolution(t *testing.T) {
 	home := "/home/user"
 	baseDir := "/abs/path"
 	mfs := &MockFileSystem{
@@ -208,7 +208,7 @@ func TestUnit_Config_Path_Resolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
+func TestUnit_Path_MarshalYAML(t *testing.T) {
 	t.Run("ConfigPath", func(t *testing.T) {
 		cp := ConfigPath{Raw: "/path"}
 		data, err := yaml.Marshal(cp)
@@ -283,7 +283,7 @@ func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_Helpers(t *testing.T) {
+func TestUnit_Path_Helpers(t *testing.T) {
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
@@ -319,7 +319,7 @@ func TestUnit_Config_Path_Helpers(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_UnmarshalYAMLErrors(t *testing.T) {
+func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
 	t.Run("MountConfig", func(t *testing.T) {
 		var mc MountConfig
 
@@ -375,7 +375,7 @@ source: ./data
 	})
 }
 
-func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
+func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
@@ -404,7 +404,7 @@ func TestUnit_Config_Path_ResolveVolume_Device(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
+func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 	t.Run("Windows path without separator", func(t *testing.T) {
 		_, _, ok := SplitHostRemainder(`C:\only-path`)
 		assert.False(t, ok)

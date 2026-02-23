@@ -118,7 +118,7 @@ python:
 	})
 }
 
-func TestIntegration_Config_Expression_Resolve(t *testing.T) {
+func TestIntegration_Expression_Resolve(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tmpDir) }()

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"os"
 	"strings"
 	"testing"
@@ -31,40 +30,18 @@ func executeCommandRaw(args []string) (string, error) {
 
 func executeCommandRawContext(ctx context.Context, args []string) (string, error) {
 	var buf bytes.Buffer
-	r, w, err := os.Pipe()
-	if err != nil {
-		return "", err
-	}
-
-	savedStdout := os.Stdout
-	savedStderr := os.Stderr
-	os.Stdout = w
-	os.Stderr = w
-	defer func() {
-		os.Stdout = savedStdout
-		os.Stderr = savedStderr
-		_ = r.Close()
-	}()
-
-	done := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(&buf, r)
-		close(done)
-	}()
-
 	execErr := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
 		// Default to terminal mode for tests to avoid auto-detection of pipes
 		// unless specifically overridden in a test.
 		o.isTerminal = func(fd int) bool { return true }
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
 	})
-
-	_ = w.Close()
-	<-done
 
 	return buf.String(), execErr
 }
 
-func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -117,7 +94,7 @@ func TestUnit_Command_Root_PreprocessArgs(t *testing.T) {
 	}
 }
 
-func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
+func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	require.NoError(t, err)
@@ -126,7 +103,7 @@ func TestUnit_Command_Root_ExecuteEmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Command_Root_CommandResolution(t *testing.T) {
+func TestUnit_Root_CommandResolution(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
@@ -286,7 +263,7 @@ func TestUnit_Command_Root_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase3Features(t *testing.T) {
+func TestUnit_Root_Phase3Features(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -403,7 +380,7 @@ func TestUnit_Command_Root_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
+func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -427,7 +404,7 @@ func TestUnit_Command_Root_Phase10StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
+func TestUnit_Root_HandleDiagnosis(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
 		opts := &rootOptions{
@@ -467,7 +444,7 @@ func TestUnit_Command_Root_HandleDiagnosis(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
+func TestUnit_Root_BuildContainerConfig_Failures(t *testing.T) {
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -485,46 +462,25 @@ func TestUnit_Command_Root_BuildContainerConfig_Failures(t *testing.T) {
 	})
 }
 
-func captureStderr(t *testing.T, fn func()) string {
-	t.Helper()
-	var buf bytes.Buffer
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	saved := os.Stderr
-	os.Stderr = w
-	defer func() {
-		os.Stderr = saved
-		_ = r.Close()
-	}()
-	done := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(&buf, r)
-		close(done)
-	}()
-	fn()
-	_ = w.Close()
-	<-done
-	return buf.String()
-}
 
-func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
 
-		stderr := captureStderr(t, func() {
-			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-					return mockRuntime, nil
-				}
-				o.exitFunc = func(code int) {}
-				o.isTerminal = func(fd int) bool { return true }
-			})
-			require.NoError(t, err)
+		var stderr bytes.Buffer
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetErr(&stderr)
 		})
+		require.NoError(t, err)
 
-		assert.Contains(t, stderr, "[WARN] failed to remove container (defer): failed to remove")
+		assert.Contains(t, stderr.String(), "[WARN] failed to remove container (defer): failed to remove")
 	})
 
 	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
@@ -532,22 +488,22 @@ func TestUnit_Command_Root_RemoveContainerWarning(t *testing.T) {
 			RemoveErr: nil,
 		}
 
-		stderr := captureStderr(t, func() {
-			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-					return mockRuntime, nil
-				}
-				o.exitFunc = func(code int) {}
-				o.isTerminal = func(fd int) bool { return true }
-			})
-			require.NoError(t, err)
+		var stderr bytes.Buffer
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetErr(&stderr)
 		})
+		require.NoError(t, err)
 
-		assert.NotContains(t, stderr, "[WARN] failed to remove container (defer)")
+		assert.NotContains(t, stderr.String(), "[WARN] failed to remove container (defer)")
 	})
 }
 
-func TestUnit_Command_Root_StrictEnvFlags(t *testing.T) {
+func TestUnit_Root_StrictEnvFlags(t *testing.T) {
 	t.Run("--strict-env flag", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -573,5 +529,88 @@ func TestUnit_Command_Root_StrictEnvFlags(t *testing.T) {
 		})
 		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
 		require.NoError(t, err)
+	})
+}
+
+func TestUnit_Root_LoadConfigs_Failures(t *testing.T) {
+	t.Run("fails when CDERun config path is invalid", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{}, // Empty
+		}
+		o := defaultOptions()
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.cderunConfigPath = "/nonexistent.yaml"
+
+		cmd := &cobra.Command{}
+		cmd.Flags().String("cderun-config", "", "")
+		_ = cmd.Flags().Set("cderun-config", "/nonexistent.yaml")
+
+		_, _, _, _, err := o.loadConfigs(cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load cderun config")
+	})
+
+	t.Run("fails when Tools config path is invalid", func(t *testing.T) {
+		mfs := &config.MockFileSystem{}
+		o := defaultOptions()
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.cderunToolConfigPath = "/nonexistent-tools.yaml"
+
+		cmd := &cobra.Command{}
+		cmd.Flags().String("cderun-tool-config", "", "")
+		_ = cmd.Flags().Set("cderun-tool-config", "/nonexistent-tools.yaml")
+
+		_, _, _, _, err := o.loadConfigs(cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load tools config")
+	})
+}
+
+func TestUnit_Root_BuildContainerConfig_EdgeCases(t *testing.T) {
+	t.Run("fails when tool not found in ToolsConfig", func(t *testing.T) {
+		o := defaultOptions()
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"nonexistent-tool"},
+		}
+		toolsCfg := config.ToolsConfig{
+			"known-tool": config.ToolConfig{Image: "alpine"},
+		}
+		_, err := o.buildContainerConfig(resolved, nil, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"nonexistent-tool\" not found in .tools.yaml")
+	})
+
+	t.Run("resolves exePath for nested execution", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecPath: "/usr/bin/cderun",
+		}
+		o := defaultOptions()
+		o.fs = mfs
+
+		// Nested execution (Level > 0)
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+			HostContext: &config.HostContext{
+				Level: 1,
+				Mounts: []config.MountMapping{
+					{Source: "/host/bin", Target: "/usr/bin", Level: 1},
+				},
+			},
+		}
+
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+
+		// /usr/bin/cderun on host (level 1) maps back to /host/bin/cderun
+		found := false
+		for _, m := range cfg.Mounts {
+			if m.Target == "/usr/local/bin/cderun" {
+				assert.Equal(t, "/host/bin/cderun", m.Source)
+				found = true
+			}
+		}
+		assert.True(t, found)
 	})
 }

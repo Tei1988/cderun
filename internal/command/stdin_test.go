@@ -32,7 +32,7 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Stdin_Piped(t *testing.T) {
+func TestUnit_Stdin_Piped(t *testing.T) {
 	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
@@ -128,7 +128,7 @@ func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
+func TestUnit_Stdin_FlowExtended(t *testing.T) {
 	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
@@ -166,7 +166,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
+func TestIntegration_Stdin_Mocked(t *testing.T) {
 	mock := &pipeMockRuntime{}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0
@@ -244,7 +244,7 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
+func TestUnit_Stdin_Synchronization(t *testing.T) {
 	t.Run("stdin is not read until container starts", func(t *testing.T) {
 		mock := &syncMockRuntime{}
 		mock.CreatedContainerID = "test-sync-container"

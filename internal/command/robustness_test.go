@@ -35,7 +35,9 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	}
 }
 
-func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
+// TestRobustness_Root_SignalHandling tests the signal handling and robustness of the root command.
+// Note: This test uses syscall.Kill(os.Getpid(), ...) and is NOT safe for parallel execution with t.Parallel().
+func TestRobustness_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
