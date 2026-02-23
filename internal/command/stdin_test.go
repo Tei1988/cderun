@@ -209,6 +209,7 @@ type syncMockRuntime struct {
 	counter    int
 	startOrder int
 	readOrder  int
+	wg         sync.WaitGroup
 }
 
 func (m *syncMockRuntime) StartContainer(ctx context.Context, containerID string) error {
@@ -224,10 +225,12 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 		close(ready)
 	}
 	if stdin != nil && stdout != nil {
+		m.wg.Add(1)
 		go func() {
+			defer m.wg.Done()
 			// Try to read immediately
-			p := make([]byte, 10)
-			n, _ := stdin.Read(p)
+			p := make([]byte, 1024)
+			n, err := stdin.Read(p)
 			if n > 0 {
 				m.mu.Lock()
 				if m.readOrder == 0 {
@@ -237,6 +240,8 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 				m.mu.Unlock()
 				_, _ = stdout.Write(p[:n])
 				_, _ = io.Copy(stdout, stdin)
+			} else if err != nil && err != io.EOF {
+				// Record error if needed, but for this test we expect data
 			}
 		}()
 	}
@@ -264,12 +269,16 @@ func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+
+		// Wait for the mock's background goroutine to finish
+		mock.wg.Wait()
+
 		assert.Equal(t, stdinData, stdout.String())
 
 		mock.mu.Lock()
 		defer mock.mu.Unlock()
-		assert.True(t, mock.startOrder > 0, "StartContainer should have been called")
-		assert.True(t, mock.readOrder > 0, "Stdin should have been read")
-		assert.True(t, mock.startOrder < mock.readOrder, "StartContainer (%d) should be called before stdin is read (%d)", mock.startOrder, mock.readOrder)
+		assert.Positive(t, mock.startOrder, "StartContainer should have been called")
+		assert.Positive(t, mock.readOrder, "Stdin should have been read")
+		assert.Less(t, mock.startOrder, mock.readOrder, "StartContainer (%d) should be called before stdin is read (%d)", mock.startOrder, mock.readOrder)
 	})
 }
