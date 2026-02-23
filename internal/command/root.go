@@ -606,6 +606,21 @@ func getFd(r any) (int, bool) {
 	return -1, false
 }
 
+type syncReader struct {
+	inner io.Reader
+	ready <-chan struct{}
+	ctx   context.Context
+}
+
+func (s *syncReader) Read(p []byte) (n int, err error) {
+	select {
+	case <-s.ctx.Done():
+		return 0, s.ctx.Err()
+	case <-s.ready:
+		return s.inner.Read(p)
+	}
+}
+
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
@@ -689,8 +704,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Attach to container IO concurrently
 	var stdin io.Reader
+	startSignal := make(chan struct{})
 	if containerConfig.Interactive {
-		stdin = cmd.InOrStdin()
+		stdin = &syncReader{
+			inner: cmd.InOrStdin(),
+			ready: startSignal,
+			ctx:   ctxG,
+		}
 	}
 
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
@@ -718,6 +738,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
+	close(startSignal) // Signal stdin to start reading
 
 	// Handle window resize synchronization
 	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {

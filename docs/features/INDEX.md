@@ -9,80 +9,124 @@
 ### コア機能
 
 1. **[引数解析 (Completed)](./argument-parsing.md)**
-   - 厳密な境界解析
-   - cderunフラグとサブコマンド引数の分離
+
+  - 厳密な境界解析
+  - cderunフラグとサブコマンド引数の分離
+
 2. **[引数・設定優先順位 (Completed)](./argument-priority-logic.md)**
-   - P1〜P6の優先順位階層
-   - CLI、環境変数、設定ファイルの解決ロジック
+
+  - P1〜P6の優先順位階層
+  - CLI、環境変数、設定ファイルの解決ロジック
+
 3. **[ポリグロットエントリーポイント (Completed)](./polyglot-entry.md)**
-   - シンボリックリンクによる自動ツール検出
-   - 単一バイナリで複数ツールとして動作
+
+  - シンボリックリンクによる自動ツール検出
+  - 単一バイナリで複数ツールとして動作
+
 4. **[設定ファイルサポート (Completed)](./configuration-file-support.md)**
-   - `.cderun.yaml`: cderun自体の設定
-   - `.tools.yaml`: 各ツールでの実行設定
+
+  - `.cderun.yaml`: cderun自体の設定
+  - `.tools.yaml`: 各ツールでの実行設定
+
+5. **[標準入力同期 (Completed)](./stdin-synchronization.md)**
+
+  - コンテナ起動と標準入力アタッチの同期
+  - パイプ入力の信頼性向上
 
 ### ランタイム機能
 
 1. **[マルチランタイムサポート (Completed)](./multi-runtime-support.md)**
-   - Docker / Podman サポート
-   - ランタイム自動検出
-   - 統一されたCRIインターフェース
+
+  - Docker / Podman サポート
+  - ランタイム自動検出
+  - 統一されたCRIインターフェース
+
 2. **[直接コンテナ実行 (Completed)](./direct-container-execution.md)**
-   - コマンド生成なしでランタイムAPIを直接使用
-   - 中間表現（ContainerConfig）からAPIコールへの変換
+
+  - コマンド生成なしでランタイムAPIを直接使用
+  - 中間表現（ContainerConfig）からAPIコールへの変換
+
 3. **[イメージマッピング (Completed)](./image-mapping.md)**
-   - サブコマンド名からイメージへの自動マッピング
-   - カスタムマッピング設定
+
+  - サブコマンド名からイメージへの自動マッピング
+  - カスタムマッピング設定
 
 ### 実行環境機能
 
 1. **[環境変数パススルー (Completed)](./env-passthrough.md)**
-   - デフォルトでは引き継がない
-   - 明示的指定による選択的パススルー
-   - `KEY=value`と`KEY`（ホストから取得）形式のサポート
+
+  - デフォルトでは引き継がない
+  - 明示的指定による選択的パススルー
+  - `KEY=value`と`KEY`（ホストから取得）形式のサポート
+
 2. **[Mount Tools (Completed)](./mount-tools.md)**
-   - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
-   - cderunバイナリを複数のツール名でマウント
+
+  - .tools.yamlに定義されたツールをコンテナ内で使用可能にする
+  - cderunバイナリを複数のツール名でマウント
+
 3. **[コンテナコマンド実行 (Completed)](./container-command-execution.md)**
-   - エフェメラルコンテナでのコマンド実行
-   - TTY/インタラクティブサポート
+
+  - エフェメラルコンテナでのコマンド実行
+  - TTY/インタラクティブサポート
 
 ### 高度な機能
 
 1. **[Docker互換フラグ (Completed)](./command-line-options.md)**
-   - ポートマッピング、リソース制限、ユーザー指定など
-   - Docker CLI互換のオプションサポート
+
+  - ポートマッピング、リソース制限、ユーザー指定など
+  - Docker CLI互換のオプションサポート
+
 2. **[cderunバイナリマウント (Completed)](./cderun-binary-mounting.md)**
-   - `--mount-cderun`でコンテナ内でcderunを使用
-   - `--mount-socket` は自動的に有効化されます
+
+  - `--mount-cderun`でコンテナ内でcderunを使用
+  - `--mount-socket` は自動的に有効化されます
+
 3. **[ドライランモード (Completed)](./dry-run-mode.md)**
-   - 実行前のコマンドプレビュー
-   - JSON/YAML/Simple形式での出力
+
+  - 実行前のコマンドプレビュー
+  - JSON/YAML/Simple形式での出力
+
 4. **[ログ・デバッグ (Completed)](./logging-debugging.md)**
-   - 詳細ログ出力
-   - レベル別出力、JSON形式対応
+
+  - 詳細ログ出力
+  - レベル別出力、JSON形式対応
+
 5. **[インタラクティブ・ターミナル (Completed)](./interactive-terminal.md)**
-   - シグナル転送
-   - TTYリサイズ同期
+
+  - シグナル転送
+  - TTYリサイズ同期
+
 6. **[README生成戦略 (Completed)](./readme-generation.md)**
-   - 実装コードからREADMEを生成
-   - Source of Truthの維持
+
+  - 実装コードからREADMEを生成
+  - Source of Truthの維持
+
 7. **[Nested Execution (Completed)](./nested-execution.md)**
-   - コンテナ内からの再帰的なcderun実行
-   - 設定の動的な注入とパス変換ロジック
+
+  - コンテナ内からの再帰的なcderun実行
+  - 設定の動的な注入とパス変換ロジック
 
 ### 開発・検証機能
 
 1. **[インテグレーションテスト (Completed)](./integration-testing-with-docker.md)**
-   - MockRuntime や実ランタイムを利用した検証
+
+  - MockRuntime や実ランタイムを利用した検証
+
 2. **[E2E テスト (Completed)](./e2e-testing.md)**
-   - 実際の Docker/Podman を利用したエンドツーエンド検証
+
+  - 実際の Docker/Podman を利用したエンドツーエンド検証
+
 3. **[テストカバレッジ計測 (Completed)](./test-coverage-reporting.md)**
-   - コードカバレッジの可視化と自動計測
+
+  - コードカバレッジの可視化と自動計測
+
 4. **[テスト構成・網羅性計画 (Completed)](./test-organization-plan.md)**
-   - テストの体系化とカバレッジ分析
+
+  - テストの体系化とカバレッジ分析
+
 5. **[診断モード (Completed)](./diagnosis-mode.md)**
-   - システム診断情報と利用可能なツールの表示
+
+  - システム診断情報と利用可能なツールの表示
 
 ## 技術リファレンス
 
@@ -103,8 +147,11 @@
 ## 重要な設計原則
 
 1. **中間表現の使用**: すべての設定を`ContainerConfig`に集約
+
 2. **ランタイム抽象化**: Docker/Podmanを統一インターフェースで扱う
+
 3. **明示的な設定**: デフォルトで安全な動作、必要に応じて明示的に指定
+
 4. **環境の分離**: デフォルトでは環境変数を引き継がない
 
 ## 実装優先順位

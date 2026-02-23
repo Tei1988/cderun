@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -160,6 +162,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, stdinData, stdout.String())
+		assert.Equal(t, "test-container", mock.GetAttachedContainerID())
 	})
 }
 
@@ -199,4 +202,76 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, stdinData, outBuf.String())
+}
+
+type syncMockRuntime struct {
+	runtime.MockRuntime
+	mu         sync.Mutex
+	counter    int
+	startOrder int
+	readOrder  int
+}
+
+func (m *syncMockRuntime) StartContainer(ctx context.Context, containerID string) error {
+	m.mu.Lock()
+	m.counter++
+	m.startOrder = m.counter
+	m.mu.Unlock()
+	return m.MockRuntime.StartContainer(ctx, containerID)
+}
+
+func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	// Call embedded mock for record keeping
+	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
+
+	if stdin != nil && stdout != nil {
+		// Perform read+write synchronously to avoid races
+		p := make([]byte, 1024)
+		n, err := stdin.Read(p)
+		if n > 0 {
+			m.mu.Lock()
+			if m.readOrder == 0 {
+				m.counter++
+				m.readOrder = m.counter
+			}
+			m.mu.Unlock()
+			_, _ = stdout.Write(p[:n])
+			_, _ = io.Copy(stdout, stdin)
+		} else if err != nil && err != io.EOF {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
+	t.Run("stdin is not read until container starts", func(t *testing.T) {
+		mock := &syncMockRuntime{}
+		mock.CreatedContainerID = "test-sync-container"
+		mock.ExitCode = 0
+
+		stdinData := "sync-data\n"
+		var stdout bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(strings.NewReader(stdinData))
+			cmd.SetOut(&stdout)
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, stdinData, stdout.String())
+		assert.Equal(t, "test-sync-container", mock.GetAttachedContainerID())
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		assert.Positive(t, mock.startOrder, "StartContainer should have been called")
+		assert.Positive(t, mock.readOrder, "Stdin should have been read")
+		assert.Less(t, mock.startOrder, mock.readOrder, "StartContainer should be called before stdin is read")
+	})
 }
