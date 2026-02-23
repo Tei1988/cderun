@@ -67,10 +67,10 @@ In some Docker versions (notably 29.1.5), a hang can occur during piped executio
 
 To address this, `cderun` implements an automatic termination logic for non-TTY executions:
 
-1.  **Concurrent Waiting**: `cderun` waits for both container exit (`WaitContainer`) and IO completion (`AttachContainer`) concurrently.
-2.  **IO Completion Detection**: When the output stream from the container is closed (EOF reached), `AttachContainer` returns.
-3.  **Hang Timeout**: If IO is complete but the container does not exit within **2 seconds**, `cderun` assumes a hang has occurred and sends a `SIGKILL` to the container.
-4.  **Preserving Interactivity**: This automatic termination is **disabled** when TTY is requested (`--tty` or `-t`), ensuring that interactive shells or long-running UI applications are not prematurely killed.
+1. **Concurrent Waiting**: `cderun` waits for both container exit (`WaitContainer`) and IO completion (`AttachContainer`) concurrently.
+2. **IO Completion Detection**: When the output stream from the container is closed (EOF reached), `AttachContainer` returns.
+3. **Hang Timeout**: If IO is complete but the container does not exit within **2 seconds**, `cderun` assumes a hang has occurred and sends a `SIGKILL` to the container.
+4. **Preserving Interactivity**: This automatic termination is **disabled** when TTY is requested (`--tty` or `-t`), ensuring that interactive shells or long-running UI applications are not prematurely killed.
 
 This ensures that piped commands like `echo "data" | cderun cat` always exit promptly after their work is done.
 
@@ -80,9 +80,9 @@ Docker 29.1.5 などの一部のバージョンでは、パイプ実行時にコ
 
 この問題に対処するため、`cderun` は非 TTY 実行時に以下の自動終了ロジックを実装しています。
 
-1.  **並行待機**: コンテナの終了（`WaitContainer`）と IO の完了（`AttachContainer`）を並行して待機します。
-2.  **IO 完了の検知**: コンテナからの出力ストリームが閉じられる（EOF 到着）と、`AttachContainer` が終了します。
-3.  **ハングタイムアウト**: IO が完了したにもかかわらず、**2秒以内**にコンテナが終了しない場合、`cderun` はハングが発生したとみなし、コンテナに `SIGKILL` を送信します。
-4.  **インタラクティブ性の維持**: この自動終了ロジックは、TTY が要求されている場合（`--tty` または `-t`）は**無効**になります。これにより、インタラクティブなシェルや長時間実行される UI アプリケーションが誤って終了されるのを防ぎます。
+1. **並行待機**: コンテナの終了（`WaitContainer`）と IO の完了（`AttachContainer`）を並行して待機します。
+2. **IO 完了の検知**: コンテナからの出力ストリームが閉じられる（EOF 到着）と、`AttachContainer` が終了します。
+3. **ハングタイムアウト**: IO が完了したにもかかわらず、**2秒以内**にコンテナが終了しない場合、`cderun` はハングが発生したとみなし、コンテナに `SIGKILL` を送信します。
+4. **インタラクティブ性の維持**: この自動終了ロジックは、TTY が要求されている場合（`--tty` または `-t`）は**無効**になります。これにより、インタラクティブなシェルや長時間実行される UI アプリケーションが誤って終了されるのを防ぎます。
 
 これにより、`echo "data" | cderun cat` のようなパイプ実行時に、処理完了後すぐに CLI が終了することが保証されます。
