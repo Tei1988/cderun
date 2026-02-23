@@ -368,7 +368,8 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			return ctx.Err()
 		}
 	case <-ctx.Done():
-		// Explicitly close the connection to unblock any pending I/O
+		// Explicitly close the connection to force-unblock pending I/O on context cancellation.
+		// Double-closing is acceptable as resp.Close() error is intentionally ignored here or by defer.
 		resp.Close()
 		return ctx.Err()
 	}
