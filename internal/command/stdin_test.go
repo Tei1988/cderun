@@ -268,8 +268,8 @@ func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
 
 		mock.mu.Lock()
 		defer mock.mu.Unlock()
-		assert.Greater(t, mock.startOrder, 0, "StartContainer should have been called")
-		assert.Greater(t, mock.readOrder, 0, "Stdin should have been read")
+		assert.Positive(t, mock.startOrder, "StartContainer should have been called")
+		assert.Positive(t, mock.readOrder, "Stdin should have been read")
 		assert.Less(t, mock.startOrder, mock.readOrder, "StartContainer should be called before stdin is read")
 	})
 }
