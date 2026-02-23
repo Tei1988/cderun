@@ -25,7 +25,10 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const pullMaxRetries = 3
+const (
+	pullMaxRetries         = 3
+	attachCloseWriteGrace = 50 * time.Millisecond
+)
 
 var eofRegex = regexp.MustCompile(`\beof\b`)
 
@@ -327,7 +330,9 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
 				// after io.Copy can cause the entire connection to be closed or
 				// the EOF to be processed before the data has been fully consumed by the daemon.
-				if err := d.sleepFunc(ctx, 50*time.Millisecond); err == nil {
+				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
+				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
+				if err := d.sleepFunc(ctx, attachCloseWriteGrace); err == nil {
 					logging.Trace("Calling CloseWrite on container %s connection", containerID)
 					if err := resp.CloseWrite(); err != nil {
 						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)

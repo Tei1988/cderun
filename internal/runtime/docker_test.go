@@ -1,8 +1,8 @@
 package runtime
 
 import (
-	"sync/atomic"
 	"bufio"
+	"sync/atomic"
 	"bytes"
 	"context"
 	"errors"
@@ -534,5 +534,24 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, io.Discard, io.Discard, nil)
 		require.NoError(t, err)
 		assert.False(t, conn.closeWriteCalled.Load(), "CloseWrite should not be called if sleep was canceled")
+	})
+
+	t.Run("CloseWrite is called if sleepFunc succeeds", func(t *testing.T) {
+		conn := &mockConn{}
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(strings.NewReader("")),
+			},
+		}
+		runtime := &DockerRuntime{
+			client:    mock,
+			sleepFunc: noopSleepFunc,
+		}
+
+		stdin := strings.NewReader("input")
+		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, io.Discard, io.Discard, nil)
+		require.NoError(t, err)
+		assert.Eventually(t, func() bool { return conn.closeWriteCalled.Load() }, 500*time.Millisecond, 10*time.Millisecond, "CloseWrite should be called if sleep succeeded")
 	})
 }
