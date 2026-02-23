@@ -124,7 +124,10 @@ type rootOptions struct {
 	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
 }
 
-const attachGracePeriod = 5 * time.Second
+const (
+	attachGracePeriod = 5 * time.Second
+	hangTimeout       = 2 * time.Second
+)
 
 var (
 	opts = defaultOptions()
@@ -809,7 +812,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
 			// Wait for container to finish (best effort)
-			<-waitDone
+			cancel()
+			select {
+			case <-waitDone:
+			case <-time.After(hangTimeout):
+				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+			}
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
@@ -817,7 +825,6 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		// IO finished before container exited.
 		// In non-TTY mode, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
 		if !containerConfig.TTY {
-			const hangTimeout = 2 * time.Second
 			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", hangTimeout, containerID)
 			select {
 			case result := <-waitDone:
