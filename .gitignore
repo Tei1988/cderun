@@ -21,3 +21,4 @@ go.work
 # Compiled binary
 cderun
 *.bak
+*.orig

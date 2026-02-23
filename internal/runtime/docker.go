@@ -25,7 +25,10 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const pullMaxRetries = 3
+const (
+	pullMaxRetries         = 3
+	attachCloseWriteGrace = 50 * time.Millisecond
+)
 
 var eofRegex = regexp.MustCompile(`\beof\b`)
 
@@ -69,10 +72,12 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 		socket: socket,
 		name:   name,
 		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			t := time.NewTimer(d)
+			defer t.Stop()
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(d):
+			case <-t.C:
 				return nil
 			}
 		},
@@ -320,9 +325,19 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				logging.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
 			} else {
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
-			}
-			if err := resp.CloseWrite(); err != nil {
-				logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+
+				// Give a small grace period before closing the write side.
+				// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
+				// after io.Copy can cause the entire connection to be closed or
+				// the EOF to be processed before the data has been fully consumed by the daemon.
+				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
+				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
+				if err := d.sleepFunc(ctx, attachCloseWriteGrace); err == nil {
+					logging.Trace("Calling CloseWrite on container %s connection", containerID)
+					if err := resp.CloseWrite(); err != nil {
+						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+					}
+				}
 			}
 			close(stdinDone)
 		}()
@@ -338,11 +353,15 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		logging.Debug("Output goroutine started")
 		if tty {
 			// When TTY is enabled, the stream is raw (not multiplexed).
+			logging.Trace("Starting raw IO copy (TTY=true)")
 			n, err = io.Copy(stdout, resp.Reader)
 		} else {
 			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
+			logging.Trace("Starting multiplexed StdCopy (TTY=false)")
 			n, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
 		}
+		logging.Trace("Output copy from container %s finished: n=%d, err=%v", containerID, n, err)
+
 		if err != nil {
 			logging.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
 		} else {
