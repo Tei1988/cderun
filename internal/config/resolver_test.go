@@ -1074,8 +1074,8 @@ func TestUnit_Config_Resolver_ExpressionsInCLI(t *testing.T) {
 func TestUnit_Config_Resolver_StrictEnvFlags(t *testing.T) {
 	t.Run("cli-strictenv-only", func(t *testing.T) {
 		cliStrictEnv := CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:        "alpine",
+			ImageSet:     true,
 			StrictEnv:    true,
 			StrictEnvSet: true,
 		}
@@ -1086,8 +1086,8 @@ func TestUnit_Config_Resolver_StrictEnvFlags(t *testing.T) {
 
 	t.Run("cli-cderun-overrides-strictenv", func(t *testing.T) {
 		cliCderunOverrides := CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:              "alpine",
+			ImageSet:           true,
 			StrictEnv:          true,
 			StrictEnvSet:       true,
 			CderunStrictEnv:    false,

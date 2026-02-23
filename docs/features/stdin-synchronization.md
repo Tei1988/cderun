@@ -59,4 +59,4 @@ Since `cderun` always attaches to the container *before* starting it, there are 
 
 ## Verification
 
-This behavior is verified by integration tests in `internal/command/stdin_test.go` which simulate delayed container startup with immediate STDIN availability.
+This behavior is verified by unit tests in `internal/command/stdin_test.go` which simulate delayed container startup with immediate STDIN availability.
