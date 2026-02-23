@@ -799,7 +799,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		case err := <-attachDone:
 			if err != nil && !errors.Is(err, context.Canceled) {
 				o.logger.Warn("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-				return 0, fmt.Errorf("failed to attach to container: %w", err)
+				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 			}
 			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 		case <-time.After(attachGracePeriod):
@@ -814,11 +814,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			// Wait for container to finish (best effort)
 			cancel()
 			select {
-			case <-waitDone:
+			case res := <-waitDone:
+				exitCode = res.code
 			case <-time.After(hangTimeout):
 				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
 			}
-			return 0, fmt.Errorf("failed to attach to container: %w", err)
+			return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
 
@@ -839,11 +840,15 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					o.logger.Warn("failed to force terminate container %s: %v", containerID, err)
 				}
 
-				result := <-waitDone
-				if result.err != nil && !errors.Is(result.err, context.Canceled) {
-					return 0, fmt.Errorf("failed to wait for container after kill: %w", result.err)
+				select {
+				case result := <-waitDone:
+					if result.err != nil && !errors.Is(result.err, context.Canceled) {
+						return 0, fmt.Errorf("failed to wait for container after kill: %w", result.err)
+					}
+					exitCode = result.code
+				case <-time.After(hangTimeout):
+					return 0, fmt.Errorf("timeout waiting for container %s to exit after SIGKILL", containerID)
 				}
-				exitCode = result.code
 			}
 		} else {
 			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
