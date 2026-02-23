@@ -322,15 +322,16 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				logging.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
 			} else {
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
-			}
-			// Give a small grace period before closing the write side.
-			// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
-			// after io.Copy can cause the entire connection to be closed or
-			// the EOF to be processed before the data has been fully consumed by the daemon.
-			if err := d.sleepFunc(ctx, 50*time.Millisecond); err == nil {
-				logging.Trace("Calling CloseWrite on container %s connection", containerID)
-				if err := resp.CloseWrite(); err != nil {
-					logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+
+				// Give a small grace period before closing the write side.
+				// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
+				// after io.Copy can cause the entire connection to be closed or
+				// the EOF to be processed before the data has been fully consumed by the daemon.
+				if err := d.sleepFunc(ctx, 50*time.Millisecond); err == nil {
+					logging.Trace("Calling CloseWrite on container %s connection", containerID)
+					if err := resp.CloseWrite(); err != nil {
+						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+					}
 				}
 			}
 			close(stdinDone)

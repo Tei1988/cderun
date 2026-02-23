@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"sync/atomic"
 	"bufio"
 	"bytes"
 	"context"
@@ -389,7 +390,7 @@ func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, msgStdout, stdoutBuf.String())
 		assert.Equal(t, msgStderr, stderrBuf.String())
-		assert.True(t, conn.closed)
+		assert.True(t, conn.closed.Load())
 	})
 
 	t.Run("attach error", func(t *testing.T) {
@@ -402,12 +403,12 @@ func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 
 type mockConn struct {
 	net.Conn
-	closed           bool
-	closeWriteCalled bool
+	closed           atomic.Bool
+	closeWriteCalled atomic.Bool
 }
 
 func (m *mockConn) Close() error {
-	m.closed = true
+	m.closed.Store(true)
 	return nil
 }
 
@@ -416,7 +417,7 @@ func (m *mockConn) Write(b []byte) (n int, err error) {
 }
 
 func (m *mockConn) CloseWrite() error {
-	m.closeWriteCalled = true
+	m.closeWriteCalled.Store(true)
 	return nil
 }
 
@@ -435,7 +436,7 @@ func TestUnit_Docker_Attach(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "output data", stdout.String())
-		assert.True(t, conn.closed)
+		assert.True(t, conn.closed.Load())
 	})
 
 	t.Run("with stdin", func(t *testing.T) {
@@ -452,8 +453,8 @@ func TestUnit_Docker_Attach(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil, nil)
 		require.NoError(t, err)
 		// CloseWrite is called in a goroutine, might need a moment to finish
-		assert.Eventually(t, func() bool { return conn.closeWriteCalled }, 500*time.Millisecond, 10*time.Millisecond, "CloseWrite should be called after stdin copy")
-		assert.True(t, conn.closed)
+		assert.Eventually(t, func() bool { return conn.closeWriteCalled.Load() }, 500*time.Millisecond, 10*time.Millisecond, "CloseWrite should be called after stdin copy")
+		assert.True(t, conn.closed.Load())
 	})
 
 	t.Run("context cancelled", func(t *testing.T) {
@@ -472,7 +473,7 @@ func TestUnit_Docker_Attach(t *testing.T) {
 		err := runtime.AttachContainer(ctx, "test-id", true, nil, nil, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
-		assert.True(t, conn.closed)
+		assert.True(t, conn.closed.Load())
 	})
 }
 
@@ -532,6 +533,6 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 		// We use a small output that finishes quickly
 		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, io.Discard, io.Discard, nil)
 		require.NoError(t, err)
-		assert.False(t, conn.closeWriteCalled, "CloseWrite should not be called if sleep was canceled")
+		assert.False(t, conn.closeWriteCalled.Load(), "CloseWrite should not be called if sleep was canceled")
 	})
 }
