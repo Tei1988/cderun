@@ -162,6 +162,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, stdinData, stdout.String())
+		assert.Equal(t, "test-container", mock.GetAttachedContainerID())
 	})
 }
 
@@ -220,9 +221,9 @@ func (m *syncMockRuntime) StartContainer(ctx context.Context, containerID string
 }
 
 func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	if ready != nil {
-		close(ready)
-	}
+	// Call embedded mock for record keeping
+	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
+
 	if stdin != nil && stdout != nil {
 		// Perform read+write synchronously to avoid races
 		p := make([]byte, 1024)
@@ -265,6 +266,7 @@ func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, stdinData, stdout.String())
+		assert.Equal(t, "test-sync-container", mock.GetAttachedContainerID())
 
 		mock.mu.Lock()
 		defer mock.mu.Unlock()
