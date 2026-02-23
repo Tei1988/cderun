@@ -233,11 +233,14 @@ func (d *DockerRuntime) StartContainer(ctx context.Context, containerID string) 
 
 // WaitContainer waits for a container to exit and returns its exit code.
 func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	logging.Trace("Waiting for container %s to stop...", containerID)
 	resultC, errC := d.client.ContainerWait(ctx, containerID, dockercontainer.WaitConditionNotRunning)
 	select {
 	case err := <-errC:
+		logging.Trace("ContainerWait for %s returned error: %v", containerID, err)
 		return 0, err
 	case result := <-resultC:
+		logging.Trace("ContainerWait for %s returned status: %d", containerID, result.StatusCode)
 		return int(result.StatusCode), nil
 	}
 }
@@ -289,7 +292,10 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
-		Logs:   false,
+		// Logs: true with Stream: true replays initial logs then switches to live stream for default
+		// drivers (json-file/journald). While ignored by some external drivers, this ensures all
+		// output is captured from the start, suitable for cderun's local development focus.
+		Logs:   true,
 		Stdin:  stdin != nil,
 		Stdout: true,
 		Stderr: true,
@@ -301,10 +307,6 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		return err
 	}
 	defer resp.Close()
-
-	if ready != nil {
-		close(ready)
-	}
 
 	var stdinErr error
 	stdinDone := make(chan struct{})
@@ -319,7 +321,9 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			} else {
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 			}
-			_ = resp.CloseWrite() //nolint:errcheck
+			if err := resp.CloseWrite(); err != nil {
+				logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+			}
 			close(stdinDone)
 		}()
 	} else {
@@ -330,21 +334,27 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	logging.Debug("Starting to copy output from container %s", containerID)
 	go func() {
 		var err error
+		var n int64
 		logging.Debug("Output goroutine started")
 		if tty {
 			// When TTY is enabled, the stream is raw (not multiplexed).
-			_, err = io.Copy(stdout, resp.Reader)
+			n, err = io.Copy(stdout, resp.Reader)
 		} else {
 			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
-			_, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
+			n, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
 		}
 		if err != nil {
-			logging.Debug("Output copy from container %s finished with error: %v", containerID, err)
+			logging.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
 		} else {
-			logging.Debug("Output copy from container %s finished", containerID)
+			logging.Debug("Output copy from container %s finished: %d bytes", containerID, n)
 		}
 		outputDone <- err
 	}()
+
+	// Signal that goroutines are started and we are ready for the container to start.
+	if ready != nil {
+		close(ready)
+	}
 
 	select {
 	case err := <-outputDone:
@@ -361,7 +371,8 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			return ctx.Err()
 		}
 	case <-ctx.Done():
-		// Explicitly close the connection to unblock any pending I/O
+		// Explicitly close the connection to force-unblock pending I/O on context cancellation.
+		// Double-closing is acceptable as resp.Close() error is intentionally ignored here or by defer.
 		resp.Close()
 		return ctx.Err()
 	}

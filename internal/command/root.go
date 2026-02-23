@@ -686,9 +686,11 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			case sig := <-sigChan:
 				if firstSignal {
 					sigName := getSignalName(sig)
-					o.logger.Debug("Forwarding signal %v to container", sig)
+					o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
 					if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
 						o.logger.Warn("failed to forward signal %v: %v", sig, err)
+					} else {
+						o.logger.Debug("Successfully forwarded signal %v to container", sig)
 					}
 					firstSignal = false
 				} else {
@@ -769,22 +771,27 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	o.logger.Trace("Waiting for container: %s", containerID)
 	exitCode, err := rt.WaitContainer(ctxG, containerID)
 	if err != nil {
+		o.logger.Debug("WaitContainer for %s failed or was interrupted: %v", containerID, err)
 		return 0, fmt.Errorf("failed to wait for container: %w", err)
 	}
+	o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 	// After container exits, wait a short grace period for remaining output
+	o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
 	select {
 	case err := <-attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
+			o.logger.Warn("AttachContainer finished with error after container exit for %s: %v", containerID, err)
 			return 0, fmt.Errorf("failed to attach to container: %w", err)
 		}
+		o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 	case <-time.After(attachGracePeriod):
-		o.logger.Debug("AttachContainer timed out after container exit, forcing close")
+		o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 		cancelAttach()
 		<-attachDone
 	}
 
-	o.logger.Debug("Container exited with code: %d", exitCode)
+	o.logger.Debug("Total execution finished for container: %s", containerID)
 	return exitCode, nil
 }
 
