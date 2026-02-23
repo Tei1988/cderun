@@ -289,7 +289,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
-		Logs:   true,
+		Logs:   false,
 		Stdin:  stdin != nil,
 		Stdout: true,
 		Stderr: true,

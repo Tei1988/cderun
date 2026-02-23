@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -199,4 +201,75 @@ func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, stdinData, outBuf.String())
+}
+
+type syncMockRuntime struct {
+	runtime.MockRuntime
+	mu         sync.Mutex
+	counter    int
+	startOrder int
+	readOrder  int
+}
+
+func (m *syncMockRuntime) StartContainer(ctx context.Context, containerID string) error {
+	m.mu.Lock()
+	m.counter++
+	m.startOrder = m.counter
+	m.mu.Unlock()
+	return m.MockRuntime.StartContainer(ctx, containerID)
+}
+
+func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	if ready != nil {
+		close(ready)
+	}
+	if stdin != nil && stdout != nil {
+		go func() {
+			// Try to read immediately
+			p := make([]byte, 10)
+			n, _ := stdin.Read(p)
+			if n > 0 {
+				m.mu.Lock()
+				if m.readOrder == 0 {
+					m.counter++
+					m.readOrder = m.counter
+				}
+				m.mu.Unlock()
+				_, _ = stdout.Write(p[:n])
+				_, _ = io.Copy(stdout, stdin)
+			}
+		}()
+	}
+	return nil
+}
+
+func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
+	t.Run("stdin is not read until container starts", func(t *testing.T) {
+		mock := &syncMockRuntime{}
+		mock.CreatedContainerID = "test-sync-container"
+		mock.ExitCode = 0
+
+		stdinData := "sync-data\n"
+		var stdout bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(strings.NewReader(stdinData))
+			cmd.SetOut(&stdout)
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, stdinData, stdout.String())
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		assert.True(t, mock.startOrder > 0, "StartContainer should have been called")
+		assert.True(t, mock.readOrder > 0, "Stdin should have been read")
+		assert.True(t, mock.startOrder < mock.readOrder, "StartContainer (%d) should be called before stdin is read (%d)", mock.startOrder, mock.readOrder)
+	})
 }
