@@ -292,7 +292,10 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
-		Logs:   true, // Capture output from the start to avoid missing data during fast container execution.
+		// Logs: true with Stream: true replays initial logs then switches to live stream for default
+		// drivers (json-file/journald). While ignored by some external drivers, this ensures all
+		// output is captured from the start, suitable for cderun's local development focus.
+		Logs:   true,
 		Stdin:  stdin != nil,
 		Stdout: true,
 		Stderr: true,
