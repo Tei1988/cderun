@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,7 +35,7 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 
 func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
-		mock := &pipeMockRuntime{}
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
@@ -82,7 +83,7 @@ func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	})
 
 	t.Run("piped stdin does NOT reach container when interactive is false", func(t *testing.T) {
-		mock := &pipeMockRuntime{}
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
@@ -130,7 +131,7 @@ func TestUnit_Command_Stdin_Piped(t *testing.T) {
 
 func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
-		mock := &pipeMockRuntime{}
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
 
@@ -167,7 +168,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 }
 
 func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
-	mock := &pipeMockRuntime{}
+	mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0
 
@@ -246,7 +247,7 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 
 func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
 	t.Run("stdin is not read until container starts", func(t *testing.T) {
-		mock := &syncMockRuntime{}
+		mock := &syncMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-sync-container"
 		mock.ExitCode = 0
 
@@ -273,5 +274,149 @@ func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
 		assert.Positive(t, mock.startOrder, "StartContainer should have been called")
 		assert.Positive(t, mock.readOrder, "Stdin should have been read")
 		assert.Less(t, mock.startOrder, mock.readOrder, "StartContainer should be called before stdin is read")
+	})
+}
+
+type fakeFdReader struct {
+	io.Reader
+}
+func (f fakeFdReader) Fd() uintptr { return 0 }
+
+func TestUnit_Command_Stdin_PipedQuickExit(t *testing.T) {
+	t.Run("piped stdin exits quickly after IO finished", func(t *testing.T) {
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
+		mock.CreatedContainerID = "test-quick-exit"
+		mock.ExitCode = 0
+		mock.WaitDelay = 1 * time.Second
+
+		var outBuf bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(strings.NewReader("quick data"))
+			cmd.SetOut(&outBuf)
+			o.isTerminal = func(fd int) bool { return false }
+		})
+		duration := time.Since(start)
+
+		require.NoError(t, err)
+		assert.Less(t, duration, 500*time.Millisecond, "Should exit quickly due to piped stdin")
+	})
+}
+
+func TestUnit_Command_Stdin_TTYWait(t *testing.T) {
+	t.Run("TTY stdin waits for original timeout", func(t *testing.T) {
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
+		mock.CreatedContainerID = "test-tty-wait"
+		mock.ExitCode = 0
+		mock.WaitDelay = 500 * time.Millisecond
+
+		var outBuf bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(fakeFdReader{strings.NewReader("tty data")})
+			cmd.SetOut(&outBuf)
+			o.isTerminal = func(fd int) bool { return true }
+			o.makeRaw = func(fd int) (*term.State, error) { return nil, nil }
+			o.restore = func(fd int, state *term.State) error { return nil }
+		})
+		duration := time.Since(start)
+
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, duration, 500*time.Millisecond, "Should wait for container to exit naturally since host is TTY")
+	})
+}
+
+func TestUnit_Command_Stdin_NonInteractiveQuickExit(t *testing.T) {
+	t.Run("non-interactive exits quickly even if host is TTY", func(t *testing.T) {
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
+		mock.CreatedContainerID = "test-non-interactive-quick"
+		mock.ExitCode = 0
+		mock.WaitDelay = 1 * time.Second
+
+		var outBuf bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(fakeFdReader{strings.NewReader("some data")})
+			cmd.SetOut(&outBuf)
+			o.isTerminal = func(fd int) bool { return true }
+			o.makeRaw = func(fd int) (*term.State, error) { return nil, nil }
+			o.restore = func(fd int, state *term.State) error { return nil }
+		})
+		duration := time.Since(start)
+
+		require.NoError(t, err)
+		assert.Less(t, duration, 500*time.Millisecond, "Should exit quickly since it is non-interactive")
+	})
+}
+
+type blockingReader struct {
+	io.Reader
+	block chan struct{}
+}
+func (b blockingReader) Read(p []byte) (int, error) {
+	<-b.block
+	return 0, io.EOF
+}
+
+func TestUnit_Command_Stdin_PipedLogsContinuous(t *testing.T) {
+	t.Run("piped stdin does not exit while pipe is open (like tail -f)", func(t *testing.T) {
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
+		mock.CreatedContainerID = "test-piped-logs"
+		mock.ExitCode = 0
+		mock.WaitDelay = 10 * time.Second
+
+		var outBuf bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		block := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				cmd.SetIn(blockingReader{Reader: strings.NewReader(""), block: block})
+				cmd.SetOut(&outBuf)
+				o.isTerminal = func(fd int) bool { return false }
+			})
+		}()
+
+		time.Sleep(200 * time.Millisecond)
+		select {
+		case err := <-done:
+			t.Fatalf("Process exited prematurely: %v", err)
+		case <-time.After(500 * time.Millisecond):
+		}
+
+		close(block)
+		select {
+		case err := <-done:
+			require.NoError(t, err)
+		case <-time.After(1 * time.Second):
+			t.Fatal("Process did not exit after pipe closed")
+		}
 	})
 }

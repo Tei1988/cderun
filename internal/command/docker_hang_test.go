@@ -54,7 +54,7 @@ func (m *hangMockRuntime) AttachContainer(ctx context.Context, containerID strin
 }
 
 func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
-	mock := &hangMockRuntime{
+	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
 	}
@@ -84,8 +84,11 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 		if elapsed > 5*time.Second {
 			t.Errorf("Execution took too long (%v), fix not working", elapsed)
 		}
-		if elapsed < 2*time.Second {
-			t.Errorf("Execution took too short (%v), expected at least hangTimeout", elapsed)
+		if elapsed < 100*time.Millisecond {
+			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
+		}
+		if elapsed > 1*time.Second {
+			t.Errorf("Execution took too long (%v), expected short timeout for non-terminal", elapsed)
 		}
 	case <-time.After(11 * time.Second):
 		t.Fatal("Test timed out completely")
@@ -93,7 +96,7 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 }
 
 func TestUnit_Command_AutoTermination_TTY_NoKill(t *testing.T) {
-	mock := &hangMockRuntime{
+	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
 	}

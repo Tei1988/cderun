@@ -667,14 +667,26 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}()
 	}
 
+	// Detect if host stdin is a terminal and get its FD
+	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
+	if isHostStdinTerminal {
+		isHostStdinTerminal = o.isTerminal(stdinFd)
+	}
+	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
+
+	effectiveHangTimeout := hangTimeout
+	if !isHostStdinTerminal || !containerConfig.Interactive {
+		effectiveHangTimeout = 100 * time.Millisecond
+	}
+
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if fd, ok := getFd(cmd.InOrStdin()); ok && containerConfig.TTY && o.isTerminal(fd) {
+	if isHostStdinTerminal && containerConfig.TTY {
 		o.logger.Trace("Setting terminal to raw mode")
-		state, err := o.makeRaw(fd)
+		state, err := o.makeRaw(stdinFd)
 		if err != nil {
 			o.logger.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer func() { _ = o.restore(fd, state) }() //nolint:errcheck
+			defer func() { _ = o.restore(stdinFd, state) }() //nolint:errcheck
 		}
 	}
 
@@ -816,24 +828,24 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			select {
 			case res := <-waitDone:
 				exitCode = res.code
-			case <-time.After(hangTimeout):
+			case <-time.After(effectiveHangTimeout):
 				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
 			}
 			return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
-
 		// IO finished before container exited.
-		// In non-TTY mode, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
-		if !containerConfig.TTY {
-			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", hangTimeout, containerID)
+		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
+		// If host stdin is not a terminal, we use a much shorter timeout because we don't expect interactive behavior.
+		if !isHostStdinTerminal || !containerConfig.Interactive {
+			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
 			select {
 			case result := <-waitDone:
 				if result.err != nil {
 					return 0, fmt.Errorf("failed to wait for container: %w", result.err)
 				}
 				exitCode = result.code
-			case <-time.After(hangTimeout):
+			case <-time.After(effectiveHangTimeout):
 				o.logger.Warn("Container %s did not exit after IO completion, forcing termination", containerID)
 				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
 				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
@@ -846,7 +858,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 						return 0, fmt.Errorf("failed to wait for container after kill: %w", result.err)
 					}
 					exitCode = result.code
-				case <-time.After(hangTimeout):
+				case <-time.After(effectiveHangTimeout):
 					return 0, fmt.Errorf("timeout waiting for container %s to exit after SIGKILL", containerID)
 				}
 			}
