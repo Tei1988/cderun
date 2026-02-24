@@ -77,10 +77,23 @@ func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (in
 	delay := m.WaitDelay
 	m.mu.RUnlock()
 	if delay > 0 {
+		t := time.NewTimer(delay)
 		select {
 		case <-m.sigChan:
-		case <-time.After(delay):
+			if !t.Stop() {
+				select {
+				case <-t.C:
+				default:
+				}
+			}
+		case <-t.C:
 		case <-ctx.Done():
+			if !t.Stop() {
+				select {
+				case <-t.C:
+				default:
+				}
+			}
 			return 0, ctx.Err()
 		}
 	} else {

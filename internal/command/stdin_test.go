@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -167,7 +166,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_Stdin_Mocked(t *testing.T) {
+func TestUnit_Command_Stdin_Mocked(t *testing.T) {
 	mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0
@@ -301,7 +300,6 @@ func TestUnit_Command_Stdin_PipedQuickExit(t *testing.T) {
 			o.exitFunc = func(code int) {}
 			cmd.SetIn(strings.NewReader("quick data"))
 			cmd.SetOut(&outBuf)
-			o.isTerminal = func(fd int) bool { return false }
 		})
 		duration := time.Since(start)
 
@@ -330,8 +328,6 @@ func TestUnit_Command_Stdin_TTYWait(t *testing.T) {
 			cmd.SetIn(fakeFdReader{strings.NewReader("tty data")})
 			cmd.SetOut(&outBuf)
 			o.isTerminal = func(fd int) bool { return true }
-			o.makeRaw = func(fd int) (*term.State, error) { return nil, nil }
-			o.restore = func(fd int, state *term.State) error { return nil }
 		})
 		duration := time.Since(start)
 
@@ -360,8 +356,6 @@ func TestUnit_Command_Stdin_NonInteractiveQuickExit(t *testing.T) {
 			cmd.SetIn(fakeFdReader{strings.NewReader("some data")})
 			cmd.SetOut(&outBuf)
 			o.isTerminal = func(fd int) bool { return true }
-			o.makeRaw = func(fd int) (*term.State, error) { return nil, nil }
-			o.restore = func(fd int, state *term.State) error { return nil }
 		})
 		duration := time.Since(start)
 

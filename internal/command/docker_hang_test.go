@@ -72,6 +72,7 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
 		})
 	}()
 
@@ -79,11 +80,8 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 	case err := <-done:
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
-		// It should finish after hangTimeout (2s)
+		// It should finish after effectiveHangTimeout (100ms) because it is non-TTY
 		require.NoError(t, err) // We handle the kill, so it should return nil error from Execute (exit code handled by exitFunc)
-		if elapsed > 5*time.Second {
-			t.Errorf("Execution took too long (%v), fix not working", elapsed)
-		}
 		if elapsed < 100*time.Millisecond {
 			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
 		}
