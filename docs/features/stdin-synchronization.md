@@ -111,6 +111,15 @@ This ensures that piped commands like `echo "data" | cderun cat` always exit pro
 - **EOF の正確なハンドリング**: ホスト STDIN からの EOF が、適切なタイミングでコンテナ内プロセスに伝えられます。Docker デーモンが送信データを完全に処理できるように、`CloseWrite()` を呼び出す前に **50ms の猶予期間 (grace period)** が設けられています。
   <!-- 50ms は実装上のマジックナンバーであり、内部的には internal/runtime/docker.go の attachCloseWriteGrace 定数を参照しています。 -->
 
+## 検証
+
+この挙動は、`internal/command/stdin_test.go` のユニットテストによって検証されています。このテストでは、`syncReader` とパイプの挙動、および EOF ハンドリングがチェックされており、コンテナの起動が遅延しつつ標準入力が即座に利用可能になる状況をシミュレートしています。
+
+主な検証手順は以下の通りです：
+
+- `stdin_test` を実行し、パイプ入力と EOF が確実に処理されることを確認する。
+- `attachCloseWriteGrace` による 50ms の猶予期間が正しく動作することを検証する。
+
 ## Docker 29.1.5 互換性のための自動終了処理
 
 Docker 29.1.5 などの一部のバージョンでは、パイプ実行時にコンテナ内のプロセスがすべての入力を消費し、出力を完了したにもかかわらず、コンテナが `Running` 状態のままとなり `WaitContainer` API が戻ってこない（ハングする）事象が確認されています。
