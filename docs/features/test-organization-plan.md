@@ -6,16 +6,16 @@
 
 ## 2. 現状の分析
 
-### 2.1. パッケージ別カバレッジ (2026-02時点)
+### 2.1. パッケージ別カバレッジ (2026-03時点)
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 92.2% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 89.8% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/command` | 91.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 88.7% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 97.1% | 極めて高いカバレッジを維持。 |
-| `internal/runtime` | 88.5% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 87.9% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% (no statements) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
-| **Total** | **90.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| **Total** | **89.8%** | 全体として高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -39,14 +39,14 @@
 | cderunバイナリマウント | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
 | ドライランモード | `internal/command/root_test.go` | 良好 |
 | ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
-| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go` | 良好 |
+| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go`, `internal/command/docker_hang_test.go` | 良好 |
 | 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` | 良好 |
 | 診断モード | `internal/command/root_test.go` | 良好 |
 | 統合テスト(Docker) | `internal/command/integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
-| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
+| Expressions | `internal/config/resolver_test.go`, `internal/config/expression_test.go`, `internal/command/integration_test.go` | 良好 |
 | パス解決(チルダ・相対) | `internal/config/path_test.go` | 良好 |
 | 厳密モード(strictEnv) | `internal/command/integration_test.go`, `internal/config/resolver_test.go` | 良好 |
 
@@ -54,7 +54,7 @@
 
   1. **ランタイム実装のテスト不足**: リトライロジックの検証テストを追加済み。
   2. **OS信号・TTY制御の未検証**: TTYリサイズ同期（`SIGWINCH`）の検証テストを追加済み。
-  3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み.
+  3. **Nested Execution の統合検証**: シナリオテストによる E2E 検証を追加済み。
   4. **ログローテーション**: 安定性の観点から設計変更により削除済み。
   5. **テスト用モックの不足**: 汎用的な `MockRuntime` および `sleepFunc` の導入により解決済み。
   6. **テストにおけるデータレース**: `robustness_test.go` 等での信号ハンドラとテスト本体間の共有変数へのアクセスを `sync.Mutex` で保護し、`go test -race` での検出を回避。
@@ -93,7 +93,7 @@
   1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
-## 6. テストマトリックス (2026-02時点)
+## 6. テストマトリックス (2026-03時点)
 
 | 機能 | Unit | Integration | Robustness | Scenario |
 | :--- | :---: | :---: | :---: | :---: |
