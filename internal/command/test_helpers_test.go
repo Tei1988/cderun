@@ -132,3 +132,25 @@ func setupTestDir(t *testing.T) string {
 	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
 	return tmpDir
 }
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf bytes.Buffer
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stderr
+	os.Stderr = w
+	defer func() {
+		os.Stderr = saved
+		_ = r.Close()
+	}()
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+	fn()
+	_ = w.Close()
+	<-done
+	return buf.String()
+}

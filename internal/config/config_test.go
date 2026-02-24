@@ -353,4 +353,53 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
 		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
 	})
+
+	t.Run("ToolConfig DeepCopy all fields", func(t *testing.T) {
+		b := true
+		orig := ToolConfig{
+			Image:           "img",
+			TTY:             &b,
+			Interactive:     &b,
+			Remove:          &b,
+			StrictEnv:       &b,
+			MountSocket:     &b,
+			MountCderun:     &b,
+			MountAllTools:   &b,
+			PublishAll:      &b,
+			Privileged:      &b,
+			MountTools:      []string{"t"},
+			Ports:           []string{"p"},
+			Expose:          []string{"e"},
+			DNS:             []string{"d"},
+			AddHosts:        []string{"a"},
+			CapAdd:          []string{"ca"},
+			CapDrop:         []string{"cd"},
+			Entrypoint:      []string{"ep"},
+			Env:             []string{"ev"},
+			Mounts:          []MountConfig{{Type: "bind", Source: ConfigPath{Raw: "s"}}},
+			Devices:         []DeviceConfig{{Source: ConfigPath{Raw: "h"}}},
+			MountSocketPath: ConfigPath{Raw: "sp"},
+			MountCderunPath: ConfigPath{Raw: "cp"},
+		}
+
+		cloned := orig.DeepCopy()
+		assert.Equal(t, orig, cloned)
+		assert.NotSame(t, orig.TTY, cloned.TTY)
+		assert.NotSame(t, orig.Interactive, cloned.Interactive)
+		assert.NotSame(t, orig.Remove, cloned.Remove)
+		assert.NotSame(t, orig.StrictEnv, cloned.StrictEnv)
+		assert.NotSame(t, orig.MountSocket, cloned.MountSocket)
+		assert.NotSame(t, orig.MountCderun, cloned.MountCderun)
+		assert.NotSame(t, orig.MountAllTools, cloned.MountAllTools)
+		assert.NotSame(t, orig.PublishAll, cloned.PublishAll)
+		assert.NotSame(t, orig.Privileged, cloned.Privileged)
+
+		assert.NotSame(t, &orig.MountTools[0], &cloned.MountTools[0])
+		assert.NotSame(t, &orig.Mounts[0], &cloned.Mounts[0])
+		assert.NotSame(t, &orig.Devices[0], &cloned.Devices[0])
+
+		// Ensure nested structures within Mounts and Devices are also copied
+		assert.Equal(t, orig.Mounts[0].Source.Raw, cloned.Mounts[0].Source.Raw)
+		assert.Equal(t, orig.Devices[0].Source.Raw, cloned.Devices[0].Source.Raw)
+	})
 }

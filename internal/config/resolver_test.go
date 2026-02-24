@@ -1098,3 +1098,35 @@ func TestUnit_Config_Resolver_StrictEnvFlags(t *testing.T) {
 		assert.False(t, res.StrictEnv)
 	})
 }
+
+func TestUnit_Config_Resolver_EnvIsolation(t *testing.T) {
+	mfs := &MockFileSystem{
+		Env: map[string]string{
+			"MOCK_VAR": "mock-value",
+		},
+	}
+
+	t.Run("Resolves environment variable from MockFileSystem", func(t *testing.T) {
+		cli := CLIOptions{
+			Env:      []string{"MOCK_VAR"},
+			Image:    "alpine",
+			ImageSet: true,
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "MOCK_VAR=mock-value")
+	})
+
+	t.Run("Strict mode fails if variable missing in MockFileSystem", func(t *testing.T) {
+		cli := CLIOptions{
+			Env:          []string{"MISSING_VAR"},
+			StrictEnv:    true,
+			StrictEnvSet: true,
+			Image:        "alpine",
+			ImageSet:     true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
+	})
+}

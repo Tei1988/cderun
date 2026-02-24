@@ -81,6 +81,14 @@ func (m *MockFileSystem) Getenv(key string) string {
 	return m.Env[key]
 }
 
+func (m *MockFileSystem) LookupEnv(key string) (string, bool) {
+	if m.Env == nil {
+		return "", false
+	}
+	val, ok := m.Env[key]
+	return val, ok
+}
+
 func (m *MockFileSystem) TempDir() string {
 	if m.TempDirValue != "" {
 		return m.TempDirValue
