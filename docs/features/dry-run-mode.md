@@ -1,4 +1,4 @@
-# Feature: Dry Run Mode (Completed)
+# ドライランモード (完了)
 
 ## 概要
 

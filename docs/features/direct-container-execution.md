@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Completed)
+# 直接コンテナ実行 (完了)
 
 ## 概要
 

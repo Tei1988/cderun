@@ -1,4 +1,4 @@
-# Feature: cderun Binary Mounting (Recursive Execution) (Completed)
+# cderunバイナリマウント (完了)
 
 ## 概要
 

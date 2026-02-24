@@ -1,4 +1,4 @@
-# Feature: Nested Execution (Recursive Execution)
+# ネスト実行 (完了)
 
 `cderun` は、自身が作成したコンテナ内で自分自身を実行することをサポートしています。これを「Nested Execution（ネスト実行）」または「Recursive Execution（再帰実行）」と呼びます。
 

@@ -1,4 +1,4 @@
-# Feature: Multi-Runtime Support (Completed)
+# マルチランタイムサポート (完了)
 
 ## 概要
 

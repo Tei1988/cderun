@@ -1,4 +1,4 @@
-# Feature: Test Coverage Reporting
+# テストカバレッジ計測 (完了)
 
 ## 1. 概要
 

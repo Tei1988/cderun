@@ -1,4 +1,4 @@
-# Feature: README Generation Strategy
+# README生成戦略 (完了)
 
 ## 概要
 

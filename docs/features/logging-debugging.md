@@ -1,4 +1,4 @@
-# Feature: Logging and Debugging (Completed)
+# ログ・デバッグ (完了)
 
 ## 概要
 

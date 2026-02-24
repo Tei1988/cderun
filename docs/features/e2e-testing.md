@@ -1,4 +1,4 @@
-# Feature: E2E テスト (End-to-End Testing)
+# E2E テスト (完了)
 
 ## 1. 概要
 

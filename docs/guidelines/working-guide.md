@@ -1,8 +1,8 @@
-# Working Guide & Coding Standards
+# 開発ガイドとコーディング規約
 
 開発を進める上でのワークフロー、ディレクトリ構成、コーディング規約です。
 
-## 1. Development Workflow
+## 1. 開発ワークフロー
 
 機能追加や修正を行う際は、以下の **"Spec-First" サイクル** を回してください。
 
@@ -20,7 +20,7 @@
    - **重要**: 実装上の制約や技術的な理由でfeaturesドキュメントと矛盾が生じる場合、ドキュメントを修正して実装と一致させることが許可される。
    - 修正する場合は、変更理由をコミットメッセージに明記する。
 
-## 2. Project Layout
+## 2. プロジェクト構成
 
 Standard Go Project Layout に準拠しつつ、小規模な構成をとります。
 
@@ -39,9 +39,9 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 └── tests/                # 統合テスト（必要な場合）
 ```
 
-## 3. Coding Guidelines
+## 3. コーディング規約
 
-### General
+### 全般
 
 - **Effective Go:** Goの公式スタイルガイドに従う。
 - **Naming Conventions:**
@@ -54,7 +54,7 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
   - エラーを返す際は、コンテキストを付与する: `fmt.Errorf("failed to open file: %w", err)`
 - **Structs:** 構造体のフィールドには適切なタグ（`json:"..."`, `yaml:"..."`）を付与する。
 
-### CLI Best Practices
+### CLIのベストプラクティス
 
 - **Stdout vs Stderr:**
   - 正常な出力結果（パイプで渡すデータなど）: `Stdout`
@@ -73,7 +73,7 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
   - 成功: `0`
   - エラー: `1` (または適切な非ゼロの値)
 
-### Testing
+### テスト
 
 詳細は [テスト実装指針](./testing.md) を参照してください。
 
@@ -87,11 +87,11 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
   - `os.Exit` や `runtime.NewDockerRuntime` などの外部依存は、パッケージ変数として関数ポインタ（`exitFunc`, `runtimeFactory` 等）を定義し、テスト時にモックに差し替え可能にする。
 - **Table-Driven Tests:** 複数のケースを検証する場合は、テーブル駆動テストを使用する。
 
-## 4. Documentation Standards
+## 4. ドキュメント標準
 
 ドキュメントを記述する際は、`markdownlint` に準拠し、一貫したフォーマットを維持してください。
 
-### Markdown Formatting Rules
+### Markdownフォーマット規則
 
 - **Indentation (MD007):** リストのインデントは一貫して **2スペース** としてください（ネストされたリストや注記を含む）。
 - **Leading Dollar Signs (MD014):** コードフェンス内で、単一のコマンドを示す際に先頭に `$` を付けないでください（シェルプロンプトを模倣する場合を除き、コピー＆ペーストの利便性を優先します）。

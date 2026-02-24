@@ -1,4 +1,4 @@
-# Feature: Argument & Configuration Priority Logic (Completed)
+# 引数・設定優先順位 (完了)
 
 ## 概要
 

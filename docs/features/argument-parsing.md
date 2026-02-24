@@ -1,4 +1,4 @@
-# Feature: Strict Argument Parsing Strategy (Completed)
+# 引数解析 (完了)
 
 ## 概要
 

@@ -1,4 +1,4 @@
-# Feature: Diagnosis Mode
+# 診断モード (完了)
 
 ## 概要
 

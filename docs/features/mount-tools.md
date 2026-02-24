@@ -1,4 +1,4 @@
-# Feature: Mount Tools (Completed)
+# ツールマウント (完了)
 
 ## 概要
 

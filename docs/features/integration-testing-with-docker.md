@@ -1,4 +1,4 @@
-# Feature: Integration Testing with Docker
+# インテグレーションテスト (完了)
 
 ## 1. 概要
 
