@@ -55,7 +55,7 @@ Since `cderun` always attaches to the container *before* starting it, there are 
 
 - **Reliability**: Piped input works consistently even for very fast-executing commands or small data sets.
 - **No Data Loss**: Data is only sent when the container is ready to receive it.
-- **Correct EOF Handling**: The EOF from the host's STDIN is delivered to the containerized process at the correct time.
+- **Correct EOF Handling**: The EOF from the host's STDIN is delivered to the containerized process at the correct time. A **50ms grace period** is implemented before calling `CloseWrite()` to ensure the Docker daemon has fully processed the transmitted data.
 
 ## Verification
 
