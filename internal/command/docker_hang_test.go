@@ -18,16 +18,14 @@ type hangMockRuntime struct {
 	waitStarted chan struct{}
 	killed      chan struct{}
 	killedOnce  sync.Once
+	waitStartedOnce sync.Once
 }
 
 func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	_, _ = m.MockRuntime.WaitContainer(ctx, containerID)
-	// Re-check if already closed to avoid panic if called multiple times (though shouldn't be)
-	select {
-	case <-m.waitStarted:
-	default:
+	m.waitStartedOnce.Do(func() {
 		close(m.waitStarted)
-	}
+	})
 
 	select {
 	case <-ctx.Done():
@@ -36,6 +34,7 @@ func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string)
 		return 137, nil // SIGKILL exit code
 	}
 }
+
 
 func (m *hangMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	_ = m.MockRuntime.SignalContainer(ctx, containerID, sig)

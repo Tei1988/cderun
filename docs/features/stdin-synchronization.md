@@ -93,6 +93,10 @@ Docker 29.1.5 などの一部のバージョンでは、パイプ実行時にコ
 
 ### TTY vs Pipe/File Detection
 
+Note: In this document, "TTY" is used in two different contexts:
+1.  **The `--tty` or `-t` flag**: Controls whether a pseudo-TTY is allocated for the container. When this flag is set, automatic termination (SIGKILL) is **disabled** to preserve interactivity.
+2.  **Host STDIN status**: Whether the host's standard input is a terminal. This determines the **Hang Timeout** duration (2s for TTY, 100ms for pipes/files).
+
 `cderun` detects whether the host's STDIN is a terminal (TTY) or a pipe/file.
 
 - **Pipe or File Redirect**: If the input is piped (e.g., `echo "data" | cderun ...`) or redirected from a file, `cderun` assumes a batch/pipeline mode.
@@ -122,6 +126,10 @@ This optimization ensures that commands like `echo "test" | cderun cat` exit ins
 `cderun` は、Docker のハング問題（全ての IO が完了した後にコンテナが終了しない問題）に対処しつつ、応答性とインタラクティブ性を維持するために、動的なタイムアウトメカニズムを使用しています。
 
 ### TTY とパイプ/ファイルの判定
+
+補足: このドキュメントでは「TTY」という言葉を2つの異なる文脈で使用しています：
+1.  **`--tty` または `-t` フラグ**: コンテナに疑似ターミナルを割り当てるかどうかを制御します。このフラグが設定されている場合、対話性を優先するため自動終了ロジック（SIGKILL）は**無効**になります。
+2.  **ホスト標準入力の状態**: ホストの標準入力が端末かどうかを指します。これは**ハングタイムアウト**の長さを決定します（TTYなら2秒、パイプ/ファイルなら100ms）。
 
 `cderun` は、ホストの標準入力（STDIN）が端末（TTY）であるか、パイプ/ファイルであるかを判定します。
 

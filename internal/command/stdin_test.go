@@ -300,6 +300,8 @@ func TestUnit_Command_Stdin_PipedQuickExit(t *testing.T) {
 			o.exitFunc = func(code int) {}
 			cmd.SetIn(strings.NewReader("quick data"))
 			cmd.SetOut(&outBuf)
+			// Explicitly set isTerminal to false to ensure non-TTY behavior
+			o.isTerminal = func(fd int) bool { return false }
 		})
 		duration := time.Since(start)
 
@@ -364,12 +366,18 @@ func TestUnit_Command_Stdin_NonInteractiveQuickExit(t *testing.T) {
 	})
 }
 
+// blockingReader blocks Read until the block channel is closed.
+// It is used to simulate an open pipe (like tail -f).
 type blockingReader struct {
 	io.Reader
 	block chan struct{}
 }
+
 func (b blockingReader) Read(p []byte) (int, error) {
 	<-b.block
+	// After unblocking, we return io.EOF to simulate the end of input.
+	// The embedded io.Reader is intentionally not used to simplify simulation
+	// of IO completion/attachment lifecycle.
 	return 0, io.EOF
 }
 
