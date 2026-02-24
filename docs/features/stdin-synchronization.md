@@ -69,7 +69,7 @@ To address this, `cderun` implements an automatic termination logic for non-TTY 
 
 1. **Concurrent Waiting**: `cderun` waits for both container exit (`WaitContainer`) and IO completion (`AttachContainer`) concurrently.
 2. **IO Completion Detection**: When the output stream from the container is closed (EOF reached), `AttachContainer` returns.
-3. **Hang Timeout**: If IO is complete but the container does not exit within **2 seconds**, `cderun` assumes a hang has occurred and sends a `SIGKILL` to the container.
+3. **Hang Timeout**: If IO is complete but the container does not exit within a graceful timeout (**2 seconds** for TTY, **100ms** for pipes/files), `cderun` assumes a hang has occurred and sends a `SIGKILL` to the container.
 4. **Preserving Interactivity**: This automatic termination is **disabled** when TTY is requested (`--tty` or `-t`), ensuring that interactive shells or long-running UI applications are not prematurely killed.
 
 This ensures that piped commands like `echo "data" | cderun cat` always exit promptly after their work is done.
@@ -82,7 +82,77 @@ Docker 29.1.5 などの一部のバージョンでは、パイプ実行時にコ
 
 1. **並行待機**: コンテナの終了（`WaitContainer`）と IO の完了（`AttachContainer`）を並行して待機します。
 2. **IO 完了の検知**: コンテナからの出力ストリームが閉じられる（EOF 到着）と、`AttachContainer` が終了します。
-3. **ハングタイムアウト**: IO が完了したにもかかわらず、**2秒以内**にコンテナが終了しない場合、`cderun` はハングが発生したとみなし、コンテナに `SIGKILL` を送信します。
+3. **ハングタイムアウト**: IO が完了したにもかかわらず、入力種別に応じた猶予期間内（TTYでは**2秒**、パイプ/ファイルでは**100ms**）にコンテナが終了しない場合、`cderun` はハングが発生したとみなし、コンテナに `SIGKILL` を送信します。
 4. **インタラクティブ性の維持**: この自動終了ロジックは、TTY が要求されている場合（`--tty` または `-t`）は**無効**になります。これにより、インタラクティブなシェルや長時間実行される UI アプリケーションが誤って終了されるのを防ぎます。
 
 これにより、`echo "data" | cderun cat` のようなパイプ実行時に、処理完了後すぐに CLI が終了することが保証されます。
+
+## Dynamic Hang Timeout based on STDIN Type
+
+`cderun` uses a dynamic timeout mechanism to handle the Docker hang issue (where a container doesn't exit after all IO is done) while maintaining responsiveness and interactivity.
+
+### TTY vs Pipe/File Detection
+
+Note: In this document, "TTY" is used in two different contexts:
+
+1. **The `--tty` or `-t` flag**: Controls whether a pseudo-TTY is allocated for the container. When this flag is set, automatic termination (SIGKILL) is **disabled** to preserve interactivity.
+2. **Host STDIN status**: Whether the host's standard input is a terminal. This determines the **Hang Timeout** duration (2s for TTY, 100ms for pipes/files).
+
+`cderun` detects whether the host's STDIN is a terminal (TTY) or a pipe/file.
+
+- **Pipe or File Redirect**: If the input is piped (e.g., `echo "data" | cderun ...`) or redirected from a file, `cderun` assumes a batch/pipeline mode.
+- **TTY (Terminal)**: If the input is a terminal, `cderun` assumes an interactive session.
+
+### Behavior Differences
+
+After the IO operations are completed (both STDIN copy and output stream reach EOF), `cderun` waits for the container to exit naturally.
+
+1. **In Pipeline Mode (Pipe/File)**:
+   - Responsibility is key: The user expects the command to finish immediately after the data has been processed.
+   - **Hang Timeout**: Reduced to **100ms**.
+   - If the container doesn't exit within 100ms after IO completion, `cderun` sends `SIGKILL` to ensure the pipeline continues promptly.
+
+2. **In Interactive Mode (TTY)**:
+   - Context is key: The user is interacting with the process. Even if output stops, the user might still be typing or the process might be doing some final cleanup.
+   - **Hang Timeout**: Maintained at **2 seconds**.
+   - This provides a graceful period for the container to exit naturally before forcing termination.
+
+3. **Non-Interactive Flag (`-i` not set)**:
+   - If `--interactive=false` is explicitly set (or default), `cderun` also uses the short **100ms** timeout, as it won't be reading any user input anyway.
+
+This optimization ensures that commands like `echo "test" | cderun cat` exit instantly while `cderun -it alpine sh` remains robust and user-friendly.
+
+## STDIN タイプに基づく動的なハングタイムアウト
+
+`cderun` は、Docker のハング問題（全ての IO が完了した後にコンテナが終了しない問題）に対処しつつ、応答性とインタラクティブ性を維持するために、動的なタイムアウトメカニズムを使用しています。
+
+### TTY とパイプ/ファイルの判定
+
+補足: このドキュメントでは「TTY」という言葉を2つの異なる文脈で使用しています：
+
+1. **`--tty` または `-t` フラグ**: コンテナに疑似ターミナルを割り当てるかどうかを制御します。このフラグが設定されている場合、対話性を優先するため自動終了ロジック（SIGKILL）は**無効**になります。
+2. **ホスト標準入力の状態**: ホストの標準入力が端末かどうかを指します。これは**ハングタイムアウト**の長さを決定します（TTYなら2秒、パイプ/ファイルなら100ms）。
+
+`cderun` は、ホストの標準入力（STDIN）が端末（TTY）であるか、パイプ/ファイルであるかを判定します。
+
+- **パイプまたはファイルリダイレクト**: 入力がパイプ（例: `echo "data" | cderun ...`）またはファイルからリダイレクトされている場合、`cderun` はバッチ/パイプラインモードであるとみなします。
+- **TTY (端末)**: 入力が端末である場合、`cderun` は対話型セッションであるとみなします。
+
+### 挙動の違い
+
+IO 操作が完了した後（STDIN のコピーと出力ストリームの両方が EOF に達した後）、`cderun` はコンテナが自然に終了するのを待ちます。
+
+1. **パイプラインモードの場合 (パイプ/ファイル)**:
+   - 応答性が重要です。ユーザーはデータ処理が完了した後、コマンドがすぐに終了することを期待します。
+   - **ハングタイムアウト**: **100ms** に短縮されます。
+   - IO 完了後 100ms 以内にコンテナが終了しない場合、`cderun` は `SIGKILL` を送信し、パイプラインが速やかに継続されるようにします。
+
+2. **対話型モードの場合 (TTY)**:
+   - コンテキストが重要です。ユーザーはプロセスと対話しています。出力が止まっても、ユーザーがまだ入力中であったり、プロセスが最終的なクリーンアップを行っていたりする可能性があります。
+   - **ハングタイムアウト**: **2秒** を維持します。
+   - これにより、強制終了する前にコンテナが自然に終了するための猶予期間が提供されます。
+
+3. **非対話型フラグ (`-i` が設定されていない場合)**:
+   - `--interactive=false` が明示的に設定されている（またはデフォルトの）場合も、ユーザー入力を読み取らないため、短い **100ms** のタイムアウトを使用します。
+
+この最適化により、`echo "test" | cderun cat` のようなコマンドは瞬時に終了し、一方 `cderun -it alpine sh` は堅牢でユーザーフレンドリーな動作を維持します。

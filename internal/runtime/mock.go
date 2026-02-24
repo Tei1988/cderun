@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"time"
 	"io"
 	"sync"
 
@@ -10,7 +11,7 @@ import (
 
 // NewMockRuntime creates a new MockRuntime.
 func NewMockRuntime() *MockRuntime {
-	return &MockRuntime{}
+	return &MockRuntime{sigChan: make(chan string, 1)}
 }
 
 // MockRuntime is a mock implementation of ContainerRuntime for testing purposes.
@@ -28,7 +29,9 @@ type MockRuntime struct {
 	SignaledContainerID string
 	Rows, Cols          uint
 	Signal              string
+	sigChan             chan string
 	ExitCode            int
+	WaitDelay           time.Duration
 	PullErr             error
 	CreateErr           error
 	StartErr            error
@@ -70,6 +73,35 @@ func (m *MockRuntime) StartContainer(ctx context.Context, containerID string) er
 }
 
 func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	m.mu.RLock()
+	delay := m.WaitDelay
+	m.mu.RUnlock()
+	if delay > 0 {
+		t := time.NewTimer(delay)
+		select {
+		case <-m.sigChan:
+			if !t.Stop() {
+				select {
+				case <-t.C:
+				default:
+				}
+			}
+		case <-t.C:
+		case <-ctx.Done():
+			if !t.Stop() {
+				select {
+				case <-t.C:
+				default:
+				}
+			}
+			return 0, ctx.Err()
+		}
+	} else {
+		select {
+		case <-m.sigChan:
+		default:
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.WaitedContainerID = containerID
@@ -155,6 +187,10 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 	defer m.mu.Unlock()
 	m.SignaledContainerID = containerID
 	m.Signal = sig
+	select {
+	case m.sigChan <- sig:
+	default:
+	}
 	return m.SignalErr
 }
 

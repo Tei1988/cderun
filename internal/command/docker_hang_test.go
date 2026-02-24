@@ -18,16 +18,14 @@ type hangMockRuntime struct {
 	waitStarted chan struct{}
 	killed      chan struct{}
 	killedOnce  sync.Once
+	waitStartedOnce sync.Once
 }
 
 func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	_, _ = m.MockRuntime.WaitContainer(ctx, containerID)
-	// Re-check if already closed to avoid panic if called multiple times (though shouldn't be)
-	select {
-	case <-m.waitStarted:
-	default:
+	m.waitStartedOnce.Do(func() {
 		close(m.waitStarted)
-	}
+	})
 
 	select {
 	case <-ctx.Done():
@@ -36,6 +34,7 @@ func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string)
 		return 137, nil // SIGKILL exit code
 	}
 }
+
 
 func (m *hangMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	_ = m.MockRuntime.SignalContainer(ctx, containerID, sig)
@@ -54,7 +53,7 @@ func (m *hangMockRuntime) AttachContainer(ctx context.Context, containerID strin
 }
 
 func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
-	mock := &hangMockRuntime{
+	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
 	}
@@ -72,6 +71,7 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
 		})
 	}()
 
@@ -79,13 +79,13 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 	case err := <-done:
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
-		// It should finish after hangTimeout (2s)
+		// It should finish after effectiveHangTimeout (100ms) because it is non-TTY
 		require.NoError(t, err) // We handle the kill, so it should return nil error from Execute (exit code handled by exitFunc)
-		if elapsed > 5*time.Second {
-			t.Errorf("Execution took too long (%v), fix not working", elapsed)
+		if elapsed < 100*time.Millisecond {
+			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
 		}
-		if elapsed < 2*time.Second {
-			t.Errorf("Execution took too short (%v), expected at least hangTimeout", elapsed)
+		if elapsed > 1*time.Second {
+			t.Errorf("Execution took too long (%v), expected short timeout for non-terminal", elapsed)
 		}
 	case <-time.After(11 * time.Second):
 		t.Fatal("Test timed out completely")
@@ -93,7 +93,7 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 }
 
 func TestUnit_Command_AutoTermination_TTY_NoKill(t *testing.T) {
-	mock := &hangMockRuntime{
+	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
 	}
