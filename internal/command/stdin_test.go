@@ -32,7 +32,7 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Stdin_Piped(t *testing.T) {
+func TestUnit_Stdin_Piped(t *testing.T) {
 	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
@@ -128,7 +128,7 @@ func TestUnit_Command_Stdin_Piped(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
+func TestUnit_Stdin_FlowExtended(t *testing.T) {
 	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
@@ -166,7 +166,7 @@ func TestUnit_Command_Stdin_FlowExtended(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_Mocked(t *testing.T) {
+func TestUnit_Stdin_Mocked(t *testing.T) {
 	mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 	mock.CreatedContainerID = "test-integration-container"
 	mock.ExitCode = 0
@@ -244,7 +244,7 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Command_Stdin_Synchronization(t *testing.T) {
+func TestUnit_Stdin_Synchronization(t *testing.T) {
 	t.Run("stdin is not read until container starts", func(t *testing.T) {
 		mock := &syncMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-sync-container"
@@ -281,7 +281,7 @@ type fakeFdReader struct {
 }
 func (f fakeFdReader) Fd() uintptr { return 0 }
 
-func TestUnit_Command_Stdin_PipedQuickExit(t *testing.T) {
+func TestUnit_Stdin_PipedQuickExit(t *testing.T) {
 	t.Run("piped stdin exits quickly after IO finished", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-quick-exit"
@@ -310,7 +310,7 @@ func TestUnit_Command_Stdin_PipedQuickExit(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_TTYWait(t *testing.T) {
+func TestUnit_Stdin_TTYWait(t *testing.T) {
 	t.Run("TTY stdin waits for original timeout", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-tty-wait"
@@ -338,7 +338,7 @@ func TestUnit_Command_Stdin_TTYWait(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_Stdin_NonInteractiveQuickExit(t *testing.T) {
+func TestUnit_Stdin_NonInteractiveQuickExit(t *testing.T) {
 	t.Run("non-interactive exits quickly even if host is TTY", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-non-interactive-quick"
@@ -381,7 +381,7 @@ func (b blockingReader) Read(p []byte) (int, error) {
 	return 0, io.EOF
 }
 
-func TestUnit_Command_Stdin_PipedLogsContinuous(t *testing.T) {
+func TestUnit_Stdin_PipedLogsContinuous(t *testing.T) {
 	t.Run("piped stdin does not exit while pipe is open (like tail -f)", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-piped-logs"

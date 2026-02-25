@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_Expression_FindDir(t *testing.T) {
+func TestUnit_Expression_FindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/modules/foo":                      []byte("bar"),
@@ -47,7 +47,7 @@ func TestUnit_Config_Expression_FindDir(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_File_Error(t *testing.T) {
+func TestUnit_Expression_File_Error(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/.go-version": []byte("1.21\n"),
@@ -77,7 +77,7 @@ func TestUnit_Config_Expression_File_Error(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_File_Empty(t *testing.T) {
+func TestUnit_Expression_File_Empty(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/empty.txt":  []byte("   "),
@@ -113,7 +113,7 @@ func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
+func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/inner.txt": []byte("outer.txt"),
@@ -185,5 +185,43 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 		val := r.resolveString("{{}}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "{{}}", val)
+	})
+}
+
+func TestUnit_Expression_EdgeCases(t *testing.T) {
+	fs := &MockFileSystem{
+		WD: "/project",
+	}
+	r, _ := NewExpressionResolverWithFS(nil, fs)
+
+	t.Run("unmatched braces in middle", func(t *testing.T) {
+		val := r.resolveString("prefix {{ PWD suffix")
+		assert.Equal(t, "prefix {{ PWD suffix", val)
+	})
+
+	t.Run("multiple directives on one line", func(t *testing.T) {
+		val := r.resolveString("{{PWD}} and {{HOME}}")
+		assert.Contains(t, val, "/project")
+	})
+
+	t.Run("invalid directive syntax", func(t *testing.T) {
+		val := r.resolveString("{{ !@#$% }}")
+		assert.Equal(t, "{{!@#$%}}", val) // Unknown directive returned as is
+	})
+
+	t.Run("malformed file directive", func(t *testing.T) {
+		r2, _ := NewExpressionResolverWithFS(nil, fs)
+		r2.resolveString("{{ file: }}")
+		// The regex matches "file: ", and resolveFile handles empty string
+		assert.Error(t, r2.Error())
+	})
+
+	t.Run("HOME when UserHomeDir fails", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			HomeErr: assert.AnError,
+		}
+		r2, _ := NewExpressionResolverWithFS(nil, mfs)
+		val := r2.resolveString("{{HOME}}")
+		assert.Empty(t, val) // Should fallback to empty string in NewExpressionResolverWithFS
 	})
 }

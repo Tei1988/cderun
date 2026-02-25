@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUnit_Command_Signals_GetSignalName(t *testing.T) {
+func TestUnit_Signal_GetSignalName(t *testing.T) {
 	assert.Equal(t, "SIGINT", getSignalName(os.Interrupt))
 	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
 

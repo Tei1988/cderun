@@ -12,6 +12,7 @@ type MockFileSystem struct {
 	Dirs         map[string]bool
 	WD           string
 	HomeDir      string
+	HomeErr      error
 	Env          map[string]string
 	ExecPath     string
 	ExecErr      error
@@ -64,7 +65,7 @@ func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
 }
 
 func (m *MockFileSystem) UserHomeDir() (string, error) {
-	return m.HomeDir, nil
+	return m.HomeDir, m.HomeErr
 }
 
 func (m *MockFileSystem) Executable() (string, error) {
