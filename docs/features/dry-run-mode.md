@@ -142,8 +142,8 @@ CapAdd:
 CapDrop:
 Entrypoint:
 Pull: missing
-Memory: 0 B
-CPUs: 0
+Memory: 512MiB
+CPUs: 1.5
 Devices:
 ```
 

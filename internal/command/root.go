@@ -846,7 +846,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				o.logger.Warn("Container %s did not exit after IO completion, forcing termination", containerID)
+				o.logger.Warn("Container %s did not exit after IO completion, forcing termination. This may be due to a known regression in Docker 29.1.5 where EOF delivery fails on non-TTY piped input.", containerID)
 				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
 				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
 					o.logger.Warn("failed to force terminate container %s: %v", containerID, err)
