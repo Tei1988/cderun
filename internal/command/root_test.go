@@ -10,14 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func executeCommand(args ...string) (string, error) {
-	return executeCommandContext(context.Background(), args...)
-}
-
-func executeCommandContext(ctx context.Context, args ...string) (string, error) {
-	return executeCommandRawContext(ctx, append([]string{"cderun"}, args...))
-}
-
 func executeCommandRaw(args []string) (string, error) {
 	return executeCommandRawContext(context.Background(), args)
 }
