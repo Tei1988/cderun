@@ -846,7 +846,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				version, _ := rt.GetVersion(ctxG)
+				version, err := rt.GetVersion(ctxG)
+				if err != nil {
+					o.logger.Debug("Failed to get container runtime version: %v", err)
+				}
 				msg := fmt.Sprintf("Container %s did not exit after IO completion, forcing termination", containerID)
 				if strings.Contains(version, "29.1.5") {
 					msg += " (Hint: This may be due to a known regression in Docker 29.1.5 where EOF is not correctly delivered)"
