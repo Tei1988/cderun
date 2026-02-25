@@ -676,7 +676,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	effectiveHangTimeout := hangTimeout
 	if !isHostStdinTerminal || !containerConfig.Interactive {
-		effectiveHangTimeout = 100 * time.Millisecond
+		effectiveHangTimeout = 500 * time.Millisecond
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
@@ -846,7 +846,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				o.logger.Warn("Container %s did not exit after IO completion, forcing termination", containerID)
+				version, _ := rt.GetVersion(ctxG)
+				msg := fmt.Sprintf("Container %s did not exit after IO completion, forcing termination", containerID)
+				if strings.Contains(version, "29.1.5") {
+					msg += " (Hint: This may be due to a known regression in Docker 29.1.5 where EOF is not correctly delivered)"
+				}
+				o.logger.Warn("%s", msg)
 				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
 				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
 					o.logger.Warn("failed to force terminate container %s: %v", containerID, err)

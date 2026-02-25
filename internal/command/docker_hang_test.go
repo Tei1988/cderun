@@ -52,6 +52,10 @@ func (m *hangMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
+func (m *hangMockRuntime) GetVersion(ctx context.Context) (string, error) {
+	return m.MockRuntime.GetVersion(ctx)
+}
+
 func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
@@ -79,9 +83,9 @@ func TestUnit_Command_AutoTermination_NonTTY(t *testing.T) {
 	case err := <-done:
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
-		// It should finish after effectiveHangTimeout (100ms) because it is non-TTY
+		// It should finish after effectiveHangTimeout (500ms) because it is non-TTY
 		require.NoError(t, err) // We handle the kill, so it should return nil error from Execute (exit code handled by exitFunc)
-		if elapsed < 100*time.Millisecond {
+		if elapsed < 500*time.Millisecond {
 			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
 		}
 		if elapsed > 1*time.Second {

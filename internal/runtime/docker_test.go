@@ -73,6 +73,8 @@ type mockDockerClient struct {
 	attachOpts dockercontainer.AttachOptions
 	attachResp types.HijackedResponse
 	attachErr  error
+	versionResp types.Version
+	versionErr  error
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -99,6 +101,10 @@ func (m *mockDockerClient) ContainerCreate(ctx context.Context, config *dockerco
 func (m *mockDockerClient) ContainerStart(ctx context.Context, containerID string, options dockercontainer.StartOptions) error {
 	m.startID = containerID
 	return m.startErr
+}
+
+func (m *mockDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
+	return m.versionResp, m.versionErr
 }
 
 func (m *mockDockerClient) ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error) {

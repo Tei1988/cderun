@@ -27,6 +27,7 @@ type MockRuntime struct {
 	AttachedContainerID string
 	ResizedContainerID  string
 	SignaledContainerID string
+	Version             string
 	Rows, Cols          uint
 	Signal              string
 	sigChan             chan string
@@ -203,4 +204,10 @@ func (m *MockRuntime) ResetCreatedConfig() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.CreatedConfig = nil
+}
+
+func (m *MockRuntime) GetVersion(ctx context.Context) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Version, nil
 }

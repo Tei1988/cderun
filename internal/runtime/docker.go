@@ -27,7 +27,7 @@ import (
 
 const (
 	pullMaxRetries         = 3
-	attachCloseWriteGrace = 50 * time.Millisecond
+	attachCloseWriteGrace = 200 * time.Millisecond
 )
 
 var eofRegex = regexp.MustCompile(`\beof\b`)
@@ -42,6 +42,7 @@ type dockerClient interface {
 	ContainerResize(ctx context.Context, containerID string, options dockercontainer.ResizeOptions) error
 	ContainerKill(ctx context.Context, containerID string, signal string) error
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
+	ServerVersion(ctx context.Context) (types.Version, error)
 }
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
@@ -417,4 +418,13 @@ func isRetryablePullError(err error) bool {
 		strings.Contains(msg, "i/o timeout") ||
 		strings.Contains(msg, "connection refused") ||
 		eofRegex.MatchString(msg)
+}
+
+// GetVersion returns the version of the Docker Engine.
+func (d *DockerRuntime) GetVersion(ctx context.Context) (string, error) {
+	resp, err := d.client.ServerVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
 }
