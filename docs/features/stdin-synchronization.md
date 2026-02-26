@@ -1,30 +1,30 @@
-# Standard Input Synchronization
+# 標準入力の同期 (Standard Input Synchronization)
 
-This document explains the synchronization mechanism for standard input (STDIN) in `cderun` and why it is necessary for reliable piped execution.
+このドキュメントでは、`cderun` における標準入力（STDIN）の同期メカニズムと、なぜそれが信頼性の高いパイプ実行に必要なのかを説明します。
 
-## The Problem: Race Conditions in Piped Execution
+## 問題点: パイプ実行におけるレースコンディション
 
-When running a command like `echo "test" | cderun ... cat`, there is a race condition between the following events:
+`echo "test" | cderun ... cat` のようなコマンドを実行すると、以下のイベント間でレースコンディション（競合状態）が発生します。
 
-1. **STDIN Attachment**: `cderun` calls Docker's `AttachContainer` API to connect the host's STDIN to the container.
-2. **Container Start**: `cderun` calls Docker's `StartContainer` API to actually begin execution of the command (e.g., `cat`).
-3. **STDIN Consumption**: The command inside the container (e.g., `cat`) starts reading from its STDIN.
+1. **STDINのアタッチ**: `cderun` が Docker の `AttachContainer` API を呼び出し、ホストの STDIN をコンテナに接続する。
+2. **コンテナの開始**: `cderun` が Docker の `StartContainer` API を呼び出し、実際にコマンド（例: `cat`）の実行を開始する。
+3. **STDINの消費**: コンテナ内のコマンド（例: `cat`）が自身の STDIN からの読み取りを開始する。
 
-If the host's STDIN is a pipe (like from `echo`), the data is available immediately. If `cderun` starts copying this data to the container's input stream *before* the container has actually started, some Docker versions or configurations might drop the data or fail to deliver it correctly to the process when it eventually starts.
+ホストの STDIN がパイプ（`echo` などから）である場合、データは即座に利用可能です。`cderun` がコンテナの開始**前**にこのデータをコンテナの入力ストリームにコピーし始めると、一部の Docker バージョンや構成では、データが欠落したり、プロセスが開始されたときに正しく配信されなかったりすることがあります。
 
-Furthermore, if the data is small (like "test\n"), `cderun` might finish copying all data and call `CloseWrite()` on the connection before the containerized process has even had a chance to open its own STDIN. This often results in the process seeing an immediate EOF and exiting (or in some cases, never seeing the data at all and hanging).
+さらに、データが小さい場合（例: "test\n"）、コンテナ化されたプロセスが自身の STDIN を開く機会を得る前に、`cderun` がすべてのデータのコピーを完了し、接続に対して `CloseWrite()` を呼び出してしまう可能性があります。これにより、プロセスが即座に EOF を検知して終了してしまったり（あるいは、データが全く見えずハングしたり）することがよくあります。
 
-## The Solution: Synchronized STDIN
+## 解決策: 同期された STDIN
 
-To ensure reliable piped input, `cderun` implements a synchronization mechanism using a `syncReader`.
+信頼性の高いパイプ入力を保証するために、`cderun` は `syncReader` を使用した同期メカニズムを実装しています。
 
-### 1. Delayed STDIN Reading
+### 1. 遅延 STDIN 読み取り
 
-`cderun` wraps the host's STDIN in a `syncReader` before passing it to the runtime's `AttachContainer` method. This reader blocks any `Read` calls until it receives a signal.
+`cderun` は、ホストの STDIN を `syncReader` でラップしてから、ランタイムの `AttachContainer` メソッドに渡します。このリーダーは、信号を受け取るまで `Read` 呼び出しをブロックします。
 
-### 2. Signal on Container Start
+### 2. コンテナ開始時の信号
 
-The signal to unblock the `syncReader` is sent only *after* the `StartContainer` API call has successfully returned. This guarantees that the container is officially "running" before any data from the host's STDIN is pushed into the container's input stream.
+`syncReader` のブロックを解除する信号は、`StartContainer` API 呼び出しが正常に返された**後**にのみ送信されます。これにより、ホストの STDIN からのデータがコンテナの入力ストリームに送られる前に、コンテナが公式に「実行中（running）」であることが保証されます。
 
 ```go
 // internal/command/root.go
@@ -45,34 +45,21 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 }
 ```
 
-### 3. Disabling Logs in Attach
+### 3. Attach 時のログ取得の無効化
 
-In `internal/runtime/docker.go`, the `AttachContainer` call now sets `Logs: false`.
+`internal/runtime/docker.go` において、`AttachContainer` 呼び出し時に `Logs: false` を設定しています。
 
-Since `cderun` always attaches to the container *before* starting it, there are no existing logs to fetch. Setting `Logs: true` can sometimes cause the Docker daemon to send an initial (empty) log stream and then close or misbehave if the container hasn't started yet, especially under heavy load or specific Docker versions. Disabling it ensures a cleaner stream connection dedicated to real-time IO.
+`cderun` は常にコンテナを開始する前にアタッチするため、取得すべき既存のログは存在しません。`Logs: true` を設定すると、特に高負荷時や特定の Docker バージョンにおいて、コンテナがまだ開始されていない場合に Docker デーモンが初期（空の）ログストリームを送信し、その後接続を閉じたり誤動作したりすることがあります。これを無効にすることで、リアルタイム IO に特化したクリーンなストリーム接続が確保されます。
 
-## Benefits
+## メリット
 
-- **Reliability**: Piped input works consistently even for very fast-executing commands or small data sets.
-- **No Data Loss**: Data is only sent when the container is ready to receive it.
-- **Correct EOF Handling**: The EOF from the host's STDIN is delivered to the containerized process at the correct time.
+- **信頼性**: 非常に高速に実行されるコマンドや小さなデータセットに対しても、パイプ入力が一貫して動作します。
+- **データ欠損なし**: コンテナがデータを受け取る準備ができてからデータが送信されます。
+- **正確な EOF 処理**: ホストの STDIN からの EOF が、適切なタイミングでコンテナ化されたプロセスに配信されます。
 
-## Verification
+## 検証
 
-This behavior is verified by unit tests in `internal/command/stdin_test.go` which simulate delayed container startup with immediate STDIN availability.
-
-## Automatic Termination for Docker 29.1.5 Compatibility
-
-In some Docker versions (notably 29.1.5), a hang can occur during piped execution where the containerized process has consumed all input and produced all output, but the container remains in a `Running` state and the `WaitContainer` API call does not return.
-
-To address this, `cderun` implements an automatic termination logic for non-TTY executions:
-
-1. **Concurrent Waiting**: `cderun` waits for both container exit (`WaitContainer`) and IO completion (`AttachContainer`) concurrently.
-2. **IO Completion Detection**: When the output stream from the container is closed (EOF reached), `AttachContainer` returns.
-3. **Hang Timeout**: If IO is complete but the container does not exit within a graceful timeout (**2 seconds** for TTY, **100ms** for pipes/files), `cderun` assumes a hang has occurred and sends a `SIGKILL` to the container.
-4. **Preserving Interactivity**: This automatic termination is **disabled** when TTY is requested (`--tty` or `-t`), ensuring that interactive shells or long-running UI applications are not prematurely killed.
-
-This ensures that piped commands like `echo "data" | cderun cat` always exit promptly after their work is done.
+この挙動は `internal/command/stdin_test.go` のユニットテストによって検証されています。このテストでは、コンテナの起動を遅らせ、即座に利用可能な STDIN をシミュレートしています。
 
 ## Docker 29.1.5 互換性のための自動終了処理
 
@@ -86,41 +73,6 @@ Docker 29.1.5 などの一部のバージョンでは、パイプ実行時にコ
 4. **インタラクティブ性の維持**: この自動終了ロジックは、TTY が要求されている場合（`--tty` または `-t`）は**無効**になります。これにより、インタラクティブなシェルや長時間実行される UI アプリケーションが誤って終了されるのを防ぎます。
 
 これにより、`echo "data" | cderun cat` のようなパイプ実行時に、処理完了後すぐに CLI が終了することが保証されます。
-
-## Dynamic Hang Timeout based on STDIN Type
-
-`cderun` uses a dynamic timeout mechanism to handle the Docker hang issue (where a container doesn't exit after all IO is done) while maintaining responsiveness and interactivity.
-
-### TTY vs Pipe/File Detection
-
-Note: In this document, "TTY" is used in two different contexts:
-
-1. **The `--tty` or `-t` flag**: Controls whether a pseudo-TTY is allocated for the container. When this flag is set, automatic termination (SIGKILL) is **disabled** to preserve interactivity.
-2. **Host STDIN status**: Whether the host's standard input is a terminal. This determines the **Hang Timeout** duration (2s for TTY, 100ms for pipes/files).
-
-`cderun` detects whether the host's STDIN is a terminal (TTY) or a pipe/file.
-
-- **Pipe or File Redirect**: If the input is piped (e.g., `echo "data" | cderun ...`) or redirected from a file, `cderun` assumes a batch/pipeline mode.
-- **TTY (Terminal)**: If the input is a terminal, `cderun` assumes an interactive session.
-
-### Behavior Differences
-
-After the IO operations are completed (both STDIN copy and output stream reach EOF), `cderun` waits for the container to exit naturally.
-
-1. **In Pipeline Mode (Pipe/File)**:
-   - Responsibility is key: The user expects the command to finish immediately after the data has been processed.
-   - **Hang Timeout**: Reduced to **100ms**.
-   - If the container doesn't exit within 100ms after IO completion, `cderun` sends `SIGKILL` to ensure the pipeline continues promptly.
-
-2. **In Interactive Mode (TTY)**:
-   - Context is key: The user is interacting with the process. Even if output stops, the user might still be typing or the process might be doing some final cleanup.
-   - **Hang Timeout**: Maintained at **2 seconds**.
-   - This provides a graceful period for the container to exit naturally before forcing termination.
-
-3. **Non-Interactive Flag (`-i` not set)**:
-   - If `--interactive=false` is explicitly set (or default), `cderun` also uses the short **100ms** timeout, as it won't be reading any user input anyway.
-
-This optimization ensures that commands like `echo "test" | cderun cat` exit instantly while `cderun -it alpine sh` remains robust and user-friendly.
 
 ## STDIN タイプに基づく動的なハングタイムアウト
 

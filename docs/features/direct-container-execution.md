@@ -1,4 +1,4 @@
-# Feature: Direct Container Execution (Completed)
+# 機能仕様：直接コンテナ実行 (完了)
 
 ## 概要
 
@@ -22,13 +22,13 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 
 | メソッド | Docker (moby) | Podman (compatible API) |
 | :--- | :---: | :---: |
-| `CreateContainer` | implemented | implemented |
-| `StartContainer` | implemented | implemented |
-| `WaitContainer` | implemented | implemented |
-| `RemoveContainer` | implemented | implemented |
-| `AttachContainer` | implemented | implemented |
-| `SignalContainer` | implemented | implemented |
-| `ResizeContainerTTY` | implemented | implemented |
+| `CreateContainer` | 実装済み | 実装済み |
+| `StartContainer` | 実装済み | 実装済み |
+| `WaitContainer` | 実装済み | 実装済み |
+| `RemoveContainer` | 実装済み | 実装済み |
+| `AttachContainer` | 実装済み | 実装済み |
+| `SignalContainer` | 実装済み | 実装済み |
+| `ResizeContainerTTY` | 実装済み | 実装済み |
 
 **メリット:**
 
@@ -83,32 +83,32 @@ CRIを直接使うことで、コンテナ内からcderunを実行しても、�
 
 ## ロードマップ
 
-### Phase 1: コア機能 (Completed)
+### Phase 1: コア機能 (完了)
 
 - 中間表現（ContainerConfig）の定義
 - Docker CRI実装
 - 基本的な実行フロー
 
-### Phase 2: 設定管理 (Completed)
+### Phase 2: 設定管理 (完了)
 
 - 設定ファイル読み込み
 - イメージマッピング
 - 優先順位解決
 - ドライランモード (Phase 4から前倒しで完了)
 
-### Phase 3: 高度な機能 (Completed)
+### Phase 3: 高度な機能 (完了)
 
 - 環境変数パススルー
 - ソケット・バイナリマウント・ツールマウント
 
-### Phase 4: 利便性向上 (Completed)
+### Phase 4: 利便性向上 (完了)
 
 - Podman CRI実装
 - エラーハンドリングの強化
 - シグナル転送・リサイズ同期
 - 詳細ログ機能
 
-### Phase 5: Docker互換フラグの拡充 (Completed)
+### Phase 5: Docker互換フラグの拡充 (完了)
 
 - 詳細なコンテナ設定（ネットワーク、リソース、セキュリティ等）のIRへの追加と各ランタイムでの実装。
 

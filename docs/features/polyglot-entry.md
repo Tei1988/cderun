@@ -1,4 +1,4 @@
-# Feature: Polyglot Entry Point (Completed)
+# 機能仕様：ポリグロットエントリーポイント (完了)
 
 ## 概要
 

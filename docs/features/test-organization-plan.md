@@ -1,4 +1,4 @@
-# Feature: Test Organization & Coverage Analysis Plan
+# 機能仕様：テスト構成・網羅性分析計画
 
 ## 1. 概要
 
@@ -14,8 +14,8 @@
 | `internal/config` | 89.8% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 97.1% | 極めて高いカバレッジを維持。 |
 | `internal/runtime` | 88.5% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
-| `internal/container` | 0% (no statements) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
-| **Total** | **90.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
+| `internal/container` | 0% (ステートメントなし) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
+| **合計** | **90.7%** | 全体として 90% を超える極めて高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 

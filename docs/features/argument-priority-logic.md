@@ -1,4 +1,4 @@
-# Feature: Argument & Configuration Priority Logic (Completed)
+# 機能仕様：引数・設定優先順位ロジック (完了)
 
 ## 概要
 
@@ -7,7 +7,7 @@
 
 ## 優先順位階層 (Resolution Hierarchy)
 
-### P1: CDERUN Internal Overrides (Highest Priority)
+### P1: CDERUN Internal Overrides (最高優先順位)
 
 - **定義**: 動作を強制的に変更するための専用フラグ。シンボリックリンク利用時でも `cderun` 側の設定を上書きすることを想定したフラグ。
 - **フラグ名**: `cderun` 標準フラグのすべてに対応する `--cderun-` プレフィックス付きフラグ。
@@ -19,7 +19,7 @@
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`
 - **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。また、これらは**サブコマンドの後ろ**に配置する必要があります。
 
-### P2: CLI Flags (User Intent)
+### P2: CLI Flags (ユーザーの意図)
 
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。
 - **フラグ名**:
@@ -29,7 +29,7 @@
 - **判定条件**: `cmd.Flags().Changed(name)` が `true` であること。
   - ※ ユーザーがフラグを入力していない場合、Cobraが持つデフォルト値は無視し、P3以下の判定へ進むこと。
 
-### P3: Environment Variables (Global Override)
+### P3: Environment Variables (グローバルオーバーライド)
 
 - **定義**: 実行環境全体に適用される設定。
 - **主要なキー**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_STRICT_ENV`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH` 等。
@@ -37,7 +37,7 @@
 - **挙動**: CLIでの指定がない場合、環境変数の値を確認する。設定されていればそれを採用する。
 - **注意**: `DOCKER_HOST` は `cderun` 自体の設定（ソケットマウントの検出等）には使用されなくなりました。
 
-### P4: Tool-specific config (YAML Profile)
+### P4: Tool-specific config (YAMLプロファイル)
 
 - **定義**: 設定ファイル（`.tools.yaml`）内の、実行対象サブコマンド（ツール）に紐づく設定ブロック。
 - **挙動**: CLIも環境変数も指定がない場合、この値を採用する。
@@ -50,12 +50,12 @@ node:
   tty: true          # P4 value
 ```
 
-### P5: Global defaults (Profile Default)
+### P5: Global defaults (プロファイルデフォルト)
 
 - **定義**: 設定ファイル（`.cderun.yaml`）の `defaults` ブロック。
 - **挙動**: P1〜P4のいずれも指定がない場合、この値を採用する。
 
-### P6: Hardcoded Defaults (Lowest Priority)
+### P6: Hardcoded Defaults (最低優先順位)
 
 - **定義**: プログラム内でハードコードされた最終フォールバック値。
 - **デフォルト値:**
