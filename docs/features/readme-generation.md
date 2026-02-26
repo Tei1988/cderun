@@ -34,7 +34,7 @@ READMEの内容は、以下の情報と整合性が取れていなければな�
 
 ### 3. Argument Parsing & Flags (Important)
 
-`04-argument-parsing.md` の仕様に基づき、**「どこまでが cderun の引数で、どこからがコンテナへの引数か」** を明確に図解または例示すること。
+`argument-parsing.md` の仕様に基づき、**「どこまでが cderun の引数で、どこからがコンテナへの引数か」** を明確に図解または例示すること。
 
 ### 4. Configuration Schema
 
