@@ -1,4 +1,4 @@
-# Feature: Environment Variable Passthrough (Completed)
+# 機能仕様：環境変数パススルー (完了)
 
 ## 概要
 

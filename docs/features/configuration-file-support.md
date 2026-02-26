@@ -1,4 +1,4 @@
-# Feature: Configuration File Support (Completed)
+# 機能仕様：設定ファイルサポート (完了)
 
 ## 概要
 

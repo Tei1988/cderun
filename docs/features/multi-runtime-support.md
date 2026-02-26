@@ -1,4 +1,4 @@
-# Feature: Multi-Runtime Support (Completed)
+# 機能仕様：マルチランタイムサポート (完了)
 
 ## 概要
 
@@ -7,13 +7,13 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 ## サポートされるランタイム
 
-### 優先度1: Docker (Completed)
+### 優先度1: Docker (完了)
 
 - デフォルトのランタイム
 - 最も広く使われている
 - Docker Engine APIを使用
 
-### 優先度2: Podman (Completed)
+### 優先度2: Podman (完了)
 
 - Dockerのドロップイン代替
 - rootlessコンテナのサポート
@@ -51,13 +51,13 @@ cderun ContainerRuntimeインターフェース
 **現状 (Phase 4):**
 Docker と Podman をフルサポートしています。Podman は Docker 互換の API を介してサポートされており、ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
 
-### 解決ロジック (Completed)
+### 解決ロジック (完了)
 
 1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
 2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH` 等。
 3. **コマンドライン引数**: `--runtime`, `--socket-path` および P1 内部オーバーライド。
 
-### 自動検出ロジック (Completed)
+### 自動検出ロジック (完了)
 
 ソケットの存在確認によるランタイムの自動選択機能。
 
@@ -67,7 +67,7 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
    - `/run/podman/podman.sock` (Runtime: `podman`)
 3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
 
-### 明示的な指定 (Completed)
+### 明示的な指定 (完了)
 
 #### 設定ファイル (`.cderun.yaml`)
 
@@ -95,7 +95,7 @@ cderun --runtime podman node app.js
 - **Podman**: Docker 互換の API を使用. Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
 - **イメージプルのリトライ**: ネットワークの不安定さやレート制限（`toomanyrequests` 等）に対応するため、指数バックオフを伴うリトライロジック（最大3回）を実装。
 
-## ランタイム情報の表示 (Completed)
+## ランタイム情報の表示 (完了)
 
 ### 現在のランタイム確認
 

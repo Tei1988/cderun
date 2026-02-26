@@ -1,11 +1,11 @@
-# Feature: README Generation Strategy
+# 機能仕様：README生成戦略
 
 ## 概要
 
 `README.md` は静的なファイルではなく、実装されたコード（フラグ、設定構造体、ロジック）を反映した動的な成果物として扱われるべきである。
 実装完了後、以下の構成要件に従って `README.md` (英語) を生成/更新すること。
 
-## Source of Truth (情報源)
+## 信頼できる唯一の情報源 (情報源)
 
 READMEの内容は、以下の情報と整合性が取れていなければならない。
 
@@ -13,7 +13,7 @@ READMEの内容は、以下の情報と整合性が取れていなければな�
 2. **構造体定義**: `config` パッケージ等で定義された YAML マッピング構造（`image` の多態性など）。
 3. **Feature Docs**: `docs/features/` 配下の仕様（優先順位ロジックなど）。
 
-## READMEの構成要件 (Structure Requirements)
+## READMEの構成要件 (構成要件)
 
 ### 1. Header & Concept
 
@@ -34,7 +34,7 @@ READMEの内容は、以下の情報と整合性が取れていなければな�
 
 ### 3. Argument Parsing & Flags (Important)
 
-`04-argument-parsing.md` の仕様に基づき、**「どこまでが cderun の引数で、どこからがコンテナへの引数か」** を明確に図解または例示すること。
+`argument-parsing.md` の仕様に基づき、**「どこまでが cderun の引数で、どこからがコンテナへの引数か」** を明確に図解または例示すること。
 
 ### 4. Configuration Schema
 
