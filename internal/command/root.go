@@ -810,7 +810,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		select {
 		case err := <-attachDone:
 			if err != nil && !errors.Is(err, context.Canceled) {
-				o.logger.Warn("AttachContainer finished with error after container exit for %s: %v", containerID, err)
+				o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
 				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 			}
 			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
@@ -846,10 +846,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				o.logger.Warn("Container %s did not exit after IO completion, forcing termination", containerID)
+				o.logger.Debug("Container %s did not exit after IO completion, forcing termination", containerID)
 				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
 				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
-					o.logger.Warn("failed to force terminate container %s: %v", containerID, err)
+					o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
 				}
 
 				select {
