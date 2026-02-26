@@ -835,7 +835,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
 		// IO finished before container exited.
-		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
+		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.x hang.
 		// If host stdin is not a terminal, we use a much shorter timeout because we don't expect interactive behavior.
 		if !isHostStdinTerminal || !containerConfig.Interactive {
 			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
@@ -851,8 +851,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					o.logger.Debug("Failed to get container runtime version: %v", err)
 				}
 				msg := fmt.Sprintf("Container %s did not exit after IO completion, forcing termination", containerID)
-				if strings.Contains(version, "29.1.5") {
-					msg += " (Hint: This may be due to a known regression in Docker 29.1.5 where EOF is not correctly delivered)"
+				if strings.HasPrefix(version, "29.") {
+					msg += " (Hint: This may be due to a known regression in Docker 29.x where EOF is not correctly delivered)"
 				}
 				o.logger.Warn("%s", msg)
 				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
