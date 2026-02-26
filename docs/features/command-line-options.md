@@ -480,7 +480,7 @@ cderun --log-timestamp=false node app.js
    `CDERUN_TTY` 等。
    - **セパレータ**:
      - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-     - カンマ (`,`): `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`
+     - カンマ (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`
 4. **ツール固有設定 (P4)**: `.tools.yaml`
 5. **グローバルデフォルト** (P5): `.cderun.yaml`
 6. **ハードコードされたデフォルト** (P6, 最低優先)
