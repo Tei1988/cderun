@@ -878,6 +878,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
+		Version:       Version,
 		Use:           "cderun",
 		SilenceUsage:  true,
 		SilenceErrors: true,
