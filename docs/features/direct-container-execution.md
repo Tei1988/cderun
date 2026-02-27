@@ -59,7 +59,7 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 
 ### ランタイム実装のポイント
 
-- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用.
+- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
 - **Podman実装**: Docker 互換 API を使用。Docker クライアントライブラリを共通の基盤として利用。
 - **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
 
