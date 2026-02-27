@@ -73,7 +73,7 @@ func TestRobustness_Root_SignalHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("TestRobustness_Root_DoubleSIGINT", func(t *testing.T) {
+	t.Run("DoubleSIGINT", func(t *testing.T) {
 		// Use a mock that blocks in WaitContainer to simulate long running process
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
@@ -131,7 +131,7 @@ func TestRobustness_Root_SignalHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("TestRobustness_Root_TTYResize", func(t *testing.T) {
+	t.Run("TTYResize", func(t *testing.T) {
 		var mu sync.Mutex
 		// Mock terminal size
 		currentRows, currentCols := 24, 80
@@ -193,7 +193,7 @@ func TestRobustness_Root_SignalHandling(t *testing.T) {
 		<-done
 	})
 
-	t.Run("TestRobustness_Root_ExitCode", func(t *testing.T) {
+	t.Run("ExitCode", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
 		}

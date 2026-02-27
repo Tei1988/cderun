@@ -16,8 +16,9 @@ import (
 
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function modifies global state (os.Stdout, os.Stderr)
-// and is NOT safe for parallel execution with t.Parallel().
+// Note: This function uses bytes.Buffers and cmd.SetOut/SetErr for isolation,
+// and it is safe for parallel execution with t.Parallel() as it does not
+// mutate global file descriptors.
 // It uses ExecuteContextWithOptions to isolate command execution.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, args...)

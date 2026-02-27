@@ -92,7 +92,7 @@ func TestUnit_AutoTermination_NonTTY(t *testing.T) {
 	}
 }
 
-func TestUnit_AutoTermination_TTYNoKill(t *testing.T) {
+func TestUnit_AutoTermination_TTY_NoKill(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
