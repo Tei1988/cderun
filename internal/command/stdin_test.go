@@ -422,3 +422,31 @@ func TestUnit_Command_Stdin_PipedLogsContinuous(t *testing.T) {
 		}
 	})
 }
+
+func TestUnit_Command_Stdin_NoMirroring(t *testing.T) {
+	t.Run("stdin is NOT mirrored to stdout by cderun", func(t *testing.T) {
+		mock := &runtime.MockRuntime{} // Default mock does NOT echo stdin
+		mock.CreatedContainerID = "test-no-mirror"
+		mock.ExitCode = 0
+
+		stdinData := "secret input that should not be displayed"
+		var stdout bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetIn(strings.NewReader(stdinData))
+			cmd.SetOut(&stdout)
+		})
+
+		require.NoError(t, err)
+		// If cderun were mirroring, stdout would contain stdinData.
+		// Since the mock container doesn't echo, stdout should be empty.
+		assert.NotContains(t, stdout.String(), stdinData, "cderun should not mirror stdin to stdout")
+		assert.Empty(t, stdout.String(), "stdout should be empty when container does not produce output")
+	})
+}
