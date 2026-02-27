@@ -31,44 +31,9 @@ func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string,
 }
 
 // runCderunCore is the shared implementation for in-process command execution.
+// It uses bytes.Buffer and cmd.SetOut/SetErr for isolation.
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
-	savedStdout := os.Stdout
-	savedStderr := os.Stderr
-
-	rOut, wOut, err := os.Pipe()
-	if err != nil {
-		return "", "", 0, err
-	}
-	rErr, wErr, err := os.Pipe()
-	if err != nil {
-		_ = rOut.Close()
-		_ = wOut.Close()
-		return "", "", 0, err
-	}
-
-	os.Stdout = wOut
-	os.Stderr = wErr
-	defer func() {
-		os.Stdout = savedStdout
-		os.Stderr = savedStderr
-	}()
-
-	stdoutChan := make(chan string)
-	stderrChan := make(chan string)
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rOut)
-		_ = rOut.Close()
-		stdoutChan <- buf.String()
-	}()
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, rErr)
-		_ = rErr.Close()
-		stderrChan <- buf.String()
-	}()
+	var outBuf, errBuf bytes.Buffer
 
 	capturedExitCode := 0
 	execErr := ExecuteContextWithOptions(context.TODO(), append([]string{"cderun"}, args...), func(o *rootOptions, cmd *cobra.Command) {
@@ -78,17 +43,11 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		if stdin != nil {
 			cmd.SetIn(stdin)
 		}
-		// Note: We don't set cmd.SetOut/Err here because we are capturing via os.Pipe
-		// and ExecuteContextWithOptions uses newRootCmd which defaults to os.Stdin/Out/Err.
+		cmd.SetOut(&outBuf)
+		cmd.SetErr(&errBuf)
 	})
 
-	_ = wOut.Close()
-	_ = wErr.Close()
-
-	stdout = <-stdoutChan
-	stderr = <-stderrChan
-
-	return stdout, stderr, capturedExitCode, execErr
+	return outBuf.String(), errBuf.String(), capturedExitCode, execErr
 }
 
 func skipIfDockerBroken(t *testing.T, err error) {

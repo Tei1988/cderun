@@ -13,7 +13,7 @@ import (
 	"cderun/internal/logging"
 )
 
-func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
+func TestUnit_Snapshot_Immutability(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -46,7 +46,7 @@ func TestUnit_Command_Snapshot_Immutability(t *testing.T) {
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
-func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
+func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -66,7 +66,7 @@ func TestUnit_Command_Snapshot_WithNilHostContext(t *testing.T) {
 	assert.Nil(t, globalCfg.HostContext)
 }
 
-func TestUnit_Command_Snapshot_Permissions(t *testing.T) {
+func TestUnit_Snapshot_Permissions(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
@@ -95,7 +95,7 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 	return m.Content, m.Err
 }
 
-func TestUnit_Command_Snapshot_DiscoverOverlay(t *testing.T) {
+func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()
