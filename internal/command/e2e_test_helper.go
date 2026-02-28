@@ -21,7 +21,7 @@ func runDiagnosisOnFailure(stderr string, exitCode int, err error) {
 
 	diagnosisOnce.Do(func() {
 		fmt.Fprintf(os.Stderr, "\n--- E2E Test Failure Detected. Running Diagnosis ---\n")
-		// We use alpine as a dummy subcommand for diagnosis as it requires one.
+		// Diagnosis mode runs without requiring a subcommand.
 		diagStdout, diagStderr, diagExitCode, diagErr := runCderun("--diagnosis")
 		if diagErr != nil {
 			fmt.Fprintf(os.Stderr, "Diagnosis failed: %v\n", diagErr)
