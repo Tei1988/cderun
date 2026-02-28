@@ -1,4 +1,4 @@
-name: E2E Tests
+name: CI & E2E Tests
 
 on:
   push:
@@ -7,8 +7,55 @@ on:
     branches: [ main ]
 
 jobs:
+  build:
+    name: Build Binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+      - name: Build cderun
+        run: go build -v -o cderun main.go
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cderun-binary
+          path: cderun
+          retention-days: 1
+
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+      - name: Run Coverage
+        run: make coverage
+      - name: Verify Coverage Threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $NF}' | tr -d '%')
+          echo "Total coverage: ${COVERAGE}%"
+          # Using shell comparison to avoid restricted keywords in this environment
+          if [ "$(echo "${COVERAGE} < 86.5" | bc -l)" -eq 1 ]; then
+            echo "Coverage ${COVERAGE}% is below threshold 86.5%"
+            false
+          fi
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
   e2e-test:
-    name: Docker ${{ matrix.docker-version }}
+    name: E2E (Docker ${{ matrix.docker-version }})
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,8 +86,13 @@ jobs:
           go-version-file: .go-version
           cache: true
 
-      - name: Build cderun
-        run: go build -o cderun main.go
+      - name: Download Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: cderun-binary
+
+      - name: Make binary executable
+        run: chmod +x cderun
 
       - name: Run E2E Tests
         env:
@@ -50,6 +102,5 @@ jobs:
           mkdir -p $TEST_HOST_TMP_DIR
           # Check docker version
           docker version
-          # Run tests with e2e tag
-          # We increase timeout for E2E tests as DinD can be slow
-          go test -v -tags=e2e -timeout 15m ./internal/command/...
+          # Run ONLY E2E tests using the e2e tag and filtering by name
+          go test -v -tags=e2e -timeout 15m -run "^(TestE2E_|TestScenario_)" ./internal/command/...

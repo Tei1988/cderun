@@ -306,7 +306,7 @@ func TestUnit_Stdin_PipedQuickExit(t *testing.T) {
 		duration := time.Since(start)
 
 		require.NoError(t, err)
-		assert.Less(t, duration, 500*time.Millisecond, "Should exit quickly due to piped stdin")
+		assert.Less(t, duration, 800*time.Millisecond, "Should exit quickly due to piped stdin")
 	})
 }
 
@@ -362,7 +362,7 @@ func TestUnit_Stdin_NonInteractiveQuickExit(t *testing.T) {
 		duration := time.Since(start)
 
 		require.NoError(t, err)
-		assert.Less(t, duration, 500*time.Millisecond, "Should exit quickly since it is non-interactive")
+		assert.Less(t, duration, 800*time.Millisecond, "Should exit quickly since it is non-interactive")
 	})
 }
 

@@ -24,8 +24,11 @@ func TestE2E_DockerVersion(t *testing.T) {
 }
 
 func TestE2E_StandardExecution(t *testing.T) {
+	// Use --entrypoint sh to avoid OCI runtime "executable file not found" errors
+	// when trying to execute "sh -c ..." directly.
 	stdout, stderr, exitCode, err := runCderun(
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
+		"--entrypoint", "sh",
 		"sh", "-c", "echo hello-cderun-e2e",
 	)
 	skipIfDockerBroken(t, err)
@@ -57,6 +60,7 @@ func TestE2E_VolumeMount(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderun(
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
 		"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
+		"--entrypoint", "sh",
 		"sh", "-c", "cat /mnt/test/test.txt",
 	)
 	skipIfDockerBroken(t, err)
@@ -69,25 +73,16 @@ func TestE2E_NestedExecution(t *testing.T) {
 	// Host -> Container A -> Container B
 	// Container A needs Docker socket and cderun binary.
 
-	// Use absolute path for cderun binary (built in GHA workflow or present in local)
-	exePath, err := os.Executable()
-	if strings.Contains(exePath, "go-build") {
-		// If running via go test, look for built binary in current dir
-		if _, err := os.Stat("./cderun"); err == nil {
-			exePath, _ = filepath.Abs("./cderun")
-		}
-	}
+	// Use absolute path for cderun binary
+	// In CI, it's in the current working directory.
+	exePath, err := filepath.Abs("./cderun")
 	require.NoError(t, err)
 
-	// We need to know where the docker socket is. Default to /var/run/docker.sock
+	// Docker socket resolution
 	dockerSocket := "/var/run/docker.sock"
 	if host := os.Getenv("DOCKER_HOST"); strings.HasPrefix(host, "unix://") {
 		dockerSocket = strings.TrimPrefix(host, "unix://")
 	}
-
-	// In DinD environment, DOCKER_HOST might be tcp.
-	// For nested execution (DooD) to work, the INNER container needs to talk to the SAME daemon.
-	// If DOCKER_HOST is tcp, we pass it to the inner container.
 
 	args := []string{
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
@@ -97,15 +92,14 @@ func TestE2E_NestedExecution(t *testing.T) {
 
 	// Handle docker socket or DOCKER_HOST passthrough
 	if os.Getenv("DOCKER_HOST") != "" && !strings.HasPrefix(os.Getenv("DOCKER_HOST"), "unix://") {
-		// If TCP, pass the environment variable
 		args = append(args, "--env", fmt.Sprintf("DOCKER_HOST=%s", os.Getenv("DOCKER_HOST")))
 	} else {
-		// If Unix socket, mount it
 		args = append(args, "--mount-socket", "--mount-socket-path", dockerSocket)
 	}
 
 	// Command in Container A: run cderun to start Container B
-	args = append(args, "sh", "-c", "cderun --image public.ecr.aws/docker/library/alpine:latest sh -c 'echo nested-success'")
+	// Using sh -c for robustness
+	args = append(args, "--entrypoint", "sh", "sh", "-c", "cderun --image public.ecr.aws/docker/library/alpine:latest --entrypoint sh sh -c 'echo nested-success'")
 
 	stdout, stderr, exitCode, err := runCderun(args...)
 	skipIfDockerBroken(t, err)

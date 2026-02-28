@@ -15,7 +15,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: .go-version
           cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
@@ -35,26 +35,3 @@ jobs:
         run: npm install -g markdownlint-cli
       - name: Run markdownlint
         run: make lint-md
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Run Coverage
-        run: make coverage
-      - name: Verify Coverage Threshold
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $NF}' | tr -d '%')
-          echo "Total coverage: $COVERAGE%"
-          echo "$COVERAGE 86.5" | awk '{if ($1 < $2) { print "Coverage " $1 "% is below threshold 86.5%"; exit 1 }}'
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.out
