@@ -15,14 +15,14 @@ func TestScenario_Device_MountNull(t *testing.T) {
 		t.Skip("skipping E2E test in short mode")
 	}
 
-	// We use Alpine image for testing
-	// Command: ls /dev/null2 && echo "test" > /dev/null2
-	// This verifies the device exists and is writable.
-	stdout, stderr, exitCode, err := runCderun(
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
-		"--device", "/dev/null:/dev/null2:rw",
-		"--entrypoint", "sh",
-		"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2",
+	// Subcommand 'alpine' is mandatory.
+	stdout, stderr, exitCode, err := runCderunE2E(
+		[]string{
+			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--device", "/dev/null:/dev/null2:rw",
+		},
+		"alpine",
+		[]string{"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
 	)
 
 	// Handle environment-specific Docker issues
@@ -42,16 +42,33 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 
 	// Create a pipe for stdin
 	pr, pw := io.Pipe()
-	go func() {
-		_, _ = pw.Write([]byte(stdinData))
+
+	// Ensure proper cleanup of resources
+	t.Cleanup(func() {
 		_ = pw.Close()
+		_ = pr.Close()
+	})
+
+	go func() {
+		_, writeErr := pw.Write([]byte(stdinData))
+		// We close the writer to signal EOF to the reader (container stdin)
+		_ = pw.Close()
+		if writeErr != nil {
+			// If the test environment is extremely slow or broken,
+			// this might be logged but typically shouldn't fail the test
+			// unless the reader is already closed.
+			return
+		}
 	}()
 
-	stdout, stderr, exitCode, err := runCderunWithStdin(pr,
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
-		"--interactive",
-		"--entrypoint", "cat",
-		"cat",
+	// Subcommand 'alpine' is mandatory.
+	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
+		[]string{
+			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--interactive",
+		},
+		"alpine",
+		[]string{"cat"},
 	)
 
 	skipIfDockerBroken(t, err)
