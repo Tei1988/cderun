@@ -17,6 +17,7 @@ func TestE2E_DockerVersion(t *testing.T) {
 	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
 	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
 	skipIfDockerBroken(t, err)
+	if err != nil { t.Logf("STDOUT: %s", stdout); t.Logf("STDERR: %s", stderr) }
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 
@@ -32,6 +33,7 @@ func TestE2E_StandardExecution(t *testing.T) {
 		[]string{"echo", "hello-cderun-e2e"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil { t.Logf("STDOUT: %s", stdout); t.Logf("STDERR: %s", stderr) }
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "hello-cderun-e2e")
@@ -66,6 +68,7 @@ func TestE2E_VolumeMount(t *testing.T) {
 		[]string{"cat", "/mnt/test/test.txt"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil { t.Logf("STDOUT: %s", stdout); t.Logf("STDERR: %s", stderr) }
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, content, strings.TrimSpace(stdout))
@@ -103,6 +106,7 @@ func TestE2E_NestedExecution(t *testing.T) {
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)
 	skipIfDockerBroken(t, err)
+	if err != nil { t.Logf("STDOUT: %s", stdout); t.Logf("STDERR: %s", stderr) }
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "nested-success")
@@ -115,6 +119,7 @@ func TestE2E_DryRun(t *testing.T) {
 		[]string{"echo", "dry-run-test"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil { t.Logf("STDOUT: %s", stdout); t.Logf("STDERR: %s", stderr) }
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "\"image\": \"public.ecr.aws/docker/library/alpine:latest\"")

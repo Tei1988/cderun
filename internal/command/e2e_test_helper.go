@@ -7,7 +7,32 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
+
+var (
+	diagnosisOnce sync.Once
+)
+
+func runDiagnosisOnFailure(stderr string, exitCode int, err error) {
+	if exitCode == 0 && err == nil {
+		return
+	}
+
+	diagnosisOnce.Do(func() {
+		fmt.Fprintf(os.Stderr, "\n--- E2E Test Failure Detected. Running Diagnosis ---\n")
+		// We use alpine as a dummy subcommand for diagnosis as it requires one.
+		diagStdout, diagStderr, diagExitCode, diagErr := runCderun("--diagnosis")
+		if diagErr != nil {
+			fmt.Fprintf(os.Stderr, "Diagnosis failed: %v\n", diagErr)
+		} else {
+			fmt.Fprintf(os.Stderr, "Diagnosis Exit Code: %d\n", diagExitCode)
+			fmt.Fprintf(os.Stderr, "Diagnosis Stdout:\n%s\n", diagStdout)
+			fmt.Fprintf(os.Stderr, "Diagnosis Stderr:\n%s\n", diagStderr)
+		}
+		fmt.Fprintf(os.Stderr, "--- End of Diagnosis ---\n\n")
+	})
+}
 
 // runCderunE2E is a helper for E2E tests.
 // It strictly requires a subcommand which acts as the tool name or image mapping key.
@@ -15,7 +40,9 @@ func runCderunE2E(cderunFlags []string, subCommand string, commandOptions []stri
 	args := append([]string{}, cderunFlags...)
 	args = append(args, subCommand)
 	args = append(args, commandOptions...)
-	return runCderun(args...)
+	stdout, stderr, exitCode, err = runCderun(args...)
+	runDiagnosisOnFailure(stderr, exitCode, err)
+	return
 }
 
 // runCderunWithStdinE2E is a helper for E2E tests with stdin.
@@ -24,7 +51,9 @@ func runCderunWithStdinE2E(stdin io.Reader, cderunFlags []string, subCommand str
 	args := append([]string{}, cderunFlags...)
 	args = append(args, subCommand)
 	args = append(args, commandOptions...)
-	return runCderunWithStdin(stdin, args...)
+	stdout, stderr, exitCode, err = runCderunWithStdin(stdin, args...)
+	runDiagnosisOnFailure(stderr, exitCode, err)
+	return
 }
 
 // findCderunBinary searches for the cderun binary in the project structure.
