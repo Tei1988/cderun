@@ -10,12 +10,12 @@
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
-| `internal/command` | 90.8% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
-| `internal/config` | 88.7% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
+| `internal/command` | 90.5% | コアロジック、フラグ解析、ドライラン、ネスト実行等は良好。 |
+| `internal/config` | 88.6% | 設定の読み込み、マージ、Expression解決、パス解決等は良好。 |
 | `internal/logging` | 97.1% | 極めて高いカバレッジを維持。 |
-| `internal/runtime` | 85.2% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
+| `internal/runtime` | 83.2% | リトライロジック、TTYリサイズ、ストリーム処理のテストが充実。 |
 | `internal/container` | 0% (ステートメントなし) | 実行ステートメントを持たない構造体定義のみだが、`internal/container/config_test.go` 等で検証。 |
-| **合計** | **89.3%** | 全体として 89% を超える極めて高いカバレッジを維持。 |
+| **合計** | **88.8%** | 全体として高いカバレッジを維持。 |
 
 ### 2.2. 機能別テストマッピング
 
@@ -39,12 +39,12 @@
 | cderunバイナリマウント | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
 | ドライランモード | `internal/command/root_test.go` | 良好 |
 | ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
-| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go` | 良好 |
+| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go`, `internal/command/docker_hang_test.go` | 良好 |
 | 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` | 良好 |
 | 診断モード | `internal/command/root_test.go` | 良好 |
-| 統合テスト(Docker) | `internal/command/integration_test.go` | 良好 |
+| 統合テスト(Docker) | `internal/command/integration_test.go`, `internal/command/e2e_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
 | Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
 | パス解決(チルダ・相対) | `internal/config/path_test.go` | 良好 |
@@ -90,7 +90,7 @@
 
 ### 5.2. カバレッジの継続的計測と記録
 
-  1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
+  1. **CIでの自動計測 (完了)**: GitHub Actions (`.github/workflows/e2e-test.yml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
 ## 6. テストマトリックス (2026-02時点)
