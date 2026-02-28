@@ -27,7 +27,7 @@ import (
 
 const (
 	pullMaxRetries         = 3
-	attachCloseWriteGrace = 200 * time.Millisecond
+	attachCloseWriteGrace = 1 * time.Second
 )
 
 var eofRegex = regexp.MustCompile(`\beof\b`)

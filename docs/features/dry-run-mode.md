@@ -148,6 +148,8 @@ CPUs: 1.5
 Devices:
 ```
 
+> **Note**: `Memory` は `512MiB` のような人間が読みやすい形式で表示され、`CPUs` は浮動小数点数（例: `1.5`）として表示されます。
+
 ## ユースケース
 
 ### 1. デバッグ
@@ -168,7 +170,7 @@ if [[ $image == "node:20-alpine" ]]; then
   echo "Configuration is correct"
 else
   echo "Unexpected image: $image"
-  exit 1
+  false
 fi
 ```
 

@@ -70,7 +70,7 @@ Hello, World!
 
 ```bash
 cderun --log-level info node app.js
-2024-01-15 10:30:45 [INFO] Running: node app.js
+2026-02-28 10:30:45 [INFO] Running: node app.js
 Hello, World!
 ```
 
@@ -78,29 +78,29 @@ Hello, World!
 
 ```bash
 cderun --log-level debug node app.js
-2024-01-15 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
-2024-01-15 10:30:45 [DEBUG] Resolved Image: node:20-alpine
-2024-01-15 10:30:45 [INFO] Running: node app.js
-2024-01-15 10:30:45 [DEBUG] Image: node:20-alpine
-2024-01-15 10:30:45 [DEBUG] Runtime: docker
-2024-01-15 10:30:45 [DEBUG] Socket: /var/run/docker.sock
+2026-02-28 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
+2026-02-28 10:30:45 [DEBUG] Resolved Image: node:20-alpine
+2026-02-28 10:30:45 [INFO] Running: node app.js
+2026-02-28 10:30:45 [DEBUG] Image: node:20-alpine
+2026-02-28 10:30:45 [DEBUG] Runtime: docker
+2026-02-28 10:30:45 [DEBUG] Socket: /var/run/docker.sock
 Hello, World!
-2024-01-15 10:30:46 [DEBUG] Container exited with code: 0
+2026-02-28 10:30:46 [DEBUG] Container exited with code: 0
 ```
 
 ### TRACE レベル
 
 ```bash
 cderun --log-level trace node app.js
-2024-01-15 10:30:45 [TRACE] Loading configurations...
-2024-01-15 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
-2024-01-15 10:30:45 [TRACE] Resolving configurations for tool: node
-2024-01-15 10:30:45 [DEBUG] Resolved Image: node:20-alpine
-2024-01-15 10:30:45 [INFO] Running: node app.js
+2026-02-28 10:30:45 [TRACE] Loading configurations...
+2026-02-28 10:30:45 [DEBUG] Loaded cderun config from: .cderun.yaml
+2026-02-28 10:30:45 [TRACE] Resolving configurations for tool: node
+2026-02-28 10:30:45 [DEBUG] Resolved Image: node:20-alpine
+2026-02-28 10:30:45 [INFO] Running: node app.js
 ...
-2024-01-15 10:30:45 [TRACE] Creating container...
-2024-01-15 10:30:45 [TRACE] Starting container: <ID>
-2024-01-15 10:30:45 [TRACE] Waiting for container: <ID>
+2026-02-28 10:30:45 [TRACE] Creating container...
+2026-02-28 10:30:45 [TRACE] Starting container: <ID>
+2026-02-28 10:30:45 [TRACE] Waiting for container: <ID>
 ...
 ```
 
@@ -109,14 +109,14 @@ cderun --log-level trace node app.js
 ### テキスト形式（デフォルト）
 
 ```text
-2024-01-15 10:30:45 [INFO] Running: node app.js
+2026-02-28 10:30:45 [INFO] Running: node app.js
 ```
 
 ### JSON形式
 
 ```bash
 cderun --log-format json --log-level info node app.js
-{"level":"info","msg":"Running: node app.js","time":"2024-01-15T10:30:45Z"}
+{"level":"info","msg":"Running: node app.js","time":"2026-02-28T10:30:45Z"}
 ```
 
 ## デバッグ機能
@@ -143,6 +143,15 @@ Dockerランタイムの実装 (`internal/runtime/docker.go`) において、`Co
 3. **安全な全出力取得**: この同期メカニズムにより、コンテナの開始直後からの出力を確実にキャプチャできるため、`Logs: false` を使用してもデータの欠落は発生しません。
 
 過去の記録では `Logs: false` でも改善しなかったとありましたが、同期メカニズムと適切に組み合わせることで、ハングおよび出力欠損の根本的な原因を解消できることが確認されました。
+
+### 終了時のハング対策 (`CDERUN_HANG_TIMEOUT`)
+
+I/Oが完了した後、コンテナが期待通りに終了しない（ハングする）現象が発生することがあります。cderunはこれを防ぐため、以下のタイムアウト制御を実装しています。
+
+- **タイムアウト設定**: 環境変数 `CDERUN_HANG_TIMEOUT` で制御可能です。
+- **挙動**: I/O完了後、指定された時間（デフォルト: 2s）待機してもコンテナが終了しない場合、cderunはコンテナの終了を待たずに復帰するか、必要に応じて強制終了（SIGKILL）を試みます。
+  - **選択ルール**: `CDERUN_HANG_TIMEOUT` 経過時、コンテナが既に終了状態（exit status取得可能）であれば即座に復帰（return）し、プロセスが依然として実行中であれば強制終了（SIGKILL）を実行します。
+- **ログ**: このタイムアウトによる終了待機や強制終了の詳細は、`DEBUG` レベルで出力されます。
 
 ## ログ出力の方針
 

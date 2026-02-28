@@ -9,7 +9,7 @@ test-e2e:
 	@go test -v -tags=e2e ./...
 
 .PHONY: lint
-lint: lint-go lint-md
+lint: lint-go lint-md link-check
 
 .PHONY: lint-go
 lint-go:
@@ -19,7 +19,16 @@ lint-go:
 .PHONY: lint-md
 lint-md:
 	@echo "Running markdownlint..."
-	@markdownlint "**/*.md"
+	@if command -v markdownlint >/dev/null 2>&1; then \
+		markdownlint "**/*.md"; \
+	else \
+		npx markdownlint-cli "**/*.md"; \
+	fi
+
+.PHONY: link-check
+link-check:
+	@echo "Checking Markdown links..."
+	@./scripts/check-links.sh
 
 .PHONY: coverage
 coverage:

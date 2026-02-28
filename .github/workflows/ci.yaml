@@ -7,8 +7,32 @@ on:
     branches: [ main ]
 
 jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.go-version'
+              - 'Makefile'
+              - '.github/workflows/*.yml'
+            docs:
+              - '**/*.md'
+              - 'scripts/check-links.sh'
+
   lint-go:
     name: Lint Go
+    needs: filter
+    if: needs.filter.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +48,8 @@ jobs:
 
   lint-md:
     name: Lint Markdown
+    needs: filter
+    if: needs.filter.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,3 +61,5 @@ jobs:
         run: npm install -g markdownlint-cli
       - name: Run markdownlint
         run: make lint-md
+      - name: Check Markdown links
+        run: make link-check

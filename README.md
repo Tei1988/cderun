@@ -92,6 +92,7 @@ cderun node app.js --cderun-image node:20-alpine
 - `--interactive`, `-i`: Keep STDIN open even if not attached.
 - `--image`: Docker image to use (overrides mapping).
 - `--env`, `-e`: Set environment variables (KEY=VALUE or KEY).
+- `--strict-env`: Require all environment variables to be present on the host.
 - `--mount`: Attach a filesystem mount to the container (type=bind,source=...,target=...[,readonly]).
 - `--workdir`, `-w`: Working directory inside the container.
 - `--network`: Connect a container to a network (default: "bridge").
