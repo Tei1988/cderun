@@ -14,7 +14,7 @@ import (
 )
 
 func TestE2E_DockerVersion(t *testing.T) {
-	// --diagnosis does not take a subcommand, so we pass empty targetCommand.
+	// --diagnosis does not take a subcommand.
 	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, nil)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -25,11 +25,10 @@ func TestE2E_DockerVersion(t *testing.T) {
 }
 
 func TestE2E_StandardExecution(t *testing.T) {
-	// Use --entrypoint sh to avoid OCI runtime "executable file not found" errors
-	// when trying to execute "sh -c ..." directly.
+	// Standard execution using the helper.
 	stdout, stderr, exitCode, err := runCderunE2E(
-		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--entrypoint", "sh"},
-		[]string{"sh", "-c", "echo hello-cderun-e2e"},
+		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
+		[]string{"echo", "hello-cderun-e2e"},
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -65,9 +64,8 @@ func TestE2E_VolumeMount(t *testing.T) {
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
 			"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
-			"--entrypoint", "sh",
 		},
-		[]string{"sh", "-c", "cat /mnt/test/test.txt"},
+		[]string{"cat", "/mnt/test/test.txt"},
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -102,11 +100,10 @@ func TestE2E_NestedExecution(t *testing.T) {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
 	}
 
-	// Command in Container A: run cderun to start Container B
-	// Using sh -c for robustness and explicit -- separator for the nested call
+	// Command in Container A: run cderun to start Container B.
+	// We use direct execution of cderun. NO -- separator.
 	targetCommand := []string{
-		"sh", "-c",
-		"cderun --image public.ecr.aws/docker/library/alpine:latest --entrypoint sh -- sh -c 'echo nested-success'",
+		"cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "echo", "nested-success",
 	}
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, targetCommand)
@@ -117,8 +114,6 @@ func TestE2E_NestedExecution(t *testing.T) {
 }
 
 func TestE2E_DryRun(t *testing.T) {
-	// Added skipIfDockerBroken for consistency and guard
-	// Dry-run normally doesn't require a running Docker daemon, but we keep it for consistency.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--dry-run", "--dry-run-format", "json"},
 		[]string{"echo", "dry-run-test"},
