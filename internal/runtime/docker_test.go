@@ -73,7 +73,7 @@ type mockDockerClient struct {
 	attachOpts dockercontainer.AttachOptions
 	attachResp types.HijackedResponse
 	attachErr  error
-	inspectResp types.ContainerJSON
+	inspectResp dockercontainer.InspectResponse
 	inspectErr  error
 }
 
@@ -138,7 +138,7 @@ func (m *mockDockerClient) ContainerAttach(ctx context.Context, container string
 	return m.attachResp, m.attachErr
 }
 
-func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (dockercontainer.InspectResponse, error) {
 	return m.inspectResp, m.inspectErr
 }
 

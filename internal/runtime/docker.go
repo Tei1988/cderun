@@ -40,7 +40,7 @@ type dockerClient interface {
 	ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error)
 	ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error
 	ContainerResize(ctx context.Context, containerID string, options dockercontainer.ResizeOptions) error
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	ContainerInspect(ctx context.Context, containerID string) (dockercontainer.InspectResponse, error)
 	ContainerKill(ctx context.Context, containerID string, signal string) error
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
 }
@@ -401,7 +401,6 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	}
 }
 
-// Name returns the name of the runtime.
 // InspectContainer inspects the container to get its status and exit code.
 func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	resp, err := d.client.ContainerInspect(ctx, containerID)
@@ -411,6 +410,7 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 	return resp.State.Running, resp.State.ExitCode, nil
 }
 
+// Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
 }
