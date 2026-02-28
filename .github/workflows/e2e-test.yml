@@ -1,0 +1,54 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  e2e-test:
+    name: Docker ${{ matrix.docker-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        docker-version: ["20.10", "24.0", "27.0"]
+
+    services:
+      docker:
+        image: docker:${{ matrix.docker-version }}-dind
+        options: >-
+          --privileged
+          --health-cmd "docker info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -v /home/runner/work:/home/runner/work
+        ports:
+          - 2375:2375
+        env:
+          DOCKER_TLS_CERTDIR: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Build cderun
+        run: go build -o cderun main.go
+
+      - name: Run E2E Tests
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+          TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-e2e
+        run: |
+          mkdir -p $TEST_HOST_TMP_DIR
+          # Check docker version
+          docker version
+          # Run tests with e2e tag
+          go test -v -tags=e2e ./internal/command/...
