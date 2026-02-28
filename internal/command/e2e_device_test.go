@@ -15,16 +15,13 @@ func TestScenario_Device_MountNull(t *testing.T) {
 		t.Skip("skipping E2E test in short mode")
 	}
 
-	// We use Alpine image for testing
-	// Command: ls /dev/null2 && echo "test" > /dev/null2
-	// This verifies the device exists and is writable.
+	// We use 'alpine' as the mandatory subcommand.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
 			"--device", "/dev/null:/dev/null2:rw",
-			"--entrypoint", "sh",
 		},
-		[]string{"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
+		[]string{"alpine", "sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
 	)
 
 	// Handle environment-specific Docker issues
@@ -49,13 +46,13 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 		_ = pw.Close()
 	}()
 
+	// We use 'alpine' as the mandatory subcommand.
 	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
 			"--interactive",
-			"--entrypoint", "sh",
 		},
-		[]string{"sh", "-c", "cat"},
+		[]string{"alpine", "cat"},
 	)
 
 	skipIfDockerBroken(t, err)

@@ -57,14 +57,16 @@ E2E テスト中に `cderun` 自体をコンテナにマウントする場合（
 
 - **命名規則**: 新しい E2E テストは `TestE2E_` または `TestScenario_` で始めること（CI でのフィルタリングのため）。
 - **ビルドタグ**: ファイル先頭に `//go:build e2e` を付与する。
-- **堅牢な実行**: 引数は直接追加する形式をとること。`cderun` は `--` セパレータをサポートしていないため、使用を避けること。
-  - 例: `runCderunE2E([]string{"--image", "alpine"}, []string{"echo", "hello"})`
+- **正しい引数構造**: `cderun` は `cderun [cderun-flags] <subcommand> [args...]` という構造を持つ。
+  - テスト内では必ず `<subcommand>`（例: `alpine`）を明示的に指定すること。
+  - 例: `runCderunE2E([]string{"--image", "alpine"}, []string{"alpine", "echo", "hello"})`
+  - サブコマンドが欠落すると、その後の引数がサブコマンド名として解釈され、実行エラー（"executable file not found" 等）の原因となる。
 - **環境のクリーンアップ**: ファイルシステム操作を伴うテストでは、必ず `t.Cleanup` を使用して環境を元に戻すこと。
 
 ### 5.2. リアル環境の利用
 
 - **診断モード**: `TestE2E_DockerVersion` で `--diagnosis` を実行し、対象の Docker バージョンをログに残す。
-- **ネスト実行 (DooD)**: ホストの Docker ソケットと `cderun` バイナリをマウントし、コンテナ内からのコンテナ起動を検証する。
+- **ネスト実行 (DooD)**: ホストの Docker ソケットと `cderun` バイナリをマウントし、コンテナ内からのコンテナ起動を検証する。内側の `cderun` 呼び出しでも正しい引数構造を維持すること。
 
 ---
 *本ドキュメントは、cderun の継続的な品質保証のための設計指針である。*
