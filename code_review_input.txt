@@ -1,0 +1,12 @@
+I have updated the documentation to match the current implementation of cderun and ensured that all dates and "as of" (時点) notations reflect the current date (Feb 28, 2026).
+
+Key changes:
+1. README.md: Added missing flags like --strict-env and updated the available flags list.
+2. docs/features/command-line-options.md: Added documentation for CDERUN_HANG_TIMEOUT environment variable.
+3. docs/features/logging-debugging.md: Added details about CDERUN_HANG_TIMEOUT and refined log level descriptions. Updated example timestamps to 2026-02-28.
+4. docs/features/dry-run-mode.md & docs/features/diagnosis-mode.md: Updated "simple" format output examples to match the implementation (e.g., memory units like 512MiB).
+5. docs/features/argument-priority-logic.md: Updated P3 environment variables and P6 defaults.
+6. docs/features/test-coverage-reporting.md: Updated current coverage percentage to 89.5% (as of 2026-02).
+7. docs/features/INDEX.md: Updated the feature list and links.
+
+I have verified that all unit tests pass and that there are no markdown linting errors.

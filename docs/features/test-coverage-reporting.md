@@ -94,7 +94,7 @@ coverage-html: coverage
 
 継続的インテグレーション (CI) プロセスにカバレッジ計測が組み込まれています。
 
-- GitHub Actions (`.github/workflows/ci.yaml`) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
-- 現在のカバレッジ率は **89.3%**（2026年2月時点）であり、非常に高い水準を維持しています。
+- GitHub Actions (`.github/workflows/e2e-test.yml`) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
+- 現在のカバレッジ率は **89.5%**（2026年2月時点）であり、非常に高い水準を維持しています。
 - カバレッジ率が **86.5%**（設定しきい値）を下回った場合、CIジョブは失敗します。
 - `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。
