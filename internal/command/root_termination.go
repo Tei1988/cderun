@@ -12,8 +12,11 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool)
 			return d
 		}
 	}
+	// The conditional below is kept for future differentiation of TTY vs non-TTY
+	// timeout behavior, although they currently both use hangTimeout (2s)
+	// to ensure stability in CI environments.
 	if !isHostStdinTerminal || !interactive {
-		return 2 * time.Second
+		return hangTimeout
 	}
 	return hangTimeout
 }
