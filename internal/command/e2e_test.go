@@ -98,6 +98,7 @@ func TestE2E_NestedExecution(t *testing.T) {
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
 		"--mount-cderun",
 		"--mount-cderun-path", exePath,
+		"--mount", "type=bind,source=/tmp,target=/tmp",
 	}
 
 	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
