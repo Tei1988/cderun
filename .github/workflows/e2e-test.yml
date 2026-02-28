@@ -100,6 +100,7 @@ jobs:
         env:
           DOCKER_HOST: tcp://localhost:2375
           TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-e2e
+          CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           # Check docker version
