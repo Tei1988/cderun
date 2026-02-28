@@ -676,7 +676,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	effectiveHangTimeout := hangTimeout
 	if !isHostStdinTerminal || !containerConfig.Interactive {
-		effectiveHangTimeout = 500 * time.Millisecond
+		effectiveHangTimeout = 2 * time.Second
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
