@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_Expression_FindDir(t *testing.T) {
+func TestUnit_Expression_FindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/modules/foo":                      []byte("bar"),
@@ -47,7 +47,7 @@ func TestUnit_Config_Expression_FindDir(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_File_Error(t *testing.T) {
+func TestUnit_Expression_FileError(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/.go-version": []byte("1.21\n"),
@@ -77,7 +77,7 @@ func TestUnit_Config_Expression_File_Error(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_File_Empty(t *testing.T) {
+func TestUnit_Expression_FileEmpty(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/empty.txt":  []byte("   "),
@@ -113,7 +113,7 @@ func TestUnit_Config_Expression_File_Empty(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
+func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/inner.txt": []byte("outer.txt"),
@@ -185,5 +185,35 @@ func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
 		val := r.resolveString("{{}}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "{{}}", val)
+	})
+
+	t.Run("expression with whitespace only", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{   }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{}}", val)
+	})
+
+	t.Run("complex mixed resolution", func(t *testing.T) {
+		fsWithHome := *fs
+		fsWithHome.HomeDir = "/home/user"
+		r, err := NewExpressionResolverWithFS(hostCtx, &fsWithHome)
+		require.NoError(t, err)
+		val := r.resolveString("~/.config/{{file:inner.txt}}/settings.json")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "/home/user/.config/outer.txt/settings.json", val)
+	})
+
+	t.Run("sticky error state", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		// First call triggers error
+		r.resolveString("{{ file:nonexistent }}")
+		require.Error(t, r.Error())
+
+		// Subsequent call should stay in error state
+		val := r.resolveString("{{ PWD }}")
+		assert.Equal(t, "{{ PWD }}", val) // Unchanged because of sticky error
 	})
 }

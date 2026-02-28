@@ -18,7 +18,7 @@ import (
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
-func TestIntegration_Command_BasicExecution(t *testing.T) {
+func TestIntegration_BasicExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -114,7 +114,7 @@ func TestIntegration_Command_BasicExecution(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_ToolsYAML(t *testing.T) {
+func TestIntegration_ToolsYAML(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -148,7 +148,7 @@ node:
 	assert.Equal(t, "/container", mockRuntime.CreatedConfig.Mounts[0].Target)
 }
 
-func TestIntegration_Command_PriorityEnvOverTools(t *testing.T) {
+func TestIntegration_PriorityEnvOverTools(t *testing.T) {
 	t.Setenv("CDERUN_IMAGE", "env-image:latest")
 	setupTestDir(t)
 
@@ -161,7 +161,7 @@ func TestIntegration_Command_PriorityEnvOverTools(t *testing.T) {
 	assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
 }
 
-func TestIntegration_Command_BaseCommandFromTools(t *testing.T) {
+func TestIntegration_BaseCommandFromTools(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -180,7 +180,7 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_Command_EnvPassThrough(t *testing.T) {
+func TestIntegration_EnvPassThrough(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -219,7 +219,7 @@ node:
 	assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")
 }
 
-func TestIntegration_Command_MountToolsNotFound(t *testing.T) {
+func TestIntegration_MountToolsNotFound(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -238,7 +238,7 @@ python:
 	assert.Contains(t, err.Error(), "available tools: node, python")
 }
 
-func TestIntegration_Command_MountToolsAutoEnable(t *testing.T) {
+func TestIntegration_MountToolsAutoEnable(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
@@ -268,7 +268,7 @@ func TestIntegration_Command_MountToolsAutoEnable(t *testing.T) {
 	assert.True(t, socketFound)
 }
 
-func TestIntegration_Command_MountToolsLogic(t *testing.T) {
+func TestIntegration_MountToolsLogic(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -321,7 +321,7 @@ sh:
 	assert.True(t, pythonFound)
 }
 
-func TestIntegration_Command_MountAllToolsEmptyConfig(t *testing.T) {
+func TestIntegration_MountAllToolsEmptyConfig(t *testing.T) {
 	setupTestDir(t)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -335,7 +335,7 @@ func TestIntegration_Command_MountAllToolsEmptyConfig(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 }
 
-func TestIntegration_Command_ExcludeToolSubcommand(t *testing.T) {
+func TestIntegration_ExcludeToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
@@ -347,7 +347,7 @@ func TestIntegration_Command_ExcludeToolSubcommand(t *testing.T) {
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_Command_IncludeExplicitToolSubcommand(t *testing.T) {
+func TestIntegration_IncludeExplicitToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -363,7 +363,7 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_Command_DockerCompatible(t *testing.T) {
+func TestIntegration_DockerCompatible(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -387,7 +387,7 @@ node:
 	assert.InDelta(t, 1.5, mockRuntime.CreatedConfig.CPUs, 0.0001)
 }
 
-func TestIntegration_Command_InternalOverrides(t *testing.T) {
+func TestIntegration_InternalOverrides(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
@@ -494,7 +494,7 @@ func TestIntegration_Command_InternalOverrides(t *testing.T) {
 	})
 }
 
-func TestIntegration_Command_ConfigFlags(t *testing.T) {
+func TestIntegration_ConfigFlags(t *testing.T) {
 	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
 		setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}

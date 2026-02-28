@@ -35,7 +35,7 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	}
 }
 
-func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
+func TestRobustness_Root_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
@@ -73,7 +73,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("handles double Ctrl+C to terminate", func(t *testing.T) {
+	t.Run("DoubleSIGINT", func(t *testing.T) {
 		// Use a mock that blocks in WaitContainer to simulate long running process
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
@@ -131,7 +131,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("handles TTY resize via SIGWINCH", func(t *testing.T) {
+	t.Run("TTYResize", func(t *testing.T) {
 		var mu sync.Mutex
 		// Mock terminal size
 		currentRows, currentCols := 24, 80
@@ -193,7 +193,7 @@ func TestRobustness_Command_Root_SignalHandling(t *testing.T) {
 		<-done
 	})
 
-	t.Run("returns non-zero exit code correctly", func(t *testing.T) {
+	t.Run("ExitCode", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
 		}

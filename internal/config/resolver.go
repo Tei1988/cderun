@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -230,6 +229,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"", nil, nil,
 		nil, nil,
 		false,
+		fs,
 	)
 
 	// 1. Resolve Image (Step 10.1: Subcommand as key)
@@ -242,6 +242,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return "" },
 		"",
 		r,
+		fs,
 	)
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
@@ -259,6 +260,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.TTY },
 		global, func(g CDERunConfig) *bool { return g.Defaults.TTY },
 		false,
+		fs,
 	)
 
 	// 3. Resolve Interactive
@@ -269,6 +271,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.Interactive },
 		global, func(g CDERunConfig) *bool { return g.Defaults.Interactive },
 		false,
+		fs,
 	)
 
 	// 4. Resolve Network
@@ -280,6 +283,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return g.Defaults.Network },
 		"bridge",
 		r,
+		fs,
 	)
 
 	// 5. Resolve Remove
@@ -290,6 +294,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.Remove },
 		global, func(g CDERunConfig) *bool { return g.Defaults.Remove },
 		true, // Default to true as per docs
+		fs,
 	)
 
 	// 7. Resolve Workdir
@@ -301,10 +306,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return g.Defaults.Workdir },
 		"",
 		r,
+		fs,
 	)
 
 	// 8. Resolve Mounts (P1 > P2 > P4)
-	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r)
+	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -317,10 +323,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.StrictEnv },
 		global, func(g CDERunConfig) *bool { return g.Defaults.StrictEnv },
 		false,
+		fs,
 	)
 
 	// 11. Resolve Env (P1 > P2 > Env (P3) > Tool (P4) > Global (P5))
-	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r)
+	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -334,6 +341,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return g.Runtime },
 		"", // Fallback to empty for auto-detection
 		r,
+		fs,
 	)
 
 	res.SocketPath, err = resolveConfigPath(
@@ -345,6 +353,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"", // Fallback to empty for auto-detection
 		r,
 		"path",
+		fs,
 	)
 	if err != nil {
 		return nil, err
@@ -395,6 +404,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) []string { return t.MountTools },
 		global, func(g CDERunConfig) []string { return g.Defaults.MountTools },
 		r,
+		fs,
 	)
 
 	res.MountAllTools = resolveBool(
@@ -404,6 +414,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, func(t ToolConfig) *bool { return t.MountAllTools },
 		global, func(g CDERunConfig) *bool { return g.Defaults.MountAllTools },
 		false,
+		fs,
 	)
 
 	// 14. Resolve MountCderun
@@ -414,6 +425,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"CDERUN_MOUNT_CDERUN",
 		subcommand, tools, func(t ToolConfig) *bool { return t.MountCderun },
 		global, func(g CDERunConfig) *bool { return g.Defaults.MountCderun },
+		fs,
 	)
 	if !mountCderunSpecified {
 		// Transitive auto-enablement: tools -> cderun
@@ -429,6 +441,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"",
 		r,
 		"path",
+		fs,
 	)
 	if err != nil {
 		return nil, err
@@ -442,6 +455,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"CDERUN_MOUNT_SOCKET",
 		subcommand, tools, func(t ToolConfig) *bool { return t.MountSocket },
 		global, func(g CDERunConfig) *bool { return g.Defaults.MountSocket },
+		fs,
 	)
 	if !mountSocketSpecified {
 		// Transitive auto-enablement: cderun -> socket
@@ -457,6 +471,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		res.SocketPath, // Default to host-side socket path
 		r,
 		"path",
+		fs,
 	)
 	if err != nil {
 		return nil, err
@@ -470,6 +485,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"", nil, nil,
 		nil, nil,
 		false,
+		fs,
 	)
 
 	// 17. Resolve DryRunFormat (CLI/Env only)
@@ -481,6 +497,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		nil, nil,
 		"yaml",
 		r,
+		fs,
 	)
 
 	// 18. Resolve DiagnosisFormat (CLI/Env only)
@@ -492,6 +509,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		nil, nil,
 		"yaml",
 		r,
+		fs,
 	)
 
 	// 19. Resolve Logging
@@ -503,6 +521,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return g.Logging.Level },
 		"warn",
 		r,
+		fs,
 	)
 
 	res.LogFormat = resolveString(
@@ -513,6 +532,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		global, func(g CDERunConfig) string { return g.Logging.Format },
 		"text",
 		r,
+		fs,
 	)
 
 	res.LogTimestamp = resolveBool(
@@ -522,27 +542,28 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"", nil, nil,
 		global, func(g CDERunConfig) *bool { return g.Logging.Timestamp },
 		true, // Default to true
+		fs,
 	)
 
 	// Resolve Docker-compatible flags
-	res.Ports = resolveStringSlice(cli.CderunPorts, cli.Ports, "CDERUN_PUBLISH", subcommand, tools, func(t ToolConfig) []string { return t.Ports }, global, func(g CDERunConfig) []string { return g.Defaults.Ports }, r)
-	res.PublishAll = resolveBool(cli.CderunPublishAllSet, cli.CderunPublishAll, cli.PublishAllSet, cli.PublishAll, "CDERUN_PUBLISH_ALL", subcommand, tools, func(t ToolConfig) *bool { return t.PublishAll }, global, func(g CDERunConfig) *bool { return g.Defaults.PublishAll }, false)
-	res.Expose = resolveStringSlice(cli.CderunExpose, cli.Expose, "CDERUN_EXPOSE", subcommand, tools, func(t ToolConfig) []string { return t.Expose }, global, func(g CDERunConfig) []string { return g.Defaults.Expose }, r)
-	res.Hostname = resolveString(cli.CderunHostnameSet, cli.CderunHostname, cli.HostnameSet, cli.Hostname, "CDERUN_HOSTNAME", subcommand, tools, func(t ToolConfig) string { return t.Hostname }, global, func(g CDERunConfig) string { return g.Defaults.Hostname }, "", r)
-	res.DNS = resolveStringSlice(cli.CderunDNS, cli.DNS, "CDERUN_DNS", subcommand, tools, func(t ToolConfig) []string { return t.DNS }, global, func(g CDERunConfig) []string { return g.Defaults.DNS }, r)
-	res.AddHosts = resolveStringSlice(cli.CderunAddHosts, cli.AddHosts, "CDERUN_ADD_HOST", subcommand, tools, func(t ToolConfig) []string { return t.AddHosts }, global, func(g CDERunConfig) []string { return g.Defaults.AddHosts }, r)
-	res.User = resolveString(cli.CderunUserSet, cli.CderunUser, cli.UserSet, cli.User, "CDERUN_USER", subcommand, tools, func(t ToolConfig) string { return t.User }, global, func(g CDERunConfig) string { return g.Defaults.User }, "", r)
-	res.Privileged = resolveBool(cli.CderunPrivilegedSet, cli.CderunPrivileged, cli.PrivilegedSet, cli.Privileged, "CDERUN_PRIVILEGED", subcommand, tools, func(t ToolConfig) *bool { return t.Privileged }, global, func(g CDERunConfig) *bool { return g.Defaults.Privileged }, false)
-	res.CapAdd = resolveStringSlice(cli.CderunCapAdd, cli.CapAdd, "CDERUN_CAP_ADD", subcommand, tools, func(t ToolConfig) []string { return t.CapAdd }, global, func(g CDERunConfig) []string { return g.Defaults.CapAdd }, r)
-	res.CapDrop = resolveStringSlice(cli.CderunCapDrop, cli.CapDrop, "CDERUN_CAP_DROP", subcommand, tools, func(t ToolConfig) []string { return t.CapDrop }, global, func(g CDERunConfig) []string { return g.Defaults.CapDrop }, r)
-	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r)
-	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r)
-	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r)
+	res.Ports = resolveStringSlice(cli.CderunPorts, cli.Ports, "CDERUN_PUBLISH", subcommand, tools, func(t ToolConfig) []string { return t.Ports }, global, func(g CDERunConfig) []string { return g.Defaults.Ports }, r, fs)
+	res.PublishAll = resolveBool(cli.CderunPublishAllSet, cli.CderunPublishAll, cli.PublishAllSet, cli.PublishAll, "CDERUN_PUBLISH_ALL", subcommand, tools, func(t ToolConfig) *bool { return t.PublishAll }, global, func(g CDERunConfig) *bool { return g.Defaults.PublishAll }, false, fs)
+	res.Expose = resolveStringSlice(cli.CderunExpose, cli.Expose, "CDERUN_EXPOSE", subcommand, tools, func(t ToolConfig) []string { return t.Expose }, global, func(g CDERunConfig) []string { return g.Defaults.Expose }, r, fs)
+	res.Hostname = resolveString(cli.CderunHostnameSet, cli.CderunHostname, cli.HostnameSet, cli.Hostname, "CDERUN_HOSTNAME", subcommand, tools, func(t ToolConfig) string { return t.Hostname }, global, func(g CDERunConfig) string { return g.Defaults.Hostname }, "", r, fs)
+	res.DNS = resolveStringSlice(cli.CderunDNS, cli.DNS, "CDERUN_DNS", subcommand, tools, func(t ToolConfig) []string { return t.DNS }, global, func(g CDERunConfig) []string { return g.Defaults.DNS }, r, fs)
+	res.AddHosts = resolveStringSlice(cli.CderunAddHosts, cli.AddHosts, "CDERUN_ADD_HOST", subcommand, tools, func(t ToolConfig) []string { return t.AddHosts }, global, func(g CDERunConfig) []string { return g.Defaults.AddHosts }, r, fs)
+	res.User = resolveString(cli.CderunUserSet, cli.CderunUser, cli.UserSet, cli.User, "CDERUN_USER", subcommand, tools, func(t ToolConfig) string { return t.User }, global, func(g CDERunConfig) string { return g.Defaults.User }, "", r, fs)
+	res.Privileged = resolveBool(cli.CderunPrivilegedSet, cli.CderunPrivileged, cli.PrivilegedSet, cli.Privileged, "CDERUN_PRIVILEGED", subcommand, tools, func(t ToolConfig) *bool { return t.Privileged }, global, func(g CDERunConfig) *bool { return g.Defaults.Privileged }, false, fs)
+	res.CapAdd = resolveStringSlice(cli.CderunCapAdd, cli.CapAdd, "CDERUN_CAP_ADD", subcommand, tools, func(t ToolConfig) []string { return t.CapAdd }, global, func(g CDERunConfig) []string { return g.Defaults.CapAdd }, r, fs)
+	res.CapDrop = resolveStringSlice(cli.CderunCapDrop, cli.CapDrop, "CDERUN_CAP_DROP", subcommand, tools, func(t ToolConfig) []string { return t.CapDrop }, global, func(g CDERunConfig) []string { return g.Defaults.CapDrop }, r, fs)
+	res.Entrypoint = resolveStringSlice(cli.CderunEntrypoint, cli.Entrypoint, "CDERUN_ENTRYPOINT", subcommand, tools, func(t ToolConfig) []string { return t.Entrypoint }, global, func(g CDERunConfig) []string { return g.Defaults.Entrypoint }, r, fs)
+	res.Pull = resolveString(cli.CderunPullSet, cli.CderunPull, cli.PullSet, cli.Pull, "CDERUN_PULL", subcommand, tools, func(t ToolConfig) string { return t.Pull }, global, func(g CDERunConfig) string { return g.Defaults.Pull }, "missing", r, fs)
+	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r, fs)
 	if err != nil {
 		return nil, err
 	}
 	// Memory resolution (string to bytes)
-	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "", r)
+	memStr := resolveString(cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, "CDERUN_MEMORY", subcommand, tools, func(t ToolConfig) string { return t.Memory }, global, func(g CDERunConfig) string { return g.Defaults.Memory }, "", r, fs)
 	if memStr != "" {
 		bytes, err := units.RAMInBytes(memStr)
 		if err != nil {
@@ -555,7 +576,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// CPUs resolution
-	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0)
+	res.CPUs = resolveFloat64(cli.CderunCPUsSet, cli.CderunCPUs, cli.CPUsSet, cli.CPUs, "CDERUN_CPUS", subcommand, tools, func(t ToolConfig) float64 { return t.CPUs }, global, func(g CDERunConfig) float64 { return g.Defaults.CPUs }, 0, fs)
 
 	res.HostContext = hostCtx
 
@@ -566,15 +587,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	return res, nil
 }
 
-func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool) bool {
-	val, specified := resolveBoolInfo(p1Set, p1Val, p2Set, p2Val, envKey, subcommand, tools, toolGetter, global, globalGetter)
+func resolveBool(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fallback bool, fs FileSystem) bool {
+	val, specified := resolveBoolInfo(p1Set, p1Val, p2Set, p2Val, envKey, subcommand, tools, toolGetter, global, globalGetter, fs)
 	if specified {
 		return val
 	}
 	return fallback
 }
 
-func resolveBoolInfo(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool) (bool, bool) {
+func resolveBoolInfo(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) *bool, global *CDERunConfig, globalGetter func(CDERunConfig) *bool, fs FileSystem) (bool, bool) {
 	if p1Set {
 		return p1Val, true
 	}
@@ -582,7 +603,7 @@ func resolveBoolInfo(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey stri
 		return p2Val, true
 	}
 	if envKey != "" {
-		if env := os.Getenv(envKey); env != "" {
+		if env := fs.Getenv(envKey); env != "" {
 			if b, err := strconv.ParseBool(env); err == nil {
 				return b, true
 			}
@@ -603,14 +624,14 @@ func resolveBoolInfo(p1Set bool, p1Val bool, p2Set bool, p2Val bool, envKey stri
 	return false, false
 }
 
-func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string, r *ExpressionResolver) string {
+func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) string, global *CDERunConfig, globalGetter func(CDERunConfig) string, fallback string, r *ExpressionResolver, fs FileSystem) string {
 	if p1Set {
 		return r.resolveString(p1Val)
 	}
 	if cliSet {
 		return r.resolveString(cliVal)
 	}
-	if env := os.Getenv(envKey); env != "" {
+	if env := fs.Getenv(envKey); env != "" {
 		return r.resolveString(env)
 	}
 	if tools != nil {
@@ -628,13 +649,13 @@ func resolveString(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey 
 	return r.resolveString(fallback)
 }
 
-func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string) (string, error) {
+func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
 	if p1Set {
 		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
 	} else if cliSet {
 		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
-	} else if env := os.Getenv(envKey); env != "" {
+	} else if env := fs.Getenv(envKey); env != "" {
 		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
 	} else {
 		found := false
@@ -667,7 +688,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	}
 }
 
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.DeviceMapping, error) {
+func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
 
 	if len(p1) > 0 {
@@ -688,7 +709,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
-	} else if env := os.Getenv("CDERUN_DEVICE"); env != "" {
+	} else if env := fs.Getenv("CDERUN_DEVICE"); env != "" {
 		for d := range strings.SplitSeq(env, ",") {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -718,13 +739,13 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
-func resolveStringSliceComma(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver) []string {
+func resolveStringSliceComma(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver, fs FileSystem) []string {
 	var vals []string
 	if p1Set {
 		vals = strings.Split(p1Val, ",")
 	} else if p2Set {
 		vals = strings.Split(p2Val, ",")
-	} else if env := os.Getenv(envKey); env != "" {
+	} else if env := fs.Getenv(envKey); env != "" {
 		vals = strings.Split(env, ",")
 	} else if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
@@ -745,13 +766,13 @@ func resolveStringSliceComma(p1Set bool, p1Val string, p2Set bool, p2Val string,
 	return res
 }
 
-func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver) []string {
+func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) []string, global *CDERunConfig, globalGetter func(CDERunConfig) []string, r *ExpressionResolver, fs FileSystem) []string {
 	var vals []string
 	if len(p1) > 0 {
 		vals = p1
 	} else if len(p2) > 0 {
 		vals = p2
-	} else if env := os.Getenv(envKey); env != "" {
+	} else if env := fs.Getenv(envKey); env != "" {
 		vals = strings.Split(env, ",")
 	} else if tools != nil {
 		if tool, ok := tools[subcommand]; ok {
@@ -769,14 +790,14 @@ func resolveStringSlice(p1 []string, p2 []string, envKey string, subcommand stri
 	return res
 }
 
-func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) float64, global *CDERunConfig, globalGetter func(CDERunConfig) float64, fallback float64) float64 {
+func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) float64, global *CDERunConfig, globalGetter func(CDERunConfig) float64, fallback float64, fs FileSystem) float64 {
 	if p1Set {
 		return p1Val
 	}
 	if cliSet {
 		return cliVal
 	}
-	if env := os.Getenv(envKey); env != "" {
+	if env := fs.Getenv(envKey); env != "" {
 		if f, err := strconv.ParseFloat(env, 64); err == nil {
 			return f
 		}
@@ -796,14 +817,14 @@ func resolveFloat64(p1Set bool, p1Val float64, cliSet bool, cliVal float64, envK
 	return fallback
 }
 
-func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver) ([]string, error) {
+func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var envs []string
 
 	if len(p1) > 0 {
 		envs = p1
 	} else if len(p2) > 0 {
 		envs = p2
-	} else if env := os.Getenv(envKey); env != "" {
+	} else if env := fs.Getenv(envKey); env != "" {
 		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
 			if e != "" {
@@ -824,7 +845,7 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
 	merged := mergeEnv(nil, nil, envs)
 
-	return resolveEnvValues(merged, strict, r)
+	return resolveEnvValues(merged, strict, r, fs)
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
@@ -852,7 +873,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 	return res
 }
 
-func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]string, error) {
+func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var res []string
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
@@ -862,7 +883,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 		if strings.Contains(resolvedE, "=") {
 			res = append(res, resolvedE)
 		} else {
-			val, found := os.LookupEnv(resolvedE)
+			val, found := fs.LookupEnv(resolvedE)
 			if !found && strict {
 				return nil, fmt.Errorf("required environment variable not found: %s", resolvedE)
 			}
@@ -872,7 +893,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver) ([]strin
 	return res, nil
 }
 
-func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver) ([]container.Mount, error) {
+func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	var mcs []MountConfig
 
 	if len(p1) > 0 {
@@ -893,7 +914,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
-	} else if env := os.Getenv("CDERUN_MOUNT"); env != "" {
+	} else if env := fs.Getenv("CDERUN_MOUNT"); env != "" {
 		for m := range strings.SplitSeq(env, ";") {
 			m = strings.TrimSpace(m)
 			if m == "" {

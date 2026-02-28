@@ -298,6 +298,7 @@ type FileSystem interface {
 	UserHomeDir() (string, error)
 	Executable() (string, error)
 	Getenv(key string) string
+	LookupEnv(key string) (string, bool)
 	TempDir() string
 	MkdirAll(path string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
@@ -313,6 +314,7 @@ func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFil
 func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
 func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
 func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
+func (RealFileSystem) LookupEnv(key string) (string, bool)   { return os.LookupEnv(key) }
 func (RealFileSystem) TempDir() string                       { return os.TempDir() }
 func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
