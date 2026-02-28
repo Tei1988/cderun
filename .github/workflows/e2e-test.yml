@@ -19,8 +19,8 @@ jobs:
           cache: true
       - name: Build cderun
         env:
-            CGO_ENABLED: 0
-          run: go build -v -o cderun main.go
+          CGO_ENABLED: 0
+        run: go build -v -o cderun main.go
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
