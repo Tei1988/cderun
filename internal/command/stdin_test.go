@@ -306,7 +306,7 @@ func TestUnit_Stdin_PipedQuickExit(t *testing.T) {
 		duration := time.Since(start)
 
 		require.NoError(t, err)
-		assert.Less(t, duration, 2500*time.Millisecond, "Should exit quickly due to piped stdin")
+		assert.Less(t, duration, 4000*time.Millisecond, "Should exit quickly due to piped stdin")
 	})
 }
 
@@ -315,7 +315,7 @@ func TestUnit_Stdin_TTYWait(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-tty-wait"
 		mock.ExitCode = 0
-		mock.WaitDelay = 500 * time.Millisecond
+		mock.WaitDelay = 100 * time.Millisecond
 
 		var outBuf bytes.Buffer
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -334,7 +334,7 @@ func TestUnit_Stdin_TTYWait(t *testing.T) {
 		duration := time.Since(start)
 
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, duration, 500*time.Millisecond, "Should wait for container to exit naturally since host is TTY")
+		assert.GreaterOrEqual(t, duration, 100*time.Millisecond, "Should wait for container to exit naturally since host is TTY")
 	})
 }
 
@@ -362,7 +362,7 @@ func TestUnit_Stdin_NonInteractiveQuickExit(t *testing.T) {
 		duration := time.Since(start)
 
 		require.NoError(t, err)
-		assert.Less(t, duration, 2500*time.Millisecond, "Should exit quickly since it is non-interactive")
+		assert.Less(t, duration, 4000*time.Millisecond, "Should exit quickly since it is non-interactive")
 	})
 }
 

@@ -68,7 +68,7 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 			"--interactive", "--cderun-tty=false", "--cderun-memory=512m",
 		},
 		"alpine",
-		[]string{"cat"},
+		[]string{"sh", "-c", "cat"},
 	)
 
 	skipIfDockerBroken(t, err)

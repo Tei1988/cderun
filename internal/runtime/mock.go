@@ -194,6 +194,12 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 	return m.SignalErr
 }
 
+func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return false, m.ExitCode, nil
+}
+
 func (m *MockRuntime) Name() string {
 	return "mock"
 }
