@@ -26,7 +26,7 @@ func TestE2E_DockerVersion(t *testing.T) {
 func TestE2E_StandardExecution(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderun(
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
-		"echo", "hello-cderun-e2e",
+		"sh", "-c", "echo hello-cderun-e2e",
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -57,7 +57,7 @@ func TestE2E_VolumeMount(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderun(
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
 		"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
-		"cat", "/mnt/test/test.txt",
+		"sh", "-c", "cat /mnt/test/test.txt",
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -105,7 +105,7 @@ func TestE2E_NestedExecution(t *testing.T) {
 	}
 
 	// Command in Container A: run cderun to start Container B
-	args = append(args, "cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "echo", "nested-success")
+	args = append(args, "sh", "-c", "cderun --image public.ecr.aws/docker/library/alpine:latest sh -c 'echo nested-success'")
 
 	stdout, stderr, exitCode, err := runCderun(args...)
 	skipIfDockerBroken(t, err)

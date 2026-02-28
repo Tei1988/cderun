@@ -51,4 +51,5 @@ jobs:
           # Check docker version
           docker version
           # Run tests with e2e tag
-          go test -v -tags=e2e ./internal/command/...
+          # We increase timeout for E2E tests as DinD can be slow
+          go test -v -tags=e2e -timeout 15m ./internal/command/...
