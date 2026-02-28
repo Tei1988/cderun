@@ -79,12 +79,12 @@ func TestUnit_AutoTermination_NonTTY(t *testing.T) {
 	case err := <-done:
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
-		// It should finish after effectiveHangTimeout (100ms) because it is non-TTY
+		// It should finish after effectiveHangTimeout (2s) because it is non-TTY
 		require.NoError(t, err) // We handle the kill, so it should return nil error from Execute (exit code handled by exitFunc)
 		if elapsed < 100*time.Millisecond {
 			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
 		}
-		if elapsed > 1*time.Second {
+		if elapsed > 3*time.Second {
 			t.Errorf("Execution took too long (%v), expected short timeout for non-terminal", elapsed)
 		}
 	case <-time.After(11 * time.Second):
