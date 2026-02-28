@@ -72,6 +72,7 @@ func TestE2E_VolumeMount(t *testing.T) {
 }
 
 func TestE2E_NestedExecution(t *testing.T) {
+	// FIXME: This test may fail in CI due to complex path resolution or implementation bugs in nested execution.
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
