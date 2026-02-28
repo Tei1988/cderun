@@ -6,6 +6,8 @@ STATUS=0
 
 for FILE in $FILES; do
     # Extract links in [label](target) format.
+    # Using perl to extract content of the first set of parentheses after brackets.
+    # We also handle labels that contain brackets (to some extent).
     LINKS=$(perl -ne 'while(/\[.*?\]\((.*?)\)/g){print "$1
 "}' "$FILE")
 
@@ -47,6 +49,7 @@ done
 
 if [ $STATUS -ne 0 ]; then
     echo "Markdown link check failed."
+    # Safe exit for assistant environment
     kill -s TERM $$
 fi
 echo "All Markdown links are valid."
