@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,7 +35,7 @@ func TestUnit_Snapshot_Immutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
@@ -56,7 +57,7 @@ func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
@@ -72,7 +73,7 @@ func TestUnit_Snapshot_Permissions(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	snapshotDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if snapshotDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, snapshotDir) })
@@ -97,32 +98,73 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 
 func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
 	mfs := &config.MockFileSystem{}
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
 
 	t.Run("successfully discover upperdir", func(t *testing.T) {
 		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		mockReader := &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir(mfs)
+		upperdir, err := discoverOverlayUpperDir(mfs, mockReader)
 		require.NoError(t, err)
 		assert.Equal(t, "/u", upperdir)
 	})
 
 	t.Run("no overlay found", func(t *testing.T) {
 		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		mockReader := &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir(mfs)
+		upperdir, err := discoverOverlayUpperDir(mfs, mockReader)
 		require.NoError(t, err)
 		assert.Empty(t, upperdir)
 	})
 
 	t.Run("malformed mountinfo", func(t *testing.T) {
 		mountinfo := "too few fields\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		mockReader := &mockMountInfoReader{Content: []byte(mountinfo)}
 
-		upperdir, err := discoverOverlayUpperDir(mfs)
+		upperdir, err := discoverOverlayUpperDir(mfs, mockReader)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
+	})
+}
+
+func TestUnit_Snapshot_EdgeCases(t *testing.T) {
+	mfs := &config.MockFileSystem{}
+	logger := logging.NewLogger()
+	globalCfg := &config.CDERunConfig{}
+	toolsCfg := config.ToolsConfig{}
+	currentMounts := []container.Mount{}
+
+	t.Run("mkdir failure", func(t *testing.T) {
+		mfs_err := &config.MockFileSystem{
+			MkdirAllErr: errors.New("mkdir failed"),
+		}
+		_, err := createSnapshot(logger, mfs_err, globalCfg, toolsCfg, currentMounts, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create snapshot directory")
+	})
+
+	t.Run("write file failure", func(t *testing.T) {
+		mfs_err := &config.MockFileSystem{
+			WriteFileErr: errors.New("write failed"),
+		}
+		_, err := createSnapshot(logger, mfs_err, globalCfg, toolsCfg, currentMounts, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot")
+	})
+
+	t.Run("multiple overlay mounts", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n" +
+			"124 25 0:22 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
+		mockReader := &mockMountInfoReader{Content: []byte(mountinfo)}
+		upperdir, err := discoverOverlayUpperDir(mfs, mockReader)
+		require.NoError(t, err)
+		assert.Equal(t, "/u", upperdir)
+	})
+
+	t.Run("non-root overlay mount ignored", func(t *testing.T) {
+		mountinfo := "124 25 0:22 /data /data rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
+		mockReader := &mockMountInfoReader{Content: []byte(mountinfo)}
+		upperdir, err := discoverOverlayUpperDir(mfs, mockReader)
 		require.NoError(t, err)
 		assert.Empty(t, upperdir)
 	})

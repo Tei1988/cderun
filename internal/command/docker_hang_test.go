@@ -52,7 +52,7 @@ func (m *hangMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_AutoTermination_NonTTY(t *testing.T) {
+func TestUnit_Root_AutoTerminationNonTTY(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
@@ -92,7 +92,7 @@ func TestUnit_AutoTermination_NonTTY(t *testing.T) {
 	}
 }
 
-func TestUnit_AutoTermination_TTY_NoKill(t *testing.T) {
+func TestUnit_Root_AutoTerminationTTYNoKill(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),

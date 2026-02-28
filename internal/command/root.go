@@ -114,6 +114,11 @@ type rootOptions struct {
 	fs           config.FileSystem
 	configLoader *config.ConfigLoader
 	logger       *logging.Logger
+	mountInfo    mountInfoReader
+
+	// Timing and Timeouts
+	attachGracePeriod time.Duration
+	hangTimeout       time.Duration
 
 	// Testing hooks
 	exitFunc       func(int)
@@ -124,11 +129,6 @@ type rootOptions struct {
 	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
 }
 
-const (
-	attachGracePeriod = 5 * time.Second
-	hangTimeout       = 2 * time.Second
-)
-
 var (
 	opts = defaultOptions()
 
@@ -138,7 +138,8 @@ var (
 
 func defaultOptions() rootOptions {
 	return rootOptions{
-		fs: config.RealFileSystem{},
+		fs:        config.RealFileSystem{},
+		mountInfo: defaultMountInfoReader,
 		exitFunc: func(code int) {
 			// Default to no-op for safety in tests.
 			// The global 'opts' is updated in init() to use os.Exit.
@@ -166,6 +167,8 @@ func defaultOptions() rootOptions {
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
 		},
+		attachGracePeriod: 5 * time.Second,
+		hangTimeout:       2 * time.Second,
 	}
 }
 
@@ -674,9 +677,14 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
-	effectiveHangTimeout := hangTimeout
+	effectiveHangTimeout := o.hangTimeout
 	if !isHostStdinTerminal || !containerConfig.Interactive {
+		// Use a shorter timeout for non-interactive sessions to avoid unnecessary waiting
+		// if IO has already finished.
 		effectiveHangTimeout = 500 * time.Millisecond
+		if o.hangTimeout < effectiveHangTimeout {
+			effectiveHangTimeout = o.hangTimeout
+		}
 	}
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
@@ -806,7 +814,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 		select {
 		case err := <-attachDone:
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -814,7 +822,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 			}
 			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-		case <-time.After(attachGracePeriod):
+		case <-time.After(o.attachGracePeriod):
 			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 			cancelAttach()
 			<-attachDone
@@ -976,7 +984,7 @@ intended for the subcommand.`,
 				if globalCfg == nil {
 					globalCfg = &config.CDERunConfig{}
 				}
-				sDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+				sDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts, o.mountInfo)
 				if err != nil {
 					o.logger.Warn("failed to create snapshot: %v", err)
 				} else {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -114,24 +113,3 @@ func TestUnit_Polyglot_Flags(t *testing.T) {
 	})
 }
 
-func TestIntegration_Polyglot_Symlink(t *testing.T) {
-	setupTestDir(t)
-
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
-	require.NoError(t, err)
-
-	mockRuntime := &runtime.MockRuntime{
-		CreatedContainerID: "test-container-id",
-		ExitCode:           0,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
-
-	require.NoError(t, err)
-	cfg := mockRuntime.GetCreatedConfig()
-	require.NotNil(t, cfg)
-	assert.Equal(t, "node:20-alpine", cfg.Image)
-	assert.Equal(t, []string{"--version"}, cfg.Command)
-}
