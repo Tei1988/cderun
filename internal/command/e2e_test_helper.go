@@ -39,6 +39,10 @@ func findCderunBinary() (string, error) {
 	for {
 		path := filepath.Join(curr, "cderun")
 		if _, err := os.Stat(path); err == nil {
+			// If already absolute, return directly. Otherwise call filepath.Abs.
+			if filepath.IsAbs(path) {
+				return path, nil
+			}
 			return filepath.Abs(path)
 		}
 

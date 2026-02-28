@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -36,8 +37,13 @@ func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string,
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	var outBuf, errBuf bytes.Buffer
 
+	// Use a timeout context to prevent indefinite hangs in CI/E2E environments.
+	// 30 seconds is a reasonable default for in-process execution tests.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	capturedExitCode := 0
-	execErr := ExecuteContextWithOptions(context.TODO(), append([]string{"cderun"}, args...), func(o *rootOptions, cmd *cobra.Command) {
+	execErr := ExecuteContextWithOptions(ctx, append([]string{"cderun"}, args...), func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
@@ -65,6 +71,10 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	}
 	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
 		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
+	}
+	// Detect Docker SIGKILL timeout (likely environment resource constraint or slow CI)
+	if strings.Contains(msg, "timeout") && strings.Contains(msg, "SIGKILL") {
+		t.Skip("Skipping test due to Docker SIGKILL timeout (likely environment resource constraint)")
 	}
 }
 

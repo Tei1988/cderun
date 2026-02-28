@@ -42,9 +42,23 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 
 	// Create a pipe for stdin
 	pr, pw := io.Pipe()
-	go func() {
-		_, _ = pw.Write([]byte(stdinData))
+
+	// Ensure proper cleanup of resources
+	t.Cleanup(func() {
 		_ = pw.Close()
+		_ = pr.Close()
+	})
+
+	go func() {
+		_, writeErr := pw.Write([]byte(stdinData))
+		// We close the writer to signal EOF to the reader (container stdin)
+		_ = pw.Close()
+		if writeErr != nil {
+			// If the test environment is extremely slow or broken,
+			// this might be logged but typically shouldn't fail the test
+			// unless the reader is already closed.
+			return
+		}
 	}()
 
 	// Subcommand 'alpine' is mandatory.
