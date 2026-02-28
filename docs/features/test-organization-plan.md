@@ -6,7 +6,7 @@
 
 ## 2. 現状の分析
 
-### 2.1. パッケージ別カバレッジ (2026-02時点)
+### 2.1. パッケージ別カバレッジ (2026年2月時点)
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
@@ -90,10 +90,10 @@
 
 ### 5.2. カバレッジの継続的計測と記録
 
-  1. **CIでの自動計測 (完了)**: GitHub Actions (`ci.yaml`) により、PR/プッシュ時に `make coverage` が実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
+  1. **CIでの自動計測 (完了)**: GitHub Actions ([e2e-test.yml](../../.github/workflows/e2e-test.yml)) により、PR/プッシュ時に `make coverage` および `Verify Coverage Threshold` ステップが実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
-## 6. テストマトリックス (2026-02時点)
+## 6. テストマトリックス (2026年2月時点)
 
 | 機能 | Unit | Integration | Robustness | Scenario |
 | :--- | :---: | :---: | :---: | :---: |
