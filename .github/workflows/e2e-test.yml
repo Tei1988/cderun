@@ -73,7 +73,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          -v /home/runner/work:/home/runner/work
+          -v /home/runner/work:/home/runner/work -v /tmp:/tmp
         ports:
           - 2375:2375
         env:
@@ -99,10 +99,9 @@ jobs:
       - name: Run E2E Tests
         env:
           DOCKER_HOST: tcp://localhost:2375
-          TMPDIR: ${{ github.workspace }}/tmp-system
           TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-e2e
         run: |
-          mkdir -p $TEST_HOST_TMP_DIR $TMPDIR
+          mkdir -p $TEST_HOST_TMP_DIR
           # Check docker version
           docker version
           # Run ONLY E2E tests using the e2e tag and filtering by name
