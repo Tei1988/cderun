@@ -14,8 +14,8 @@ import (
 )
 
 func TestE2E_DockerVersion(t *testing.T) {
-	// --diagnosis does not take a subcommand.
-	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "", nil)
+	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
+	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
@@ -25,7 +25,7 @@ func TestE2E_DockerVersion(t *testing.T) {
 }
 
 func TestE2E_StandardExecution(t *testing.T) {
-	// cderun [flags] <subcommand> [commandOptions]
+	// Mandatory subcommand 'alpine' identifies the tool/image context.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
 		"alpine",
@@ -94,9 +94,8 @@ func TestE2E_NestedExecution(t *testing.T) {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
 	}
 
-	// Host Call: cderun [cderunFlags] alpine cderun --image ... alpine echo ...
-	// The host side mandatory subcommand is 'alpine'.
-	// The container command is 'cderun' with its own arguments.
+	// Host-side Call: cderun [flags] alpine [container command]
+	// Container Command: cderun --image ... alpine echo nested-success
 	commandOptions := []string{
 		"cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "alpine", "echo", "nested-success",
 	}

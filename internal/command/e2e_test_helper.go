@@ -10,22 +10,19 @@ import (
 )
 
 // runCderunE2E is a helper for E2E tests.
-// It explicitly separates cderun flags, the mandatory subcommand, and container command options.
+// It strictly requires a subcommand which acts as the tool name or image mapping key.
 func runCderunE2E(cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
-	if subCommand != "" {
-		args = append(args, subCommand)
-	}
+	args = append(args, subCommand)
 	args = append(args, commandOptions...)
 	return runCderun(args...)
 }
 
 // runCderunWithStdinE2E is a helper for E2E tests with stdin.
+// It strictly requires a subcommand.
 func runCderunWithStdinE2E(stdin io.Reader, cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
-	if subCommand != "" {
-		args = append(args, subCommand)
-	}
+	args = append(args, subCommand)
 	args = append(args, commandOptions...)
 	return runCderunWithStdin(stdin, args...)
 }

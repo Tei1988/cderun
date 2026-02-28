@@ -15,7 +15,7 @@ func TestScenario_Device_MountNull(t *testing.T) {
 		t.Skip("skipping E2E test in short mode")
 	}
 
-	// Host Call: cderun [flags] alpine ls -l /dev/null2 ...
+	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
@@ -47,7 +47,7 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 		_ = pw.Close()
 	}()
 
-	// Host Call: cderun [flags] alpine cat
+	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
