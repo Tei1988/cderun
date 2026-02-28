@@ -18,11 +18,13 @@ func TestScenario_Device_MountNull(t *testing.T) {
 	// We use Alpine image for testing
 	// Command: ls /dev/null2 && echo "test" > /dev/null2
 	// This verifies the device exists and is writable.
-	stdout, stderr, exitCode, err := runCderun(
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
-		"--device", "/dev/null:/dev/null2:rw",
-		"--entrypoint", "sh",
-		"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2",
+	stdout, stderr, exitCode, err := runCderunE2E(
+		[]string{
+			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--device", "/dev/null:/dev/null2:rw",
+			"--entrypoint", "sh",
+		},
+		[]string{"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
 	)
 
 	// Handle environment-specific Docker issues
@@ -47,11 +49,13 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 		_ = pw.Close()
 	}()
 
-	stdout, stderr, exitCode, err := runCderunWithStdin(pr,
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
-		"--interactive",
-		"--entrypoint", "cat",
-		"cat",
+	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
+		[]string{
+			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--interactive",
+			"--entrypoint", "sh",
+		},
+		[]string{"sh", "-c", "cat"},
 	)
 
 	skipIfDockerBroken(t, err)

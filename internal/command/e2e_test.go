@@ -79,17 +79,9 @@ func TestE2E_NestedExecution(t *testing.T) {
 	// Host -> Container A -> Container B
 	// Container A needs Docker socket and cderun binary.
 
-	// Use absolute path for cderun binary
-	// Capture errors for both os.Executable and filepath.Abs
-	var exePath string
-	var err error
-	if _, statErr := os.Stat("./cderun"); statErr == nil {
-		exePath, err = filepath.Abs("./cderun")
-	} else {
-		exePath, err = os.Executable()
-	}
+	// Use robust search for cderun binary
+	exePath, err := findCderunBinary()
 	require.NoError(t, err, "failed to resolve cderun binary path")
-	require.NotEmpty(t, exePath, "resolved cderun path is empty")
 
 	// Docker socket resolution
 	dockerSocket := "/var/run/docker.sock"
