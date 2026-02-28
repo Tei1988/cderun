@@ -73,6 +73,8 @@ type mockDockerClient struct {
 	attachOpts dockercontainer.AttachOptions
 	attachResp types.HijackedResponse
 	attachErr  error
+	inspectResp dockercontainer.InspectResponse
+	inspectErr  error
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -134,6 +136,10 @@ func (m *mockDockerClient) ContainerAttach(ctx context.Context, container string
 	m.attachID = container
 	m.attachOpts = options
 	return m.attachResp, m.attachErr
+}
+
+func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (dockercontainer.InspectResponse, error) {
+	return m.inspectResp, m.inspectErr
 }
 
 func TestUnit_Docker_RetryablePullError(t *testing.T) {

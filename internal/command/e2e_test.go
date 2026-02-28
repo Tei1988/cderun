@@ -17,6 +17,10 @@ func TestE2E_DockerVersion(t *testing.T) {
 	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
 	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
 	skipIfDockerBroken(t, err)
+	if err != nil || exitCode != 0 {
+		t.Logf("STDOUT: %s", stdout)
+		t.Logf("STDERR: %s", stderr)
+	}
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 
@@ -32,6 +36,10 @@ func TestE2E_StandardExecution(t *testing.T) {
 		[]string{"echo", "hello-cderun-e2e"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil || exitCode != 0 {
+		t.Logf("STDOUT: %s", stdout)
+		t.Logf("STDERR: %s", stderr)
+	}
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "hello-cderun-e2e")
@@ -66,13 +74,16 @@ func TestE2E_VolumeMount(t *testing.T) {
 		[]string{"cat", "/mnt/test/test.txt"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil || exitCode != 0 {
+		t.Logf("STDOUT: %s", stdout)
+		t.Logf("STDERR: %s", stderr)
+	}
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, content, strings.TrimSpace(stdout))
 }
 
 func TestE2E_NestedExecution(t *testing.T) {
-	// FIXME: This test may fail in CI due to complex path resolution or implementation bugs in nested execution.
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
@@ -87,10 +98,21 @@ func TestE2E_NestedExecution(t *testing.T) {
 		"--image", "public.ecr.aws/docker/library/alpine:latest",
 		"--mount-cderun",
 		"--mount-cderun-path", exePath,
+		"--mount", "type=bind,source=/tmp,target=/tmp",
 	}
 
-	if os.Getenv("DOCKER_HOST") != "" && !strings.HasPrefix(os.Getenv("DOCKER_HOST"), "unix://") {
-		cderunFlags = append(cderunFlags, "--env", fmt.Sprintf("DOCKER_HOST=%s", os.Getenv("DOCKER_HOST")))
+	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
+		if !strings.HasPrefix(dockerHost, "unix://") {
+			// In CI (DinD), DOCKER_HOST is typically tcp://localhost:2375
+			// For Container A to reach the same daemon, it must use tcp://docker:2375
+			// (where 'docker' is the alias for the DinD service container)
+			if strings.Contains(dockerHost, "localhost") {
+				dockerHost = strings.Replace(dockerHost, "localhost", "docker", 1)
+			}
+			cderunFlags = append(cderunFlags, "--env", fmt.Sprintf("DOCKER_HOST=%s", dockerHost))
+		} else {
+			cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
+		}
 	} else {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
 	}
@@ -103,6 +125,10 @@ func TestE2E_NestedExecution(t *testing.T) {
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)
 	skipIfDockerBroken(t, err)
+	if err != nil || exitCode != 0 {
+		t.Logf("STDOUT: %s", stdout)
+		t.Logf("STDERR: %s", stderr)
+	}
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "nested-success")
@@ -115,6 +141,10 @@ func TestE2E_DryRun(t *testing.T) {
 		[]string{"echo", "dry-run-test"},
 	)
 	skipIfDockerBroken(t, err)
+	if err != nil || exitCode != 0 {
+		t.Logf("STDOUT: %s", stdout)
+		t.Logf("STDERR: %s", stderr)
+	}
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "\"image\": \"public.ecr.aws/docker/library/alpine:latest\"")

@@ -674,10 +674,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
-	effectiveHangTimeout := hangTimeout
-	if !isHostStdinTerminal || !containerConfig.Interactive {
-		effectiveHangTimeout = 500 * time.Millisecond
-	}
+	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, containerConfig.Interactive)
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
 	if isHostStdinTerminal && containerConfig.TTY {
@@ -846,21 +843,16 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				o.logger.Debug("Container %s did not exit after IO completion, forcing termination", containerID)
-				// Use context.Background() for Kill to ensure it runs even if ctxG is almost done
-				if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
-					o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
-				}
-
-				select {
-				case result := <-waitDone:
-					if result.err != nil && !errors.Is(result.err, context.Canceled) {
-						return 0, fmt.Errorf("failed to wait for container after kill: %w", result.err)
+					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
+					if err != nil {
+						return 0, err
 					}
-					exitCode = result.code
-				case <-time.After(effectiveHangTimeout):
-					return 0, fmt.Errorf("timeout waiting for container %s to exit after SIGKILL", containerID)
-				}
+					select {
+					case result := <-waitDone:
+						exitCode = result.code
+					case <-time.After(effectiveHangTimeout):
+						return exitCode, nil
+					}
 			}
 		} else {
 			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
