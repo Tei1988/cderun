@@ -15,7 +15,7 @@ import (
 
 func TestE2E_DockerVersion(t *testing.T) {
 	// --diagnosis does not take a subcommand.
-	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, nil)
+	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "", nil)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
@@ -25,11 +25,11 @@ func TestE2E_DockerVersion(t *testing.T) {
 }
 
 func TestE2E_StandardExecution(t *testing.T) {
-	// cderun [flags] <subcommand> [args...]
-	// We use 'alpine' as the subcommand which maps to the image (if not specified by flags).
+	// cderun [flags] <subcommand> [commandOptions]
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
-		[]string{"alpine", "echo", "hello-cderun-e2e"},
+		"alpine",
+		[]string{"echo", "hello-cderun-e2e"},
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -38,7 +38,6 @@ func TestE2E_StandardExecution(t *testing.T) {
 }
 
 func TestE2E_VolumeMount(t *testing.T) {
-	// Use TEST_HOST_TMP_DIR if set, otherwise t.TempDir()
 	var baseDir string
 	if envDir := os.Getenv("TEST_HOST_TMP_DIR"); envDir != "" {
 		err := os.MkdirAll(envDir, 0755)
@@ -63,7 +62,8 @@ func TestE2E_VolumeMount(t *testing.T) {
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
 			"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
 		},
-		[]string{"alpine", "cat", "/mnt/test/test.txt"},
+		"alpine",
+		[]string{"cat", "/mnt/test/test.txt"},
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
@@ -94,13 +94,14 @@ func TestE2E_NestedExecution(t *testing.T) {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
 	}
 
-	// Command in Container A: run cderun to start Container B.
-	// We MUST include the subcommand (e.g. 'alpine') for the inner cderun call.
-	targetCommand := []string{
+	// Host Call: cderun [cderunFlags] alpine cderun --image ... alpine echo ...
+	// The host side mandatory subcommand is 'alpine'.
+	// The container command is 'cderun' with its own arguments.
+	commandOptions := []string{
 		"cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "alpine", "echo", "nested-success",
 	}
 
-	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, targetCommand)
+	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Equal(t, 0, exitCode)
@@ -110,7 +111,8 @@ func TestE2E_NestedExecution(t *testing.T) {
 func TestE2E_DryRun(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--dry-run", "--dry-run-format", "json"},
-		[]string{"alpine", "echo", "dry-run-test"},
+		"alpine",
+		[]string{"echo", "dry-run-test"},
 	)
 	skipIfDockerBroken(t, err)
 	require.NoError(t, err, "stderr: %s", stderr)

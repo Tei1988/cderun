@@ -34,7 +34,7 @@
 
 E2E テストジョブでは、`-tags=e2e` を指定した上で、`-run "^(TestE2E_|TestScenario_)"` フラグを使用して E2E テストのみをピンポイントで実行する。これにより、マトリックス内でユニットテストが繰り返し実行されるのを防ぐ。
 
-## 4. CI 環境特有のパス解決
+## 4. CI 環境特有 of パス解決
 
 ### 4.1. ホストパス vs DinD コンテナパス
 
@@ -57,10 +57,11 @@ E2E テスト中に `cderun` 自体をコンテナにマウントする場合（
 
 - **命名規則**: 新しい E2E テストは `TestE2E_` または `TestScenario_` で始めること（CI でのフィルタリングのため）。
 - **ビルドタグ**: ファイル先頭に `//go:build e2e` を付与する。
-- **正しい引数構造**: `cderun` は `cderun [cderun-flags] <subcommand> [args...]` という構造を持つ。
-  - テスト内では必ず `<subcommand>`（例: `alpine`）を明示的に指定すること。
-  - 例: `runCderunE2E([]string{"--image", "alpine"}, []string{"alpine", "echo", "hello"})`
+- **正しい引数構造**: `cderun` は `cderun [cderun-flags] <subcommand> [command-options]` という構造を持つ。
+  - テスト内では、`cderun` 自体のフラグと、必須のサブコマンド（ツール名/イメージ名）、およびコンテナ内で実行するコマンドのオプションを明示的に分けて指定すること。
+  - 例: `runCderunE2E([]string{"--image", "alpine"}, "alpine", []string{"echo", "hello"})`
   - サブコマンドが欠落すると、その後の引数がサブコマンド名として解釈され、実行エラー（"executable file not found" 等）の原因となる。
+  - `cderun` は `--` セパレータをサポートしていないため、使用しないこと。
 - **環境のクリーンアップ**: ファイルシステム操作を伴うテストでは、必ず `t.Cleanup` を使用して環境を元に戻すこと。
 
 ### 5.2. リアル環境の利用

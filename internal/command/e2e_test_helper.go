@@ -10,17 +10,23 @@ import (
 )
 
 // runCderunE2E is a helper for E2E tests.
-// It simply appends the target command to the cderun flags.
-func runCderunE2E(cderunFlags []string, targetCommand []string) (stdout, stderr string, exitCode int, err error) {
+// It explicitly separates cderun flags, the mandatory subcommand, and container command options.
+func runCderunE2E(cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
-	args = append(args, targetCommand...)
+	if subCommand != "" {
+		args = append(args, subCommand)
+	}
+	args = append(args, commandOptions...)
 	return runCderun(args...)
 }
 
 // runCderunWithStdinE2E is a helper for E2E tests with stdin.
-func runCderunWithStdinE2E(stdin io.Reader, cderunFlags []string, targetCommand []string) (stdout, stderr string, exitCode int, err error) {
+func runCderunWithStdinE2E(stdin io.Reader, cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
-	args = append(args, targetCommand...)
+	if subCommand != "" {
+		args = append(args, subCommand)
+	}
+	args = append(args, commandOptions...)
 	return runCderunWithStdin(stdin, args...)
 }
 
