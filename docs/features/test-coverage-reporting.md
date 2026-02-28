@@ -11,7 +11,7 @@ Go言語に標準で組み込まれているカバレッジ計測ツールを活
 
 ### 2.1. カバレッジプロファイルの生成
 
-`go test` コマンドに `-coverprofile` フラグを指定することで、カバレッジデータをファイルに出力する。
+`go test` コマンドに `-coverprofile` フラグを指定することで、カバレッジデータを file に出力する。
 
 ```bash
 # プロジェクト全体のカバレッジプロファイルを coverage.out に生成
@@ -94,7 +94,8 @@ coverage-html: coverage
 
 継続的インテグレーション (CI) プロセスにカバレッジ計測が組み込まれています。
 
-- GitHub Actions (`.github/workflows/e2e-test.yml`) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
-- 現在のカバレッジ率は **89.5%**（2026年2月時点）であり、非常に高い水準を維持しています。
-- カバレッジ率が **86.5%**（設定しきい値）を下回った場合、CIジョブは失敗します。
+- GitHub Actions ([e2e-test.yml](../../.github/workflows/e2e-test.yml)) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
+- 詳細はワークフロー（[e2e-test.yml](../../.github/workflows/e2e-test.yml)）の `Verify Coverage Threshold` ステップを参照してください。
+- 現在のカバレッジ率は **89.5%**（2026年2月時点）であり、しきい値（**86.5%**）を上回る非常に高い水準を維持しています。これらの値はワークフロー定義（`Verify Coverage Threshold` ステップ）と一致しています。
+- カバレッジ率がしきい値を下回った場合、CIジョブは失敗します。
 - `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。

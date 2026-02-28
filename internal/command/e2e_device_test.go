@@ -5,6 +5,7 @@ package command
 import (
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,8 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 	})
 
 	go func() {
+		// Give some time for the container to start and attach to be ready
+		time.Sleep(500 * time.Millisecond)
 		_, writeErr := pw.Write([]byte(stdinData))
 		// We close the writer to signal EOF to the reader (container stdin)
 		_ = pw.Close()
