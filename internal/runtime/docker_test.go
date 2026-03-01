@@ -30,12 +30,12 @@ var noopSleepFunc = func(ctx context.Context, d time.Duration) error { return ni
 
 func TestUnit_Docker_NewRuntime(t *testing.T) {
 	// This should succeed even without docker daemon as it just creates the client
-	runtime, err := NewDockerRuntime("/var/run/docker.sock")
+	runtime, err := NewDockerRuntime("/var/run/docker.sock", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, runtime)
 	assert.Equal(t, "docker", runtime.Name())
 
-	runtimeWithName, err := NewDockerRuntimeWithName("/var/run/docker.sock", "custom")
+	runtimeWithName, err := NewDockerRuntimeWithName("/var/run/docker.sock", "custom", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "custom", runtimeWithName.Name())
 }

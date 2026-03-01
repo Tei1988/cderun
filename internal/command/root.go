@@ -163,14 +163,8 @@ func defaultOptions() rootOptions {
 		attachGracePeriod: attachGracePeriod,
 		hangTimeout:       hangTimeout,
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
-			switch name {
-			case "docker":
-				return runtime.NewDockerRuntime(socket)
-			case "podman":
-				return runtime.NewPodmanRuntime(socket)
-			default:
-				return nil, fmt.Errorf("unsupported runtime %q", name)
-			}
+			// This placeholder will be overridden by localOptions.logger in newRootCmd/ExecuteContextWithOptions
+			return nil, nil
 		},
 	}
 }
@@ -875,6 +869,19 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 }
 
 func newRootCmd(o *rootOptions) *cobra.Command {
+	if o.runtimeFactory == nil || fmt.Sprintf("%p", o.runtimeFactory) == fmt.Sprintf("%p", defaultOptions().runtimeFactory) {
+		o.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+			switch name {
+			case "docker":
+				return runtime.NewDockerRuntime(socket, o.logger)
+			case "podman":
+				return runtime.NewPodmanRuntime(socket, o.logger)
+			default:
+				return nil, fmt.Errorf("unsupported runtime %q", name)
+			}
+		}
+	}
+
 	cmd := &cobra.Command{
 		Version:       Version,
 		Use:           "cderun",
@@ -1252,5 +1259,16 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 func init() {
 	opts.exitFunc = os.Exit
+	// Finalize runtimeFactory with the instance logger
+	opts.runtimeFactory = func(name string, socket string) (runtime.ContainerRuntime, error) {
+		switch name {
+		case "docker":
+			return runtime.NewDockerRuntime(socket, opts.logger)
+		case "podman":
+			return runtime.NewPodmanRuntime(socket, opts.logger)
+		default:
+			return nil, fmt.Errorf("unsupported runtime %q", name)
+		}
+	}
 	rootCmd = newRootCmd(&opts)
 }

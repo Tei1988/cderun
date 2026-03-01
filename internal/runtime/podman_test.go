@@ -9,7 +9,7 @@ import (
 
 func TestUnit_Podman_NewRuntime(t *testing.T) {
 	// This should succeed even without podman daemon as it just creates the client
-	runtime, err := NewPodmanRuntime("/run/podman/podman.sock")
+	runtime, err := NewPodmanRuntime("/run/podman/podman.sock", nil)
 	require.NoError(t, err)
 	assert.NotNil(t, runtime)
 	assert.Equal(t, "podman", runtime.Name())
