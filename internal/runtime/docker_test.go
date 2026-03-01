@@ -303,6 +303,18 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {
+	t.Run("interactive sets StdinOnce", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
+			Interactive: true,
+		})
+		require.NoError(t, err)
+		assert.True(t, mock.createConfig.StdinOnce)
+		assert.True(t, mock.createConfig.OpenStdin)
+	})
+}
 
 func TestUnit_Docker_Lifecycle(t *testing.T) {
 	id := "test-id"
