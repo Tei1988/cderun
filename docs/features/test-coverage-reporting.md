@@ -96,6 +96,6 @@ coverage-html: coverage
 
 - GitHub Actions ([e2e-test.yml](../../.github/workflows/e2e-test.yml)) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
 - 詳細はワークフロー（[e2e-test.yml](../../.github/workflows/e2e-test.yml)）の `Verify Coverage Threshold` ステップを参照してください。
-- 現在のカバレッジ率は **88.8%**（2026年2月時点）であり、しきい値（**86.5%**）を上回る非常に高い水準を維持しています。これらの値はワークフロー定義（`Verify Coverage Threshold` ステップ）と一致しています。
+- 現在のカバレッジ率は **88.8%**（2026年3月時点）であり、しきい値（**86.5%**）を上回る非常に高い水準を維持しています。これらの値はワークフロー定義（`Verify Coverage Threshold` ステップ）と一致しています。
 - カバレッジ率がしきい値を下回った場合、CIジョブは失敗します。
 - `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。
