@@ -300,6 +300,16 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Expose: []string{"invalid"},
 		})
+	t.Run("interactive sets StdinOnce", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		_, _ = runtime.CreateContainer(context.Background(), &container.ContainerConfig{
+			Interactive: true,
+		})
+		assert.True(t, mock.createConfig.StdinOnce)
+		assert.True(t, mock.createConfig.OpenStdin)
+	})
+
 		require.Error(t, err)
 	})
 }

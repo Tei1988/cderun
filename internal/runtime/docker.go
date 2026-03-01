@@ -143,6 +143,7 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 		Image:        config.Image,
 		Cmd:          config.Command,
 		Tty:          config.TTY,
+		StdinOnce:    config.Interactive,
 		OpenStdin:    config.Interactive,
 		Env:          config.Env,
 		WorkingDir:   config.Workdir,

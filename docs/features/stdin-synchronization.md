@@ -45,7 +45,15 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 }
 ```
 
-### 3. Attach 時のログ取得の無効化
+### 3. StdinOnce による確実な EOF 伝達
+
+`internal/runtime/docker.go` において、`Interactive` モードが有効な場合に `StdinOnce: true` を設定しています。
+
+Docker のデフォルト挙動（`StdinOnce: false`）では、クライアントが標準入力を閉じても、Docker デーモン側でコンテナの入力ストリームを維持し続けることがあります。特に非 TTY かつパイプ入力の場合、これによりコンテナ内のプロセス（`cat` など）が EOF を検知できず、終了しない原因となります。
+
+`StdinOnce: true` を設定することで、`cderun` が標準入力のコピーを完了して接続を閉じた際に、Docker が確実にコンテナへ EOF を伝え、プロセスが正常に終了（Exit 0）することを保証します。
+
+### 4. Attach 時のログ取得の無効化
 
 `internal/runtime/docker.go` において、`AttachContainer` 呼び出し時に `Logs: false` を設定しています。
 
