@@ -28,7 +28,7 @@ import (
 var noopSleepFunc = func(ctx context.Context, d time.Duration) error { return nil }
 
 
-func TestUnit_Docker_New(t *testing.T) {
+func TestUnit_Docker_NewRuntime(t *testing.T) {
 	// This should succeed even without docker daemon as it just creates the client
 	runtime, err := NewDockerRuntime("/var/run/docker.sock")
 	require.NoError(t, err)
@@ -304,7 +304,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 	})
 }
 
-func TestUnit_Docker_Lifecycle(t *testing.T) {
+func TestUnit_Docker_ContainerLifecycle(t *testing.T) {
 	id := "test-id"
 	ctx := context.Background()
 
@@ -427,7 +427,7 @@ func (m *mockConn) CloseWrite() error {
 	return nil
 }
 
-func TestUnit_Docker_Attach(t *testing.T) {
+func TestUnit_Docker_AttachContainer(t *testing.T) {
 	t.Run("TTY mode", func(t *testing.T) {
 		conn := &mockConn{}
 		mock := &mockDockerClient{

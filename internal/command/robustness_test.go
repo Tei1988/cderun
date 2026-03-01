@@ -17,6 +17,7 @@ import (
 
 type blockingMockRuntime struct {
 	runtime.MockRuntime
+	mu          sync.RWMutex
 	blockAttach chan struct{}
 }
 
@@ -27,15 +28,20 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	if ready != nil {
 		close(ready)
 	}
+
+	m.mu.RLock()
+	block := m.blockAttach
+	m.mu.RUnlock()
+
 	select {
-	case <-m.blockAttach:
+	case <-block:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func TestRobustness_Root_SignalHandling(t *testing.T) {
+func TestRobustness_Root_Execute_SignalHandling(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),

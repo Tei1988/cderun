@@ -16,9 +16,9 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool)
 	// timeout behavior, although they currently both use hangTimeout (2s)
 	// to ensure stability in CI environments.
 	if !isHostStdinTerminal || !interactive {
-		return hangTimeout
+		return o.hangTimeout
 	}
-	return hangTimeout
+	return o.hangTimeout
 }
 
 func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {

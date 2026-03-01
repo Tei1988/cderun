@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_Loader_LoadCDERun(t *testing.T) {
+func TestUnit_Config_Loader_LoadCDERunConfig(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
@@ -108,7 +108,7 @@ hostContext:
 	})
 }
 
-func TestUnit_Config_Loader_LoadTools(t *testing.T) {
+func TestUnit_Config_Loader_LoadToolsConfig(t *testing.T) {
 	t.Run("found in current dir", func(t *testing.T) {
 		content := `
 node:
@@ -134,7 +134,7 @@ node:
 	})
 }
 
-func TestUnit_Config_Loader_SetDirs(t *testing.T) {
+func TestUnit_Config_Loader_SetDirectories(t *testing.T) {
 	t.Run("SetRunConfigDirForTest", func(t *testing.T) {
 		original := defaultLoader.runConfigDir
 		cleanup := SetRunConfigDirForTest("/tmp/run")
@@ -152,7 +152,7 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Loader_LoadPath(t *testing.T) {
+func TestUnit_Config_Loader_LoadFromPath(t *testing.T) {
 	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
 		content := `
 runtime: podman
@@ -217,7 +217,7 @@ node:
 
 }
 
-func TestUnit_Config_Loader_LoadCDERun_Errors(t *testing.T) {
+func TestUnit_Config_Loader_LoadCDERunConfigErrors(t *testing.T) {
 	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
@@ -245,7 +245,7 @@ func TestUnit_Config_Loader_LoadCDERun_Errors(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_DeepCopy(t *testing.T) {
+func TestUnit_Config_DeepCopy_Consistency(t *testing.T) {
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
 		tty := true
 		orig := CDERunConfig{

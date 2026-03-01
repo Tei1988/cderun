@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -126,4 +127,30 @@ func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, upperdir)
 	})
+}
+
+func TestUnit_Snapshot_MkdirError(t *testing.T) {
+	mfs := &config.MockFileSystem{
+		MkdirAllErr: errors.New("mkdir failed"),
+	}
+	globalCfg := &config.CDERunConfig{}
+	toolsCfg := config.ToolsConfig{}
+	currentMounts := []container.Mount{}
+
+	_, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create snapshot directory: mkdir failed")
+}
+
+func TestUnit_Snapshot_WriteFileError(t *testing.T) {
+	mfs := &config.MockFileSystem{
+		WriteFileErr: errors.New("write failed"),
+	}
+	globalCfg := &config.CDERunConfig{}
+	toolsCfg := config.ToolsConfig{}
+	currentMounts := []container.Mount{}
+
+	_, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot: write failed")
 }

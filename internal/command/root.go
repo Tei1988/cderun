@@ -115,6 +115,10 @@ type rootOptions struct {
 	configLoader *config.ConfigLoader
 	logger       *logging.Logger
 
+	// Timeouts
+	attachGracePeriod time.Duration
+	hangTimeout       time.Duration
+
 	// Testing hooks
 	exitFunc       func(int)
 	isTerminal     func(int) bool
@@ -155,7 +159,9 @@ func defaultOptions() rootOptions {
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
 		},
-		logger: logging.GetGlobalLogger(),
+		logger:            logging.NewLogger(),
+		attachGracePeriod: attachGracePeriod,
+		hangTimeout:       hangTimeout,
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -803,7 +809,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 		select {
 		case err := <-attachDone:
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -811,7 +817,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 			}
 			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-		case <-time.After(attachGracePeriod):
+		case <-time.After(o.attachGracePeriod):
 			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 			cancelAttach()
 			<-attachDone

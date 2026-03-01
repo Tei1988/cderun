@@ -11,7 +11,7 @@ import (
 	"cderun/internal/container"
 )
 
-func TestUnit_Mock_Methods(t *testing.T) {
+func TestUnit_Mock_InterfaceMethods(t *testing.T) {
 	mock := NewMockRuntime()
 	ctx := context.Background()
 
@@ -64,7 +64,7 @@ func TestUnit_Mock_Methods(t *testing.T) {
 	assert.Nil(t, mock.GetCreatedConfig())
 }
 
-func TestUnit_Mock_New(t *testing.T) {
+func TestUnit_Mock_NewRuntime(t *testing.T) {
 	mock := NewMockRuntime()
 	assert.NotNil(t, mock)
 }
