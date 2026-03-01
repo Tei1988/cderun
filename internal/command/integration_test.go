@@ -760,7 +760,7 @@ func TestIntegration_Root_InternalOverrides(t *testing.T) {
 	})
 }
 
-func TestIntegration_ConfigFlags(t *testing.T) {
+func TestIntegration_Config_Flags(t *testing.T) {
 	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
 		setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}

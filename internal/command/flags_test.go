@@ -11,7 +11,7 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestUnit_Flags_DockerCompatible(t *testing.T) {
+func TestUnit_Root_Flags_DockerCompatible(t *testing.T) {
 	t.Run("basic and complex Docker flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",

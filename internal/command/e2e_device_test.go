@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScenario_Device_MountNull(t *testing.T) {
+func TestScenario_Root_Execute_DeviceMountNull(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}
@@ -34,7 +34,7 @@ func TestScenario_Device_MountNull(t *testing.T) {
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
-func TestScenario_Stdin_Piped(t *testing.T) {
+func TestScenario_Root_Execute_StdinPiped(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E test in short mode")
 	}
@@ -71,7 +71,7 @@ func TestScenario_Stdin_Piped(t *testing.T) {
 			"--interactive", "--cderun-tty=false", "--cderun-memory=512m",
 		},
 		"alpine",
-		[]string{"cat"},
+		[]string{"sh", "-c", "cat"},
 	)
 
 	skipIfDockerBroken(t, err)
