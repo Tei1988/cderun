@@ -7,7 +7,7 @@
 | **Unit** | 外部依存なし。ロジックの正当性を検証。 | `*_test.go` (同パッケージ) |
 | **Integration** | MockRuntime、ファイルシステムとの連携を検証。 | `internal/command/integration_test.go` |
 | **Robustness** | 信号、レースコンディション、タイムアウトを検証。 | `internal/command/robustness_test.go` |
-| **Scenario (E2E)** | 複雑なシナリオや実環境での検証。 | `internal/command/scenario_*_test.go`, `internal/command/e2e_*_test.go` (Build tag: `e2e`, 命名: `TestScenario_`) |
+| **Scenario (E2E)** | 複雑なシナリオや実環境での検証。 | `internal/command/scenario_*_test.go`, `internal/command/e2e_test.go`, `internal/command/e2e_*_test.go` (Build tag: `e2e`, 命名: `TestScenario_`) |
 
 ## 命名規則
 
@@ -34,7 +34,7 @@
 | Expressions | ✅ | ✅ | - | - |
 | 厳密モード | ✅ | ✅ | - | - |
 | cderunバイナリマウント | ✅ | ✅ | - | ✅ |
-| 診断モード | ✅ | - | - | - |
+| 診断モード | ✅ | - | - | ✅ |
 | Mount Tools | ✅ | ✅ | - | ✅ |
 | ポリグロット実行 | ✅ | ✅ | - | - |
 
