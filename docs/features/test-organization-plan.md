@@ -6,7 +6,7 @@
 
 ## 2. 現状の分析
 
-### 2.1. パッケージ別カバレッジ (2026年3月時点)
+### 2.1. パッケージ別カバレッジ (2026年3月2日時点)
 
 | パッケージ | カバレッジ率 | 備考 |
 | :--- | :--- | :--- |
@@ -39,14 +39,14 @@
 | cderunバイナリマウント | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
 | ドライランモード | `internal/command/root_test.go` | 良好 |
 | ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
-| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go` | 良好 |
+| インタラクティブ | `internal/command/robustness_test.go` (信号、リサイズ), `internal/command/stdin_test.go`, `internal/command/docker_hang_test.go` | 良好 |
 | 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` | 良好 |
 | README生成 | - | 対象外 (開発フロー) |
 | Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` | 良好 |
 | 診断モード | `internal/command/root_test.go` | 良好 |
 | 統合テスト(Docker) | `internal/command/integration_test.go` | 良好 |
 | テストカバレッジ | `Makefile` | 良好 |
-| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
+| Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go`, `internal/config/expression_test.go` | 良好 |
 | パス解決(チルダ・相対) | `internal/config/path_test.go` | 良好 |
 | 厳密モード(strictEnv) | `internal/command/integration_test.go`, `internal/config/resolver_test.go` | 良好 |
 
@@ -93,7 +93,7 @@
   1. **CIでの自動計測 (完了)**: GitHub Actions ([e2e-test.yml](../../.github/workflows/e2e-test.yml)) により、PR/プッシュ時に `make coverage` および `Verify Coverage Threshold` ステップが実行される。カバレッジが 86.5% 未満の場合はジョブが失敗し、`coverage.out` がアーティファクト (`coverage-report`) として保存される。詳細は [Test Coverage Reporting](test-coverage-reporting.md) を参照。
   2. **`COVERAGE.md` の運用検討**: カバレッジの推移を視覚化するためのドキュメント化。
 
-## 6. テストマトリックス (2026年3月時点)
+## 6. テストマトリックス (2026年3月2日時点)
 
 | 機能 | Unit | Integration | Robustness | Scenario |
 | :--- | :---: | :---: | :---: | :---: |
@@ -105,14 +105,17 @@
 | ポート転送 | ✅ | ✅ | - | - |
 | 信号処理(Ctrl+C) | ✅ | - | ✅ | - |
 | TTYリサイズ | - | - | ✅ | - |
-| インタラクティブ(Stdin) | ✅ | ✅ | - | - |
+| インタラクティブ(Stdin) | ✅ | ✅ | - | ✅ |
 | Nested Execution | ✅ | ✅ | - | ✅ |
 | Expressions | ✅ | ✅ | - | - |
 | 厳密モード | ✅ | ✅ | - | - |
 | cderunバイナリマウント | ✅ | ✅ | - | ✅ |
-| 診断モード | ✅ | - | - | - |
+| 診断モード | ✅ | - | - | ✅ |
 | Mount Tools | ✅ | ✅ | - | ✅ |
 | ポリグロット実行 | ✅ | ✅ | - | - |
+| ドライランモード | ✅ | - | - | ✅ |
+| ハング回復 | ✅ | - | ✅ | - |
+| スナップショット作成 | ✅ | - | - | ✅ |
 
 ---
-*2026年3月時点のテスト構成・網羅性計画である。実装の進展に合わせて随時更新されるべきである。*
+*2026年3月2日時点のテスト構成・網羅性計画である。実装の進展に合わせて随時更新されるべきである。*
