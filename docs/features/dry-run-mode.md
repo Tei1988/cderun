@@ -32,7 +32,6 @@ cderun --dry-run node --version
 ```yaml
 image: node:latest
 command:
-  - node
   - app.js
 tty: true
 interactive: true
@@ -79,7 +78,7 @@ devices:
 ```json
 {
   "image": "node:latest",
-  "command": ["node", "app.js"],
+  "command": ["app.js"],
   "tty": true,
   "interactive": true,
   "remove": true,
@@ -123,7 +122,7 @@ devices:
 
 ```text
 Image: node:latest
-Command: node app.js
+Command: app.js
 TTY: true
 Interactive: true
 Network: bridge
@@ -226,3 +225,6 @@ mounts:
     source: /home/user/project
     target: /workspace
 ```
+
+---
+*2026年3月2日時点の仕様である。*
