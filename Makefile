@@ -33,7 +33,7 @@ link-check:
 .PHONY: coverage
 coverage:
 	@echo "Generating coverage report..."
-	@go test ./... -cover -coverprofile=coverage.out
+	@go test ./... -cover -coverprofile=coverage.txt
 	@echo "Done. To view HTML report, run: go tool cover -html=coverage.out"
 
 .PHONY: coverage-html
