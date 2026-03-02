@@ -60,6 +60,13 @@ jobs:
         with:
           name: coverage-report
           path: coverage.out
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          flags: unit
+          fail_ci_if_error: true
 
   e2e-test:
     name: E2E (Docker ${{ matrix.docker-version }})
@@ -112,4 +119,15 @@ jobs:
           # Check docker version
           docker version
           # Run ONLY E2E tests using the e2e tag and filtering by name
-          go test -v -tags=e2e -timeout 15m -run "^TestScenario_" ./internal/command/...
+          go test -v -tags=e2e -timeout 15m -run "^TestScenario_" -coverprofile=coverage-e2e.out ./internal/command/...
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-e2e.out
+          flags: e2e
+          env_vars: DOCKER_VERSION
+          fail_ci_if_error: true
+        env:
+          DOCKER_VERSION: ${{ matrix.docker-version }}

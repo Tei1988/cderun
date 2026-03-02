@@ -1,8 +1,10 @@
 # Feature: Test Coverage Reporting
 
+[![codecov](https://codecov.io/gh/Tei1988/cderun/graph/badge.svg)](https://codecov.io/gh/Tei1988/cderun)
+
 ## 1. 概要
 
-`cderun` のコードベースが、ユニットテストおよびインテグレーションテストによってどの程度カバーされているかを計測・可視化する仕組みを導入する。
+`cderun` のコードベースが、ユニットテストおよびE2Eテストによってどの程度カバーされているかを計測・可視化する仕組みを導入する。
 これにより、テストが不十分な箇所を特定し、品質の高い開発サイクルを維持することが可能になる。
 
 ## 2. 実装方針
@@ -43,28 +45,26 @@ open coverage.html # (macOS)
 go tool cover -func=coverage.out
 ```
 
-## 3. インテグレーションテストのカバレッジ計測
+#### c) Codecov (クラウド)
 
-Dockerコンテナを起動するインテグレーションテストは、`go test` プロセスとは別の `cderun` プロセスを実行するため、標準的な方法ではカバレッジを計測できない。
-これを解決するため、以下の手順を踏む。
+GitHub Actions で実行されたテスト結果は自動的に [Codecov](https://codecov.io/gh/Tei1988/cderun) にアップロードされる。
+Codecov 上では以下の機能が利用可能：
 
-1. **カバレッジ計測用テストバイナリのビルド**:
-  `go test -c -cover` コマンドを使い、カバレッジ計測が可能なテスト専用バイナリを生成する。
+- プルリクエストごとのカバレッジ変化の確認
+- ソースコード上でのカバレッジ可視化
+- UnitテストとE2Eテストのフラグ別集計
+
+## 3. インテグレーション・E2Eテストのカバレッジ計測
+
+Dockerコンテナを起動するテストにおいて、`go test` プロセス内で行われるロジックのカバレッジは標準的な方法で計測される。
+
+### CIでの計測
+
+E2Eテストジョブでは、Dockerの複数バージョン（20.10, 25.0, 29.0）のマトリックスでテストが実行され、それぞれのカバレッジデータが Codecov 上でマージされる。
 
 ```bash
-go test -c ./internal/command -cover -o cderun.test
+go test -v -tags=e2e -coverprofile=coverage-e2e.out ./internal/command/...
 ```
-
-1. **テストバイナリの実行**:
-  生成されたテストバイナリを実行する際に、カバレッジプロファイルの出力先を指定する。インテグレーションテストのロジック内で、このテストバイナリを `cderun` の実行ファイルとして使用する。
-
-```bash
-# テストコード内から、os/exec などで以下のように実行するイメージ
-./cderun.test -test.run ^TestIntegration$ -test.coverprofile=integration.cover.out
-```
-
-1. **プロファイルの統合 (任意)**:
-  ユニットテストとインテグレーションテストで別々に生成されたカバレッジプロファイルは、ツールを使ってマージし、プロジェクト全体のカバレッジとして集計することも可能。
 
 ## 4. 自動化
 
@@ -90,11 +90,11 @@ coverage-html: coverage
 	@echo "Generated coverage.html"
 ```
 
-## 5. CIへの統合 (既実装)
+## 5. CIへの統合
 
-継続的インテグレーション (CI) プロセスにカバレッジ計測が組み込まれています。
+継続的インテグレーション (CI) プロセスにカバレッジ計測と Codecov へのアップロードが組み込まれている。
 
-- GitHub Actions ([e2e-test.yml](../../.github/workflows/e2e-test.yml)) により、すべてのプッシュおよびプルリクエストにおいて `make coverage` が実行されます。
-- 詳細はワークフロー（[e2e-test.yml](../../.github/workflows/e2e-test.yml)）の `Verify Coverage Threshold` ステップを参照してください。
-- カバレッジ率がしきい値（**86.5%**）を下回った場合、CIジョブは失敗します。最新の数値はGitHub Actionsの `coverage-report` アーティファクトを参照すること。
-- `coverage.out` はアーティファクト (`coverage-report`) として保存され、詳細な解析に利用できます。
+- GitHub Actions ([`e2e-test.yml`](../../.github/workflows/e2e-test.yml)) により、すべてのプッシュおよびプルリクエストにおいてカバレッジが計測される。
+- **Unitテストジョブ**: ローカルでのカバレッジしきい値チェック（**86.5%**）を行い、満たない場合はジョブが失敗する（ファストフェイル）。
+- **Codecov**: PR 上で詳細なステータスチェック（`unit` / `e2e` フラグ別のレポートを含む）を提供し、プロジェクト全体の品質管理を補完する。
+- **E2Eテスト**: Dockerバージョンごとに計測され、Codecov 上で自動的にマージされる。

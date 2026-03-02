@@ -1,0 +1,39 @@
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    # Wait for 1 unit-test + 3 e2e-test (docker matrix) = 4 reports
+    after_n_builds: 4
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        # Overall project coverage must be at least 86.5%
+        target: 86.5%
+        threshold: 0%
+      unit:
+        flags:
+          - unit
+        target: auto
+        informational: true
+      e2e:
+        flags:
+          - e2e
+        target: auto
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+
+flag_management:
+  default_rules:
+    carryforward: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
