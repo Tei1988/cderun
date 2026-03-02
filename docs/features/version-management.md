@@ -42,6 +42,7 @@ cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
 ビルド時に Go のリンカーフラグ (`-ldflags`) を使用して、`internal/version` パッケージ内の変数を直接書き換えます。
 
 #### Makefile での例
+
 ```makefile
 LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
            -X cderun/internal/version.Revision=$(REVISION) \

@@ -6,7 +6,19 @@ import (
 )
 
 func TestInfo(t *testing.T) {
-	// Reset to default values
+	// Save original values
+	originalVersion := Version
+	originalRevision := Revision
+	originalBuildDate := BuildDate
+
+	// Restore original values after test
+	t.Cleanup(func() {
+		Version = originalVersion
+		Revision = originalRevision
+		BuildDate = originalBuildDate
+	})
+
+	// Reset to default values for first test case
 	Version = "dev"
 	Revision = "unknown"
 	BuildDate = "unknown"
