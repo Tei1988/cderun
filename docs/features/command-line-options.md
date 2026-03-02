@@ -474,16 +474,7 @@ cderun --log-timestamp=false node app.js
 
 ## オプションの優先順位
 
-1. **cderun内部オーバーライド (P1)**: `--cderun-*` フラグ
-2. **コマンドライン引数 (P2)**: `--tty`, `--env` 等の標準フラグ
-3. **環境変数 (P3)**: `CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_SOCKET`,
-   `CDERUN_TTY` 等。
-   - **セパレータ**:
-     - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-     - カンマ (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`
-4. **ツール固有設定 (P4)**: `.tools.yaml`
-5. **グローバルデフォルト** (P5): `.cderun.yaml`
-6. **ハードコードされたデフォルト** (P6, 最低優先)
+優先順位の詳細は [引数・設定優先順位](./argument-priority-logic.md) を参照。
 
 ### 実行制御用環境変数
 

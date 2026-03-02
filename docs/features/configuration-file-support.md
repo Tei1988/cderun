@@ -273,42 +273,4 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 
 ## 優先順位
 
-設定の優先順位（高い順）については、[引数・設定優先順位](./argument-priority-logic.md)を参照してください。
-
-1. **CDERUN内部オーバーライド**: `--cderun-tty` 等
-2. **コマンドライン引数**: `--tty`, `--network` 等
-3. **環境変数**: `CDERUN_TTY` 等
-4. **ツール固有設定**: `.tools.yaml` 内の設定
-5. **cderunデフォルト設定**: `.cderun.yaml` の `defaults` または `logging`
-6. **ハードコード値**: 内部デフォルト値
-
-### 例
-
-`.cderun.yaml`:
-
-```yaml
-defaults:
-  tty: false        # cderunのデフォルト
-  network: bridge
-```
-
-`.tools.yaml`:
-
-```yaml
-node:
-  tty: true         # nodeツールの設定（cderunデフォルトを上書き）
-  network: host
-```
-
-実行例：
-
-```bash
-# tty=true, network=host (ツール設定を使用)
-cderun node app.js
-
-# tty=false, network=host (コマンドライン引数が最優先)
-cderun --tty=false node app.js
-
-# tty=true, network=mynet (コマンドライン引数が最優先)
-cderun --network mynet node app.js
-```
+設定の優先順位については、[引数・設定優先順位](./argument-priority-logic.md) を参照してください。

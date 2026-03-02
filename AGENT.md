@@ -18,6 +18,7 @@
 | docs/guidelines/testing.md | テスト実装指針  リーク防止やモックの作り方などの詳細なガイドラインです。必ず遵守してください。 | 高 (Must Read) |
 | docs/architecture/libraries.md | 技術スタック、使用ライブラリ  使用すべきライブラリやツール選定の基準です。 | 高 (Must Read) |
 | docs/features/*.md | 機能要件定義書  個別の機能（コマンド）の実装詳細です。実装時はこれを正とします。 | 中 (Reference) |
+| docs/testing/*.md | テスト関連ドキュメント  E2E・統合テストの設計方針、カバレッジ計測、テスト構成計画。**テストを実装する際は必ず参照すること。** | 高 (Must Read) |
 
 ## 3. Core Principles
 
