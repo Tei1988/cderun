@@ -1,3 +1,11 @@
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+REVISION := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
+           -X cderun/internal/version.Revision=$(REVISION) \
+           -X cderun/internal/version.BuildDate=$(BUILD_DATE)
+
 .PHONY: test
 test:
 	@echo "Running all unit and integration tests..."
@@ -44,7 +52,7 @@ coverage-html: coverage
 .PHONY: build
 build:
 	@echo "Building cderun..."
-	@go build -o cderun main.go
+	@go build -ldflags "$(LDFLAGS)" -o cderun main.go
 
 .PHONY: clean
 clean:

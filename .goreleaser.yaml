@@ -28,6 +28,11 @@ builds:
         goarch: arm
       - goos: darwin
         goarch: riscv64
+    ldflags:
+      - -s -w
+      - -X cderun/internal/version.Version={{.Version}}
+      - -X cderun/internal/version.Revision={{.FullCommit}}
+      - -X cderun/internal/version.BuildDate={{.Date}}
 
 archives:
   - format: tar.gz

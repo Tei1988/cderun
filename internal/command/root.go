@@ -17,6 +17,7 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
+	"cderun/internal/version"
 
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
@@ -870,7 +871,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Version:       Version,
+		Version:       version.Info(),
 		Use:           "cderun",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -878,15 +879,17 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		Long: `cderun is a CLI wrapper tool that simplifies running commands
 within a container. It separates its own flags from the flags
 intended for the subcommand.`,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if o.fs == nil {
-				o.fs = config.RealFileSystem{}
-			}
-			if o.configLoader == nil {
-				o.configLoader = config.NewConfigLoaderWithFS(o.fs)
-			}
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+	}
+	cmd.SetVersionTemplate("{{.Version}}\n")
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if o.fs == nil {
+			o.fs = config.RealFileSystem{}
+		}
+		if o.configLoader == nil {
+			o.configLoader = config.NewConfigLoaderWithFS(o.fs)
+		}
+	}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 			// Early logger initialization with CLI and Environment settings before config loading.
 			// This allows loadConfigs() to use the correct log level.
 			initialLevel := "warn"
@@ -996,10 +999,9 @@ intended for the subcommand.`,
 			}
 			o.exitFunc(exitCode)
 			return nil
-		},
-	}
+		}
 
-	cmd.PersistentFlags().BoolVarP(&o.tty, "tty", "t", false, "Allocate a pseudo-TTY")
+cmd.PersistentFlags().BoolVarP(&o.tty, "tty", "t", false, "Allocate a pseudo-TTY")
 	cmd.PersistentFlags().BoolVarP(&o.interactive, "interactive", "i", false, "Keep STDIN open even if not attached")
 	cmd.PersistentFlags().StringVar(&o.network, "network", "bridge", "Connect a container to a network")
 	cmd.PersistentFlags().StringVar(&o.socketPath, "socket-path", "", "Path to the container runtime socket on the host")
