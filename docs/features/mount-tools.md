@@ -9,10 +9,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 - `.tools.yaml` が存在し、対象のツールが定義されていること
 
-※ `--mount-tools` または `--mount-all-tools` を使用する場合、以下の設定が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
-
-- `--mount-cderun`: `cderun` バイナリ自体を `/usr/local/bin/cderun` にマウント。
-- `--mount-socket`: コンテナランタイムのソケットをマウント（ネストされた `cderun` がホストのデーモンと通信するために必要）。
+`--mount-tools` または `--mount-all-tools` を使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります。詳細は [nested-execution.md](./nested-execution.md) を参照してください。
 
 ## オプション
 

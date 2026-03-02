@@ -80,12 +80,12 @@
   - ポートマッピング、リソース制限、ユーザー指定など
   - Docker CLI互換のオプションサポート
 
-2. **[cderunバイナリマウント (完了)](./cderun-binary-mounting.md)**
+2. **[cderunバイナリマウント・ネスト実行 (完了)](./nested-execution.md)**
 
-  - `--mount-cderun`でコンテナ内でcderunを使用
+  - `--mount-cderun` でコンテナ内でcderunを使用
   - `--mount-socket` は自動的に有効化されます
-
-3. **[ドライランモード (完了)](./dry-run-mode.md)**
+  - コンテナ内からの再帰的なcderun実行
+  - 設定の動的な注入とパス変換ロジック
 
   - 実行前のコマンドプレビュー
   - JSON/YAML/Simple形式での出力
@@ -100,37 +100,25 @@
   - シグナル転送
   - TTYリサイズ同期
 
-6. **[README生成戦略 (完了)](./readme-generation.md)**
-
-  - 実装コードからREADMEを生成
-  - 信頼できる唯一の情報源の維持
-
-7. **[ネスト実行 (完了)](./nested-execution.md)**
+6. **[ネスト実行 (完了)](./nested-execution.md)**
 
   - コンテナ内からの再帰的なcderun実行
   - 設定の動的な注入とパス変換ロジック
 
 ### 開発・検証機能
 
-1. **[インテグレーションテスト (完了)](./integration-testing-with-docker.md)**
-
-  - MockRuntime や実ランタイムを利用した検証
-
-2. **[E2E テスト (完了)](./e2e-testing.md)**
-
-  - 実際の Docker/Podman を利用したエンドツーエンド検証
-
-3. **[テストカバレッジ計測 (完了)](./test-coverage-reporting.md)**
-
-  - コードカバレッジの可視化と自動計測
-
-4. **[テスト構成・網羅性計画 (完了)](./test-organization-plan.md)**
-
-  - テストの体系化とカバレッジ分析
-
-5. **[診断モード (完了)](./diagnosis-mode.md)**
+1. **[診断モード (完了)](./diagnosis-mode.md)**
 
   - システム診断情報と利用可能なツールの表示
+
+## テストドキュメント
+
+テストに関するドキュメントは [`docs/testing/`](../testing/) を参照すること。
+
+- [E2E テスト](../testing/e2e.md)
+- [統合テスト](../testing/integration.md)
+- [テスト構成・網羅性計画](../testing/organization.md)
+- [テストカバレッジ計測](../testing/coverage.md)
 
 ## 技術リファレンス
 
