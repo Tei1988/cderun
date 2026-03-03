@@ -102,6 +102,13 @@
   - シグナル転送
   - TTYリサイズ同期
 
+### 管理・デバッグ機能
+
+1. **[バージョン管理 (完了)](./version-management.md)**
+
+  - Git 情報の動的注入 (Tag, SHA, BuildDate)
+  - 詳細な `--version` 出力
+
 ### 開発・検証機能
 
 1. **[診断モード (完了)](./diagnosis-mode.md)**
