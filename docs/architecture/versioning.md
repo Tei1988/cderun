@@ -45,7 +45,7 @@ make build
 
 ```bash
 $ ./cderun --version
-cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
+cderun version 0.0.2 (rev: 3989443, built at: 2026-03-03T10:00:00Z, linux/amd64)
 ```
 
 ### 開発時の挙動 (`go run`)

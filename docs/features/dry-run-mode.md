@@ -131,20 +131,20 @@ Mounts: type=bind,source=/home/user/project,target=/workspace,readonly=false
 Env: NODE_ENV=development
 Workdir: /workspace
 User:
-Ports:
+Ports: 8080:80
 PublishAll: false
-Expose:
-Hostname:
-DNS:
-AddHosts:
+Expose: 80/tcp
+Hostname: node-app
+DNS: 8.8.8.8
+AddHosts: my-server:192.168.1.100
 Privileged: false
-CapAdd:
-CapDrop:
-Entrypoint:
+CapAdd: SYS_ADMIN
+CapDrop: NET_RAW
+Entrypoint: /usr/bin/node
 Pull: missing
 Memory: 512MiB
 CPUs: 1.5
-Devices:
+Devices: /dev/fuse:/dev/fuse:rwm
 ```
 
 > **Note**: `Memory` は `512MiB` のような人間が読みやすい形式で表示され、`CPUs` は浮動小数点数（例: `1.5`）として表示されます。
@@ -227,4 +227,4 @@ mounts:
 ```
 
 ---
-*2026年3月2日時点の仕様である。*
+*2026年3月3日時点の仕様である。*

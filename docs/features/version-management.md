@@ -19,8 +19,8 @@
 | 項目 | 説明 | 例 |
 | :--- | :--- | :--- |
 | Version | Git タグまたは `dev` | `0.0.2`, `v1.1.0-dirty` |
-| Revision | 短縮 Git コミット SHA | `abc1234` |
-| BuildDate | ISO8601 形式のビルド日時 | `2026-03-02T12:34:56Z` |
+| Revision | 短縮 Git コミット SHA | `3989443` |
+| BuildDate | ISO8601 形式のビルド日時 | `2026-03-03T10:00:00Z` |
 | OS/Arch | 実行環境の OS とアーキテクチャ | `linux/amd64`, `darwin/arm64` |
 
 ### 出力フォーマット
@@ -28,7 +28,7 @@
 `cderun --version` を実行した際の出力例：
 
 ```text
-cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
+cderun version 0.0.2 (rev: 3989443, built at: 2026-03-03T10:00:00Z, linux/amd64)
 ```
 
 ## 実装の仕組み
