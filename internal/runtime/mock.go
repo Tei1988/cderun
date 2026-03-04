@@ -197,7 +197,9 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return false, m.ExitCode, nil
+	// Return true if start was called but wait hasn't finished (simplified)
+	running := m.StartedContainerID != "" && m.WaitedContainerID == ""
+	return running, m.ExitCode, nil
 }
 
 func (m *MockRuntime) Name() string {

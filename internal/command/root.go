@@ -117,12 +117,14 @@ type rootOptions struct {
 	logger       *logging.Logger
 
 	// Testing hooks
-	exitFunc       func(int)
-	isTerminal     func(int) bool
-	termGetSize    func(int) (int, int, error)
-	makeRaw        func(int) (*term.State, error)
-	restore        func(int, *term.State) error
-	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
+	exitFunc           func(int)
+	isTerminal         func(int) bool
+	termGetSize        func(int) (int, int, error)
+	makeRaw            func(int) (*term.State, error)
+	restore            func(int, *term.State) error
+	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
+	setupSignals       func(chan os.Signal)
+	setupResizeSignal  func(chan os.Signal)
 }
 
 const (
@@ -155,6 +157,12 @@ func defaultOptions() rootOptions {
 		},
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
+		},
+		setupSignals: func(c chan os.Signal) {
+			setupSignals(c)
+		},
+		setupResizeSignal: func(c chan os.Signal) {
+			setupResizeSignal(c)
 		},
 		logger: logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
@@ -690,7 +698,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Handle signals and forward them to the container
 	sigChan := make(chan os.Signal, 1)
-	setupSignals(sigChan)
+	o.setupSignals(sigChan)
 	defer signal.Stop(sigChan)
 	go func() {
 		firstSignal := true
@@ -758,7 +766,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Handle window resize synchronization
 	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
-		setupResizeSignal(resizeChan)
+		o.setupResizeSignal(resizeChan)
 		defer signal.Stop(resizeChan)
 		go func() {
 			for {
@@ -1158,7 +1166,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
 			if strings.HasPrefix(arg, "--") {
 				name := strings.SplitN(arg[2:], "=", 2)[0]
-				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+				f := cmd.Flags().Lookup(name)
+				if f == nil {
+					f = cmd.PersistentFlags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
 					// Flag exists, takes an argument, and no '=' used, so skip next argument.
 					i++
 				}
@@ -1166,7 +1178,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 				// Shorthand(s), e.g., -i, -it, -p 80:80
 				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
 				lastChar := string(arg[len(arg)-1])
-				if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+				f := cmd.Flags().ShorthandLookup(lastChar)
+				if f == nil {
+					f = cmd.PersistentFlags().ShorthandLookup(lastChar)
+				}
+				if f != nil && f.NoOptDefVal == "" {
 					// Last shorthand takes an argument, skip next argument.
 					i++
 				}

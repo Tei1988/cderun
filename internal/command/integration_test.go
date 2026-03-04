@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ import (
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
-func TestIntegration_BasicExecution(t *testing.T) {
+func TestIntegration_Basic_Execution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -114,7 +115,159 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 }
 
-func TestIntegration_ToolsYAML(t *testing.T) {
+func TestIntegration_Root_CommandResolution(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{
+		CreatedContainerID: "test-container-id",
+		ExitCode:           42,
+	}
+	var capturedExitCode int
+
+	// Use ExecuteContextWithOptions directly to capture exit code and use mock runtime
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {
+			capturedExitCode = code
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.NoError(t, err)
+
+	cfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, cfg)
+	assert.Equal(t, "node:20-alpine", cfg.Image)
+	assert.Equal(t, []string{"--version"}, cfg.Command)
+	assert.True(t, cfg.TTY)
+	assert.True(t, cfg.Interactive)
+	assert.Equal(t, "host", cfg.Network)
+	assert.Equal(t, "test-container-id", mockRuntime.GetStartedContainerID())
+	assert.Equal(t, "test-container-id", mockRuntime.GetWaitedContainerID())
+	assert.Equal(t, "test-container-id", mockRuntime.GetRemovedContainerID())
+	assert.Equal(t, 42, capturedExitCode)
+}
+
+func TestIntegration_Root_P1Override(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "sh", "--cderun-tty=false"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.NoError(t, err)
+	assert.False(t, mockRuntime.CreatedConfig.TTY)
+}
+
+func TestIntegration_Root_ShorthandTTY(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "-t", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.NoError(t, err)
+	assert.True(t, mockRuntime.CreatedConfig.TTY)
+}
+
+func TestIntegration_Root_DiagnosisPrecedence(t *testing.T) {
+	// diagnosis mode works with subcommand and takes precedence
+	mockRuntime := &runtime.MockRuntime{}
+	var out bytes.Buffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return true }
+		cmd.SetOut(&out)
+	})
+	require.NoError(t, err)
+	output := out.String()
+	assert.Contains(t, output, "runtime:")
+	assert.Contains(t, output, "configs:")
+	assert.NotContains(t, output, "image: node") // Should not be container config dry-run
+}
+
+func TestIntegration_Root_DryRun(t *testing.T) {
+	// Dry-run with simple
+	var out bytes.Buffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.isTerminal = func(fd int) bool { return true }
+		cmd.SetOut(&out)
+	})
+	require.NoError(t, err)
+	output := out.String()
+	assert.Contains(t, output, "Image: alpine")
+	assert.Contains(t, output, "Command: echo hello")
+	assert.NotContains(t, output, "Command: sh")
+}
+
+func TestIntegration_Root_AttachFailure(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{
+		AttachErr: errors.New("attach failed"),
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+}
+
+func TestIntegration_Root_RemoveWarning(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{
+		RemoveErr: errors.New("failed to remove"),
+	}
+
+	var stderrBuf bytes.Buffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return true }
+		cmd.SetErr(&stderrBuf)
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, stderrBuf.String(), "[WARN] failed to remove container (defer): failed to remove")
+}
+
+func TestIntegration_Root_PullFailure(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{
+		PullErr: errors.New("pull failed"),
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to pull image: pull failed")
+}
+
+func TestIntegration_Root_CreateFailure(t *testing.T) {
+	mockRuntime := &runtime.MockRuntime{
+		CreateErr: errors.New("create failed"),
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create container: create failed")
+}
+
+func TestIntegration_Config_ToolsYAML(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -148,7 +301,7 @@ node:
 	assert.Equal(t, "/container", mockRuntime.CreatedConfig.Mounts[0].Target)
 }
 
-func TestIntegration_PriorityEnvOverTools(t *testing.T) {
+func TestIntegration_Config_PriorityEnvOverTools(t *testing.T) {
 	t.Setenv("CDERUN_IMAGE", "env-image:latest")
 	setupTestDir(t)
 
@@ -161,7 +314,7 @@ func TestIntegration_PriorityEnvOverTools(t *testing.T) {
 	assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
 }
 
-func TestIntegration_BaseCommandFromTools(t *testing.T) {
+func TestIntegration_Config_BaseCommandFromTools(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -180,7 +333,7 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_EnvPassThrough(t *testing.T) {
+func TestIntegration_Config_EnvPassThrough(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -219,7 +372,7 @@ node:
 	assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")
 }
 
-func TestIntegration_MountToolsNotFound(t *testing.T) {
+func TestIntegration_Config_MountToolsNotFound(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -238,7 +391,7 @@ python:
 	assert.Contains(t, err.Error(), "available tools: node, python")
 }
 
-func TestIntegration_MountToolsAutoEnable(t *testing.T) {
+func TestIntegration_Config_MountToolsAutoEnable(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
@@ -268,7 +421,7 @@ func TestIntegration_MountToolsAutoEnable(t *testing.T) {
 	assert.True(t, socketFound)
 }
 
-func TestIntegration_MountToolsLogic(t *testing.T) {
+func TestIntegration_Config_MountToolsLogic(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -321,7 +474,7 @@ sh:
 	assert.True(t, pythonFound)
 }
 
-func TestIntegration_MountAllToolsEmptyConfig(t *testing.T) {
+func TestIntegration_Config_MountAllToolsEmptyConfig(t *testing.T) {
 	setupTestDir(t)
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -335,7 +488,7 @@ func TestIntegration_MountAllToolsEmptyConfig(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 }
 
-func TestIntegration_ExcludeToolSubcommand(t *testing.T) {
+func TestIntegration_Config_ExcludeToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
@@ -347,7 +500,7 @@ func TestIntegration_ExcludeToolSubcommand(t *testing.T) {
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_IncludeExplicitToolSubcommand(t *testing.T) {
+func TestIntegration_Config_IncludeExplicitToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -363,7 +516,7 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_DockerCompatible(t *testing.T) {
+func TestIntegration_Config_DockerCompatible(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
@@ -387,7 +540,7 @@ node:
 	assert.InDelta(t, 1.5, mockRuntime.CreatedConfig.CPUs, 0.0001)
 }
 
-func TestIntegration_InternalOverrides(t *testing.T) {
+func TestIntegration_Config_InternalOverrides(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
@@ -494,7 +647,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 	})
 }
 
-func TestIntegration_ConfigFlags(t *testing.T) {
+func TestIntegration_Config_ConfigFlags(t *testing.T) {
 	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
 		setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}

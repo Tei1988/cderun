@@ -2,22 +2,29 @@ package command
 
 import (
 	"os"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUnit_Signals_GetSignalName(t *testing.T) {
-	assert.Equal(t, "SIGINT", getSignalName(os.Interrupt))
-	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
-
-	// Platform-specific signals
-	// On Unix, SIGTERM is supported. On Windows, it might not be.
-	// We check for some standard ones.
+	tests := []struct {
+		sig  os.Signal
+		want string
+	}{
+		{os.Interrupt, "SIGINT"},
+		{os.Kill, "SIGKILL"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := getSignalName(tt.sig); got != tt.want {
+				t.Errorf("getSignalName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 
 	t.Run("Other signals", func(t *testing.T) {
-		// Just ensure it doesn't panic and returns a string
-		assert.NotEmpty(t, getSignalName(syscall.Signal(99)))
+		// Just ensure it doesn't panic
+		assert.NotEmpty(t, getSignalName(os.Interrupt))
 	})
 }

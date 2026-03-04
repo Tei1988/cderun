@@ -102,3 +102,30 @@ func TestUnit_Flags_DockerCompatible(t *testing.T) {
 		assert.InDelta(t, 2.0, cfg.CPUs, 0.0001)
 	})
 }
+
+func TestUnit_Flags_StrictEnv(t *testing.T) {
+	t.Run("--strict-env flag", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+		})
+		// Should fail because NONEXISTENT env is not on host and strict-env is true
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
+
+	t.Run("--cderun-strict-env override", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+		})
+		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
+		require.NoError(t, err)
+	})
+}

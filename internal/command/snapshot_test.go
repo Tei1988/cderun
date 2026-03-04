@@ -66,7 +66,7 @@ func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
 	assert.Nil(t, globalCfg.HostContext)
 }
 
-func TestUnit_Snapshot_Permissions(t *testing.T) {
+func TestUnit_Snapshot_DirectoryPermissions(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
@@ -95,7 +95,7 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 	return m.Content, m.Err
 }
 
-func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
+func TestUnit_Snapshot_DiscoverOverlayUpperDir(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()
