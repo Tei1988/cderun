@@ -66,5 +66,5 @@ func TestFeature(t *testing.T) {
 
 `docs/features/test-organization-plan.md` に定義されている命名規則とカテゴリに従ってください。
 
-- **命名規則:** `Test[Category]_[Package]_[Feature]_[Scenario]`
+- **命名規則:** `Test[Category]_[Feature]_[Scenario]`
 - **配置:** ロジックに応じた適切なテストファイル（`root_test.go`, `integration_test.go`, `robustness_test.go` など）を選択してください。

@@ -58,6 +58,7 @@
 | ログ・デバッグ | `internal/logging/logger_test.go` |
 | インタラクティブ | `internal/command/robustness_test.go`, `internal/command/stdin_test.go` |
 | 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` |
+| ハングリカバリ | `internal/command/docker_hang_test.go` |
 | Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` |
 | 診断モード | `internal/command/root_test.go` |
 | Expressions | `internal/config/resolver_test.go`, `internal/command/integration_test.go` |
