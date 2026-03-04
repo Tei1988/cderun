@@ -210,7 +210,6 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
 - `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
 - `entrypoint` ([]string): エントリーポイント
-- `command` ([]string): デフォルトのコマンド引数。サブコマンドの後に結合されます。
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
@@ -266,7 +265,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
 - `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
 - `entrypoint` ([]string): エントリーポイント
-- `command` ([]string): デフォルトのコマンド引数
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
