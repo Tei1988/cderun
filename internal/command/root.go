@@ -156,7 +156,7 @@ func defaultOptions() rootOptions {
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
 		},
-		logger: logging.GetGlobalLogger(),
+		logger: logging.NewLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":

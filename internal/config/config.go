@@ -293,6 +293,7 @@ func expandHome(p string, fs FileSystem) (string, error) {
 // FileSystem defines the interface for filesystem operations.
 type FileSystem interface {
 	Getwd() (string, error)
+	Abs(path string) (string, error)
 	Stat(name string) (os.FileInfo, error)
 	ReadFile(name string) ([]byte, error)
 	UserHomeDir() (string, error)
@@ -309,6 +310,7 @@ type FileSystem interface {
 type RealFileSystem struct{}
 
 func (RealFileSystem) Getwd() (string, error)                { return os.Getwd() }
+func (RealFileSystem) Abs(path string) (string, error)       { return filepath.Abs(path) }
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } //nolint:gosec
 func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
@@ -379,7 +381,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 		for {
 			p := filepath.Join(curr, filename)
 			if _, err := l.fs.Stat(p); err == nil {
-				if abs, err := filepath.Abs(p); err == nil {
+				if abs, err := l.fs.Abs(p); err == nil {
 					paths = append(paths, abs)
 				} else {
 					paths = append(paths, p)
@@ -397,7 +399,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 	if home, err := l.fs.UserHomeDir(); err == nil {
 		p := filepath.Join(home, ".config", "cderun", filename)
 		if _, err := l.fs.Stat(p); err == nil {
-			if abs, err := filepath.Abs(p); err == nil {
+			if abs, err := l.fs.Abs(p); err == nil {
 				paths = append(paths, abs)
 			} else {
 				paths = append(paths, p)
@@ -532,7 +534,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 		return nil, nil, err
 	}
 	path = expanded
-	absPath, err := filepath.Abs(path)
+	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 	}
@@ -562,7 +564,7 @@ func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []stri
 		return nil, nil, err
 	}
 	path = expanded
-	absPath, err := filepath.Abs(path)
+	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 	}

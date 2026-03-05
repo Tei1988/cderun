@@ -945,7 +945,7 @@ func TestUnit_Resolver_StringSlice(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_Devices_Env(t *testing.T) {
+func TestUnit_Resolver_DevicesEnv(t *testing.T) {
 	t.Run("Multiple devices in CDERUN_DEVICE", func(t *testing.T) {
 		t.Setenv("CDERUN_DEVICE", "/dev/video0:/dev/video0,/dev/fuse:/dev/fuse:rm")
 		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
@@ -964,7 +964,7 @@ func TestUnit_Resolver_Devices_Env(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_Float64_Precedence(t *testing.T) {
+func TestUnit_Resolver_Float64Precedence(t *testing.T) {
 	t.Run("Tool returns 0, should fallback to global", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -984,7 +984,7 @@ func TestUnit_Resolver_Float64_Precedence(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_StringSlice_Precedence(t *testing.T) {
+func TestUnit_Resolver_StringSlicePrecedence(t *testing.T) {
 	t.Run("Tool returns empty, should fallback to global", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
@@ -1004,7 +1004,7 @@ func TestUnit_Resolver_StringSlice_Precedence(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_Devices_Invalid(t *testing.T) {
+func TestUnit_Resolver_DevicesInvalid(t *testing.T) {
 	t.Run("Invalid device in P1 override", func(t *testing.T) {
 		cli := CLIOptions{
 			CderunDevices: []string{":/invalid"},
@@ -1016,7 +1016,7 @@ func TestUnit_Resolver_Devices_Invalid(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_StringSlice_P1P2(t *testing.T) {
+func TestUnit_Resolver_StringSliceP1P2(t *testing.T) {
 	t.Run("P1 takes priority", func(t *testing.T) {
 		cli := CLIOptions{
 			CderunDNS: []string{"1.1.1.1"},

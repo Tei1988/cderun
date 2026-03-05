@@ -4,37 +4,80 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
 
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
+type testFileSystem struct {
+	config.RealFileSystem
+	wd  string
+	env map[string]string
+}
+
+func (f *testFileSystem) Getwd() (string, error) {
+	return f.wd, nil
+}
+
+func (f *testFileSystem) Abs(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(f.wd, path), nil
+}
+
+func (f *testFileSystem) Getenv(key string) string {
+	if f.env != nil {
+		if v, ok := f.env[key]; ok {
+			return v
+		}
+	}
+	return f.RealFileSystem.Getenv(key)
+}
+
+func (f *testFileSystem) LookupEnv(key string) (string, bool) {
+	if f.env != nil {
+		if v, ok := f.env[key]; ok {
+			return v, true
+		}
+	}
+	return f.RealFileSystem.LookupEnv(key)
+}
+
+func (f *testFileSystem) Setenv(key, value string) {
+	if f.env == nil {
+		f.env = make(map[string]string)
+	}
+	f.env[key] = value
+}
+
 // runCderun runs the cderun command in-process for integration testing.
 // It captures stdout and stderr and returns the exit code.
-// Note: This function uses bytes.Buffers and cmd.SetOut/SetErr for isolation,
-// and it is safe for parallel execution with t.Parallel() as it does not
-// mutate global file descriptors.
+// Note: This function uses bytes.Buffers and cmd.SetOut/SetErr for isolation.
 // It uses ExecuteContextWithOptions to isolate command execution.
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
-	return runCderunCore(nil, args...)
+	return runCderunCore(nil, nil, args...)
+}
+
+// runCderunWithSetup runs the cderun command with custom setup.
+func runCderunWithSetup(setup func(o *rootOptions, cmd *cobra.Command), args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCore(nil, setup, args...)
 }
 
 // runCderunWithStdin runs the cderun command in-process with a custom stdin.
-//
-//nolint:unused
 func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
-	return runCderunCore(stdin, args...)
+	return runCderunCore(stdin, nil, args...)
 }
 
 // runCderunCore is the shared implementation for in-process command execution.
 // It uses bytes.Buffer and cmd.SetOut/SetErr for isolation.
-func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+func runCderunCore(stdin io.Reader, setup func(o *rootOptions, cmd *cobra.Command), args ...string) (stdout, stderr string, exitCode int, err error) {
 	var outBuf, errBuf bytes.Buffer
 
 	// Use a timeout context to prevent indefinite hangs in CI/E2E environments.
@@ -52,6 +95,9 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		}
 		cmd.SetOut(&outBuf)
 		cmd.SetErr(&errBuf)
+		if setup != nil {
+			setup(o, cmd)
+		}
 	})
 
 	return outBuf.String(), errBuf.String(), capturedExitCode, execErr
@@ -93,12 +139,12 @@ func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOption
 	}
 }
 
-func setupTestDir(t *testing.T) string {
+func setupTestDir(t *testing.T) (string, *testFileSystem, func(o *rootOptions, cmd *cobra.Command)) {
 	t.Helper()
-	restoreWd, err := os.Getwd()
-	require.NoError(t, err)
 	tmpDir := t.TempDir()
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
-	return tmpDir
+	fs := &testFileSystem{wd: tmpDir, env: make(map[string]string)}
+	return tmpDir, fs, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = fs
+		o.configLoader = config.NewConfigLoaderWithFS(fs)
+	}
 }

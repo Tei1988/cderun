@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +18,9 @@ import (
 )
 
 func TestUnit_Polyglot_Flags(t *testing.T) {
+	t.Parallel()
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
+		t.Parallel()
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 
@@ -67,6 +70,7 @@ func TestUnit_Polyglot_Flags(t *testing.T) {
 	})
 
 	t.Run("flags WITH cderun-prefix ARE picked up in polyglot mode", func(t *testing.T) {
+		t.Parallel()
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 
@@ -115,9 +119,10 @@ func TestUnit_Polyglot_Flags(t *testing.T) {
 }
 
 func TestIntegration_Polyglot_Symlink(t *testing.T) {
-	setupTestDir(t)
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("node:\n  image: node:20-alpine"), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{
@@ -127,7 +132,7 @@ func TestIntegration_Polyglot_Symlink(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime, setup))
 
 	require.NoError(t, err)
 	cfg := mockRuntime.GetCreatedConfig()

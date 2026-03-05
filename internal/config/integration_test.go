@@ -9,32 +9,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntegration_Config_Load_RealFS(t *testing.T) {
+type testFileSystem struct {
+	RealFileSystem
+	wd string
+}
+
+func (f *testFileSystem) Getwd() (string, error) {
+	return f.wd, nil
+}
+
+func (f *testFileSystem) Abs(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(f.wd, path), nil
+}
+
+func TestIntegration_ConfigLoader_LoadRealFS(t *testing.T) {
+	t.Parallel()
 	// Keep one test with real filesystem to ensure RealFileSystem works
-	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tmpDir := t.TempDir()
 
 	content := "runtime: docker"
-	err = os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0o644)
 	require.NoError(t, err)
 
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	// Changing the working directory is process-global and can affect parallel tests.
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() {
-		// Restore the original working directory after the test.
-		require.NoError(t, os.Chdir(originalWd))
-	})
+	fs := &testFileSystem{wd: tmpDir}
+	loader := NewConfigLoaderWithFS(fs)
 
-	cfg, paths, err := LoadCDERunConfig()
+	cfg, paths, err := loader.LoadCDERunConfig()
 	require.NoError(t, err)
 	assert.NotNil(t, cfg)
 	assert.NotEmpty(t, paths)
+	assert.Equal(t, filepath.Join(tmpDir, ".cderun.yaml"), paths[0])
 }
 
-func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
+func TestIntegration_ConfigLoader_MergeHierarchical(t *testing.T) {
+	t.Parallel()
 	// Create a temporary directory structure
 	// tmp/
 	//   .cderun.yaml (parent)
@@ -43,12 +54,10 @@ func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
 	//     .cderun.yaml (child)
 	//     .tools.yaml (child)
 
-	tmpDir, err := os.MkdirTemp("", "cderun-merge-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	tmpDir := t.TempDir()
 
 	childDir := filepath.Join(tmpDir, "child")
-	err = os.MkdirAll(childDir, 0o755)
+	err := os.MkdirAll(childDir, 0o755)
 	require.NoError(t, err)
 
 	// Parent configs
@@ -84,18 +93,16 @@ python:
 	err = os.WriteFile(filepath.Join(childDir, ".tools.yaml"), []byte(childTools), 0o644)
 	require.NoError(t, err)
 
-	// Change working directory to childDir
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(childDir))
-	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
+	fs := &testFileSystem{wd: childDir}
+	loader := NewConfigLoaderWithFS(fs)
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
-		cfg, paths, err := LoadCDERunConfig()
+		t.Parallel()
+		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
 		require.Len(t, paths, 2)
-		assert.Contains(t, paths[0], filepath.Join("child", ".cderun.yaml"))
-		assert.Contains(t, paths[1], filepath.Join(".cderun.yaml"))
+		assert.Equal(t, filepath.Join(childDir, ".cderun.yaml"), paths[0])
+		assert.Equal(t, filepath.Join(tmpDir, ".cderun.yaml"), paths[1])
 
 		assert.Equal(t, "docker", cfg.Runtime)          // From parent
 		assert.True(t, *cfg.Defaults.TTY)               // From child (overridden)
@@ -103,14 +110,13 @@ python:
 	})
 
 	t.Run("ToolsConfig Merge", func(t *testing.T) {
-		cfg, paths, err := LoadToolsConfig()
+		t.Parallel()
+		cfg, paths, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
 		require.Len(t, paths, 2)
 
 		node := cfg["node"]
 		assert.Equal(t, "node:16", node.Image) // From child (overridden)
-		// Note: 既存の ToolConfig に対して mergo.Merge を使って深いマージを行う (LoadToolsConfig 内)。
-		// yaml.Unmarshal はファイルの読み込みに使用され、実際の深いマージは mergo.Merge が担当する。
 		assert.Equal(t, []string{"PARENT=1"}, node.Env) // From parent (preserved by deep merge)
 
 		python := cfg["python"]
@@ -118,50 +124,48 @@ python:
 	})
 }
 
-func TestIntegration_Config_Expression_Resolve(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+func TestIntegration_Expression_Resolve(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
 
-	originalWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { require.NoError(t, os.Chdir(originalWd)) })
-
-	resolver, err := NewExpressionResolver(nil)
+	fs := &testFileSystem{wd: tmpDir}
+	resolver, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
 
 	t.Run("Magic Words", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t, resolver.Pwd, resolver.Resolve("{{PWD}}"))
 		assert.Equal(t, resolver.Home, resolver.Resolve("{{HOME}}"))
 		assert.Equal(t, resolver.Pwd+"/src", resolver.Resolve("{{PWD}}/src"))
 	})
 
 	t.Run("File Directive", func(t *testing.T) {
-		err := os.WriteFile("version.txt", []byte(" 1.2.3 \n"), 0o644)
+		t.Parallel()
+		err := os.WriteFile(filepath.Join(tmpDir, "version.txt"), []byte(" 1.2.3 \n"), 0o644)
 		require.NoError(t, err)
 
 		assert.Equal(t, "golang:1.2.3", resolver.Resolve("golang:{{file:version.txt}}"))
 		require.NoError(t, resolver.Error())
 		resolver.Resolve("{{file:nonexistent.txt}}")
 		require.Error(t, resolver.Error())
-		resolver, _ = NewExpressionResolver(nil) // Reset
 
 		t.Run("Path Traversal Protection", func(t *testing.T) {
+			t.Parallel()
 			// Absolute path should be blocked
-			resolver, _ = NewExpressionResolver(nil)
-			resolver.Resolve("{{file:/etc/passwd}}")
-			require.Error(t, resolver.Error())
+			r, _ := NewExpressionResolverWithFS(nil, fs)
+			r.Resolve("{{file:/etc/passwd}}")
+			require.Error(t, r.Error())
 
 			// Parent directory reference should be blocked
-			resolver, _ = NewExpressionResolver(nil)
-			resolver.Resolve("{{file:../etc/passwd}}")
-			require.Error(t, resolver.Error())
+			r, _ = NewExpressionResolverWithFS(nil, fs)
+			r.Resolve("{{file:../etc/passwd}}")
+			require.Error(t, r.Error())
 		})
 	})
 
 	t.Run("Nested Structures", func(t *testing.T) {
-		resolver, _ = NewExpressionResolver(nil) // Reset
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, fs)
 		input := map[string]any{
 			"image": "node:{{PWD}}",
 			"env": []any{
@@ -170,15 +174,15 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 			},
 		}
 		expected := map[string]any{
-			"image": "node:" + resolver.Pwd,
+			"image": "node:" + r.Pwd,
 			"env": []any{
-				"HOME=" + resolver.Home,
+				"HOME=" + r.Home,
 				"OTHER=fixed",
 			},
 		}
 
 		// Map iteration order is random, but values should match
-		resolved := resolver.Resolve(input)
+		resolved := r.Resolve(input)
 		actual, ok := resolved.(map[string]any)
 		require.True(t, ok, "Resolve should return map[string]any, got %T", resolved)
 		assert.Equal(t, expected["image"], actual["image"])

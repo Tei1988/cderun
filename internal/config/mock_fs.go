@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -26,6 +27,13 @@ type MockFileSystem struct {
 
 func (m *MockFileSystem) Getwd() (string, error) {
 	return m.WD, nil
+}
+
+func (m *MockFileSystem) Abs(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(m.WD, path), nil
 }
 
 type mockFileInfo struct {

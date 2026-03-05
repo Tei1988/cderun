@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,18 +19,19 @@ import (
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
-func TestIntegration_BasicExecution(t *testing.T) {
+func TestIntegration_Root_BasicExecution(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 
 	t.Run("cderun alpine echo hello", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0o644)
+		err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
+		stdout, _, exitCode, err := runCderunWithSetup(setup, "echo", "hello-cderun")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -37,16 +39,17 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 
 	t.Run("volume mounting", func(t *testing.T) {
-		tmpDir := setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0o644)
+		err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("cat:\n  image: "+testImage+"\n  entrypoint: [\"cat\"]"), 0o644)
 		require.NoError(t, err)
 
 		hostFile := filepath.Join(tmpDir, "hello.txt")
 		err = os.WriteFile(hostFile, []byte("hello-from-host"), 0o644)
 		require.NoError(t, err)
 
-		stdout, stderr, exitCode, err := runCderun("--log-level", "info", "--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
+		stdout, stderr, exitCode, err := runCderunWithSetup(setup, "--log-level", "info", "--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode, "cat failed with exit code %d, stderr: %s", exitCode, stderr)
@@ -54,13 +57,14 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 
 	t.Run("environment variables", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, fs, setup := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0o644)
+		err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("env:\n  image: "+testImage+"\n  entrypoint: [\"env\"]"), 0o644)
 		require.NoError(t, err)
 
-		t.Setenv("HOST_VAR", "host-value")
-		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
+		fs.Setenv("HOST_VAR", "host-value")
+		stdout, _, exitCode, err := runCderunWithSetup(setup, "-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -69,19 +73,22 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		_, _, exitCode, err := runCderunWithSetup(setup, "--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
 	})
 
 	t.Run("cderun expressions", func(t *testing.T) {
-		tmpDir := setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 
-		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0o644)
+		err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "env")
+		stdout, _, exitCode, err := runCderunWithSetup(setup, "mytool", "env")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -89,16 +96,17 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 
 	t.Run("relative path and tilde expansion", func(t *testing.T) {
-		tmpDir := setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 
 		subDir := filepath.Join(tmpDir, "subdir")
 		err := os.MkdirAll(subDir, 0o755)
 		require.NoError(t, err)
 
-		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0o644)
+		err = os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
+		stdout, _, exitCode, err := runCderunWithSetup(setup, "mytool", "ls", "-d", "/mnt")
 		skipIfDockerBroken(t, err)
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
@@ -106,16 +114,19 @@ func TestIntegration_BasicExecution(t *testing.T) {
 	})
 
 	t.Run("mount-cderun-path", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
 		customPath := "/tmp/custom-cderun"
-		stdout, _, exitCode, err := runCderun("--image", testImage, "--mount-socket", "--mount-cderun", "--mount-cderun-path", customPath, "--dry-run", "--dry-run-format", "simple", "echo", "hello")
+		stdout, _, exitCode, err := runCderunWithSetup(setup, "--image", testImage, "--mount-socket", "--mount-cderun", "--mount-cderun-path", customPath, "--dry-run", "--dry-run-format", "simple", "echo", "hello")
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "source="+customPath+",target=/usr/local/bin/cderun")
 	})
 }
 
-func TestIntegration_ToolsYAML(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Config_ToolsYAML(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
@@ -129,11 +140,11 @@ node:
       source: /host
       target: /container
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -148,31 +159,33 @@ node:
 	assert.Equal(t, "/container", mockRuntime.CreatedConfig.Mounts[0].Target)
 }
 
-func TestIntegration_PriorityEnvOverTools(t *testing.T) {
-	t.Setenv("CDERUN_IMAGE", "env-image:latest")
-	setupTestDir(t)
+func TestIntegration_Config_PriorityEnvOverTools(t *testing.T) {
+	t.Parallel()
+	tmpDir, fs, setup := setupTestDir(t)
+	fs.Setenv("CDERUN_IMAGE", "env-image:latest")
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("node:\n  image: node:20-alpine"), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 	assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
 }
 
-func TestIntegration_BaseCommandFromTools(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Config_BaseCommandFromTools(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
   image: node:20-alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -180,8 +193,9 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_EnvPassThrough(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Config_EnvPassThrough(t *testing.T) {
+	t.Parallel()
+	tmpDir, fs, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
@@ -192,11 +206,11 @@ node:
     - P1_OVERRIDE_KEY=TOOL_VALUE
     - HOST_KEY
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
-	t.Setenv("HOST_KEY", "HOST_VALUE")
-	t.Setenv("CLI_HOST_KEY", "CLI_HOST_VALUE")
+	fs.Setenv("HOST_KEY", "HOST_VALUE")
+	fs.Setenv("CLI_HOST_KEY", "CLI_HOST_VALUE")
 
 	mockRuntime := &runtime.MockRuntime{}
 	err = ExecuteContextWithOptions(context.Background(), []string{"cderun",
@@ -207,7 +221,7 @@ node:
 		"node",
 		"--cderun-env=P1_OVERRIDE_KEY=P1_VALUE",
 		"app.js",
-	}, withMockRuntime(mockRuntime))
+	}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	require.NotNil(t, mockRuntime.CreatedConfig)
@@ -219,8 +233,9 @@ node:
 	assert.Contains(t, envs, "P1_OVERRIDE_KEY=P1_VALUE")
 }
 
-func TestIntegration_MountToolsNotFound(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Mount_ToolsNotFound(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
@@ -228,24 +243,25 @@ node:
 python:
   image: python:3
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-socket", "--mount-tools", "unknown", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, setup))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "tool \"unknown\" not found in .tools.yaml")
 	assert.Contains(t, err.Error(), "available tools: node, python")
 }
 
-func TestIntegration_MountToolsAutoEnable(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Mount_ToolsAutoEnable(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("node:\n  image: node:20"), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-tools", "node", "sh"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-tools", "node", "sh"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 	require.NotNil(t, mockRuntime.CreatedConfig)
 
@@ -268,8 +284,9 @@ func TestIntegration_MountToolsAutoEnable(t *testing.T) {
 	assert.True(t, socketFound)
 }
 
-func TestIntegration_MountToolsLogic(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Mount_ToolsLogic(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
@@ -279,14 +296,14 @@ python:
 sh:
   image: alpine
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
 	exePath, err := os.Executable()
 	require.NoError(t, err)
 
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-tools", "node", "--mount-socket", "--socket-path", "/socket", "sh"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	nodeFound := false
@@ -304,7 +321,7 @@ sh:
 
 	// Test mount-all-tools
 	mockRuntime.CreatedConfig = nil
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "sh"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "sh"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	nodeFound = false
@@ -321,50 +338,55 @@ sh:
 	assert.True(t, pythonFound)
 }
 
-func TestIntegration_MountAllToolsEmptyConfig(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Mount_AllToolsEmptyConfig(t *testing.T) {
+	t.Parallel()
+	_, _, setup := setupTestDir(t)
 
 	mockRuntime := &runtime.MockRuntime{}
 	var outBuf, errBuf bytes.Buffer
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-all-tools", "--mount-socket", "--socket-path", "/socket", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 		cmd.SetOut(&outBuf)
 		cmd.SetErr(&errBuf)
+		setup(o, cmd)
 	}))
 	require.NoError(t, err)
 	// Warnings should be in stderr (errBuf)
 	assert.Contains(t, errBuf.String(), "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 }
 
-func TestIntegration_ExcludeToolSubcommand(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Root_ExcludeToolSubcommand(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("node:\n  image: node:20"), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_IncludeExplicitToolSubcommand(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Root_IncludeExplicitToolSubcommand(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
   image: node:20
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_DockerCompatible(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Flags_DockerCompatible(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
 	toolsContent := `
 node:
@@ -374,11 +396,11 @@ node:
   memory: 1g
   cpus: 1.5
 `
-	err := os.WriteFile(".tools.yaml", []byte(toolsContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte(toolsContent), 0o644)
 	require.NoError(t, err)
 
 	mockRuntime := &runtime.MockRuntime{}
-	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime))
+	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, setup))
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"8080:80"}, mockRuntime.CreatedConfig.Ports)
@@ -387,10 +409,11 @@ node:
 	assert.InDelta(t, 1.5, mockRuntime.CreatedConfig.CPUs, 0.0001)
 }
 
-func TestIntegration_InternalOverrides(t *testing.T) {
-	setupTestDir(t)
+func TestIntegration_Flags_InternalOverrides(t *testing.T) {
+	t.Parallel()
+	tmpDir, _, setup := setupTestDir(t)
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".tools.yaml"), []byte("node:\n  image: node:20-alpine"), 0o644)
 	require.NoError(t, err)
 
 	// mockRuntime and its CreatedConfig are shared between sequential subtests.
@@ -400,6 +423,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 	t.Run("cderun-tty overrides tty even if placed after subcommand", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--tty=true", "node", "--cderun-tty=false", "--version"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
 		}))
 		require.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
@@ -409,6 +433,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 		err := ExecuteContextWithOptions(context.Background(), []string{"node", "--cderun-tty=true", "--version"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
 		}))
 		require.NoError(t, err)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
@@ -417,6 +442,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 	t.Run("cderun internal overrides before subcommand result in error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--cderun-image=alpine:latest", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(code int) {}
+			setup(o, cmd)
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be placed after the subcommand")
@@ -426,6 +452,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine:stable", "sh", "--cderun-image=alpine:latest"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, "alpine:latest", mockRuntime.CreatedConfig.Image)
@@ -435,6 +462,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine", "--network=bridge", "--remove=false", "--workdir=/initial", "--mount=type=bind,source=/h1,target=/c1", "sh", "--cderun-network=host", "--cderun-remove=true", "--cderun-workdir=/override", "--cderun-mount=type=bind,source=/h2,target=/c2"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
@@ -446,12 +474,13 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 
 	t.Run("cderun internal overrides for runtime, socket and mounting", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		setupTestDir(t)
-		err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
+		tmpDir2, _, setup2 := setupTestDir(t)
+		err := os.WriteFile(filepath.Join(tmpDir2, ".tools.yaml"), []byte("node:\n  image: node:20"), 0o644)
 		require.NoError(t, err)
 
 		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine", "sh", "--cderun-runtime=docker", "--cderun-socket-path=/var/run/custom.sock", "--cderun-mount-socket=true", "--cderun-mount-cderun=true", "--cderun-mount-tools=node"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
 			o.isTerminal = func(fd int) bool { return true }
+			setup2(o, cmd)
 		}))
 		require.NoError(t, err)
 
@@ -476,7 +505,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 
 	t.Run("cderun internal override can turn off remove", func(t *testing.T) {
 		mockRuntime.CreatedConfig = nil
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine", "--remove=true", "sh", "--cderun-remove=false"}, withMockRuntime(mockRuntime))
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine", "--remove=true", "sh", "--cderun-remove=false"}, withMockRuntime(mockRuntime, setup))
 		require.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.Remove)
 	})
@@ -487,6 +516,7 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image=alpine", "sh", "echo", "hello", "--cderun-dry-run", "--cderun-dry-run-format=simple"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(code int) {}
 			cmd.SetOut(&outBuf)
+			setup(o, cmd)
 		})
 		require.NoError(t, err)
 		assert.Contains(t, outBuf.String(), "Image: alpine")
@@ -494,24 +524,26 @@ func TestIntegration_InternalOverrides(t *testing.T) {
 	})
 }
 
-func TestIntegration_ConfigFlags(t *testing.T) {
+func TestIntegration_Flags_Config(t *testing.T) {
+	t.Parallel()
 	t.Run("--config flag overrides hierarchical search", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
 		// Create hierarchical config that should be skipped
-		err := os.WriteFile(".cderun.yaml", []byte("runtime: podman"), 0o644)
+		err := os.WriteFile(filepath.Join(tmpDir, ".cderun.yaml"), []byte("runtime: podman"), 0o644)
 		require.NoError(t, err)
 
 		// Create custom config
-		err = os.MkdirAll("custom", 0o755)
+		err = os.MkdirAll(filepath.Join(tmpDir, "custom"), 0o755)
 		require.NoError(t, err)
-		err = os.WriteFile("custom/my.yaml", []byte(`runtime: docker
+		err = os.WriteFile(filepath.Join(tmpDir, "custom/my.yaml"), []byte(`runtime: docker
 defaults:
   network: host`), 0o644)
 		require.NoError(t, err)
 
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "custom/my.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime))
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "custom/my.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, setup))
 		require.NoError(t, err)
 
 		// Check the network mode returned in mockRuntime.CreatedConfig.Network
@@ -520,95 +552,305 @@ defaults:
 	})
 
 	t.Run("--cderun-config overrides standard config flag", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
-		err := os.WriteFile("config1.yaml", []byte(`defaults:
+		err := os.WriteFile(filepath.Join(tmpDir, "config1.yaml"), []byte(`defaults:
   network: net1`), 0o644)
 		require.NoError(t, err)
-		err = os.WriteFile("config2.yaml", []byte(`defaults:
+		err = os.WriteFile(filepath.Join(tmpDir, "config2.yaml"), []byte(`defaults:
   network: net2`), 0o644)
 		require.NoError(t, err)
 
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "config1.yaml", "--image", "alpine", "sh", "--cderun-config", "config2.yaml"}, withMockRuntime(mockRuntime))
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "config1.yaml", "--image", "alpine", "sh", "--cderun-config", "config2.yaml"}, withMockRuntime(mockRuntime, setup))
 		require.NoError(t, err)
 		assert.Equal(t, "net2", mockRuntime.CreatedConfig.Network)
 	})
 
 	t.Run("CDERUN_CONFIG env var works", func(t *testing.T) {
-		cwd := setupTestDir(t)
+		t.Parallel()
+		cwd, fs, _ := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
 		configPath := filepath.Join(cwd, "env-config.yaml")
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
-			o.fs = &config.MockFileSystem{
-				Files: map[string][]byte{
-					configPath: []byte(`defaults:
-  network: env-net`),
-				},
-				WD: cwd,
-				Env: map[string]string{
-					"CDERUN_CONFIG": "env-config.yaml",
-				},
-			}
+			fs.Setenv("CDERUN_CONFIG", "env-config.yaml")
+			o.fs = fs
+			o.configLoader = config.NewConfigLoaderWithFS(fs)
+			_ = fs.WriteFile(configPath, []byte(`defaults:
+  network: env-net`), 0o644)
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, "env-net", mockRuntime.CreatedConfig.Network)
 	})
 
 	t.Run("Missing config file results in error", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "non-existent.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime))
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "non-existent.yaml", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, setup))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load cderun config")
 	})
 
 	t.Run("--tool-config flag works", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
-		err := os.WriteFile("custom-tools.yaml", []byte(`node:
+		err := os.WriteFile(filepath.Join(tmpDir, "custom-tools.yaml"), []byte(`node:
   image: node:custom`), 0o644)
 		require.NoError(t, err)
 
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--tool-config", "custom-tools.yaml", "node", "--version"}, withMockRuntime(mockRuntime))
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--tool-config", "custom-tools.yaml", "node", "--version"}, withMockRuntime(mockRuntime, setup))
 		require.NoError(t, err)
 		assert.Equal(t, "node:custom", mockRuntime.CreatedConfig.Image)
 	})
 
 	t.Run("--cderun-tool-config flag works", func(t *testing.T) {
-		setupTestDir(t)
+		t.Parallel()
+		tmpDir, _, setup := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
-		err := os.WriteFile("override-tools.yaml", []byte(`node:
+		err := os.WriteFile(filepath.Join(tmpDir, "override-tools.yaml"), []byte(`node:
   image: node:override`), 0o644)
 		require.NoError(t, err)
 
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "--version", "--cderun-tool-config", "override-tools.yaml"}, withMockRuntime(mockRuntime))
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "--version", "--cderun-tool-config", "override-tools.yaml"}, withMockRuntime(mockRuntime, setup))
 		require.NoError(t, err)
 		assert.Equal(t, "node:override", mockRuntime.CreatedConfig.Image)
 	})
 
 	t.Run("CDERUN_TOOL_CONFIG env var works", func(t *testing.T) {
-		cwd := setupTestDir(t)
+		t.Parallel()
+		cwd, fs, _ := setupTestDir(t)
 		mockRuntime := &runtime.MockRuntime{}
 
 		toolsPath := filepath.Join(cwd, "env-tools.yaml")
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "--version"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
-			o.fs = &config.MockFileSystem{
-				Files: map[string][]byte{
-					toolsPath: []byte(`node:
-  image: node:env`),
-				},
-				WD: cwd,
-				Env: map[string]string{
-					"CDERUN_TOOL_CONFIG": "env-tools.yaml",
-				},
-			}
+			fs.Setenv("CDERUN_TOOL_CONFIG", "env-tools.yaml")
+			o.fs = fs
+			o.configLoader = config.NewConfigLoaderWithFS(fs)
+			_ = fs.WriteFile(toolsPath, []byte(`node:
+  image: node:env`), 0o644)
 		}))
 		require.NoError(t, err)
 		assert.Equal(t, "node:env", mockRuntime.CreatedConfig.Image)
+	})
+}
+
+func TestIntegration_Root_Phase3Features(t *testing.T) {
+	t.Parallel()
+	t.Run("workdir, mount and device flags", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
+		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
+		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Mounts[0].Source)
+		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Mounts[0].Target)
+		assert.True(t, mockRuntime.CreatedConfig.Mounts[0].ReadOnly)
+
+		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathInContainer)
+		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
+	})
+
+	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
+		t.Parallel()
+		_, fs, setup := setupTestDir(t)
+		fs.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
+		// If unspecified, --mount-cderun should auto-enable --mount-socket
+		fs.Setenv("CDERUN_MOUNT_SOCKET", "")
+
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Target == "/var/run/docker.sock" {
+				assert.Equal(t, "/var/run/docker.sock", v.Source)
+				socketFound = true
+			}
+		}
+		assert.True(t, socketFound, "Socket should be automatically mounted")
+
+		// If explicitly set to false, it should NOT mount the socket but NOT fail
+		fs.Setenv("CDERUN_MOUNT_SOCKET", "false")
+		mockRuntime = &runtime.MockRuntime{}
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+		require.NotNil(t, mockRuntime.CreatedConfig)
+
+		socketFound = false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
+				socketFound = true
+			}
+		}
+		assert.False(t, socketFound, "Socket should NOT be mounted when CDERUN_MOUNT_SOCKET=false")
+	})
+
+	t.Run("mount-cderun logic", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		exePath, _ := os.Executable()
+
+		binaryFound := false
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == exePath && v.Target == "/usr/local/bin/cderun" {
+				binaryFound = true
+			}
+			if v.Source == "/socket" && v.Target == "/socket" {
+				socketFound = true
+			}
+		}
+		assert.True(t, binaryFound, "binary should be mounted")
+		assert.True(t, socketFound, "socket should be mounted")
+	})
+
+	t.Run("mount-socket-path logic", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-socket", "--socket-path", "/host/socket", "--mount-socket-path", "/container/socket", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.isTerminal = func(fd int) bool { return true }
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+
+		require.NotNil(t, mockRuntime.CreatedConfig)
+		socketFound := false
+		for _, v := range mockRuntime.CreatedConfig.Mounts {
+			if v.Source == "/host/socket" && v.Target == "/container/socket" {
+				socketFound = true
+			}
+		}
+		assert.True(t, socketFound, "socket should be mounted to custom path")
+	})
+}
+
+func TestIntegration_Root_RemoveContainerWarning(t *testing.T) {
+	t.Parallel()
+	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{
+			RemoveErr: errors.New("failed to remove"),
+		}
+
+		var stderrBuf bytes.Buffer
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetErr(&stderrBuf)
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+
+		assert.Contains(t, stderrBuf.String(), "[WARN] failed to remove container (defer): failed to remove")
+	})
+
+	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{
+			RemoveErr: nil,
+		}
+
+		var stderrBuf bytes.Buffer
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetErr(&stderrBuf)
+			setup(o, cmd)
+		})
+		require.NoError(t, err)
+
+		assert.NotContains(t, stderrBuf.String(), "[WARN] failed to remove container (defer)")
+	})
+}
+
+func TestIntegration_Root_StrictEnvFlags(t *testing.T) {
+	t.Parallel()
+	t.Run("--strict-env flag", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			setup(o, cmd)
+		})
+		// Should fail because NONEXISTENT env is not on host and strict-env is true
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
+
+	t.Run("--cderun-strict-env override", func(t *testing.T) {
+		t.Parallel()
+		_, _, setup := setupTestDir(t)
+		mockRuntime := &runtime.MockRuntime{}
+		// Set global strictEnv to true via mock? No, just use flags.
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			setup(o, cmd)
+			o.fs = config.RealFileSystem{} // Ensure we use real FS to check env
+		})
+		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
+		require.NoError(t, err)
 	})
 }

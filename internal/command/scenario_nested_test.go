@@ -14,6 +14,7 @@ import (
 )
 
 func TestScenario_Nested_ExecutionFlow(t *testing.T) {
+	t.Parallel()
 	// Scenario: Standard Docker environment (level 0) running a container (level 1).
 	// We verify that a snapshot is created when requested.
 
@@ -30,16 +31,13 @@ func TestScenario_Nested_ExecutionFlow(t *testing.T) {
 		CreatedContainerID: "test-container-id",
 	}
 
-	savedWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(hostProjectDir))
-	t.Cleanup(func() { _ = os.Chdir(savedWd) })
-
+	fs := testFileSystem{wd: hostProjectDir}
 	err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-cderun", "node", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		o.exitFunc = func(code int) {}
+		o.fs = &fs
 	})
 	require.NoError(t, err)
 	cfg := mockRuntime.GetCreatedConfig()

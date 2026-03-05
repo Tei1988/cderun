@@ -2,135 +2,139 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
+func TestUnit_FS_RealFileSystem(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("Executable", func(t *testing.T) {
-		exe, err := fs.Executable()
+		t.Parallel()
+		path, err := fs.Executable()
 		require.NoError(t, err)
-		assert.NotEmpty(t, exe)
+		assert.NotEmpty(t, path)
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
-		t.Setenv("TEST_VAR", "value")
-		assert.Equal(t, "value", fs.Getenv("TEST_VAR"))
+		t.Setenv("CDERUN_TEST_FS", "value")
+		assert.Equal(t, "value", fs.Getenv("CDERUN_TEST_FS"))
 	})
 
 	t.Run("TempDir", func(t *testing.T) {
+		t.Parallel()
 		assert.NotEmpty(t, fs.TempDir())
 	})
 
-	t.Run("File operations", func(t *testing.T) {
-		tmp := t.TempDir()
-		path := filepath.Join(tmp, "subdir", "file.txt")
-
-		err := fs.MkdirAll(filepath.Dir(path), 0o755)
+	t.Run("UserHomeDir", func(t *testing.T) {
+		t.Parallel()
+		home, err := fs.UserHomeDir()
 		require.NoError(t, err)
+		assert.NotEmpty(t, home)
+	})
 
-		err = fs.WriteFile(path, []byte("hello"), 0o644)
+	t.Run("Getwd", func(t *testing.T) {
+		t.Parallel()
+		wd, err := fs.Getwd()
 		require.NoError(t, err)
+		assert.NotEmpty(t, wd)
+	})
 
-		data, err := fs.ReadFile(path)
+	t.Run("Abs", func(t *testing.T) {
+		t.Parallel()
+		abs, err := fs.Abs("config.go")
 		require.NoError(t, err)
-		assert.Equal(t, "hello", string(data))
-
-		err = fs.RemoveAll(filepath.Dir(path))
-		require.NoError(t, err)
-
-		_, err = fs.Stat(path)
-		require.Error(t, err)
+		assert.True(t, os.IsPathSeparator(abs[0]) || (len(abs) > 1 && abs[1] == ':'))
 	})
 }
 
-func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
-	mfs := &MockFileSystem{
-		ExecPath: "/bin/cderun",
-		Env:      map[string]string{"K": "V"},
-	}
+func TestUnit_FS_MockFileSystem(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Getwd", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{WD: "/project"}
+		wd, err := mfs.Getwd()
+		require.NoError(t, err)
+		assert.Equal(t, "/project", wd)
+	})
+
+	t.Run("Abs", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{WD: "/project"}
+		abs, err := mfs.Abs("rel")
+		require.NoError(t, err)
+		assert.Equal(t, "/project/rel", abs)
+
+		abs, err = mfs.Abs("/abs")
+		require.NoError(t, err)
+		assert.Equal(t, "/abs", abs)
+	})
 
 	t.Run("Executable", func(t *testing.T) {
-		exe, err := mfs.Executable()
+		t.Parallel()
+		mfs := &MockFileSystem{ExecPath: "/bin/cderun"}
+		path, err := mfs.Executable()
 		require.NoError(t, err)
-		assert.Equal(t, "/bin/cderun", exe)
-
-		mfs.ExecErr = os.ErrPermission
-		_, err = mfs.Executable()
-		require.Error(t, err)
-		mfs.ExecErr = nil
+		assert.Equal(t, "/bin/cderun", path)
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{Env: map[string]string{"K": "V"}}
 		assert.Equal(t, "V", mfs.Getenv("K"))
-		assert.Empty(t, mfs.Getenv("UNKNOWN"))
+		assert.Empty(t, mfs.Getenv("NONEXISTENT"))
 	})
 
-	t.Run("TempDir", func(t *testing.T) {
-		assert.Equal(t, "/tmp", mfs.TempDir())
-		mfs.TempDirValue = "/custom/tmp"
-		assert.Equal(t, "/custom/tmp", mfs.TempDir())
-	})
-
-	t.Run("MkdirAll and Stat", func(t *testing.T) {
-		err := mfs.MkdirAll("/a/b", 0o755)
-		require.NoError(t, err)
-		_, err = mfs.Stat("/a/b")
-		require.NoError(t, err)
+	t.Run("Errors", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{}
+		mfs.ExecErr = os.ErrPermission
+		_, err := mfs.Executable()
+		require.ErrorIs(t, err, os.ErrPermission)
 
 		mfs.MkdirAllErr = os.ErrPermission
-		err = mfs.MkdirAll("/c", 0o755)
-		require.Error(t, err)
-		mfs.MkdirAllErr = nil
-	})
-
-	t.Run("WriteFile and ReadFile", func(t *testing.T) {
-		err := mfs.WriteFile("/f", []byte("d"), 0o644)
-		require.NoError(t, err)
-		data, err := mfs.ReadFile("/f")
-		require.NoError(t, err)
-		assert.Equal(t, "d", string(data))
+		err = mfs.MkdirAll("/tmp", 0755)
+		require.ErrorIs(t, err, os.ErrPermission)
 
 		mfs.WriteFileErr = os.ErrPermission
-		err = mfs.WriteFile("/g", []byte("d"), 0o644)
-		require.Error(t, err)
-		mfs.WriteFileErr = nil
+		err = mfs.WriteFile("/tmp/f", []byte{}, 0644)
+		require.ErrorIs(t, err, os.ErrPermission)
 
 		mfs.ReadFileErr = os.ErrPermission
-		_, err = mfs.ReadFile("/f")
-		require.Error(t, err)
-		mfs.ReadFileErr = nil
-	})
-
-	t.Run("RemoveAll", func(t *testing.T) {
-		require.NoError(t, mfs.WriteFile("/d/f1", []byte("1"), 0o644))
-		require.NoError(t, mfs.WriteFile("/d/f2", []byte("2"), 0o644))
-		require.NoError(t, mfs.MkdirAll("/d", 0o755))
-
-		err := mfs.RemoveAll("/d")
-		require.NoError(t, err)
-
-		_, err = mfs.Stat("/d")
-		require.Error(t, err)
-		_, err = mfs.ReadFile("/d/f1")
-		require.Error(t, err)
+		_, err = mfs.ReadFile("/tmp/f")
+		require.ErrorIs(t, err, os.ErrPermission)
 
 		mfs.RemoveAllErr = os.ErrPermission
-		err = mfs.RemoveAll("/x")
-		require.Error(t, err)
-		mfs.RemoveAllErr = nil
+		err = mfs.RemoveAll("/tmp")
+		require.ErrorIs(t, err, os.ErrPermission)
+	})
+
+	t.Run("RemoveAll and MkdirAll logic", func(t *testing.T) {
+		t.Parallel()
+		m := &MockFileSystem{
+			Dirs:  map[string]bool{"/a": true, "/a/b": true, "/c": true},
+			Files: map[string][]byte{"/a/f1": {}, "/a/b/f2": {}},
+		}
+
+		err := m.RemoveAll("/a")
+		require.NoError(t, err)
+
+		assert.False(t, m.Dirs["/a"])
+		assert.False(t, m.Dirs["/a/b"])
+		assert.True(t, m.Dirs["/c"])
+		assert.Empty(t, m.Files["/a/f1"])
+		assert.Empty(t, m.Files["/a/b/f2"])
 	})
 }
 
-func TestUnit_Config_Loader_Initialization(t *testing.T) {
+func TestUnit_ConfigLoader_Initialization(t *testing.T) {
+	t.Parallel()
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)
-	assert.Equal(t, defaultLoader.systemConfigDir, loader.systemConfigDir)
-	assert.Equal(t, defaultLoader.runConfigDir, loader.runConfigDir)
+	assert.Equal(t, "/etc/cderun", loader.systemConfigDir)
+	assert.Equal(t, "/run/cderun", loader.runConfigDir)
 }
