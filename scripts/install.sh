@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -xe
+#!/usr/bin/env bash
 set -euo pipefail
 
 REPO="Tei1988/cderun"
@@ -8,8 +8,17 @@ SYMLINK_PATH="${SYMLINK_PATH:-/usr/local/bin/cderun}"
 # Resolve latest version if not specified
 VERSION="${VERSION:-}"
 if [[ -z "$VERSION" ]]; then
-  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
+  api_response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || {
+    echo "Error: Failed to fetch latest release from GitHub API for ${REPO}"
+    echo "Context: $api_response"
+    exit 1
+  }
+  VERSION=$(echo "$api_response" | grep '"tag_name"' | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
+  if [[ -z "$VERSION" ]]; then
+    echo "Error: VERSION resolution failed for ${REPO}"
+    echo "Context: $api_response"
+    exit 1
+  fi
 fi
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -47,21 +56,23 @@ ln -sf "${INSTALL_DIR}/cderun_${os}_${mapped_arch}" "${INSTALL_DIR}/cderun"
 if [[ "$os" == "darwin" ]]; then
   download "linux" "$mapped_arch"
 
-  config="$HOME/.config/cderun/.cderun.yaml"
-  if [[ ! -f "$config" ]]; then
-    cat > "$config" <<EOF
+  if [[ -z "${SKIP_CONFIG:-}" ]]; then
+    config="$HOME/.config/cderun/.cderun.yaml"
+    if [[ ! -f "$config" ]]; then
+      mkdir -p "$(dirname "$config")"
+      cat > "$config" <<EOF
 defaults:
   mountCderunPath: ${INSTALL_DIR}/cderun_linux_${mapped_arch}
 EOF
+    fi
   fi
 fi
 
 # Create symlink (use sudo if needed)
-_symlink() { rm -f "$SYMLINK_PATH" && ln -s "${INSTALL_DIR}/cderun" "$SYMLINK_PATH"; }
 if [[ -w "$(dirname "$SYMLINK_PATH")" ]]; then
-  _symlink
+  rm -f "$SYMLINK_PATH" && ln -s "${INSTALL_DIR}/cderun" "$SYMLINK_PATH"
 else
-  sudo bash -c "$(declare -f _symlink); SYMLINK_PATH='$SYMLINK_PATH' INSTALL_DIR='$INSTALL_DIR' _symlink"
+  sudo rm -f "$SYMLINK_PATH" && sudo ln -s "${INSTALL_DIR}/cderun" "$SYMLINK_PATH"
 fi
 
 echo "cderun ${VERSION} installed to ${INSTALL_DIR}"
