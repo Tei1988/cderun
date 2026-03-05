@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"cderun/internal/runtime"
 )
@@ -66,7 +67,7 @@ func TestRobustness_Root_SignalHanging(t *testing.T) {
 		// and AttachContainer will be canceled after grace period.
 		select {
 		case err := <-errCh:
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		case <-ctx.Done():
 			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
 		}
@@ -133,7 +134,7 @@ func TestRobustness_Root_DoubleSIGINT(t *testing.T) {
 	// Now it should finish
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-ctx.Done():
 		t.Fatal("Process did not exit after second SIGINT or timeout")
 	}
@@ -207,7 +208,7 @@ func TestRobustness_Root_TTYResize(t *testing.T) {
 	close(mock.blockAttach)
 	select {
 	case err := <-errCh:
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("Timeout waiting for TTYResize test completion")
 	}
