@@ -102,12 +102,12 @@ cderun node app.js --cderun-image node:20-alpine
 - `--hostname`: Container host name.
 - `--dns`: Set custom DNS servers.
 - `--add-host`: Add a custom host-to-IP mapping (host:ip).
-- `--user`, `-u`: Username or UID to use.
+- `--user`, `-u`: Username or UID (format: <name|uid>[:<group|gid>]).
 - `--privileged`: Give extended privileges to this container.
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
 - `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
-- `--pull`: Pull image before running (always, missing, never).
+- `--pull`: Pull image before running (always, missing, never). Default is `missing`.
 - `--memory`, `-m`: Memory limit.
 - `--cpus`: Number of CPUs.
 - `--device`: Add a host device to the container.

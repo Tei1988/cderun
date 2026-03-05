@@ -53,6 +53,8 @@ available_tools:
   - python
 ```
 
+※実際の出力項目は、実装の変更に伴い多少異なる場合があります。
+
 ### JSON形式
 
 `cderun --diagnosis --diagnosis-format json` または `cderun <subcommand> --cderun-diagnosis-format json`
@@ -127,3 +129,6 @@ cderun
 ```
 
 利用可能な値は `yaml`（デフォルト）、`json`、`simple` です。
+
+---
+*2026年3月5日時点の仕様である。*

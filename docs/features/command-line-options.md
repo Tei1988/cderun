@@ -147,6 +147,7 @@ cderun --mount-all-tools alpine sh
 
 - **型**: string
 - **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
+- **注意**: アドホック実行（設定にないツール名の指定）時には必須となります。
 
 ```bash
 cderun --image node:18-alpine node --version
@@ -540,6 +541,9 @@ cderun --tty node --version
 # 間違い（--ttyがnodeに渡される）
 cderun node --tty --version
 ```
+
+---
+*2026年3月5日時点の仕様である。*
 
 **例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。
 
