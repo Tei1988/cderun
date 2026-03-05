@@ -61,6 +61,7 @@ func (f *testFileSystem) Setenv(key, value string) {
 // It captures stdout and stderr and returns the exit code.
 // Note: This function uses bytes.Buffers and cmd.SetOut/SetErr for isolation.
 // It uses ExecuteContextWithOptions to isolate command execution.
+//nolint:unused
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(nil, nil, args...)
 }
@@ -71,6 +72,7 @@ func runCderunWithSetup(setup func(o *rootOptions, cmd *cobra.Command), args ...
 }
 
 // runCderunWithStdin runs the cderun command in-process with a custom stdin.
+//nolint:unused
 func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	return runCderunCore(stdin, nil, args...)
 }
