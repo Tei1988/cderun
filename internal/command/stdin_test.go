@@ -50,10 +50,9 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 			_ = pr.Close()
 		}()
 
-		done := make(chan struct{})
-		var execErr error
+		errCh := make(chan error, 1)
 		go func() {
-			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -62,7 +61,6 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 				cmd.SetOut(&stdout)
 				cmd.SetErr(io.Discard)
 			})
-			close(done)
 		}()
 
 		testData := "hello from pipe\n"
@@ -72,12 +70,11 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 		}()
 
 		select {
-		case <-done:
+		case err := <-errCh:
+			require.NoError(t, err)
 		case <-ctx.Done():
 			t.Fatal("Test timed out")
 		}
-
-		require.NoError(t, execErr)
 		assert.Equal(t, testData, stdout.String())
 	})
 
@@ -98,9 +95,9 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 			_ = pr.Close()
 		}()
 
-		done := make(chan struct{})
+		errCh := make(chan error, 1)
 		go func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -109,7 +106,6 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 				cmd.SetOut(&stdout)
 				cmd.SetErr(io.Discard)
 			})
-			close(done)
 		}()
 
 		// Use a goroutine to write to avoid blocking if cat doesn't read
@@ -119,7 +115,8 @@ func TestUnit_Stdin_PipedInput(t *testing.T) {
 		}()
 
 		select {
-		case <-done:
+		case err := <-errCh:
+			require.NoError(t, err)
 		case <-ctx.Done():
 			t.Fatal("Test timed out")
 		}
@@ -289,9 +286,9 @@ func TestUnit_Stdin_ContinuousInput(t *testing.T) {
 		defer cancel()
 
 		block := make(chan struct{})
-		done := make(chan error, 1)
+		errCh := make(chan error, 1)
 		go func() {
-			done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -302,16 +299,21 @@ func TestUnit_Stdin_ContinuousInput(t *testing.T) {
 			})
 		}()
 
-		time.Sleep(200 * time.Millisecond)
+		// Replace brittle Sleep with state-polling
+		assert.Eventually(t, func() bool {
+			return mock.GetAttachedContainerID() != ""
+		}, 5*time.Second, 10*time.Millisecond, "Container did not attach in time")
+
+		// Verify it hasn't exited yet
 		select {
-		case err := <-done:
+		case err := <-errCh:
 			t.Fatalf("Process exited prematurely: %v", err)
-		case <-time.After(500 * time.Millisecond):
+		default:
 		}
 
 		close(block)
 		select {
-		case err := <-done:
+		case err := <-errCh:
 			require.NoError(t, err)
 		case <-time.After(5 * time.Second):
 			t.Fatal("Process did not exit after pipe closed")

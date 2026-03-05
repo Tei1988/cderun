@@ -159,7 +159,7 @@ func TestUnit_Root_HelpWithoutSubcommand(t *testing.T) {
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.True(t, assert.Contains(t, output, "cderun is a CLI wrapper tool"))
+	assert.Contains(t, output, "cderun is a CLI wrapper tool")
 	assert.Contains(t, output, "Usage:")
 }
 
@@ -201,7 +201,7 @@ func TestUnit_Root_HandleDiagnosis_JSON(t *testing.T) {
 func TestUnit_Root_HandleDiagnosis_Simple(t *testing.T) {
 	out := &bytes.Buffer{}
 	opts := &rootOptions{
-		fs: config.RealFileSystem{} ,
+		fs: config.RealFileSystem{},
 	}
 	resolved := &config.ResolvedConfig{
 		Runtime:         "podman",

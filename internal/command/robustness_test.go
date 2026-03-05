@@ -47,15 +47,14 @@ func TestRobustness_Root_SignalHanging(t *testing.T) {
 		defer cancel()
 
 		// Run execute in a goroutine because we want to check if it finishes
-		done := make(chan struct{})
+		errCh := make(chan error, 1)
 		go func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}
 			})
-			close(done)
 		}()
 
 		// Wait for attach to start
@@ -66,8 +65,8 @@ func TestRobustness_Root_SignalHanging(t *testing.T) {
 		// executeCommand should eventually finish because WaitContainer returns immediately
 		// and AttachContainer will be canceled after grace period.
 		select {
-		case <-done:
-			// Success
+		case err := <-errCh:
+			assert.NoError(t, err)
 		case <-ctx.Done():
 			t.Fatal("executeCommand did not finish even though WaitContainer should have completed")
 		}
@@ -87,9 +86,10 @@ func TestRobustness_Root_DoubleSIGINT(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	done := make(chan struct{})
+	sigChan := make(chan os.Signal, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return &waitBlockingMock{
 					blockingMockRuntime: mock,
@@ -97,8 +97,14 @@ func TestRobustness_Root_DoubleSIGINT(t *testing.T) {
 				}, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.setupSignals = func(c chan os.Signal) {
+				go func() {
+					for s := range sigChan {
+						c <- s
+					}
+				}()
+			}
 		})
-		close(done)
 	}()
 
 	// Wait for attach to start
@@ -107,26 +113,27 @@ func TestRobustness_Root_DoubleSIGINT(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond, "AttachContainer did not start in time")
 
 	// Send first SIGINT
-	_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
+	sigChan <- syscall.SIGINT
 
 	// Wait a bit
 	time.Sleep(100 * time.Millisecond)
 
 	// Ensure it hasn't finished yet
 	select {
-	case <-done:
-		t.Fatal("Process exited after first SIGINT, expected it to stay running")
+	case err := <-errCh:
+		t.Fatalf("Process exited after first SIGINT with error %v, expected it to stay running", err)
 	default:
 		// Still running, good
 	}
 
 	// Send second SIGINT
-	_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
+	close(blockWait)
+	sigChan <- syscall.SIGINT
 
 	// Now it should finish
 	select {
-	case <-done:
-		// Success
+	case err := <-errCh:
+		assert.NoError(t, err)
 	case <-ctx.Done():
 		t.Fatal("Process did not exit after second SIGINT or timeout")
 	}
@@ -148,9 +155,10 @@ func TestRobustness_Root_TTYResize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	done := make(chan struct{})
+	resizeChan := make(chan os.Signal, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return &waitBlockingMock{
 					blockingMockRuntime: mock,
@@ -164,8 +172,14 @@ func TestRobustness_Root_TTYResize(t *testing.T) {
 				defer mu.Unlock()
 				return currentCols, currentRows, nil
 			}
+			o.setupResizeSignal = func(c chan os.Signal) {
+				go func() {
+					for s := range resizeChan {
+						c <- s
+					}
+				}()
+			}
 		})
-		close(done)
 	}()
 
 	// Wait for wait to start
@@ -179,7 +193,7 @@ func TestRobustness_Root_TTYResize(t *testing.T) {
 	mu.Unlock()
 
 	// Send SIGWINCH
-	_ = syscall.Kill(os.Getpid(), syscall.SIGWINCH)
+	resizeChan <- syscall.SIGWINCH
 
 	// Poll for resize with timeout
 	expectedRows, expectedCols := 30, 100
@@ -191,7 +205,12 @@ func TestRobustness_Root_TTYResize(t *testing.T) {
 	// Cleanup
 	close(blockWait)
 	close(mock.blockAttach)
-	<-done
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Timeout waiting for TTYResize test completion")
+	}
 }
 
 func TestRobustness_Root_ExitCodeCapture(t *testing.T) {
