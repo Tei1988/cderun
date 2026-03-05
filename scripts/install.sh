@@ -13,7 +13,7 @@ if [[ -z "$VERSION" ]]; then
     echo "Context: $api_response"
     exit 1
   }
-  VERSION=$(echo "$api_response" | grep '"tag_name"' | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
+  VERSION=$(echo "$api_response" | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
   if [[ -z "$VERSION" ]]; then
     echo "Error: VERSION resolution failed for ${REPO}"
     echo "Context: $api_response"
@@ -39,14 +39,30 @@ download() {
   local target_os="$1" target_arch="$2"
   local archive="cderun_${target_os}_${target_arch}.tar.gz"
   local url="https://github.com/${REPO}/releases/download/${VERSION}/${archive}"
+  local checksum_url="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
   local dest="${INSTALL_DIR}/cderun_${target_os}_${target_arch}"
 
-  echo "Downloading ${url} ..."
-  curl -fsSL "$url" | tar -xz -O cderun > "$dest"
+  echo "Downloading and verifying ${archive} ..."
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  # shellcheck disable=SC2064
+  trap "rm -rf \"$tmp_dir\"" RETURN
+
+  curl -fsSL "$url" -o "${tmp_dir}/${archive}"
+  curl -fsSL "$checksum_url" -o "${tmp_dir}/checksums.txt"
+
+  (cd "$tmp_dir" && sha256sum --check --ignore-missing "checksums.txt" > /dev/null 2>&1) || {
+    echo "Error: Checksum verification failed for ${archive}"
+    return 1
+  }
+
+  tar -xz -C "$tmp_dir" -f "${tmp_dir}/${archive}" cderun
+  mv "${tmp_dir}/cderun" "$dest"
   chmod +x "$dest"
 }
 
 mkdir -p "$INSTALL_DIR"
+INSTALL_DIR=$(cd "$INSTALL_DIR" && pwd)
 
 mapped_arch=$(map_arch "$arch")
 download "$os" "$mapped_arch"
