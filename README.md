@@ -132,6 +132,19 @@ cderun node app.js --cderun-image node:20-alpine
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
 
+## Environment Variables
+
+`cderun` can be configured using environment variables. These variables provide a way to set global overrides or defaults.
+
+- `CDERUN_CONFIG`: Path to the global configuration file.
+- `CDERUN_TOOL_CONFIG`: Path to the tool mapping configuration file.
+- `CDERUN_IMAGE`: Default image to use.
+- `CDERUN_RUNTIME`: Container runtime to use (`docker` or `podman`).
+- `CDERUN_SOCKET_PATH`: Path to the container runtime socket.
+- `CDERUN_LOG_LEVEL`: Set log level (`error`, `warn`, `info`, `debug`, `trace`).
+- `CDERUN_REMOVE`: Automatically remove the container when it exits (`true` or `false`).
+- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive sessions during I/O propagation cleanup (e.g., `2s`, `500ms`).
+
 ## Configuration
 
 `cderun` uses two configuration files to manage its behavior.
