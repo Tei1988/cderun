@@ -143,7 +143,7 @@ cderun node app.js --cderun-image node:20-alpine
 - `CDERUN_SOCKET_PATH`: Path to the container runtime socket.
 - `CDERUN_LOG_LEVEL`: Set log level (`error`, `warn`, `info`, `debug`, `trace`).
 - `CDERUN_REMOVE`: Automatically remove the container when it exits (`true` or `false`).
-- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive sessions during I/O propagation cleanup (e.g., `2s`, `500ms`).
+- `CDERUN_HANG_TIMEOUT`: Global grace period for I/O propagation cleanup (default: `2s`). If the container is still running after this timeout, `SIGKILL` is attempted unless interactive mode (`--interactive` / `-i`) is enabled and a terminal is detected. See [Standard Input Synchronization](docs/features/stdin-synchronization.md) for details.
 
 ## Configuration
 
