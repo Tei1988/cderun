@@ -132,6 +132,32 @@ cderun node app.js --cderun-image node:20-alpine
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
 
+## Environment Variables
+
+`cderun` supports environment variables as a global override (P3 priority).
+
+### Global Overrides
+
+Most CLI flags have a corresponding environment variable:
+
+- `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_REMOVE`, `CDERUN_WORKDIR`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_STRICT_ENV`, `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_USER`, `CDERUN_PRIVILEGED`, `CDERUN_HOSTNAME`, `CDERUN_PULL`, `CDERUN_PUBLISH_ALL`.
+- `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_ALL_TOOLS`.
+- `CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`, `CDERUN_DIAGNOSIS`, `CDERUN_DIAGNOSIS_FORMAT`.
+- `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`.
+
+### Collection Variables & Separators
+
+Variables that accept multiple values use specific separators:
+
+- **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`.
+- **Comma (`,`)**: `CDERUN_MOUNT_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`.
+
+### Special Control Variables
+
+- `CDERUN_CONFIG`: Path to the `.cderun.yaml` configuration file.
+- `CDERUN_TOOL_CONFIG`: Path to the `.tools.yaml` tool mapping file.
+- `CDERUN_HANG_TIMEOUT`: Grace period (e.g., `2s`, `500ms`) to wait for container exit after I/O propagation is complete before sending SIGKILL (default: `2s`).
+
 ## Configuration
 
 `cderun` uses two configuration files to manage its behavior.

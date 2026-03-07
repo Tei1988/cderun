@@ -142,6 +142,7 @@ node:
   remove: true
   mountCderun: true
   privileged: false
+  capAdd: ["SYS_ADMIN"]
   memory: "512m"
   devices:
     - /dev/fuse                    # コンテナに追加するデバイス
@@ -272,3 +273,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 ## 優先順位
 
 設定の優先順位については、[引数・設定優先順位](./argument-priority-logic.md) を参照してください。
+
+---
+*2026年3月7日時点の仕様である。*
