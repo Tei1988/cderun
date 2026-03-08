@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"cderun/internal/runtime"
 )
@@ -265,7 +266,6 @@ type hangMockRuntime struct {
 	killed          chan struct{}
 	killedOnce      sync.Once
 	waitStartedOnce sync.Once
-	mu              sync.Mutex
 }
 
 func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
@@ -345,7 +345,7 @@ func TestRobustness_Hang_AutoTerminationNonTTY(t *testing.T) {
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
 		// It should finish after effectiveHangTimeout (2s) because it is non-TTY
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		if elapsed < 2*time.Second {
 			t.Errorf("Execution took too short (%v), expected at least effectiveHangTimeout", elapsed)
 		}
@@ -384,7 +384,7 @@ func TestRobustness_Hang_AutoTerminationTTYNoKill(t *testing.T) {
 		elapsed := time.Since(start)
 		t.Logf("Execution finished in %v", elapsed)
 		// In TTY mode, it should wait for the context timeout (5s) because no auto-kill
-		assert.Error(t, err)
+		require.Error(t, err)
 		if elapsed < 4*time.Second {
 			t.Errorf("Execution finished too early (%v), expected to wait for context", elapsed)
 		}

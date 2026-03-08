@@ -117,10 +117,6 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 
 var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
 
-func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
-	return discoverOverlayUpperDirWithReader(fs, defaultMountInfoReader)
-}
-
 func discoverOverlayUpperDirWithReader(fs config.FileSystem, reader mountInfoReader) (string, error) {
 	data, err := reader.ReadMountInfo(fs)
 	if err != nil {
