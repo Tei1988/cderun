@@ -156,7 +156,7 @@ func defaultOptions() rootOptions {
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
 		},
-		logger: logging.GetGlobalLogger(),
+		logger: nil,
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -1120,6 +1120,10 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	} else {
 		// Create fresh state for testing
 		localOpts := defaultOptions()
+		// Ensure fresh logger for test isolation if not already set
+		if localOpts.logger == nil {
+			localOpts.logger = logging.NewLogger()
+		}
 		cmd = newRootCmd(&localOpts)
 		setup(&localOpts, cmd)
 	}
@@ -1248,5 +1252,6 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 func init() {
 	opts.exitFunc = os.Exit
+	opts.logger = logging.GetGlobalLogger()
 	rootCmd = newRootCmd(&opts)
 }

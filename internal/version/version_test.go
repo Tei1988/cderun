@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestInfo(t *testing.T) {
+func TestUnit_Version_Info(t *testing.T) {
 	// Save original values
 	originalVersion := Version
 	originalRevision := Revision
