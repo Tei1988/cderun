@@ -132,6 +132,27 @@ cderun node app.js --cderun-image node:20-alpine
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
 
+## Environment Variables
+
+`cderun` can be configured using environment variables (Priority P3).
+
+- **Core**: `CDERUN_IMAGE`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`.
+- **Execution**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_WORKDIR`, `CDERUN_STRICT_ENV`, `CDERUN_PULL`.
+- **Resources**: `CDERUN_MEMORY`, `CDERUN_CPUS`.
+- **Mounts & Tools**: `CDERUN_MOUNT`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_ALL_TOOLS`, `CDERUN_DEVICE`.
+- **Networking**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_HOSTNAME`, `CDERUN_DNS`, `CDERUN_ADD_HOST`.
+- **Security**: `CDERUN_USER`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`.
+- **Logging & Diagnosis**: `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`, `CDERUN_DRY_RUN`, `CDERUN_DIAGNOSIS`.
+- **Special**:
+  - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive sessions during I/O propagation cleanup (e.g., `2s`).
+  - `CDERUN_CONFIG`: Path to a custom `.cderun.yaml`.
+  - `CDERUN_TOOL_CONFIG`: Path to a custom `.tools.yaml`.
+
+### Separators for List Values
+
+- **Semicolon (`;`)**: Used for `CDERUN_ENV` and `CDERUN_MOUNT`.
+- **Comma (`,`)**: Used for all other list-type variables (e.g., `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_DNS`, `CDERUN_MOUNT_TOOLS`).
+
 ## Configuration
 
 `cderun` uses two configuration files to manage its behavior.
