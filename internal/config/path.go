@@ -368,7 +368,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		for _, m := range r.HostContext.Mounts {
 			rel, err := filepath.Rel(m.Target, abs)
 			if err == nil && !strings.HasPrefix(rel, "..") {
-				if m.Level > maxLevel || (m.Level == maxLevel && len(m.Target) > len(bestTarget)) {
+				if len(m.Target) > len(bestTarget) || (len(m.Target) == len(bestTarget) && m.Level > maxLevel) {
 					maxLevel = m.Level
 					bestTarget = m.Target
 					bestSource = m.Source
