@@ -186,6 +186,45 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, "/home/user/project/file", val)
 	})
 
+	t.Run("Reverse Path Resolution (Specificity vs Level)", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 2,
+			Mounts: []MountMapping{
+				{Source: "/tmp", Target: "/tmp", Level: 1}, // Broad but specific
+				{Source: "/var/lib/docker/overlay/diff", Target: "/", Level: 2}, // Higher level but root
+			},
+		}
+		rn, err := NewExpressionResolver(hostCtx)
+		require.NoError(t, err)
+
+		// /tmp/file should match /tmp (Level 1) instead of / (Level 2)
+		val, err := ResolvePath("/tmp/file", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/tmp/file", val)
+
+		// /etc/hosts should match / (Level 2)
+		val, err = ResolvePath("/etc/hosts", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/var/lib/docker/overlay/diff/etc/hosts", val)
+	})
+
+	t.Run("Reverse Path Resolution (Same Specificity)", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 2,
+			Mounts: []MountMapping{
+				{Source: "/host/v1", Target: "/app", Level: 1},
+				{Source: "/host/v2", Target: "/app", Level: 2},
+			},
+		}
+		rn, err := NewExpressionResolver(hostCtx)
+		require.NoError(t, err)
+
+		// Same specificity, higher level wins
+		val, err := ResolvePath("/app/file", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/v2/file", val)
+	})
+
 	t.Run("Reverse Path Resolution (Partial Segment Match)", func(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 1,
