@@ -67,6 +67,9 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		if err != nil {
 			return "", "", fmt.Errorf("failed to resolve snapshot directory to host path: %w", err)
 		}
+		if resolvedSnapshotDir == "" {
+			return "", "", fmt.Errorf("failed to resolve snapshot directory: empty result")
+		}
 		hostSnapshotDir = resolvedSnapshotDir
 	}
 
