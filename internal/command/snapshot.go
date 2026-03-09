@@ -78,11 +78,15 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	exePath, err := fs.Executable()
 	if err == nil {
 		hostCtx.BinPath = exePath
+	} else {
+		logger.Debug("failed to get executable path for snapshot: %v", err)
 	}
 
 	pwd, err := fs.Getwd()
 	if err == nil {
 		hostCtx.WorkingDir = pwd
+	} else {
+		logger.Debug("failed to get working directory for snapshot: %v", err)
 	}
 
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
