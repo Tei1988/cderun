@@ -971,7 +971,7 @@ intended for the subcommand.`,
 				if globalCfg == nil {
 					globalCfg = &config.CDERunConfig{}
 				}
-				sDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+				sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
 				if err != nil {
 					o.logger.Warn("failed to create snapshot: %v", err)
 				} else {
@@ -982,10 +982,10 @@ intended for the subcommand.`,
 							o.logger.Warn("failed to cleanup snapshot: %v", err)
 						}
 					}()
-					// Mount the snapshot directory
+					// Mount the snapshot directory using the host path as source
 					containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 						Type:     "bind",
-						Source:   snapshotDir,
+						Source:   hostDir,
 						Target:   "/run/cderun",
 						ReadOnly: true,
 					})

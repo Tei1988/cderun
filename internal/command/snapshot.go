@@ -13,13 +13,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, error) {
+// createSnapshot creates a snapshot directory and returns (containerDir, hostDir, error).
+// containerDir is the path inside the current container (used for file I/O and cleanup).
+// hostDir is the resolved host path (used as mount source for the next container).
+func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, string, error) {
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
-
-	if err := fs.MkdirAll(snapshotDir, 0o700); err != nil {
-		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
-	}
 
 	// Prepare HostContext (copy to avoid mutating the caller's config)
 	var hostCtx config.HostContext
@@ -27,19 +26,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		hostCtx = globalCfg.HostContext.DeepCopy()
 	}
 
-	hostCtx.SnapshotDir = snapshotDir
-
-	exePath, err := fs.Executable()
-	if err == nil {
-		hostCtx.BinPath = exePath
-	}
-
-	pwd, err := fs.Getwd()
-	if err == nil {
-		hostCtx.WorkingDir = pwd
-	}
-
-	// Increment level
+	// Increment level first so mounts are recorded at the correct level
 	hostCtx.Level++
 
 	// Map current mounts into HostContext.Mounts
@@ -53,8 +40,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		}
 	}
 
-	// OverlayFS root discovery (only at level 1 if we want to find the host root)
-	// Actually, it can be done at any level if we want to find the "upperdir" of the current container.
+	// Discover OverlayFS upperdir and add as root mapping before path resolution
 	if upperDir, err := discoverOverlayUpperDir(fs); err == nil && upperDir != "" {
 		logger.Debug("Discovered OverlayFS upperdir: %s", upperDir)
 		hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
@@ -62,6 +48,38 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 			Target: "/",
 			Level:  hostCtx.Level,
 		})
+	}
+
+	// MkdirAll uses the container-local path; this works because we are running inside the container.
+	if err := fs.MkdirAll(snapshotDir, 0o700); err != nil {
+		return "", "", fmt.Errorf("failed to create snapshot directory: %w", err)
+	}
+
+	// When running inside a container (level >= 1), snapshotDir is a container-local path.
+	// Resolve it to a host path for SnapshotDir, which is used as a mount source.
+	hostSnapshotDir := snapshotDir
+	if hostCtx.Level > 1 {
+		r, err := config.NewExpressionResolverWithFS(&hostCtx, fs)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to create expression resolver: %w", err)
+		}
+		resolvedSnapshotDir, err := config.ResolvePath(snapshotDir, "", r)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to resolve snapshot directory to host path: %w", err)
+		}
+		hostSnapshotDir = resolvedSnapshotDir
+	}
+
+	hostCtx.SnapshotDir = hostSnapshotDir
+
+	exePath, err := fs.Executable()
+	if err == nil {
+		hostCtx.BinPath = exePath
+	}
+
+	pwd, err := fs.Getwd()
+	if err == nil {
+		hostCtx.WorkingDir = pwd
 	}
 
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
@@ -74,22 +92,22 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	// Save .cderun.yaml
 	cderunData, err := yaml.Marshal(snapshotCfg)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal cderun config: %w", err)
+		return "", "", fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
 	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0o600); err != nil {
-		return "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
+		return "", "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
 	}
 
 	// Save .tools.yaml
 	toolsData, err := yaml.Marshal(snapshotToolsCfg)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal tools config: %w", err)
+		return "", "", fmt.Errorf("failed to marshal tools config: %w", err)
 	}
 	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0o600); err != nil {
-		return "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
+		return "", "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 
-	return snapshotDir, nil
+	return snapshotDir, hostSnapshotDir, nil
 }
 
 func cleanupSnapshot(fs config.FileSystem, snapshotDir string) error {
