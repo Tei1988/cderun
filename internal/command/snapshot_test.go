@@ -15,9 +15,10 @@ import (
 )
 
 func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
-	mfs := &config.MockFileSystem{}
-	// This test modifies a global variable 'defaultMountInfoReader',
+	// This test and its subtests modify a global variable 'defaultMountInfoReader',
 	// so it cannot be run in parallel with other tests that access it.
+	// DO NOT call t.Parallel() here or in subtests.
+	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	t.Cleanup(func() { defaultMountInfoReader = originalReader })
 
@@ -127,9 +128,10 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 }
 
 func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
-	mfs := &config.MockFileSystem{}
-	// This test modifies a global variable 'defaultMountInfoReader',
+	// This test and its subtests modify a global variable 'defaultMountInfoReader',
 	// so it cannot be run in parallel with other tests that access it.
+	// DO NOT call t.Parallel() here or in subtests.
+	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	t.Cleanup(func() { defaultMountInfoReader = originalReader })
 

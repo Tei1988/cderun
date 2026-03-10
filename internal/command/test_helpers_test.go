@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,6 +79,8 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	}
 }
 
+var setupMu sync.Mutex
+
 func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOptions, cmd *cobra.Command)) func(o *rootOptions, cmd *cobra.Command) {
 	return func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -102,9 +105,17 @@ func setupTestDir(t *testing.T) string {
 
 	// Note: We still use Chdir here for legacy integration tests that don't yet
 	// fully use the MockFileSystem. For these tests, we must NOT call t.Parallel().
+	// We serialize access to the global working directory using setupMu to reduce flakes.
+	setupMu.Lock()
 	restoreWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	t.Cleanup(func() { _ = os.Chdir(restoreWd) })
+	setupMu.Unlock()
+
+	t.Cleanup(func() {
+		setupMu.Lock()
+		defer setupMu.Unlock()
+		_ = os.Chdir(restoreWd)
+	})
 	return tmpDir
 }

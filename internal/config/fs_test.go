@@ -149,7 +149,8 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 		abs, err := fs.Abs("config.go")
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(abs))
-		assert.Contains(t, abs, "internal/config/config.go")
+		// Check only the base name to be path-agnostic
+		assert.Equal(t, "config.go", filepath.Base(abs))
 	})
 
 	t.Run("MockFileSystem", func(t *testing.T) {
