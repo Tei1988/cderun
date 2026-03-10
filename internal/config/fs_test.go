@@ -186,7 +186,7 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 			defer func() { mfs.AbsErr = nil }()
 
 			_, err := mfs.Abs("anything")
-			assert.ErrorIs(t, err, sentinelErr)
+			require.ErrorIs(t, err, sentinelErr)
 
 			// Test ResolvePath error propagation
 			_, err = ResolvePath("relative", "/app", &ExpressionResolver{

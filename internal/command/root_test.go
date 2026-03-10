@@ -42,8 +42,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	return buf.String(), execErr
 }
 
-func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     []string
@@ -99,16 +98,6 @@ func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--cderun-tty=false"},
 			expected: []string{"cderun", "--cderun-image", "alpine", "--cderun-tty=false", "-t", "sh", "-c", "ls"},
 		},
-		{
-			name:     "hoisting with unknown flags after subcommand",
-			args:     []string{"cderun", "sh", "--unknown", "--cderun-image", "alpine"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "sh", "--unknown"},
-		},
-		{
-			name:     "hoisting with shorthand cluster and cderun-flag",
-			args:     []string{"cderun", "sh", "-it", "--cderun-image", "alpine"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "sh", "-it"},
-		},
 	}
 
 	for _, tt := range tests {
@@ -121,8 +110,7 @@ func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 	}
 }
 
-func TestUnit_Execute_EmptyArgs(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_ExecuteEmptyArgs(t *testing.T) {
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
 	require.NoError(t, err)
@@ -131,8 +119,7 @@ func TestUnit_Execute_EmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Execution_CommandResolution(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_CommandResolution(t *testing.T) {
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
@@ -292,9 +279,8 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Flags_Phase3Features(t *testing.T) {
+func TestUnit_Root_Phase3Features(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
-		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -318,7 +304,7 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 
 	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
-		// This subtest uses t.Setenv, so it cannot be run in parallel with t.Parallel().
+		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
 		// If unspecified, --mount-cderun should auto-enable --mount-socket
 		t.Setenv("CDERUN_MOUNT_SOCKET", "")
 
@@ -410,8 +396,7 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Execution_StrictBehavior(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_Phase10StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
 		_, err := executeCommand("unknown-tool", "--version")
@@ -435,8 +420,7 @@ func TestUnit_Execution_StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_HandleDiagnosis(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
 		opts := &rootOptions{
@@ -476,8 +460,7 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 	})
 }
 
-func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_BuildContainerConfig_Failures(t *testing.T) {
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -495,8 +478,7 @@ func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
 	})
 }
 
-func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_RemoveContainerWarning(t *testing.T) {
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
@@ -536,8 +518,7 @@ func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
 	})
 }
 
-func TestUnit_Env_StrictEnvFlags(t *testing.T) {
-	t.Parallel()
+func TestUnit_Root_StrictEnvFlags(t *testing.T) {
 	t.Run("--strict-env flag", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {

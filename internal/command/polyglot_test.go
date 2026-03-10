@@ -16,8 +16,7 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
-	t.Parallel()
+func TestUnit_Polyglot_Flags(t *testing.T) {
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
@@ -115,7 +114,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 	})
 }
 
-func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
+func TestIntegration_Polyglot_Symlink(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)

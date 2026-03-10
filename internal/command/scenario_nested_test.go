@@ -13,7 +13,7 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestIntegration_Scenario_NestedRecursiveToolFlow(t *testing.T) {
+func TestScenario_Nested_ExecutionFlow(t *testing.T) {
 	// Scenario: Standard Docker environment (level 0) running a container (level 1).
 	// We verify that a snapshot is created when requested.
 

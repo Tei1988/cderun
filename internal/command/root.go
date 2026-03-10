@@ -131,8 +131,6 @@ const (
 )
 
 var (
-	// opts is the global state for standard execution.
-	// Tests should use ExecuteContextWithOptions to avoid global state.
 	opts = defaultOptions()
 
 	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
@@ -1122,7 +1120,6 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	} else {
 		// Create fresh state for testing
 		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
 		cmd = newRootCmd(&localOpts)
 		setup(&localOpts, cmd)
 	}

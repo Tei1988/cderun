@@ -61,8 +61,7 @@ func (m *hangMockRuntime) InspectContainer(ctx context.Context, containerID stri
 	}
 }
 
-func TestUnit_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
-	t.Parallel()
+func TestUnit_AutoTermination_NonTTY(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),
@@ -102,8 +101,7 @@ func TestUnit_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
 	}
 }
 
-func TestUnit_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
-	t.Parallel()
+func TestUnit_AutoTermination_TTY_NoKill(t *testing.T) {
 	mock := &hangMockRuntime{MockRuntime: *runtime.NewMockRuntime(),
 		waitStarted: make(chan struct{}),
 		killed:      make(chan struct{}),

@@ -136,9 +136,7 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 	return fs.ReadFile("/proc/self/mountinfo")
 }
 
-var (
-	defaultMountInfoReader mountInfoReader = realMountInfoReader{}
-)
+var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
 
 func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
 	data, err := defaultMountInfoReader.ReadMountInfo(fs)
