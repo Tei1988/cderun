@@ -14,11 +14,7 @@ import (
 	"cderun/internal/logging"
 )
 
-func TestUnit_Snapshot_NestedSnapshotDirResolvesToHostPath(t *testing.T) {
-	// This test and its subtests modify a global variable 'defaultMountInfoReader',
-	// so it cannot be run in parallel with other tests that access it.
-	// Reference: defaultMountInfoReader, TestUnit_Snapshot_NestedSnapshotDirResolvesToHostPath, t.Cleanup.
-	// DO NOT call t.Parallel() here or in subtests.
+func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()
@@ -43,7 +39,7 @@ func TestUnit_Snapshot_NestedSnapshotDirResolvesToHostPath(t *testing.T) {
 	assert.True(t, strings.HasPrefix(hostDir, "/var/lib/docker/overlay2/abc/diff/"), "expected host path via OverlayFS, got: %s", hostDir)
 }
 
-func TestUnit_Snapshot_Immutability(t *testing.T) {
+func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -76,7 +72,7 @@ func TestUnit_Snapshot_Immutability(t *testing.T) {
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
-func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
+func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -96,7 +92,7 @@ func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
 	assert.Nil(t, globalCfg.HostContext)
 }
 
-func TestUnit_Snapshot_Permissions(t *testing.T) {
+func TestUnit_Snapshot_DirectoryAndFilePermissions(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
@@ -125,11 +121,7 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 	return m.Content, m.Err
 }
 
-func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
-	// This test and its subtests modify a global variable 'defaultMountInfoReader',
-	// so it cannot be run in parallel with other tests that access it.
-	// Reference: defaultMountInfoReader, TestUnit_Snapshot_DiscoverOverlay, t.Cleanup.
-	// DO NOT call t.Parallel() here or in subtests.
+func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()

@@ -43,8 +43,26 @@ func TestFeature(t *testing.T) {
   - `runCderun` ヘルパーの使用（内部で `os.Stdout` や `os.Stderr` などのグローバルなストリームを置換し、グローバルな `opts` をリセットするため）。
   - `syscall.Kill(os.Getpid(), ...)` による自プロセスへのシグナル送信（例: `robustness_test.go`）。
   - `os.Stdout` や `os.Stderr` などのグローバルなストリームの直接的な置換。
+  - `t.Setenv` や `os.Chdir` を使用するテスト（これらはプロセス全体の状態を変更するため）。
 
-## 2. モック実装の原則 (Mocking Principles)
+## 2. テストしやすい構造 (Testable Architecture)
+
+### 2.1. 依存性の注入 (DI)
+
+- グローバル状態（`os.Chdir`, `os.Stdout`, `os.Stderr`, グローバル変数など）への依存を排除する。
+- 外部依存（ファイルシステム、ランタイム、ターミナル操作など）はインターフェース（`FileSystem`, `ContainerRuntime` 等）を介して抽象化する。
+- `rootOptions` を通じてこれらの依存性を注入し、テスト時にモックに差し替え可能にする。
+
+### 2.2. ファイルシステムの抽象化
+
+- `config.FileSystem` インターフェースに `Abs(path string) (string, error)` を追加し、相対パス解決を完全に制御可能にする。
+- テストでは `MockFileSystem` を使用し、`os.Chdir` を使わずに「仮想的な作業ディレクトリ」での動作を検証する。これにより、テストの並列実行（`t.Parallel()`）を安全に行えるようにする。
+
+### 2.3. 不変性の確保
+
+- 設定データ（`CDERunConfig`, `ToolsConfig`）は、必要に応じて `DeepCopy` を行い、不用意なミュータブルな変更が他の処理に影響を与えないようにする。
+
+## 3. モック実装の原則 (Mocking Principles)
 
 ### 2.1. 可読性の高いロジック
 
@@ -56,15 +74,15 @@ func TestFeature(t *testing.T) {
 インターフェースをモックする場合、埋め込みフィールドを `nil` のままにせず、パニックを避けるために最小限のメソッドを実装してください。
 特に `os.FileInfo` などをモックで返す場合、予期せぬメソッド呼び出しでテストがクラッシュしないように注意してください。
 
-## 3. コードの依存関係とドキュメント (Dependency & Documentation)
+## 4. コードの依存関係とドキュメント (Dependency & Documentation)
 
-### 3.1. 初期化順序の明示
+### 4.1. 初期化順序の明示
 
 パッケージレベルの変数や、特定の初期化順序に依存する関数（例: `defaultLoader` に依存する `NewConfigLoaderWithFS`）については、将来の開発者が意図を理解できるようにコメントで明記してください。
 
-## 4. 命名規則と構成
+## 5. 命名規則と構成
 
-`docs/features/test-organization-plan.md` に定義されている命名規則とカテゴリに従ってください。
+`docs/testing/organization.md` に定義されている命名規則とカテゴリに従ってください。
 
 - **命名規則:** `Test[Category]_[Feature]_[Scenario]`
 - **配置:** ロジックに応じた適切なテストファイル（`root_test.go`, `integration_test.go`, `robustness_test.go` など）を選択してください。

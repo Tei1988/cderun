@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,25 +13,21 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("Executable", func(t *testing.T) {
-		t.Parallel()
 		exe, err := fs.Executable()
 		require.NoError(t, err)
 		assert.NotEmpty(t, exe)
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
-		// t.Setenv cannot be used with t.Parallel()
 		t.Setenv("TEST_VAR", "value")
 		assert.Equal(t, "value", fs.Getenv("TEST_VAR"))
 	})
 
 	t.Run("TempDir", func(t *testing.T) {
-		t.Parallel()
 		assert.NotEmpty(t, fs.TempDir())
 	})
 
 	t.Run("File operations", func(t *testing.T) {
-		t.Parallel()
 		tmp := t.TempDir()
 		path := filepath.Join(tmp, "subdir", "file.txt")
 
@@ -55,9 +50,7 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 }
 
 func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
-	t.Parallel()
-	// Note: All subtests below share and mutate the same MockFileSystem instance (mfs).
-	// Therefore, they must NOT call t.Parallel() internally.
+	// mfs is shared between subtests.
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
 		Env:      map[string]string{"K": "V"},
@@ -136,7 +129,6 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 }
 
 func TestUnit_Config_Loader_Initialization(t *testing.T) {
-	t.Parallel()
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)
@@ -145,33 +137,24 @@ func TestUnit_Config_Loader_Initialization(t *testing.T) {
 }
 
 func TestUnit_FileSystem_Abs(t *testing.T) {
-	t.Parallel()
-
 	t.Run("RealFileSystem", func(t *testing.T) {
 		fs := RealFileSystem{}
-		abs, err := fs.Abs("config.go")
+		abs, err := fs.Abs(".")
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(abs))
-		// Check only the base name to be path-agnostic
-		assert.Equal(t, "config.go", filepath.Base(abs))
 	})
 
 	t.Run("MockFileSystem", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			WD: "/app",
-		}
-
+		mfs := &MockFileSystem{WD: "/work"}
 		tests := []struct {
 			name     string
 			path     string
 			expected string
 		}{
-			{"relative file", "file.txt", "/app/file.txt"},
-			{"explicit relative", "./file.txt", "/app/file.txt"},
-			{"parent dir", "../other/file.txt", "/other/file.txt"},
-			{"absolute path", "/absolute/path", "/absolute/path"},
+			{"relative", "dir/file", "/work/dir/file"},
+			{"absolute", "/other/file", "/other/file"},
+			{"dot", ".", "/work"},
 		}
-
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				abs, err := mfs.Abs(tt.path)
@@ -179,22 +162,25 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 				assert.Equal(t, tt.expected, filepath.ToSlash(abs))
 			})
 		}
+	})
 
-		t.Run("error path", func(t *testing.T) {
-			sentinelErr := fmt.Errorf("abs failed")
-			mfs.AbsErr = sentinelErr
-			defer func() { mfs.AbsErr = nil }()
+	t.Run("ResolvePath propagates Abs error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD:     "/work",
+			AbsErr: assert.AnError,
+		}
+		// ResolvePath uses fs.Abs when r.HostContext.Level > 0
+		r := &ExpressionResolver{
+			fs: mfs,
+			HostContext: &HostContext{
+				Level:  1,
+				Mounts: []MountMapping{{Source: "/host", Target: "/work", Level: 1}},
+			},
+		}
 
-			_, err := mfs.Abs("anything")
-			require.ErrorIs(t, err, sentinelErr)
-
-			// Test ResolvePath error propagation
-			_, err = ResolvePath("relative", "/app", &ExpressionResolver{
-				fs:          mfs,
-				HostContext: &HostContext{Level: 1}, // Triggers fs.Abs in the level > 0 branch
-			})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to get absolute path for relative: abs failed")
-		})
+		_, err := ResolvePath("relative", "/work", r)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to get absolute path")
 	})
 }

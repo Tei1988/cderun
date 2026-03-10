@@ -17,11 +17,11 @@ type MockFileSystem struct {
 	ExecPath     string
 	ExecErr      error
 	StatErr      error
-	AbsErr       error
 	ReadFileErr  error
 	MkdirAllErr  error
 	WriteFileErr error
 	RemoveAllErr error
+	AbsErr       error
 	TempDirValue string
 	Perms        map[string]os.FileMode
 }
