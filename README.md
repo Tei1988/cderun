@@ -49,7 +49,7 @@ cderun --image=alpine --entrypoint=ls ls -l
 ### 4. Diagnosis Mode
 
 Run `cderun` with the `--diagnosis` flag to see system diagnostics
-and available tools.
+and available tools. This mode does not require a subcommand.
 
 ```bash
 cderun --diagnosis
@@ -131,6 +131,19 @@ cderun node app.js --cderun-image node:20-alpine
 - `--log-timestamp`: Include timestamp in logs (default: true).
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
+
+## Environment Variables
+
+`cderun` can be configured using environment variables. Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variable (e.g., `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_REMOVE`).
+
+Key variables include:
+
+- `CDERUN_CONFIG`: Path to cderun config file.
+- `CDERUN_TOOL_CONFIG`: Path to tools config file.
+- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive sessions during I/O propagation cleanup (default: `2s`).
+- `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
+
+Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, and `CDERUN_PUBLISH` use comma (`,`).
 
 ## Configuration
 
