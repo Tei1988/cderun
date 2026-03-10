@@ -131,6 +131,8 @@ const (
 )
 
 var (
+	// opts is the global state for standard execution.
+	// Tests should use ExecuteContextWithOptions to avoid global state.
 	opts = defaultOptions()
 
 	// rootCmd is initialized in init() to ensure it uses the properly initialized opts

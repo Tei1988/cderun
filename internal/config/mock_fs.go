@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -144,4 +145,11 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 		}
 	}
 	return nil
+}
+
+func (m *MockFileSystem) Abs(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(m.WD, path), nil
 }

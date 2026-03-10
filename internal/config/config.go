@@ -303,6 +303,7 @@ type FileSystem interface {
 	MkdirAll(path string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	RemoveAll(path string) error
+	Abs(path string) (string, error)
 }
 
 // RealFileSystem implements FileSystem using standard os and filepath.
@@ -324,6 +325,7 @@ func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) 
 	return os.WriteFile(filename, data, perm)
 }
 func (RealFileSystem) RemoveAll(path string) error { return os.RemoveAll(path) }
+func (RealFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
 
 // ConfigLoader handles finding and loading configuration files.
 type ConfigLoader struct {
@@ -379,7 +381,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 		for {
 			p := filepath.Join(curr, filename)
 			if _, err := l.fs.Stat(p); err == nil {
-				if abs, err := filepath.Abs(p); err == nil {
+				if abs, err := l.fs.Abs(p); err == nil {
 					paths = append(paths, abs)
 				} else {
 					paths = append(paths, p)
@@ -397,7 +399,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 	if home, err := l.fs.UserHomeDir(); err == nil {
 		p := filepath.Join(home, ".config", "cderun", filename)
 		if _, err := l.fs.Stat(p); err == nil {
-			if abs, err := filepath.Abs(p); err == nil {
+			if abs, err := l.fs.Abs(p); err == nil {
 				paths = append(paths, abs)
 			} else {
 				paths = append(paths, p)
@@ -532,7 +534,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 		return nil, nil, err
 	}
 	path = expanded
-	absPath, err := filepath.Abs(path)
+	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 	}
@@ -562,7 +564,7 @@ func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []stri
 		return nil, nil, err
 	}
 	path = expanded
-	absPath, err := filepath.Abs(path)
+	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 	}

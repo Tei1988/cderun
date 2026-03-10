@@ -14,10 +14,12 @@ import (
 	"cderun/internal/logging"
 )
 
-func TestUnit_Snapshot_NestedSnapshotDirResolvesToHostPath(t *testing.T) {
+func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 	mfs := &config.MockFileSystem{}
+	// This test modifies a global variable 'defaultMountInfoReader',
+	// so it cannot be run in parallel with other tests that access it.
 	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
+	t.Cleanup(func() { defaultMountInfoReader = originalReader })
 
 	// Simulate OverlayFS: container / maps to host /var/lib/docker/overlay2/abc/diff
 	mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/var/lib/docker/overlay2/abc/diff,workdir=/w\n"
@@ -39,7 +41,8 @@ func TestUnit_Snapshot_NestedSnapshotDirResolvesToHostPath(t *testing.T) {
 	assert.True(t, strings.HasPrefix(hostDir, "/var/lib/docker/overlay2/abc/diff/"), "expected host path via OverlayFS, got: %s", hostDir)
 }
 
-func TestUnit_Snapshot_Immutability(t *testing.T) {
+func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -72,7 +75,8 @@ func TestUnit_Snapshot_Immutability(t *testing.T) {
 	assert.Equal(t, initialMountSource, globalCfg.HostContext.Mounts[0].Source)
 }
 
-func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
+func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -92,7 +96,8 @@ func TestUnit_Snapshot_WithNilHostContext(t *testing.T) {
 	assert.Nil(t, globalCfg.HostContext)
 }
 
-func TestUnit_Snapshot_Permissions(t *testing.T) {
+func TestUnit_Snapshot_DirectoryAndFilePermissions(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
@@ -121,10 +126,12 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 	return m.Content, m.Err
 }
 
-func TestUnit_Snapshot_DiscoverOverlay(t *testing.T) {
+func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 	mfs := &config.MockFileSystem{}
+	// This test modifies a global variable 'defaultMountInfoReader',
+	// so it cannot be run in parallel with other tests that access it.
 	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
+	t.Cleanup(func() { defaultMountInfoReader = originalReader })
 
 	t.Run("successfully discover upperdir", func(t *testing.T) {
 		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"

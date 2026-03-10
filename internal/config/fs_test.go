@@ -13,21 +13,25 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("Executable", func(t *testing.T) {
+		t.Parallel()
 		exe, err := fs.Executable()
 		require.NoError(t, err)
 		assert.NotEmpty(t, exe)
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
+		// t.Setenv cannot be used with t.Parallel()
 		t.Setenv("TEST_VAR", "value")
 		assert.Equal(t, "value", fs.Getenv("TEST_VAR"))
 	})
 
 	t.Run("TempDir", func(t *testing.T) {
+		t.Parallel()
 		assert.NotEmpty(t, fs.TempDir())
 	})
 
 	t.Run("File operations", func(t *testing.T) {
+		t.Parallel()
 		tmp := t.TempDir()
 		path := filepath.Join(tmp, "subdir", "file.txt")
 
@@ -50,6 +54,7 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 }
 
 func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
+	t.Parallel()
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
 		Env:      map[string]string{"K": "V"},
@@ -128,9 +133,44 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 }
 
 func TestUnit_Config_Loader_Initialization(t *testing.T) {
+	t.Parallel()
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)
 	assert.Equal(t, defaultLoader.systemConfigDir, loader.systemConfigDir)
 	assert.Equal(t, defaultLoader.runConfigDir, loader.runConfigDir)
+}
+
+func TestUnit_FileSystem_Abs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RealFileSystem", func(t *testing.T) {
+		fs := RealFileSystem{}
+		abs, err := fs.Abs("config.go")
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(abs))
+		assert.Contains(t, abs, "internal/config/config.go")
+	})
+
+	t.Run("MockFileSystem", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+		}
+
+		tests := []struct {
+			path     string
+			expected string
+		}{
+			{"file.txt", "/app/file.txt"},
+			{"./file.txt", "/app/file.txt"},
+			{"../other/file.txt", "/other/file.txt"},
+			{"/absolute/path", "/absolute/path"},
+		}
+
+		for _, tt := range tests {
+			abs, err := mfs.Abs(tt.path)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, filepath.ToSlash(abs))
+		}
+	})
 }
