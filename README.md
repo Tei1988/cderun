@@ -140,7 +140,7 @@ Key variables include:
 
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `2s`). When the host input is not a TTY or the container is non-interactive, this timeout is used during I/O propagation cleanup to forcefully terminate the container (SIGKILL) if it hangs past the grace period.
+- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `2s`). Forcefully terminates the container (SIGKILL) if it hangs past the grace period after I/O completion.
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 
 Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
