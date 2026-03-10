@@ -6,9 +6,11 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.config/cderun/.bin}"
 SYMLINK_PATH="${SYMLINK_PATH:-/usr/local/bin/cderun}"
 
 # Resolve latest version if not specified
-VERSION="${VERSION:-}"
+VERSION="${VERSION:-${1:-}}"
 if [[ -z "$VERSION" ]]; then
-  api_response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || {
+  auth_header=""
+  [[ -n "${GITHUB_TOKEN:-}" ]] && auth_header="-H 'Authorization: Bearer ${GITHUB_TOKEN}'"
+  api_response=$(curl -sSL -H "Accept: application/vnd.github+json" ${auth_header} "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || {
     echo "Error: Failed to fetch latest release from GitHub API for ${REPO}"
     echo "Context: $api_response"
     exit 1
