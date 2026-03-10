@@ -180,7 +180,7 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 
 		_, err := ResolvePath("relative", "/work", r)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, assert.AnError)
+		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to get absolute path")
 	})
 }
