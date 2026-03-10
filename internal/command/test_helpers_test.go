@@ -106,14 +106,13 @@ func setupTestDir(t *testing.T) string {
 	// Note: We still use Chdir here for legacy integration tests that don't yet
 	// fully use the MockFileSystem. For these tests, we must NOT call t.Parallel().
 	// We serialize access to the global working directory using setupMu to reduce flakes.
+	// We hold the lock for the entire lifetime of the test that changes CWD.
 	setupMu.Lock()
 	restoreWd, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(tmpDir))
-	setupMu.Unlock()
 
 	t.Cleanup(func() {
-		setupMu.Lock()
 		defer setupMu.Unlock()
 		_ = os.Chdir(restoreWd)
 	})

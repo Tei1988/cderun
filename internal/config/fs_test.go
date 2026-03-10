@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,6 +56,8 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 
 func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 	t.Parallel()
+	// Note: All subtests below share and mutate the same MockFileSystem instance (mfs).
+	// Therefore, they must NOT call t.Parallel() internally.
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
 		Env:      map[string]string{"K": "V"},
@@ -159,19 +162,39 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 		}
 
 		tests := []struct {
+			name     string
 			path     string
 			expected string
 		}{
-			{"file.txt", "/app/file.txt"},
-			{"./file.txt", "/app/file.txt"},
-			{"../other/file.txt", "/other/file.txt"},
-			{"/absolute/path", "/absolute/path"},
+			{"relative file", "file.txt", "/app/file.txt"},
+			{"explicit relative", "./file.txt", "/app/file.txt"},
+			{"parent dir", "../other/file.txt", "/other/file.txt"},
+			{"absolute path", "/absolute/path", "/absolute/path"},
 		}
 
 		for _, tt := range tests {
-			abs, err := mfs.Abs(tt.path)
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, filepath.ToSlash(abs))
+			t.Run(tt.name, func(t *testing.T) {
+				abs, err := mfs.Abs(tt.path)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, filepath.ToSlash(abs))
+			})
 		}
+
+		t.Run("error path", func(t *testing.T) {
+			sentinelErr := fmt.Errorf("abs failed")
+			mfs.AbsErr = sentinelErr
+			defer func() { mfs.AbsErr = nil }()
+
+			_, err := mfs.Abs("anything")
+			assert.ErrorIs(t, err, sentinelErr)
+
+			// Test ResolvePath error propagation
+			_, err = ResolvePath("relative", "/app", &ExpressionResolver{
+				fs:          mfs,
+				HostContext: &HostContext{Level: 1}, // Triggers fs.Abs in the level > 0 branch
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "failed to get absolute path for relative: abs failed")
+		})
 	})
 }

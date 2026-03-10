@@ -17,6 +17,7 @@ type MockFileSystem struct {
 	ExecPath     string
 	ExecErr      error
 	StatErr      error
+	AbsErr       error
 	ReadFileErr  error
 	MkdirAllErr  error
 	WriteFileErr error
@@ -148,6 +149,9 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 }
 
 func (m *MockFileSystem) Abs(path string) (string, error) {
+	if m.AbsErr != nil {
+		return "", m.AbsErr
+	}
 	if filepath.IsAbs(path) {
 		return filepath.Clean(path), nil
 	}
