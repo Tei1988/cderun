@@ -353,7 +353,9 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
 		abs := absPath
 		if !filepath.IsAbs(abs) {
-			abs, _ = fs.Abs(abs)
+			if a, err := fs.Abs(abs); err == nil {
+				abs = a
+			}
 		}
 
 		found := false
