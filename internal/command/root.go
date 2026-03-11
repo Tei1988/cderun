@@ -1120,8 +1120,11 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	} else {
 		// Create fresh state for testing
 		localOpts := defaultOptions()
+		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
 		cmd = newRootCmd(&localOpts)
 		setup(&localOpts, cmd)
+		// Redirect logger to the command's error writer early to capture initial logs.
+		localOpts.logger.SetOutput(cmd.ErrOrStderr())
 	}
 
 	args, err := preprocessArgs(cmd, rawArgs)

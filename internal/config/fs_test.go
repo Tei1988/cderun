@@ -50,6 +50,7 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 }
 
 func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
+	// mfs is shared between subtests.
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
 		Env:      map[string]string{"K": "V"},
@@ -133,4 +134,53 @@ func TestUnit_Config_Loader_Initialization(t *testing.T) {
 	assert.Equal(t, mfs, loader.fs)
 	assert.Equal(t, defaultLoader.systemConfigDir, loader.systemConfigDir)
 	assert.Equal(t, defaultLoader.runConfigDir, loader.runConfigDir)
+}
+
+func TestUnit_FileSystem_Abs(t *testing.T) {
+	t.Run("RealFileSystem", func(t *testing.T) {
+		fs := RealFileSystem{}
+		abs, err := fs.Abs(".")
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(abs))
+	})
+
+	t.Run("MockFileSystem", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/work"}
+		tests := []struct {
+			name     string
+			path     string
+			expected string
+		}{
+			{"relative", "dir/file", "/work/dir/file"},
+			{"absolute", "/other/file", "/other/file"},
+			{"dot", ".", "/work"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				abs, err := mfs.Abs(tt.path)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, filepath.ToSlash(abs))
+			})
+		}
+	})
+
+	t.Run("ResolvePath propagates Abs error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD:     "/work",
+			AbsErr: assert.AnError,
+		}
+		// ResolvePath uses fs.Abs when r.HostContext.Level > 0
+		r := &ExpressionResolver{
+			fs: mfs,
+			HostContext: &HostContext{
+				Level:  1,
+				Mounts: []MountMapping{{Source: "/host", Target: "/work", Level: 1}},
+			},
+		}
+
+		_, err := ResolvePath("relative", "/work", r)
+		require.Error(t, err)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to get absolute path")
+	})
 }

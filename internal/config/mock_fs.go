@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -20,6 +21,7 @@ type MockFileSystem struct {
 	MkdirAllErr  error
 	WriteFileErr error
 	RemoveAllErr error
+	AbsErr       error
 	TempDirValue string
 	Perms        map[string]os.FileMode
 }
@@ -144,4 +146,14 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 		}
 	}
 	return nil
+}
+
+func (m *MockFileSystem) Abs(path string) (string, error) {
+	if m.AbsErr != nil {
+		return "", m.AbsErr
+	}
+	if filepath.IsAbs(path) {
+		return filepath.Clean(path), nil
+	}
+	return filepath.Join(m.WD, path), nil
 }

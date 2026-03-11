@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScenario_DockerVersion(t *testing.T) {
+func TestScenario_Runtime_VersionCheck(t *testing.T) {
 	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
 	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
 	skipIfDockerBroken(t, err)
@@ -28,7 +28,7 @@ func TestScenario_DockerVersion(t *testing.T) {
 	fmt.Printf("Detected Docker Version in E2E: %s\n", stdout)
 }
 
-func TestScenario_StandardExecution(t *testing.T) {
+func TestScenario_Execution_AlpineSh(t *testing.T) {
 	// Mandatory subcommand 'alpine' identifies the tool/image context.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
@@ -45,7 +45,7 @@ func TestScenario_StandardExecution(t *testing.T) {
 	assert.Contains(t, stdout, "hello-cderun-e2e")
 }
 
-func TestScenario_VolumeMount(t *testing.T) {
+func TestScenario_Execution_VolumeMounting(t *testing.T) {
 	var baseDir string
 	if envDir := os.Getenv("TEST_HOST_TMP_DIR"); envDir != "" {
 		err := os.MkdirAll(envDir, 0755)
@@ -83,7 +83,7 @@ func TestScenario_VolumeMount(t *testing.T) {
 	assert.Equal(t, content, strings.TrimSpace(stdout))
 }
 
-func TestScenario_NestedExecution(t *testing.T) {
+func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
@@ -134,7 +134,7 @@ func TestScenario_NestedExecution(t *testing.T) {
 	assert.Contains(t, stdout, "nested-success")
 }
 
-func TestScenario_DryRun(t *testing.T) {
+func TestScenario_DryRun_FormatsAndOutput(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--dry-run", "--dry-run-format", "json"},
 		"alpine",

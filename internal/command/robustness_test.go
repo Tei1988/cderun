@@ -35,7 +35,7 @@ func (m *blockingMockRuntime) AttachContainer(ctx context.Context, containerID s
 	}
 }
 
-func TestRobustness_Root_SignalHandling(t *testing.T) {
+func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 	t.Run("unblocks hanging AttachContainer after WaitContainer finishes", func(t *testing.T) {
 		mock := &blockingMockRuntime{
 			blockAttach: make(chan struct{}),
