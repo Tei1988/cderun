@@ -76,6 +76,11 @@ type ConfigDefaults struct {
 	Pull            string         `yaml:"pull,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
+	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
+	DryRun          *bool          `yaml:"dryRun,omitempty"`
+	DryRunFormat    string         `yaml:"dryRunFormat,omitempty"`
+	Diagnosis       *bool          `yaml:"diagnosis,omitempty"`
+	DiagnosisFormat string         `yaml:"diagnosisFormat,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
@@ -92,6 +97,8 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.MountAllTools = copyBoolPtr(d.MountAllTools)
 	res.PublishAll = copyBoolPtr(d.PublishAll)
 	res.Privileged = copyBoolPtr(d.Privileged)
+	res.DryRun = copyBoolPtr(d.DryRun)
+	res.Diagnosis = copyBoolPtr(d.Diagnosis)
 
 	res.MountTools = copyStringSlice(d.MountTools)
 	res.Ports = copyStringSlice(d.Ports)
@@ -192,6 +199,14 @@ type ToolConfig struct {
 	Pull            string         `yaml:"pull,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            float64        `yaml:"cpus,omitempty"`
+	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
+	LogLevel        string         `yaml:"logLevel,omitempty"`
+	LogFormat       string         `yaml:"logFormat,omitempty"`
+	LogTimestamp    *bool          `yaml:"logTimestamp,omitempty"`
+	DryRun          *bool          `yaml:"dryRun,omitempty"`
+	DryRunFormat    string         `yaml:"dryRunFormat,omitempty"`
+	Diagnosis       *bool          `yaml:"diagnosis,omitempty"`
+	DiagnosisFormat string         `yaml:"diagnosisFormat,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
@@ -208,6 +223,9 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.MountAllTools = copyBoolPtr(t.MountAllTools)
 	res.PublishAll = copyBoolPtr(t.PublishAll)
 	res.Privileged = copyBoolPtr(t.Privileged)
+	res.LogTimestamp = copyBoolPtr(t.LogTimestamp)
+	res.DryRun = copyBoolPtr(t.DryRun)
+	res.Diagnosis = copyBoolPtr(t.Diagnosis)
 
 	res.MountTools = copyStringSlice(t.MountTools)
 	res.Ports = copyStringSlice(t.Ports)

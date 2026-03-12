@@ -17,11 +17,15 @@
 
 ## 設定
 
-ハングタイムアウトの時間は、環境変数 `CDERUN_HANG_TIMEOUT` で変更可能です。
+ハングタイムアウトの時間は、以下の全ての経路で変更可能です。
 
 - **デフォルト値**: `2s` (2秒)
 - **形式**: Go の Duration 形式（例: `500ms`, `5s`, `10s`）
-- **環境変数**: `CDERUN_HANG_TIMEOUT`
+- **P1 フラグ**: `--cderun-hang-timeout`（サブコマンドの後ろに指定）
+- **P2 フラグ**: `--hang-timeout`
+- **P3 環境変数**: `CDERUN_HANG_TIMEOUT`
+- **P4 ツール別設定** (`.tools.yaml`): `hangTimeout` フィールド
+- **P5 グローバルデフォルト** (`.cderun.yaml` defaults): `hangTimeout` フィールド
 
 ## 適用条件
 

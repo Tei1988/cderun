@@ -78,6 +78,8 @@ type rootOptions struct {
 	cderunLogLevel        string
 	cderunLogFormat       string
 	cderunLogTimestamp    bool
+	hangTimeout           string
+	cderunHangTimeout     string
 
 	// Docker-compatible flags
 	ports            []string
@@ -318,6 +320,10 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
 		CderunStrictEnv:          o.cderunStrictEnv,
 		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
+		HangTimeout:              o.hangTimeout,
+		HangTimeoutSet:           cmd.Flags().Changed("hang-timeout"),
+		CderunHangTimeout:        o.cderunHangTimeout,
+		CderunHangTimeoutSet:     cmd.Flags().Changed("cderun-hang-timeout"),
 
 		// Docker-compatible flags
 		Ports:               o.ports,
@@ -675,7 +681,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
-	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, containerConfig.Interactive)
+	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, containerConfig.Interactive, resolved)
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
 	if isHostStdinTerminal && containerConfig.TTY {
@@ -1093,6 +1099,9 @@ cmd.PersistentFlags().BoolVarP(&o.tty, "tty", "t", false, "Allocate a pseudo-TTY
 	cmd.PersistentFlags().StringVar(&o.cderunLogLevel, "cderun-log-level", "", "Override log level (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().StringVar(&o.cderunLogFormat, "cderun-log-format", "", "Override log format (highest priority, can be used after subcommand)")
 	cmd.PersistentFlags().BoolVar(&o.cderunLogTimestamp, "cderun-log-timestamp", true, "Override log-timestamp setting (highest priority, can be used after subcommand)")
+
+	cmd.PersistentFlags().StringVar(&o.hangTimeout, "hang-timeout", "", "Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms)")
+	cmd.PersistentFlags().StringVar(&o.cderunHangTimeout, "cderun-hang-timeout", "", "Override hang-timeout setting (highest priority, can be used after subcommand)")
 
 	cmd.Flags().SetInterspersed(false)
 	return cmd

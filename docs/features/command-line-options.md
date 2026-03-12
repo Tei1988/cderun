@@ -407,6 +407,18 @@ cderun --diagnosis
 cderun --diagnosis --diagnosis-format json
 ```
 
+### `--hang-timeout`
+
+- **型**: string
+- **デフォルト**: `2s`
+- **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間
+- **形式**: Go の Duration 形式（例: `500ms`, `5s`, `10s`）
+- **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
+
+```bash
+cderun --hang-timeout 5s node script.js
+```
+
 ### `--log-level`
 
 - **型**: string
@@ -448,7 +460,7 @@ cderun --log-timestamp=false node app.js
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
     `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
     `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`,
-    `--cderun-cap-drop`
+    `--cderun-cap-drop`, `--cderun-hang-timeout`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`,
     `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`,
     `--cderun-dns`, `--cderun-add-host`

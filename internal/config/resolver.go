@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
@@ -39,6 +40,7 @@ type ResolvedConfig struct {
 	LogFormat       string
 	LogTimestamp    bool
 	StrictEnv       bool
+	HangTimeout     time.Duration
 
 	// Docker-compatible flags
 	Ports      []string
@@ -151,6 +153,10 @@ type CLIOptions struct {
 	CderunLogFormatSet       bool
 	CderunLogTimestamp       bool
 	CderunLogTimestampSet    bool
+	HangTimeout              string
+	HangTimeoutSet           bool
+	CderunHangTimeout        string
+	CderunHangTimeoutSet     bool
 
 	// Docker-compatible flags
 	Ports               []string
@@ -220,14 +226,14 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	// 0. Resolve Diagnosis (CLI/Env only)
+	// 0. Resolve Diagnosis
 	// This is resolved early because diagnosis mode bypasses some validations.
 	res.Diagnosis = resolveBool(
 		cli.CderunDiagnosisSet, cli.CderunDiagnosis,
 		cli.DiagnosisSet, cli.Diagnosis,
 		"CDERUN_DIAGNOSIS",
-		"", nil, nil,
-		nil, nil,
+		subcommand, tools, func(t ToolConfig) *bool { return t.Diagnosis },
+		global, func(g CDERunConfig) *bool { return g.Defaults.Diagnosis },
 		false,
 		fs,
 	)
@@ -477,47 +483,77 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, err
 	}
 
-	// 16. Resolve DryRun (CLI/Env only)
+	// Resolve HangTimeout
+	hangTimeoutStr := resolveString(
+		cli.CderunHangTimeoutSet, cli.CderunHangTimeout,
+		cli.HangTimeoutSet, cli.HangTimeout,
+		"CDERUN_HANG_TIMEOUT",
+		subcommand, tools, func(t ToolConfig) string { return t.HangTimeout },
+		global, func(g CDERunConfig) string { return g.Defaults.HangTimeout },
+		"2s",
+		r,
+		fs,
+	)
+	if hangTimeoutStr != "" {
+		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
+			res.HangTimeout = d
+		} else {
+			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+		}
+	}
+
+	// Resolve DryRun (CLI/Env/Config)
 	res.DryRun = resolveBool(
 		cli.CderunDryRunSet, cli.CderunDryRun,
 		cli.DryRunSet, cli.DryRun,
 		"CDERUN_DRY_RUN",
-		"", nil, nil,
-		nil, nil,
+		subcommand, tools, func(t ToolConfig) *bool { return t.DryRun },
+		global, func(g CDERunConfig) *bool { return g.Defaults.DryRun },
 		false,
 		fs,
 	)
 
-	// 17. Resolve DryRunFormat (CLI/Env only)
+	// Resolve DryRunFormat (CLI/Env/Config)
 	res.DryRunFormat = resolveString(
 		cli.CderunDryRunFormatSet, cli.CderunDryRunFormat,
 		cli.DryRunFormatSet, cli.DryRunFormat,
 		"CDERUN_DRY_RUN_FORMAT",
-		"", nil, nil,
-		nil, nil,
+		subcommand, tools, func(t ToolConfig) string { return t.DryRunFormat },
+		global, func(g CDERunConfig) string { return g.Defaults.DryRunFormat },
 		"yaml",
 		r,
 		fs,
 	)
 
-	// 18. Resolve DiagnosisFormat (CLI/Env only)
+	// Resolve DiagnosisFormat (CLI/Env/Config)
 	res.DiagnosisFormat = resolveString(
 		cli.CderunDiagnosisFormatSet, cli.CderunDiagnosisFormat,
 		cli.DiagnosisFormatSet, cli.DiagnosisFormat,
 		"CDERUN_DIAGNOSIS_FORMAT",
-		"", nil, nil,
-		nil, nil,
+		subcommand, tools, func(t ToolConfig) string { return t.DiagnosisFormat },
+		global, func(g CDERunConfig) string { return g.Defaults.DiagnosisFormat },
 		"yaml",
 		r,
 		fs,
 	)
 
-	// 19. Resolve Logging
+	// Resolve Diagnosis (CLI/Env/Config)
+	res.Diagnosis = resolveBool(
+		cli.CderunDiagnosisSet, cli.CderunDiagnosis,
+		cli.DiagnosisSet, cli.Diagnosis,
+		"CDERUN_DIAGNOSIS",
+		subcommand, tools, func(t ToolConfig) *bool { return t.Diagnosis },
+		global, func(g CDERunConfig) *bool { return g.Defaults.Diagnosis },
+		false,
+		fs,
+	)
+
+	// Resolve LogLevel/LogFormat/LogTimestamp for tool-specific overrides (P4)
 	res.LogLevel = resolveString(
 		cli.CderunLogLevelSet, cli.CderunLogLevel,
 		cli.LogLevelSet, cli.LogLevel,
 		"CDERUN_LOG_LEVEL",
-		"", nil, nil,
+		subcommand, tools, func(t ToolConfig) string { return t.LogLevel },
 		global, func(g CDERunConfig) string { return g.Logging.Level },
 		"warn",
 		r,
@@ -528,7 +564,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		cli.CderunLogFormatSet, cli.CderunLogFormat,
 		cli.LogFormatSet, cli.LogFormat,
 		"CDERUN_LOG_FORMAT",
-		"", nil, nil,
+		subcommand, tools, func(t ToolConfig) string { return t.LogFormat },
 		global, func(g CDERunConfig) string { return g.Logging.Format },
 		"text",
 		r,
@@ -539,13 +575,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		cli.CderunLogTimestampSet, cli.CderunLogTimestamp,
 		cli.LogTimestampSet, cli.LogTimestamp,
 		"CDERUN_LOG_TIMESTAMP",
-		"", nil, nil,
+		subcommand, tools, func(t ToolConfig) *bool { return t.LogTimestamp },
 		global, func(g CDERunConfig) *bool { return g.Logging.Timestamp },
-		true, // Default to true
+		true,
 		fs,
 	)
-
-	// Resolve Docker-compatible flags
 	res.Ports = resolveStringSlice(cli.CderunPorts, cli.Ports, "CDERUN_PUBLISH", subcommand, tools, func(t ToolConfig) []string { return t.Ports }, global, func(g CDERunConfig) []string { return g.Defaults.Ports }, r, fs)
 	res.PublishAll = resolveBool(cli.CderunPublishAllSet, cli.CderunPublishAll, cli.PublishAllSet, cli.PublishAll, "CDERUN_PUBLISH_ALL", subcommand, tools, func(t ToolConfig) *bool { return t.PublishAll }, global, func(g CDERunConfig) *bool { return g.Defaults.PublishAll }, false, fs)
 	res.Expose = resolveStringSlice(cli.CderunExpose, cli.Expose, "CDERUN_EXPOSE", subcommand, tools, func(t ToolConfig) []string { return t.Expose }, global, func(g CDERunConfig) []string { return g.Defaults.Expose }, r, fs)
