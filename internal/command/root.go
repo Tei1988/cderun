@@ -812,7 +812,6 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
 			select {
 			case err := <-attachDone:
-				attachDoneConsumed = true
 				if err != nil && !errors.Is(err, context.Canceled) {
 					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
 					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
@@ -822,12 +821,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 				cancelAttach()
 				<-attachDone
-				attachDoneConsumed = true
 			}
 		}
 
 	case err := <-attachDone:
-		attachDoneConsumed = true
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
 			// Wait for container to finish (best effort)
