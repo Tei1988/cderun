@@ -5,12 +5,12 @@ REPO="Tei1988/cderun"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.config/cderun/.bin}"
 SYMLINK_PATH="${SYMLINK_PATH:-/usr/local/bin/cderun}"
 
+auth_header=()
+[[ -n "${GITHUB_TOKEN:-}" ]] && auth_header=("-H" "Authorization: Bearer ${GITHUB_TOKEN}")
 # Resolve latest version if not specified
 VERSION="${VERSION:-${1:-}}"
 if [[ -z "$VERSION" ]]; then
-  auth_header=""
-  [[ -n "${GITHUB_TOKEN:-}" ]] && auth_header="-H 'Authorization: Bearer ${GITHUB_TOKEN}'"
-  api_response=$(curl -sSL -H "Accept: application/vnd.github+json" ${auth_header} "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || {
+  api_response=$(curl -sSL -H "Accept: application/vnd.github+json" "${auth_header[@]}" "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || {
     echo "Error: Failed to fetch latest release from GitHub API for ${REPO}"
     echo "Context: $api_response"
     exit 1
@@ -50,8 +50,8 @@ download() {
   # shellcheck disable=SC2064
   trap "rm -rf \"$tmp_dir\"" RETURN
 
-  curl -fsSL "$url" -o "${tmp_dir}/${archive}"
-  curl -fsSL "$checksum_url" -o "${tmp_dir}/checksums.txt"
+  curl -fsSL "${auth_header[@]}" "$url" -o "${tmp_dir}/${archive}"
+  curl -fsSL "${auth_header[@]}" "$checksum_url" -o "${tmp_dir}/checksums.txt"
 
   (cd "$tmp_dir" && sha256sum --check --ignore-missing "checksums.txt" > /dev/null 2>&1) || {
     echo "Error: Checksum verification failed for ${archive}"
