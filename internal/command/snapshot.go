@@ -16,7 +16,7 @@ import (
 // createSnapshot creates a snapshot directory and returns (containerDir, hostDir, error).
 // containerDir is the path inside the current container (used for file I/O and cleanup).
 // hostDir is the resolved host path (used as mount source for the next container).
-func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, string, error) {
+func createSnapshot(logger *logging.Logger, fs config.FileSystem, mountInfo mountInfoReader, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount) (string, string, error) {
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
@@ -41,7 +41,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	}
 
 	// Discover OverlayFS upperdir and add as root mapping before path resolution
-	if upperDir, err := discoverOverlayUpperDir(fs); err == nil && upperDir != "" {
+	if upperDir, err := discoverOverlayUpperDir(fs, mountInfo); err == nil && upperDir != "" {
 		logger.Debug("Discovered OverlayFS upperdir: %s", upperDir)
 		hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
 			Source: upperDir,
@@ -136,10 +136,8 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 	return fs.ReadFile("/proc/self/mountinfo")
 }
 
-var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
-
-func discoverOverlayUpperDir(fs config.FileSystem) (string, error) {
-	data, err := defaultMountInfoReader.ReadMountInfo(fs)
+func discoverOverlayUpperDir(fs config.FileSystem, mountInfo mountInfoReader) (string, error) {
+	data, err := mountInfo.ReadMountInfo(fs)
 	if err != nil {
 		return "", err
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntegration_Config_Load_RealFS(t *testing.T) {
+func TestIntegration_Config_LoadRealFS(t *testing.T) {
 	// Keep one test with real filesystem to ensure RealFileSystem works
 	tmpDir, err := os.MkdirTemp("", "cderun-test-*")
 	require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestIntegration_Config_Load_RealFS(t *testing.T) {
 	assert.NotEmpty(t, paths)
 }
 
-func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
+func TestIntegration_Config_MergeHierarchical(t *testing.T) {
 	// Create a temporary directory structure
 	// tmp/
 	//   .cderun.yaml (parent)
@@ -118,7 +118,7 @@ python:
 	})
 }
 
-func TestIntegration_Config_Expression_Resolve(t *testing.T) {
+func TestIntegration_Config_ExpressionResolve(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cderun-expr-*")
 	require.NoError(t, err)
 	defer func() { _ = os.RemoveAll(tmpDir) }()

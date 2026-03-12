@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -121,7 +122,7 @@ func TestUnit_Execute_EmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Execution_CommandResolution(t *testing.T) {
+func TestUnit_Execute_CommandResolution(t *testing.T) {
 	t.Parallel()
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
@@ -282,7 +283,7 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Flags_Phase3Features(t *testing.T) {
+func TestUnit_Flags_Phase3(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -399,7 +400,7 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Execution_StrictBehavior(t *testing.T) {
+func TestUnit_Execute_StrictBehavior(t *testing.T) {
 	t.Parallel()
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
@@ -424,7 +425,7 @@ func TestUnit_Execution_StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
+func TestUnit_Diagnosis_Formats(t *testing.T) {
 	t.Parallel()
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
@@ -465,8 +466,21 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 	})
 }
 
-func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
+func TestUnit_Config_BuildFailures(t *testing.T) {
 	t.Parallel()
+	t.Run("fails when tool not found in .tools.yaml", func(t *testing.T) {
+		o := defaultOptions()
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"nonexistent"},
+		}
+		toolsCfg := config.ToolsConfig{
+			"node": config.ToolConfig{Image: "node"},
+		}
+		_, err := o.buildContainerConfig(resolved, nil, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"nonexistent\" not found in .tools.yaml")
+	})
+
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -484,7 +498,7 @@ func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
 	})
 }
 
-func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Cleanup_RemoveWarning(t *testing.T) {
 	t.Parallel()
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
@@ -525,7 +539,7 @@ func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
 	})
 }
 
-func TestUnit_Env_StrictEnvFlags(t *testing.T) {
+func TestUnit_Env_StrictFlags(t *testing.T) {
 	t.Parallel()
 	t.Run("--strict-env flag", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
@@ -552,5 +566,29 @@ func TestUnit_Env_StrictEnvFlags(t *testing.T) {
 		})
 		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
 		require.NoError(t, err)
+	})
+}
+
+func TestUnit_Execute_HangTimeoutEnv(t *testing.T) {
+	t.Parallel()
+	t.Run("valid duration", func(t *testing.T) {
+		o := defaultOptions()
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_HANG_TIMEOUT": "5s"},
+		}
+		o.fs = mfs
+		timeout := o.getHangTimeout(false, false)
+		assert.Equal(t, 5*time.Second, timeout)
+	})
+
+	t.Run("invalid duration uses default", func(t *testing.T) {
+		o := defaultOptions()
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_HANG_TIMEOUT": "invalid"},
+		}
+		o.fs = mfs
+		o.hangTimeout = 2 * time.Second
+		timeout := o.getHangTimeout(false, false)
+		assert.Equal(t, 2*time.Second, timeout)
 	})
 }

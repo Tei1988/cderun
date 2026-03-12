@@ -117,18 +117,18 @@ type rootOptions struct {
 	logger       *logging.Logger
 
 	// Testing hooks
-	exitFunc       func(int)
-	isTerminal     func(int) bool
-	termGetSize    func(int) (int, int, error)
-	makeRaw        func(int) (*term.State, error)
-	restore        func(int, *term.State) error
-	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
+	attachGracePeriod  time.Duration
+	hangTimeout        time.Duration
+	mountInfo          mountInfoReader
+	setupSignals       func(chan os.Signal)
+	setupResizeSignal  func(chan os.Signal)
+	exitFunc           func(int)
+	isTerminal         func(int) bool
+	termGetSize        func(int) (int, int, error)
+	makeRaw            func(int) (*term.State, error)
+	restore            func(int, *term.State) error
+	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
 }
-
-const (
-	attachGracePeriod = 5 * time.Second
-	hangTimeout       = 2 * time.Second
-)
 
 var (
 	opts = defaultOptions()
@@ -139,7 +139,12 @@ var (
 
 func defaultOptions() rootOptions {
 	return rootOptions{
-		fs: config.RealFileSystem{},
+		fs:                config.RealFileSystem{},
+		attachGracePeriod: 5 * time.Second,
+		hangTimeout:       2 * time.Second,
+		mountInfo:         realMountInfoReader{},
+		setupSignals:      setupSignals,
+		setupResizeSignal: setupResizeSignal,
 		exitFunc: func(code int) {
 			// Default to no-op for safety in tests.
 			// The global 'opts' is updated in init() to use os.Exit.
@@ -690,7 +695,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Handle signals and forward them to the container
 	sigChan := make(chan os.Signal, 1)
-	setupSignals(sigChan)
+	o.setupSignals(sigChan)
 	defer signal.Stop(sigChan)
 	go func() {
 		firstSignal := true
@@ -758,7 +763,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Handle window resize synchronization
 	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
-		setupResizeSignal(resizeChan)
+		o.setupResizeSignal(resizeChan)
 		defer signal.Stop(resizeChan)
 		go func() {
 			for {
@@ -804,7 +809,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 		select {
 		case err := <-attachDone:
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -812,7 +817,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 			}
 			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-		case <-time.After(attachGracePeriod):
+		case <-time.After(o.attachGracePeriod):
 			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 			cancelAttach()
 			<-attachDone
@@ -971,7 +976,7 @@ intended for the subcommand.`,
 				if globalCfg == nil {
 					globalCfg = &config.CDERunConfig{}
 				}
-				sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+				sDir, hostDir, err := createSnapshot(o.logger, o.fs, o.mountInfo, globalCfg, toolsCfg, containerConfig.Mounts)
 				if err != nil {
 					o.logger.Warn("failed to create snapshot: %v", err)
 				} else {

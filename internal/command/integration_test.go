@@ -335,7 +335,7 @@ func TestIntegration_MountTools_AllWithEmptyConfig(t *testing.T) {
 	assert.Contains(t, errBuf.String(), "[WARN] --mount-all-tools specified but no tools defined in .tools.yaml")
 }
 
-func TestIntegration_Execution_ExcludeToolSubcommand(t *testing.T) {
+func TestIntegration_Execute_ExcludeToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20"), 0o644)
@@ -347,7 +347,7 @@ func TestIntegration_Execution_ExcludeToolSubcommand(t *testing.T) {
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 }
 
-func TestIntegration_Execution_IncludeExplicitToolSubcommand(t *testing.T) {
+func TestIntegration_Execute_IncludeExplicitToolSubcommand(t *testing.T) {
 	setupTestDir(t)
 
 	toolsContent := `
