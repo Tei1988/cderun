@@ -63,3 +63,124 @@ jobs:
         run: make lint-md
       - name: Check Markdown links
         run: make link-check
+
+  build:
+    name: Build Binary
+    needs: filter
+    if: needs.filter.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+      - name: Build cderun
+        env:
+          CGO_ENABLED: 0
+        run: go build -v -o cderun main.go
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cderun-binary
+          path: cderun
+          retention-days: 1
+
+  unit-test:
+    name: Unit Tests
+    needs: filter
+    if: needs.filter.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+      - name: Run Coverage
+        run: make coverage
+      - name: Verify Coverage Threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $NF}' | tr -d '%')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 86.5" | bc -l)" -eq 1 ]; then
+            echo "Coverage ${COVERAGE}% is below threshold 86.5%"
+            false
+          fi
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          flags: unit
+          fail_ci_if_error: true
+
+  e2e-test:
+    name: E2E (Docker ${{ matrix.docker-version }})
+    needs: [filter, build]
+    if: needs.filter.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        docker-version: ["20.10", "25.0", "29.0"]
+
+    services:
+      docker:
+        image: docker:${{ matrix.docker-version }}-dind
+        options: >-
+          --privileged
+          --health-cmd "docker info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          -v /home/runner/work:/home/runner/work -v /tmp:/tmp
+        ports:
+          - 2375:2375
+        env:
+          DOCKER_TLS_CERTDIR: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Download Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: cderun-binary
+
+      - name: Make binary executable
+        run: chmod +x cderun
+
+      - name: Run E2E Tests
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+          TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-e2e
+          CDERUN_HANG_TIMEOUT: 10s
+        run: |
+          mkdir -p $TEST_HOST_TMP_DIR
+          docker version
+          go test -v -tags=e2e -timeout 15m -run "^TestScenario_" -coverprofile=coverage-e2e.out ./internal/command/...
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-e2e.out
+          flags: e2e
+          env_vars: DOCKER_VERSION
+          fail_ci_if_error: true
+        env:
+          DOCKER_VERSION: ${{ matrix.docker-version }}

@@ -728,6 +728,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}
 	}
 
+	var attachDoneConsumed bool
 	attachCtx, cancelAttach := context.WithCancel(ctxG)
 	defer cancelAttach()
 
@@ -739,14 +740,17 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
 	// reducing race condition where container starts and finishes before attachment.
-	select {
-	case <-attachReady:
-	case err := <-attachDone:
-		if err != nil {
-			return 0, fmt.Errorf("failed to attach to container: %w", err)
+	if !attachDoneConsumed {
+		select {
+		case <-attachReady:
+		case err := <-attachDone:
+			attachDoneConsumed = true
+			if err != nil {
+				return 0, fmt.Errorf("failed to attach to container: %w", err)
+			}
+		case <-ctxG.Done():
+			return 0, ctxG.Err()
 		}
-	case <-ctxG.Done():
-		return 0, ctxG.Err()
 	}
 
 	o.logger.Trace("Starting container: %s", containerID)
@@ -804,18 +808,20 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
-		select {
-		case err := <-attachDone:
-			if err != nil && !errors.Is(err, context.Canceled) {
-				o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-				return exitCode, fmt.Errorf("failed to attach to container: %w", err)
+		if !attachDoneConsumed {
+			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+			select {
+			case err := <-attachDone:
+				if err != nil && !errors.Is(err, context.Canceled) {
+					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
+					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
+				}
+				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
+			case <-time.After(attachGracePeriod):
+				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
+				cancelAttach()
+				<-attachDone
 			}
-			o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-		case <-time.After(attachGracePeriod):
-			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-			cancelAttach()
-			<-attachDone
 		}
 
 	case err := <-attachDone:
