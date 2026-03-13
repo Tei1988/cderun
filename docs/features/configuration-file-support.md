@@ -296,7 +296,6 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `diagnosis` (bool): 診断モード
 - `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
 
-
 > [!IMPORTANT]
 > `config` および `toolConfig` は、ネストされた実行時に内部メタデータとして使用されるフィールドであり、ユーザーが設定ファイル（`.cderun.yaml` / `.tools.yaml`）に記述するためのものではありません。
 > `cderun` は `internal/command/root.go` の `loadConfigs` メソッドにより、フラグ（`--config`, `--tool-config`）または環境変数（`CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`）から読み込み先パスを決定します。
