@@ -3,21 +3,22 @@ package command
 import (
 	"context"
 	"time"
+
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
-func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool) time.Duration {
-	if val := o.fs.Getenv("CDERUN_HANG_TIMEOUT"); val != "" {
-		if d, err := time.ParseDuration(val); err == nil {
-			return d
-		}
+func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool, resolved *config.ResolvedConfig) time.Duration {
+	// Hang timeout only applies if host stdin is NOT a TTY or if interactive mode is NOT enabled.
+	if isHostStdinTerminal && interactive {
+		return 0
 	}
-	// The conditional below is kept for future differentiation of TTY vs non-TTY
-	// timeout behavior, although they currently both use hangTimeout (2s)
-	// to ensure stability in CI environments.
-	if !isHostStdinTerminal || !interactive {
-		return hangTimeout
+
+	if resolved != nil && resolved.HangTimeout > 0 {
+		return resolved.HangTimeout
 	}
+
+	// Fallback to default hangTimeout (e.g. 2s)
 	return hangTimeout
 }
 

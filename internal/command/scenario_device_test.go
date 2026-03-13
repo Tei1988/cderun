@@ -1,4 +1,4 @@
-//go:build e2e
+//go:build runtime
 
 package command
 
@@ -13,7 +13,7 @@ import (
 
 func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping E2E test in short mode")
+		t.Skip("skipping runtime test in short mode")
 	}
 
 	// Subcommand 'alpine' is mandatory.
@@ -36,7 +36,7 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 
 func TestScenario_Stdin_PipedInput(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping E2E test in short mode")
+		t.Skip("skipping runtime test in short mode")
 	}
 
 	stdinData := "hello e2e stdin"

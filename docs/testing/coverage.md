@@ -63,7 +63,7 @@ Dockerコンテナを起動するテストにおいて、`go test` プロセス�
 E2Eテストジョブでは、Dockerの複数バージョン（20.10, 25.0, 29.0）のマトリックスでテストが実行され、それぞれのカバレッジデータが Codecov 上でマージされる。
 
 ```bash
-go test -v -tags=e2e -coverprofile=coverage-e2e.out ./internal/command/...
+go test -v -tags=runtime -coverprofile=coverage-runtime.out ./internal/command/...
 ```
 
 ## 4. 自動化
@@ -94,7 +94,7 @@ coverage-html: coverage
 
 継続的インテグレーション (CI) プロセスにカバレッジ計測と Codecov へのアップロードが組み込まれている。
 
-- GitHub Actions ([`e2e-test.yml`](../../.github/workflows/e2e-test.yml)) により、すべてのプッシュおよびプルリクエストにおいてカバレッジが計測される。
+- GitHub Actions ([`ci.yaml`](../../.github/workflows/ci.yaml)) により、すべてのプッシュおよびプルリクエストにおいてカバレッジが計測される。
 - **Unitテストジョブ**: ローカルでのカバレッジしきい値チェック（**86.5%**）を行い、満たない場合はジョブが失敗する（ファストフェイル）。
-- **Codecov**: PR 上で詳細なステータスチェック（`unit` / `e2e` フラグ別のレポートを含む）を提供し、プロジェクト全体の品質管理を補完する。
+- **Codecov**: PR 上で詳細なステータスチェック（`unit` / `runtime` フラグ別のレポートを含む）を提供し、プロジェクト全体の品質管理を補完する。
 - **E2Eテスト**: Dockerバージョンごとに計測され、Codecov 上で自動的にマージされる。

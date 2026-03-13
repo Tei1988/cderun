@@ -124,7 +124,7 @@
 
 テストに関するドキュメントは [`docs/testing/`](../testing/) を参照すること。
 
-- [E2E テスト](../testing/e2e.md)
+- [ランタイムテスト](../testing/runtime-tests.md)
 - [統合テスト](../testing/integration.md)
 - [テスト構成・網羅性計画](../testing/organization.md)
 - [テストカバレッジ計測](../testing/coverage.md)

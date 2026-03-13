@@ -21,10 +21,12 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 
 ### 設定不可能なオプション
 
-以下のモード設定は、セキュリティおよび混乱回避のため設定ファイル（YAML）ではサポートされておらず、コマンドライン引数または環境変数でのみ指定可能です。
+以下のオプションは、設定ファイルの**読み込み先パスを決める**ためのオプションであり、ファイルを読み込む前にパスが確定している必要があるため P1/P2/P3 のみ有効です。P4/P5（設定ファイル内）に記述すると、デコードエラーが発生します。
 
-- **ドライランモード** (`--dry-run`, `--dry-run-format`)
-- **診断モード** (`--diagnosis`, `--diagnosis-format`)
+これは、デシリアライザが `KnownFields(true)` に設定されているため、`config` や `toolConfig` のような定義されていない、あるいは許可されていないフィールドが含まれているとエラーを出す仕様になっているためです。
+
+- **`config`** (`--config`): cderun設定ファイルのパス（設定ファイル内では記述不可）
+- **`toolConfig`** (`--tool-config`): ツール設定ファイルのパス（設定ファイル内では記述不可）
 
 ### 明示的な設定ファイルの指定
 
@@ -107,6 +109,11 @@ defaults:
   user: "1000:1000"
   memory: "1g"
   cpus: 1.5
+  hangTimeout: "5s"          # ハングタイムアウト
+  dryRun: false              # ドライランモード
+  dryRunFormat: yaml         # ドライラン出力形式
+  diagnosis: false           # 診断モード
+  diagnosisFormat: yaml      # 診断出力形式
   mounts:
     - type: tmpfs
       target: /tmp
@@ -143,6 +150,14 @@ node:
   mountCderun: true
   privileged: false
   memory: "512m"
+  hangTimeout: "10s"         # 処理が重いツールは長めに設定
+  logLevel: info             # ツール別にログレベルを変える
+  logFormat: text
+  logTimestamp: true
+  dryRun: false
+  dryRunFormat: yaml
+  diagnosis: false
+  diagnosisFormat: yaml
   devices:
     - /dev/fuse                    # コンテナに追加するデバイス
 
@@ -213,6 +228,12 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
+- `hangTimeout` (string): ハングタイムアウト。Go Duration 形式（例: `2s`, `500ms`）
+- `dryRun` (bool): ドライランモード
+- `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
+- `diagnosis` (bool): 診断モード
+- `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
+
 - `mounts` ([]object): マウント設定
   - `type` (string): `bind` | `volume` | `tmpfs`
   - `source` (string): ホスト側のパス（bindの場合）
@@ -268,6 +289,18 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `pull` (string): プルポリシー (`always` | `missing` | `never`)
 - `memory` (string): メモリ制限
 - `cpus` (float64): CPU制限
+- `hangTimeout` (string): ハングタイムアウト。Go Duration 形式（例: `2s`, `500ms`）
+- `logLevel` (string): ログレベル (`error` | `warn` | `info` | `debug` | `trace`)
+- `logFormat` (string): ログ出力形式 (`text` | `json`)
+- `logTimestamp` (bool): タイムスタンプを含めるかどうか
+- `dryRun` (bool): ドライランモード
+- `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
+- `diagnosis` (bool): 診断モード
+- `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
+
+> [!IMPORTANT]
+> `config` および `toolConfig` は、ネストされた実行時に内部メタデータとして使用されるフィールドであり、ユーザーが設定ファイル（`.cderun.yaml` / `.tools.yaml`）に記述するためのものではありません。
+> `cderun` は `internal/command/root.go` の `loadConfigs` メソッドにより、フラグ（`--config`, `--tool-config`）または環境変数（`CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`）から読み込み先パスを決定します。
 
 ## 優先順位
 

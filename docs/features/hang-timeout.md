@@ -17,11 +17,15 @@
 
 ## 設定
 
-ハングタイムアウトの時間は、環境変数 `CDERUN_HANG_TIMEOUT` で変更可能です。
+ハングタイムアウトの時間は、以下の全ての経路で変更可能です。
 
 - **デフォルト値**: `2s` (2秒)
 - **形式**: Go の Duration 形式（例: `500ms`, `5s`, `10s`）
-- **環境変数**: `CDERUN_HANG_TIMEOUT`
+- **P1 フラグ**: `--cderun-hang-timeout`（サブコマンドの後ろに指定）
+- **P2 フラグ**: `--hang-timeout`
+- **P3 環境変数**: `CDERUN_HANG_TIMEOUT`
+- **P4 ツール別設定** (`.tools.yaml`): `hangTimeout` フィールド
+- **P5 グローバルデフォルト** (`.cderun.yaml` defaults): `hangTimeout` フィールド
 
 ## 適用条件
 
@@ -42,7 +46,7 @@
 ### 補足
 
 - **対話型実行**: `cderun -i alpine sh` を端末で実行している場合（かつホストの入力が端末である場合）、ユーザーの入力を待ち続ける必要があるため、タイムアウトによる強制終了は行われません。
-- **非対話型・パイプ実行**: `echo "test" | cderun cat` のような実行や、フラグなしでの実行では、IO 完了後に**デフォルトでは2秒（`CDERUN_HANG_TIMEOUT` 環境変数で上書き可能）**待ってもコンテナが終了しない場合に `SIGKILL` が適用されます。
+- **非対話型・パイプ実行**: `echo "test" | cderun cat` のような実行や、フラグなしでの実行では、IO 完了後に**デフォルトでは2秒（P1: `--cderun-hang-timeout`, P2: `--hang-timeout`, P3: `CDERUN_HANG_TIMEOUT`, P4: `.tools.yaml` の `hangTimeout`, P5: `.cderun.yaml` の `hangTimeout` で上書き可能）**待ってもコンテナが終了しない場合に `SIGKILL` が適用されます。
 
 ## 関連ドキュメント
 
@@ -50,4 +54,4 @@
 - [コマンドラインオプション](./command-line-options.md)
 
 ---
-*2026年3月10日時点の仕様である。*
+*2026年3月14日時点の仕様である。*

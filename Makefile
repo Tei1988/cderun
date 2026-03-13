@@ -11,10 +11,10 @@ test:
 	@echo "Running all unit and integration tests..."
 	@go test -v ./...
 
-.PHONY: test-e2e
-test-e2e:
-	@echo "Running E2E tests (requires Docker/Podman)..."
-	@go test -v -tags=e2e ./...
+.PHONY: test-runtime
+test-runtime:
+	@echo "Running tests that require a container runtime (Docker/Podman)..."
+	@go test -v -tags=runtime ./...
 
 .PHONY: lint
 lint: lint-go lint-md link-check

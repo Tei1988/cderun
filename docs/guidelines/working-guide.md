@@ -39,7 +39,40 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 └── tests/                # 統合テスト（必要な場合）
 ```
 
-## 3. Coding Guidelines
+## 3. Adding a New Option
+
+新しいオプションを追加する際は、以下の **全経路チェックリスト** を必ず確認してください。
+`cderun` のすべてのオプションは、原則として以下の全ての経路で指定可能でなければなりません。
+
+### チェックリスト
+
+- [ ] **P1**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--cderun-<name>`）
+- [ ] **P2**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--<name>`）
+- [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する
+- [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
+- [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
+- [ ] **P6**: `resolver.go` のハードコードデフォルト値を設定する
+- [ ] **CLIOptions**: `CLIOptions` 構造体（`resolver.go`）に `<Name>` / `<Name>Set` / `Cderun<Name>` / `Cderun<Name>Set` フィールドを追加する
+- [ ] **ResolvedConfig**: `ResolvedConfig` 構造体（`resolver.go`）に結果フィールドを追加する
+- [ ] **resolveSettings**: `root.go` の `resolveSettings` で `CLIOptions` への代入を追加する
+- [ ] **DeepCopy**: `ToolConfig.DeepCopy()` / `ConfigDefaults.DeepCopy()` に新フィールドのコピー処理を追加する（ポインタ型・スライス型の場合）
+- [ ] **ドキュメント**: 以下のドキュメントを更新する
+  - `docs/features/argument-priority-logic.md`（P1/P2/P3 のフラグ・環境変数リスト）
+  - `docs/features/command-line-options.md`（オプションの説明）
+  - `docs/features/configuration-file-support.md`（YAMLスキーマ）
+
+### 例外が許容されるケース
+
+以下の条件を**両方**満たす場合に限り、特定の経路を省略できます。
+
+1. 省略する技術的・設計的な理由が明確である
+2. `docs/features/` の該当ドキュメントに理由を明記している
+
+**既知の例外:**
+
+- `config` / `toolConfig`: 設定ファイルの読み込み先パスを決める前処理で使用されるため、P4/P5 に書いても無視される。P1/P2/P3 のみ有効。
+
+## 4. Coding Guidelines
 
 ### General
 
