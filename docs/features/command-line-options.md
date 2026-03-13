@@ -484,7 +484,6 @@ cderun --log-timestamp=false node app.js
 - **説明**: 指定された環境変数がホストに存在しない場合にエラーとする設定。
 - **指定方法**: `.cderun.yaml`, `.tools.yaml` の `strictEnv` フィールド、
   環境変数 `CDERUN_STRICT_ENV=true`、またはコマンドラインフラグ `--strict-env` で指定します。
-- **`CDERUN_REMOVE`**: 自動的にコンテナを削除するかどうか（デフォルト: `true`）。
 
 ## オプションの優先順位
 
@@ -495,6 +494,7 @@ cderun --log-timestamp=false node app.js
 これらは優先順位階層（P1-P6）とは別に、実行時の挙動を直接制御するために使用されます。
 
 - **`CDERUN_HANG_TIMEOUT`**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の終了猶予時間（デフォルト: `2s`）。詳細な動作条件については [ハングタイムアウト](./hang-timeout.md) を参照してください。
+- **`CDERUN_REMOVE`**: 自動的にコンテナを削除するかどうか（デフォルト: `true`）。
 
 ## 使用例
 
