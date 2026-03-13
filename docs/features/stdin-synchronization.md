@@ -53,6 +53,8 @@ Docker のデフォルト挙動（`StdinOnce: false`）では、クライアン�
 
 `StdinOnce: true` を設定することで、`cderun` が標準入力のコピーを完了して接続を閉じた際に、Docker が確実にコンテナへ EOF を伝え、プロセスが正常に終了（Exit 0）することを保証します。
 
+また、`io.Copy` 完了後、書き込み側の接続を閉じる（`CloseWrite`）前に短い猶予期間（`attachCloseWriteGrace` = 1秒）を設けることで、一部の Docker バージョンで見られる EOF の早期処理によるデータ欠損を防止しています。
+
 ### 4. Attach 時のログ取得の無効化
 
 `internal/runtime/docker.go` において、`AttachContainer` 呼び出し時に `Logs: false` を設定しています。
@@ -76,4 +78,4 @@ Docker のデフォルト挙動（`StdinOnce: false`）では、クライアン�
 詳細については、[ハングタイムアウト](./hang-timeout.md) を参照してください。
 
 ---
-*2026年3月10日時点の仕様である。*
+*2026年3月13日時点の仕様である。*
