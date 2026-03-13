@@ -63,7 +63,7 @@ Dockerコンテナを起動するテストにおいて、`go test` プロセス�
 E2Eテストジョブでは、Dockerの複数バージョン（20.10, 25.0, 29.0）のマトリックスでテストが実行され、それぞれのカバレッジデータが Codecov 上でマージされる。
 
 ```bash
-go test -v -tags=e2e -coverprofile=coverage-e2e.out ./internal/command/...
+go test -v -tags=runtime ./internal/command/...
 ```
 
 ## 4. 自動化

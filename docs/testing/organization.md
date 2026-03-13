@@ -30,8 +30,8 @@
 | イメージマッピング | `internal/config/resolver_test.go` | 良好 |
 | 環境変数パススルー | `internal/config/resolver_test.go`, `internal/command/integration_test.go` | 良好 |
 | Mount Tools | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
-| Docker互換フラグ | `internal/command/flags_test.go`, `internal/command/root_test.go`, `internal/command/e2e_device_test.go` | 良好 |
-| デバイスマウント | `internal/config/path_test.go`, `internal/runtime/docker_test.go`, `internal/command/e2e_device_test.go` | 良好 |
+| Docker互換フラグ | `internal/command/flags_test.go`, `internal/command/root_test.go`, `internal/command/scenario_device_test.go` | 良好 |
+| デバイスマウント | `internal/config/path_test.go`, `internal/runtime/docker_test.go`, `internal/command/scenario_device_test.go` | 良好 |
 | cderunバイナリマウント | `internal/command/root_test.go`, `internal/command/integration_test.go` | 良好 |
 | ドライランモード | `internal/command/root_test.go` | 良好 |
 | ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
@@ -53,7 +53,7 @@
 | **Unit** | 外部依存なし。ロジックの正当性を検証。 | `*_test.go` (同パッケージ) |
 | **Integration** | MockRuntime、ファイルシステムとの連携を検証。 | `internal/command/integration_test.go` |
 | **Robustness** | 信号、レースコンディション、タイムアウトを検証。 | `internal/command/robustness_test.go` |
-| **Scenario (E2E)** | 複雑なシナリオや実環境での検証。 | `internal/command/scenario_*_test.go`, `internal/command/e2e_test.go`, `internal/command/e2e_*_test.go` (Build tag: `e2e`, 命名: `TestScenario_`) |
+| **Scenario** | 複雑なシナリオや実環境での検証。 | `internal/command/scenario_*_test.go`, `internal/command/runtime_inprocess_test.go` (Build tag: `runtime`, 命名: `TestScenario_` / `TestRuntime_`) |
 
 ### 3.2. 命名規則
 
