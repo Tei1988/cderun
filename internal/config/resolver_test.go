@@ -1,5 +1,7 @@
 package config
 
+
+
 import (
 	"path/filepath"
 	"testing"
@@ -969,18 +971,18 @@ func TestUnit_Resolver_Float64_Precedence(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node",
-				CPUs:  0,
+				CPUs: float64Ptr(0),
 			},
 		}
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				CPUs: 2.0,
+				CPUs: float64Ptr(2.0),
 			},
 		}
 
 		res, err := Resolve("node", CLIOptions{}, tools, global)
 		require.NoError(t, err)
-		assert.InDelta(t, 2.0, res.CPUs, 0.0001)
+		assert.InDelta(t, 0.0, res.CPUs, 0.0001)
 	})
 }
 
@@ -1097,4 +1099,9 @@ func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, res.StrictEnv)
 	})
+
+
 }
+
+
+func float64Ptr(f float64) *float64 { return &f }

@@ -9,9 +9,16 @@ import (
 )
 
 func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool, resolved *config.ResolvedConfig) time.Duration {
-	if resolved.HangTimeout > 0 {
+	// Hang timeout only applies if host stdin is NOT a TTY or if interactive mode is NOT enabled.
+	if isHostStdinTerminal && interactive {
+		return 0
+	}
+
+	if resolved != nil && resolved.HangTimeout > 0 {
 		return resolved.HangTimeout
 	}
+
+	// Fallback to default hangTimeout (e.g. 2s)
 	return hangTimeout
 }
 

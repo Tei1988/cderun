@@ -13,9 +13,6 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 	return runCderunCore(nil, args...)
 }
 
-func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
-	return runCderunCore(stdin, args...)
-}
 
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	var outBuf, errBuf bytes.Buffer
