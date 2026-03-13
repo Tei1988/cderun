@@ -40,13 +40,17 @@ func setupTestDir(t *testing.T) string {
 	// We serialize access to the global working directory using setupMu to reduce flakes.
 	// We hold the lock for the entire lifetime of the test that changes CWD.
 	setupMu.Lock()
-	restoreWd, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-
+	var restoreWd string
 	t.Cleanup(func() {
 		defer setupMu.Unlock()
-		_ = os.Chdir(restoreWd)
+		if restoreWd != "" {
+			require.NoError(t, os.Chdir(restoreWd))
+		}
 	})
+
+	var err error
+	restoreWd, err = os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
 	return tmpDir
 }
