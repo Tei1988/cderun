@@ -46,8 +46,8 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 
 ### チェックリスト
 
-- [ ] **P1**: `--cderun-<name>` フラグを `root.go` に追加し、`rootOptions` に対応フィールドを追加する
-- [ ] **P2**: `--<name>` フラグを `root.go` に追加し、`rootOptions` に対応フィールドを追加する
+- [ ] **P1**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--cderun-<name>`）
+- [ ] **P2**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--<name>`）
 - [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する
 - [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
 - [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する

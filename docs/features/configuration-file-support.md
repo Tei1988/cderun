@@ -112,8 +112,6 @@ defaults:
   dryRunFormat: yaml         # ドライラン出力形式
   diagnosis: false           # 診断モード
   diagnosisFormat: yaml      # 診断出力形式
-  config: ""                 # cderun設定ファイルパス（ネスト実行時に有効）
-  toolConfig: ""             # ツール設定ファイルパス（ネスト実行時に有効）
   mounts:
     - type: tmpfs
       target: /tmp
@@ -158,8 +156,6 @@ node:
   dryRunFormat: yaml
   diagnosis: false
   diagnosisFormat: yaml
-  config: ""
-  toolConfig: ""
   devices:
     - /dev/fuse                    # コンテナに追加するデバイス
 
@@ -235,8 +231,7 @@ cderunコマンドのデフォルト動作を定義。コマンドライン引�
 - `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
 - `diagnosis` (bool): 診断モード
 - `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
-- `config` (string): cderun設定ファイルパス。ネスト実行時に子コンテナへ伝播される
-- `toolConfig` (string): ツール設定ファイルパス。ネスト実行時に子コンテナへ伝播される
+
 - `mounts` ([]object): マウント設定
   - `type` (string): `bind` | `volume` | `tmpfs`
   - `source` (string): ホスト側のパス（bindの場合）
@@ -300,8 +295,11 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 - `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
 - `diagnosis` (bool): 診断モード
 - `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
-- `config` (string): cderun設定ファイルパス。ネスト実行時に子コンテナへ伝播される
-- `toolConfig` (string): ツール設定ファイルパス。ネスト実行時に子コンテナへ伝播される
+
+
+> [!IMPORTANT]
+> `config` および `toolConfig` は、ネストされた実行時に内部メタデータとして使用されるフィールドであり、ユーザーが設定ファイル（`.cderun.yaml` / `.tools.yaml`）に記述するためのものではありません。
+> `cderun` は `internal/command/root.go` の `loadConfigs` メソッドにより、フラグ（`--config`, `--tool-config`）または環境変数（`CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`）から読み込み先パスを決定します。
 
 ## 優先順位
 

@@ -523,16 +523,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, global, r, fs,
 	)
 
-	// Resolve Diagnosis (re-resolve with P4/P5 now available)
-	res.Diagnosis = resolveBoolOpt(
-		OptionDef[*bool]{EnvKey: "CDERUN_DIAGNOSIS",
-			ToolGetter:   func(t ToolConfig) *bool { return t.Diagnosis },
-			GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.Diagnosis }},
-		false,
-		cli.CderunDiagnosisSet, cli.CderunDiagnosis,
-		cli.DiagnosisSet, cli.Diagnosis,
-		subcommand, tools, global, fs,
-	)
 
 	// Resolve Logging
 	res.LogLevel = resolveStringOpt(
@@ -672,9 +662,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		res.Memory = bytes
 	}
 	res.CPUs = resolveFloat64Opt(
-		OptionDef[float64]{EnvKey: "CDERUN_CPUS",
-			ToolGetter:   func(t ToolConfig) float64 { return t.CPUs },
-			GlobalGetter: func(g CDERunConfig) float64 { return g.Defaults.CPUs }},
+		OptionDef[*float64]{EnvKey: "CDERUN_CPUS",
+			ToolGetter:   func(t ToolConfig) *float64 { return t.CPUs },
+			GlobalGetter: func(g CDERunConfig) *float64 { return g.Defaults.CPUs }},
 		cli.CderunCPUsSet, cli.CderunCPUs,
 		cli.CPUsSet, cli.CPUs,
 		subcommand, tools, global, fs,

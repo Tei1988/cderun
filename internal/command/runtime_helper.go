@@ -20,7 +20,7 @@ func runDiagnosisOnFailure(stderr string, exitCode int, err error) {
 	}
 
 	diagnosisOnce.Do(func() {
-		fmt.Fprintf(os.Stderr, "\n--- E2E Test Failure Detected. Running Diagnosis ---\n")
+		fmt.Fprintf(os.Stderr, "\n--- Runtime Test Failure Detected. Running Diagnosis ---\n")
 		// Diagnosis mode runs without requiring a subcommand.
 		diagStdout, diagStderr, diagExitCode, diagErr := runCderun("--diagnosis")
 		if diagErr != nil {
@@ -34,7 +34,7 @@ func runDiagnosisOnFailure(stderr string, exitCode int, err error) {
 	})
 }
 
-// runCderunE2E is a helper for E2E tests.
+// runCderunE2E is a helper for runtime tests.
 // It strictly requires a subcommand which acts as the tool name or image mapping key.
 func runCderunE2E(cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
@@ -45,7 +45,7 @@ func runCderunE2E(cderunFlags []string, subCommand string, commandOptions []stri
 	return
 }
 
-// runCderunWithStdinE2E is a helper for E2E tests with stdin.
+// runCderunWithStdinE2E is a helper for runtime tests with stdin.
 // It strictly requires a subcommand.
 func runCderunWithStdinE2E(stdin io.Reader, cderunFlags []string, subCommand string, commandOptions []string) (stdout, stderr string, exitCode int, err error) {
 	args := append([]string{}, cderunFlags...)
@@ -83,4 +83,8 @@ func findCderunBinary() (string, error) {
 	}
 
 	return "", fmt.Errorf("cderun binary not found in %s or its ancestors", wd)
+}
+
+func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
+	return runCderunCore(stdin, args...)
 }

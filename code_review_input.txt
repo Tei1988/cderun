@@ -1,0 +1,8 @@
+I have fixed several CI issues and aligned documentation with the codebase:
+1. Updated documentation in docs/features/configuration-file-support.md, hang-timeout.md, and guidelines/working-guide.md.
+2. Fixed getHangTimeout logic in internal/command/root_termination.go (added nil check, applied only to non-interactive/non-TTY sessions).
+3. Moved runCderunWithStdin to runtime_helper.go to avoid unused function lint errors.
+4. Updated CI step names and test skip messages.
+5. Refactored CPUs to *float64 in ToolConfig and ConfigDefaults to support 0.0 as a valid value.
+6. Deduplicated Diagnosis resolution in internal/config/resolver.go.
+7. Fixed compilation and test expectations in internal/config/resolver_test.go.
