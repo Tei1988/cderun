@@ -1074,6 +1074,7 @@ func TestUnit_Resolver_ExpressionsInCLI(t *testing.T) {
 }
 
 func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
+	t.Parallel()
 	t.Run("cli-strictenv-only", func(t *testing.T) {
 		cliStrictEnv := CLIOptions{
 			Image:        "alpine",
@@ -1103,5 +1104,73 @@ func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
 
 }
 
+func TestUnit_Resolver_EdgeCases(t *testing.T) {
+	t.Parallel()
+	t.Run("HangTimeout invalid duration", func(t *testing.T) {
+		cli := CLIOptions{
+			HangTimeout:    "invalid",
+			HangTimeoutSet: true,
+		}
+		_, err := Resolve("", cli, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid hang-timeout value")
+	})
+
+	t.Run("Memory invalid value", func(t *testing.T) {
+		cli := CLIOptions{
+			Memory:    "invalid",
+			MemorySet: true,
+		}
+		_, err := Resolve("", cli, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value")
+	})
+
+	t.Run("Memory expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		cli := CLIOptions{
+			Memory:    "{{file:nonexistent}}",
+			MemorySet: true,
+		}
+		_, err := ResolveWithFS("", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
+	})
+
+	t.Run("resolveEnv deduplication", func(t *testing.T) {
+		cli := CLIOptions{
+			Env: []string{"VAR=cli1", "VAR=cli2"},
+		}
+		res, err := Resolve("", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 1)
+		assert.Equal(t, "VAR=cli2", res.Env[0])
+	})
+
+	t.Run("resolveConfigPath with fallback", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		// Use empty subcommand or one with image to avoid image mapping error
+		res, err := ResolveWithFS("", CLIOptions{}, nil, nil, mfs)
+		require.NoError(t, err)
+		// Default auto-detection should trigger if no socket path is set.
+		// If /var/run/docker.sock doesn't exist, it defaults to it anyway.
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
+	})
+
+	t.Run("resolveMounts with empty env", func(t *testing.T) {
+		// Use MockFileSystem to avoid process-global t.Setenv in Parallel test
+		mfs := &MockFileSystem{WD: "/app", Env: map[string]string{"CDERUN_MOUNT": ""}}
+		res, err := ResolveWithFS("", CLIOptions{}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.Mounts)
+	})
+
+	t.Run("resolveMounts with whitespace env", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app", Env: map[string]string{"CDERUN_MOUNT": "  ;  "}}
+		res, err := ResolveWithFS("", CLIOptions{}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.Mounts)
+	})
+}
 
 func float64Ptr(f float64) *float64 { return &f }

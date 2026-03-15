@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
+func TestUnit_FileSystem_Real(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("Executable", func(t *testing.T) {
@@ -49,7 +49,8 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
+func TestUnit_FileSystem_Mock(t *testing.T) {
+	t.Parallel()
 	// mfs is shared between subtests.
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
@@ -128,7 +129,8 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_Loader_Initialization(t *testing.T) {
+func TestUnit_Config_LoaderInitialization(t *testing.T) {
+	t.Parallel()
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)

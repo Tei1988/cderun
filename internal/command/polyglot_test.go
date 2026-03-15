@@ -1,10 +1,8 @@
 package command
 
 import (
-	"bytes"
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -17,6 +15,7 @@ import (
 )
 
 func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
+	t.Parallel()
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
@@ -29,8 +28,6 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 
 		// Simulate symlink execution: node --interactive=true --image alpine cat
 		// Specification: only --cderun- prefixed flags are hoisted.
-
-		var stdout bytes.Buffer
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -46,7 +43,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 				o.exitFunc = func(code int) {}
 				o.fs = mfs
 				o.configLoader = config.NewConfigLoaderWithFS(mfs)
-				cmd.SetOut(&stdout)
+				cmd.SetOut(io.Discard)
 				cmd.SetErr(io.Discard)
 			})
 			close(done)
@@ -115,10 +112,13 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 }
 
 func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
-	setupTestDir(t)
-
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
-	require.NoError(t, err)
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		WD: "/project",
+		Files: map[string][]byte{
+			"/project/.tools.yaml": []byte("node:\n  image: node:20-alpine"),
+		},
+	}
 
 	mockRuntime := &runtime.MockRuntime{
 		CreatedContainerID: "test-container-id",
@@ -127,7 +127,7 @@ func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
+	err := ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime, withMockFS(mfs)))
 
 	require.NoError(t, err)
 	cfg := mockRuntime.GetCreatedConfig()

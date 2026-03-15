@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
@@ -25,6 +26,14 @@ func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOption
 		for _, extra := range extras {
 			extra(o, cmd)
 		}
+	}
+}
+
+// withMockFS returns a setup function that injects a MockFileSystem into the root options.
+func withMockFS(mfs *config.MockFileSystem) func(o *rootOptions, cmd *cobra.Command) {
+	return func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 	}
 }
 

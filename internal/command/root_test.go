@@ -121,7 +121,7 @@ func TestUnit_Execute_EmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Execution_CommandResolution(t *testing.T) {
+func TestUnit_Execute_CommandResolution(t *testing.T) {
 	t.Parallel()
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
@@ -282,7 +282,8 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Flags_Phase3Features(t *testing.T) {
+func TestUnit_Flags_CommonOptions(t *testing.T) {
+	t.Parallel()
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -307,12 +308,16 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 
 	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
-		// If unspecified, --mount-cderun should auto-enable --mount-socket
-		t.Setenv("CDERUN_MOUNT_SOCKET", "")
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_SOCKET_PATH": "/var/run/docker.sock",
+				"CDERUN_MOUNT_SOCKET": "",
+			},
+		}
 
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = mfs
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -331,9 +336,10 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 		assert.True(t, socketFound, "Socket should be automatically mounted")
 
 		// If explicitly set to false, it should NOT mount the socket but NOT fail
-		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
+		mfs.Env["CDERUN_MOUNT_SOCKET"] = "false"
 		mockRuntime = &runtime.MockRuntime{}
 		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = mfs
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -399,7 +405,7 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 }
 
-func TestUnit_Execution_StrictBehavior(t *testing.T) {
+func TestUnit_Execute_StrictBehavior(t *testing.T) {
 	t.Parallel()
 	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
 		// No .tools.yaml created, and no --image flag
@@ -465,7 +471,7 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 	})
 }
 
-func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
+func TestUnit_Execute_BuildContainerConfigFailures(t *testing.T) {
 	t.Parallel()
 	t.Run("fails when os.Executable fails", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
@@ -542,13 +548,15 @@ func TestUnit_Env_StrictEnvFlags(t *testing.T) {
 
 	t.Run("--cderun-strict-env override", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		// Set global strictEnv to true via mock? No, just use flags.
+		mfs := &config.MockFileSystem{
+			WD: "/test",
+		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = mfs
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
-			o.fs = config.RealFileSystem{} // Ensure we use real FS to check env
 		})
 		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
 		require.NoError(t, err)

@@ -12,6 +12,7 @@ import (
 )
 
 func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
+	t.Parallel()
 	t.Run("basic and complex Docker flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",

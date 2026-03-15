@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Expression_FindDir(t *testing.T) {
+func TestUnit_Expression_ResolveFindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/modules/foo":                      []byte("bar"),
@@ -47,7 +47,7 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	})
 }
 
-func TestUnit_Expression_FileError(t *testing.T) {
+func TestUnit_Expression_ResolveFile(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/.go-version": []byte("1.21\n"),
@@ -77,7 +77,7 @@ func TestUnit_Expression_FileError(t *testing.T) {
 	})
 }
 
-func TestUnit_Expression_FileEmpty(t *testing.T) {
+func TestUnit_Expression_ResolveFileEmpty(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/empty.txt":  []byte("   "),
