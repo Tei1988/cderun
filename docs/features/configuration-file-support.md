@@ -106,17 +106,7 @@ defaults:
   mountAllTools: false             # 定義された全ツールのマウント
   # ネットワーク・セキュリティ・リソース等のデフォルト
   ports: ["8080:80"]
-  publishAll: false
-  expose: ["80/tcp"]
-  hostname: "cderun-host"
-  dns: ["8.8.8.8"]
-  addHosts: ["myserver:192.168.1.1"]
   user: "1000:1000"
-  privileged: false
-  capAdd: ["SYS_ADMIN"]
-  capDrop: ["NET_RAW"]
-  entrypoint: ["/usr/bin/myentry"]
-  pull: "missing"
   memory: "1g"
   cpus: 1.5
   hangTimeout: "5s"          # ハングタイムアウト
@@ -146,23 +136,6 @@ node:
   network: host
   ports:
     - "3000:3000"
-  publishAll: false
-  expose:
-    - "3000/tcp"
-  hostname: node-app
-  dns:
-    - 8.8.8.8
-  addHosts:
-    - "db:192.168.1.10"
-  user: "node"
-  privileged: false
-  capAdd:
-    - NET_ADMIN
-  capDrop:
-    - SETUID
-  entrypoint:
-    - node
-  pull: missing
   mounts:
     - type: bind
       source: .
@@ -332,6 +305,3 @@ cderunのコマンドライン引数で指定できる全てのオプション�
 ## 優先順位
 
 設定の優先順位については、[引数・設定優先順位](./argument-priority-logic.md) を参照してください。
-
----
-*2026年3月14日時点の仕様である。*

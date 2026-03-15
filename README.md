@@ -112,7 +112,6 @@ cderun node app.js --cderun-image node:20-alpine
 - `--cpus`: Number of CPUs.
 - `--device`: Add a host device to the container.
 - `--remove`: Automatically remove the container when it exits (default: true).
-- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms).
 - `--config`: Path to cderun config file.
 - `--tool-config`: Path to tools config file.
 - `--runtime`: Container runtime to use (docker/podman).
@@ -143,11 +142,6 @@ Key variables include:
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `2s`). Forcefully terminates the container (SIGKILL) if it hangs past the grace period after I/O completion.
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
-- `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
-- `CDERUN_DRY_RUN_FORMAT`: Output format for dry-run (yaml, json, simple).
-- `CDERUN_DIAGNOSIS`: If set to `true`, enables diagnosis mode.
-- `CDERUN_DIAGNOSIS_FORMAT`: Output format for diagnosis (yaml, json, simple).
-- `CDERUN_PUBLISH_ALL`: If set to `true`, publish all exposed ports to random ports.
 
 Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
 
