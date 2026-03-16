@@ -6,7 +6,9 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -555,6 +557,26 @@ func TestUnit_Env_StrictEnvFlags(t *testing.T) {
 	})
 }
 
+type signalTestMock struct {
+	runtime.MockRuntime
+	waitStarted chan struct{}
+	blockWait   chan struct{}
+}
+
+func (m *signalTestMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	if m.waitStarted != nil {
+		close(m.waitStarted)
+	}
+	if m.blockWait != nil {
+		<-m.blockWait
+	}
+	return 0, nil
+}
+
+func (m *signalTestMock) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	return m.MockRuntime.SignalErr
+}
+
 func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 	t.Parallel()
 	t.Run("fails when StartContainer fails", func(t *testing.T) {
@@ -586,22 +608,44 @@ func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 	})
 
 	t.Run("logs warning when SignalContainer fails", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			SignalErr: errors.New("signal failed"),
+		mock := &signalTestMock{
+			MockRuntime: runtime.MockRuntime{
+				SignalErr: errors.New("signal failed"),
+			},
+			waitStarted: make(chan struct{}),
+			blockWait:   make(chan struct{}),
 		}
-		var stderrBuf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-			cmd.SetErr(&stderrBuf)
-		})
-		require.NoError(t, err)
+		mock.CreatedContainerID = "test-container"
 
-		// We need to trigger a signal for this to be called, but the current implementation
-		// handles signals in a goroutine that is hard to trigger deterministically without
-		// sending a real signal to the process.
-		// However, for this plan I'll just verify the existing tests pass.
+		var stderrBuf bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				cmd.SetErr(&stderrBuf)
+			})
+		}()
+
+		<-mock.waitStarted
+
+		// Send SIGINT to the current process, which the signal handler in root.go will catch and forward.
+		// Use syscall.Kill(os.Getpid(), ...) instead of signal.Notify to simulate external signal.
+		_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
+
+		require.Eventually(t, func() bool {
+			return strings.Contains(stderrBuf.String(), "failed to forward signal")
+		}, 2*time.Second, 10*time.Millisecond)
+
+		require.Contains(t, stderrBuf.String(), "signal failed")
+
+		close(mock.blockWait)
+		<-done
 	})
 }
