@@ -568,22 +568,27 @@ func (m *signalTestMock) WaitContainer(ctx context.Context, containerID string) 
 		close(m.waitStarted)
 	}
 	if m.blockWait != nil {
-		<-m.blockWait
+		select {
+		case <-m.blockWait:
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
 	}
 	return 0, nil
 }
 
 func (m *signalTestMock) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	return m.MockRuntime.SignalErr
+	return m.SignalErr
 }
 
 func TestUnit_Execution_RuntimeErrors(t *testing.T) {
-	t.Parallel()
 	t.Run("fails when StartContainer fails", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 		mockRuntime := &runtime.MockRuntime{
 			StartErr: errors.New("start failed"),
 		}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -594,10 +599,12 @@ func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 	})
 
 	t.Run("fails when WaitContainer fails", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 		mockRuntime := &runtime.MockRuntime{
 			WaitErr: errors.New("wait failed"),
 		}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -646,6 +653,11 @@ func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 		require.Contains(t, stderrBuf.String(), "signal failed")
 
 		close(mock.blockWait)
-		<-done
+
+		select {
+		case <-done:
+		case <-ctx.Done():
+			t.Fatal("Test timed out waiting for ExecuteContextWithOptions")
+		}
 	})
 }
