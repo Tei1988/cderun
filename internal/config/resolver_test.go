@@ -1099,8 +1099,37 @@ func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, res.StrictEnv)
 	})
+}
 
+func TestUnit_Resolver_EdgeCases(t *testing.T) {
+	t.Run("Empty tool configuration", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true}
+		tools := ToolsConfig{} // Empty
+		res, err := Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "alpine", res.Image)
+	})
 
+	t.Run("Tool not found in tools.yaml (image provided by CLI)", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true}
+		tools := ToolsConfig{"other": {Image: "other"}}
+		res, err := Resolve("node", cli, tools, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "alpine", res.Image)
+	})
+
+	t.Run("Missing environment variables in strict mode (CLI)", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:        "alpine",
+			ImageSet:     true,
+			Env:          []string{"NONEXISTENT"},
+			StrictEnv:    true,
+			StrictEnvSet: true,
+		}
+		_, err := Resolve("node", cli, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
 }
 
 

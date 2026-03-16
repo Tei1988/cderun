@@ -8,10 +8,18 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
 
 var setupMu sync.Mutex
+
+func withMockFS(mfs *config.MockFileSystem) func(o *rootOptions, cmd *cobra.Command) {
+	return func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+	}
+}
 
 func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOptions, cmd *cobra.Command)) func(o *rootOptions, cmd *cobra.Command) {
 	return func(o *rootOptions, cmd *cobra.Command) {
