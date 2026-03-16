@@ -358,6 +358,77 @@ func TestUnit_Path_Helpers(t *testing.T) {
 	})
 }
 
+func TestUnit_Path_ResolveErrors(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/app"}
+
+	t.Run("Expression error", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		// Trigger error in resolver
+		r.resolveString("{{file:nonexistent}}")
+
+		cp := ConfigPath{Raw: "./data", BaseDir: "/app"}
+		_, err := cp.Resolve(r)
+		require.Error(t, err)
+	})
+
+	t.Run("ResolveVolume error", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r.resolveString("{{file:nonexistent}}")
+
+		cp := ConfigPath{Raw: "./host:/container", BaseDir: "/app"}
+		_, err := cp.ResolveVolume(r)
+		require.Error(t, err)
+	})
+
+	t.Run("ResolveDevice error", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r.resolveString("{{file:nonexistent}}")
+
+		cp := ConfigPath{Raw: "./dev:/dev:rw", BaseDir: "/app"}
+		_, err := cp.ResolveDevice(r)
+		require.Error(t, err)
+	})
+
+	t.Run("MountConfig.Resolve error", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r.resolveString("{{file:nonexistent}}")
+
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "./src"},
+			Target: ConfigPath{Raw: "/dst"},
+		}
+		_, err := mc.Resolve(r)
+		require.Error(t, err)
+
+		mcNonBind := MountConfig{
+			Type:   "volume",
+			Source: ConfigPath{Raw: "vol"},
+			Target: ConfigPath{Raw: "/dst"},
+		}
+		_, err = mcNonBind.Resolve(r)
+		require.Error(t, err)
+	})
+
+	t.Run("DeviceConfig.Resolve error", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r.resolveString("{{file:nonexistent}}")
+
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/v1"},
+			Destination: ConfigPath{Raw: "/dev/v1"},
+		}
+		_, err := dc.Resolve(r)
+		require.Error(t, err)
+	})
+}
+
 func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
 	t.Run("MountConfig", func(t *testing.T) {
 		var mc MountConfig

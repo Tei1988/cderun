@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/container"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -40,6 +42,18 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	})
 
 	return buf.String(), execErr
+}
+
+func TestUnit_PreprocessArgs_ShorthandWithArg(t *testing.T) {
+	t.Parallel()
+	cmd := &cobra.Command{}
+	cmd.Flags().StringP("env", "e", "", "env")
+
+	// -e value -> value should be skipped in subcmd search
+	args := []string{"cderun", "-e", "K=V", "ls"}
+	processed, err := preprocessArgs(cmd, args)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"cderun", "-e", "K=V", "ls"}, processed)
 }
 
 func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
@@ -283,6 +297,7 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 }
 
 func TestUnit_Flags_Phase3Features(t *testing.T) {
+	// Not safe for t.Parallel() because some subtests use t.Setenv
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -446,6 +461,7 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 	})
 
 	t.Run("Simple format", func(t *testing.T) {
+		t.Parallel()
 		out := &bytes.Buffer{}
 		opts := &rootOptions{
 			fs: config.RealFileSystem{},
@@ -463,6 +479,121 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime: podman")
 	})
+
+	t.Run("YAML format (default)", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		opts := &rootOptions{
+			fs: config.RealFileSystem{},
+		}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/var/run/docker.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "yaml",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "runtime:")
+		assert.Contains(t, out.String(), "name: docker")
+	})
+
+	t.Run("Socket missing", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		opts := &rootOptions{
+			fs: &config.MockFileSystem{StatErr: errors.New("not found")},
+		}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/missing.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "simple",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
+	})
+}
+
+func TestUnit_DryRun_OutputFormats(t *testing.T) {
+	t.Parallel()
+	cfg := &container.ContainerConfig{Image: "alpine", Command: []string{"ls"}}
+
+	t.Run("JSON format", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{DryRunFormat: "json"}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+		err := opts.handleDryRun(cmd, cfg, resolved)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "\"image\": \"alpine\"")
+	})
+
+	t.Run("Simple format", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{DryRunFormat: "simple"}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+		err := opts.handleDryRun(cmd, cfg, resolved)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Image: alpine")
+		assert.Contains(t, out.String(), "Command: ls")
+	})
+
+	t.Run("YAML format (default)", func(t *testing.T) {
+		t.Parallel()
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{DryRunFormat: "yaml"}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+		err := opts.handleDryRun(cmd, cfg, resolved)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "image: alpine")
+	})
+}
+
+func TestUnit_ContainerConfig_Nested(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		ExecPath: "/container/project/bin/cderun",
+	}
+	opts := defaultOptions()
+	opts.fs = mfs
+	opts.logger = logging.NewLogger()
+	resolved := &config.ResolvedConfig{
+		MountCderun: true,
+		HostContext: &config.HostContext{
+			Level: 1,
+			Mounts: []config.MountMapping{
+				{Source: "/host/project", Target: "/container/project", Level: 1},
+			},
+		},
+	}
+
+	cc, err := opts.buildContainerConfig(resolved, nil, nil)
+	require.NoError(t, err)
+
+	// Should resolve /container/project/bin/cderun to /host/project/bin/cderun for the next level
+	found := false
+	for _, m := range cc.Mounts {
+		if m.Target == "/usr/local/bin/cderun" {
+			assert.Equal(t, "/host/project/bin/cderun", m.Source)
+			found = true
+		}
+	}
+	assert.True(t, found)
 }
 
 func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
@@ -481,6 +612,81 @@ func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
 		_, err := o.buildContainerConfig(resolved, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
+	})
+
+	t.Run("fails when tool not found", func(t *testing.T) {
+		t.Parallel()
+		opts := &rootOptions{
+			fs: &config.MockFileSystem{ExecPath: "/bin/cderun"},
+		}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"missing-tool"},
+		}
+		toolsCfg := config.ToolsConfig{"other": {Image: "alpine"}}
+		_, err := opts.buildContainerConfig(resolved, nil, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"missing-tool\" not found in .tools.yaml")
+	})
+}
+
+func TestUnit_Execute_RuntimeErrors(t *testing.T) {
+	t.Parallel()
+	resolved := &config.ResolvedConfig{Runtime: "docker", SocketPath: "/var/run/docker.sock"}
+	cfg := &container.ContainerConfig{Image: "alpine"}
+
+	t.Run("runtime initialization failure", func(t *testing.T) {
+		t.Parallel()
+		opts := defaultOptions()
+		opts.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return nil, errors.New("factory error")
+		}
+		cmd := &cobra.Command{}
+		cmd.SetContext(context.Background())
+		_, err := opts.execute(cmd, resolved, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to initialize runtime")
+	})
+
+	t.Run("image pull failure", func(t *testing.T) {
+		t.Parallel()
+		mock := &runtime.MockRuntime{PullErr: errors.New("pull error")}
+		opts := defaultOptions()
+		opts.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		cmd := &cobra.Command{}
+		cmd.SetContext(context.Background())
+		_, err := opts.execute(cmd, resolved, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to pull image")
+	})
+
+	t.Run("container creation failure", func(t *testing.T) {
+		t.Parallel()
+		mock := &runtime.MockRuntime{CreateErr: errors.New("create error")}
+		opts := defaultOptions()
+		opts.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		cmd := &cobra.Command{}
+		cmd.SetContext(context.Background())
+		_, err := opts.execute(cmd, resolved, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create container")
+	})
+
+	t.Run("container start failure", func(t *testing.T) {
+		t.Parallel()
+		mock := &runtime.MockRuntime{StartErr: errors.New("start error")}
+		opts := defaultOptions()
+		opts.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		cmd := &cobra.Command{}
+		cmd.SetContext(context.Background())
+		_, err := opts.execute(cmd, resolved, cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to start container")
 	})
 }
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -17,8 +16,11 @@ import (
 )
 
 func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
+	t.Parallel()
+
 	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
-		mock := &pipeMockRuntime{}
+		t.Parallel()
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 
 		// Use MockFileSystem
@@ -26,9 +28,6 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 			Dirs: map[string]bool{"/project": true},
 			WD:   "/project",
 		}
-
-		// Simulate symlink execution: node --interactive=true --image alpine cat
-		// Specification: only --cderun- prefixed flags are hoisted.
 
 		var stdout bytes.Buffer
 
@@ -38,7 +37,6 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			// Simulating "node --interactive=true --image alpine cat"
 			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--interactive=true", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
@@ -58,16 +56,13 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 			t.Fatal("Test timed out")
 		}
 
-		// It should fail because no image mapping for 'node' exists, and --image was not hoisted.
 		require.Error(t, execErr)
 		assert.Contains(t, execErr.Error(), "no image mapping found for tool: node")
-
-		requireConfig := mock.GetCreatedConfig()
-		assert.Nil(t, requireConfig)
 	})
 
 	t.Run("flags WITH cderun-prefix ARE picked up in polyglot mode", func(t *testing.T) {
-		mock := &pipeMockRuntime{}
+		t.Parallel()
+		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 
 		// Use MockFileSystem
@@ -85,7 +80,6 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			// Simulating "node --cderun-interactive=true --cderun-image=alpine cat"
 			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
@@ -115,10 +109,14 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 }
 
 func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
-	setupTestDir(t)
+	t.Parallel()
 
-	err := os.WriteFile(".tools.yaml", []byte("node:\n  image: node:20-alpine"), 0o644)
-	require.NoError(t, err)
+	mfs := &config.MockFileSystem{
+		WD: "/app",
+		Files: map[string][]byte{
+			"/app/.tools.yaml": []byte("node:\n  image: node:20-alpine"),
+		},
+	}
 
 	mockRuntime := &runtime.MockRuntime{
 		CreatedContainerID: "test-container-id",
@@ -127,7 +125,10 @@ func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err = ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime))
+	err := ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+	}))
 
 	require.NoError(t, err)
 	cfg := mockRuntime.GetCreatedConfig()

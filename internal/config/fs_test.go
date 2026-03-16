@@ -72,6 +72,24 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 		assert.Empty(t, mfs.Getenv("UNKNOWN"))
 	})
 
+	t.Run("LookupEnv", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{
+			Env: map[string]string{"K": "V"},
+		}
+		val, ok := mfs.LookupEnv("K")
+		assert.True(t, ok)
+		assert.Equal(t, "V", val)
+
+		val, ok = mfs.LookupEnv("UNKNOWN")
+		assert.False(t, ok)
+		assert.Empty(t, val)
+
+		mfs.Env = nil
+		val, ok = mfs.LookupEnv("K")
+		assert.False(t, ok)
+	})
+
 	t.Run("TempDir", func(t *testing.T) {
 		assert.Equal(t, "/tmp", mfs.TempDir())
 		mfs.TempDirValue = "/custom/tmp"

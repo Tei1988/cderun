@@ -45,6 +45,22 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: nonexistent")
 	})
+
+	t.Run("resolveFindDir error cases", func(t *testing.T) {
+		t.Parallel()
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+
+		// Absolute path not allowed
+		r.resolveString("{{ find_dir:/abs }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "absolute paths")
+
+		// Parent directory not allowed
+		r2, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r2.resolveString("{{ find_dir:../parent }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "parent directory references")
+	})
 }
 
 func TestUnit_Expression_FileError(t *testing.T) {

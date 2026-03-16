@@ -18,6 +18,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -531,7 +532,9 @@ func TestUnit_Docker_AttachOptions(t *testing.T) {
 }
 
 func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
+	t.Parallel()
 	t.Run("CloseWrite is skipped if sleepFunc returns error", func(t *testing.T) {
+		t.Parallel()
 		conn := &mockConn{}
 		mock := &mockDockerClient{
 			attachResp: types.HijackedResponse{
@@ -555,6 +558,7 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 	})
 
 	t.Run("CloseWrite is called if sleepFunc succeeds", func(t *testing.T) {
+		t.Parallel()
 		conn := &mockConn{}
 		mock := &mockDockerClient{
 			attachResp: types.HijackedResponse{
@@ -571,5 +575,101 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, io.Discard, io.Discard, nil)
 		require.NoError(t, err)
 		assert.Eventually(t, func() bool { return conn.closeWriteCalled.Load() }, 500*time.Millisecond, 10*time.Millisecond, "CloseWrite should be called if sleep succeeded")
+	})
+}
+
+func TestUnit_Docker_InspectContainer(t *testing.T) {
+	t.Parallel()
+	mock := &mockDockerClient{}
+	mock.inspectResp.ContainerJSONBase = &dockercontainer.ContainerJSONBase{
+		State: &dockercontainer.State{
+			Running:  true,
+			ExitCode: 42,
+		},
+	}
+	rt := &DockerRuntime{client: mock}
+
+	running, code, err := rt.InspectContainer(context.Background(), "id")
+	require.NoError(t, err)
+	assert.True(t, running)
+	assert.Equal(t, 42, code)
+
+	mock.inspectErr = errors.New("inspect error")
+	_, _, err = rt.InspectContainer(context.Background(), "id")
+	require.Error(t, err)
+}
+
+func TestUnit_Docker_RemoveContainer_Errors(t *testing.T) {
+	t.Parallel()
+	t.Run("NotFound is ignored", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{removeErr: errdefs.ErrNotFound}
+		rt := &DockerRuntime{client: mock}
+		err := rt.RemoveContainer(context.Background(), "id")
+		require.NoError(t, err)
+	})
+
+	t.Run("Conflict is ignored", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{removeErr: errdefs.ErrConflict}
+		rt := &DockerRuntime{client: mock}
+		err := rt.RemoveContainer(context.Background(), "id")
+		require.NoError(t, err)
+	})
+
+	t.Run("Other errors are propagated", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{removeErr: errors.New("other error")}
+		rt := &DockerRuntime{client: mock}
+		err := rt.RemoveContainer(context.Background(), "id")
+		require.Error(t, err)
+	})
+}
+
+func TestUnit_Docker_AttachContainer_Errors(t *testing.T) {
+	t.Parallel()
+	t.Run("attach error closes ready channel", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{attachErr: errors.New("attach error")}
+		rt := &DockerRuntime{client: mock}
+
+		ready := make(chan struct{})
+		err := rt.AttachContainer(context.Background(), "id", false, nil, nil, nil, ready)
+		require.Error(t, err)
+
+		// Ready channel should be closed
+		select {
+		case <-ready:
+			// OK
+		default:
+			t.Fatal("ready channel should have been closed")
+		}
+	})
+}
+
+func TestUnit_Docker_SignalContainer_Errors(t *testing.T) {
+	t.Parallel()
+	t.Run("NotFound is ignored", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{killErr: errdefs.ErrNotFound}
+		rt := &DockerRuntime{client: mock}
+		err := rt.SignalContainer(context.Background(), "id", "SIGINT")
+		require.NoError(t, err)
+	})
+
+	t.Run("Conflict is ignored", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{killErr: errdefs.ErrConflict}
+		rt := &DockerRuntime{client: mock}
+		err := rt.SignalContainer(context.Background(), "id", "SIGINT")
+		require.NoError(t, err)
+	})
+
+	t.Run("Other errors are propagated", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{killErr: errors.New("other error")}
+		rt := &DockerRuntime{client: mock}
+		err := rt.SignalContainer(context.Background(), "id", "SIGINT")
+		require.Error(t, err)
 	})
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,9 @@ import (
 )
 
 func TestUnit_Config_Loader_LoadCDERun(t *testing.T) {
+	t.Parallel()
 	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			Dirs:  map[string]bool{"/project": true},
@@ -22,6 +25,7 @@ func TestUnit_Config_Loader_LoadCDERun(t *testing.T) {
 	})
 
 	t.Run("found in current dir", func(t *testing.T) {
+		t.Parallel()
 		content := `
 runtime: docker
 defaults:
@@ -45,6 +49,7 @@ defaults:
 	})
 
 	t.Run("found in home dir", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/home/user/.config/cderun/.cderun.yaml": []byte("runtime: podman"),
@@ -63,6 +68,7 @@ defaults:
 	})
 
 	t.Run("found in run dir", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/run/cderun/.cderun.yaml": []byte("defaults:\n  network: host"),
@@ -80,6 +86,7 @@ defaults:
 	})
 
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
+		t.Parallel()
 		content := `
 hostContext:
   level: 1
@@ -109,7 +116,9 @@ hostContext:
 }
 
 func TestUnit_Config_Loader_LoadTools(t *testing.T) {
+	t.Parallel()
 	t.Run("found in current dir", func(t *testing.T) {
+		t.Parallel()
 		content := `
 node:
   image: node:20-alpine
@@ -153,7 +162,9 @@ func TestUnit_Config_Loader_SetDirs(t *testing.T) {
 }
 
 func TestUnit_Config_Loader_LoadPath(t *testing.T) {
+	t.Parallel()
 	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
+		t.Parallel()
 		content := `
 runtime: podman
 defaults:
@@ -176,6 +187,7 @@ defaults:
 	})
 
 	t.Run("LoadCDERunConfigFromPath - missing", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			WD:    "/project",
@@ -186,6 +198,7 @@ defaults:
 	})
 
 	t.Run("LoadToolsConfigFromPath", func(t *testing.T) {
+		t.Parallel()
 		content := `
 node:
   image: node:20-alpine
@@ -206,6 +219,7 @@ node:
 	})
 
 	t.Run("LoadToolsConfigFromPath - missing", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			WD:    "/project",
@@ -214,11 +228,12 @@ node:
 		_, _, err := loader.LoadToolsConfigFromPath("/missing.yaml")
 		require.Error(t, err)
 	})
-
 }
 
 func TestUnit_Config_Loader_LoadCDERun_Errors(t *testing.T) {
+	t.Parallel()
 	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/project/.cderun.yaml": []byte("invalid: yaml: ["),
@@ -232,6 +247,7 @@ func TestUnit_Config_Loader_LoadCDERun_Errors(t *testing.T) {
 	})
 
 	t.Run("LoadCDERunConfig - unknown field", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/project/.cderun.yaml": []byte("unknown_field: true"),
@@ -243,10 +259,65 @@ func TestUnit_Config_Loader_LoadCDERun_Errors(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found in type config.CDERunConfig")
 	})
+
+	t.Run("LoadCDERunConfig - permission denied", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/.cderun.yaml": []byte("runtime: docker"),
+			},
+			ReadFileErr: errors.New("permission denied"),
+			WD:          "/project",
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission denied")
+	})
+}
+
+func TestUnit_Config_SetBaseDir(t *testing.T) {
+	t.Parallel()
+	defaults := ConfigDefaults{
+		Mounts: []MountConfig{{Source: ConfigPath{Raw: "./s"}}},
+		Devices: []DeviceConfig{{Source: ConfigPath{Raw: "./d"}}},
+	}
+	defaults.SetBaseDir("/base")
+	assert.Equal(t, "/base", defaults.Mounts[0].Source.BaseDir)
+	assert.Equal(t, "/base", defaults.Devices[0].Source.BaseDir)
+
+	tc := ToolConfig{
+		Mounts: []MountConfig{{Source: ConfigPath{Raw: "./s"}}},
+	}
+	tc.SetBaseDir("/toolbase")
+	assert.Equal(t, "/toolbase", tc.Mounts[0].Source.BaseDir)
+}
+
+func TestUnit_Config_Helpers(t *testing.T) {
+	t.Parallel()
+	t.Run("copyFloat64Ptr", func(t *testing.T) {
+		t.Parallel()
+		// Test nil case
+		assert.Nil(t, copyFloat64Ptr(nil))
+		// Test value case
+		val := 1.5
+		res := copyFloat64Ptr(&val)
+		require.NotNil(t, res)
+		assert.Equal(t, 1.5, *res)
+		assert.NotSame(t, &val, res)
+	})
+
+	t.Run("FindConfigs via defaultLoader", func(t *testing.T) {
+		// This uses the real filesystem but should not fail if files don't exist
+		paths := FindConfigs(".nonexistent-config-file")
+		assert.Empty(t, paths)
+	})
 }
 
 func TestUnit_Config_DeepCopy(t *testing.T) {
+	t.Parallel()
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
+		t.Parallel()
 		tty := true
 		orig := CDERunConfig{
 			Runtime: "docker",
@@ -286,6 +357,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	})
 
 	t.Run("ToolsConfig DeepCopy", func(t *testing.T) {
+		t.Parallel()
 		orig := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
@@ -306,7 +378,9 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	})
 
 	t.Run("DeepCopy all fields", func(t *testing.T) {
+		t.Parallel()
 		b := true
+		f := 2.5
 		orig := CDERunConfig{
 			Logging: LoggingConfig{
 				Timestamp: &b,
@@ -321,6 +395,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				MountAllTools:   &b,
 				PublishAll:      &b,
 				Privileged:      &b,
+				CPUs:            &f,
 				MountTools:      []string{"t"},
 				Ports:           []string{"p"},
 				Expose:          []string{"e"},
@@ -349,6 +424,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.NotSame(t, orig.Defaults.MountAllTools, cloned.Defaults.MountAllTools)
 		assert.NotSame(t, orig.Defaults.PublishAll, cloned.Defaults.PublishAll)
 		assert.NotSame(t, orig.Defaults.Privileged, cloned.Defaults.Privileged)
+		assert.NotSame(t, orig.Defaults.CPUs, cloned.Defaults.CPUs)
 		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
 		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
 		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
