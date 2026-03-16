@@ -252,7 +252,7 @@ type hangMockRuntime struct {
 }
 
 func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	_, _ = m.WaitContainer(ctx, containerID)
+	_, _ = m.MockRuntime.WaitContainer(ctx, containerID)
 	m.waitStartedOnce.Do(func() {
 		close(m.waitStarted)
 	})
@@ -266,7 +266,7 @@ func (m *hangMockRuntime) WaitContainer(ctx context.Context, containerID string)
 }
 
 func (m *hangMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	_ = m.SignalContainer(ctx, containerID, sig)
+	_ = m.MockRuntime.SignalContainer(ctx, containerID, sig)
 	if sig == "SIGKILL" {
 		m.killedOnce.Do(func() {
 			close(m.killed)
@@ -276,7 +276,7 @@ func (m *hangMockRuntime) SignalContainer(ctx context.Context, containerID strin
 }
 
 func (m *hangMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	_ = m.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
 	// Return immediately to simulate IO finished
 	return nil
 }
