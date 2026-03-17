@@ -343,7 +343,7 @@ func TestRobustness_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
 	select {
 	case err := <-done:
 		require.Error(t, err)
-		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
 		_ = capturedExitCode
 		select {
 		case <-mock.killed:
