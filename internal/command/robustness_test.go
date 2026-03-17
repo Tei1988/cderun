@@ -344,6 +344,7 @@ func TestRobustness_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
 	case err := <-done:
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
+			// capturedExitCode exists to satisfy the exitFunc signature in this TTY timeout test.
 		_ = capturedExitCode
 		select {
 		case <-mock.killed:
