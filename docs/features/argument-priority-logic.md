@@ -68,8 +68,17 @@ node:
   - `logLevel: warn`
   - `logFormat: text`
   - `logTimestamp: true`
+  - `strictEnv: false`
+  - `mountSocket: false`
+  - `mountCderun: false`
+  - `mountAllTools: false`
+  - `privileged: false`
+  - `publishAll: false`
+  - `dryRun: false`
   - `dryRunFormat: yaml`
+  - `diagnosis: false`
   - `diagnosisFormat: yaml`
+  - `hangTimeout: 2s`
   - `image`: なし (Fatal Error)
     - ※ P1〜P6のいずれでも解決できない場合、プログラムはエラーメッセージを出力して終了すること (Exit Code 1)。勝手なデフォルトイメージ（`ubuntu:latest` 等）を使用してはならない。
 
@@ -103,4 +112,4 @@ node:
 - **明示的な未指定の扱い**: YAMLのフィールドはポインタ型（`*bool` 等）で定義し、「未設定（nil）」と「明示的なfalse」を区別できるようにする。
 
 ---
-*2026年3月14日時点の仕様である。*
+*2026年3月17日時点の仕様である。*
