@@ -64,6 +64,7 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 
 	t.Run("Nested tool config overrides global defaults", func(t *testing.T) {
 		// Given: Global config with some defaults and Tool config with overrides
+		mfs := &MockFileSystem{} // Empty isolated environment
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
 				Network: "bridge",
@@ -79,8 +80,8 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 			},
 		}
 
-		// When: Resolving configuration for "app"
-		res, err := Resolve("app", CLIOptions{}, tools, global)
+		// When: Resolving configuration for "app" with isolated FS
+		res, err := ResolveWithFS("app", CLIOptions{}, tools, global, mfs)
 
 		// Then: Tool settings should override global ones, and slices should not merge across layers
 		require.NoError(t, err)
@@ -176,6 +177,7 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 		cfg, paths, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
 		assert.Equal(t, "node:20", cfg["node"].Image)
+		require.NotEmpty(t, paths)
 		assert.Contains(t, paths[0], ".tools.yaml")
 	})
 
