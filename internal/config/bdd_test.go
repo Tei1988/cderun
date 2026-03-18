@@ -308,31 +308,71 @@ func TestUnit_Config_RealFS_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("Other methods", func(t *testing.T) {
-		_, _ = fs.Getwd()
-		_, _ = fs.UserHomeDir()
-		_, _ = fs.Executable()
-		_ = fs.Getenv("PATH")
-		_ = fs.TempDir()
+		wd, err := fs.Getwd()
+		require.NoError(t, err)
+		assert.NotEmpty(t, wd)
 
-		tmp := t.TempDir()
-		_ = fs.MkdirAll(tmp+"/a", 0o755)
-		_ = fs.WriteFile(tmp+"/f", []byte("d"), 0o644)
-		_, _ = fs.ReadFile(tmp+"/f")
-		_, _ = fs.Stat(tmp+"/f")
-		_ = fs.RemoveAll(tmp+"/a")
-		_, _ = fs.Abs(".")
+		home, err := fs.UserHomeDir()
+		require.NoError(t, err)
+		assert.NotEmpty(t, home)
+
+		exe, err := fs.Executable()
+		require.NoError(t, err)
+		assert.NotEmpty(t, exe)
+
+		t.Setenv("PATH_FS_TEST", "/usr/bin")
+		assert.Equal(t, "/usr/bin", fs.Getenv("PATH_FS_TEST"))
+
+		temp := fs.TempDir()
+		assert.NotEmpty(t, temp)
+
+		tmpDir := t.TempDir()
+
+		err = fs.MkdirAll(tmpDir+"/a", 0o755)
+		require.NoError(t, err)
+
+		err = fs.WriteFile(tmpDir+"/f", []byte("data"), 0o644)
+		require.NoError(t, err)
+
+		data, err := fs.ReadFile(tmpDir+"/f")
+		require.NoError(t, err)
+		assert.Equal(t, "data", string(data))
+
+		info, err := fs.Stat(tmpDir+"/f")
+		require.NoError(t, err)
+		assert.False(t, info.IsDir())
+
+		err = fs.RemoveAll(tmpDir+"/a")
+		require.NoError(t, err)
+
+		abs, err := fs.Abs(".")
+		require.NoError(t, err)
+		assert.NotEmpty(t, abs)
 	})
 }
 
 func TestUnit_Config_PackageLevel_More(t *testing.T) {
-	// Exercise package level wrappers and verify outcomes (best effort)
-	_ = FindConfigs(".cderun.yaml")
+	// Use isolated temp dir to avoid flakiness and probe real FS only deterministically
+	tempDir := t.TempDir()
 
-	_, _, err := LoadCDERunConfig()
-	assert.NoError(t, err)
+	restoreRun := SetRunConfigDirForTest(tempDir)
+	defer restoreRun()
+	restoreSys := SetSystemConfigDirForTest(tempDir)
+	defer restoreSys()
 
-	_, _, err = LoadToolsConfig()
-	assert.NoError(t, err)
+	// Exercise package level wrappers and verify outcomes
+	paths := FindConfigs(".cderun.yaml")
+	assert.Empty(t, paths)
+
+	cfg, paths, err := LoadCDERunConfig()
+	require.NoError(t, err)
+	assert.Nil(t, cfg)
+	assert.Empty(t, paths)
+
+	tCfg, paths, err := LoadToolsConfig()
+	require.NoError(t, err)
+	assert.Nil(t, tCfg)
+	assert.Empty(t, paths)
 }
 
 func TestUnit_Config_Path_DeepCopy_Exhaustive(t *testing.T) {
