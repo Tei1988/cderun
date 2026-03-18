@@ -332,8 +332,13 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 	t.Parallel()
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/var/run/docker.sock": {},
+			},
+		}
 		opts := &rootOptions{
-			fs: config.RealFileSystem{},
+			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",

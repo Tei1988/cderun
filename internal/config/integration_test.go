@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -116,17 +115,14 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 
 	t.Run("Path Traversal Protection", func(t *testing.T) {
 		// When/Then: Path traversal attempts are blocked
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		r.Resolve("{{file:/etc/passwd}}")
 		require.Error(t, r.Error())
 
-		r, _ = NewExpressionResolverWithFS(nil, mfs)
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		r.Resolve("{{file:../etc/passwd}}")
 		require.Error(t, r.Error())
 	})
-}
-
-// writeFile is a helper to write file using FileSystem interface
-func writeFile(fs FileSystem, filename string, data []byte, perm os.FileMode) error {
-	return fs.WriteFile(filename, data, perm)
 }
