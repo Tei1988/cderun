@@ -197,11 +197,12 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 func TestUnit_Config_MockFS_FileDetails(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{
-		Files: map[string][]byte{"/f": []byte("data")},
+		Files: map[string][]byte{"/dir/f": []byte("data")},
 	}
-	info, err := mfs.Stat("/f")
+	info, err := mfs.Stat("/dir/f")
 	require.NoError(t, err)
-	assert.Equal(t, "/f", info.Name())
+	// After fix in Stat, Name() should return only the base name "f"
+	assert.Equal(t, "f", info.Name())
 	assert.Equal(t, int64(0), info.Size())
 	assert.Equal(t, os.FileMode(0), info.Mode())
 	assert.False(t, info.IsDir())
@@ -475,12 +476,12 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 
 func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{WD: "/app"}
-	r, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	t.Run("resolveMounts with expressions", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
 		mfs.Env = map[string]string{"SRC": "/host/path"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		p1 := []string{"source={{env:SRC}},target=/cont/path"}
 		res, err := resolveMounts(p1, nil, "", nil, nil, r, mfs)
 		require.NoError(t, err)
@@ -489,12 +490,18 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveConfigPath volume with fallback", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/fallback:ro", r, "volume", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/fallback:ro", val)
 	})
 
 	t.Run("resolveConfigPath device with fallback", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/dev/null:/dev/null:rw", r, "device", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/null:/dev/null:rw", val)

@@ -46,11 +46,12 @@ func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}
+	baseName := filepath.Base(name)
 	if _, ok := m.Files[name]; ok {
-		return &mockFileInfo{name: name, isDir: false}, nil
+		return &mockFileInfo{name: baseName, isDir: false}, nil
 	}
 	if m.Dirs[name] {
-		return &mockFileInfo{name: name, isDir: true}, nil
+		return &mockFileInfo{name: baseName, isDir: true}, nil
 	}
 	return nil, os.ErrNotExist
 }
