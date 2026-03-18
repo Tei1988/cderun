@@ -35,7 +35,11 @@ func TestFeature(t *testing.T) {
 
 共通のセットアップ処理は `setupMockRuntime` のような補助関数にまとめ、その中で `t.Cleanup` を呼び出すことで、復元の漏れを防いでください。
 
-### 1.3. 並列実行の安全性 (Parallel Execution Safety)
+### 1.3. サブテストの独立性 (Subtest Independence)
+
+`t.Run` を使用したサブテスト内では、共有のモックインスタンスを使い回さず、可能な限りサブテストごとに新鮮なインスタンス（`MockFileSystem` など）を生成してください。これにより、サブテスト間での意図しない状態の引き継ぎや、並列実行時のレースコンディションを防止できます。
+
+### 1.4. 並列実行の安全性 (Parallel Execution Safety)
 
 `t.Parallel()` を使用してテストを並列実行する場合は、以下の点に注意してください。
 
@@ -43,7 +47,7 @@ func TestFeature(t *testing.T) {
   - `runCderun` ヘルパーの使用（内部で `os.Stdout` や `os.Stderr` などのグローバルなストリームを置換し、グローバルな `opts` をリセットするため）。
   - `syscall.Kill(os.Getpid(), ...)` による自プロセスへのシグナル送信（例: `robustness_test.go`）。
   - `os.Stdout` や `os.Stderr` などのグローバルなストリームの直接的な置換。
-  - `t.Setenv` や `os.Chdir` を使用するテスト（これらはプロセス全体の状態を変更するため）。
+  - `t.Setenv` や `os.Chdir` を使用するテスト（これらはプロセス全体の状態を変更するため）。**可能な限り、DI（Dependency Injection）を介して環境変数や作業ディレクトリをモック化し、プロセス全体の状態変更を避けてください。**
 
 ## 2. テストしやすい構造 (Testable Architecture)
 
@@ -73,12 +77,21 @@ func TestFeature(t *testing.T) {
 
 インターフェースをモックする場合、埋め込みフィールドを `nil` のままにせず、パニックを避けるために最小限のメソッドを実装してください。
 特に `os.FileInfo` などをモックで返す場合、予期せぬメソッド呼び出しでテストがクラッシュしないように注意してください。
+**`MockFileSystem.Stat` が返す `FileInfo.Name()` は、標準の `os.Stat` と同様にベース名のみを返すように実装してください。**
 
-## 4. コードの依存関係とドキュメント (Dependency & Documentation)
+## 4. アサーションのベストプラクティス (Assertion Best Practices)
 
-### 4.1. 初期化順序の明示
+### 4.1. 型アサーションの安全性
 
-パッケージレベルの変数や、特定の初期化順序に依存する関数（例: `defaultLoader` に依存する `NewConfigLoaderWithFS`）については、将来の開発者が意図を理解できるようにコメントで明記してください。
+インターフェース型の戻り値を具体的な型として検証する場合は、パニックを避けるために必ず `value, ok := ...` 形式（comma-ok idiom）を使用し、`ok` が真であることを確認してから要素にアクセスしてください。
+
+### 4.2. 浮動小数点数の比較
+
+CPUリソースなどの浮動小数点数（`float64`）を比較する場合は、微小な精度の誤差を許容するために `assert.InDelta` または `assert.InEpsilon` を使用してください。
+
+### 4.3. スライスの検証
+
+スライスの内容を検証する場合、順序が重要でないなら `assert.ElementsMatch` を使用し、要素の過不足がないか厳密に確認してください。また、環境変数のリストなど、特定の組み合わせが期待される場合は、`assert.Equal` を使用して長さと内容の両方を一度に検証することを検討してください。
 
 ## 5. 命名規則と構成
 
@@ -86,3 +99,4 @@ func TestFeature(t *testing.T) {
 
 - **命名規則:** `Test[Category]_[Feature]_[Scenario]`
 - **配置:** ロジックに応じた適切なテストファイル（`root_test.go`, `integration_test.go`, `robustness_test.go` など）を選択してください。
+- **カテゴリの厳守:** プロセス全体の変数を変更する操作（パッケージレベルのセッター呼び出しなど）を含むテストは `Integration` カテゴリとして分類し、純粋なロジック検証である `Unit` テストと区別してください。
