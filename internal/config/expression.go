@@ -202,6 +202,8 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	return rel, nil
 }
 
+// resolveEnv returns the value of an environment variable.
+// It mirrors os.Getenv behavior and returns an empty string if the key is missing.
 func (r *ExpressionResolver) resolveEnv(key string) (string, error) {
 	val := r.fs.Getenv(key)
 	return val, nil

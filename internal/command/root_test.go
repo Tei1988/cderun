@@ -376,11 +376,14 @@ func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 	t.Parallel()
 	t.Run("--strict-env flag", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{} // Empty environment
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")

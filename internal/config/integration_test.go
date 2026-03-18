@@ -9,20 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntegration_Config_Load_RealFS(t *testing.T) {
-	// We keep this one to ensure RealFileSystem works, but it shouldn't use t.Parallel()
-	// because it uses os.Chdir (process-global).
-	tmpDir := t.TempDir()
-
+func TestIntegration_Config_Load_MockFS(t *testing.T) {
+	t.Parallel()
+	tmpDir := "/tmp/cderun-test"
 	content := "runtime: docker"
-	err := WriteFile(RealFileSystem{}, filepath.Join(tmpDir, ".cderun.yaml"), []byte(content), 0o644)
-	require.NoError(t, err)
-
-	originalWd, err := RealFileSystem{}.Getwd()
-	require.NoError(t, err)
-
-	// Since we are not using t.Parallel(), we can safely change the working directory.
-	require.NoError(t, RealFileSystem{}.MkdirAll(tmpDir, 0o755))
 
 	mfs := &MockFileSystem{
 		WD: tmpDir,
@@ -37,7 +27,6 @@ func TestIntegration_Config_Load_RealFS(t *testing.T) {
 	assert.NotNil(t, cfg)
 	assert.NotEmpty(t, paths)
 	assert.Equal(t, "docker", cfg.Runtime)
-	_ = originalWd
 }
 
 func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
@@ -137,7 +126,7 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 	})
 }
 
-// WriteFile is a helper to write file using FileSystem interface
-func WriteFile(fs FileSystem, filename string, data []byte, perm os.FileMode) error {
+// writeFile is a helper to write file using FileSystem interface
+func writeFile(fs FileSystem, filename string, data []byte, perm os.FileMode) error {
 	return fs.WriteFile(filename, data, perm)
 }
