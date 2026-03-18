@@ -363,34 +363,13 @@ func NewConfigLoader() *ConfigLoader {
 	}
 }
 
-// NewConfigLoaderWithFS creates a new ConfigLoader with the specified FileSystem and current default directories.
+// NewConfigLoaderWithFS creates a new ConfigLoader with the specified FileSystem and default directories.
 func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 	return &ConfigLoader{
 		fs:              fs,
-		systemConfigDir: defaultLoader.systemConfigDir,
-		runConfigDir:    defaultLoader.runConfigDir,
+		systemConfigDir: "/etc/cderun",
+		runConfigDir:    "/run/cderun",
 	}
-}
-
-var defaultLoader = NewConfigLoader()
-
-// SetRunConfigDirForTest sets the directory for run configuration (used for testing).
-func SetRunConfigDirForTest(path string) func() {
-	restoreDir := defaultLoader.runConfigDir
-	defaultLoader.runConfigDir = path
-	return func() { defaultLoader.runConfigDir = restoreDir }
-}
-
-// SetSystemConfigDirForTest sets the directory for system configuration (used for testing).
-func SetSystemConfigDirForTest(path string) func() {
-	restoreDir := defaultLoader.systemConfigDir
-	defaultLoader.systemConfigDir = path
-	return func() { defaultLoader.systemConfigDir = restoreDir }
-}
-
-// FindConfigs searches for config files in hierarchical order.
-func FindConfigs(filename string) []string {
-	return defaultLoader.FindConfigs(filename)
 }
 
 // FindConfigs searches for config files in hierarchical order using the loader's filesystem and directories.
@@ -453,11 +432,6 @@ func unmarshalStrict(data []byte, v any) error {
 	return nil
 }
 
-// LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them.
-func LoadCDERunConfig() (*CDERunConfig, []string, error) {
-	return defaultLoader.LoadCDERunConfig()
-}
-
 // LoadCDERunConfig searches for .cderun.yaml in hierarchical locations and merges them using the loader's filesystem.
 func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	paths := l.FindConfigs(".cderun.yaml")
@@ -496,11 +470,6 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	}
 
 	return &merged, loadedPaths, nil
-}
-
-// LoadToolsConfig searches for .tools.yaml in hierarchical locations and merges them.
-func LoadToolsConfig() (ToolsConfig, []string, error) {
-	return defaultLoader.LoadToolsConfig()
 }
 
 // LoadToolsConfig searches for .tools.yaml in hierarchical locations and merges them using the loader's filesystem.

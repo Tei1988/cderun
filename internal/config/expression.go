@@ -46,8 +46,8 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		fileCache:   make(map[string]fileCacheEntry),
 		loader: &ConfigLoader{
 			fs:              fs,
-			systemConfigDir: defaultLoader.systemConfigDir,
-			runConfigDir:    defaultLoader.runConfigDir,
+			systemConfigDir: "/etc/cderun",
+			runConfigDir:    "/run/cderun",
 		},
 	}, nil
 }

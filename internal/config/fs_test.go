@@ -132,8 +132,8 @@ func TestUnit_Config_Loader_Initialization(t *testing.T) {
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)
-	assert.Equal(t, defaultLoader.systemConfigDir, loader.systemConfigDir)
-	assert.Equal(t, defaultLoader.runConfigDir, loader.runConfigDir)
+	assert.Equal(t, "/etc/cderun", loader.systemConfigDir)
+	assert.Equal(t, "/run/cderun", loader.runConfigDir)
 }
 
 func TestUnit_FileSystem_Abs(t *testing.T) {

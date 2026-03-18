@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"os"
 	"strings"
 	"syscall"
@@ -113,7 +114,7 @@ func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 	}
 }
 
-func TestUnit_Execute_EmptyArgs(t *testing.T) {
+func TestUnit_Execution_EmptyArgs(t *testing.T) {
 	t.Parallel()
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
@@ -309,12 +310,20 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 	})
 
 	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
-		// If unspecified, --mount-cderun should auto-enable --mount-socket
-		t.Setenv("CDERUN_MOUNT_SOCKET", "")
+		t.Parallel()
 
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = &config.MockFileSystem{
+				Env: map[string]string{
+					"CDERUN_SOCKET_PATH":  "/var/run/docker.sock",
+					"CDERUN_MOUNT_SOCKET": "",
+				},
+				Dirs: map[string]bool{"/var/run": true},
+				Files: map[string][]byte{
+					"/var/run/docker.sock": {},
+				},
+			}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -333,9 +342,18 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 		assert.True(t, socketFound, "Socket should be automatically mounted")
 
 		// If explicitly set to false, it should NOT mount the socket but NOT fail
-		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
 		mockRuntime = &runtime.MockRuntime{}
 		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = &config.MockFileSystem{
+				Env: map[string]string{
+					"CDERUN_SOCKET_PATH":  "/var/run/docker.sock",
+					"CDERUN_MOUNT_SOCKET": "false",
+				},
+				Dirs: map[string]bool{"/var/run": true},
+				Files: map[string][]byte{
+					"/var/run/docker.sock": {},
+				},
+			}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -557,6 +575,23 @@ func TestUnit_Env_StrictEnvFlags(t *testing.T) {
 	})
 }
 
+type safeBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+func (s *safeBuffer) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *safeBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
 type signalTestMock struct {
 	runtime.MockRuntime
 	waitStarted chan struct{}
@@ -624,7 +659,7 @@ func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 		}
 		mock.CreatedContainerID = "test-container"
 
-		var stderrBuf bytes.Buffer
+		stderrBuf := &safeBuffer{}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -636,7 +671,7 @@ func TestUnit_Execution_RuntimeErrors(t *testing.T) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}
-				cmd.SetErr(&stderrBuf)
+				cmd.SetErr(stderrBuf)
 			})
 		}()
 
