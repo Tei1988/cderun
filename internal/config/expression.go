@@ -147,6 +147,10 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 		return r.resolveFindDir(after)
 	}
 
+	if after, ok := strings.CutPrefix(content, "env:"); ok {
+		return r.resolveEnv(after)
+	}
+
 	return "{{" + content + "}}", nil // Keep as is if unknown
 }
 
@@ -196,4 +200,9 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	}
 
 	return rel, nil
+}
+
+func (r *ExpressionResolver) resolveEnv(key string) (string, error) {
+	val := r.fs.Getenv(key)
+	return val, nil
 }
