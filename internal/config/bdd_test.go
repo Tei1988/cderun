@@ -359,7 +359,7 @@ func TestIntegration_Config_RealFS_Exhaustive(t *testing.T) {
 
 		abs, err := fs.Abs(".")
 		require.NoError(t, err)
-		assert.NotEmpty(t, abs)
+		assert.Equal(t, expectedWd, abs)
 	})
 }
 
