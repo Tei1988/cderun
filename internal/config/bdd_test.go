@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
 func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -225,35 +226,30 @@ func TestUnit_Config_MockFS_LookupEnv(t *testing.T) {
 
 func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{
-		Env: map[string]string{
-			"CDERUN_MOUNT_TOOLS": "t1,t2",
-			"CDERUN_ENV": "A;B=2",
-			"A": "1",
-			"CDERUN_CPUS": "0.5",
-		},
-	}
 
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT_TOOLS": "t1,t2"}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"t1", "t2"}, res.MountTools)
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.InDelta(t, 0.5, res.CPUs, 0.0001)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
+		mfs := &MockFileSystem{}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"MISSING"}, StrictEnv: true, StrictEnvSet: true}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
-		mfs.WD = "/work"
+		mfs := &MockFileSystem{WD: "/work"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{PWD}}/docker.sock", SocketPathSet: true}
 		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -282,11 +278,11 @@ func TestIntegration_Config_PackageLevel_Exhaustive(t *testing.T) {
 
 func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{WD: "/app"}
-	resolver, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	t.Run("ResolveVolume with host remainder", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		cp := ConfigPath{Raw: "/data:ro", BaseDir: "/app"}
 		val, err := cp.ResolveVolume(resolver)
 		require.NoError(t, err)
@@ -294,6 +290,9 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 	})
 
 	t.Run("ResolveDevice with host remainder", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		cp := ConfigPath{Raw: "/dev/video0:/dev/video0:rw", BaseDir: "/app"}
 		val, err := cp.ResolveDevice(resolver)
 		require.NoError(t, err)
@@ -416,11 +415,11 @@ func TestUnit_Config_Resolver_Env_Deduplication(t *testing.T) {
 
 func TestUnit_Config_Resolver_Devices_More(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{WD: "/app"}
-	r, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	t.Run("Resolve empty devices", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		res, err := resolveDevices(nil, nil, "", nil, nil, r, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res)
@@ -429,21 +428,25 @@ func TestUnit_Config_Resolver_Devices_More(t *testing.T) {
 
 func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{WD: "/app"}
-	r, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	t.Run("resolveDevices invalid format", func(t *testing.T) {
-		_, err := resolveDevices([]string{":"}, nil, "", nil, nil, r, mfs)
+		mfs := &MockFileSystem{WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = resolveDevices([]string{":"}, nil, "", nil, nil, r, mfs)
 		assert.Error(t, err)
 	})
 
 	t.Run("resolveMounts invalid format", func(t *testing.T) {
-		_, err := resolveMounts([]string{"invalid"}, nil, "", nil, nil, r, mfs)
+		mfs := &MockFileSystem{WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = resolveMounts([]string{"invalid"}, nil, "", nil, nil, r, mfs)
 		assert.Error(t, err)
 	})
 
 	t.Run("resolveEnvValues expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
 		// Create a resolver that will error on some expression
 		rErr, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -453,20 +456,24 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveFloat64Opt invalid", func(t *testing.T) {
-		mfs.Env = map[string]string{"CDERUN_CPUS": "invalid"}
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "invalid"}}
 		val := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, "", nil, nil, mfs)
 		assert.InDelta(t, 0.0, val, 1e-9)
 	})
 
 	t.Run("resolveConfigPath volume resolution", func(t *testing.T) {
-		mfs.Env = map[string]string{"VOL": "/host:/cont:ro"}
+		mfs := &MockFileSystem{Env: map[string]string{"VOL": "/host:/cont:ro"}, WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		val, err := resolveConfigPath(false, "", false, "", "VOL", "", nil, nil, nil, nil, "", r, "volume", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/host:/cont:ro", val)
 	})
 
 	t.Run("resolveConfigPath device resolution", func(t *testing.T) {
-		mfs.Env = map[string]string{"DEV": "/dev/a:/dev/b:rw"}
+		mfs := &MockFileSystem{Env: map[string]string{"DEV": "/dev/a:/dev/b:rw"}, WD: "/app"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		val, err := resolveConfigPath(false, "", false, "", "DEV", "", nil, nil, nil, nil, "", r, "device", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/a:/dev/b:rw", val)
