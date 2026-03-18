@@ -147,15 +147,19 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 
 	t.Run("Resolve slice", func(t *testing.T) {
 		input := []any{"{{PWD}}", "fixed"}
-		result := resolver.Resolve(input).([]any)
-		assert.Equal(t, "/app", result[0])
-		assert.Equal(t, "fixed", result[1])
+		result := resolver.Resolve(input)
+		v, ok := result.([]any)
+		require.True(t, ok, "Resolve should return []any for slice input, got %T", result)
+		assert.Equal(t, "/app", v[0])
+		assert.Equal(t, "fixed", v[1])
 	})
 
 	t.Run("Resolve map", func(t *testing.T) {
 		input := map[string]any{"key": "{{HOME}}"}
-		result := resolver.Resolve(input).(map[string]any)
-		assert.Equal(t, "/home/user", result["key"])
+		result := resolver.Resolve(input)
+		m, ok := result.(map[string]any)
+		require.True(t, ok, "Resolve should return map[string]any for map input, got %T", result)
+		assert.Equal(t, "/home/user", m["key"])
 	})
 
 	t.Run("Resolve other", func(t *testing.T) {
@@ -256,7 +260,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_PackageLevel_Exhaustive(t *testing.T) {
+func TestIntegration_Config_PackageLevel_Exhaustive(t *testing.T) {
 	t.Run("FindConfigs package level", func(t *testing.T) {
 		paths := FindConfigs(".nonexistent")
 		assert.Empty(t, paths)
@@ -312,17 +316,20 @@ func TestIntegration_Config_RealFS_Exhaustive(t *testing.T) {
 	t.Run("Other methods", func(t *testing.T) {
 		wd, err := fs.Getwd()
 		require.NoError(t, err)
-		expectedWd, _ := os.Getwd()
+		expectedWd, err := os.Getwd()
+		require.NoError(t, err)
 		assert.Equal(t, expectedWd, wd)
 
 		home, err := fs.UserHomeDir()
 		require.NoError(t, err)
-		expectedHome, _ := os.UserHomeDir()
+		expectedHome, err := os.UserHomeDir()
+		require.NoError(t, err)
 		assert.Equal(t, expectedHome, home)
 
 		exe, err := fs.Executable()
 		require.NoError(t, err)
-		expectedExe, _ := os.Executable()
+		expectedExe, err := os.Executable()
+		require.NoError(t, err)
 		assert.Equal(t, expectedExe, exe)
 
 		expectedPath := os.Getenv("PATH")
