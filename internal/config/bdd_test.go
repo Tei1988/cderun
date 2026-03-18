@@ -88,8 +88,7 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "host", res.Network)
 		assert.True(t, res.Remove)
-		assert.Contains(t, res.Env, "TOOL=1")
-		assert.NotContains(t, res.Env, "GLOBAL=1")
+		assert.Equal(t, []string{"TOOL=1"}, res.Env)
 	})
 }
 
@@ -139,14 +138,12 @@ func TestUnit_Config_LoadFromPath_Direct(t *testing.T) {
 
 func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{
-		WD: "/app",
-		HomeDir: "/home/user",
-	}
-	resolver, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	t.Run("Resolve slice", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
+		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
 		input := []any{"{{PWD}}", "fixed"}
 		result := resolver.Resolve(input)
 		v, ok := result.([]any)
@@ -156,6 +153,10 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("Resolve map", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
+		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
 		input := map[string]any{"key": "{{HOME}}"}
 		result := resolver.Resolve(input)
 		m, ok := result.(map[string]any)
@@ -164,21 +165,20 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("Resolve other", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
+		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
 		assert.Equal(t, 123, resolver.Resolve(123))
 	})
 }
 
 func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 	t.Parallel()
-	mfs := &MockFileSystem{
-		WD: "/app",
-		Files: map[string][]byte{
-			"/app/.tools.yaml": []byte("node:\n  image: node:20"),
-		},
-	}
-	loader := NewConfigLoaderWithFS(mfs)
 
 	t.Run("LoadToolsConfig success", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app", Files: map[string][]byte{"/app/.tools.yaml": []byte("node:\n  image: node:20")}}
+		loader := NewConfigLoaderWithFS(mfs)
 		cfg, paths, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
 		assert.Equal(t, "node:20", cfg["node"].Image)
@@ -187,8 +187,8 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("LoadCDERunConfig from path with tilde", func(t *testing.T) {
-		mfs.HomeDir = "/home/user"
-		mfs.Files["/home/user/custom.yaml"] = []byte("runtime: docker")
+		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user", Files: map[string][]byte{"/home/user/custom.yaml": []byte("runtime: docker")}}
+		loader := NewConfigLoaderWithFS(mfs)
 		cfg, _, err := loader.LoadCDERunConfigFromPath("~/custom.yaml")
 		require.NoError(t, err)
 		assert.Equal(t, "docker", cfg.Runtime)
@@ -484,8 +484,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("resolveMounts with expressions", func(t *testing.T) {
-		mfs := &MockFileSystem{WD: "/app"}
-		mfs.Env = map[string]string{"SRC": "/host/path"}
+		mfs := &MockFileSystem{WD: "/app", Env: map[string]string{"SRC": "/host/path"}}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		p1 := []string{"source={{env:SRC}},target=/cont/path"}
