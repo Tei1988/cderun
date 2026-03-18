@@ -40,7 +40,7 @@
 | ログ・デバッグ | `internal/logging/logger_test.go` | 良好 |
 | インタラクティブ | `internal/command/robustness_test.go`, `internal/command/stdin_test.go` | 良好 |
 | 信号処理 | `internal/command/signals_test.go`, `internal/command/robustness_test.go` | 良好 |
-| ハングリカバリ | `internal/command/root_termination.go` | 良好 |
+| ハングリカバリ | `internal/command/robustness_test.go` | 良好 |
 | Nested Execution | `internal/command/snapshot_test.go`, `internal/command/scenario_nested_test.go`, `internal/config/path_test.go` | 良好 |
 | 診断モード | `internal/command/root_test.go` | 良好 |
 | Expressions | `internal/config/resolver_test.go`, `internal/config/bdd_test.go`, `internal/command/integration_test.go` | 良好 |
@@ -72,9 +72,10 @@
 
 1. **依存性の注入 (DI) の徹底**: `FileSystem` や `ContainerRuntime` などのインターフェースを介した抽象化を維持し、グローバル状態への依存を排除する。
 2. **ファイルシステムの抽象化**: `FileSystem.Abs` および `MockFileSystem.WD` を活用し、`os.Chdir` を使わずに仮想的な作業ディレクトリでのパス解決を実現する。これにより 100% の `t.Parallel()` 互換性を確保する。
-3. **並列実行の安全性**: プロセス全体の状態を変更する操作（`os.Chdir`, `t.Setenv` 等）を排除し、モック化された環境でテストを実行する。
+3. **並列実行の安全性**: プロセス全体の状態を変更する操作（`os.Chdir`, `t.Setenv` 等）を排除し、モック化された環境でテストを実行する。**ただし、Scenarioカテゴリなど、ふるまいを重視するテストにおいては、必要に応じて実環境に近い状態での検証も許容される。**
 4. **不変性の確保**: 設定情報のスナップショット（`DeepCopy`）を活用し、テスト間の干渉を防止する。
 5. **BDDスタイルの導入**: `bdd_test.go` において Given-When-Then 構造を採用し、仕様としての可読性を向上させる。
+6. **テストの粒度と分離**: ユニットテストでは厳格な分離とモック化を行い、シナリオテストでは実際の利用シーンに近い形での統合的な動作検証を行う。
 
 ## 5. テストマトリックス (2026年3月18日時点)
 

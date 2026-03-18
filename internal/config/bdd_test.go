@@ -296,37 +296,40 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_RealFS_Exhaustive(t *testing.T) {
+func TestIntegration_Config_RealFS_Exhaustive(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("LookupEnv", func(t *testing.T) {
-		t.Setenv("TEST_LOOKUP", "val")
-		v, ok := fs.LookupEnv("TEST_LOOKUP")
-		assert.True(t, ok)
-		assert.Equal(t, "val", v)
+		expectedVal, expectedFound := os.LookupEnv("PATH")
+		v, ok := fs.LookupEnv("PATH")
+		assert.Equal(t, expectedFound, ok)
+		assert.Equal(t, expectedVal, v)
 
-		_, ok = fs.LookupEnv("NONEXISTENT_LOOKUP")
+		_, ok = fs.LookupEnv("NONEXISTENT_ENV_KEY_FOR_TEST")
 		assert.False(t, ok)
 	})
 
 	t.Run("Other methods", func(t *testing.T) {
 		wd, err := fs.Getwd()
 		require.NoError(t, err)
-		assert.NotEmpty(t, wd)
+		expectedWd, _ := os.Getwd()
+		assert.Equal(t, expectedWd, wd)
 
 		home, err := fs.UserHomeDir()
 		require.NoError(t, err)
-		assert.NotEmpty(t, home)
+		expectedHome, _ := os.UserHomeDir()
+		assert.Equal(t, expectedHome, home)
 
 		exe, err := fs.Executable()
 		require.NoError(t, err)
-		assert.NotEmpty(t, exe)
+		expectedExe, _ := os.Executable()
+		assert.Equal(t, expectedExe, exe)
 
-		t.Setenv("PATH_FS_TEST", "/usr/bin")
-		assert.Equal(t, "/usr/bin", fs.Getenv("PATH_FS_TEST"))
+		expectedPath := os.Getenv("PATH")
+		assert.Equal(t, expectedPath, fs.Getenv("PATH"))
 
 		temp := fs.TempDir()
-		assert.NotEmpty(t, temp)
+		assert.Equal(t, os.TempDir(), temp)
 
 		tmpDir := t.TempDir()
 
@@ -353,7 +356,7 @@ func TestUnit_Config_RealFS_Exhaustive(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_PackageLevel_More(t *testing.T) {
+func TestIntegration_Config_PackageLevel_More(t *testing.T) {
 	// Use isolated temp dir to avoid flakiness and probe real FS only deterministically
 	tempDir := t.TempDir()
 
