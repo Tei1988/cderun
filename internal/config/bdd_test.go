@@ -409,10 +409,9 @@ func TestUnit_Config_Resolver_Env_Deduplication(t *testing.T) {
 	p2 := []string{"B=3", "C=4"}
 	p1 := []string{"C=5", "D=6"}
 	merged := mergeEnv(base, p2, p1)
-	assert.Contains(t, merged, "A=1")
-	assert.Contains(t, merged, "B=3")
-	assert.Contains(t, merged, "C=5")
-	assert.Contains(t, merged, "D=6")
+
+	assert.Len(t, merged, 4)
+	assert.ElementsMatch(t, []string{"A=1", "B=3", "C=5", "D=6"}, merged)
 }
 
 func TestUnit_Config_Resolver_Devices_More(t *testing.T) {
