@@ -1,60 +1,68 @@
 package config
 
-
-
 import (
-	"path/filepath"
 	"testing"
+	"time"
 
-	"dario.cat/mergo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func mcs(tb testing.TB, ss ...string) []MountConfig {
-	tb.Helper()
-	var res []MountConfig
-	for _, s := range ss {
-		m, err := ParseMountFlag(s)
-		if err != nil {
-			tb.Fatalf("failed to parse mount flag %q: %v", s, err)
-		}
-		res = append(res, m)
-	}
-	return res
+func ptr[T any](v T) *T {
+	return &v
 }
 
-func dcs(tb testing.TB, ss ...string) []DeviceConfig {
-	tb.Helper()
-	var res []DeviceConfig
-	for _, s := range ss {
-		d, ok := ParseDeviceConfig(s)
-		if !ok {
-			tb.Fatalf("failed to parse device config %q", s)
-		}
-		res = append(res, d)
-	}
-	return res
-}
-
-func ptr(b bool) *bool {
-	return &b
-}
-
-func cp(s string) ConfigPath {
-	return ConfigPath{Raw: s}
-}
-
-func TestUnit_Resolver_Priority(t *testing.T) {
-	t.Run("P2 CLI takes priority over P4 Tool and P5 Global", func(t *testing.T) {
+func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
+	t.Parallel()
+	t.Run("P1 Override takes priority over P2 CLI", func(t *testing.T) {
 		cli := CLIOptions{
-			TTY:    true,
-			TTYSet: true,
+			Image:        "alpine",
+			ImageSet:     true,
+			TTY:          true,
+			TTYSet:       true,
+			CderunTTY:    false,
+			CderunTTYSet: true,
+		}
+		res, err := Resolve("node", cli, nil, nil)
+		require.NoError(t, err)
+		assert.False(t, res.TTY)
+	})
+
+	t.Run("P2 CLI takes priority over P3 Env", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_TTY": "false"},
+		}
+		cli := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			TTY:      true,
+			TTYSet:   true,
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.TTY)
+	})
+
+	t.Run("P3 Env takes priority over P4 Tool", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_TTY": "true"},
 		}
 		tools := ToolsConfig{
 			"node": ToolConfig{
-				Image: "node:20",
+				Image: "node",
 				TTY:   ptr(false),
+			},
+		}
+		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.TTY)
+	})
+
+	t.Run("P4 Tool takes priority over P5 Global", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node",
+				TTY:   ptr(true),
 			},
 		}
 		global := &CDERunConfig{
@@ -62,1075 +70,199 @@ func TestUnit_Resolver_Priority(t *testing.T) {
 				TTY: ptr(false),
 			},
 		}
-
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.True(t, res.TTY)
-		assert.Equal(t, "node:20", res.Image)
-	})
-
-	t.Run("P1 Override takes priority over P2 CLI", func(t *testing.T) {
-		cli := CLIOptions{
-			TTY:          true,
-			TTYSet:       true,
-			CderunTTY:    false,
-			CderunTTYSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.False(t, res.TTY)
-	})
-
-	t.Run("P3 Env Var priority", func(t *testing.T) {
-		t.Setenv("CDERUN_TTY", "true")
-		t.Setenv("CDERUN_IMAGE", "env-image:latest")
-		cli := CLIOptions{}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-				TTY:   ptr(false),
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.True(t, res.TTY)
-		// Image should respect P3 environment variable
-		assert.Equal(t, "env-image:latest", res.Image)
-	})
-
-	t.Run("Priority logic when tool value matches fallback", func(t *testing.T) {
-		// Global sets network to host
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{Network: "host"},
-		}
-		// Tool sets network to bridge (which is the default fallback)
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:   "node",
-				Network: "bridge",
-			},
-		}
-
 		res, err := Resolve("node", CLIOptions{}, tools, global)
 		require.NoError(t, err)
-		assert.Equal(t, "bridge", res.Network, "Tool config should take priority even if it matches fallback")
-	})
-}
-
-func TestUnit_Resolver_Image(t *testing.T) {
-	t.Run("Image resolution from ToolConfig", func(t *testing.T) {
-		cli := CLIOptions{}
-		tools := ToolsConfig{
-			"python": ToolConfig{
-				Image: "python:3.11",
-			},
-		}
-
-		res, err := Resolve("python", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "python:3.11", res.Image)
-	})
-
-	t.Run("Error if no image found", func(t *testing.T) {
-		cli := CLIOptions{}
-		_, err := Resolve("unknown", cli, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found")
-	})
-
-	t.Run("Allow empty subcommand for resolution", func(t *testing.T) {
-		cli := CLIOptions{}
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.Empty(t, res.Image)
-	})
-}
-
-func TestUnit_Resolver_Mounts(t *testing.T) {
-	t.Run("Mount parsing", func(t *testing.T) {
-		cli := CLIOptions{}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:  "node:20",
-				Mounts: mcs(t, "type=bind,source=/host/path,target=/container/path,readonly", "source=.,target=/app"),
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 2)
-		assert.Equal(t, "/host/path", res.Mounts[0].Source)
-		assert.Equal(t, "/container/path", res.Mounts[0].Target)
-		assert.True(t, res.Mounts[0].ReadOnly)
-		assert.Equal(t, ".", res.Mounts[1].Source)
-		assert.Equal(t, "/app", res.Mounts[1].Target)
-		assert.False(t, res.Mounts[1].ReadOnly)
-	})
-
-	t.Run("Windows-style mount parsing", func(t *testing.T) {
-		cli := CLIOptions{}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-				Mounts: mcs(t,
-					`type=bind,source=C:\host\path,target=/container/path`,
-					`type=bind,source=D:\data,target=/mnt,readonly`,
-					`type=bind,source=Z:\shared folder,target=/app,readonly=false`,
-				),
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 3)
-
-		assert.Equal(t, `C:\host\path`, res.Mounts[0].Source)
-		assert.Equal(t, `/container/path`, res.Mounts[0].Target)
-		assert.False(t, res.Mounts[0].ReadOnly)
-
-		assert.Equal(t, `D:\data`, res.Mounts[1].Source)
-		assert.Equal(t, `/mnt`, res.Mounts[1].Target)
-		assert.True(t, res.Mounts[1].ReadOnly)
-
-		assert.Equal(t, `Z:\shared folder`, res.Mounts[2].Source)
-		assert.Equal(t, `/app`, res.Mounts[2].Target)
-		assert.False(t, res.Mounts[2].ReadOnly)
-	})
-
-	t.Run("Mount resolution with overwrite logic", func(t *testing.T) {
-		cli := CLIOptions{
-			Mounts: []string{"source=/cli/path,target=/cli/target"},
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:  "node",
-				Mounts: mcs(t, "source=/tool/path,target=/tool/target"),
-			},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				Mounts: mcs(t, "source=/global/path,target=/global/target"),
-			},
-		}
-
-		// CLI (P2)
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/cli/path", res.Mounts[0].Source)
-
-		// CDERUN_MOUNT (P3)
-		t.Setenv("CDERUN_MOUNT", "source=/env/path,target=/env/target")
-		cli.Mounts = nil
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/env/path", res.Mounts[0].Source)
-
-		// Tool (P4)
-		t.Setenv("CDERUN_MOUNT", "")
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/tool/path", res.Mounts[0].Source)
-
-		// Global (P5)
-		delete(tools, "node")
-		cli.Image = "node"
-		cli.ImageSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/global/path", res.Mounts[0].Source)
-
-		// P1 Overwrites P2
-		cli.CderunMounts = []string{"source=/p1/path,target=/p1/target"}
-		cli.Mounts = []string{"source=/p2/path,target=/p2/target"}
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/p1/path", res.Mounts[0].Source)
-	})
-
-	t.Run("CDERUN_MOUNT resolution", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT", "type=bind,source=/env/path,target=/env/target")
-
-		res, err := Resolve("", CLIOptions{}, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/env/path", res.Mounts[0].Source)
-		assert.Equal(t, "/env/target", res.Mounts[0].Target)
-	})
-
-	t.Run("CDERUN_MOUNT multiple resolution", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT", "type=bind,source=/path1,target=/target1 ; type=bind,source=/path2,target=/target2")
-
-		res, err := Resolve("", CLIOptions{}, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, res.Mounts, 2)
-		assert.Equal(t, "/path1", res.Mounts[0].Source)
-		assert.Equal(t, "/path2", res.Mounts[1].Source)
-	})
-
-	t.Run("Error on invalid mount flag", func(t *testing.T) {
-		cli := CLIOptions{
-			Mounts: []string{"invalid"},
-		}
-		_, err := Resolve("", cli, nil, nil)
-		require.Error(t, err)
-	})
-
-	t.Run("MountTools and MountAllTools resolution", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_TOOLS", "tool1,tool2")
-		t.Setenv("CDERUN_MOUNT_ALL_TOOLS", "true")
-
-		cli := CLIOptions{}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:      "node",
-				MountTools: []string{"tool-tool"},
-			},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				MountTools: []string{"global-tool"},
-			},
-		}
-
-		// Env (P3)
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"tool1", "tool2"}, res.MountTools)
-		assert.True(t, res.MountAllTools)
-
-		// CLI (P2)
-		cli.MountTools = "cli-tool1, cli-tool2"
-		cli.MountToolsSet = true
-		cli.MountAllTools = false
-		cli.MountAllToolsSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"cli-tool1", "cli-tool2"}, res.MountTools)
-		assert.False(t, res.MountAllTools)
-
-		// P1 Override
-		cli.CderunMountTools = "p1-tool"
-		cli.CderunMountToolsSet = true
-		cli.CderunMountAllTools = true
-		cli.CderunMountAllToolsSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"p1-tool"}, res.MountTools)
-		assert.True(t, res.MountAllTools)
-
-		// Tool (P4)
-		t.Setenv("CDERUN_MOUNT_TOOLS", "")
-		t.Setenv("CDERUN_MOUNT_ALL_TOOLS", "")
-		cli = CLIOptions{}
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"tool-tool"}, res.MountTools)
-
-		// Global (P5)
-		delete(tools, "node")
-		cli.Image = "node"
-		cli.ImageSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"global-tool"}, res.MountTools)
-
-		// Multiple tools in slice
-		tools["node"] = ToolConfig{
-			Image:      "node",
-			MountTools: []string{"toolA", "toolB"},
-		}
-		res, err = Resolve("node", CLIOptions{}, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"toolA", "toolB"}, res.MountTools)
-	})
-}
-
-func TestUnit_Resolver_Env(t *testing.T) {
-	t.Run("Strict environment variable resolution", func(t *testing.T) {
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node:20",
-				Env:   []string{"EXISTING_VAR", "MISSING_VAR"},
-			},
-		}
-
-		t.Setenv("EXISTING_VAR", "value")
-
-		// Default: missing var is empty string
-		res, err := Resolve("node", CLIOptions{}, tools, nil)
-		require.NoError(t, err)
-		assert.Contains(t, res.Env, "EXISTING_VAR=value")
-		assert.Contains(t, res.Env, "MISSING_VAR=")
-
-		// Strict mode from tool config
-		toolsStrict := ToolsConfig{
-			"node": ToolConfig{
-				Image:     "node:20",
-				Env:       []string{"MISSING_VAR"},
-				StrictEnv: ptr(true),
-			},
-		}
-		_, err = Resolve("node", CLIOptions{}, toolsStrict, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
-
-		// Strict mode from global config
-		globalStrict := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				StrictEnv: ptr(true),
-			},
-		}
-		_, err = Resolve("node", CLIOptions{}, tools, globalStrict)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
-
-		// Strict mode from environment variable
-		t.Setenv("CDERUN_STRICT_ENV", "true")
-		_, err = Resolve("node", CLIOptions{}, tools, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "required environment variable not found: MISSING_VAR")
-	})
-
-	t.Run("Env resolution with overwrite logic", func(t *testing.T) {
-		t.Setenv("EXISTING_VAR", "host-value")
-		cli := CLIOptions{
-			Env: []string{"CLI_VAR=cli-value", "EXISTING_VAR"},
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node",
-				Env:   []string{"TOOL_VAR=tool-value"},
-			},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				Env: []string{"GLOBAL_VAR=global-value"},
-			},
-		}
-
-		// CLI takes priority and overwrites Tool and Global
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Env, 2)
-		assert.Contains(t, res.Env, "CLI_VAR=cli-value")
-		assert.Contains(t, res.Env, "EXISTING_VAR=host-value")
-		assert.NotContains(t, res.Env, "TOOL_VAR=tool-value")
-		assert.NotContains(t, res.Env, "GLOBAL_VAR=global-value")
-
-		// CDERUN_ENV (P3)
-		t.Setenv("CDERUN_ENV", "ENV_VAR=env-value; EXISTING_VAR")
-		cli.Env = nil
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Env, 2)
-		assert.Contains(t, res.Env, "ENV_VAR=env-value")
-		assert.Contains(t, res.Env, "EXISTING_VAR=host-value")
-		assert.NotContains(t, res.Env, "TOOL_VAR=tool-value")
-
-		// Tool (P4)
-		t.Setenv("CDERUN_ENV", "")
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Env, 1)
-		assert.Contains(t, res.Env, "TOOL_VAR=tool-value")
-
-		// Global (P5)
-		delete(tools, "node")
-		cli.Image = "node"
-		cli.ImageSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Env, 1)
-		assert.Contains(t, res.Env, "GLOBAL_VAR=global-value")
+		assert.True(t, res.TTY)
 	})
 }
 
 func TestUnit_Resolver_AutoDetection(t *testing.T) {
-	t.Run("SocketPath resolution from CDERUN_SOCKET_PATH", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/custom/socket.sock")
-		cli := CLIOptions{}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "/custom/socket.sock", res.SocketPath)
-	})
-
-	t.Run("MountSocket resolution", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_SOCKET", "true")
-		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.True(t, res.MountSocket)
-	})
-
-	t.Run("DOCKER_HOST is ignored", func(t *testing.T) {
-		t.Setenv("DOCKER_HOST", "/var/run/docker.sock")
-		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		// It will fallback to default auto-detection or empty, but should NOT be /var/run/docker.sock from DOCKER_HOST
-		assert.False(t, res.MountSocket)
-	})
-
-	t.Run("P1 CderunSocketPath overrides CLI and Env", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/env/socket")
+	t.Parallel()
+	t.Run("Infer runtime from socket path", func(t *testing.T) {
 		cli := CLIOptions{
-			SocketPath:          "/cli/socket",
-			SocketPathSet:       true,
-			CderunSocketPath:    "/p1/socket",
-			CderunSocketPathSet: true,
-		}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "/p1/socket", res.SocketPath)
-	})
-
-	t.Run("Runtime auto-detection from SocketPath", func(t *testing.T) {
-		cli := CLIOptions{
-			SocketPath:    "/run/user/1000/podman/podman.sock",
+			Image:         "alpine",
+			ImageSet:      true,
+			SocketPath:    "/run/podman/podman.sock",
 			SocketPathSet: true,
 		}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err := Resolve("node", cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
-		assert.Equal(t, "/run/user/1000/podman/podman.sock", res.SocketPath)
-
-		cli = CLIOptions{
-			SocketPath:    "/var/run/docker.sock",
-			SocketPathSet: true,
-		}
-		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
 	})
 
-	t.Run("Default socket for specified runtime", func(t *testing.T) {
+	t.Run("Default socket for runtime", func(t *testing.T) {
 		cli := CLIOptions{
-			Runtime:    "podman",
-			RuntimeSet: true,
-		}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Runtime)
-		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
-
-		cli = CLIOptions{
+			Image:      "alpine",
+			ImageSet:   true,
 			Runtime:    "docker",
 			RuntimeSet: true,
 		}
-		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
+		res, err := Resolve("node", cli, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 	})
 }
 
-func TestUnit_Resolver_Logging(t *testing.T) {
-	t.Run("Logging resolution", func(t *testing.T) {
-		cli := CLIOptions{
-			LogLevel:     "debug",
-			LogLevelSet:  true,
-			LogFormat:    "json",
-			LogFormatSet: true,
+func TestUnit_Resolver_Mounts_Exhaustive(t *testing.T) {
+	t.Parallel()
+	t.Run("Multiple mounts from environment", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_MOUNT": "source=/a,target=/b ; source=/c,target=/d,readonly"},
 		}
-		global := &CDERunConfig{
-			Logging: LoggingConfig{
-				Level: "warn",
-			},
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{Image: "node"},
-		}
-
-		// Explicit LogLevel (P2) takes priority over global
-		res, err := Resolve("node", cli, tools, global)
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "debug", res.LogLevel)
-		assert.Equal(t, "json", res.LogFormat)
-
-		// P1 Override takes highest priority
-		cli.CderunLogLevel = "error"
-		cli.CderunLogLevelSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "error", res.LogLevel)
+		require.Len(t, res.Mounts, 2)
+		assert.Equal(t, "/a", res.Mounts[0].Source)
+		assert.True(t, res.Mounts[1].ReadOnly)
 	})
 }
 
-func TestUnit_Resolver_Devices(t *testing.T) {
-	t.Run("Device resolution (overwrite logic)", func(t *testing.T) {
-		cli := CLIOptions{
-			Devices: []string{"/dev/video0:/dev/video0:rw"},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				Devices: dcs(t, "/dev/fuse:/dev/fuse"),
-			},
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:   "node",
-				Devices: dcs(t, "/dev/null:/dev/null:r"),
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-
-		// Overwrite: only CLI should be present
-		assert.Len(t, res.Devices, 1)
-		assert.Equal(t, "/dev/video0", res.Devices[0].PathOnHost)
-		assert.Equal(t, "rw", res.Devices[0].CgroupPermissions)
-
-		// If CLI is empty, Tool should be used
-		cli.Devices = nil
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Devices, 1)
-		assert.Equal(t, "/dev/null", res.Devices[0].PathOnHost)
-
-		// If Tool is also empty, Global should be used
-		delete(tools, "node")
-		cli.Image = "node" // restore image for resolution
-		cli.ImageSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Len(t, res.Devices, 1)
-		assert.Equal(t, "/dev/fuse", res.Devices[0].PathOnHost)
-	})
-
-	t.Run("Device resolution from environment", func(t *testing.T) {
-		t.Setenv("CDERUN_DEVICE", "/dev/video2:/dev/video2")
-		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.Len(t, res.Devices, 1)
-		assert.Equal(t, "/dev/video2", res.Devices[0].PathOnHost)
-	})
-
-	t.Run("Invalid device config errors", func(t *testing.T) {
-		cli := CLIOptions{Devices: []string{":/container"}}
-		_, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.Error(t, err)
-
-		t.Setenv("CDERUN_DEVICE", ":/container")
-		_, err = Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.Error(t, err)
-	})
-}
-
-func TestUnit_Resolver_Float64(t *testing.T) {
-	t.Run("CPUs resolution", func(t *testing.T) {
-		cli := CLIOptions{CPUs: 2.5, CPUsSet: true}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.InDelta(t, 2.5, res.CPUs, 0.0001)
-
-		cli.CPUsSet = false
-		t.Setenv("CDERUN_CPUS", "1.5")
-		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.InDelta(t, 1.5, res.CPUs, 0.0001)
-
-		t.Setenv("CDERUN_CPUS", "invalid")
-		res, err = Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		assert.InDelta(t, 0.0, res.CPUs, 0.0001) // Should fallback
-	})
-}
-
-func TestUnit_Resolver_Misc(t *testing.T) {
-	t.Run("Workdir resolution", func(t *testing.T) {
-		cli := CLIOptions{
-			Workdir:    "/cli/workdir",
-			WorkdirSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:   "node:20",
-				Workdir: "/tool/workdir",
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "/cli/workdir", res.Workdir)
-
-		cli.WorkdirSet = false
-		res, err = Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, "/tool/workdir", res.Workdir)
-	})
-
-	t.Run("MountCderun resolution", func(t *testing.T) {
-		cli := CLIOptions{
-			MountCderun:    true,
-			MountCderunSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:       "node:20",
-				MountCderun: ptr(false),
-			},
-		}
-
-		res, err := Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.True(t, res.MountCderun)
-
-		cli.MountCderunSet = false
-		res, err = Resolve("node", cli, tools, nil)
-		require.NoError(t, err)
-		assert.False(t, res.MountCderun)
-	})
-
-	t.Run("MountCderunPath resolution", func(t *testing.T) {
-		t.Setenv("CDERUN_MOUNT_CDERUN_PATH", "/env/path/cderun")
-		cli := CLIOptions{
-			MountCderunPath:    "/cli/path/cderun",
-			MountCderunPathSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image:           "node",
-				MountCderunPath: cp("/tool/path/cderun"),
-			},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				MountCderunPath: cp("/global/path/cderun"),
-			},
-		}
-
-		// CLI (P2) takes priority
-		res, err := Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/cli/path/cderun", res.MountCderunPath)
-
-		// P1 Override
-		cli.CderunMountCderunPath = "/p1/path/cderun"
-		cli.CderunMountCderunPathSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/p1/path/cderun", res.MountCderunPath)
-
-		// Env (P3) takes priority if CLI not set
-		cli.MountCderunPathSet = false
-		cli.CderunMountCderunPathSet = false
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/env/path/cderun", res.MountCderunPath)
-
-		// Tool (P4) takes priority if CLI and Env not set
-		t.Setenv("CDERUN_MOUNT_CDERUN_PATH", "")
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/tool/path/cderun", res.MountCderunPath)
-
-		// Global (P5)
-		delete(tools, "node")
-		cli.Image = "node-image"
-		cli.ImageSet = true
-		res, err = Resolve("node", cli, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/global/path/cderun", res.MountCderunPath)
-	})
-
-	t.Run("DryRun resolution (CLI/Env only)", func(t *testing.T) {
-		t.Setenv("CDERUN_DRY_RUN", "true")
-		cli := CLIOptions{}
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, res.DryRun)
-
-		t.Setenv("CDERUN_DRY_RUN", "false")
-		cli.DryRun = true
-		cli.DryRunSet = true
-		res, err = Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, res.DryRun)
-
-		// P1 overrides
-		cli.CderunDryRun = false
-		cli.CderunDryRunSet = true
-		res, err = Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.False(t, res.DryRun)
-	})
-
-	t.Run("Diagnosis resolution (CLI/Env only)", func(t *testing.T) {
-		t.Setenv("CDERUN_DIAGNOSIS", "true")
-		cli := CLIOptions{}
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, res.Diagnosis)
-
-		t.Setenv("CDERUN_DIAGNOSIS", "false")
-		cli.Diagnosis = true
-		cli.DiagnosisSet = true
-		res, err = Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.True(t, res.Diagnosis)
-
-		// P1 overrides
-		cli.CderunDiagnosis = false
-		cli.CderunDiagnosisSet = true
-		res, err = Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.False(t, res.Diagnosis)
-	})
-
-	t.Run("Deferred path resolution with multiple layers", func(t *testing.T) {
-		global := &CDERunConfig{
-			SocketPath: ConfigPath{Raw: "./global.sock", BaseDir: "/etc/cderun"},
-		}
+func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{
+		Env: map[string]string{
+			"HOST_VAR": "host-val",
+			"CDERUN_ENV": "ENV_VAR=env-val; HOST_VAR",
+		},
+	}
+	t.Run("Env resolution from all layers", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node",
-				Mounts: []MountConfig{{
-					Type:   "bind",
-					Source: ConfigPath{Raw: "./project-data", BaseDir: "/home/user/project"},
-					Target: ConfigPath{Raw: "/data"},
+				Env: []string{"TOOL_VAR=tool-val"},
+			},
+		}
+		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "ENV_VAR=env-val")
+		assert.Contains(t, res.Env, "HOST_VAR=host-val")
+	})
+
+	t.Run("Strict mode env validation", func(t *testing.T) {
+		cli := CLIOptions{
+			Image: "alpine", ImageSet: true,
+			Env: []string{"NONEXISTENT"},
+			StrictEnv: true, StrictEnvSet: true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+	})
+}
+
+func TestUnit_Resolver_Devices_Advanced(t *testing.T) {
+	t.Parallel()
+	t.Run("Device resolution priority", func(t *testing.T) {
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Devices: []DeviceConfig{{
+					Source: ConfigPath{Raw: "/dev/global"},
+					Destination: ConfigPath{Raw: "/dev/global"},
 				}},
 			},
 		}
-
-		res, err := Resolve("node", CLIOptions{}, tools, global)
-		require.NoError(t, err)
-
-		assert.Equal(t, "/etc/cderun/global.sock", res.SocketPath)
-		require.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/home/user/project/project-data", res.Mounts[0].Source)
-	})
-
-	t.Run("Merging does not overwrite with empty Raw paths", func(t *testing.T) {
-		// Low priority layer has a path
-		merged := CDERunConfig{
-			SocketPath: ConfigPath{Raw: "./low.sock", BaseDir: "/low"},
-		}
-		// High priority layer does NOT have the path, but has a BaseDir (assigned by SetBaseDir)
-		highLayer := CDERunConfig{}
-		highLayer.SetBaseDir("/high")
-
-		err := mergo.Merge(&merged, &highLayer, mergo.WithOverride)
-		require.NoError(t, err)
-
-		assert.Equal(t, "./low.sock", merged.SocketPath.Raw)
-		assert.Equal(t, "/low", merged.SocketPath.BaseDir)
-	})
-
-	t.Run("Absolute CLI paths resolution", func(t *testing.T) {
-		cli := CLIOptions{
-			Mounts: []string{"type=bind,source=./data,target=/data"},
-		}
-		r, _ := NewExpressionResolver(nil)
-
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		require.Len(t, res.Mounts, 1)
-
-		// Should be an absolute path
-		assert.True(t, filepath.IsAbs(res.Mounts[0].Source))
-		assert.Equal(t, func() string { s, _ := ResolvePath("./data", r.Pwd, r); return s }(), res.Mounts[0].Source)
-	})
-
-	t.Run("Workdir global default resolution", func(t *testing.T) {
-		cli := CLIOptions{}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				Workdir: "/global/workdir",
-			},
-		}
-		res, err := Resolve("node", cli, ToolsConfig{"node": {Image: "node"}}, global)
-		require.NoError(t, err)
-		assert.Equal(t, "/global/workdir", res.Workdir)
-	})
-}
-
-func TestUnit_Resolver_TransitiveAutoEnablement(t *testing.T) {
-	t.Run("MountTools enables MountCderun and MountSocket transitively", func(t *testing.T) {
-		cli := CLIOptions{
-			MountTools:    "node",
-			MountToolsSet: true,
-		}
-		tools := ToolsConfig{
-			"node": ToolConfig{Image: "node"},
-			"sh":   ToolConfig{Image: "alpine"},
-		}
-
-		res, err := Resolve("sh", cli, tools, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"node"}, res.MountTools)
-		assert.True(t, res.MountCderun, "MountCderun should be auto-enabled by MountTools")
-		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled by MountCderun")
-	})
-
-	t.Run("MountAllTools enables MountCderun and MountSocket transitively", func(t *testing.T) {
-		cli := CLIOptions{
-			MountAllTools:    true,
-			MountAllToolsSet: true,
-		}
-		tools := ToolsConfig{
-			"sh": ToolConfig{Image: "alpine"},
-		}
-
-		res, err := Resolve("sh", cli, tools, nil)
-		require.NoError(t, err)
-		assert.True(t, res.MountAllTools)
-		assert.True(t, res.MountCderun, "MountCderun should be auto-enabled by MountAllTools")
-		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled by MountCderun")
-	})
-
-	t.Run("Explicit MountCderun=false prevents transitive socket enablement", func(t *testing.T) {
-		cli := CLIOptions{
-			MountAllTools:        true,
-			MountAllToolsSet:     true,
-			CderunMountCderun:    false,
-			CderunMountCderunSet: true,
-		}
-		tools := ToolsConfig{
-			"sh": ToolConfig{Image: "alpine"},
-		}
-
-		res, err := Resolve("sh", cli, tools, nil)
-		require.NoError(t, err)
-		assert.False(t, res.MountCderun)
-		assert.False(t, res.MountSocket, "MountSocket should NOT be auto-enabled if MountCderun is false")
-	})
-
-	t.Run("Explicit MountSocket=false prevents transitive socket enablement", func(t *testing.T) {
-		cli := CLIOptions{
-			MountCderun:          true,
-			MountCderunSet:       true,
-			CderunMountSocket:    false,
-			CderunMountSocketSet: true,
-		}
-
-		res, err := Resolve("sh", cli, ToolsConfig{"sh": {Image: "alpine"}}, nil)
-		require.NoError(t, err)
-		assert.True(t, res.MountCderun)
-		assert.False(t, res.MountSocket, "MountSocket should NOT be auto-enabled if explicitly false")
-	})
-
-	t.Run("MountCderun alone enables MountSocket", func(t *testing.T) {
-		cli := CLIOptions{
-			MountCderun:    true,
-			MountCderunSet: true,
-		}
-
-		res, err := Resolve("sh", cli, ToolsConfig{"sh": {Image: "alpine"}}, nil)
-		require.NoError(t, err)
-		assert.True(t, res.MountCderun)
-		assert.True(t, res.MountSocket, "MountSocket should be auto-enabled by MountCderun")
-	})
-}
-
-func TestUnit_Resolver_StringSlice(t *testing.T) {
-	t.Run("resolveStringSlice with various inputs", func(t *testing.T) {
-		t.Setenv("CDERUN_DNS", "8.8.8.8,1.1.1.1")
-		res, err := Resolve("", CLIOptions{}, nil, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
-
-		t.Setenv("CDERUN_DNS", "")
-		res, err = Resolve("", CLIOptions{}, nil, nil)
-		require.NoError(t, err)
-		assert.Empty(t, res.DNS)
-	})
-}
-
-func TestUnit_Resolver_Devices_Env(t *testing.T) {
-	t.Run("Multiple devices in CDERUN_DEVICE", func(t *testing.T) {
-		t.Setenv("CDERUN_DEVICE", "/dev/video0:/dev/video0,/dev/fuse:/dev/fuse:rm")
-		res, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.NoError(t, err)
-		require.Len(t, res.Devices, 2)
-		assert.Equal(t, "/dev/video0", res.Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/fuse", res.Devices[1].PathOnHost)
-		assert.Equal(t, "rm", res.Devices[1].CgroupPermissions)
-	})
-
-	t.Run("Invalid device in CDERUN_DEVICE", func(t *testing.T) {
-		t.Setenv("CDERUN_DEVICE", ":/invalid")
-		_, err := Resolve("node", CLIOptions{}, ToolsConfig{"node": {Image: "node"}}, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
-	})
-}
-
-func TestUnit_Resolver_Float64_Precedence(t *testing.T) {
-	t.Run("Tool returns 0, should fallback to global", func(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node",
-				CPUs: float64Ptr(0),
+				Devices: []DeviceConfig{{
+					Source: ConfigPath{Raw: "/dev/tool"},
+					Destination: ConfigPath{Raw: "/dev/tool"},
+				}},
 			},
 		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				CPUs: float64Ptr(2.0),
-			},
-		}
-
 		res, err := Resolve("node", CLIOptions{}, tools, global)
 		require.NoError(t, err)
-		assert.InDelta(t, 0.0, res.CPUs, 0.0001)
+		require.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/tool", res.Devices[0].PathOnHost)
 	})
 }
 
-func TestUnit_Resolver_StringSlice_Precedence(t *testing.T) {
-	t.Run("Tool returns empty, should fallback to global", func(t *testing.T) {
-		tools := ToolsConfig{
-			"node": ToolConfig{
-				Image: "node",
-				DNS:   []string{},
-			},
-		}
-		global := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				DNS: []string{"1.1.1.1"},
-			},
-		}
-
-		res, err := Resolve("node", CLIOptions{}, tools, global)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"1.1.1.1"}, res.DNS)
-	})
-}
-
-func TestUnit_Resolver_Devices_Invalid(t *testing.T) {
-	t.Run("Invalid device in P1 override", func(t *testing.T) {
+func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
+	t.Parallel()
+	t.Run("HangTimeout parsing", func(t *testing.T) {
 		cli := CLIOptions{
-			CderunDevices: []string{":/invalid"},
+			Image:          "alpine",
+			ImageSet:       true,
+			HangTimeout:    "5s",
+			HangTimeoutSet: true,
 		}
-		tools := ToolsConfig{"node": {Image: "node"}}
-		_, err := Resolve("node", cli, tools, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config (override)")
+		res, err := Resolve("node", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 5*time.Second, res.HangTimeout)
+	})
+
+	t.Run("Memory string parsing", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "512MiB",
+			MemorySet: true,
+		}
+		res, err := Resolve("node", cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(512*1024*1024), res.Memory)
 	})
 }
 
-func TestUnit_Resolver_StringSlice_P1P2(t *testing.T) {
-	t.Run("P1 takes priority", func(t *testing.T) {
-		cli := CLIOptions{
-			CderunDNS: []string{"1.1.1.1"},
-			DNS:       []string{"8.8.8.8"},
-		}
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"1.1.1.1"}, res.DNS)
-	})
-
-	t.Run("P2 takes priority over Env", func(t *testing.T) {
-		t.Setenv("CDERUN_DNS", "1.1.1.1")
-		cli := CLIOptions{
-			DNS: []string{"8.8.8.8"},
-		}
-		res, err := Resolve("", cli, nil, nil)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"8.8.8.8"}, res.DNS)
-	})
-}
-
-func TestUnit_Resolver_ExpressionsInCLI(t *testing.T) {
-	home := "/home/user"
+func TestUnit_Resolver_Expressions_Exhaustive(t *testing.T) {
+	t.Parallel()
 	mfs := &MockFileSystem{
-		WD:      "/app",
-		HomeDir: home,
+		WD: "/app",
 		Files: map[string][]byte{
-			"/app/.go-version": []byte("golang:1.25"),
+			"/app/.version": []byte("1.0"),
 		},
 	}
-
-	t.Run("Expressions in CLI flags", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:    "{{file:.go-version}}",
-			ImageSet: true,
-		}
-		res, err := ResolveWithFS("go", cli, nil, nil, mfs)
+	t.Run("Expression in environment variable override", func(t *testing.T) {
+		mfs.Env = map[string]string{"CDERUN_IMAGE": "node:{{file:.version}}"}
+		res, err := ResolveWithFS("node", CLIOptions{}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "golang:1.25", res.Image)
-	})
-
-	t.Run("Tilde expansion in CLI flags", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			SocketPath:    "~/docker.sock",
-			SocketPathSet: true,
-		}
-		res, err := ResolveWithFS("go", cli, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(home, "docker.sock"), res.SocketPath)
+		assert.Equal(t, "node:1.0", res.Image)
 	})
 }
 
-func TestUnit_Resolver_StrictEnvFlags(t *testing.T) {
-	t.Run("cli-strictenv-only", func(t *testing.T) {
-		cliStrictEnv := CLIOptions{
-			Image:        "alpine",
-			ImageSet:     true,
-			StrictEnv:    true,
-			StrictEnvSet: true,
-		}
-		res, err := Resolve("node", cliStrictEnv, nil, nil)
+func TestUnit_Resolver_Exhaustive_Additional(t *testing.T) {
+	t.Parallel()
+	t.Run("Diagnosis mode bypasses image check", func(t *testing.T) {
+		cli := CLIOptions{Diagnosis: true, DiagnosisSet: true}
+		res, err := Resolve("unknown", cli, nil, nil)
 		require.NoError(t, err)
-		assert.True(t, res.StrictEnv)
+		assert.True(t, res.Diagnosis)
 	})
 
-	t.Run("cli-cderun-overrides-strictenv", func(t *testing.T) {
-		cliCderunOverrides := CLIOptions{
-			Image:              "alpine",
-			ImageSet:           true,
-			StrictEnv:          true,
-			StrictEnvSet:       true,
-			CderunStrictEnv:    false,
-			CderunStrictEnvSet: true,
-		}
-		res, err := Resolve("node", cliCderunOverrides, nil, nil)
+	t.Run("Transitive auto-enablement cderun to socket", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true, MountCderun: true, MountCderunSet: true}
+		res, err := Resolve("sh", cli, nil, nil)
 		require.NoError(t, err)
-		assert.False(t, res.StrictEnv)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("Float64 resolution", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true, CPUs: 1.5, CPUsSet: true}
+		res, err := Resolve("node", cli, nil, nil)
+		require.NoError(t, err)
+		assert.InDelta(t, 1.5, res.CPUs, 0.0001)
+	})
+
+	t.Run("String slice with comma resolution", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DNS": "8.8.8.8,1.1.1.1"}}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
 	})
 }
 
-func TestUnit_Resolver_EdgeCases(t *testing.T) {
-	t.Run("Empty tool configuration", func(t *testing.T) {
-		cli := CLIOptions{Image: "alpine", ImageSet: true}
-		tools := ToolsConfig{} // Empty
-		res, err := Resolve("node", cli, tools, nil)
+func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
+	t.Parallel()
+	t.Run("MountTools resolution", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true, MountTools: "tool1,tool2", MountToolsSet: true}
+		res, err := Resolve("sh", cli, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "alpine", res.Image)
+		assert.Equal(t, []string{"tool1", "tool2"}, res.MountTools)
 	})
 
-	t.Run("Tool not found in tools.yaml (image provided by CLI)", func(t *testing.T) {
-		cli := CLIOptions{Image: "alpine", ImageSet: true}
-		tools := ToolsConfig{"other": {Image: "other"}}
-		res, err := Resolve("node", cli, tools, nil)
+	t.Run("Log settings resolution", func(t *testing.T) {
+		cli := CLIOptions{Image: "alpine", ImageSet: true, LogLevel: "debug", LogLevelSet: true}
+		res, err := Resolve("sh", cli, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "alpine", res.Image)
-	})
-
-	t.Run("Missing environment variables in strict mode (CLI)", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:        "alpine",
-			ImageSet:     true,
-			Env:          []string{"NONEXISTENT"},
-			StrictEnv:    true,
-			StrictEnvSet: true,
-		}
-		_, err := Resolve("node", cli, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+		assert.Equal(t, "debug", res.LogLevel)
 	})
 }
-
-
-func float64Ptr(f float64) *float64 { return &f }

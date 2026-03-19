@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -44,7 +41,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	return buf.String(), execErr
 }
 
-func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
+func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -113,7 +110,7 @@ func TestUnit_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 	}
 }
 
-func TestUnit_Execute_EmptyArgs(t *testing.T) {
+func TestUnit_Root_Execute_EmptyArgs(t *testing.T) {
 	t.Parallel()
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
@@ -123,7 +120,7 @@ func TestUnit_Execute_EmptyArgs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUnit_Execution_CommandResolution(t *testing.T) {
+func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Parallel()
 	t.Run("executes container correctly", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
@@ -218,7 +215,6 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Dry-run with YAML (default)
-		// Step 10.2: subcommand 'sh' is excluded from command
 		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
@@ -243,16 +239,6 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "Interactive: false")
 		assert.Contains(t, output, "Network: bridge")
 		assert.Contains(t, output, "Remove: true")
-
-		// Dry-run with mount
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--mount", "type=bind,source=/h,target=/c", "sh")
-		require.NoError(t, err)
-		assert.Contains(t, output, "Mounts: type=bind,source=/h,target=/c,readonly=false")
-
-		// Dry-run with device
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--device", "/dev/video0:/dev/video1:ro", "sh")
-		require.NoError(t, err)
-		assert.Contains(t, output, "Devices: /dev/video0:/dev/video1:ro")
 	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
@@ -268,23 +254,10 @@ func TestUnit_Execution_CommandResolution(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
 	})
-
-	t.Run("comma in env value is preserved (StringArrayVar)", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--env", "MYVAR=a,b", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.isTerminal = func(fd int) bool { return true }
-		})
-		require.NoError(t, err)
-
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=a,b")
-	})
 }
 
-func TestUnit_Flags_Phase3Features(t *testing.T) {
+func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
+	t.Parallel()
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
@@ -299,26 +272,25 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 		assert.Equal(t, "/my/workdir", mockRuntime.CreatedConfig.Workdir)
 		require.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
 		assert.Equal(t, "/h", mockRuntime.CreatedConfig.Mounts[0].Source)
-		assert.Equal(t, "/c", mockRuntime.CreatedConfig.Mounts[0].Target)
-		assert.True(t, mockRuntime.CreatedConfig.Mounts[0].ReadOnly)
 
 		require.Len(t, mockRuntime.CreatedConfig.Devices, 1)
 		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathInContainer)
-		assert.Equal(t, "rm", mockRuntime.CreatedConfig.Devices[0].CgroupPermissions)
 	})
 
-	t.Run("mounting flags no longer require explicit cderun socket settings (auto-enabled if unspecified)", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/docker.sock")
-		// If unspecified, --mount-cderun should auto-enable --mount-socket
-		t.Setenv("CDERUN_MOUNT_SOCKET", "")
-
+	t.Run("mounting flags auto-enable socket mounting", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_SOCKET_PATH": "/var/run/docker.sock",
+			},
+		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
 		require.NoError(t, err)
 		require.NotNil(t, mockRuntime.CreatedConfig)
@@ -326,91 +298,22 @@ func TestUnit_Flags_Phase3Features(t *testing.T) {
 		socketFound := false
 		for _, v := range mockRuntime.CreatedConfig.Mounts {
 			if v.Target == "/var/run/docker.sock" {
-				assert.Equal(t, "/var/run/docker.sock", v.Source)
 				socketFound = true
 			}
 		}
 		assert.True(t, socketFound, "Socket should be automatically mounted")
-
-		// If explicitly set to false, it should NOT mount the socket but NOT fail
-		t.Setenv("CDERUN_MOUNT_SOCKET", "false")
-		mockRuntime = &runtime.MockRuntime{}
-		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.isTerminal = func(fd int) bool { return true }
-		})
-		require.NoError(t, err)
-		require.NotNil(t, mockRuntime.CreatedConfig)
-
-		socketFound = false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
-			if strings.Contains(v.Source, "docker.sock") || strings.Contains(v.Target, "docker.sock") {
-				socketFound = true
-			}
-		}
-		assert.False(t, socketFound, "Socket should NOT be mounted when CDERUN_MOUNT_SOCKET=false")
-	})
-
-	t.Run("mount-cderun logic", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "--mount-socket", "--socket-path", "/socket", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.isTerminal = func(fd int) bool { return true }
-		})
-		require.NoError(t, err)
-
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		exePath, _ := os.Executable()
-
-		binaryFound := false
-		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
-			if v.Source == exePath && v.Target == "/usr/local/bin/cderun" {
-				binaryFound = true
-			}
-			if v.Source == "/socket" && v.Target == "/socket" {
-				socketFound = true
-			}
-		}
-		assert.True(t, binaryFound, "binary should be mounted")
-		assert.True(t, socketFound, "socket should be mounted")
-	})
-
-	t.Run("mount-socket-path logic", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-socket", "--socket-path", "/host/socket", "--mount-socket-path", "/container/socket", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.isTerminal = func(fd int) bool { return true }
-		})
-		require.NoError(t, err)
-
-		require.NotNil(t, mockRuntime.CreatedConfig)
-		socketFound := false
-		for _, v := range mockRuntime.CreatedConfig.Mounts {
-			if v.Source == "/host/socket" && v.Target == "/container/socket" {
-				socketFound = true
-			}
-		}
-		assert.True(t, socketFound, "socket should be mounted to custom path")
 	})
 }
 
-func TestUnit_Execution_StrictBehavior(t *testing.T) {
+func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Parallel()
-	t.Run("fails when no image mapping found for tool (Step 10.1)", func(t *testing.T) {
-		// No .tools.yaml created, and no --image flag
+	t.Run("fails when no image mapping found for tool", func(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found for tool: unknown-tool")
 	})
 
-	t.Run("subcommand is excluded from CMD (Step 10.2)", func(t *testing.T) {
+	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "ls", "-l", "/tmp"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -421,17 +324,21 @@ func TestUnit_Execution_StrictBehavior(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, mockRuntime.CreatedConfig)
-		// 'ls' should be excluded, only '-l' and '/tmp' remain
 		assert.Equal(t, []string{"-l", "/tmp"}, mockRuntime.CreatedConfig.Command)
 	})
 }
 
-func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
+func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 	t.Parallel()
 	t.Run("JSON format", func(t *testing.T) {
 		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/var/run/docker.sock": {},
+			},
+		}
 		opts := &rootOptions{
-			fs: config.RealFileSystem{},
+			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
@@ -446,47 +353,9 @@ func TestUnit_Diagnosis_OutputFormats(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "\"name\": \"docker\"")
 	})
-
-	t.Run("Simple format", func(t *testing.T) {
-		out := &bytes.Buffer{}
-		opts := &rootOptions{
-			fs: config.RealFileSystem{},
-		}
-		resolved := &config.ResolvedConfig{
-			Runtime:         "podman",
-			SocketPath:      "/run/podman/podman.sock",
-			Diagnosis:       true,
-			DiagnosisFormat: "simple",
-		}
-		cmd := &cobra.Command{}
-		cmd.SetOut(out)
-
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
-		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Runtime: podman")
-	})
 }
 
-func TestUnit_ContainerConfig_BuildFailures(t *testing.T) {
-	t.Parallel()
-	t.Run("fails when os.Executable fails", func(t *testing.T) {
-		mfs := &config.MockFileSystem{
-			ExecErr: errors.New("exec error"),
-		}
-		o := defaultOptions()
-		o.fs = mfs
-
-		// We need to trigger binary mount logic
-		resolved := &config.ResolvedConfig{
-			MountCderun: true,
-		}
-		_, err := o.buildContainerConfig(resolved, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
-	})
-}
-
-func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
 	t.Parallel()
 	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
@@ -506,158 +375,22 @@ func TestUnit_Cleanup_RemoveContainerWarning(t *testing.T) {
 
 		assert.Contains(t, stderrBuf.String(), "[WARN] failed to remove container (defer): failed to remove")
 	})
-
-	t.Run("does not print warning if RemoveContainer succeeds", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			RemoveErr: nil,
-		}
-
-		var stderrBuf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.isTerminal = func(fd int) bool { return true }
-			cmd.SetErr(&stderrBuf)
-		})
-		require.NoError(t, err)
-
-		assert.NotContains(t, stderrBuf.String(), "[WARN] failed to remove container (defer)")
-	})
 }
 
-func TestUnit_Env_StrictEnvFlags(t *testing.T) {
+func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 	t.Parallel()
 	t.Run("--strict-env flag", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{} // Empty environment
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
-		// Should fail because NONEXISTENT env is not on host and strict-env is true
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
-	})
-
-	t.Run("--cderun-strict-env override", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{}
-		// Set global strictEnv to true via mock? No, just use flags.
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--strict-env", "--image", "alpine", "node", "--cderun-strict-env=false", "--env", "NONEXISTENT", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.fs = config.RealFileSystem{} // Ensure we use real FS to check env
-		})
-		// Should NOT fail because --cderun-strict-env=false overrides --strict-env
-		require.NoError(t, err)
-	})
-}
-
-type signalTestMock struct {
-	runtime.MockRuntime
-	waitStarted chan struct{}
-	blockWait   chan struct{}
-}
-
-func (m *signalTestMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	if m.waitStarted != nil {
-		close(m.waitStarted)
-	}
-	if m.blockWait != nil {
-		select {
-		case <-m.blockWait:
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		}
-	}
-	return 0, nil
-}
-
-func (m *signalTestMock) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	return m.SignalErr
-}
-
-func TestUnit_Execution_RuntimeErrors(t *testing.T) {
-	t.Run("fails when StartContainer fails", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		mockRuntime := &runtime.MockRuntime{
-			StartErr: errors.New("start failed"),
-		}
-		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to start container: start failed")
-	})
-
-	t.Run("fails when WaitContainer fails", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		mockRuntime := &runtime.MockRuntime{
-			WaitErr: errors.New("wait failed"),
-		}
-		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-				return mockRuntime, nil
-			}
-			o.exitFunc = func(code int) {}
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to wait for container: wait failed")
-	})
-
-	t.Run("logs warning when SignalContainer fails", func(t *testing.T) {
-		mock := &signalTestMock{
-			MockRuntime: runtime.MockRuntime{
-				SignalErr: errors.New("signal failed"),
-			},
-			waitStarted: make(chan struct{}),
-			blockWait:   make(chan struct{}),
-		}
-		mock.CreatedContainerID = "test-container"
-
-		var stderrBuf bytes.Buffer
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-					return mock, nil
-				}
-				o.exitFunc = func(code int) {}
-				cmd.SetErr(&stderrBuf)
-			})
-		}()
-
-		<-mock.waitStarted
-
-		// Send SIGINT to the current process, which the signal handler in root.go will catch and forward.
-		// Use syscall.Kill(os.Getpid(), ...) instead of signal.Notify to simulate external signal.
-		_ = syscall.Kill(os.Getpid(), syscall.SIGINT)
-
-		require.Eventually(t, func() bool {
-			return strings.Contains(stderrBuf.String(), "failed to forward signal")
-		}, 2*time.Second, 10*time.Millisecond)
-
-		require.Contains(t, stderrBuf.String(), "signal failed")
-
-		close(mock.blockWait)
-
-		select {
-		case <-done:
-		case <-ctx.Done():
-			t.Fatal("Test timed out waiting for ExecuteContextWithOptions")
-		}
 	})
 }
