@@ -61,9 +61,9 @@ func (r *ExpressionResolver) Error() error {
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
-	copy := *r
-	copy.HostContext = nil
-	return &copy
+	clone:= *r
+	clone.HostContext = nil
+	return &clone
 }
 
 func (r *ExpressionResolver) setError(err error) {
