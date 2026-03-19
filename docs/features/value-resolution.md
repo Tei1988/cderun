@@ -55,7 +55,7 @@ clasp:
   mounts:
     - type: bind
       source: "{{BASE_HOME}}/.config/gcloud"
-      target: /.config/gcloud
+      target: /root/.config/gcloud
 ```
 
 ## チルダ展開 (Tilde Expansion)
