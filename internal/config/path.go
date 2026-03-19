@@ -149,7 +149,7 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
-	target, err := mc.Target.Resolve(r)
+	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.Mount{}, err
 	}

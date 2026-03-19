@@ -57,6 +57,15 @@ func (r *ExpressionResolver) Error() error {
 	return r.err
 }
 
+// WithoutHostContext returns a shallow copy of the resolver with HostContext set to nil.
+// Use this when resolving container-side paths (e.g. mount targets) that should not
+// undergo reverse path resolution.
+func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
+	copy := *r
+	copy.HostContext = nil
+	return &copy
+}
+
 func (r *ExpressionResolver) setError(err error) {
 	if r.err == nil {
 		r.err = err
@@ -135,6 +144,16 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 	case "HOME":
 		return r.Home, nil
 	case "PWD":
+		return r.Pwd, nil
+	case "BASE_HOME":
+		if r.HostContext != nil && r.HostContext.HomeDir != "" {
+			return r.HostContext.HomeDir, nil
+		}
+		return r.Home, nil
+	case "BASE_PWD":
+		if r.HostContext != nil && r.HostContext.WorkingDir != "" {
+			return r.HostContext.WorkingDir, nil
+		}
 		return r.Pwd, nil
 	}
 

@@ -18,6 +18,8 @@ cderunが特別な意味を持つと定義しているキーワードです。
 | :--- | :--- |
 | `{{HOME}}` | 実行ユーザーのホームディレクトリに置換されます。 |
 | `{{PWD}}` | `cderun` コマンドを実行したカレントワーキングディレクトリに置換されます。 |
+| `{{BASE_HOME}}` | 基底ホストのホームディレクトリに置換されます。Nested 実行環境（コンテナ内）では `{{HOME}}` がコンテナ内のホームディレクトリ（例: `/root`）に展開されるのに対し、`{{BASE_HOME}}` は常に基底ホストのホームディレクトリ（例: `/Users/user`）に展開されます。Level 0（基底ホスト）では `{{HOME}}` と同じ値になります。 |
+| `{{BASE_PWD}}` | 基底ホストのカレントワーキングディレクトリに置換されます。Nested 実行環境では `{{PWD}}` がコンテナ内の作業ディレクトリに展開されるのに対し、`{{BASE_PWD}}` は常に基底ホストで `cderun` を実行したディレクトリに展開されます。Level 0 では `{{PWD}}` と同じ値になります。 |
 
 #### 2. ディレクティブ (Directives)
 
@@ -45,6 +47,15 @@ node:
     - type: bind
       source: "{{HOME}}/.npmrc"
       target: /root/.npmrc
+
+# Nested 実行環境での使用例
+# {{BASE_HOME}} を使うことで、コンテナ内から別のコンテナを起動する際に
+# 基底ホストのパスを正しく参照できます。
+clasp:
+  mounts:
+    - type: bind
+      source: "{{BASE_HOME}}/.config/gcloud"
+      target: /.config/gcloud
 ```
 
 ## チルダ展開 (Tilde Expansion)
