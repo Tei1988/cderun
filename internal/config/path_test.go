@@ -9,7 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_Path_Resolution(t *testing.T) {
+func TestUnit_Config_Path_Resolution(t *testing.T) {
+	t.Parallel()
 	home := "/home/user"
 	baseDir := "/abs/path"
 	mfs := &MockFileSystem{
@@ -20,6 +21,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("ResolvePath", func(t *testing.T) {
+		t.Parallel()
 		val, err := ResolvePath("./file", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/abs/path/file", val)
@@ -46,6 +48,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("ConfigPath.Resolve", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "./data", BaseDir: baseDir}
 		val, err := cp.Resolve(r)
 		require.NoError(t, err)
@@ -58,6 +61,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("MountConfig.Resolve", func(t *testing.T) {
+		t.Parallel()
 		mc := MountConfig{
 			Type:     "bind",
 			Source:   ConfigPath{Raw: "./data", BaseDir: baseDir},
@@ -85,6 +89,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("DeviceConfig.Resolve", func(t *testing.T) {
+		t.Parallel()
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
 			Destination: ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
@@ -98,6 +103,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("ParseMountFlag", func(t *testing.T) {
+		t.Parallel()
 		mc, err := ParseMountFlag("type=bind,source=./data,target=/app/data,readonly")
 		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
@@ -117,6 +123,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
+		t.Parallel()
 		mc, err := ParseMountFlag(`type=bind,source=C:\host\path,target=/container`)
 		require.NoError(t, err)
 		assert.Equal(t, `C:\host\path`, mc.Source.Raw)
@@ -130,6 +137,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Scheme Preservation", func(t *testing.T) {
+		t.Parallel()
 		val, err := ResolvePath("unix:///var/run/docker.sock", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "unix:///var/run/docker.sock", val)
@@ -144,6 +152,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Reverse Path Resolution (Nested)", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
@@ -165,6 +174,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Reverse Path Resolution (Nested Priority)", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 2,
 			Mounts: []MountMapping{
@@ -187,6 +197,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Reverse Path Resolution (Specificity vs Level)", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 2,
 			Mounts: []MountMapping{
@@ -209,6 +220,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Reverse Path Resolution (Same Specificity)", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 2,
 			Mounts: []MountMapping{
@@ -226,6 +238,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 
 	t.Run("Reverse Path Resolution (Partial Segment Match)", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
@@ -247,8 +260,10 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Path_MarshalYAML(t *testing.T) {
+func TestUnit_Config_Path_MarshalYAML(t *testing.T) {
+	t.Parallel()
 	t.Run("ConfigPath", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "/path"}
 		data, err := yaml.Marshal(cp)
 		require.NoError(t, err)
@@ -261,6 +276,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 
 	t.Run("MountConfig", func(t *testing.T) {
+		t.Parallel()
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/host"},
@@ -279,6 +295,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
+		t.Parallel()
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/video0"},
 			Destination: ConfigPath{Raw: "/dev/video1"},
@@ -304,6 +321,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 
 	t.Run("omitempty behavior", func(t *testing.T) {
+		t.Parallel()
 		type TestConfig struct {
 			Path    ConfigPath     `yaml:"path,omitempty"`
 			Mounts  []MountConfig  `yaml:"mounts,omitempty"`
@@ -322,11 +340,13 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 }
 
-func TestUnit_Path_Helpers(t *testing.T) {
+func TestUnit_Config_Path_Helpers(t *testing.T) {
+	t.Parallel()
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
 	t.Run("resolveVolumePath", func(t *testing.T) {
+		t.Parallel()
 		val, err := resolveVolumePath("./host:/container", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/host:/container", val)
@@ -337,12 +357,14 @@ func TestUnit_Path_Helpers(t *testing.T) {
 	})
 
 	t.Run("resolveDevicePath", func(t *testing.T) {
+		t.Parallel()
 		val, err := resolveDevicePath("./dev:/dev:rw", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/dev:/dev:rw", val)
 	})
 
 	t.Run("SplitHostRemainder", func(t *testing.T) {
+		t.Parallel()
 		host, rem, ok := SplitHostRemainder("/host:/container")
 		assert.True(t, ok)
 		assert.Equal(t, "/host", host)
@@ -358,8 +380,10 @@ func TestUnit_Path_Helpers(t *testing.T) {
 	})
 }
 
-func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
+func TestUnit_Config_Path_UnmarshalErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("MountConfig", func(t *testing.T) {
+		t.Parallel()
 		var mc MountConfig
 
 		// Valid (structure)
@@ -400,6 +424,7 @@ source: ./data
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
+		t.Parallel()
 		var dc DeviceConfig
 
 		// Valid
@@ -414,11 +439,13 @@ source: ./data
 	})
 }
 
-func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
+func TestUnit_Config_Path_VolumeAndDevice(t *testing.T) {
+	t.Parallel()
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
 	t.Run("ResolveVolume", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
 		val, err := cp.ResolveVolume(r)
 		require.NoError(t, err)
@@ -431,6 +458,7 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	})
 
 	t.Run("ResolveDevice", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "./dev:/dev:rw", BaseDir: baseDir}
 		val, err := cp.ResolveDevice(r)
 		require.NoError(t, err)
@@ -443,7 +471,7 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	})
 }
 
-func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
+func TestUnit_Config_Path_Windows_Invalid(t *testing.T) {
 	t.Run("Windows path without separator", func(t *testing.T) {
 		_, _, ok := SplitHostRemainder(`C:\only-path`)
 		assert.False(t, ok)

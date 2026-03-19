@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Expression_FindDir(t *testing.T) {
+func TestUnit_Config_Expression_FindDir(t *testing.T) {
+	t.Parallel()
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/modules/foo":                      []byte("bar"),
@@ -27,18 +28,21 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("find_dir existing directory", func(t *testing.T) {
+		t.Parallel()
 		val := r.resolveString("{{ find_dir:modules }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "../..", val)
 	})
 
 	t.Run("find_dir existing file", func(t *testing.T) {
+		t.Parallel()
 		val := r.resolveString("{{ find_dir:modules/foo }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "../../modules", val)
 	})
 
 	t.Run("find_dir not found", func(t *testing.T) {
+		t.Parallel()
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		r2.resolveString("{{ find_dir:nonexistent }}")
@@ -47,7 +51,8 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	})
 }
 
-func TestUnit_Expression_FileError(t *testing.T) {
+func TestUnit_Config_Expression_FileError(t *testing.T) {
+	t.Parallel()
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/.go-version": []byte("1.21\n"),
@@ -63,12 +68,14 @@ func TestUnit_Expression_FileError(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("file found", func(t *testing.T) {
+		t.Parallel()
 		val := r.resolveString("{{ file:.go-version }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "1.21", val)
 	})
 
 	t.Run("file not found", func(t *testing.T) {
+		t.Parallel()
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		r2.resolveString("{{ file:missing }}")
@@ -77,7 +84,8 @@ func TestUnit_Expression_FileError(t *testing.T) {
 	})
 }
 
-func TestUnit_Expression_FileEmpty(t *testing.T) {
+func TestUnit_Config_Expression_FileEmpty(t *testing.T) {
+	t.Parallel()
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/empty.txt":  []byte("   "),
@@ -94,18 +102,21 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("empty file resolves to empty string", func(t *testing.T) {
+		t.Parallel()
 		val := r.resolveString("{{ file:empty.txt }}")
 		require.NoError(t, r.Error())
 		assert.Empty(t, val)
 	})
 
 	t.Run("normal file still works", func(t *testing.T) {
+		t.Parallel()
 		val := r.resolveString("{{ file:normal.txt }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "content", val)
 	})
 
 	t.Run("cached empty file still works", func(t *testing.T) {
+		t.Parallel()
 		// Second call should hit cache
 		val := r.resolveString("{{ file:empty.txt }}")
 		require.NoError(t, r.Error())
@@ -113,7 +124,8 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 	})
 }
 
-func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
+func TestUnit_Config_Expression_SecurityAndEdgeCases(t *testing.T) {
+	t.Parallel()
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
 			"/project/inner.txt": []byte("outer.txt"),
@@ -128,6 +140,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	hostCtx := &HostContext{}
 
 	t.Run("nested expressions (partial match due to non-recursive regex)", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ file:{{ file:inner.txt }} }}")
@@ -138,6 +151,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("multiple expressions", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ PWD }}/{{ file:inner.txt }}")
@@ -146,6 +160,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("path traversal attempt in file", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		r.resolveString("{{ file:../../etc/passwd }}")
@@ -154,6 +169,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("absolute path attempt in file", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		r.resolveString("{{ file:/etc/passwd }}")
@@ -163,6 +179,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("invalid directive", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ unknown:value }}")
@@ -172,6 +189,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("unclosed expression", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ PWD")
@@ -180,6 +198,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("empty expression", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{}}")
@@ -188,6 +207,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("expression with whitespace only", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{   }}")
@@ -196,6 +216,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("complex mixed resolution", func(t *testing.T) {
+		t.Parallel()
 		fsWithHome := *fs
 		fsWithHome.HomeDir = "/home/user"
 		r, err := NewExpressionResolverWithFS(hostCtx, &fsWithHome)
@@ -206,6 +227,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("sticky error state", func(t *testing.T) {
+		t.Parallel()
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		// First call triggers error

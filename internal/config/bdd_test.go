@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 	t.Parallel()
 
 	t.Run("P1 through P5 priority with complex expressions", func(t *testing.T) {
+		t.Parallel()
 		// Given: A complex environment with multiple configuration layers and expressions
 		mfs := &MockFileSystem{
 			WD: "/home/user/project",
@@ -20,7 +20,7 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 				"/home/user/project/.go-version": []byte("1.25"),
 			},
 			Env: map[string]string{
-				"PROJECT_ENV": "production",
+				"PROJECT_ENV":  "production",
 				"CDERUN_IMAGE": "node:{{file:.go-version}}-{{env:PROJECT_ENV}}",
 			},
 		}
@@ -58,12 +58,95 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 		// and expression {{file:.go-version}} and {{env:PROJECT_ENV}} are resolved
 		assert.Equal(t, "node:1.25-production", res.Image)
 	})
+
+	t.Run("Scenario: Complex environment merging with P1-P5 overrides", func(t *testing.T) {
+		t.Parallel()
+		// Given: Environment variables at various priority levels
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"P3_VAR":     "v3",
+				"HOST_VAR":   "v_host",
+				"CDERUN_ENV": "P3_VAR=p3_override; HOST_VAR",
+			},
+		}
+
+		cli := CLIOptions{
+			Env:       []string{"P2_VAR=v2", "P3_VAR=p2_wins"}, // P2
+			CderunEnv: []string{"P1_VAR=v1"},                   // P1 - Replaces ALL others
+		}
+
+		tools := ToolsConfig{
+			"app": ToolConfig{
+				Image: "alpine",
+				Env:   []string{"P4_VAR=v4"}, // P4
+			},
+		}
+
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Env: []string{"P5_VAR=v5"}, // P5
+			},
+		}
+
+		// When: Resolving configuration for "app"
+		res, err := ResolveWithFS("app", cli, tools, global, mfs)
+
+		// Then: P1 should replace ALL other environment variables
+		require.NoError(t, err)
+		assert.Len(t, res.Env, 1)
+		assert.Contains(t, res.Env, "P1_VAR=v1")
+		assert.NotContains(t, res.Env, "P2_VAR=v2")
+		assert.NotContains(t, res.Env, "P3_VAR=p3_override")
+		assert.NotContains(t, res.Env, "P4_VAR=v4")
+		assert.NotContains(t, res.Env, "P5_VAR=v5")
+	})
+
+	t.Run("Scenario: Standard environment merging (P2-P5)", func(t *testing.T) {
+		t.Parallel()
+		// Given: Environment variables at P2-P5 (No P1)
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"HOST_VAR":   "v_host",
+				"CDERUN_ENV": "P3_VAR=v3; HOST_VAR",
+			},
+		}
+
+		cli := CLIOptions{
+			Env: []string{"P2_VAR=v2", "P3_VAR=p2_wins"},
+		}
+
+		tools := ToolsConfig{
+			"app": ToolConfig{
+				Image: "alpine",
+				Env:   []string{"P4_VAR=v4", "P2_VAR=p4_loses"},
+			},
+		}
+
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Env: []string{"P5_VAR=v5"},
+			},
+		}
+
+		// When: Resolving configuration
+		res, err := ResolveWithFS("app", cli, tools, global, mfs)
+
+		// Then: Merging should follow P2 > P3 > P4 > P5
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "P2_VAR=v2")
+		assert.Contains(t, res.Env, "P3_VAR=p2_wins")
+		assert.Contains(t, res.Env, "HOST_VAR=v_host")
+		assert.Contains(t, res.Env, "P4_VAR=v4")
+		// P5 is ignored because Tool level (P4) has Env set (slices don't merge across layers P4/P5)
+		assert.NotContains(t, res.Env, "P5_VAR=v5")
+	})
 }
 
 func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Nested tool config overrides global defaults", func(t *testing.T) {
+		t.Parallel()
 		// Given: Global config with some defaults and Tool config with overrides
 		mfs := &MockFileSystem{} // Empty isolated environment
 		global := &CDERunConfig{
@@ -140,6 +223,7 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Resolve slice", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -153,6 +237,7 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("Resolve map", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -165,6 +250,7 @@ func TestUnit_Config_Expression_Resolve_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("Resolve other", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user"}
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -177,6 +263,7 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 	t.Parallel()
 
 	t.Run("LoadToolsConfig success", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", Files: map[string][]byte{"/app/.tools.yaml": []byte("node:\n  image: node:20")}}
 		loader := NewConfigLoaderWithFS(mfs)
 		cfg, paths, err := loader.LoadToolsConfig()
@@ -187,6 +274,7 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("LoadCDERunConfig from path with tilde", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", HomeDir: "/home/user", Files: map[string][]byte{"/home/user/custom.yaml": []byte("runtime: docker")}}
 		loader := NewConfigLoaderWithFS(mfs)
 		cfg, _, err := loader.LoadCDERunConfigFromPath("~/custom.yaml")
@@ -228,6 +316,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT_TOOLS": "t1,t2"}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
@@ -235,6 +324,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
@@ -242,6 +332,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"MISSING"}, StrictEnv: true, StrictEnvSet: true}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
@@ -249,6 +340,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{PWD}}/docker.sock", SocketPathSet: true}
 		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
@@ -280,6 +372,7 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("ResolveVolume with host remainder", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -290,6 +383,7 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 	})
 
 	t.Run("ResolveDevice with host remainder", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -417,6 +511,7 @@ func TestUnit_Config_Resolver_Devices_More(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Resolve empty devices", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -430,6 +525,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	t.Parallel()
 
 	t.Run("resolveDevices invalid format", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -438,6 +534,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveMounts invalid format", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -446,6 +543,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues expression error", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		// Create a resolver that will error on some expression
 		rErr, err := NewExpressionResolverWithFS(nil, mfs)
@@ -456,12 +554,14 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveFloat64Opt invalid", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "invalid"}}
 		val := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, "", nil, nil, mfs)
 		assert.InDelta(t, 0.0, val, 1e-9)
 	})
 
 	t.Run("resolveConfigPath volume resolution", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{Env: map[string]string{"VOL": "/host:/cont:ro"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -471,6 +571,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveConfigPath device resolution", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{Env: map[string]string{"DEV": "/dev/a:/dev/b:rw"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -484,6 +585,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("resolveMounts with expressions", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app", Env: map[string]string{"SRC": "/host/path"}}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -495,6 +597,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveConfigPath volume with fallback", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
@@ -504,6 +607,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 	})
 
 	t.Run("resolveConfigPath device with fallback", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)

@@ -30,10 +30,14 @@ func executeCommandRaw(args []string) (string, error) {
 func executeCommandRawContext(ctx context.Context, args []string) (string, error) {
 	var buf bytes.Buffer
 
+	mfs := &config.MockFileSystem{}
+
 	execErr := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
 		// Default to terminal mode for tests to avoid auto-detection of pipes
 		// unless specifically overridden in a test.
 		o.isTerminal = func(fd int) bool { return true }
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		cmd.SetOut(&buf)
 		cmd.SetErr(&buf)
 	})
@@ -41,7 +45,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	return buf.String(), execErr
 }
 
-func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
+func TestUnit_Root_PreprocessArgs_Hoisting(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -110,7 +114,7 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 	}
 }
 
-func TestUnit_Root_Execute_EmptyArgs(t *testing.T) {
+func TestUnit_Root_Execution_EmptyArgs(t *testing.T) {
 	t.Parallel()
 	// Should not panic
 	_, err := executeCommandRaw([]string{})
@@ -122,7 +126,7 @@ func TestUnit_Root_Execute_EmptyArgs(t *testing.T) {
 
 func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Parallel()
-	t.Run("executes container correctly", func(t *testing.T) {
+	t.Run("ExecutesContainer_Standard_CorrectConfig", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-container-id",
 			ExitCode:           42,
@@ -154,7 +158,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Equal(t, 42, capturedExitCode)
 	})
 
-	t.Run("shows help when no subcommand is provided", func(t *testing.T) {
+	t.Run("ShowsHelp_NoSubcommand_UsageOutput", func(t *testing.T) {
 		output, err := executeCommand("--tty")
 		require.NoError(t, err)
 
@@ -162,7 +166,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "Usage:")
 	})
 
-	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
+	t.Run("P1Priority_OverCLI_ResolvedCorrecty", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -174,7 +178,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
 	})
 
-	t.Run("-t shorthand for --tty", func(t *testing.T) {
+	t.Run("ShorthandFlags_TTY_Enabled", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "-t", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -186,20 +190,20 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 	})
 
-	t.Run("returns error for unsupported runtime", func(t *testing.T) {
+	t.Run("UnsupportedRuntime_InvalidName_Error", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
 	})
 
-	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
+	t.Run("DiagnosisMode_NoSubcommand_OutputInfo", func(t *testing.T) {
 		output, err := executeCommand("--diagnosis")
 		require.NoError(t, err)
 		assert.Contains(t, output, "runtime:")
 		assert.Contains(t, output, "configs:")
 	})
 
-	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
+	t.Run("DiagnosisMode_WithSubcommand_Priority", func(t *testing.T) {
 		output, err := executeCommand("--diagnosis", "node", "--version")
 		require.NoError(t, err)
 		assert.Contains(t, output, "runtime:")
@@ -207,13 +211,13 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.NotContains(t, output, "image: node") // Should not be container config dry-run
 	})
 
-	t.Run("dry-run requires a subcommand", func(t *testing.T) {
+	t.Run("DryRun_NoSubcommand_Error", func(t *testing.T) {
 		_, err := executeCommand("--dry-run")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 	})
 
-	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
+	t.Run("DryRun_OutputFormats_CorrectStructure", func(t *testing.T) {
 		// Dry-run with YAML (default)
 		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
 		require.NoError(t, err)
@@ -241,7 +245,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "Remove: true")
 	})
 
-	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
+	t.Run("AttachContainer_RuntimeError_Propagated", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
 		}
@@ -256,9 +260,9 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
+func TestUnit_Root_Execution_MountingAndDevices(t *testing.T) {
 	t.Parallel()
-	t.Run("workdir, mount and device flags", func(t *testing.T) {
+	t.Run("Flags_WorkdirMountDevice_CorrectConfig", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -277,7 +281,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 		assert.Equal(t, "/dev/fuse", mockRuntime.CreatedConfig.Devices[0].PathOnHost)
 	})
 
-	t.Run("mounting flags auto-enable socket mounting", func(t *testing.T) {
+	t.Run("MountCderun_AutoEnableSocket_SocketMounted", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		mfs := &config.MockFileSystem{
 			Env: map[string]string{
@@ -305,15 +309,15 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
+func TestUnit_Root_Execution_SubcommandBehavior(t *testing.T) {
 	t.Parallel()
-	t.Run("fails when no image mapping found for tool", func(t *testing.T) {
+	t.Run("UnknownTool_NoImageMapping_Error", func(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found for tool: unknown-tool")
 	})
 
-	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
+	t.Run("SubcommandExclusion_OnlyArgsPassedToCMD", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "ls", "-l", "/tmp"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -328,9 +332,9 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
+func TestUnit_Root_Execution_DiagnosisFormats(t *testing.T) {
 	t.Parallel()
-	t.Run("JSON format", func(t *testing.T) {
+	t.Run("JSON_ValidFormat_CapturedOutput", func(t *testing.T) {
 		out := &bytes.Buffer{}
 		mfs := &config.MockFileSystem{
 			Files: map[string][]byte{
@@ -355,9 +359,9 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
+func TestUnit_Root_Execution_Cleanup(t *testing.T) {
 	t.Parallel()
-	t.Run("prints warning if RemoveContainer fails", func(t *testing.T) {
+	t.Run("RemoveContainer_RuntimeError_WarningPrinted", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			RemoveErr: errors.New("failed to remove"),
 		}
@@ -377,9 +381,9 @@ func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
+func TestUnit_Root_Execution_StrictEnv(t *testing.T) {
 	t.Parallel()
-	t.Run("--strict-env flag", func(t *testing.T) {
+	t.Run("StrictEnvFlag_MissingEnvVar_Error", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		mfs := &config.MockFileSystem{} // Empty environment
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {

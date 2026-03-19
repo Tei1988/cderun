@@ -352,6 +352,7 @@ type ConfigLoader struct {
 	fs              FileSystem
 	systemConfigDir string
 	runConfigDir    string
+	testHostContext *HostContext
 }
 
 // NewConfigLoader creates a new ConfigLoader with a RealFileSystem.
@@ -386,6 +387,10 @@ func SetSystemConfigDirForTest(path string) func() {
 	restoreDir := defaultLoader.systemConfigDir
 	defaultLoader.systemConfigDir = path
 	return func() { defaultLoader.systemConfigDir = restoreDir }
+}
+
+func (l *ConfigLoader) SetHostContextForTest(hc *HostContext) {
+	l.testHostContext = hc
 }
 
 // FindConfigs searches for config files in hierarchical order.
@@ -462,6 +467,9 @@ func LoadCDERunConfig() (*CDERunConfig, []string, error) {
 func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 	paths := l.FindConfigs(".cderun.yaml")
 	if len(paths) == 0 {
+		if l.testHostContext != nil {
+			return &CDERunConfig{HostContext: l.testHostContext}, nil, nil
+		}
 		return nil, nil, nil
 	}
 
@@ -493,6 +501,10 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 
 	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
 		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
+	}
+
+	if l.testHostContext != nil {
+		merged.HostContext = l.testHostContext
 	}
 
 	return &merged, loadedPaths, nil

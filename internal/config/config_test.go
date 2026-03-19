@@ -7,8 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_LoadCDERun(t *testing.T) {
+func TestUnit_Config_ConfigLoader_LoadCDERun(t *testing.T) {
+	t.Parallel()
 	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			Dirs:  map[string]bool{"/project": true},
@@ -22,6 +24,7 @@ func TestUnit_Config_LoadCDERun(t *testing.T) {
 	})
 
 	t.Run("found in current dir", func(t *testing.T) {
+		t.Parallel()
 		content := `
 runtime: docker
 defaults:
@@ -45,6 +48,7 @@ defaults:
 	})
 
 	t.Run("found in home dir", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/home/user/.config/cderun/.cderun.yaml": []byte("runtime: podman"),
@@ -63,6 +67,7 @@ defaults:
 	})
 
 	t.Run("found in run dir", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/run/cderun/.cderun.yaml": []byte("defaults:\n  network: host"),
@@ -80,6 +85,7 @@ defaults:
 	})
 
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
+		t.Parallel()
 		content := `
 hostContext:
   level: 1
@@ -108,8 +114,10 @@ hostContext:
 	})
 }
 
-func TestUnit_Config_LoadTools(t *testing.T) {
+func TestUnit_Config_ConfigLoader_LoadTools(t *testing.T) {
+	t.Parallel()
 	t.Run("found in current dir", func(t *testing.T) {
+		t.Parallel()
 		content := `
 node:
   image: node:20-alpine
@@ -134,7 +142,7 @@ node:
 	})
 }
 
-func TestUnit_Config_SetDirs(t *testing.T) {
+func TestUnit_Config_ConfigLoader_SetDirs(t *testing.T) {
 	t.Run("SetRunConfigDirForTest", func(t *testing.T) {
 		original := defaultLoader.runConfigDir
 		cleanup := SetRunConfigDirForTest("/tmp/run")
@@ -152,8 +160,10 @@ func TestUnit_Config_SetDirs(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_LoadPath(t *testing.T) {
+func TestUnit_Config_ConfigLoader_LoadFromPath(t *testing.T) {
+	t.Parallel()
 	t.Run("LoadCDERunConfigFromPath", func(t *testing.T) {
+		t.Parallel()
 		content := `
 runtime: podman
 defaults:
@@ -176,6 +186,7 @@ defaults:
 	})
 
 	t.Run("LoadCDERunConfigFromPath - missing", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			WD:    "/project",
@@ -186,6 +197,7 @@ defaults:
 	})
 
 	t.Run("LoadToolsConfigFromPath", func(t *testing.T) {
+		t.Parallel()
 		content := `
 node:
   image: node:20-alpine
@@ -206,6 +218,7 @@ node:
 	})
 
 	t.Run("LoadToolsConfigFromPath - missing", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			WD:    "/project",
@@ -217,8 +230,10 @@ node:
 
 }
 
-func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
+func TestUnit_Config_ConfigLoader_LoadErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/project/.cderun.yaml": []byte("invalid: yaml: ["),
@@ -232,6 +247,7 @@ func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
 	})
 
 	t.Run("LoadCDERunConfig - unknown field", func(t *testing.T) {
+		t.Parallel()
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
 				"/project/.cderun.yaml": []byte("unknown_field: true"),
@@ -245,8 +261,10 @@ func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_DeepCopy(t *testing.T) {
+func TestUnit_Config_DeepCopy_Operations(t *testing.T) {
+	t.Parallel()
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
+		t.Parallel()
 		tty := true
 		orig := CDERunConfig{
 			Runtime: "docker",
@@ -286,6 +304,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	})
 
 	t.Run("ToolsConfig DeepCopy", func(t *testing.T) {
+		t.Parallel()
 		orig := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
@@ -306,6 +325,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	})
 
 	t.Run("DeepCopy all fields", func(t *testing.T) {
+		t.Parallel()
 		b := true
 		orig := CDERunConfig{
 			Logging: LoggingConfig{

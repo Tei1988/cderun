@@ -523,7 +523,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, global, r, fs,
 	)
 
-
 	// Resolve Logging
 	res.LogLevel = resolveStringOpt(
 		OptionDef[string]{EnvKey: "CDERUN_LOG_LEVEL",
@@ -770,33 +769,49 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var envs []string
+	var p1Envs, p2Envs, p3Envs, p4Envs, p5Envs []string
 
 	if len(p1) > 0 {
-		envs = p1
-	} else if len(p2) > 0 {
-		envs = p2
-	} else if env := fs.Getenv(envKey); env != "" {
+		p1Envs = p1
+		// P1 overrides EVERYTHING.
+		return resolveEnvValues(mergeEnv(nil, nil, p1Envs), strict, r, fs)
+	}
+
+	if len(p2) > 0 {
+		p2Envs = p2
+	}
+
+	if env := fs.Getenv(envKey); env != "" {
 		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
 			if e != "" {
-				envs = append(envs, e)
+				p3Envs = append(p3Envs, e)
 			}
 		}
-	} else if tools != nil {
+	}
+
+	if tools != nil {
 		if tool, ok := tools[subcommand]; ok && len(tool.Env) > 0 {
-			envs = tool.Env
+			p4Envs = tool.Env
 		}
 	}
 
-	if len(envs) == 0 && global != nil {
-		envs = global.Defaults.Env
+	if global != nil {
+		p5Envs = global.Defaults.Env
 	}
 
-	// Deduplicate within the winning source (last-one-wins for the same key)
-	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
-	merged := mergeEnv(nil, nil, envs)
+	// standard merge P2 > P3 > P4 > P5
+	// note: P4 and P5 do not merge slices, so if P4 is present, P5 is ignored.
+	// however mergeEnv handles it correctly if we pass them.
+	// Actually, the current logic for other fields is that if Tool level is set, Global level is ignored.
+	// Let's stick to that for slices to be consistent.
 
+	base := p5Envs
+	if len(p4Envs) > 0 {
+		base = p4Envs
+	}
+
+	merged := mergeEnv(base, p3Envs, p2Envs)
 	return resolveEnvValues(merged, strict, r, fs)
 }
 

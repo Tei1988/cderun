@@ -32,9 +32,9 @@ func (m *pipeMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Stdin_PipedInputFlow(t *testing.T) {
+func TestUnit_Root_Stdin_PipedInputFlow(t *testing.T) {
 	t.Parallel()
-	t.Run("piped stdin reaches container when interactive is true", func(t *testing.T) {
+	t.Run("PipedInput_InteractiveTrue_ReachedContainer", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
@@ -82,7 +82,7 @@ func TestUnit_Stdin_PipedInputFlow(t *testing.T) {
 		assert.Equal(t, testData, stdout.String())
 	})
 
-	t.Run("piped stdin does NOT reach container when interactive is false", func(t *testing.T) {
+	t.Run("PipedInput_InteractiveFalse_NotReachedContainer", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
@@ -129,9 +129,9 @@ func TestUnit_Stdin_PipedInputFlow(t *testing.T) {
 	})
 }
 
-func TestUnit_Stdin_PipedFlowExtended(t *testing.T) {
+func TestUnit_Root_Stdin_PipedFlowExtended(t *testing.T) {
 	t.Parallel()
-	t.Run("container echoes stdin with pipe-like reader", func(t *testing.T) {
+	t.Run("PipedInput_CatCommand_EchoedBack", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-container"
 		mock.ExitCode = 0
@@ -168,7 +168,7 @@ func TestUnit_Stdin_PipedFlowExtended(t *testing.T) {
 	})
 }
 
-func TestUnit_Stdin_MockedInput(t *testing.T) {
+func TestUnit_Root_Stdin_MockedInput(t *testing.T) {
 	t.Parallel()
 	mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 	mock.CreatedContainerID = "test-integration-container"
@@ -247,9 +247,9 @@ func (m *syncMockRuntime) AttachContainer(ctx context.Context, containerID strin
 	return nil
 }
 
-func TestUnit_Stdin_AttachSynchronization(t *testing.T) {
+func TestUnit_Root_Stdin_AttachSynchronization(t *testing.T) {
 	t.Parallel()
-	t.Run("stdin is not read until container starts", func(t *testing.T) {
+	t.Run("Synchronization_StartBeforeRead_OrderVerified", func(t *testing.T) {
 		mock := &syncMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-sync-container"
 		mock.ExitCode = 0
@@ -285,9 +285,9 @@ type fakeFdReader struct {
 }
 func (f fakeFdReader) Fd() uintptr { return 0 }
 
-func TestUnit_Stdin_QuickExitWithPipedInput(t *testing.T) {
+func TestUnit_Root_Stdin_QuickExitWithPipedInput(t *testing.T) {
 	t.Parallel()
-	t.Run("piped stdin exits quickly after IO finished", func(t *testing.T) {
+	t.Run("PipedInput_NonTTY_QuickExit", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-quick-exit"
 		mock.ExitCode = 0
@@ -315,9 +315,9 @@ func TestUnit_Stdin_QuickExitWithPipedInput(t *testing.T) {
 	})
 }
 
-func TestUnit_Stdin_TTYWaitBehavior(t *testing.T) {
+func TestUnit_Root_Stdin_TTYWaitBehavior(t *testing.T) {
 	t.Parallel()
-	t.Run("TTY stdin waits for original timeout", func(t *testing.T) {
+	t.Run("TTYInput_WaitTimeout_NormalExit", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-tty-wait"
 		mock.ExitCode = 0
@@ -344,9 +344,9 @@ func TestUnit_Stdin_TTYWaitBehavior(t *testing.T) {
 	})
 }
 
-func TestUnit_Stdin_NonInteractiveQuickExitBehavior(t *testing.T) {
+func TestUnit_Root_Stdin_NonInteractiveQuickExitBehavior(t *testing.T) {
 	t.Parallel()
-	t.Run("non-interactive exits quickly even if host is TTY", func(t *testing.T) {
+	t.Run("NonInteractive_TTYHost_QuickExit", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-non-interactive-quick"
 		mock.ExitCode = 0
@@ -388,9 +388,9 @@ func (b blockingReader) Read(p []byte) (int, error) {
 	return 0, io.EOF
 }
 
-func TestUnit_Stdin_PipedContinuousLogOutput(t *testing.T) {
+func TestUnit_Root_Stdin_PipedContinuousLogOutput(t *testing.T) {
 	t.Parallel()
-	t.Run("piped stdin does not exit while pipe is open (like tail -f)", func(t *testing.T) {
+	t.Run("ContinuousInput_BlockingReader_WaitUntilClose", func(t *testing.T) {
 		mock := &pipeMockRuntime{MockRuntime: *runtime.NewMockRuntime()}
 		mock.CreatedContainerID = "test-piped-logs"
 		mock.ExitCode = 0

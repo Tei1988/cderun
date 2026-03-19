@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
+func TestIntegration_Config_FS_RealFileSystem_Operations(t *testing.T) {
 	fs := RealFileSystem{}
 
 	t.Run("Executable", func(t *testing.T) {
@@ -19,6 +19,8 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
+		// Use t.Setenv for RealFileSystem as it truly uses OS environment.
+		// RealFileSystem tests should not be run in parallel with other tests that depend on environment.
 		t.Setenv("TEST_VAR", "value")
 		assert.Equal(t, "value", fs.Getenv("TEST_VAR"))
 	})
@@ -49,14 +51,14 @@ func TestUnit_Config_FS_RealFileSystem(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
-	// mfs is shared between subtests.
-	mfs := &MockFileSystem{
-		ExecPath: "/bin/cderun",
-		Env:      map[string]string{"K": "V"},
-	}
+func TestUnit_Config_FS_MockFileSystem_Operations(t *testing.T) {
+	t.Parallel()
 
 	t.Run("Executable", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{
+			ExecPath: "/bin/cderun",
+		}
 		exe, err := mfs.Executable()
 		require.NoError(t, err)
 		assert.Equal(t, "/bin/cderun", exe)
@@ -68,17 +70,25 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 	})
 
 	t.Run("Getenv", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{
+			Env: map[string]string{"K": "V"},
+		}
 		assert.Equal(t, "V", mfs.Getenv("K"))
 		assert.Empty(t, mfs.Getenv("UNKNOWN"))
 	})
 
 	t.Run("TempDir", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{}
 		assert.Equal(t, "/tmp", mfs.TempDir())
 		mfs.TempDirValue = "/custom/tmp"
 		assert.Equal(t, "/custom/tmp", mfs.TempDir())
 	})
 
 	t.Run("MkdirAll and Stat", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{}
 		err := mfs.MkdirAll("/a/b", 0o755)
 		require.NoError(t, err)
 		_, err = mfs.Stat("/a/b")
@@ -87,10 +97,11 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 		mfs.MkdirAllErr = os.ErrPermission
 		err = mfs.MkdirAll("/c", 0o755)
 		require.Error(t, err)
-		mfs.MkdirAllErr = nil
 	})
 
 	t.Run("WriteFile and ReadFile", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{}
 		err := mfs.WriteFile("/f", []byte("d"), 0o644)
 		require.NoError(t, err)
 		data, err := mfs.ReadFile("/f")
@@ -100,15 +111,15 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 		mfs.WriteFileErr = os.ErrPermission
 		err = mfs.WriteFile("/g", []byte("d"), 0o644)
 		require.Error(t, err)
-		mfs.WriteFileErr = nil
 
 		mfs.ReadFileErr = os.ErrPermission
 		_, err = mfs.ReadFile("/f")
 		require.Error(t, err)
-		mfs.ReadFileErr = nil
 	})
 
 	t.Run("RemoveAll", func(t *testing.T) {
+		t.Parallel()
+		mfs := &MockFileSystem{}
 		require.NoError(t, mfs.WriteFile("/d/f1", []byte("1"), 0o644))
 		require.NoError(t, mfs.WriteFile("/d/f2", []byte("2"), 0o644))
 		require.NoError(t, mfs.MkdirAll("/d", 0o755))
@@ -124,11 +135,10 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 		mfs.RemoveAllErr = os.ErrPermission
 		err = mfs.RemoveAll("/x")
 		require.Error(t, err)
-		mfs.RemoveAllErr = nil
 	})
 }
 
-func TestUnit_Config_Loader_Initialization(t *testing.T) {
+func TestUnit_Config_Loader_NewWithFS(t *testing.T) {
 	mfs := &MockFileSystem{}
 	loader := NewConfigLoaderWithFS(mfs)
 	assert.Equal(t, mfs, loader.fs)
@@ -136,7 +146,7 @@ func TestUnit_Config_Loader_Initialization(t *testing.T) {
 	assert.Equal(t, defaultLoader.runConfigDir, loader.runConfigDir)
 }
 
-func TestUnit_FileSystem_Abs(t *testing.T) {
+func TestUnit_Config_FS_Abs_Resolution(t *testing.T) {
 	t.Run("RealFileSystem", func(t *testing.T) {
 		fs := RealFileSystem{}
 		abs, err := fs.Abs(".")

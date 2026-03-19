@@ -15,8 +15,9 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
-	t.Run("flags without cderun-prefix ARE NOT picked up in polyglot mode (specification)", func(t *testing.T) {
+func TestUnit_Root_Polyglot_Hoisting(t *testing.T) {
+	t.Parallel()
+	t.Run("StandardFlags_NotHoistedInPolyglot_Error", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 
@@ -65,7 +66,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		assert.Nil(t, requireConfig)
 	})
 
-	t.Run("flags WITH cderun-prefix ARE picked up in polyglot mode", func(t *testing.T) {
+	t.Run("CderunPrefixFlags_HoistedInPolyglot_Applied", func(t *testing.T) {
 		mock := &pipeMockRuntime{}
 		mock.CreatedContainerID = "test-container"
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -23,6 +24,7 @@ type ExpressionResolver struct {
 	fileCache   map[string]fileCacheEntry
 	loader      *ConfigLoader
 	err         error
+	mu          sync.RWMutex
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
@@ -54,10 +56,14 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 
 // Error returns the first error encountered during expression resolution.
 func (r *ExpressionResolver) Error() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.err
 }
 
 func (r *ExpressionResolver) setError(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.err == nil {
 		r.err = err
 	}
@@ -93,7 +99,7 @@ func (r *ExpressionResolver) ResolveString(s string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
-	if r.err != nil {
+	if r.Error() != nil {
 		return s
 	}
 
@@ -101,7 +107,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	resolved := s
 	if strings.Contains(s, "{{") {
 		resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
-			if r.err != nil {
+			if r.Error() != nil {
 				return match
 			}
 			content := strings.TrimSpace(match[2 : len(match)-2])
@@ -159,26 +165,35 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	if cached, ok := r.fileCache[filename]; ok {
+	r.mu.RLock()
+	cached, ok := r.fileCache[filename]
+	r.mu.RUnlock()
+	if ok {
 		return cached.content, cached.err
 	}
 
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
+		r.mu.Lock()
 		r.fileCache[filename] = fileCacheEntry{err: err}
+		r.mu.Unlock()
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
+		r.mu.Lock()
 		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.mu.Unlock()
 		return "", wrappedErr
 	}
 
 	result := strings.TrimSpace(string(data))
+	r.mu.Lock()
 	r.fileCache[filename] = fileCacheEntry{content: result}
+	r.mu.Unlock()
 	return result, nil
 }
 
