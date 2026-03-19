@@ -245,6 +245,29 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "/host/app/le", val)
 	})
+
+	t.Run("MountConfig.Resolve target not reverse-resolved in nested", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/Users/user/.config/gcloud", Target: "/root/.config/gcloud", Level: 1},
+			},
+		}
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
+
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/root/.config/gcloud"},
+			Target: ConfigPath{Raw: "/.config/gcloud"},
+		}
+		mount, err := mc.Resolve(rn)
+		require.NoError(t, err)
+		// source should be reverse-resolved to host path
+		assert.Equal(t, "/Users/user/.config/gcloud", mount.Source)
+		// target must NOT be reverse-resolved; it stays as the container-side path
+		assert.Equal(t, "/.config/gcloud", mount.Target)
+	})
 }
 
 func TestUnit_Path_MarshalYAML(t *testing.T) {

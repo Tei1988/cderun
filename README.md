@@ -213,7 +213,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
   in configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the

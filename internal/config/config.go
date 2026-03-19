@@ -154,6 +154,7 @@ type HostContext struct {
 	SnapshotDir string         `yaml:"snapshotDir"`
 	BinPath     string         `yaml:"binPath"`
 	WorkingDir  string         `yaml:"workingDir"`
+	HomeDir     string         `yaml:"homeDir"`
 	Mounts      []MountMapping `yaml:"mounts"`
 }
 

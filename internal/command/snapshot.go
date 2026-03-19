@@ -89,6 +89,13 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		logger.Debug("failed to get working directory for snapshot: %v", err)
 	}
 
+	home, err := fs.UserHomeDir()
+	if err == nil {
+		hostCtx.HomeDir = home
+	} else {
+		logger.Debug("failed to get home directory for snapshot: %v", err)
+	}
+
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
 	snapshotCfg := globalCfg.DeepCopy()
 	snapshotCfg.HostContext = &hostCtx

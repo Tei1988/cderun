@@ -7,6 +7,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
+	fs := &MockFileSystem{
+		WD:      "/container/work",
+		HomeDir: "/root",
+	}
+
+	t.Run("BASE_HOME and BASE_PWD fall back to HOME/PWD at level 0", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "/root", r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, "/container/work", r.resolveString("{{BASE_PWD}}"))
+	})
+
+	t.Run("BASE_HOME and BASE_PWD return host values in nested execution", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level:      1,
+			HomeDir:    "/Users/user",
+			WorkingDir: "/Users/user/project",
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "/Users/user", r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, "/Users/user/project", r.resolveString("{{BASE_PWD}}"))
+		// HOME and PWD still return container-local values
+		assert.Equal(t, "/root", r.resolveString("{{HOME}}"))
+		assert.Equal(t, "/container/work", r.resolveString("{{PWD}}"))
+	})
+}
+
 func TestUnit_Expression_FindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
