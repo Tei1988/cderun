@@ -126,9 +126,9 @@ func TestUnit_Config_Resolver_Mounts_Exhaustive(t *testing.T) {
 
 func TestUnit_Config_Resolver_Env_Exhaustive(t *testing.T) {
 	t.Parallel()
-	mfs_shared := &MockFileSystem{
+	mfsShared := &MockFileSystem{
 		Env: map[string]string{
-			"HOST_VAR": "host-val",
+			"HOST_VAR":   "host-val",
 			"CDERUN_ENV": "ENV_VAR=env-val; HOST_VAR",
 		},
 	}
@@ -140,7 +140,7 @@ func TestUnit_Config_Resolver_Env_Exhaustive(t *testing.T) {
 				Env:   []string{"TOOL_VAR=tool-val"},
 			},
 		}
-		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs_shared)
+		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfsShared)
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "ENV_VAR=env-val")
 		assert.Contains(t, res.Env, "HOST_VAR=host-val")
@@ -153,7 +153,7 @@ func TestUnit_Config_Resolver_Env_Exhaustive(t *testing.T) {
 			Env:       []string{"NONEXISTENT"},
 			StrictEnv: true, StrictEnvSet: true,
 		}
-		_, err := ResolveWithFS("node", cli, nil, nil, mfs_shared)
+		_, err := ResolveWithFS("node", cli, nil, nil, mfsShared)
 		require.Error(t, err)
 	})
 }
