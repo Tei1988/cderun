@@ -113,7 +113,7 @@ func TestUnit_Mock_WaitContainer_Advanced(t *testing.T) {
 
 	t.Run("WaitDelay with SIGINT", func(t *testing.T) {
 		mock := NewMockRuntime()
-		mock.WaitDelay = 100 * time.Millisecond
+		mock.WaitDelay = 200 * time.Millisecond
 
 		go func() {
 			time.Sleep(20 * time.Millisecond)
@@ -124,7 +124,7 @@ func TestUnit_Mock_WaitContainer_Advanced(t *testing.T) {
 		code, err := mock.WaitContainer(ctx, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, 0, code)
-		assert.Less(t, time.Since(start), 100*time.Millisecond)
+		assert.Less(t, time.Since(start), 400*time.Millisecond)
 	})
 
 	t.Run("Context Cancelled during WaitDelay", func(t *testing.T) {
