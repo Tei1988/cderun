@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"cderun/internal/container"
 )
@@ -97,4 +98,61 @@ func TestUnit_Mock_ConcurrentAccess(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestUnit_Mock_WithLockedMock(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WithLockedMock(func(m *MockRuntime) {
+		m.ExitCode = 123
+	})
+	assert.Equal(t, 123, mock.GetExitCode())
+}
+
+func TestUnit_Mock_WaitContainer_Advanced(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("WaitDelay with SIGINT", func(t *testing.T) {
+		mock := NewMockRuntime()
+		mock.WaitDelay = 100 * time.Millisecond
+
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			_ = mock.SignalContainer(ctx, "c1", "SIGINT")
+		}()
+
+		start := time.Now()
+		code, err := mock.WaitContainer(ctx, "c1")
+		require.NoError(t, err)
+		assert.Equal(t, 0, code)
+		assert.Less(t, time.Since(start), 100*time.Millisecond)
+	})
+
+	t.Run("Context Cancelled during WaitDelay", func(t *testing.T) {
+		mock := NewMockRuntime()
+		mock.WaitDelay = 1 * time.Second
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			cancel()
+		}()
+
+		_, err := mock.WaitContainer(ctx, "c1")
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestUnit_Mock_InspectContainer(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.ExitCode = 7
+	running, code, err := mock.InspectContainer(context.Background(), "c1")
+	require.NoError(t, err)
+	assert.False(t, running)
+	assert.Equal(t, 7, code)
+}
+
+func TestUnit_Mock_GetExitCode(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.ExitCode = 99
+	assert.Equal(t, 99, mock.GetExitCode())
 }

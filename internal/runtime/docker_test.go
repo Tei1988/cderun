@@ -573,3 +573,103 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 		assert.Eventually(t, func() bool { return conn.closeWriteCalled.Load() }, 500*time.Millisecond, 10*time.Millisecond, "CloseWrite should be called if sleep succeeded")
 	})
 }
+
+type errNotFound struct{ error }
+func (e errNotFound) NotFound() {}
+
+type errConflict struct{ error }
+func (e errConflict) Conflict() {}
+
+func TestUnit_Docker_InspectContainer(t *testing.T) {
+	ctx := context.Background()
+	t.Run("success", func(t *testing.T) {
+		mock := &mockDockerClient{
+			inspectResp: dockercontainer.InspectResponse{
+				ContainerJSONBase: &dockercontainer.ContainerJSONBase{
+					State: &dockercontainer.State{
+						Running:  true,
+						ExitCode: 0,
+					},
+				},
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		running, code, err := runtime.InspectContainer(ctx, "id")
+		require.NoError(t, err)
+		assert.True(t, running)
+		assert.Equal(t, 0, code)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mock := &mockDockerClient{inspectErr: errors.New("inspect failed")}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		_, _, err := runtime.InspectContainer(ctx, "id")
+		require.Error(t, err)
+	})
+}
+
+func TestUnit_Docker_RemoveContainer_Suppression(t *testing.T) {
+	ctx := context.Background()
+	t.Run("suppress not found", func(t *testing.T) {
+		mock := &mockDockerClient{removeErr: errNotFound{errors.New("not found")}}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.RemoveContainer(ctx, "id")
+		require.NoError(t, err)
+	})
+
+	t.Run("suppress conflict", func(t *testing.T) {
+		mock := &mockDockerClient{removeErr: errConflict{errors.New("conflict")}}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.RemoveContainer(ctx, "id")
+		require.NoError(t, err)
+	})
+
+	t.Run("other error", func(t *testing.T) {
+		mock := &mockDockerClient{removeErr: errors.New("boom")}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.RemoveContainer(ctx, "id")
+		require.Error(t, err)
+	})
+}
+
+func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
+	ctx := context.Background()
+	t.Run("suppress not found", func(t *testing.T) {
+		mock := &mockDockerClient{killErr: errNotFound{errors.New("not found")}}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
+		require.NoError(t, err)
+	})
+
+	t.Run("suppress conflict", func(t *testing.T) {
+		mock := &mockDockerClient{killErr: errConflict{errors.New("conflict")}}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
+		require.NoError(t, err)
+	})
+
+	t.Run("other error", func(t *testing.T) {
+		mock := &mockDockerClient{killErr: errors.New("boom")}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
+		require.Error(t, err)
+	})
+}
+
+func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
+	runtime, err := NewDockerRuntimeWithName("/tmp/mock.sock", "test")
+	require.NoError(t, err)
+
+	t.Run("sleep completes", func(t *testing.T) {
+		ctx := context.Background()
+		err := runtime.sleepFunc(ctx, 1*time.Millisecond)
+		require.NoError(t, err)
+	})
+
+	t.Run("sleep cancelled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := runtime.sleepFunc(ctx, 1*time.Second)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
