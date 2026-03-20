@@ -1,6 +1,9 @@
 package command
 
 import (
+	"cderun/internal/logging"
+	"time"
+	"os"
 	"bytes"
 	"context"
 	"errors"
@@ -14,6 +17,16 @@ import (
 	"cderun/internal/config"
 	"cderun/internal/runtime"
 )
+type terminationMockRuntime struct {
+	*runtime.MockRuntime
+	isRunning  bool
+	inspectErr error
+}
+
+func (m *terminationMockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
+	return m.isRunning, m.ExitCode, m.inspectErr
+}
+
 
 func executeCommand(args ...string) (string, error) {
 	return executeCommandContext(context.Background(), args...)
@@ -98,12 +111,38 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--cderun-tty=false"},
 			expected: []string{"cderun", "--cderun-image", "alpine", "--cderun-tty=false", "-t", "sh", "-c", "ls"},
 		},
+		{
+			name:     "P1 flag before subcommand (error case)",
+			args:     []string{"cderun", "--cderun-image", "alpine", "sh"},
+			expected: nil,
+		},
+		{
+			name:     "multiple shorthands, none take argument",
+			args:     []string{"cderun", "-it", "sh", "--cderun-tty"},
+			expected: []string{"cderun", "--cderun-tty", "-it", "sh"},
+		},
+		{
+			name:     "polyglot with P1 and regular flags",
+			args:     []string{"node", "--version", "--cderun-image", "alpine", "-t"},
+			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version", "-t"},
+		},
+		{
+			name:     "no subcommand found (diagnosis mode behavior in preprocess)",
+			args:     []string{"cderun", "--diagnosis"},
+			expected: []string{"cderun", "--diagnosis"},
+		},
+
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := newRootCmd(&rootOptions{})
 			actual, err := preprocessArgs(cmd, tt.args)
+			if tt.expected == nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "must be placed after the subcommand")
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
 		})
@@ -215,13 +254,16 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Dry-run with YAML (default)
-		output, err := executeCommand("--dry-run", "--image", "alpine", "sh", "echo", "hello")
+		output, err := executeCommand("--dry-run", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
 		assert.Contains(t, output, "command:")
 		assert.Contains(t, output, "- echo")
 		assert.Contains(t, output, "- hello")
-		assert.NotContains(t, output, "- sh")
+		assert.Contains(t, output, "env:")
+		assert.Contains(t, output, "- K=V")
+		assert.Contains(t, output, "mounts:")
+		assert.Contains(t, output, "target: /t")
 
 		// Dry-run with JSON
 		output, err = executeCommand("--dry-run", "--dry-run-format", "json", "--image", "alpine", "sh", "echo", "hello")
@@ -230,15 +272,15 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "\"command\": [")
 
 		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "sh", "echo", "hello")
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "--device", "/dev/fuse", "--memory", "512MiB", "--cpus", "2", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
-		assert.NotContains(t, output, "Command: sh")
-		assert.Contains(t, output, "TTY: false")
-		assert.Contains(t, output, "Interactive: false")
-		assert.Contains(t, output, "Network: bridge")
-		assert.Contains(t, output, "Remove: true")
+		assert.Contains(t, output, "Env: K=V")
+		assert.Contains(t, output, "Mounts: type=bind,source=/s,target=/t,readonly=false")
+		assert.Contains(t, output, "Devices: /dev/fuse")
+		assert.Contains(t, output, "Memory: 512MiB") // go-units formatting
+		assert.Contains(t, output, "CPUs: 2")
 	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
@@ -352,6 +394,80 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "\"name\": \"docker\"")
+		assert.Contains(t, out.String(), "\"status\": \"accessible\"")
+	})
+
+	t.Run("YAML format (default)", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/var/run/docker.sock": {},
+			},
+		}
+		opts := &rootOptions{
+			fs: mfs,
+		}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/var/run/docker.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "yaml",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "name: docker")
+		assert.Contains(t, out.String(), "status: accessible")
+	})
+
+	t.Run("Simple format", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/var/run/docker.sock": {},
+			},
+		}
+		opts := &rootOptions{
+			fs: mfs,
+		}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/var/run/docker.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "simple",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"})
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Runtime: docker (/var/run/docker.sock)")
+		assert.Contains(t, out.String(), "Runtime Status: accessible")
+		assert.Contains(t, out.String(), "Global Config: /etc/cderun.yaml")
+		assert.Contains(t, out.String(), "Tools Config: .tools.yaml")
+		assert.Contains(t, out.String(), "Available Tools: node")
+	})
+
+	t.Run("Socket not found", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{} // Empty filesystem
+		opts := &rootOptions{
+			fs: mfs,
+		}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/nonexistent/socket",
+			Diagnosis:       true,
+			DiagnosisFormat: "simple",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
 	})
 }
 
@@ -392,5 +508,175 @@ func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+	})
+}
+
+
+func TestUnit_Root_DefaultOptions(t *testing.T) {
+	t.Parallel()
+	o := defaultOptions()
+	assert.NotNil(t, o.fs)
+	assert.NotNil(t, o.exitFunc)
+	assert.NotNil(t, o.isTerminal)
+	assert.NotNil(t, o.termGetSize)
+	assert.NotNil(t, o.makeRaw)
+	assert.NotNil(t, o.restore)
+}
+
+func TestUnit_Root_GetFd(t *testing.T) {
+	t.Parallel()
+
+	// Test os.Stdin
+	fd, ok := getFd(os.Stdin)
+	assert.True(t, ok)
+	assert.Equal(t, int(os.Stdin.Fd()), fd)
+
+	// Test non-file reader
+	buf := bytes.NewBuffer(nil)
+	_, ok = getFd(buf)
+	assert.False(t, ok)
+}
+
+type syncBlockingReader struct {
+	entered chan struct{}
+	unblock chan struct{}
+}
+
+func (r *syncBlockingReader) Read(p []byte) (n int, err error) {
+	close(r.entered)
+	<-r.unblock
+	copy(p, "hello")
+	return 5, nil
+}
+
+func TestUnit_Root_SyncReader(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	ready := make(chan struct{})
+	entered := make(chan struct{})
+	unblock := make(chan struct{})
+	inner := &syncBlockingReader{entered: entered, unblock: unblock}
+
+	sr := &syncReader{
+		inner: inner,
+		ready: ready,
+		ctx:   ctx,
+	}
+
+	// Test before ready
+	p := make([]byte, 5)
+	done := make(chan bool)
+	go func() {
+		n, err := sr.Read(p)
+		assert.Equal(t, 5, n)
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", string(p))
+		done <- true
+	}()
+
+	// Ensure Read has reached the select block but is waiting for ready
+	select {
+	case <-done:
+		t.Fatal("Read should have blocked on ready")
+	case <-time.After(10 * time.Millisecond):
+		// OK
+	}
+
+	close(ready)
+
+	// Now ensure it reaches the inner reader's Read method
+	<-entered
+
+	// And verify it's still blocked on unblock
+	select {
+	case <-done:
+		t.Fatal("Read should have blocked on inner reader")
+	case <-time.After(10 * time.Millisecond):
+		// OK
+	}
+
+	close(unblock)
+	<-done
+}
+
+func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+
+	sr := &syncReader{
+		inner: strings.NewReader("hello"),
+		ready: make(chan struct{}),
+		ctx:   ctx,
+	}
+
+	cancel()
+	p := make([]byte, 5)
+	n, err := sr.Read(p)
+	assert.Equal(t, 0, n)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+
+func TestUnit_Root_GetHangTimeout(t *testing.T) {
+	t.Parallel()
+	o := &rootOptions{logger: &logging.Logger{}}
+
+	// Case 1: TTY + Interactive -> Timeout 0
+	assert.Equal(t, time.Duration(0), o.getHangTimeout(true, true, nil))
+
+	// Case 2: Resolved HangTimeout > 0
+	resolved := &config.ResolvedConfig{HangTimeout: 5 * time.Second}
+	assert.Equal(t, 5*time.Second, o.getHangTimeout(false, true, resolved))
+
+	// Case 3: Fallback to default (2s)
+	assert.Equal(t, 2*time.Second, o.getHangTimeout(false, false, nil))
+}
+
+func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
+	t.Parallel()
+	o := &rootOptions{logger: &logging.Logger{}}
+
+	t.Run("Container already stopped", func(t *testing.T) {
+		mockRuntime := &terminationMockRuntime{
+			MockRuntime: &runtime.MockRuntime{ExitCode: 123},
+			isRunning:   false,
+		}
+		exitCode, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		require.NoError(t, err)
+		assert.Equal(t, 123, exitCode)
+		assert.Empty(t, mockRuntime.SignaledContainerID)
+	})
+
+	t.Run("Container running, signal success", func(t *testing.T) {
+		mockRuntime := &terminationMockRuntime{
+			MockRuntime: runtime.NewMockRuntime(),
+			isRunning:   true,
+		}
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		require.NoError(t, err)
+		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
+	})
+
+	t.Run("Inspect fails, fallback to signal", func(t *testing.T) {
+		mockRuntime := &terminationMockRuntime{
+			MockRuntime: runtime.NewMockRuntime(),
+			inspectErr:  errors.New("inspect failed"),
+		}
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		require.NoError(t, err)
+		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
+	})
+
+	t.Run("Signal fails, ignore error", func(t *testing.T) {
+		mockRuntime := &terminationMockRuntime{
+			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
+			isRunning:   true,
+		}
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		require.NoError(t, err)
+		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
 }

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,4 +153,56 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, upperdir)
 	})
+}
+
+type errorFS struct {
+	*config.MockFileSystem
+	mkdirErr error
+	writeErr error
+}
+
+func (f *errorFS) MkdirAll(path string, perm os.FileMode) error {
+	if f.mkdirErr != nil {
+		return f.mkdirErr
+	}
+	return f.MockFileSystem.MkdirAll(path, perm)
+}
+
+func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	return f.MockFileSystem.WriteFile(path, data, perm)
+}
+
+func TestUnit_Snapshot_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("MkdirAll fails", func(t *testing.T) {
+		mfs := &errorFS{
+			MockFileSystem: &config.MockFileSystem{},
+			mkdirErr:       os.ErrPermission,
+		}
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create snapshot directory")
+	})
+
+	t.Run("WriteFile fails for global config", func(t *testing.T) {
+		mfs := &errorFS{
+			MockFileSystem: &config.MockFileSystem{},
+			writeErr:       os.ErrPermission,
+		}
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot")
+	})
+}
+
+func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
+	t.Parallel()
+	sentinel := errors.New("cleanup failed")
+	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
+	err := cleanupSnapshot(mfs, "/tmp/snapshot")
+	require.ErrorIs(t, err, sentinel)
 }
