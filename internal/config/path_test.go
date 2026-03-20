@@ -9,6 +9,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type pathMockFS struct {
+	MockFileSystem
+	absErr error
+}
+
+func (m *pathMockFS) Abs(path string) (string, error) {
+	if m.absErr != nil {
+		return "", m.absErr
+	}
+	return m.MockFileSystem.Abs(path)
+}
+
 func TestUnit_Path_Resolution(t *testing.T) {
 	home := "/home/user"
 	baseDir := "/abs/path"
@@ -43,6 +55,19 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		val, err = ResolvePath("just-name", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "just-name", val) // No ./ prefix, no resolution
+
+		// fs.Abs failure case
+		mfsErr := &pathMockFS{
+			MockFileSystem: MockFileSystem{
+				WD: "/wd",
+			},
+			absErr: assert.AnError,
+		}
+		hostCtx := &HostContext{Level: 1} // Trigger nested check
+		rErr, _ := NewExpressionResolverWithFS(hostCtx, mfsErr)
+		// ResolvePath calls fs.Abs when r.HostContext.Level > 0 and path is NOT absolute.
+		_, err = ResolvePath("some/path", "/wd", rErr)
+		require.Error(t, err)
 	})
 
 	t.Run("ConfigPath.Resolve", func(t *testing.T) {
@@ -82,6 +107,17 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, filepath.Join(home, "config"), mount.Source)
 		assert.Equal(t, "/root/config", mount.Target)
 		assert.True(t, mount.ReadOnly)
+
+		mc = MountConfig{
+			Type:   "volume",
+			Source: ConfigPath{Raw: "myvol"},
+			Target: ConfigPath{Raw: "/data"},
+		}
+		mount, err = mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "volume", mount.Type)
+		assert.Equal(t, "myvol", mount.Source)
+		assert.Equal(t, "/data", mount.Target)
 	})
 
 	t.Run("DeviceConfig.Resolve", func(t *testing.T) {
@@ -463,6 +499,16 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 		val, err = cp.ResolveDevice(r)
 		require.NoError(t, err)
 		assert.Empty(t, val)
+	})
+
+	t.Run("DeviceConfig.SetBaseDir", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/a"},
+			Destination: ConfigPath{Raw: "/dev/b"},
+		}
+		dc.SetBaseDir("/base")
+		assert.Equal(t, "/base", dc.Source.BaseDir)
+		assert.Equal(t, "/base", dc.Destination.BaseDir)
 	})
 }
 
