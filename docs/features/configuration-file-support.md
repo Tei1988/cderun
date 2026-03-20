@@ -1,4 +1,4 @@
-# 機能仕様：設定ファイルサポート (完了)
+# 機能仕様：設定ファイルサポート
 
 ## 概要
 
@@ -8,10 +8,10 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 
 ### ファイル構成
 
-設定は2つのファイルに分離：
+設定は2つのファイルに分離されています。
 
-1. **`.cderun.yaml`**: cderun自体の動作設定
-2. **`.tools.yaml`**: 各サブコマンド（ツール）の実行設定
+1. **`.cderun.yaml`**: cderun自体の動作設定（デフォルト値、ランタイム、ログ設定など）
+2. **`.tools.yaml`**: 各サブコマンド（ツール）ごとの実行設定（イメージ、マウント、環境変数など）
 
 ### サポートされる形式
 
@@ -23,10 +23,10 @@ cderun自体の動作設定と、各サブコマンド（ツール）の実行�
 
 以下のオプションは、設定ファイルの**読み込み先パスを決める**ためのオプションであり、ファイルを読み込む前にパスが確定している必要があるため P1/P2/P3 のみ有効です。P4/P5（設定ファイル内）に記述すると、デコードエラーが発生します。
 
-これは、デシリアライザが `KnownFields(true)` に設定されているため、`config` や `toolConfig` のような定義されていない、あるいは許可されていないフィールドが含まれているとエラーを出す仕様になっているためです。
+- **`config`** (`--config`): cderun設定ファイルのパス（YAML内キー: `config` は不可）
+- **`toolConfig`** (`--tool-config`): ツール設定ファイルのパス（YAML内キー: `toolConfig` は不可）
 
-- **`config`** (`--config`): cderun設定ファイルのパス（設定ファイル内では記述不可）
-- **`toolConfig`** (`--tool-config`): ツール設定ファイルのパス（設定ファイル内では記述不可）
+> **Note**: `dryRun`, `dryRunFormat`, `diagnosis`, `diagnosisFormat` は、以前の仕様とは異なり、現在は設定ファイル内でもフルサポートされています。
 
 ### 明示的な設定ファイルの指定
 
@@ -75,263 +75,64 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 #### マージのルール
 
-- 見つかったすべての設定ファイルの内容がマージされます。
-- 設定値が重複した場合、上記の検索順序でより優先度の高いファイルの値が採用されます。
-- **リスト型の設定について**: `mounts`, `env`, `ports`, `devices` などのリスト形式の設定は、**「上書き（完全置き換え）」**となります。マージ（追加）はされません。
-
-### 値の解決 (Value Resolution)
-
-設定ファイル内の値は、cderunによって解釈・実行される前に、いくつかの変換プロセスを経ます（cderun式やチルダ展開など）。
-
-詳細は [値の解決 (Value Resolution)](./value-resolution.md) を参照してください。
+- 検索された順序（優先順位の高い順）で設定ファイルの内容が読み込まれ、マージされます。
+- **リスト型の設定（`mounts`, `env`, `ports`, `devices` など）について**:
+  これらの設定は、**「上書き（完全置き換え）」**となります。優先順位の高いファイルに定義があれば、低いファイルの内容はすべて無視されます。マージ（追加）はされません。
 
 ## 設定スキーマ
 
-### `.cderun.yaml` 例
+設定ファイルで使用するキー名は、コマンドラインフラグに対応した**キャメルケース（camelCase）**です。
 
-```yaml
-runtime: docker                    # コンテナランタイム (docker/podman)
-socketPath: /var/run/docker.sock   # ホスト上のランタイムソケットパス
-defaults:
-  tty: false                       # デフォルトでTTYを有効化
-  interactive: false               # デフォルトでインタラクティブモード
-  network: bridge                  # デフォルトネットワーク
-  remove: true                     # コンテナの自動削除
-  strictEnv: false                 # 環境変数の厳密モード
-  mountSocket: false               # ソケットのマウント
-  mountSocketPath: /var/run/docker.sock # コンテナ内のソケットマウントパス
-  mountCderun: false               # cderunバイナリのマウント
-  mountCderunPath: ""              # cderunバイナリのホスト側パス
-  mountTools: ["node", "python"]   # コンテナ内にマウントするツールのリスト
-  mountAllTools: false             # 定義された全ツールのマウント
-  # ネットワーク・セキュリティ・リソース等のデフォルト
-  ports: ["8080:80"]
-  publishAll: false
-  expose: ["80/tcp"]
-  hostname: "cderun-host"
-  dns: ["8.8.8.8"]
-  addHosts: ["myserver:192.168.1.1"]
-  user: "1000:1000"
-  privileged: false
-  capAdd: ["SYS_ADMIN"]
-  capDrop: ["NET_RAW"]
-  entrypoint: ["/usr/bin/myentry"]
-  pull: "missing"
-  memory: "1g"
-  cpus: 1.5
-  hangTimeout: "5s"          # ハングタイムアウト
-  dryRun: false              # ドライランモード
-  dryRunFormat: yaml         # ドライラン出力形式
-  diagnosis: false           # 診断モード
-  diagnosisFormat: yaml      # 診断出力形式
-  mounts:
-    - type: tmpfs
-      target: /tmp
-  devices:
-    - /dev/fuse
-logging:
-  level: warn                      # ログレベル
-  format: text                     # ログフォーマット (text/json)
-  timestamp: true                  # タイムスタンプの有無
-```
-
-### `.tools.yaml` 例
-
-```yaml
-node:
-  image: node:20-alpine
-  strictEnv: true
-  tty: true
-  interactive: true
-  network: host
-  ports:
-    - "3000:3000"
-  publishAll: false
-  expose:
-    - "3000/tcp"
-  hostname: node-app
-  dns:
-    - 8.8.8.8
-  addHosts:
-    - "db:192.168.1.10"
-  user: "node"
-  privileged: false
-  capAdd:
-    - NET_ADMIN
-  capDrop:
-    - SETUID
-  entrypoint:
-    - node
-  pull: missing
-  mounts:
-    - type: bind
-      source: .
-      target: /workspace
-    - type: bind
-      source: ~/.npm
-      target: /root/.npm
-  env:
-    - NODE_ENV=development
-  workdir: /workspace
-  remove: true
-  mountCderun: true
-  privileged: false
-  memory: "512m"
-  hangTimeout: "10s"         # 処理が重いツールは長めに設定
-  logLevel: info             # ツール別にログレベルを変える
-  logFormat: text
-  logTimestamp: true
-  dryRun: false
-  dryRunFormat: yaml
-  diagnosis: false
-  diagnosisFormat: yaml
-  devices:
-    - /dev/fuse                    # コンテナに追加するデバイス
-
-python:
-  image: python:3.11-slim
-  tty: true
-  interactive: true
-  env:
-    - PYTHONUNBUFFERED=1
-  mounts:
-    - type: bind
-      source: .
-      target: /app
-    - type: bind
-      source: ~/.cache/pip
-      target: /root/.cache/pip
-  workdir: /app
-
-docker:
-  image: docker:latest
-  mounts:
-    - type: bind
-      source: /var/run/docker.sock
-      target: /var/run/docker.sock
-  network: host
-```
-
-## 設定オプション詳細
-
-### `.cderun.yaml` （cderun自体の設定）
+### `.cderun.yaml` (Global Settings)
 
 #### トップレベル
 
-- `runtime` (string): 使用するコンテナランタイム
-  - 値: `docker` | `podman`
-  - デフォルト: `docker`
+- `runtime` (string): 使用するコンテナランタイム (`docker` | `podman`)
 - `socketPath` (string): ホスト上のランタイムソケットの絶対パス
-  - 例: `/var/run/docker.sock`, `/run/podman/podman.sock`
-  - デフォルト: 自動検出
+- `defaults` (object): cderunコマンドのデフォルト動作（下記参照）
+- `logging` (object): ログ出力設定
+  - `level`: `error` | `warn` | `info` | `debug` | `trace`
+  - `format`: `text` | `json`
+  - `timestamp`: bool
 
-#### `defaults` サブセクション
+#### `defaults` ブロックでサポートされるフィールド
 
-cderunコマンドのデフォルト動作を定義。コマンドライン引数で上書き可能。
+- `tty`, `interactive`, `remove`, `strictEnv` (bool)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `memory`, `hangTimeout` (string)
+- `cpus` (float64)
+- `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
+- `mountCderunPath`, `mountSocketPath` (ConfigPath object/string)
+- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env` ([]string)
+- `dryRun`, `diagnosis` (bool)
+- `dryRunFormat`, `diagnosisFormat` (string)
+- `mounts` ([]MountConfig)
+- `devices` ([]DeviceConfig)
 
-- `tty` (bool): デフォルトでTTYを割り当てる
-- `interactive` (bool): デフォルトでSTDINを開いたままにする
-- `network` (string): デフォルトのネットワーク設定
-- `remove` (bool): コンテナ終了後に自動削除
-- `strictEnv` (bool): 指定された環境変数がホストに存在しない場合にエラーとする
-- `workdir` (string): デフォルトの作業ディレクトリ
-- `mountSocket` (bool): ホストのランタイムソケットをマウント
-- `mountSocketPath` (string): コンテナ内のソケットマウントパス
-- `mountCderun` (bool): cderunバイナリをマウント
-- `mountCderunPath` (string): cderunバイナリのホスト側パス
-- `mountTools` ([]string): 指定したツールをコンテナ内にマウント
-- `mountAllTools` (bool): 全てのツールをコンテナ内にマウント
-- `ports` ([]string): ポートマッピング
-- `publishAll` (bool): 全ポート公開
-- `expose` ([]string): ポート露出
-- `hostname` (string): ホスト名
-- `dns` ([]string): DNSサーバ
-- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip` (YAMLキー: `addHosts`)。
-- `user` (string): 実行ユーザー
-- `privileged` (bool): 特権モード
-- `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
-- `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
-- `entrypoint` ([]string): エントリーポイント
-- `pull` (string): プルポリシー (`always` | `missing` | `never`)
-- `memory` (string): メモリ制限
-- `cpus` (float64): CPU制限
-- `hangTimeout` (string): ハングタイムアウト。Go Duration 形式（例: `2s`, `500ms`）
-- `dryRun` (bool): ドライランモード
-- `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
-- `diagnosis` (bool): 診断モード
-- `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
+### `.tools.yaml` (Tool Mappings)
 
-- `mounts` ([]object): マウント設定
-  - `type` (string): `bind` | `volume` | `tmpfs`
-  - `source` (string): ホスト側のパス（bindの場合）
-  - `target` (string, 必須): コンテナ内のパス
-  - `read_only` (bool): 読み取り専用
-- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`。
-- `env` ([]string): 環境変数
-
-#### `logging` サブセクション
-
-ログ出力に関する設定。
-
-- `level` (string): ログレベル (`error` | `warn` | `info` | `debug` | `trace`)
-- `format` (string): ログの出力形式 (`text` | `json`)
-- `timestamp` (bool): タイムスタンプを含めるかどうか
-
-### `.tools.yaml` （サブコマンドの設定）
-
-各ツール名をキーとして、そのツールの実行設定を定義。
-cderunのコマンドライン引数で指定できる全てのオプションを設定可能。
-
-#### 共通オプション
+各ツール名をキーとして、そのツールの実行設定を定義します。`defaults` ブロックでサポートされているすべてのフィールドに加え、以下のフィールドが必須です。
 
 - `image` (string, 必須): 使用するコンテナイメージ
-- `addHosts` ([]string): ホストマッピング。形式: `hostname:ip`。
-- `devices` ([]string): デバイス追加。形式: `<host-path>:<container-path>[:<permissions>]` または `<path>`。
-- `tty` (bool): TTYを割り当てる（`--tty`フラグに相当）
-- `interactive` (bool): STDINを開く（`--interactive`フラグに相当）
-- `network` (string): ネットワーク設定（`--network`フラグに相当）
-- `remove` (bool): コンテナの自動削除
-- `strictEnv` (bool): 環境変数の厳密モード
-- `mounts` ([]object): マウント設定（上述）
-- `env` ([]string): 環境変数
-  - 形式: `KEY=VALUE`
-  - 例: `NODE_ENV=development`
-- `workdir` (string): コンテナ内の作業ディレクトリ
-- `mountSocket` (bool): ホストのランタイムソケットをマウント
-- `mountSocketPath` (string): コンテナ内のソケットマウントパス
-- `mountCderun` (bool): cderunバイナリをマウント
-- `mountCderunPath` (string): cderunバイナリのホスト側パス
-- `mountTools` ([]string): 指定したツールをコンテナ内にマウント
-- `mountAllTools` (bool): 全てのツールをコンテナ内にマウント
-- `ports` ([]string): ポートマッピング
-- `publishAll` (bool): 全ポート公開
-- `expose` ([]string): ポート露出
-- `hostname` (string): ホスト名
-- `dns` ([]string): DNSサーバ
-- `user` (string): 実行ユーザー
-- `privileged` (bool): 特権モード
-- `capAdd` ([]string): ケーパビリティ追加 (YAMLキー: `capAdd`)
-- `capDrop` ([]string): ケーパビリティ削除 (YAMLキー: `capDrop`)
-- `entrypoint` ([]string): エントリーポイント
-- `pull` (string): プルポリシー (`always` | `missing` | `never`)
-- `memory` (string): メモリ制限
-- `cpus` (float64): CPU制限
-- `hangTimeout` (string): ハングタイムアウト。Go Duration 形式（例: `2s`, `500ms`）
-- `logLevel` (string): ログレベル (`error` | `warn` | `info` | `debug` | `trace`)
-- `logFormat` (string): ログ出力形式 (`text` | `json`)
-- `logTimestamp` (bool): タイムスタンプを含めるかどうか
-- `dryRun` (bool): ドライランモード
-- `dryRunFormat` (string): ドライラン出力形式 (`yaml` | `json` | `simple`)
-- `diagnosis` (bool): 診断モード
-- `diagnosisFormat` (string): 診断出力形式 (`yaml` | `json` | `simple`)
 
-> [!IMPORTANT]
-> `config` および `toolConfig` は、ネストされた実行時に内部メタデータとして使用されるフィールドであり、ユーザーが設定ファイル（`.cderun.yaml` / `.tools.yaml`）に記述するためのものではありません。
-> `cderun` は `internal/command/root.go` の `loadConfigs` メソッドにより、フラグ（`--config`, `--tool-config`）または環境変数（`CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`）から読み込み先パスを決定します。
+また、以下のログ設定をツールごとに上書き可能です。
 
-## 優先順位
+- `logLevel`, `logFormat` (string)
+- `logTimestamp` (bool)
 
-設定の優先順位については、[引数・設定優先順位](./argument-priority-logic.md) を参照してください。
+## 設定オプション詳細
+
+### マウント設定 (`mounts`)
+
+`mounts` 配列の各要素は以下のフィールドを持ちます。
+
+- `type`: `bind` | `volume` | `tmpfs`
+- `source`: ホスト側のパス（bindの場合）
+- `target` (必須): コンテナ内のパス
+- `readOnly`: bool
+
+### デバイス設定 (`devices`)
+
+`devices` 配列の各要素は、文字列形式 (`<host-path>:<container-path>[:<permissions>]`) またはオブジェクト形式で記述可能です。
 
 ---
-*2026年3月14日時点の仕様である。*
+*2026年3月17日時点の仕様である。*
