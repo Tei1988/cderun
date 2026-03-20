@@ -77,7 +77,8 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 - 見つかったすべての設定ファイルの内容がマージされます。
 - 設定値が重複した場合、上記の検索順序でより優先度の高いファイルの値が採用されます。
-- **リスト型の設定について**: `mounts`, `env`, `ports`, `devices` などのリスト形式の設定は、**「上書き（完全置き換え）」**となります。マージ（追加）はされません。
+- **リスト型の設定について**: `mounts`, `env`, `ports`, `devices` などのリスト形式の設定は、原則として**「上書き（完全置き換え）」**となります。マージ（追加）はされません。
+  - **重要**: ただし、上位のファイルでリストを**空（`[]`）**に設定した場合は、下位のファイルの設定が採用されます（フォールバックが発生します）。空のリストによって下位の設定を打ち消すことはできません。
 
 ### 値の解決 (Value Resolution)
 
@@ -121,9 +122,9 @@ defaults:
   cpus: 1.5
   hangTimeout: "5s"          # ハングタイムアウト
   dryRun: false              # ドライランモード
-  dryRunFormat: yaml         # ドライラン出力形式
+  dryRunFormat: yaml         # ドライラン出力形式 (yaml/json/simple)
   diagnosis: false           # 診断モード
-  diagnosisFormat: yaml      # 診断出力形式
+  diagnosisFormat: yaml      # 診断出力形式 (yaml/json/simple)
   mounts:
     - type: tmpfs
       target: /tmp
