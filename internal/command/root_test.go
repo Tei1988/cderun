@@ -537,13 +537,26 @@ func TestUnit_Root_GetFd(t *testing.T) {
 	assert.False(t, ok)
 }
 
+type syncBlockingReader struct {
+	entered chan struct{}
+	unblock chan struct{}
+}
+
+func (r *syncBlockingReader) Read(p []byte) (n int, err error) {
+	close(r.entered)
+	<-r.unblock
+	copy(p, "hello")
+	return 5, nil
+}
+
 func TestUnit_Root_SyncReader(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	ready := make(chan struct{})
-	inner := strings.NewReader("hello")
+	entered := make(chan struct{})
+	unblock := make(chan struct{})
+	inner := &syncBlockingReader{entered: entered, unblock: unblock}
 
 	sr := &syncReader{
 		inner: inner,
@@ -562,20 +575,34 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 		done <- true
 	}()
 
+	// Ensure Read has reached the select block but is waiting for ready
 	select {
 	case <-done:
-		t.Fatal("Read should have blocked")
+		t.Fatal("Read should have blocked on ready")
 	case <-time.After(10 * time.Millisecond):
 		// OK
 	}
 
 	close(ready)
+
+	// Now ensure it reaches the inner reader's Read method
+	<-entered
+
+	// And verify it's still blocked on unblock
+	select {
+	case <-done:
+		t.Fatal("Read should have blocked on inner reader")
+	case <-time.After(10 * time.Millisecond):
+		// OK
+	}
+
+	close(unblock)
 	<-done
 }
 
 func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	sr := &syncReader{
 		inner: strings.NewReader("hello"),
@@ -615,10 +642,10 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: &runtime.MockRuntime{ExitCode: 123},
 			isRunning:   false,
 		}
-		exitCode, err := o.forceTerminateIfRunning(context.Background(), mockRuntime, "c1")
+		exitCode, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, 123, exitCode)
-		assert.Equal(t, "", mockRuntime.SignaledContainerID)
+		assert.Empty(t, mockRuntime.SignaledContainerID)
 	})
 
 	t.Run("Container running, signal success", func(t *testing.T) {
@@ -626,7 +653,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			isRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(context.Background(), mockRuntime, "c1")
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
@@ -637,7 +664,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			inspectErr:  errors.New("inspect failed"),
 		}
-		_, err := o.forceTerminateIfRunning(context.Background(), mockRuntime, "c1")
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 	})
@@ -647,7 +674,9 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
 			isRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(context.Background(), mockRuntime, "c1")
+		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
+		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
 }

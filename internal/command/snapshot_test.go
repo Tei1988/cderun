@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,8 +201,8 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 
 func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
 	t.Parallel()
-	mfs := &config.MockFileSystem{}
-	// cleanupSnapshot should ignore errors from RemoveAll as it's a best-effort cleanup
-	err := cleanupSnapshot(mfs, "/nonexistent")
-	require.NoError(t, err)
+	sentinel := errors.New("cleanup failed")
+	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
+	err := cleanupSnapshot(mfs, "/tmp/snapshot")
+	require.ErrorIs(t, err, sentinel)
 }
