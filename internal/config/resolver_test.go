@@ -265,4 +265,48 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "debug", res.LogLevel)
 	})
+
+	t.Run("resolveDevices from environment", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/b:rw"}}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/a", res.Devices[0].PathOnHost)
+	})
+
+	t.Run("resolveDevices invalid format in CDERUN_DEVICE", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": ":"}}
+		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.Error(t, err)
+	})
+
+	t.Run("resolveMounts from environment", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "source=/a,target=/b"}}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/a", res.Mounts[0].Source)
+	})
+
+	t.Run("resolveMounts invalid format in CDERUN_MOUNT", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "invalid"}}
+		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.Error(t, err)
+	})
+
+	t.Run("resolveConfigPath from CDERUN_SOCKET_PATH", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_SOCKET_PATH": "/run/my.sock"}}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/run/my.sock", res.SocketPath)
+	})
+
+	t.Run("resolveConfigPath from global config", func(t *testing.T) {
+		global := &CDERunConfig{
+			SocketPath: ConfigPath{Raw: "/global.sock"},
+		}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "/global.sock", res.SocketPath)
+	})
 }

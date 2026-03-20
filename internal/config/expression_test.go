@@ -7,6 +7,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type exprMockFS struct {
+	MockFileSystem
+	homeDirErr  error
+	getwdErr    error
+	readFileErr error
+}
+
+func (m *exprMockFS) UserHomeDir() (string, error) {
+	if m.homeDirErr != nil {
+		return "", m.homeDirErr
+	}
+	return m.MockFileSystem.UserHomeDir()
+}
+
+func (m *exprMockFS) Getwd() (string, error) {
+	if m.getwdErr != nil {
+		return "", m.getwdErr
+	}
+	return m.MockFileSystem.Getwd()
+}
+
+func (m *exprMockFS) ReadFile(name string) ([]byte, error) {
+	if m.readFileErr != nil {
+		return nil, m.readFileErr
+	}
+	return m.MockFileSystem.ReadFile(name)
+}
+
 func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
 	fs := &MockFileSystem{
 		WD:      "/container/work",
@@ -33,6 +61,30 @@ func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
 		// HOME and PWD still return container-local values
 		assert.Equal(t, "/root", r.resolveString("{{HOME}}"))
 		assert.Equal(t, "/container/work", r.resolveString("{{PWD}}"))
+	})
+
+	t.Run("NewExpressionResolverWithFS - UserHomeDir failure", func(t *testing.T) {
+		fsErr := &exprMockFS{
+			homeDirErr: assert.AnError,
+			MockFileSystem: MockFileSystem{
+				WD: "/wd",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fsErr)
+		require.NoError(t, err)
+		assert.Empty(t, r.Home)
+	})
+
+	t.Run("NewExpressionResolverWithFS - Getwd failure", func(t *testing.T) {
+		fsErr := &exprMockFS{
+			getwdErr: assert.AnError,
+			MockFileSystem: MockFileSystem{
+				HomeDir: "/home",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fsErr)
+		require.NoError(t, err)
+		assert.Empty(t, r.Pwd)
 	})
 }
 
@@ -74,6 +126,26 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: nonexistent")
 	})
+
+	t.Run("filepath.Rel failure in resolveFindDir", func(t *testing.T) {
+		// On Unix, filepath.Rel("rel", "/abs") fails.
+		fs := &MockFileSystem{
+			Files: map[string][]byte{"/abs/foo": []byte("bar")},
+			Dirs:  map[string]bool{"/abs": true},
+			WD:    "/abs",
+		}
+		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+
+		// Force find_dir to use a search result that will fail Rel against r2.Pwd
+		// resolveFindDir calls FindConfigs, which returns absolute paths from MockFileSystem.Abs
+		// Then it calls filepath.Rel(r.Pwd, dir)
+		r2.Pwd = "relative" // rel
+		// FindConfigs will find /abs/foo
+		r2.resolveString("{{ find_dir:foo }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "failed to calculate relative path")
+	})
 }
 
 func TestUnit_Expression_FileError(t *testing.T) {
@@ -103,6 +175,22 @@ func TestUnit_Expression_FileError(t *testing.T) {
 		r2.resolveString("{{ file:missing }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "file not found: missing")
+	})
+
+	t.Run("ReadFile failure in resolveFile", func(t *testing.T) {
+		fsErr := &exprMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.go-version": []byte("1.21")},
+				Dirs:  map[string]bool{"/project": true},
+				WD:    "/project",
+			},
+			readFileErr: assert.AnError,
+		}
+		r2, err := NewExpressionResolverWithFS(hostCtx, fsErr)
+		require.NoError(t, err)
+		r2.resolveString("{{ file:.go-version }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "failed to read file")
 	})
 }
 

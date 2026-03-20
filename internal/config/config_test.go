@@ -7,6 +7,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type customMockFS struct {
+	MockFileSystem
+	homeDirErr  error
+	absErr      error
+	readFileErr error
+}
+
+func (m *customMockFS) UserHomeDir() (string, error) {
+	if m.homeDirErr != nil {
+		return "", m.homeDirErr
+	}
+	return m.MockFileSystem.UserHomeDir()
+}
+
+func (m *customMockFS) Abs(path string) (string, error) {
+	if m.absErr != nil {
+		return "", m.absErr
+	}
+	return m.MockFileSystem.Abs(path)
+}
+
+func (m *customMockFS) ReadFile(name string) ([]byte, error) {
+	if m.readFileErr != nil {
+		return nil, m.readFileErr
+	}
+	return m.MockFileSystem.ReadFile(name)
+}
+
 func TestUnit_Config_LoadCDERun(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		mfs := &MockFileSystem{
@@ -185,6 +213,37 @@ defaults:
 		require.Error(t, err)
 	})
 
+	t.Run("LoadCDERunConfigFromPath - expandHome failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			homeDirErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfigFromPath("~/config.yaml")
+		require.Error(t, err)
+	})
+
+	t.Run("LoadCDERunConfigFromPath - Abs failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			absErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfigFromPath("/config.yaml")
+		require.Error(t, err)
+	})
+
+	t.Run("LoadCDERunConfigFromPath - ReadFile failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/config.yaml": []byte("foo")},
+				WD:    "/",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfigFromPath("/config.yaml")
+		require.Error(t, err)
+	})
+
 	t.Run("LoadToolsConfigFromPath", func(t *testing.T) {
 		content := `
 node:
@@ -215,6 +274,36 @@ node:
 		require.Error(t, err)
 	})
 
+	t.Run("LoadToolsConfigFromPath - expandHome failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			homeDirErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfigFromPath("~/tools.yaml")
+		require.Error(t, err)
+	})
+
+	t.Run("LoadToolsConfigFromPath - Abs failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			absErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfigFromPath("/tools.yaml")
+		require.Error(t, err)
+	})
+
+	t.Run("LoadToolsConfigFromPath - ReadFile failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/tools.yaml": []byte("foo")},
+				WD:    "/",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfigFromPath("/tools.yaml")
+		require.Error(t, err)
+	})
 }
 
 func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
@@ -352,5 +441,9 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
 		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
 		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
+	})
+
+	t.Run("copyFloat64Ptr nil", func(t *testing.T) {
+		assert.Nil(t, copyFloat64Ptr(nil))
 	})
 }
