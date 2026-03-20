@@ -13,7 +13,8 @@ While our current DinD tests cover standard container workflows, Podman introduc
 **Key Requirements:**
 1. **New Test Job:** Create a new job (e.g., test-podman) or extend the existing matrix to include Podman.
 1. **Container Image:** Use quay.io/podman/stable:v5.8.1 as the execution environment.
-1. **Environment Setup:** - Ensure the container runs in --privileged mode to allow Podman-to-Podman nesting.
+1. **Environment Setup:**
+  - Ensure the container runs in --privileged mode to allow Podman-to-Podman nesting.
   - Configure necessary environment variables or aliases (e.g., alias docker=podman) if the test suite expects a docker command.
 1. **Validation:** All existing integration tests must pass within the Podman container.
 
