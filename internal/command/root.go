@@ -3,139 +3,134 @@ package command
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
+	"gopkg.in/yaml.v3"
 
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
 	"cderun/internal/version"
-
-	"github.com/docker/go-units"
-	"github.com/spf13/cobra"
-	"golang.org/x/term"
-	"gopkg.in/yaml.v3"
 )
 
+const hangTimeout = 2 * time.Second
+
 type rootOptions struct {
-	tty                   bool
-	interactive           bool
-	network               string
-	socketPath            string
-	mountSocket           bool
-	mountSocketPath       string
-	mountCderun           bool
-	mountCderunPath       string
-	image                 string
-	remove                bool
+	// Options matching flags
+	tty               bool
+	interactive       bool
+	network           string
+	socketPath        string
+	mountSocket       bool
+	mountSocketPath   string
+	mountCderun       bool
+	mountCderunPath   string
+	mountAllTools     bool
+	mountTools        string
+	remove            bool
+	image             string
+	runtimeName       string
+	workdir           string
+	configPath        string
+	toolConfigPath    string
+	hostname          string
+	user              string
+	pull              string
+	memory            string
+	dryRun            bool
+	dryRunFormat      string
+	diagnosis         bool
+	diagnosisFormat   string
+	logLevel          string
+	logFormat         string
+	logTimestamp      bool
+	hangTimeout       string
+	strictEnv         bool
+	publishAll        bool
+	privileged        bool
+
+	// String slices for multi-value flags
+	env        []string
+	mounts     []string
+	ports      []string
+	expose     []string
+	dns        []string
+	addHosts   []string
+	capAdd     []string
+	capDrop    []string
+	entrypoint []string
+	devices    []string
+
+	// Float64 flags
+	cpus float64
+
+	// Internal override flags (P1)
 	cderunTTY             bool
 	cderunInteractive     bool
-	cderunImage           string
 	cderunNetwork         string
-	cderunRemove          bool
-	cderunRuntime         string
 	cderunSocketPath      string
 	cderunMountSocket     bool
 	cderunMountSocketPath string
-	cderunWorkdir         string
-	cderunMounts          []string
 	cderunMountCderun     bool
 	cderunMountCderunPath string
-	cderunMountTools      string
 	cderunMountAllTools   bool
-	runtimeName           string
-	env                   []string
-	cderunEnv             []string
-	workdir               string
-	mounts                []string
-	mountTools            string
-	mountAllTools         bool
-	configPath            string
+	cderunMountTools      string
+	cderunRemove          bool
+	cderunImage           string
+	cderunRuntime         string
+	cderunWorkdir         string
 	cderunConfigPath      string
-	toolConfigPath        string
 	cderunToolConfigPath  string
-	dryRun                bool
-	dryRunFormat          string
+	cderunHostname        string
+	cderunUser            string
+	cderunPull            string
+	cderunMemory          string
 	cderunDryRun          bool
 	cderunDryRunFormat    string
-	diagnosis             bool
-	diagnosisFormat       string
 	cderunDiagnosis       bool
 	cderunDiagnosisFormat string
-	logLevel              string
-	logFormat             string
-	logTimestamp          bool
-	strictEnv             bool
-	cderunStrictEnv       bool
 	cderunLogLevel        string
 	cderunLogFormat       string
 	cderunLogTimestamp    bool
-	hangTimeout           string
 	cderunHangTimeout     string
+	cderunStrictEnv       bool
+	cderunPublishAll      bool
+	cderunPrivileged      bool
 
-	// Docker-compatible flags
-	ports            []string
-	publishAll       bool
-	expose           []string
-	hostname         string
-	dns              []string
-	addHosts         []string
-	user             string
-	privileged       bool
-	capAdd           []string
-	capDrop          []string
-	entrypoint       []string
-	pull             string
-	memory           string
-	cpus             float64
-	devices          []string
+	cderunEnv        []string
+	cderunMounts     []string
 	cderunPorts      []string
-	cderunPublishAll bool
 	cderunExpose     []string
-	cderunHostname   string
 	cderunDNS        []string
 	cderunAddHosts   []string
-	cderunUser       string
-	cderunPrivileged bool
 	cderunCapAdd     []string
 	cderunCapDrop    []string
 	cderunEntrypoint []string
-	cderunPull       string
-	cderunMemory     string
-	cderunCPUs       float64
 	cderunDevices    []string
 
-	// Dependencies
-	fs           config.FileSystem
-	configLoader *config.ConfigLoader
-	logger       *logging.Logger
+	cderunCPUs float64
 
-	// Testing hooks
-	exitFunc       func(int)
-	isTerminal     func(int) bool
-	termGetSize    func(int) (int, int, error)
-	makeRaw        func(int) (*term.State, error)
-	restore        func(int, *term.State) error
-	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
+	// Injectable dependencies
+	fs                config.FileSystem
+	configLoader      *config.ConfigLoader
+	runtimeFactory    func(name, socket string) (runtime.ContainerRuntime, error)
+	logger            *logging.Logger
+	exitFunc          func(code int)
+	isTerminal        func(fd int) bool
+	termGetSize       func(fd int) (int, int, error)
+	attachGracePeriod time.Duration
 }
 
-const (
-	attachGracePeriod = 5 * time.Second
-	hangTimeout       = 2 * time.Second
-)
-
 var (
-	opts = defaultOptions()
-
-	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
+	opts    rootOptions
 	rootCmd *cobra.Command
 )
 
@@ -143,39 +138,19 @@ func defaultOptions() rootOptions {
 	return rootOptions{
 		fs: config.RealFileSystem{},
 		exitFunc: func(code int) {
-			// Default to no-op for safety in tests.
-			// The global 'opts' is updated in init() to use os.Exit.
+			os.Exit(code)
 		},
-		isTerminal: func(fd int) bool {
-			return term.IsTerminal(fd)
-		},
-		termGetSize: func(fd int) (int, int, error) {
-			return term.GetSize(fd)
-		},
-		makeRaw: func(fd int) (*term.State, error) {
-			return term.MakeRaw(fd)
-		},
-		restore: func(fd int, state *term.State) error {
-			return term.Restore(fd, state)
-		},
-		logger: logging.GetGlobalLogger(),
-		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
-			switch name {
-			case "docker":
-				return runtime.NewDockerRuntime(socket)
-			case "podman":
-				return runtime.NewPodmanRuntime(socket)
-			default:
-				return nil, fmt.Errorf("unsupported runtime %q", name)
-			}
-		},
+		runtimeFactory:    runtime.NewRuntime,
+		logger:            logging.NewLogger(),
+		isTerminal:        func(fd int) bool { return term.IsTerminal(fd) },
+		termGetSize:       term.GetSize,
+		attachGracePeriod: 5 * time.Second,
 	}
 }
 
 func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *config.CDERunConfig, []string, []string, error) {
 	o.logger.Trace("Loading configurations...")
 
-	// Determine CDERun config path
 	cderunPath := ""
 	if cmd.Flags().Changed("cderun-config") {
 		cderunPath = o.cderunConfigPath
@@ -188,19 +163,19 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 	var globalCfg *config.CDERunConfig
 	var globalPaths []string
 	var err error
+
 	if cderunPath != "" {
 		globalCfg, globalPaths, err = o.configLoader.LoadCDERunConfigFromPath(cderunPath)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config from %s: %w", cderunPath, err)
+		}
 	} else {
 		globalCfg, globalPaths, err = o.configLoader.LoadCDERunConfig()
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
+		}
 	}
 
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to load cderun config: %w", err)
-	} else if len(globalPaths) > 0 {
-		o.logger.Debug("Loaded cderun config from: %s", strings.Join(globalPaths, ", "))
-	}
-
-	// Determine Tools config path
 	toolsPath := ""
 	if cmd.Flags().Changed("cderun-tool-config") {
 		toolsPath = o.cderunToolConfigPath
@@ -212,209 +187,182 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 
 	var toolsCfg config.ToolsConfig
 	var toolsPaths []string
+
 	if toolsPath != "" {
 		toolsCfg, toolsPaths, err = o.configLoader.LoadToolsConfigFromPath(toolsPath)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to load tools config from %s: %w", toolsPath, err)
+		}
 	} else {
 		toolsCfg, toolsPaths, err = o.configLoader.LoadToolsConfig()
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
+		}
 	}
 
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to load tools config: %w", err)
-	} else if len(toolsPaths) > 0 {
-		o.logger.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
-	}
 	return toolsCfg, globalCfg, globalPaths, toolsPaths, nil
 }
 
-func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
-	cliOpts := config.CLIOptions{
-		Image:                    o.image,
-		ImageSet:                 cmd.Flags().Changed("image"),
-		TTY:                      o.tty,
-		TTYSet:                   cmd.Flags().Changed("tty"),
-		Interactive:              o.interactive,
-		InteractiveSet:           cmd.Flags().Changed("interactive"),
-		Network:                  o.network,
-		NetworkSet:               cmd.Flags().Changed("network"),
-		CderunNetwork:            o.cderunNetwork,
-		CderunNetworkSet:         cmd.Flags().Changed("cderun-network"),
-		Remove:                   o.remove,
-		RemoveSet:                cmd.Flags().Changed("remove"),
-		CderunRemove:             o.cderunRemove,
-		CderunRemoveSet:          cmd.Flags().Changed("cderun-remove"),
+func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, tools config.ToolsConfig, global *config.CDERunConfig) (*config.ResolvedConfig, error) {
+	cli := config.CLIOptions{
+		TTY:                   o.tty,
+		TTYSet:                cmd.Flags().Changed("tty"),
+		Interactive:           o.interactive,
+		InteractiveSet:        cmd.Flags().Changed("interactive"),
+		Network:               o.network,
+		NetworkSet:            cmd.Flags().Changed("network"),
+		SocketPath:            o.socketPath,
+		SocketPathSet:         cmd.Flags().Changed("socket-path"),
+		MountSocket:           o.mountSocket,
+		MountSocketSet:        cmd.Flags().Changed("mount-socket"),
+		MountSocketPath:       o.mountSocketPath,
+		MountSocketPathSet:    cmd.Flags().Changed("mount-socket-path"),
+		MountCderun:           o.mountCderun,
+		MountCderunSet:        cmd.Flags().Changed("mount-cderun"),
+		MountCderunPath:       o.mountCderunPath,
+		MountCderunPathSet:    cmd.Flags().Changed("mount-cderun-path"),
+		MountAllTools:         o.mountAllTools,
+		MountAllToolsSet:      cmd.Flags().Changed("mount-all-tools"),
+		MountTools:            o.mountTools,
+		Remove:                o.remove,
+		RemoveSet:             cmd.Flags().Changed("remove"),
+		Image:                 o.image,
+		Runtime:               o.runtimeName,
+		Workdir:               o.workdir,
+		Hostname:              o.hostname,
+		User:                  o.user,
+		UserSet:               cmd.Flags().Changed("user"),
+		Pull:                  o.pull,
+		PullSet:               cmd.Flags().Changed("pull"),
+		Memory:                o.memory,
+		MemorySet:             cmd.Flags().Changed("memory"),
+		CPUs:                  o.cpus,
+		CPUsSet:               cmd.Flags().Changed("cpus"),
+		DryRun:                o.dryRun,
+		DryRunSet:             cmd.Flags().Changed("dry-run"),
+		DryRunFormat:          o.dryRunFormat,
+		Diagnosis:             o.diagnosis,
+		DiagnosisSet:          cmd.Flags().Changed("diagnosis"),
+		DiagnosisFormat:       o.diagnosisFormat,
+		LogLevel:              o.logLevel,
+		LogFormat:             o.logFormat,
+		LogTimestamp:          o.logTimestamp,
+		LogTimestampSet:       cmd.Flags().Changed("log-timestamp"),
+		HangTimeout:           o.hangTimeout,
+		StrictEnv:             o.strictEnv,
+		StrictEnvSet:          cmd.Flags().Changed("strict-env"),
+		PublishAll:            o.publishAll,
+		PublishAllSet:         cmd.Flags().Changed("publish-all"),
+		Privileged:            o.privileged,
+		PrivilegedSet:         cmd.Flags().Changed("privileged"),
+
+		Env:        o.env,
+		Mounts:     o.mounts,
+		Publish:    o.ports,
+		Expose:     o.expose,
+		DNS:        o.dns,
+		AddHosts:   o.addHosts,
+		CapAdd:     o.capAdd,
+		CapDrop:    o.capDrop,
+		Entrypoint: o.entrypoint,
+		Devices:    o.devices,
+
 		CderunTTY:                o.cderunTTY,
 		CderunTTYSet:             cmd.Flags().Changed("cderun-tty"),
 		CderunInteractive:        o.cderunInteractive,
 		CderunInteractiveSet:     cmd.Flags().Changed("cderun-interactive"),
-		CderunImage:              o.cderunImage,
-		CderunImageSet:           cmd.Flags().Changed("cderun-image"),
-		Runtime:                  o.runtimeName,
-		RuntimeSet:               cmd.Flags().Changed("runtime"),
-		CderunRuntime:            o.cderunRuntime,
-		CderunRuntimeSet:         cmd.Flags().Changed("cderun-runtime"),
-		SocketPath:               o.socketPath,
-		SocketPathSet:            cmd.Flags().Changed("socket-path"),
+		CderunNetwork:            o.cderunNetwork,
+		CderunNetworkSet:         cmd.Flags().Changed("cderun-network"),
 		CderunSocketPath:         o.cderunSocketPath,
 		CderunSocketPathSet:      cmd.Flags().Changed("cderun-socket-path"),
-		MountSocket:              o.mountSocket,
-		MountSocketSet:           cmd.Flags().Changed("mount-socket"),
 		CderunMountSocket:        o.cderunMountSocket,
 		CderunMountSocketSet:     cmd.Flags().Changed("cderun-mount-socket"),
-		MountSocketPath:          o.mountSocketPath,
-		MountSocketPathSet:       cmd.Flags().Changed("mount-socket-path"),
 		CderunMountSocketPath:    o.cderunMountSocketPath,
 		CderunMountSocketPathSet: cmd.Flags().Changed("cderun-mount-socket-path"),
-		Env:                      o.env,
-		CderunEnv:                o.cderunEnv,
-		Workdir:                  o.workdir,
-		WorkdirSet:               cmd.Flags().Changed("workdir"),
-		CderunWorkdir:            o.cderunWorkdir,
-		CderunWorkdirSet:         cmd.Flags().Changed("cderun-workdir"),
-		Mounts:                   o.mounts,
-		CderunMounts:             o.cderunMounts,
-		MountCderun:              o.mountCderun,
-		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
 		CderunMountCderun:        o.cderunMountCderun,
 		CderunMountCderunSet:     cmd.Flags().Changed("cderun-mount-cderun"),
-		MountCderunPath:          o.mountCderunPath,
-		MountCderunPathSet:       cmd.Flags().Changed("mount-cderun-path"),
 		CderunMountCderunPath:    o.cderunMountCderunPath,
 		CderunMountCderunPathSet: cmd.Flags().Changed("cderun-mount-cderun-path"),
-		MountTools:               o.mountTools,
-		MountToolsSet:            cmd.Flags().Changed("mount-tools"),
-		CderunMountTools:         o.cderunMountTools,
-		CderunMountToolsSet:      cmd.Flags().Changed("cderun-mount-tools"),
-		MountAllTools:            o.mountAllTools,
-		MountAllToolsSet:         cmd.Flags().Changed("mount-all-tools"),
 		CderunMountAllTools:      o.cderunMountAllTools,
 		CderunMountAllToolsSet:   cmd.Flags().Changed("cderun-mount-all-tools"),
-		DryRun:                   o.dryRun,
-		DryRunSet:                cmd.Flags().Changed("dry-run"),
+		CderunMountTools:         o.cderunMountTools,
+		CderunRemove:             o.cderunRemove,
+		CderunRemoveSet:          cmd.Flags().Changed("cderun-remove"),
+		CderunImage:              o.cderunImage,
+		CderunRuntime:            o.cderunRuntime,
+		CderunWorkdir:            o.cderunWorkdir,
+		CderunHostname:           o.cderunHostname,
+		CderunUser:               o.cderunUser,
+		CderunUserSet:            cmd.Flags().Changed("cderun-user"),
+		CderunPull:               o.cderunPull,
+		CderunPullSet:            cmd.Flags().Changed("cderun-pull"),
+		CderunMemory:             o.cderunMemory,
+		CderunMemorySet:          cmd.Flags().Changed("cderun-memory"),
+		CderunCPUs:               o.cderunCPUs,
+		CderunCPUsSet:            cmd.Flags().Changed("cderun-cpus"),
 		CderunDryRun:             o.cderunDryRun,
 		CderunDryRunSet:          cmd.Flags().Changed("cderun-dry-run"),
-		DryRunFormat:             o.dryRunFormat,
-		DryRunFormatSet:          cmd.Flags().Changed("dry-run-format"),
 		CderunDryRunFormat:       o.cderunDryRunFormat,
-		CderunDryRunFormatSet:    cmd.Flags().Changed("cderun-dry-run-format"),
-		Diagnosis:                o.diagnosis,
-		DiagnosisSet:             cmd.Flags().Changed("diagnosis"),
 		CderunDiagnosis:          o.cderunDiagnosis,
 		CderunDiagnosisSet:       cmd.Flags().Changed("cderun-diagnosis"),
-		DiagnosisFormat:          o.diagnosisFormat,
-		DiagnosisFormatSet:       cmd.Flags().Changed("diagnosis-format"),
 		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
-		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
-		LogLevel:                 o.logLevel,
-		LogLevelSet:              cmd.Flags().Changed("log-level"),
-		LogFormat:                o.logFormat,
-		LogFormatSet:             cmd.Flags().Changed("log-format"),
-		LogTimestamp:             o.logTimestamp,
-		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
 		CderunLogLevel:           o.cderunLogLevel,
-		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
 		CderunLogFormat:          o.cderunLogFormat,
-		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
 		CderunLogTimestamp:       o.cderunLogTimestamp,
 		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
-		StrictEnv:                o.strictEnv,
-		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
+		CderunHangTimeout:        o.cderunHangTimeout,
 		CderunStrictEnv:          o.cderunStrictEnv,
 		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
-		HangTimeout:              o.hangTimeout,
-		HangTimeoutSet:           cmd.Flags().Changed("hang-timeout"),
-		CderunHangTimeout:        o.cderunHangTimeout,
-		CderunHangTimeoutSet:     cmd.Flags().Changed("cderun-hang-timeout"),
+		CderunPublishAll:         o.cderunPublishAll,
+		CderunPublishAllSet:      cmd.Flags().Changed("cderun-publish-all"),
+		CderunPrivileged:         o.cderunPrivileged,
+		CderunPrivilegedSet:      cmd.Flags().Changed("cderun-privileged"),
 
-		// Docker-compatible flags
-		Ports:               o.ports,
-		CderunPorts:         o.cderunPorts,
-		PublishAll:          o.publishAll,
-		PublishAllSet:       cmd.Flags().Changed("publish-all"),
-		CderunPublishAll:    o.cderunPublishAll,
-		CderunPublishAllSet: cmd.Flags().Changed("cderun-publish-all"),
-		Expose:              o.expose,
-		CderunExpose:        o.cderunExpose,
-		Hostname:            o.hostname,
-		HostnameSet:         cmd.Flags().Changed("hostname"),
-		CderunHostname:      o.cderunHostname,
-		CderunHostnameSet:   cmd.Flags().Changed("cderun-hostname"),
-		DNS:                 o.dns,
-		CderunDNS:           o.cderunDNS,
-		AddHosts:            o.addHosts,
-		CderunAddHosts:      o.cderunAddHosts,
-		User:                o.user,
-		UserSet:             cmd.Flags().Changed("user"),
-		CderunUser:          o.cderunUser,
-		CderunUserSet:       cmd.Flags().Changed("cderun-user"),
-		Privileged:          o.privileged,
-		PrivilegedSet:       cmd.Flags().Changed("privileged"),
-		CderunPrivileged:    o.cderunPrivileged,
-		CderunPrivilegedSet: cmd.Flags().Changed("cderun-privileged"),
-		CapAdd:              o.capAdd,
-		CderunCapAdd:        o.cderunCapAdd,
-		CapDrop:             o.capDrop,
-		CderunCapDrop:       o.cderunCapDrop,
-		Entrypoint:          o.entrypoint,
-		CderunEntrypoint:    o.cderunEntrypoint,
-		Pull:                o.pull,
-		PullSet:             cmd.Flags().Changed("pull"),
-		CderunPull:          o.cderunPull,
-		CderunPullSet:       cmd.Flags().Changed("cderun-pull"),
-		Memory:              o.memory,
-		MemorySet:           cmd.Flags().Changed("memory"),
-		CderunMemory:        o.cderunMemory,
-		CderunMemorySet:     cmd.Flags().Changed("cderun-memory"),
-		CPUs:                o.cpus,
-		CPUsSet:             cmd.Flags().Changed("cpus"),
-		CderunCPUs:          o.cderunCPUs,
-		CderunCPUsSet:       cmd.Flags().Changed("cderun-cpus"),
-		Devices:             o.devices,
-		CderunDevices:       o.cderunDevices,
+		CderunEnv:        o.cderunEnv,
+		CderunMounts:     o.cderunMounts,
+		CderunPublish:    o.cderunPorts,
+		CderunExpose:     o.cderunExpose,
+		CderunDNS:        o.cderunDNS,
+		CderunAddHosts:   o.cderunAddHosts,
+		CderunCapAdd:     o.cderunCapAdd,
+		CderunCapDrop:    o.cderunCapDrop,
+		CderunEntrypoint: o.cderunEntrypoint,
+		CderunDevices:    o.cderunDevices,
 	}
 
-	return config.ResolveWithFS(subcommand, cliOpts, toolsCfg, globalCfg, o.fs)
+	return config.ResolveWithFS(subcommand, cli, tools, global, o.fs)
 }
 
-func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
-	// Step 10.2: Container command assembly.
-	// The subcommand itself is NOT included in fullCommand.
-	// the passthrough arguments provided after the subcommand are used.
-	var fullCommand []string
-	if len(passthroughArgs) > 0 {
-		fullCommand = append([]string{}, passthroughArgs...)
-	}
-
-	// Build ContainerConfig
-	containerConfig := &container.ContainerConfig{
+func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, args []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
+	cc := &container.ContainerConfig{
 		Image:       resolved.Image,
-		Command:     fullCommand,
+		Command:     args,
+		Env:         resolved.Env,
+		Mounts:      resolved.Mounts,
+		Ports:       resolved.Publish,
+		Expose:      resolved.Expose,
+		Hostname:    resolved.Hostname,
+		User:        resolved.User,
+		Network:     resolved.Network,
 		TTY:         resolved.TTY,
 		Interactive: resolved.Interactive,
-		Network:     resolved.Network,
-		Remove:      resolved.Remove,
-		Mounts:      resolved.Mounts,
-		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
-		User:        resolved.User,
-
-		// Docker-compatible flags
-		Ports:      resolved.Ports,
-		PublishAll: resolved.PublishAll,
-		Expose:     resolved.Expose,
-		Hostname:   resolved.Hostname,
-		DNS:        resolved.DNS,
-		AddHosts:   resolved.AddHosts,
-		Privileged: resolved.Privileged,
-		CapAdd:     resolved.CapAdd,
-		CapDrop:    resolved.CapDrop,
-		Entrypoint: resolved.Entrypoint,
-		Pull:       resolved.Pull,
-		Memory:     resolved.Memory,
-		CPUs:       resolved.CPUs,
-		Devices:    resolved.Devices,
+		Memory:      resolved.Memory,
+		CPUs:        0, // Set later
+		DNS:         resolved.DNS,
+		AddHosts:    resolved.AddHosts,
+		Privileged:  resolved.Privileged,
+		CapAdd:      resolved.CapAdd,
+		CapDrop:     resolved.CapDrop,
+		Entrypoint:  resolved.Entrypoint,
+		Devices:     resolved.Devices,
+		PublishAll:  resolved.PublishAll,
+		Pull:        resolved.Pull,
+	}
+	if resolved.CPUs != nil {
+		cc.CPUs = *resolved.CPUs
 	}
 
-	// Handle mounting flags
 	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
 		exePath := resolved.MountCderunPath
 		if exePath == "" {
@@ -425,14 +373,12 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			}
 		}
 
-		// Translate exePath for nested execution if it was determined from os.Executable()
-		// (MountCderunPath is already resolved during resolution if it came from config/flags)
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
-			r, err := config.NewExpressionResolver(resolved.HostContext)
+			r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
 			if err != nil {
 				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
 			} else {
-				resolvedPath, err := config.ResolvePath(exePath, "", r)
+				resolvedPath, err := config.ResolvePath(o.fs, exePath, "", r)
 				if err != nil {
 					o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
 				} else {
@@ -441,444 +387,201 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			}
 		}
 
-		// Add binary mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-			Type:     "bind",
-			Source:   exePath,
-			Target:   "/usr/local/bin/cderun",
-			ReadOnly: true,
-		})
+		if resolved.MountCderun {
+			cc.Mounts = append(cc.Mounts, container.Mount{
+				Type:     "bind",
+				Source:   exePath,
+				Target:   "/usr/local/bin/cderun",
+				ReadOnly: true,
+			})
+		}
 
-		// Handle MountTools / MountAllTools
 		if resolved.MountAllTools {
-			if len(toolsCfg) == 0 {
-				o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
-			}
-			// Sort tool names to ensure deterministic mount order
-			toolNames := make([]string, 0, len(toolsCfg))
-			for name := range toolsCfg {
-				toolNames = append(toolNames, name)
-			}
-			sort.Strings(toolNames)
-
-			for _, toolName := range toolNames {
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
-			}
-		} else if len(resolved.MountTools) > 0 {
-			for _, toolName := range resolved.MountTools {
-				if _, ok := toolsCfg[toolName]; !ok {
-					available := make([]string, 0, len(toolsCfg))
-					for k := range toolsCfg {
-						available = append(available, k)
-					}
-					sort.Strings(available)
-					return nil, fmt.Errorf("tool %q not found in .tools.yaml\navailable tools: %s", toolName, strings.Join(available, ", "))
+			for name, tool := range toolsCfg {
+				if tool.Image != "" {
+					cc.Mounts = append(cc.Mounts, container.Mount{
+						Type:     "bind",
+						Source:   exePath,
+						Target:   "/usr/local/bin/" + name,
+						ReadOnly: true,
+					})
 				}
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
+			}
+		} else {
+			if len(resolved.MountTools) > 0 {
+				for _, name := range resolved.MountTools {
+					cc.Mounts = append(cc.Mounts, container.Mount{
+						Type:     "bind",
+						Source:   exePath,
+						Target:   "/usr/local/bin/" + name,
+						ReadOnly: true,
+					})
+				}
 			}
 		}
 	}
 
 	if resolved.MountSocket {
-		// Add socket mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+		cc.Mounts = append(cc.Mounts, container.Mount{
 			Type:     "bind",
 			Source:   resolved.SocketPath,
-			Target:   resolved.MountSocketPath,
-			ReadOnly: false, // Socket needs to be writable
+			Target:   resolved.SocketPath,
+			ReadOnly: false,
 		})
 	}
 
-	return containerConfig, nil
-}
-
-type diagnosticsInfo struct {
-	Runtime struct {
-		Name   string `json:"name" yaml:"name"`
-		Socket string `json:"socket" yaml:"socket"`
-		Status string `json:"status" yaml:"status"`
-	} `json:"runtime" yaml:"runtime"`
-	Configs struct {
-		Global []string `json:"global" yaml:"global"`
-		Tools  []string `json:"tools" yaml:"tools"`
-	} `json:"configs" yaml:"configs"`
-	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
-}
-
-func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
-	info := diagnosticsInfo{}
-	info.Runtime.Name = resolved.Runtime
-	info.Runtime.Socket = resolved.SocketPath
-	if _, err := o.fs.Stat(resolved.SocketPath); err == nil {
-		info.Runtime.Status = "accessible"
-	} else {
-		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
-	}
-	info.Configs.Global = globalPaths
-	info.Configs.Tools = toolsPaths
-	for toolName := range toolsCfg {
-		info.AvailableTools = append(info.AvailableTools, toolName)
-	}
-	sort.Strings(info.AvailableTools)
-
-	switch strings.ToLower(resolved.DiagnosisFormat) {
-	case "json":
-		data, err := json.MarshalIndent(info, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
-	default: // Default to YAML
-		data, err := yaml.Marshal(info)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
-	}
-	return nil
-}
-
-func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
-	switch strings.ToLower(resolved.DryRunFormat) {
-	case "json":
-		data, err := json.MarshalIndent(containerConfig, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Remove: %v\n", containerConfig.Remove)
-		var mounts []string
-		for _, m := range containerConfig.Mounts {
-			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
-		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "PublishAll: %v\n", containerConfig.PublishAll)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Hostname: %s\n", containerConfig.Hostname)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Privileged: %v\n", containerConfig.Privileged)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
-		var devices []string
-		for _, d := range containerConfig.Devices {
-			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
-				devices = append(devices, d.PathOnHost)
-			} else {
-				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
-			}
-		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
-	default: // Default to YAML
-		data, err := yaml.Marshal(containerConfig)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
-	}
-	return nil
-}
-
-func getFd(r any) (int, bool) {
-	if f, ok := r.(interface{ Fd() uintptr }); ok {
-		return int(f.Fd()), true
-	}
-	return -1, false
-}
-
-type syncReader struct {
-	inner io.Reader
-	ready <-chan struct{}
-	ctx   context.Context
-}
-
-func (s *syncReader) Read(p []byte) (n int, err error) {
-	select {
-	case <-s.ctx.Done():
-		return 0, s.ctx.Err()
-	case <-s.ready:
-		return s.inner.Read(p)
-	}
+	return cc, nil
 }
 
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
-	ctx := cmd.Context()
-	fullCmdStr := strings.Join(containerConfig.Command, " ")
-	if len(containerConfig.Entrypoint) > 0 {
-		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
-	}
-	o.logger.Info("Running: %s", fullCmdStr)
-	o.logger.Debug("Image: %s", containerConfig.Image)
-	o.logger.Debug("Command: %v", containerConfig.Command)
-	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
-	o.logger.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
-	o.logger.Debug("Runtime: %s", resolved.Runtime)
-	o.logger.Debug("Socket: %s", resolved.SocketPath)
-
-	ctxG, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Initialize Runtime
 	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
+		return 0, fmt.Errorf("failed to initialize container runtime: %w", err)
 	}
 
-	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull); err != nil {
-		return 0, fmt.Errorf("failed to pull image: %w", err)
+	ctx := cmd.Context()
+
+	if resolved.Pull != "never" {
+		o.logger.Info("Pulling image: %s...", containerConfig.Image)
+		err = rt.PullImage(ctx, containerConfig.Image, resolved.Pull)
+		if err != nil {
+			return 0, fmt.Errorf("failed to pull image: %w", err)
+		}
 	}
 
+	o.logger.Debug("Creating container with config: %+v", containerConfig)
 	containerID, err := rt.CreateContainer(ctx, containerConfig)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create container: %w", err)
 	}
+	o.logger.Debug("Container created: %s", containerID)
 
-	if containerConfig.Remove {
-		cleanupCtx := context.WithoutCancel(ctx)
+	if resolved.Remove {
 		defer func() {
-			o.logger.Trace("Removing container: %s", containerID)
-			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
-				o.logger.Warn("failed to remove container (defer): %v", err)
+			o.logger.Debug("Removing container: %s", containerID)
+			if err := rt.RemoveContainer(context.Background(), containerID); err != nil {
+				o.logger.Warn("failed to remove container: %v", err)
 			}
 		}()
 	}
 
-	// Detect if host stdin is a terminal and get its FD
-	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
-	if isHostStdinTerminal {
-		isHostStdinTerminal = o.isTerminal(stdinFd)
-	}
-	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
-
-	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, containerConfig.Interactive, resolved)
-
-	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if isHostStdinTerminal && containerConfig.TTY {
-		o.logger.Trace("Setting terminal to raw mode")
-		state, err := o.makeRaw(stdinFd)
-		if err != nil {
-			o.logger.Warn("failed to set terminal to raw mode: %v", err)
-		} else {
-			defer func() { _ = o.restore(stdinFd, state) }() //nolint:errcheck
-		}
-	}
-
-	// Handle signals and forward them to the container
 	sigChan := make(chan os.Signal, 1)
-	setupSignals(sigChan)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
 	defer signal.Stop(sigChan)
+
 	go func() {
-		firstSignal := true
-		for {
-			select {
-			case sig := <-sigChan:
-				if firstSignal {
-					sigName := getSignalName(sig)
-					o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
-					if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
-						o.logger.Warn("failed to forward signal %v: %v", sig, err)
-					} else {
-						o.logger.Debug("Successfully forwarded signal %v to container", sig)
-					}
-					firstSignal = false
-				} else {
-					o.logger.Info("Received second signal, terminating...")
-					cancel()
-					return
-				}
-			case <-ctxG.Done():
-				return
+		for sig := range sigChan {
+			o.logger.Debug("Received signal: %v, forwarding to container", sig)
+			if err := rt.SignalContainer(context.Background(), containerID, sig.String()); err != nil {
+				o.logger.Warn("failed to signal container: %v", err)
 			}
 		}
 	}()
 
-	// Attach to container IO concurrently
-	var stdin io.Reader
-	startSignal := make(chan struct{})
-	if containerConfig.Interactive {
-		stdin = &syncReader{
-			inner: cmd.InOrStdin(),
-			ready: startSignal,
-			ctx:   ctxG,
-		}
-	}
-
-	var attachDoneConsumed bool
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
-	attachReady := make(chan struct{})
-	attachDone := make(chan error, 1)
-	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr(), attachReady)
-	}()
-
-	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
-	// reducing race condition where container starts and finishes before attachment.
-	if !attachDoneConsumed {
-		select {
-		case <-attachReady:
-		case err := <-attachDone:
-			attachDoneConsumed = true
-			if err != nil {
-				return 0, fmt.Errorf("failed to attach to container: %w", err)
-			}
-		case <-ctxG.Done():
-			return 0, ctxG.Err()
-		}
-	}
-
-	o.logger.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
-	close(startSignal) // Signal stdin to start reading
 
-	// Handle window resize synchronization
-	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
-		resizeChan := make(chan os.Signal, 1)
-		setupResizeSignal(resizeChan)
-		defer signal.Stop(resizeChan)
-		go func() {
-			for {
-				select {
-				case <-resizeChan:
-					w, h, err := o.termGetSize(fd)
-					if err == nil && h >= 0 && w >= 0 {
-						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
-					}
-				case <-ctxG.Done():
-					return
-				}
-			}
-		}()
-
-		// Initial resize to match current terminal size
-		w, h, err := o.termGetSize(fd)
-		if err == nil && h >= 0 && w >= 0 {
-			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
-		}
-	}
-
-	o.logger.Trace("Waiting for container: %s", containerID)
-
-	type waitResult struct {
+	waitDone := make(chan struct {
 		code int
 		err  error
-	}
-	waitDone := make(chan waitResult, 1)
+	}, 1)
 	go func() {
-		code, err := rt.WaitContainer(ctxG, containerID)
-		waitDone <- waitResult{code, err}
+		code, err := rt.WaitContainer(ctx, containerID)
+		waitDone <- struct { code int; err  error }{code, err}
 	}()
+
+	ready := make(chan struct{})
+	attachErrChan := make(chan error, 1)
+	go func() {
+		attachErrChan <- rt.AttachContainer(ctx, containerID, resolved.TTY, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr(), ready)
+	}()
+
+	select {
+	case <-ready:
+	case err := <-attachErrChan:
+		if err != nil {
+			return 0, fmt.Errorf("failed to attach to container: %w", err)
+		}
+	case <-time.After(5 * time.Second):
+		o.logger.Debug("Timeout waiting for container attach ready, proceeding...")
+	}
 
 	var exitCode int
 	select {
 	case result := <-waitDone:
 		if result.err != nil {
-			o.logger.Debug("WaitContainer for %s failed or was interrupted: %v", containerID, result.err)
 			return 0, fmt.Errorf("failed to wait for container: %w", result.err)
 		}
 		exitCode = result.code
-		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
-
-		// After container exits, wait a short grace period for remaining output
-		if !attachDoneConsumed {
-			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
-			select {
-			case err := <-attachDone:
-				if err != nil && !errors.Is(err, context.Canceled) {
-					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
-				}
-				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-			case <-time.After(attachGracePeriod):
-				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-				cancelAttach()
-				<-attachDone
-			}
-		}
-
-	case err := <-attachDone:
-		if err != nil && !errors.Is(err, context.Canceled) {
-			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
-			// Wait for container to finish (best effort)
-			cancel()
-			select {
-			case res := <-waitDone:
-				exitCode = res.code
-			case <-time.After(effectiveHangTimeout):
-				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
-			}
-			return exitCode, fmt.Errorf("failed to attach to container: %w", err)
-		}
-		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
-		// IO finished before container exited.
-		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
-		// If host stdin is not a terminal, we use a much shorter timeout because we don't expect interactive behavior.
-		if !isHostStdinTerminal || !containerConfig.Interactive {
-			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
-			select {
-			case result := <-waitDone:
-				if result.err != nil {
-					return 0, fmt.Errorf("failed to wait for container: %w", result.err)
-				}
-				exitCode = result.code
-			case <-time.After(effectiveHangTimeout):
-					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
-					if err != nil {
-						return 0, err
-					}
-					select {
-					case result := <-waitDone:
-						exitCode = result.code
-					case <-time.After(effectiveHangTimeout):
-						return exitCode, nil
-					}
-			}
-		} else {
-			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
-			result := <-waitDone
-			if result.err != nil {
-				return 0, fmt.Errorf("failed to wait for container: %w", result.err)
-			}
-			exitCode = result.code
-		}
+	case <-ctx.Done():
+		return 0, ctx.Err()
 	}
 
-	o.logger.Debug("Total execution finished for container: %s", containerID)
 	return exitCode, nil
+}
+
+func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
+	switch resolved.DryRunFormat {
+	case "json":
+		data, err := json.MarshalIndent(containerConfig, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	case "yaml":
+		data, err := yaml.Marshal(containerConfig)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	default: // simple
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Memory: %d\n", containerConfig.Memory)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
+		var mounts []string
+		for _, m := range containerConfig.Mounts {
+			mounts = append(mounts, fmt.Sprintf("%s:%s:%v", m.Source, m.Target, m.ReadOnly))
+		}
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
+	}
+	return nil
+}
+
+func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+	diag := struct {
+		Resolved    *config.ResolvedConfig `json:"resolved" yaml:"resolved"`
+		GlobalPaths []string               `json:"globalPaths" yaml:"globalPaths"`
+		ToolsPaths  []string               `json:"toolsPaths" yaml:"toolsPaths"`
+	}{
+		Resolved:    resolved,
+		GlobalPaths: globalPaths,
+		ToolsPaths:  toolsPaths,
+	}
+
+	switch resolved.DiagnosisFormat {
+	case "json":
+		data, err := json.MarshalIndent(diag, "", "  ")
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	default: // text/yaml
+		data, err := yaml.Marshal(diag)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	}
+	return nil
 }
 
 func newRootCmd(o *rootOptions) *cobra.Command {
@@ -888,9 +591,6 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Short:         "A wrapper tool to run commands in a containerized environment.",
-		Long: `cderun is a CLI wrapper tool that simplifies running commands
-within a container. It separates its own flags from the flags
-intended for the subcommand.`,
 	}
 	cmd.SetVersionTemplate("{{.Version}}\n")
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -902,149 +602,91 @@ intended for the subcommand.`,
 		}
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-			// Early logger initialization with CLI and Environment settings before config loading.
-			// This allows loadConfigs() to use the correct log level.
-			initialLevel := "warn"
-			if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
-				initialLevel = env
-			}
-			if o.logLevel != "" {
-				initialLevel = o.logLevel
-			}
-			if o.cderunLogLevel != "" {
-				initialLevel = o.cderunLogLevel
-			}
-			_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
+		initialLevel := "warn"
+		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+			initialLevel = env
+		}
+		if o.logLevel != "" {
+			initialLevel = o.logLevel
+		}
+		if o.cderunLogLevel != "" {
+			initialLevel = o.cderunLogLevel
+		}
+		_ = o.logger.Init(initialLevel, "text", true)
 
-			// Load configurations
-			toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
-			if err != nil {
-				return err
-			}
-
-			subcommand := ""
-			passthroughArgs := []string{}
-			if len(args) > 0 {
-				subcommand = args[0]
-				passthroughArgs = args[1:]
-			}
-
-			// Resolve settings using priority logic (CLI > Env > Config > Default)
-			resolved, err := o.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
-			if err != nil {
-				return fmt.Errorf("configuration error: %w", err)
-			}
-
-			// Validate pull policy
-			switch resolved.Pull {
-			case "always", "missing", "never":
-				// Valid
-			default:
-				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
-			}
-
-			if resolved.Diagnosis {
-				return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
-			}
-
-			if len(args) == 0 {
-				if resolved.DryRun {
-					return fmt.Errorf("--dry-run requires a subcommand")
-				}
-				return cmd.Help()
-			}
-
-			// Re-initialize logger with fully resolved settings including those from config files.
-			if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
-				return fmt.Errorf("failed to initialize logger: %w", err)
-			}
-			// Redirect logging to the command's stderr stream.
-			o.logger.SetOutput(cmd.ErrOrStderr())
-			o.logger.Debug("Logger initialized with level: %s", resolved.LogLevel)
-
-			// Build ContainerConfig
-			var containerConfig *container.ContainerConfig
-			if subcommand != "" {
-				containerConfig, err = o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
-				if err != nil {
-					return fmt.Errorf("container configuration error: %w", err)
-				}
-			}
-
-			if resolved.DryRun {
-				return o.handleDryRun(cmd, containerConfig, resolved)
-			}
-
-			// Create snapshot if nested execution support is requested or already active
-			var snapshotDir string
-			if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
-				o.logger.Debug("Creating execution snapshot for nested support...")
-				// Ensure globalCfg is initialized for snapshot if it was nil
-				if globalCfg == nil {
-					globalCfg = &config.CDERunConfig{}
-				}
-				sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
-				if err != nil {
-					o.logger.Warn("failed to create snapshot: %v", err)
-				} else {
-					snapshotDir = sDir
-					defer func() {
-						o.logger.Trace("Cleaning up snapshot: %s", snapshotDir)
-						if err := cleanupSnapshot(o.fs, snapshotDir); err != nil {
-							o.logger.Warn("failed to cleanup snapshot: %v", err)
-						}
-					}()
-					// Mount the snapshot directory using the host path as source
-					containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-						Type:     "bind",
-						Source:   hostDir,
-						Target:   "/run/cderun",
-						ReadOnly: true,
-					})
-				}
-			}
-
-			// Execute Container
-			exitCode, err := o.execute(cmd, resolved, containerConfig)
-			if err != nil {
-				return err
-			}
-			o.exitFunc(exitCode)
-			return nil
+		toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
+		if err != nil {
+			return err
 		}
 
-registerFlags(cmd, o)
+		subcommand := ""
+		passthroughArgs := []string{}
+		if len(args) > 0 {
+			subcommand = args[0]
+			passthroughArgs = args[1:]
+		}
 
+		resolved, err := o.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
+		if err != nil {
+			return fmt.Errorf("configuration error: %w", err)
+		}
+
+		if resolved.Diagnosis {
+			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
+		}
+
+		if len(args) == 0 {
+			if resolved.DryRun {
+				return fmt.Errorf("--dry-run requires a subcommand")
+			}
+			return cmd.Help()
+		}
+
+		if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
+		o.logger.SetOutput(cmd.ErrOrStderr())
+
+		containerConfig, err := o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
+		if err != nil {
+			return fmt.Errorf("container configuration error: %w", err)
+		}
+
+		if resolved.DryRun {
+			return o.handleDryRun(cmd, containerConfig, resolved)
+		}
+
+		exitCode, err := o.execute(cmd, resolved, containerConfig)
+		if err != nil {
+			return err
+		}
+		o.exitFunc(exitCode)
+		return nil
+	}
+
+	registerFlags(cmd, o)
 	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(rawArgs []string) error {
 	return ExecuteContext(context.Background(), rawArgs)
 }
 
-// ExecuteContext adds all child commands to the root command and sets flags appropriately, using the provided context.
 func ExecuteContext(ctx context.Context, rawArgs []string) error {
 	return ExecuteContextWithOptions(ctx, rawArgs, nil)
 }
 
-// ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
-// using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
 	var cmd *cobra.Command
 
 	if setup == nil {
-		// Use global state for standard execution
 		cmd = rootCmd
 	} else {
-		// Create fresh state for testing
 		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
+		localOpts.logger = logging.NewLogger()
 		cmd = newRootCmd(&localOpts)
 		setup(&localOpts, cmd)
-		// Redirect logger to the command's error writer early to capture initial logs.
 		localOpts.logger.SetOutput(cmd.ErrOrStderr())
 	}
 
@@ -1068,7 +710,6 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index robustly by skipping flags and their arguments
 	subcmdIdx := -1
 	if isPolyglot {
 		subcmdIdx = 0
@@ -1079,26 +720,20 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 				subcmdIdx = i
 				break
 			}
-			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
 			if strings.HasPrefix(arg, "--") {
 				name := strings.SplitN(arg[2:], "=", 2)[0]
 				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
-					// Flag exists, takes an argument, and no '=' used, so skip next argument.
 					i++
 				}
 			} else if len(arg) > 1 {
-				// Shorthand(s), e.g., -i, -it, -p 80:80
-				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
 				lastChar := string(arg[len(arg)-1])
 				if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
-					// Last shorthand takes an argument, skip next argument.
 					i++
 				}
 			}
 		}
 	}
 
-	// If not polyglot, check for P1 flags before the subcommand
 	if !isPolyglot && subcmdIdx != -1 {
 		for i := 1; i < subcmdIdx; i++ {
 			if strings.HasPrefix(args[i], "--cderun-") {
@@ -1117,12 +752,8 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	var overrides []string
 	var others []string
 
-	// Scan all arguments after the executable name
-	// In polyglot mode, everything after index 0 is after the subcommand.
-	// In standard mode, only arguments after subcmdIdx are considered for hoisting P1 overrides.
 	startIdx := 1
 	if !isPolyglot && subcmdIdx != -1 {
-		// Standard mode: hoist only from after the subcommand
 		for i := 1; i <= subcmdIdx; i++ {
 			others = append(others, args[i])
 		}
@@ -1132,15 +763,12 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	for i := startIdx; i < len(args); i++ {
 		arg := args[i]
 		shouldHoist := false
-
 		if strings.HasPrefix(arg, "--cderun-") {
 			shouldHoist = true
 		}
 
 		if shouldHoist {
 			overrides = append(overrides, arg)
-			// Handle flags that take arguments (skip next arg if it's the value)
-			// Note: only --cderun- flags are hoisted here.
 			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
 				name := arg[2:]
 				f := cmd.PersistentFlags().Lookup(name)
@@ -1157,20 +785,16 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		}
 	}
 
-	// Place --cderun-* overrides immediately after "cderun" so they are always parsed
 	processedArgs = append(processedArgs, overrides...)
-
 	if isPolyglot {
-		// In polyglot mode, the original executable name becomes the subcommand
 		processedArgs = append(processedArgs, execName)
 	}
-
 	processedArgs = append(processedArgs, others...)
 
 	return processedArgs, nil
 }
 
 func init() {
-	opts.exitFunc = os.Exit
+	opts = defaultOptions()
 	rootCmd = newRootCmd(&opts)
 }

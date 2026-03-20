@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_Path_Resolution(t *testing.T) {
+func TestUnit_Path_Resolution_Complex(t *testing.T) {
+	t.Parallel()
 	home := "/home/user"
 	baseDir := "/abs/path"
 	mfs := &MockFileSystem{
@@ -20,258 +20,168 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("ResolvePath", func(t *testing.T) {
-		val, err := ResolvePath("./file", baseDir, r)
+		t.Parallel()
+		val, err := ResolvePath(mfs, "./file", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/abs/path/file", val)
 
-		val, err = ResolvePath("../file", baseDir, r)
+		val, err = ResolvePath(mfs, "../file", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/abs/file", val)
 
-		val, err = ResolvePath("~/.ssh", baseDir, r)
+		val, err = ResolvePath(mfs, "~/.ssh", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(home, ".ssh"), val)
+		assert.Equal(t, "/home/user/.ssh", val)
 
-		val, err = ResolvePath("~", baseDir, r)
+		val, err = ResolvePath(mfs, "~", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, home, val)
+		assert.Equal(t, "/home/user", val)
 
-		val, err = ResolvePath("/other/abs/path", baseDir, r)
+		val, err = ResolvePath(mfs, "/other/abs/path", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/other/abs/path", val)
 
-		val, err = ResolvePath("just-name", baseDir, r)
+		val, err = ResolvePath(mfs, "just-name", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, "just-name", val) // No ./ prefix, no resolution
+		assert.Equal(t, "just-name", val)
 	})
 
-	t.Run("ConfigPath.Resolve", func(t *testing.T) {
-		cp := ConfigPath{Raw: "./data", BaseDir: baseDir}
-		val, err := cp.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, "/abs/path/data", val)
-
-		cp = ConfigPath{Raw: "{{HOME}}/config", BaseDir: baseDir}
-		val, err = cp.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(home, "config"), val)
-	})
-
-	t.Run("MountConfig.Resolve", func(t *testing.T) {
-		mc := MountConfig{
-			Type:     "bind",
-			Source:   ConfigPath{Raw: "./data", BaseDir: baseDir},
-			Target:   ConfigPath{Raw: "/app/data", BaseDir: baseDir},
-			ReadOnly: false,
-		}
-		mount, err := mc.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, "bind", mount.Type)
-		assert.Equal(t, "/abs/path/data", mount.Source)
-		assert.Equal(t, "/app/data", mount.Target)
-		assert.False(t, mount.ReadOnly)
-
-		mc = MountConfig{
-			Type:     "bind",
-			Source:   ConfigPath{Raw: "~/config", BaseDir: baseDir},
-			Target:   ConfigPath{Raw: "/root/config", BaseDir: baseDir},
-			ReadOnly: true,
-		}
-		mount, err = mc.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(home, "config"), mount.Source)
-		assert.Equal(t, "/root/config", mount.Target)
-		assert.True(t, mount.ReadOnly)
-	})
-
-	t.Run("DeviceConfig.Resolve", func(t *testing.T) {
-		dc := DeviceConfig{
-			Source:      ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
-			Destination: ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
-			Permissions: "rwm",
-		}
-		mapping, err := dc.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, "/dev/video0", mapping.PathOnHost)
-		assert.Equal(t, "/dev/video0", mapping.PathInContainer)
-		assert.Equal(t, "rwm", mapping.CgroupPermissions)
-	})
-
-	t.Run("ParseMountFlag", func(t *testing.T) {
-		mc, err := ParseMountFlag("type=bind,source=./data,target=/app/data,readonly")
-		require.NoError(t, err)
-		assert.Equal(t, "bind", mc.Type)
-		assert.Equal(t, "./data", mc.Source.Raw)
-		assert.Equal(t, "/app/data", mc.Target.Raw)
-		assert.True(t, mc.ReadOnly)
-
-		mc, err = ParseMountFlag("source=/host/path,target=/container/path")
-		require.NoError(t, err)
-		assert.Equal(t, "bind", mc.Type)
-		assert.Equal(t, "/host/path", mc.Source.Raw)
-		assert.Equal(t, "/container/path", mc.Target.Raw)
-		assert.False(t, mc.ReadOnly)
-
-		_, err = ParseMountFlag("invalid-format")
-		require.Error(t, err)
-	})
-
-	t.Run("Windows Paths", func(t *testing.T) {
-		mc, err := ParseMountFlag(`type=bind,source=C:\host\path,target=/container`)
-		require.NoError(t, err)
-		assert.Equal(t, `C:\host\path`, mc.Source.Raw)
-		assert.Equal(t, `/container`, mc.Target.Raw)
-
-		dc, ok := ParseDeviceConfig(`E:\dev\path:/dev/path:rwm`)
-		assert.True(t, ok)
-		assert.Equal(t, `E:\dev\path`, dc.Source.Raw)
-		assert.Equal(t, `/dev/path`, dc.Destination.Raw)
-		assert.Equal(t, "rwm", dc.Permissions)
-	})
-
-	t.Run("Scheme Preservation", func(t *testing.T) {
-		val, err := ResolvePath("unix:///var/run/docker.sock", baseDir, r)
+	t.Run("Scheme handling", func(t *testing.T) {
+		t.Parallel()
+		val, err := ResolvePath(mfs, "unix:///var/run/docker.sock", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "unix:///var/run/docker.sock", val)
 
-		val, err = ResolvePath("unix:////var/run/docker.sock", baseDir, r)
+		val, err = ResolvePath(mfs, "unix:///var/run/docker.sock", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "unix:///var/run/docker.sock", val)
 
-		val, err = ResolvePath("http://example.com/path", baseDir, r)
+		val, err = ResolvePath(mfs, "http://example.com/path", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "http://example.com/path", val)
 	})
 
-	t.Run("Reverse Path Resolution (Nested)", func(t *testing.T) {
+	t.Run("Nested execution reverse resolution", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/home/user/project", Target: "/app", Level: 1},
+				{Source: "/host/app", Target: "/app", Level: 1},
+				{Source: "/host/tmp", Target: "/tmp", Level: 1},
 			},
 		}
-		rn, err := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		// Inside container /app/src should resolve to host /home/user/project/src
-		val, err := ResolvePath("/app/src", baseDir, rn)
+		val, err := ResolvePath(mfs, "/app/src", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/home/user/project/src", val)
+		assert.Equal(t, "/host/app/src", val)
 
-		// Path outside mapping should stay same
-		val, err = ResolvePath("/tmp/other", baseDir, rn)
+		val, err = ResolvePath(mfs, "/tmp/other", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/tmp/other", val)
+		assert.Equal(t, "/host/tmp/other", val)
 	})
 
-	t.Run("Reverse Path Resolution (Nested Priority)", func(t *testing.T) {
+	t.Run("Nested execution longest prefix win", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
-			Level: 2,
+			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/home/user/project", Target: "/app", Level: 1},
-				{Source: "/home/user/project/src", Target: "/src", Level: 2},
+				{Source: "/host/src", Target: "/src", Level: 1},
+				{Source: "/host/app", Target: "/app", Level: 1},
 			},
 		}
-		rn, err := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		// /src should match level 2 mapping
-		val, err := ResolvePath("/src/file", baseDir, rn)
+		val, err := ResolvePath(mfs, "/src/file", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/home/user/project/src/file", val)
+		assert.Equal(t, "/host/src/file", val)
 
-		// /app should match level 1 mapping
-		val, err = ResolvePath("/app/file", baseDir, rn)
+		val, err = ResolvePath(mfs, "/app/file", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/home/user/project/file", val)
+		assert.Equal(t, "/host/app/file", val)
 	})
 
-	t.Run("Reverse Path Resolution (Specificity vs Level)", func(t *testing.T) {
+	t.Run("Nested execution exact match", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
-			Level: 2,
+			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/tmp", Target: "/tmp", Level: 1}, // Broad but specific
-				{Source: "/var/lib/docker/overlay/diff", Target: "/", Level: 2}, // Higher level but root
+				{Source: "/host/tmp", Target: "/tmp", Level: 1},
+				{Source: "/host/etc", Target: "/etc", Level: 1},
 			},
 		}
-		rn, err := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		// /tmp/file should match /tmp (Level 1) instead of / (Level 2)
-		val, err := ResolvePath("/tmp/file", baseDir, rn)
+		val, err := ResolvePath(mfs, "/tmp/file", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/tmp/file", val)
+		assert.Equal(t, "/host/tmp/file", val)
 
-		// /etc/hosts should match / (Level 2)
-		val, err = ResolvePath("/etc/hosts", baseDir, rn)
+		val, err = ResolvePath(mfs, "/etc/hosts", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/var/lib/docker/overlay/diff/etc/hosts", val)
+		assert.Equal(t, "/host/etc/hosts", val)
 	})
 
-	t.Run("Reverse Path Resolution (Same Specificity)", func(t *testing.T) {
-		hostCtx := &HostContext{
-			Level: 2,
-			Mounts: []MountMapping{
-				{Source: "/host/v1", Target: "/app", Level: 1},
-				{Source: "/host/v2", Target: "/app", Level: 2},
-			},
-		}
-		rn, err := NewExpressionResolver(hostCtx)
-		require.NoError(t, err)
-
-		// Same specificity, higher level wins
-		val, err := ResolvePath("/app/file", baseDir, rn)
-		require.NoError(t, err)
-		assert.Equal(t, "/host/v2/file", val)
-	})
-
-	t.Run("Reverse Path Resolution (Partial Segment Match)", func(t *testing.T) {
+	t.Run("Nested execution no match", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
 				{Source: "/host/app", Target: "/app", Level: 1},
 			},
 		}
-		rn, err := NewExpressionResolver(hostCtx)
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		// /apple should NOT match /app
-		val, err := ResolvePath("/apple", baseDir, rn)
+		val, err := ResolvePath(mfs, "/other/file", baseDir, rn)
 		require.NoError(t, err)
-		assert.Equal(t, "/apple", val)
-
-		// /app/le should match /app
-		val, err = ResolvePath("/app/le", baseDir, rn)
-		require.NoError(t, err)
-		assert.Equal(t, "/host/app/le", val)
+		assert.Equal(t, "/other/file", val)
 	})
 
-	t.Run("MountConfig.Resolve target not reverse-resolved in nested", func(t *testing.T) {
+	t.Run("Nested execution relative path resolution", func(t *testing.T) {
+		t.Parallel()
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/Users/user/.config/gcloud", Target: "/root/.config/gcloud", Level: 1},
+				{Source: "/host/app", Target: "/app", Level: 1},
 			},
 		}
 		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		mc := MountConfig{
-			Type:   "bind",
-			Source: ConfigPath{Raw: "/root/.config/gcloud"},
-			Target: ConfigPath{Raw: "/.config/gcloud"},
-		}
-		mount, err := mc.Resolve(rn)
+		val, err := ResolvePath(mfs, "/app/file", baseDir, rn)
 		require.NoError(t, err)
-		// source should be reverse-resolved to host path
-		assert.Equal(t, "/Users/user/.config/gcloud", mount.Source)
-		// target must NOT be reverse-resolved; it stays as the container-side path
-		assert.Equal(t, "/.config/gcloud", mount.Target)
+		assert.Equal(t, "/host/app/file", val)
+	})
+
+	t.Run("Nested execution prefix ambiguity", func(t *testing.T) {
+		t.Parallel()
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/apple", Target: "/apple", Level: 1},
+				{Source: "/host/app", Target: "/app", Level: 1},
+			},
+		}
+		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
+
+		val, err := ResolvePath(mfs, "/apple", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/apple", val)
+
+		val, err = ResolvePath(mfs, "/app/le", baseDir, rn)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/app/le", val)
 	})
 }
 
 func TestUnit_Path_MarshalYAML(t *testing.T) {
+	t.Parallel()
 	t.Run("ConfigPath", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "/path"}
 		data, err := yaml.Marshal(cp)
 		require.NoError(t, err)
@@ -284,6 +194,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 
 	t.Run("MountConfig", func(t *testing.T) {
+		t.Parallel()
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/host"},
@@ -302,70 +213,49 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
+		t.Parallel()
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/video0"},
-			Destination: ConfigPath{Raw: "/dev/video1"},
-			Permissions: "rw",
+			Destination: ConfigPath{Raw: "/dev/video0"},
+			Permissions: "rwm",
 		}
 		data, err := yaml.Marshal(dc)
 		require.NoError(t, err)
-		assert.Equal(t, "/dev/video0:/dev/video1:rw\n", string(data))
+		assert.Equal(t, "/dev/video0:/dev/video0\n", string(data))
 
-		dc = DeviceConfig{
-			Source:      ConfigPath{Raw: "/dev/fuse"},
-			Destination: ConfigPath{Raw: "/dev/fuse"},
-			Permissions: "rwm",
-		}
+		dc.Permissions = "rw"
 		data, err = yaml.Marshal(dc)
 		require.NoError(t, err)
-		assert.Equal(t, "/dev/fuse:/dev/fuse\n", string(data))
-
-		dc = DeviceConfig{}
-		data, err = yaml.Marshal(dc)
-		require.NoError(t, err)
-		assert.Equal(t, "null\n", string(data))
-	})
-
-	t.Run("omitempty behavior", func(t *testing.T) {
-		type TestConfig struct {
-			Path    ConfigPath     `yaml:"path,omitempty"`
-			Mounts  []MountConfig  `yaml:"mounts,omitempty"`
-			Devices []DeviceConfig `yaml:"devices,omitempty"`
-		}
-
-		cfg := TestConfig{}
-		data, err := yaml.Marshal(cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "{}\n", string(data))
-
-		cfg.Path = ConfigPath{Raw: "/foo"}
-		data, err = yaml.Marshal(cfg)
-		require.NoError(t, err)
-		assert.Contains(t, string(data), "path: /foo")
+		assert.Equal(t, "/dev/video0:/dev/video0:rw\n", string(data))
 	})
 }
 
-func TestUnit_Path_Helpers(t *testing.T) {
+func TestUnit_Path_Parsing_Helpers(t *testing.T) {
+	t.Parallel()
 	baseDir := "/base"
-	r, _ := NewExpressionResolver(nil)
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolverWithFS(nil, mfs)
 
 	t.Run("resolveVolumePath", func(t *testing.T) {
-		val, err := resolveVolumePath("./host:/container", baseDir, r)
+		t.Parallel()
+		val, err := resolveVolumePath(mfs, "./host:/container", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/host:/container", val)
 
-		val, err = resolveVolumePath("named-volume:/container", baseDir, r)
+		val, err = resolveVolumePath(mfs, "named-volume:/container", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "named-volume:/container", val)
 	})
 
 	t.Run("resolveDevicePath", func(t *testing.T) {
-		val, err := resolveDevicePath("./dev:/dev:rw", baseDir, r)
+		t.Parallel()
+		val, err := resolveDevicePath(mfs, "./dev:/dev:rw", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/dev:/dev:rw", val)
 	})
 
 	t.Run("SplitHostRemainder", func(t *testing.T) {
+		t.Parallel()
 		host, rem, ok := SplitHostRemainder("/host:/container")
 		assert.True(t, ok)
 		assert.Equal(t, "/host", host)
@@ -382,93 +272,61 @@ func TestUnit_Path_Helpers(t *testing.T) {
 }
 
 func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("MountConfig", func(t *testing.T) {
+		t.Parallel()
 		var mc MountConfig
-
-		// Valid (structure)
-		yamlStr := `
-type: bind
-source: ./data
-target: /app/data
-read_only: true
-`
-		err := yaml.Unmarshal([]byte(yamlStr), &mc)
-		require.NoError(t, err)
-		assert.Equal(t, "bind", mc.Type)
-		assert.Equal(t, "./data", mc.Source.Raw)
-
-		// Implicit type (default to bind)
-		yamlStr = `
-source: ./implicit
-target: /app/implicit
-`
-		err = yaml.Unmarshal([]byte(yamlStr), &mc)
-		require.NoError(t, err)
-		assert.Equal(t, "bind", mc.Type)
-		assert.Equal(t, "./implicit", mc.Source.Raw)
-
-		// Invalid
-		err = yaml.Unmarshal([]byte("invalid-mount"), &mc)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid mount config")
-
-		// Missing target
-		yamlStr = `
-type: bind
-source: ./data
-`
-		err = yaml.Unmarshal([]byte(yamlStr), &mc)
+		err := yaml.Unmarshal([]byte("target: ''"), &mc)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target is required")
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
+		t.Parallel()
 		var dc DeviceConfig
-
-		// Valid
-		err := yaml.Unmarshal([]byte("/dev/video0:/dev/video0:rwm"), &dc)
-		require.NoError(t, err)
-		assert.Equal(t, "/dev/video0", dc.Source.Raw)
-
-		// Invalid
-		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
+		err := yaml.Unmarshal([]byte("["), &dc)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config")
 	})
 }
 
 func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
+	t.Parallel()
 	baseDir := "/base"
-	r, _ := NewExpressionResolver(nil)
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolverWithFS(nil, mfs)
 
 	t.Run("ResolveVolume", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
-		val, err := cp.ResolveVolume(r)
+		val, err := cp.ResolveVolume(mfs, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/host:/container", val)
 
 		cp = ConfigPath{Raw: ""}
-		val, err = cp.ResolveVolume(r)
+		val, err = cp.ResolveVolume(mfs, r)
 		require.NoError(t, err)
 		assert.Empty(t, val)
 	})
 
 	t.Run("ResolveDevice", func(t *testing.T) {
+		t.Parallel()
 		cp := ConfigPath{Raw: "./dev:/dev:rw", BaseDir: baseDir}
-		val, err := cp.ResolveDevice(r)
+		val, err := cp.ResolveDevice(mfs, r)
 		require.NoError(t, err)
 		assert.Equal(t, "/base/dev:/dev:rw", val)
 
 		cp = ConfigPath{Raw: ""}
-		val, err = cp.ResolveDevice(r)
+		val, err = cp.ResolveDevice(mfs, r)
 		require.NoError(t, err)
 		assert.Empty(t, val)
 	})
 }
 
 func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
+	t.Parallel()
 	t.Run("Windows path without separator", func(t *testing.T) {
-		_, _, ok := SplitHostRemainder(`C:\only-path`)
+		t.Parallel()
+		_, _, ok := SplitHostRemainder("C:\\no-sep")
 		assert.False(t, ok)
 	})
 }

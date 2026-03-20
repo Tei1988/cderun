@@ -118,11 +118,13 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.mu.Lock()
 	m.AttachedContainerID = containerID
+	err := m.AttachErr
 	m.mu.Unlock()
-	if ready != nil {
+
+	if err == nil && ready != nil {
 		close(ready)
 	}
-	return m.AttachErr
+	return err
 }
 
 func (m *MockRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {

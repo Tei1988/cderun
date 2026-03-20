@@ -32,14 +32,14 @@ func (c CDERunConfig) DeepCopy() CDERunConfig {
 	return res
 }
 
-func (c *CDERunConfig) SetBaseDir(baseDir string) error {
+func (c *CDERunConfig) SetBaseDir(fs FileSystem, baseDir string) error {
 	if c.SocketPath.Raw != "" {
 		c.SocketPath.BaseDir = baseDir
 	}
 	c.Defaults.SetBaseDir(baseDir)
 	if c.HostContext != nil {
 		for i := range c.HostContext.Mounts {
-			s, err := ResolvePath(c.HostContext.Mounts[i].Source, baseDir, nil)
+			s, err := ResolvePath(fs, c.HostContext.Mounts[i].Source, baseDir, nil)
 			if err != nil {
 				return err
 			}
@@ -481,7 +481,7 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
 		}
 
-		if err := layer.SetBaseDir(baseDir); err != nil {
+		if err := layer.SetBaseDir(l.fs, baseDir); err != nil {
 			return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", path, err)
 		}
 
@@ -571,7 +571,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 	}
 
 	baseDir := filepath.Dir(absPath)
-	if err := cfg.SetBaseDir(baseDir); err != nil {
+	if err := cfg.SetBaseDir(l.fs, baseDir); err != nil {
 		return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", absPath, err)
 	}
 

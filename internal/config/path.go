@@ -39,27 +39,27 @@ func (cp ConfigPath) IsEmpty() bool {
 }
 
 // Resolve expands expressions and resolves the path relative to BaseDir.
-func (cp ConfigPath) Resolve(r *ExpressionResolver) (string, error) {
+func (cp ConfigPath) Resolve(fs FileSystem, r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
 		return "", nil
 	}
-	return ResolvePath(cp.Raw, cp.BaseDir, r)
+	return ResolvePath(fs, cp.Raw, cp.BaseDir, r)
 }
 
 // ResolveVolume expands expressions and resolves the volume host path relative to BaseDir.
-func (cp ConfigPath) ResolveVolume(r *ExpressionResolver) (string, error) {
+func (cp ConfigPath) ResolveVolume(fs FileSystem, r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
 		return "", nil
 	}
-	return resolveVolumePath(cp.Raw, cp.BaseDir, r)
+	return resolveVolumePath(fs, cp.Raw, cp.BaseDir, r)
 }
 
 // ResolveDevice expands expressions and resolves the device host path relative to BaseDir.
-func (cp ConfigPath) ResolveDevice(r *ExpressionResolver) (string, error) {
+func (cp ConfigPath) ResolveDevice(fs FileSystem, r *ExpressionResolver) (string, error) {
 	if cp.IsEmpty() {
 		return "", nil
 	}
-	return resolveDevicePath(cp.Raw, cp.BaseDir, r)
+	return resolveDevicePath(fs, cp.Raw, cp.BaseDir, r)
 }
 
 // MountConfig is an intermediate representation for mount points in configuration.
@@ -131,17 +131,17 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	}
 }
 
-func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
+func (mc MountConfig) Resolve(fs FileSystem, r *ExpressionResolver) (container.Mount, error) {
 	source := ""
 	if mc.Type == "bind" {
-		s, err := mc.Source.Resolve(r)
+		s, err := mc.Source.Resolve(fs, r)
 		if err != nil {
 			return container.Mount{}, err
 		}
 		source = s
 	} else {
 		if !mc.Source.IsEmpty() {
-			s, err := mc.Source.Resolve(r)
+			s, err := mc.Source.Resolve(fs, r)
 			if err != nil {
 				return container.Mount{}, err
 			}
@@ -149,7 +149,7 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
-	target, err := mc.Target.Resolve(r.WithoutHostContext())
+	target, err := mc.Target.Resolve(fs, r.WithoutHostContext())
 	if err != nil {
 		return container.Mount{}, err
 	}
@@ -211,12 +211,12 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	}
 }
 
-func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
-	host, err := dc.Source.Resolve(r)
+func (dc DeviceConfig) Resolve(fs FileSystem, r *ExpressionResolver) (container.DeviceMapping, error) {
+	host, err := dc.Source.Resolve(fs, r)
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	containerPath, err := dc.Destination.Resolve(r)
+	containerPath, err := dc.Destination.Resolve(fs, r)
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
@@ -317,18 +317,13 @@ var (
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
-func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
+func ResolvePath(fs FileSystem, p string, baseDir string, r *ExpressionResolver) (string, error) {
 	if p == "" {
 		return p, nil
 	}
 
 	prefix := schemeRegex.FindString(p)
 	p = strings.TrimPrefix(p, prefix)
-
-	var fs FileSystem = RealFileSystem{}
-	if r != nil && r.fs != nil {
-		fs = r.fs
-	}
 
 	if r != nil {
 		resolved, err := r.ResolveString(p)
@@ -389,24 +384,24 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
-func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
+func resolveVolumePath(fs FileSystem, v string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
-		return ResolvePath(v, baseDir, r)
+		return ResolvePath(fs, v, baseDir, r)
 	}
-	resolvedHost, err := ResolvePath(host, baseDir, r)
+	resolvedHost, err := ResolvePath(fs, host, baseDir, r)
 	if err != nil {
 		return "", err
 	}
 	return resolvedHost + ":" + remainder, nil
 }
 
-func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
+func resolveDevicePath(fs FileSystem, d string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
-		return ResolvePath(d, baseDir, r)
+		return ResolvePath(fs, d, baseDir, r)
 	}
-	resolvedHost, err := ResolvePath(host, baseDir, r)
+	resolvedHost, err := ResolvePath(fs, host, baseDir, r)
 	if err != nil {
 		return "", err
 	}

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,25 +41,23 @@ type ResolvedConfig struct {
 	LogTimestamp    bool
 	StrictEnv       bool
 	HangTimeout     time.Duration
-
-	// Docker-compatible flags
-	Ports      []string
-	PublishAll bool
-	Expose     []string
-	Hostname   string
-	DNS        []string
-	AddHosts   []string
-	Privileged bool
-	CapAdd     []string
-	CapDrop    []string
-	Entrypoint []string
-	Pull       string
-	Memory     int64
-	CPUs       float64
-	Devices    []container.DeviceMapping
+	Pull            string
+	Devices         []container.DeviceMapping
+	Memory          int64
+	CPUs            *float64
+	Hostname        string
+	DNS             []string
+	AddHosts        []string
+	Privileged      bool
+	CapAdd          []string
+	CapDrop         []string
+	Entrypoint      []string
+	PublishAll      bool
+	Expose          []string
+	Publish         []string
 }
 
-// CLIOptions represents values from CLI flags.
+// CLIOptions contains flags from the command line.
 type CLIOptions struct {
 	Image                    string
 	ImageSet                 bool
@@ -70,138 +69,136 @@ type CLIOptions struct {
 	NetworkSet               bool
 	Remove                   bool
 	RemoveSet                bool
+	CderunImage              string
+	CderunImageSet           bool
 	CderunTTY                bool
 	CderunTTYSet             bool
 	CderunInteractive        bool
 	CderunInteractiveSet     bool
-	CderunImage              string
-	CderunImageSet           bool
 	CderunNetwork            string
 	CderunNetworkSet         bool
 	CderunRemove             bool
 	CderunRemoveSet          bool
-	Runtime                  string
-	RuntimeSet               bool
 	CderunRuntime            string
 	CderunRuntimeSet         bool
-	SocketPath               string
-	SocketPathSet            bool
 	CderunSocketPath         string
 	CderunSocketPathSet      bool
-	MountSocket              bool
-	MountSocketSet           bool
 	CderunMountSocket        bool
 	CderunMountSocketSet     bool
-	MountSocketPath          string
-	MountSocketPathSet       bool
 	CderunMountSocketPath    string
 	CderunMountSocketPathSet bool
-	Env                      []string
-	CderunEnv                []string
-	Workdir                  string
-	WorkdirSet               bool
 	CderunWorkdir            string
 	CderunWorkdirSet         bool
-	Mounts                   []string
 	CderunMounts             []string
-	MountCderun              bool
-	MountCderunSet           bool
 	CderunMountCderun        bool
 	CderunMountCderunSet     bool
-	MountCderunPath          string
-	MountCderunPathSet       bool
 	CderunMountCderunPath    string
 	CderunMountCderunPathSet bool
-	MountTools               string
-	MountToolsSet            bool
 	CderunMountTools         string
-	CderunMountToolsSet      bool
-	MountAllTools            bool
-	MountAllToolsSet         bool
 	CderunMountAllTools      bool
 	CderunMountAllToolsSet   bool
-	DryRun                   bool
-	DryRunSet                bool
 	CderunDryRun             bool
 	CderunDryRunSet          bool
-	DryRunFormat             string
-	DryRunFormatSet          bool
 	CderunDryRunFormat       string
 	CderunDryRunFormatSet    bool
-	Diagnosis                bool
-	DiagnosisSet             bool
 	CderunDiagnosis          bool
 	CderunDiagnosisSet       bool
-	DiagnosisFormat          string
-	DiagnosisFormatSet       bool
 	CderunDiagnosisFormat    string
 	CderunDiagnosisFormatSet bool
-	LogLevel                 string
-	LogLevelSet              bool
-	LogFormat                string
-	LogFormatSet             bool
-	LogTimestampSet          bool
-	LogTimestamp             bool
-	StrictEnv                bool
-	StrictEnvSet             bool
-	CderunStrictEnv          bool
-	CderunStrictEnvSet       bool
 	CderunLogLevel           string
 	CderunLogLevelSet        bool
 	CderunLogFormat          string
 	CderunLogFormatSet       bool
 	CderunLogTimestamp       bool
 	CderunLogTimestampSet    bool
-	HangTimeout              string
-	HangTimeoutSet           bool
+	CderunStrictEnv          bool
+	CderunStrictEnvSet       bool
 	CderunHangTimeout        string
 	CderunHangTimeoutSet     bool
+	CderunPull               string
+	CderunPullSet            bool
+	CderunMemory             string
+	CderunMemorySet          bool
+	CderunCPUs               float64
+	CderunCPUsSet            bool
+	CderunDevices            []string
+	CderunHostname           string
+	CderunHostnameSet        bool
+	CderunDNS                []string
+	CderunAddHosts           []string
+	CderunPrivileged         bool
+	CderunPrivilegedSet      bool
+	CderunCapAdd             []string
+	CderunCapDrop            []string
+	CderunEntrypoint         []string
+	CderunPublishAll         bool
+	CderunPublishAllSet      bool
+	CderunExpose             []string
+	CderunEnv                []string
+	CderunUser               string
+	CderunUserSet            bool
+	CderunPublish            []string
 
-	// Docker-compatible flags
-	Ports               []string
-	CderunPorts         []string
-	PublishAll          bool
-	PublishAllSet       bool
-	CderunPublishAll    bool
-	CderunPublishAllSet bool
-	Expose              []string
-	CderunExpose        []string
-	Hostname            string
-	HostnameSet         bool
-	CderunHostname      string
-	CderunHostnameSet   bool
-	DNS                 []string
-	CderunDNS           []string
-	AddHosts            []string
-	CderunAddHosts      []string
-	User                string
-	UserSet             bool
-	CderunUser          string
-	CderunUserSet       bool
-	Privileged          bool
-	PrivilegedSet       bool
-	CderunPrivileged    bool
-	CderunPrivilegedSet bool
-	CapAdd              []string
-	CderunCapAdd        []string
-	CapDrop             []string
-	CderunCapDrop       []string
-	Entrypoint          []string
-	CderunEntrypoint    []string
+	// P2 (standard) flags
+	Workdir             string
+	WorkdirSet          bool
+	Mounts              []string
+	Env                 []string
+	StrictEnv           bool
+	StrictEnvSet        bool
+	Runtime             string
+	RuntimeSet          bool
+	SocketPath          string
+	SocketPathSet       bool
+	MountSocket         bool
+	MountSocketSet      bool
+	MountSocketPath     string
+	MountSocketPathSet  bool
+	MountCderun         bool
+	MountCderunSet      bool
+	MountCderunPath     string
+	MountCderunPathSet  bool
+	MountTools          string
+	MountAllTools       bool
+	MountAllToolsSet    bool
+	DryRun              bool
+	DryRunSet           bool
+	DryRunFormat        string
+	DryRunFormatSet     bool
+	Diagnosis           bool
+	DiagnosisSet        bool
+	DiagnosisFormat     string
+	DiagnosisFormatSet  bool
+	LogLevel            string
+	LogLevelSet         bool
+	LogFormat           string
+	LogFormatSet        bool
+	LogTimestamp        bool
+	LogTimestampSet     bool
+	HangTimeout         string
+	HangTimeoutSet      bool
 	Pull                string
 	PullSet             bool
-	CderunPull          string
-	CderunPullSet       bool
 	Memory              string
 	MemorySet           bool
-	CderunMemory        string
-	CderunMemorySet     bool
 	CPUs                float64
 	CPUsSet             bool
-	CderunCPUs          float64
-	CderunCPUsSet       bool
 	Devices             []string
-	CderunDevices       []string
+	Hostname            string
+	HostnameSet         bool
+	DNS                 []string
+	AddHosts            []string
+	Privileged          bool
+	PrivilegedSet       bool
+	CapAdd              []string
+	CapDrop             []string
+	Entrypoint          []string
+	PublishAll          bool
+	PublishAllSet       bool
+	Expose              []string
+	User                string
+	UserSet             bool
+	Publish             []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -226,7 +223,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// 0. Resolve Diagnosis
-	// This is resolved early because diagnosis mode bypasses some validations.
 	res.Diagnosis = resolveBoolOpt(
 		OptionDef[*bool]{EnvKey: "CDERUN_DIAGNOSIS",
 			ToolGetter:   func(t ToolConfig) *bool { return t.Diagnosis },
@@ -308,7 +304,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, global, r, fs,
 	)
 
-	// 8. Resolve Mounts (P1 > P2 > P4)
+	// 8. Resolve Mounts
 	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r, fs)
 	if err != nil {
 		return nil, err
@@ -325,13 +321,13 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, global, fs,
 	)
 
-	// 11. Resolve Env (P1 > P2 > Env (P3) > Tool (P4) > Global (P5))
+	// 11. Resolve Env
 	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r, fs)
 	if err != nil {
 		return nil, err
 	}
 
-	// 12. Resolve Runtime & Socket with Auto-detection
+	// 12. Resolve Runtime & Socket
 	res.Runtime = resolveStringOpt(
 		OptionDef[string]{EnvKey: "CDERUN_RUNTIME",
 			GlobalGetter: func(g CDERunConfig) string { return g.Runtime }},
@@ -346,42 +342,31 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		"CDERUN_SOCKET_PATH",
 		"", nil, nil,
 		global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
-		"", // Fallback to empty for auto-detection
-		r,
-		"path",
-		fs,
+		"", r, "default", fs,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Auto-detection logic
 	if res.Runtime == "" {
 		if res.SocketPath != "" {
-			// Infer runtime from socket path
 			if strings.Contains(res.SocketPath, "podman") {
 				res.Runtime = "podman"
 			} else {
 				res.Runtime = "docker"
 			}
 		} else {
-			// Check default socket paths
-			if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
-				res.Runtime = "docker"
-				res.SocketPath = "/var/run/docker.sock"
-			} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
+			if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
 				res.Runtime = "podman"
-				res.SocketPath = "/run/podman/podman.sock"
-			} else {
-				// Default fallback
+			} else if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
 				res.Runtime = "docker"
-				res.SocketPath = "/var/run/docker.sock"
+			} else {
+				res.Runtime = "docker"
 			}
 		}
 	}
 
 	if res.SocketPath == "" {
-		// Runtime was specified but socket was not
 		if res.Runtime == "podman" {
 			res.SocketPath = "/run/podman/podman.sock"
 		} else {
@@ -389,19 +374,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		}
 	}
 
-	// Special handling for unix:// prefix for the host-side socket path
-	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
-
 	// 13. Resolve MountTools and MountAllTools
 	res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
 			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
 			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
-		cli.CderunMountToolsSet, cli.CderunMountTools,
-		cli.MountToolsSet, cli.MountTools,
+		cli.CderunMountTools != "", cli.CderunMountTools,
+		cli.MountTools != "", cli.MountTools,
 		subcommand, tools, global, r, fs,
 	)
-
 	res.MountAllTools = resolveBoolOpt(
 		OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_ALL_TOOLS",
 			ToolGetter:   func(t ToolConfig) *bool { return t.MountAllTools },
@@ -413,67 +394,57 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	)
 
 	// 14. Resolve MountCderun
-	var mountCderunSpecified bool
-	res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(
+	res.MountCderun = resolveBoolOpt(
 		OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_CDERUN",
 			ToolGetter:   func(t ToolConfig) *bool { return t.MountCderun },
 			GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.MountCderun }},
+		false,
 		cli.CderunMountCderunSet, cli.CderunMountCderun,
 		cli.MountCderunSet, cli.MountCderun,
 		subcommand, tools, global, fs,
 	)
-	if !mountCderunSpecified {
-		// Transitive auto-enablement: tools -> cderun
-		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
-	}
-
 	res.MountCderunPath, err = resolveConfigPath(
 		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
 		cli.MountCderunPathSet, cli.MountCderunPath,
 		"CDERUN_MOUNT_CDERUN_PATH",
 		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
 		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-		"",
-		r,
-		"path",
-		fs,
+		"", r, "default", fs,
 	)
 	if err != nil {
 		return nil, err
 	}
+	if res.MountCderunPath != "" {
+		res.MountCderun = true
+	}
 
 	// 15. Resolve MountSocket and MountSocketPath
-	var mountSocketSpecified bool
-	res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(
+	res.MountSocket = resolveBoolOpt(
 		OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_SOCKET",
 			ToolGetter:   func(t ToolConfig) *bool { return t.MountSocket },
 			GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.MountSocket }},
+		false,
 		cli.CderunMountSocketSet, cli.CderunMountSocket,
 		cli.MountSocketSet, cli.MountSocket,
 		subcommand, tools, global, fs,
 	)
-	if !mountSocketSpecified {
-		// Transitive auto-enablement: cderun -> socket
-		res.MountSocket = res.MountCderun
-	}
-
 	res.MountSocketPath, err = resolveConfigPath(
 		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
 		cli.MountSocketPathSet, cli.MountSocketPath,
 		"CDERUN_MOUNT_SOCKET_PATH",
 		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
 		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-		res.SocketPath, // Default to host-side socket path
-		r,
-		"path",
-		fs,
+		"", r, "default", fs,
 	)
 	if err != nil {
 		return nil, err
 	}
+	if res.MountSocketPath != "" {
+		res.MountSocket = true
+	}
 
 	// Resolve HangTimeout
-	hangTimeoutStr := resolveStringOpt(
+	timeoutStr := resolveStringOpt(
 		OptionDef[string]{EnvKey: "CDERUN_HANG_TIMEOUT",
 			ToolGetter:   func(t ToolConfig) string { return t.HangTimeout },
 			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.HangTimeout },
@@ -482,12 +453,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		cli.HangTimeoutSet, cli.HangTimeout,
 		subcommand, tools, global, r, fs,
 	)
-	if hangTimeoutStr != "" {
-		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
-			res.HangTimeout = d
-		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+	if timeoutStr != "" {
+		d, err := time.ParseDuration(timeoutStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hang timeout %q: %w", timeoutStr, err)
 		}
+		res.HangTimeout = d
 	}
 
 	// Resolve DryRun
@@ -506,7 +477,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		OptionDef[string]{EnvKey: "CDERUN_DRY_RUN_FORMAT",
 			ToolGetter:   func(t ToolConfig) string { return t.DryRunFormat },
 			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.DryRunFormat },
-			Fallback:     "yaml"},
+			Fallback:     "simple"},
 		cli.CderunDryRunFormatSet, cli.CderunDryRunFormat,
 		cli.DryRunFormatSet, cli.DryRunFormat,
 		subcommand, tools, global, r, fs,
@@ -517,12 +488,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		OptionDef[string]{EnvKey: "CDERUN_DIAGNOSIS_FORMAT",
 			ToolGetter:   func(t ToolConfig) string { return t.DiagnosisFormat },
 			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.DiagnosisFormat },
-			Fallback:     "yaml"},
+			Fallback:     "text"},
 		cli.CderunDiagnosisFormatSet, cli.CderunDiagnosisFormat,
 		cli.DiagnosisFormatSet, cli.DiagnosisFormat,
 		subcommand, tools, global, r, fs,
 	)
-
 
 	// Resolve Logging
 	res.LogLevel = resolveStringOpt(
@@ -554,12 +524,6 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	)
 
 	// Resolve Docker-compatible flags
-	res.Ports = resolveStringSliceOpt(
-		OptionDef[[]string]{EnvKey: "CDERUN_PUBLISH",
-			ToolGetter:   func(t ToolConfig) []string { return t.Ports },
-			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.Ports }},
-		",", cli.CderunPorts, cli.Ports, subcommand, tools, global, r, fs,
-	)
 	res.PublishAll = resolveBoolOpt(
 		OptionDef[*bool]{EnvKey: "CDERUN_PUBLISH_ALL",
 			ToolGetter:   func(t ToolConfig) *bool { return t.PublishAll },
@@ -661,13 +625,20 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		}
 		res.Memory = bytes
 	}
-	res.CPUs = resolveFloat64Opt(
+	res.CPUs = resolveFloat64OptPtr(
 		OptionDef[*float64]{EnvKey: "CDERUN_CPUS",
 			ToolGetter:   func(t ToolConfig) *float64 { return t.CPUs },
 			GlobalGetter: func(g CDERunConfig) *float64 { return g.Defaults.CPUs }},
 		cli.CderunCPUsSet, cli.CderunCPUs,
 		cli.CPUsSet, cli.CPUs,
 		subcommand, tools, global, fs,
+	)
+
+	res.Publish = resolveStringSliceOpt(
+		OptionDef[[]string]{EnvKey: "CDERUN_PUBLISH",
+			ToolGetter:   func(t ToolConfig) []string { return t.Ports },
+			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.Ports }},
+		",", cli.CderunPublish, cli.Publish, subcommand, tools, global, r, fs,
 	)
 
 	res.HostContext = hostCtx
@@ -677,6 +648,33 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	return res, nil
+}
+
+func resolveFloat64OptPtr(def OptionDef[*float64], p1Set bool, p1Val float64, p2Set bool, p2Val float64, subcommand string, tools ToolsConfig, global *CDERunConfig, fs FileSystem) *float64 {
+	if p1Set {
+		return &p1Val
+	}
+	if p2Set {
+		return &p2Val
+	}
+	if env := fs.Getenv(def.EnvKey); env != "" {
+		if f, err := strconv.ParseFloat(env, 64); err == nil {
+			return &f
+		}
+	}
+	if def.ToolGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if f := def.ToolGetter(tool); f != nil {
+				return f
+			}
+		}
+	}
+	if def.GlobalGetter != nil && global != nil {
+		if f := def.GlobalGetter(*global); f != nil {
+			return f
+		}
+	}
+	return def.Fallback
 }
 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
@@ -710,16 +708,17 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 
 	switch pathType {
 	case "volume":
-		return cp.ResolveVolume(r)
+		return cp.ResolveVolume(fs, r)
 	case "device":
-		return cp.ResolveDevice(r)
+		return cp.ResolveDevice(fs, r)
 	default:
-		return cp.Resolve(r)
+		return cp.Resolve(fs, r)
 	}
 }
 
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
+	found := false
 
 	if len(p1) > 0 {
 		for _, d := range p1 {
@@ -730,6 +729,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
+		found = true
 	} else if len(p2) > 0 {
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
@@ -739,8 +739,9 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
+		found = true
 	} else if env := fs.Getenv("CDERUN_DEVICE"); env != "" {
-		for d := range strings.SplitSeq(env, ",") {
+		for _, d := range strings.Split(env, ",") {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
 				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
@@ -748,19 +749,21 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
+		found = true
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Devices) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
 			dcs = tool.Devices
+			found = true
 		}
 	}
 
-	if len(dcs) == 0 && global != nil {
+	if !found && global != nil && global.Defaults.Devices != nil {
 		dcs = global.Defaults.Devices
 	}
 
 	var res []container.DeviceMapping
 	for _, dc := range dcs {
-		resolved, err := dc.Resolve(r)
+		resolved, err := dc.Resolve(fs, r)
 		if err != nil {
 			return nil, err
 		}
@@ -771,30 +774,33 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var envs []string
+	found := false
 
 	if len(p1) > 0 {
 		envs = p1
+		found = true
 	} else if len(p2) > 0 {
 		envs = p2
+		found = true
 	} else if env := fs.Getenv(envKey); env != "" {
-		for e := range strings.SplitSeq(env, ";") {
+		for _, e := range strings.Split(env, ";") {
 			e = strings.TrimSpace(e)
 			if e != "" {
 				envs = append(envs, e)
 			}
 		}
+		found = true
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Env) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
 			envs = tool.Env
+			found = true
 		}
 	}
 
-	if len(envs) == 0 && global != nil {
+	if !found && global != nil && global.Defaults.Env != nil {
 		envs = global.Defaults.Env
 	}
 
-	// Deduplicate within the winning source (last-one-wins for the same key)
-	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
 	merged := mergeEnv(nil, nil, envs)
 
 	return resolveEnvValues(merged, strict, r, fs)
@@ -847,6 +853,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	var mcs []MountConfig
+	found := false
 
 	if len(p1) > 0 {
 		for _, m := range p1 {
@@ -857,6 +864,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
+		found = true
 	} else if len(p2) > 0 {
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
@@ -866,8 +874,9 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
+		found = true
 	} else if env := fs.Getenv("CDERUN_MOUNT"); env != "" {
-		for m := range strings.SplitSeq(env, ";") {
+		for _, m := range strings.Split(env, ";") {
 			m = strings.TrimSpace(m)
 			if m == "" {
 				continue
@@ -879,19 +888,21 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
+		found = true
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Mounts) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
 			mcs = tool.Mounts
+			found = true
 		}
 	}
 
-	if len(mcs) == 0 && global != nil {
+	if !found && global != nil && global.Defaults.Mounts != nil {
 		mcs = global.Defaults.Mounts
 	}
 
 	var res []container.Mount
 	for _, mc := range mcs {
-		resolved, err := mc.Resolve(r)
+		resolved, err := mc.Resolve(fs, r)
 		if err != nil {
 			return nil, err
 		}

@@ -116,7 +116,7 @@ func TestUnit_Config_SetBaseDir_Exhaustive(t *testing.T) {
 	cfg := &CDERunConfig{
 		SocketPath: ConfigPath{Raw: "./sock"},
 	}
-	err := cfg.SetBaseDir("/base")
+	err := cfg.SetBaseDir(&MockFileSystem{}, "/base")
 	require.NoError(t, err)
 	assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
 }
@@ -238,7 +238,7 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.InDelta(t, 0.5, res.CPUs, 0.0001)
+		assert.InDelta(t, 0.5, *res.CPUs, 0.0001)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
@@ -284,7 +284,7 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		cp := ConfigPath{Raw: "/data:ro", BaseDir: "/app"}
-		val, err := cp.ResolveVolume(resolver)
+		val, err := cp.ResolveVolume(mfs, resolver)
 		require.NoError(t, err)
 		assert.Equal(t, "/data:ro", val)
 	})
@@ -294,7 +294,7 @@ func TestUnit_Config_Path_Exhaustive_Coverage(t *testing.T) {
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		cp := ConfigPath{Raw: "/dev/video0:/dev/video0:rw", BaseDir: "/app"}
-		val, err := cp.ResolveDevice(resolver)
+		val, err := cp.ResolveDevice(mfs, resolver)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0:/dev/video0:rw", val)
 	})

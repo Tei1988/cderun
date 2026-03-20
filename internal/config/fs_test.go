@@ -178,7 +178,7 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 			},
 		}
 
-		_, err := ResolvePath("relative", "/work", r)
+		_, err := ResolvePath(mfs, "relative", "/work", r)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to get absolute path")
