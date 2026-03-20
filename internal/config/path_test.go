@@ -64,7 +64,8 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			absErr: assert.AnError,
 		}
 		hostCtx := &HostContext{Level: 1} // Trigger nested check
-		rErr, _ := NewExpressionResolverWithFS(hostCtx, mfsErr)
+		rErr, err := NewExpressionResolverWithFS(hostCtx, mfsErr)
+		require.NoError(t, err)
 		// ResolvePath calls fs.Abs when r.HostContext.Level > 0 and path is NOT absolute.
 		_, err = ResolvePath("some/path", "/wd", rErr)
 		require.Error(t, err)
