@@ -64,9 +64,13 @@ node --env DEBUG=app app.js --cderun-env NODE_ENV=production
 1. `--env DEBUG=app` はホイストされず、`node`（コンテナ内の実行コマンド）にそのまま渡されます。
 2. `--cderun-env NODE_ENV=production` はホイストされ、`cderun` 自体の環境変数設定として処理されます。
 
+詳細は [polyglot-entry.md](./polyglot-entry.md) を参照してください。
+
 ### サブコマンドを必要としないモード
 
-`--diagnosis` フラグが指定された場合、`cderun` は診断モードとして動作し、サブコマンドの指定を必要としません。このモードでは、フラグの境界解析やホイストは行われず、すべてのフラグが `cderun` のオプションとして直接評価されます。
+`--diagnosis` フラグが指定された場合、`cderun` は診断モードとして動作し、サブコマンドの指定を必要としません。
+
+このモードでも `preprocessArgs` による前処理（`--cderun-` フラグのホイスト等）は通常通り実行されますが、診断情報の出力後にプログラムが早期終了（Early Return）するため、ホイストされたフラグの多く（イメージの上書きや環境変数の追加など）は実際の動作に影響を与えません。
 
 ## テストケース要件
 
