@@ -461,9 +461,13 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 	})
 
 	t.Run("Expression error in ResolvePath", func(t *testing.T) {
-		r := &ExpressionResolver{}
-		r.setError(assert.AnError)
-		_, err := ResolvePath("{{BAD}}", "/base", r)
+		r, err := NewExpressionResolverWithFS(nil, &customMockFS{
+			MockFileSystem: MockFileSystem{WD: "/base"},
+			readFileErr:    assert.AnError,
+		})
+		require.NoError(t, err)
+		// {{file:foo}} will trigger an error when it tries to read the file
+		_, err = ResolvePath("{{file:foo}}", "/base", r)
 		require.Error(t, err)
 	})
 

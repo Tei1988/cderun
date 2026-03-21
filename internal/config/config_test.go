@@ -36,6 +36,20 @@ func (m *customMockFS) ReadFile(name string) ([]byte, error) {
 }
 
 func TestUnit_Config_LoadCDERun(t *testing.T) {
+	t.Run("ReadFile error", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.cderun.yaml": []byte("runtime: docker")},
+				WD:    "/project",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read config file")
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
@@ -137,6 +151,20 @@ hostContext:
 }
 
 func TestUnit_Config_LoadTools(t *testing.T) {
+	t.Run("ReadFile error", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.tools.yaml": []byte("node: {image: node}")},
+				WD:    "/project",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read tools file")
+	})
+
 	t.Run("found in current dir", func(t *testing.T) {
 		content := `
 node:
@@ -334,6 +362,63 @@ func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
 	})
 }
 
+func TestUnit_Config_SetBaseDir(t *testing.T) {
+	cfg := &CDERunConfig{
+		SocketPath: ConfigPath{Raw: "/sock"},
+		Defaults: ConfigDefaults{
+			MountCderunPath: ConfigPath{Raw: "cderun"},
+			MountSocketPath: ConfigPath{Raw: "socket"},
+			Mounts: []MountConfig{
+				{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
+			},
+			Devices: []DeviceConfig{
+				{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
+			},
+		},
+	}
+	cfg.SetBaseDir("/base")
+	assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.MountCderunPath.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.MountSocketPath.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Source.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
+	assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
+
+	// ToolConfig SetBaseDir
+	tc := &ToolConfig{
+		MountCderunPath: ConfigPath{Raw: "cderun"},
+		MountSocketPath: ConfigPath{Raw: "socket"},
+		Mounts: []MountConfig{
+			{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
+		},
+		Devices: []DeviceConfig{
+			{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
+		},
+	}
+	tc.SetBaseDir("/base")
+	assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
+	assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
+	assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
+	assert.Equal(t, "/base", tc.Mounts[0].Target.BaseDir)
+	assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
+	assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
+}
+
+func TestUnit_Config_Helpers(t *testing.T) {
+	t.Run("copyFloat64Ptr non-nil", func(t *testing.T) {
+		f := 1.5
+		res := copyFloat64Ptr(&f)
+		assert.NotNil(t, res)
+		assert.InDelta(t, f, *res, 1e-9)
+		assert.NotSame(t, &f, res)
+	})
+
+	t.Run("copyFloat64Ptr nil", func(t *testing.T) {
+		assert.Nil(t, copyFloat64Ptr(nil))
+	})
+}
+
 func TestUnit_Config_DeepCopy(t *testing.T) {
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
 		tty := true
@@ -397,85 +482,6 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	t.Run("ToolsConfig DeepCopy nil", func(t *testing.T) {
 		var orig ToolsConfig
 		assert.Nil(t, orig.DeepCopy())
-	})
-
-	t.Run("SetBaseDir exhaustive", func(t *testing.T) {
-		cfg := &CDERunConfig{
-			SocketPath: ConfigPath{Raw: "/sock"},
-			Defaults: ConfigDefaults{
-				MountCderunPath: ConfigPath{Raw: "cderun"},
-				MountSocketPath: ConfigPath{Raw: "socket"},
-				Mounts: []MountConfig{
-					{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
-				},
-				Devices: []DeviceConfig{
-					{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
-				},
-			},
-		}
-		cfg.SetBaseDir("/base")
-		assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.MountCderunPath.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.MountSocketPath.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Source.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
-
-		// ToolConfig SetBaseDir
-		tc := &ToolConfig{
-			MountCderunPath: ConfigPath{Raw: "cderun"},
-			MountSocketPath: ConfigPath{Raw: "socket"},
-			Mounts: []MountConfig{
-				{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
-			},
-			Devices: []DeviceConfig{
-				{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
-			},
-		}
-		tc.SetBaseDir("/base")
-		assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
-		assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
-		assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
-		assert.Equal(t, "/base", tc.Mounts[0].Target.BaseDir)
-		assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
-		assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
-	})
-
-	t.Run("copyFloat64Ptr non-nil", func(t *testing.T) {
-		f := 1.5
-		res := copyFloat64Ptr(&f)
-		assert.NotNil(t, res)
-		assert.InDelta(t, f, *res, 1e-9)
-		assert.NotSame(t, &f, res)
-	})
-
-	t.Run("LoadCDERunConfig ReadFile error", func(t *testing.T) {
-		mfs := &customMockFS{
-			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/project/.cderun.yaml": []byte("runtime: docker")},
-				WD:    "/project",
-			},
-			readFileErr: assert.AnError,
-		}
-		loader := &ConfigLoader{fs: mfs}
-		_, _, err := loader.LoadCDERunConfig()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read config file")
-	})
-
-	t.Run("LoadToolsConfig ReadFile error", func(t *testing.T) {
-		mfs := &customMockFS{
-			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/project/.tools.yaml": []byte("node: {image: node}")},
-				WD:    "/project",
-			},
-			readFileErr: assert.AnError,
-		}
-		loader := &ConfigLoader{fs: mfs}
-		_, _, err := loader.LoadToolsConfig()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read tools file")
 	})
 
 	t.Run("DeepCopy all fields", func(t *testing.T) {
@@ -586,7 +592,4 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.NotSame(t, &orig.Devices[0], &cloned.Devices[0])
 	})
 
-	t.Run("copyFloat64Ptr nil", func(t *testing.T) {
-		assert.Nil(t, copyFloat64Ptr(nil))
-	})
 }
