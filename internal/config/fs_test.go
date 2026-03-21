@@ -170,15 +170,14 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 			AbsErr: assert.AnError,
 		}
 		// ResolvePath uses fs.Abs when r.HostContext.Level > 0
-		r := &ExpressionResolver{
-			fs: mfs,
-			HostContext: &HostContext{
+			hostCtx := &HostContext{
 				Level:  1,
 				Mounts: []MountMapping{{Source: "/host", Target: "/work", Level: 1}},
-			},
 		}
+			r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+			require.NoError(t, err)
 
-		_, err := ResolvePath("relative", "/work", r)
+			_, err = ResolvePath("relative", "/work", r)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to get absolute path")

@@ -456,7 +456,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-		_, err := ResolvePath("~/foo", "/base", &ExpressionResolver{fs: mfs})
+			r, err := NewExpressionResolverWithFS(nil, mfs)
+			require.NoError(t, err)
+			_, err = ResolvePath("~/foo", "/base", r)
 		require.Error(t, err)
 	})
 
