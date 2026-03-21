@@ -492,7 +492,7 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		case reflect.Map:
 			if !fOrig.IsNil() && fOrig.Len() > 0 {
 				if fOrig.Pointer() == fCloned.Pointer() {
-					assert.Failf(t, "Map %s should have different internal pointers", fieldName)
+					assert.Failf(t, "Map deep-copy failed", "Map %s should have different internal pointers", fieldName)
 				}
 			}
 		default:
