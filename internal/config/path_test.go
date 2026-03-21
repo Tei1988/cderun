@@ -151,6 +151,14 @@ func TestUnit_Path_Resolution(t *testing.T) {
 
 		_, err = ParseMountFlag("invalid-format")
 		require.Error(t, err)
+
+		_, err = ParseMountFlag("type=bind,source=./src")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target is required")
+
+		_, err = ParseMountFlag("type=bind,source=./src,target=/dst,readonly=invalid")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid readonly value")
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
@@ -415,6 +423,60 @@ func TestUnit_Path_Helpers(t *testing.T) {
 
 		_, _, ok = SplitHostRemainder("/no-sep")
 		assert.False(t, ok)
+	})
+}
+
+func TestUnit_Path_ParseDeviceConfig_Errors(t *testing.T) {
+	t.Run("empty string", func(t *testing.T) {
+		_, ok := ParseDeviceConfig("")
+		assert.False(t, ok)
+	})
+
+	t.Run("missing components", func(t *testing.T) {
+		_, ok := ParseDeviceConfig(":")
+		assert.False(t, ok)
+	})
+}
+
+func TestUnit_Path_Resolve_Errors(t *testing.T) {
+	t.Run("ConfigPath.Resolve empty", func(t *testing.T) {
+		cp := ConfigPath{}
+		val, err := cp.Resolve(nil)
+		require.NoError(t, err)
+		assert.Empty(t, val)
+	})
+
+	t.Run("ResolvePath empty", func(t *testing.T) {
+		val, err := ResolvePath("", "/base", nil)
+		require.NoError(t, err)
+		assert.Empty(t, val)
+	})
+
+	t.Run("expandHome error", func(t *testing.T) {
+		mfs := &customMockFS{
+			homeDirErr: assert.AnError,
+		}
+			r, err := NewExpressionResolverWithFS(nil, mfs)
+			require.NoError(t, err)
+			_, err = ResolvePath("~/foo", "/base", r)
+		require.Error(t, err)
+	})
+
+	t.Run("Expression error in ResolvePath", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, &customMockFS{
+			MockFileSystem: MockFileSystem{WD: "/base"},
+			readFileErr:    assert.AnError,
+		})
+		require.NoError(t, err)
+		// {{file:foo}} will trigger an error when it tries to read the file
+		_, err = ResolvePath("{{file:foo}}", "/base", r)
+		require.Error(t, err)
+	})
+
+	t.Run("Scheme preservation exhaustive", func(t *testing.T) {
+		val, err := ResolvePath("ssh://git@github.com/org/repo", "/base", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "ssh://git@github.com/org/repo", val)
 	})
 }
 
