@@ -477,12 +477,13 @@ func TestUnit_Docker_Attach(t *testing.T) {
 
 	t.Run("context cancelled", func(t *testing.T) {
 		conn := &mockConn{}
-			pr, _ := io.Pipe() // Use pipe to simulate blocking read
-			defer pr.Close()
+		pr, pw := io.Pipe() // Use pipe to simulate blocking read
+		defer pr.Close()
+		defer pw.Close()
 		mock := &mockDockerClient{
 			attachResp: types.HijackedResponse{
 				Conn:   conn,
-					Reader: bufio.NewReader(pr),
+				Reader: bufio.NewReader(pr),
 			},
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
