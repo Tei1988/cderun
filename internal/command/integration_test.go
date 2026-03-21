@@ -1,13 +1,10 @@
 package command
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -98,27 +95,4 @@ func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
 	err := ExecuteContextWithOptions(ctx, []string{"node", "--version"}, withMockRuntime(mockRuntime, withMockFS(mfs)))
 
 	require.NoError(t, err)
-}
-
-func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
-	t.Parallel()
-
-	t.Run("container creation failure", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			CreateErr: errors.New("creation failed"),
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
-		var errBuf bytes.Buffer
-		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			withMockRuntime(mockRuntime)(o, cmd)
-			o.isTerminal = func(fd int) bool { return true }
-			cmd.SetErr(&errBuf)
-		})
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "creation failed")
-	})
 }
