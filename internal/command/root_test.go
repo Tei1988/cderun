@@ -922,7 +922,7 @@ func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
 	// runCderunCore uses ExecuteContextWithOptions.
 	// We can trigger a failure by providing arguments that cause an error, e.g., missing image.
 	stdout, _, exitCode, err := runCderunCore(nil, "sh") // No image provided
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no image mapping found for tool: sh")
 	assert.Empty(t, stdout)
 	assert.Equal(t, 0, exitCode) // Exit code is only set if o.exitFunc is called, but RunE returns error before that.
