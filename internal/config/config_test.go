@@ -394,8 +394,93 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.Equal(t, "NODE_ENV=dev", orig["node"].Env[0])
 	})
 
+	t.Run("ToolsConfig DeepCopy nil", func(t *testing.T) {
+		var orig ToolsConfig
+		assert.Nil(t, orig.DeepCopy())
+	})
+
+	t.Run("SetBaseDir exhaustive", func(t *testing.T) {
+		cfg := &CDERunConfig{
+			SocketPath: ConfigPath{Raw: "/sock"},
+			Defaults: ConfigDefaults{
+				MountCderunPath: ConfigPath{Raw: "cderun"},
+				MountSocketPath: ConfigPath{Raw: "socket"},
+				Mounts: []MountConfig{
+					{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
+				},
+				Devices: []DeviceConfig{
+					{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
+				},
+			},
+		}
+		cfg.SetBaseDir("/base")
+		assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.MountCderunPath.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.MountSocketPath.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Source.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
+
+		// ToolConfig SetBaseDir
+		tc := &ToolConfig{
+			MountCderunPath: ConfigPath{Raw: "cderun"},
+			MountSocketPath: ConfigPath{Raw: "socket"},
+			Mounts: []MountConfig{
+				{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
+			},
+			Devices: []DeviceConfig{
+				{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
+			},
+		}
+		tc.SetBaseDir("/base")
+		assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
+		assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
+		assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
+		assert.Equal(t, "/base", tc.Mounts[0].Target.BaseDir)
+		assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
+		assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
+	})
+
+	t.Run("copyFloat64Ptr non-nil", func(t *testing.T) {
+		f := 1.5
+		res := copyFloat64Ptr(&f)
+		assert.NotNil(t, res)
+		assert.Equal(t, f, *res)
+		assert.NotSame(t, &f, res)
+	})
+
+	t.Run("LoadCDERunConfig ReadFile error", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.cderun.yaml": []byte("runtime: docker")},
+				WD:    "/project",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadCDERunConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read config file")
+	})
+
+	t.Run("LoadToolsConfig ReadFile error", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.tools.yaml": []byte("node: {image: node}")},
+				WD:    "/project",
+			},
+			readFileErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		_, _, err := loader.LoadToolsConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read tools file")
+	})
+
 	t.Run("DeepCopy all fields", func(t *testing.T) {
 		b := true
+		f := 2.0
 		orig := CDERunConfig{
 			Logging: LoggingConfig{
 				Timestamp: &b,
@@ -410,6 +495,9 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				MountAllTools:   &b,
 				PublishAll:      &b,
 				Privileged:      &b,
+				DryRun:          &b,
+				Diagnosis:       &b,
+				CPUs:            &f,
 				MountTools:      []string{"t"},
 				Ports:           []string{"p"},
 				Expose:          []string{"e"},
@@ -419,8 +507,8 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				CapDrop:         []string{"cd"},
 				Entrypoint:      []string{"ep"},
 				Env:             []string{"ev"},
-				Mounts:          []MountConfig{{Type: "bind"}},
-				Devices:         []DeviceConfig{{Permissions: "r"}},
+				Mounts:          []MountConfig{{Type: "bind", Target: ConfigPath{Raw: "/t"}}},
+				Devices:         []DeviceConfig{{Source: ConfigPath{Raw: "/s"}, Destination: ConfigPath{Raw: "/d"}}},
 				MountCderunPath: ConfigPath{Raw: "rcp"},
 				MountSocketPath: ConfigPath{Raw: "rsp"},
 			},
@@ -438,9 +526,64 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		assert.NotSame(t, orig.Defaults.MountAllTools, cloned.Defaults.MountAllTools)
 		assert.NotSame(t, orig.Defaults.PublishAll, cloned.Defaults.PublishAll)
 		assert.NotSame(t, orig.Defaults.Privileged, cloned.Defaults.Privileged)
+		assert.NotSame(t, orig.Defaults.DryRun, cloned.Defaults.DryRun)
+		assert.NotSame(t, orig.Defaults.Diagnosis, cloned.Defaults.Diagnosis)
+		assert.NotSame(t, orig.Defaults.CPUs, cloned.Defaults.CPUs)
 		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
 		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
 		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
+	})
+
+	t.Run("ToolConfig DeepCopy all fields", func(t *testing.T) {
+		b := true
+		f := 2.0
+		orig := ToolConfig{
+			TTY:             &b,
+			Interactive:     &b,
+			Remove:          &b,
+			StrictEnv:       &b,
+			MountCderun:     &b,
+			MountSocket:     &b,
+			MountAllTools:   &b,
+			PublishAll:      &b,
+			Privileged:      &b,
+			LogTimestamp:    &b,
+			DryRun:          &b,
+			Diagnosis:       &b,
+			CPUs:            &f,
+			MountTools:      []string{"t"},
+			Ports:           []string{"p"},
+			Expose:          []string{"e"},
+			DNS:             []string{"d"},
+			AddHosts:        []string{"a"},
+			CapAdd:          []string{"ca"},
+			CapDrop:         []string{"cd"},
+			Entrypoint:      []string{"ep"},
+			Env:             []string{"ev"},
+			Mounts:          []MountConfig{{Type: "bind", Target: ConfigPath{Raw: "/t"}}},
+			Devices:         []DeviceConfig{{Source: ConfigPath{Raw: "/s"}, Destination: ConfigPath{Raw: "/d"}}},
+			MountCderunPath: ConfigPath{Raw: "rcp"},
+			MountSocketPath: ConfigPath{Raw: "rsp"},
+		}
+
+		cloned := orig.DeepCopy()
+		assert.Equal(t, orig, cloned)
+		assert.NotSame(t, orig.TTY, cloned.TTY)
+		assert.NotSame(t, orig.Interactive, cloned.Interactive)
+		assert.NotSame(t, orig.Remove, cloned.Remove)
+		assert.NotSame(t, orig.StrictEnv, cloned.StrictEnv)
+		assert.NotSame(t, orig.MountCderun, cloned.MountCderun)
+		assert.NotSame(t, orig.MountSocket, cloned.MountSocket)
+		assert.NotSame(t, orig.MountAllTools, cloned.MountAllTools)
+		assert.NotSame(t, orig.PublishAll, cloned.PublishAll)
+		assert.NotSame(t, orig.Privileged, cloned.Privileged)
+		assert.NotSame(t, orig.LogTimestamp, cloned.LogTimestamp)
+		assert.NotSame(t, orig.DryRun, cloned.DryRun)
+		assert.NotSame(t, orig.Diagnosis, cloned.Diagnosis)
+		assert.NotSame(t, orig.CPUs, cloned.CPUs)
+		assert.NotSame(t, &orig.MountTools[0], &cloned.MountTools[0])
+		assert.NotSame(t, &orig.Mounts[0], &cloned.Mounts[0])
+		assert.NotSame(t, &orig.Devices[0], &cloned.Devices[0])
 	})
 
 	t.Run("copyFloat64Ptr nil", func(t *testing.T) {

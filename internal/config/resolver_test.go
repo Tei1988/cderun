@@ -12,6 +12,146 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+func TestUnit_Config_Option_Exhaustive(t *testing.T) {
+	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
+		def := OptionDef[[]string]{
+			EnvKey: "TEST_SLICE",
+			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
+		}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
+		r, _ := NewExpressionResolver(nil)
+
+		// Env priority
+		res := resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"env1", "env2"}, res)
+
+		// P2 priority
+		res = resolveStringSliceCommaOpt(def, false, "", true, "cli1,cli2", "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"cli1", "cli2"}, res)
+
+		// P1 priority
+		res = resolveStringSliceCommaOpt(def, true, "p1a,p1b", false, "", "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"p1a", "p1b"}, res)
+
+		// Fallback to global
+		mfs.Env = nil
+		res = resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, &CDERunConfig{Defaults: ConfigDefaults{}}, r, mfs)
+		assert.Equal(t, []string{"global"}, res)
+	})
+
+	t.Run("resolveFloat64Opt", func(t *testing.T) {
+		def := OptionDef[*float64]{
+			EnvKey: "TEST_FLOAT",
+			Fallback: ptr(1.0),
+		}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
+
+		// Env
+		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 2.5, res)
+
+		// Fallback
+		mfs.Env = nil
+		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 1.0, res)
+
+		// Invalid env
+		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
+		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 1.0, res)
+
+		// Tool getter
+		mfs.Env = nil
+		f2 := 2.0
+		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
+		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		assert.Equal(t, 2.0, res)
+
+		// Global getter
+		def.ToolGetter = nil
+		f3 := 3.0
+		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
+		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		assert.Equal(t, 3.0, res)
+
+		// P2 CLI
+		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		assert.Equal(t, 4.0, res)
+
+		// P1 Override
+		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		assert.Equal(t, 5.0, res)
+	})
+
+	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
+		r, _ := NewExpressionResolver(nil)
+		mfs := &MockFileSystem{}
+		_, err := resolveEnvValues([]string{"UNSET"}, true, r, mfs)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "required environment variable not found")
+	})
+
+	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
+		mfs := &MockFileSystem{HomeDir: "/home/user"}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		res, err := resolveConfigPath(false, "", false, "", "UNSET", "sub", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/sock", res)
+	})
+
+	t.Run("resolveStringOpt exhaustive", func(t *testing.T) {
+		def := OptionDef[string]{EnvKey: "TEST_STR", Fallback: "fallback"}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_STR": "env"}}
+		r, _ := NewExpressionResolver(nil)
+
+		// Env
+		res := resolveStringOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
+		assert.Equal(t, "env", res)
+
+		// Tool
+		mfs.Env = nil
+		def.ToolGetter = func(tc ToolConfig) string { return "tool" }
+		res = resolveStringOpt(def, false, "", false, "", "node", ToolsConfig{"node": ToolConfig{}}, nil, r, mfs)
+		assert.Equal(t, "tool", res)
+
+		// Global
+		def.ToolGetter = nil
+		def.GlobalGetter = func(c CDERunConfig) string { return "global" }
+		res = resolveStringOpt(def, false, "", false, "", "node", nil, &CDERunConfig{}, r, mfs)
+		assert.Equal(t, "global", res)
+	})
+
+	t.Run("resolveStringSliceOpt exhaustive", func(t *testing.T) {
+		def := OptionDef[[]string]{EnvKey: "TEST_SLICE"}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "a:b"}}
+		r, _ := NewExpressionResolver(nil)
+
+		// Env
+		res := resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"a", "b"}, res)
+
+		// Tool
+		mfs.Env = nil
+		def.ToolGetter = func(tc ToolConfig) []string { return []string{"tool"} }
+		res = resolveStringSliceOpt(def, ":", nil, nil, "node", ToolsConfig{"node": ToolConfig{}}, nil, r, mfs)
+		assert.Equal(t, []string{"tool"}, res)
+
+		// Global
+		def.ToolGetter = nil
+		def.GlobalGetter = func(c CDERunConfig) []string { return []string{"global"} }
+		res = resolveStringSliceOpt(def, ":", nil, nil, "node", nil, &CDERunConfig{}, r, mfs)
+		assert.Equal(t, []string{"global"}, res)
+
+		// P2 CLI
+		res = resolveStringSliceOpt(def, ":", nil, []string{"cli"}, "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"cli"}, res)
+
+		// P1 Override
+		res = resolveStringSliceOpt(def, ":", []string{"p1"}, nil, "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"p1"}, res)
+	})
+}
+
 func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 	t.Parallel()
 	t.Run("P1 Override takes priority over P2 CLI", func(t *testing.T) {
@@ -308,5 +448,120 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "/global.sock", res.SocketPath)
+	})
+
+	t.Run("Auto-detection exhaustive", func(t *testing.T) {
+		// docker.sock exists
+		mfs := &MockFileSystem{
+			Dirs: map[string]bool{"/var/run": true},
+			Files: map[string][]byte{"/var/run/docker.sock": []byte("")},
+		}
+		res, err := ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
+
+		// podman.sock exists
+		mfs = &MockFileSystem{
+			Dirs: map[string]bool{"/run/podman": true},
+			Files: map[string][]byte{"/run/podman/podman.sock": []byte("")},
+		}
+		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
+
+		// specified podman but no socket, should use default podman socket
+		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Runtime: "podman", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
+
+		// specified docker but no socket
+		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Runtime: "docker", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
+
+		// specified unknown runtime (e.g. from global)
+		global := &CDERunConfig{Runtime: "containerd"}
+		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath) // Fallback to docker socket
+	})
+
+	t.Run("Resolve coverage final", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		// resolveDevices P2
+		resDevices, err := resolveDevices(nil, []string{"/dev/p2:/dev/p2"}, "", nil, nil, r, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/dev/p2", resDevices[0].PathOnHost)
+
+		// resolveMounts P2 and Global
+		resMounts, err := resolveMounts(nil, []string{"source=/p2,target=/p2"}, "", nil, nil, r, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/p2", resMounts[0].Source)
+
+		global := &CDERunConfig{Defaults: ConfigDefaults{Mounts: []MountConfig{{Source: ConfigPath{Raw: "/global"}, Target: ConfigPath{Raw: "/global"}}}}}
+		resMounts, err = resolveMounts(nil, nil, "", nil, global, r, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/global", resMounts[0].Source)
+
+		// resolveConfigPath P1 and CLI
+		resPath, err := resolveConfigPath(true, "/p1", false, "", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/p1", resPath)
+
+		resPath, err = resolveConfigPath(false, "", true, "/cli", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "/cli", resPath)
+	})
+
+	t.Run("Resolve errors", func(t *testing.T) {
+		// no image
+		_, err := ResolveWithFS("sh", CLIOptions{}, nil, nil, &MockFileSystem{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no image mapping found")
+
+		// invalid memory
+		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value")
+
+		// Expression resolver error
+		mfs := &customMockFS{homeDirErr: assert.AnError}
+		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		// Expression resolver error is recorded but doesn't immediately stop ResolveWithFS until the end or specific points.
+		// Actually NewExpressionResolverWithFS swallows homeDirErr and sets home to "".
+		// Let's try to trigger an error in ResolveWithFS.
+
+		// Expression error
+		mfsExpr := &MockFileSystem{WD: "/app"}
+		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}}
+		_, err = ResolveWithFS("sh", cli, nil, nil, mfsExpr)
+		assert.Error(t, err)
+
+		// Test resolveEnv with Tool getter
+		tools := ToolsConfig{"node": ToolConfig{Env: []string{"TOOL=1"}}}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "TOOL=1")
+
+		// Test resolveDevices with Tool getter
+		tools = ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/t"}}}}}
+		res, err = ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		require.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/t", res.Devices[0].PathOnHost)
+
+		// Test resolveMounts with Tool getter
+		tools = ToolsConfig{"node": ToolConfig{Mounts: []MountConfig{{Source: ConfigPath{Raw: "/s"}, Target: ConfigPath{Raw: "/t"}}}}}
+		res, err = ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/s", res.Mounts[0].Source)
 	})
 }
