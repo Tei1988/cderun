@@ -434,7 +434,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		_, err = resolveDevices([]string{":"}, nil, "", nil, nil, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveMounts invalid format", func(t *testing.T) {
@@ -442,7 +442,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		_, err = resolveMounts([]string{"invalid"}, nil, "", nil, nil, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveEnvValues expression error", func(t *testing.T) {
@@ -452,7 +452,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		require.NoError(t, err)
 		rErr.setError(assert.AnError)
 		_, err = resolveEnvValues([]string{"VAR={{expr}}"}, false, rErr, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveFloat64Opt invalid", func(t *testing.T) {

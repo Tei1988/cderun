@@ -48,46 +48,46 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 		// Env
 		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 2.5, res)
+		assert.InDelta(t, 2.5, res, 1e-9)
 
 		// Fallback
 		mfs.Env = nil
 		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 1.0, res)
+		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
 		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 1.0, res)
+		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Tool getter
 		mfs.Env = nil
 		f2 := 2.0
 		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
 		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
-		assert.Equal(t, 2.0, res)
+		assert.InDelta(t, 2.0, res, 1e-9)
 
 		// Global getter
 		def.ToolGetter = nil
 		f3 := 3.0
 		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
 		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
-		assert.Equal(t, 3.0, res)
+		assert.InDelta(t, 3.0, res, 1e-9)
 
 		// P2 CLI
 		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
-		assert.Equal(t, 4.0, res)
+		assert.InDelta(t, 4.0, res, 1e-9)
 
 		// P1 Override
 		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
-		assert.Equal(t, 5.0, res)
+		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		r, _ := NewExpressionResolver(nil)
 		mfs := &MockFileSystem{}
 		_, err := resolveEnvValues([]string{"UNSET"}, true, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
 
@@ -523,17 +523,20 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	t.Run("Resolve errors", func(t *testing.T) {
 		// no image
 		_, err := ResolveWithFS("sh", CLIOptions{}, nil, nil, &MockFileSystem{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found")
 
 		// invalid memory
 		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid memory value")
 
 		// Expression resolver error
-		mfs := &customMockFS{homeDirErr: assert.AnError}
-		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		mfsError := &customMockFS{homeDirErr: assert.AnError}
+		resError, err := ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
+		require.NoError(t, err)
+		assert.NotNil(t, resError)
+
 		// Expression resolver error is recorded but doesn't immediately stop ResolveWithFS until the end or specific points.
 		// Actually NewExpressionResolverWithFS swallows homeDirErr and sets home to "".
 		// Let's try to trigger an error in ResolveWithFS.
@@ -542,7 +545,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		mfsExpr := &MockFileSystem{WD: "/app"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}}
 		_, err = ResolveWithFS("sh", cli, nil, nil, mfsExpr)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// Test resolveEnv with Tool getter
 		tools := ToolsConfig{"node": ToolConfig{Env: []string{"TOOL=1"}}}

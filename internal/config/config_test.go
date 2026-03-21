@@ -446,7 +446,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		f := 1.5
 		res := copyFloat64Ptr(&f)
 		assert.NotNil(t, res)
-		assert.Equal(t, f, *res)
+		assert.InDelta(t, f, *res, 1e-9)
 		assert.NotSame(t, &f, res)
 	})
 
@@ -460,7 +460,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfig()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read config file")
 	})
 
@@ -474,7 +474,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfig()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read tools file")
 	})
 
