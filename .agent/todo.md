@@ -20,9 +20,3 @@ While our current DinD tests cover standard container workflows, Podman introduc
 
 **Success Criteria:**
 The CI pipeline successfully triggers and passes a full test run using the Podman v5.8.1 image.
-
-### Outstanding coverage gaps in internal/command
-- None
-
-### Diagnosis Mode Improvement
-- None

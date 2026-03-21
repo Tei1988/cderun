@@ -920,6 +920,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 
 func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 	t.Parallel()
+	var logBuf bytes.Buffer
 	mfs := &config.MockFileSystem{
 		RemoveAllErr: errors.New("remove failed"),
 	}
@@ -930,8 +931,10 @@ func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
+		cmd.SetErr(&logBuf)
 	})
 	require.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "failed to cleanup snapshot: remove failed")
 }
 
 func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
@@ -964,8 +967,8 @@ func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
 func TestUnit_Root_ExecuteWrappers(t *testing.T) {
 	t.Parallel()
 	// These are just to cover the simple wrapper functions
-	_ = Execute(nil)
-	_ = ExecuteContext(context.Background(), nil)
+	require.NoError(t, Execute(nil))
+	require.NoError(t, ExecuteContext(context.Background(), nil))
 }
 
 
@@ -989,6 +992,7 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 
 func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 	t.Parallel()
+	var logBuf bytes.Buffer
 	mfs := &errorFS{
 		MockFileSystem: &config.MockFileSystem{},
 		mkdirErr:       os.ErrPermission,
@@ -998,14 +1002,13 @@ func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
-		// Mock runtime to avoid actual execution if snapshot creation were to succeed (it shouldn't here)
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
+		cmd.SetErr(&logBuf)
 	})
-	// snapshot failure is currently a warning, not a fatal error in RunE.
-	// Let's verify it continues but logs a warning.
 	require.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "failed to create snapshot: failed to create snapshot directory")
 }
 
 
