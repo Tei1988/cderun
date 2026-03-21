@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -429,6 +430,72 @@ func TestUnit_Config_Helpers(t *testing.T) {
 	})
 }
 
+func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
+	t.Helper()
+
+	vOrig := reflect.ValueOf(orig)
+	vCloned := reflect.ValueOf(cloned)
+
+	if !vOrig.IsValid() {
+		assert.False(t, vCloned.IsValid())
+		return
+	}
+
+	assert.Equal(t, orig, cloned)
+
+	if vOrig.Kind() == reflect.Map {
+		if !vOrig.IsNil() {
+			if vOrig.Pointer() == vCloned.Pointer() {
+				assert.Fail(t, "Map should have different internal pointers")
+			}
+			for _, k := range vOrig.MapKeys() {
+				assertDeepCopyDistinct(t, vOrig.MapIndex(k).Interface(), vCloned.MapIndex(k).Interface())
+			}
+		}
+		return
+	}
+
+	if vOrig.Kind() == reflect.Ptr {
+		if !vOrig.IsNil() {
+			assert.NotSame(t, vOrig.Interface(), vCloned.Interface(), "Pointer should be different")
+			assertDeepCopyDistinct(t, vOrig.Elem().Interface(), vCloned.Elem().Interface())
+		}
+		return
+	}
+
+	if vOrig.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < vOrig.NumField(); i++ {
+		fOrig := vOrig.Field(i)
+		fCloned := vCloned.Field(i)
+		fieldName := vOrig.Type().Field(i).Name
+
+		switch fOrig.Kind() {
+		case reflect.Ptr:
+			if !fOrig.IsNil() {
+				assert.NotSame(t, fOrig.Interface(), fCloned.Interface(), "Field %s should be a different pointer", fieldName)
+			}
+		case reflect.Slice:
+			if !fOrig.IsNil() && fOrig.Len() > 0 {
+				assert.NotSame(t, fOrig.Index(0).Addr().Interface(), fCloned.Index(0).Addr().Interface(), "Field %s slice elements should have different addresses", fieldName)
+			}
+		case reflect.Struct:
+			// Known leaf structs that don't need internal pointer check or have their own logic
+			if vOrig.Type().Field(i).Type.Name() != "ConfigPath" {
+				assertDeepCopyDistinct(t, fOrig.Interface(), fCloned.Interface())
+			}
+		case reflect.Map:
+			if !fOrig.IsNil() && fOrig.Len() > 0 {
+				if fOrig.Pointer() == fCloned.Pointer() {
+					assert.Fail(t, "Map %s should have different internal pointers", fieldName)
+				}
+			}
+		}
+	}
+}
+
 func TestUnit_Config_DeepCopy(t *testing.T) {
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
 		tty := true
@@ -445,19 +512,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		}
 
 		cloned := orig.DeepCopy()
-
-		// Verify deep copy of HostContext
-		assert.NotSame(t, orig.HostContext, cloned.HostContext)
-		assert.Equal(t, orig.HostContext.Level, cloned.HostContext.Level)
-		assert.NotSame(t, &orig.HostContext.Mounts[0], &cloned.HostContext.Mounts[0])
-
-		// Verify deep copy of *bool
-		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
-		assert.Equal(t, *orig.Defaults.TTY, *cloned.Defaults.TTY)
-
-		// Verify deep copy of slice
-		assert.NotSame(t, &orig.Defaults.Env[0], &cloned.Defaults.Env[0])
-		assert.Equal(t, orig.Defaults.Env, cloned.Defaults.Env)
+		assertDeepCopyDistinct(t, orig, cloned)
 
 		// Mutate cloned and ensure original is unchanged
 		*cloned.Defaults.TTY = false
@@ -478,11 +533,9 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		}
 
 		cloned := orig.DeepCopy()
+		assertDeepCopyDistinct(t, orig, cloned)
 
-		nodeOrig := orig["node"]
 		nodeCloned := cloned["node"]
-		assert.NotSame(t, &nodeOrig.Env[0], &nodeCloned.Env[0])
-
 		nodeCloned.Env[0] = "NODE_ENV=prod"
 		cloned["node"] = nodeCloned
 
@@ -491,7 +544,8 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 
 	t.Run("ToolsConfig DeepCopy nil", func(t *testing.T) {
 		var orig ToolsConfig
-		assert.Nil(t, orig.DeepCopy())
+		cloned := orig.DeepCopy()
+		assertDeepCopyDistinct(t, orig, cloned)
 	})
 
 	t.Run("DeepCopy all fields", func(t *testing.T) {
@@ -532,30 +586,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 
 		cloned := orig.DeepCopy()
 		assert.Equal(t, orig, cloned)
-		assert.NotSame(t, orig.Logging.Timestamp, cloned.Logging.Timestamp)
-		assert.NotSame(t, orig.Defaults.TTY, cloned.Defaults.TTY)
-		assert.NotSame(t, orig.Defaults.Interactive, cloned.Defaults.Interactive)
-		assert.NotSame(t, orig.Defaults.Remove, cloned.Defaults.Remove)
-		assert.NotSame(t, orig.Defaults.StrictEnv, cloned.Defaults.StrictEnv)
-		assert.NotSame(t, orig.Defaults.MountCderun, cloned.Defaults.MountCderun)
-		assert.NotSame(t, orig.Defaults.MountSocket, cloned.Defaults.MountSocket)
-		assert.NotSame(t, orig.Defaults.MountAllTools, cloned.Defaults.MountAllTools)
-		assert.NotSame(t, orig.Defaults.PublishAll, cloned.Defaults.PublishAll)
-		assert.NotSame(t, orig.Defaults.Privileged, cloned.Defaults.Privileged)
-		assert.NotSame(t, orig.Defaults.DryRun, cloned.Defaults.DryRun)
-		assert.NotSame(t, orig.Defaults.Diagnosis, cloned.Defaults.Diagnosis)
-		assert.NotSame(t, orig.Defaults.CPUs, cloned.Defaults.CPUs)
-		assert.NotSame(t, &orig.Defaults.MountTools[0], &cloned.Defaults.MountTools[0])
-		assert.NotSame(t, &orig.Defaults.Ports[0], &cloned.Defaults.Ports[0])
-		assert.NotSame(t, &orig.Defaults.Expose[0], &cloned.Defaults.Expose[0])
-		assert.NotSame(t, &orig.Defaults.DNS[0], &cloned.Defaults.DNS[0])
-		assert.NotSame(t, &orig.Defaults.AddHosts[0], &cloned.Defaults.AddHosts[0])
-		assert.NotSame(t, &orig.Defaults.CapAdd[0], &cloned.Defaults.CapAdd[0])
-		assert.NotSame(t, &orig.Defaults.CapDrop[0], &cloned.Defaults.CapDrop[0])
-		assert.NotSame(t, &orig.Defaults.Entrypoint[0], &cloned.Defaults.Entrypoint[0])
-		assert.NotSame(t, &orig.Defaults.Env[0], &cloned.Defaults.Env[0])
-		assert.NotSame(t, &orig.Defaults.Mounts[0], &cloned.Defaults.Mounts[0])
-		assert.NotSame(t, &orig.Defaults.Devices[0], &cloned.Defaults.Devices[0])
+		assertDeepCopyDistinct(t, orig, cloned)
 	})
 
 	t.Run("ToolConfig DeepCopy all fields", func(t *testing.T) {
@@ -592,30 +623,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 
 		cloned := orig.DeepCopy()
 		assert.Equal(t, orig, cloned)
-		assert.NotSame(t, orig.TTY, cloned.TTY)
-		assert.NotSame(t, orig.Interactive, cloned.Interactive)
-		assert.NotSame(t, orig.Remove, cloned.Remove)
-		assert.NotSame(t, orig.StrictEnv, cloned.StrictEnv)
-		assert.NotSame(t, orig.MountCderun, cloned.MountCderun)
-		assert.NotSame(t, orig.MountSocket, cloned.MountSocket)
-		assert.NotSame(t, orig.MountAllTools, cloned.MountAllTools)
-		assert.NotSame(t, orig.PublishAll, cloned.PublishAll)
-		assert.NotSame(t, orig.Privileged, cloned.Privileged)
-		assert.NotSame(t, orig.LogTimestamp, cloned.LogTimestamp)
-		assert.NotSame(t, orig.DryRun, cloned.DryRun)
-		assert.NotSame(t, orig.Diagnosis, cloned.Diagnosis)
-		assert.NotSame(t, orig.CPUs, cloned.CPUs)
-		assert.NotSame(t, &orig.MountTools[0], &cloned.MountTools[0])
-		assert.NotSame(t, &orig.Ports[0], &cloned.Ports[0])
-		assert.NotSame(t, &orig.Expose[0], &cloned.Expose[0])
-		assert.NotSame(t, &orig.DNS[0], &cloned.DNS[0])
-		assert.NotSame(t, &orig.AddHosts[0], &cloned.AddHosts[0])
-		assert.NotSame(t, &orig.CapAdd[0], &cloned.CapAdd[0])
-		assert.NotSame(t, &orig.CapDrop[0], &cloned.CapDrop[0])
-		assert.NotSame(t, &orig.Entrypoint[0], &cloned.Entrypoint[0])
-		assert.NotSame(t, &orig.Env[0], &cloned.Env[0])
-		assert.NotSame(t, &orig.Mounts[0], &cloned.Mounts[0])
-		assert.NotSame(t, &orig.Devices[0], &cloned.Devices[0])
+		assertDeepCopyDistinct(t, orig, cloned)
 	})
 
 }
