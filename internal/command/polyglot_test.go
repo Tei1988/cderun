@@ -126,3 +126,43 @@ func TestUnit_Polyglot_PreprocessArgs_Symlinks_Additions(t *testing.T) {
 		assert.Equal(t, []string{"cderun", "node", "--version"}, processed)
 	})
 }
+
+func TestUnit_Polyglot_PreprocessArgs_MultiTool(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		args     []string
+		expected []string
+	}{
+		{
+			name:     "node symlink",
+			args:     []string{"node", "-v"},
+			expected: []string{"cderun", "node", "-v"},
+		},
+		{
+			name:     "python3 symlink",
+			args:     []string{"python3", "--version"},
+			expected: []string{"cderun", "python3", "--version"},
+		},
+		{
+			name:     "git symlink with absolute path",
+			args:     []string{"/usr/bin/git", "status"},
+			expected: []string{"cderun", "git", "status"},
+		},
+		{
+			name:     "cderun standard mode",
+			args:     []string{"cderun", "run", "--image", "alpine"},
+			expected: []string{"cderun", "run", "--image", "alpine"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := newRootCmd(&rootOptions{})
+			processed, err := preprocessArgs(cmd, tc.args)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, processed)
+		})
+	}
+}

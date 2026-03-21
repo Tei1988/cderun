@@ -825,3 +825,81 @@ func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
 		assert.Contains(t, err.Error(), "creation failed")
 	})
 }
+
+func TestUnit_Root_NewRootCmd_PersistentPreRun_RespectsExisting(t *testing.T) {
+	t.Parallel()
+
+	mfs := &config.MockFileSystem{}
+	mcl := config.NewConfigLoaderWithFS(mfs)
+	o := &rootOptions{
+		fs:           mfs,
+		configLoader: mcl,
+	}
+	cmd := newRootCmd(o)
+
+	// Execute PersistentPreRun
+	if cmd.PersistentPreRun != nil {
+		cmd.PersistentPreRun(cmd, []string{})
+	}
+
+	assert.Same(t, mfs, o.fs)
+	assert.Same(t, mcl, o.configLoader)
+}
+
+func TestUnit_Root_BuildContainerConfig_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fs.Executable failure", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecErr: errors.New("exec error"),
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+		}
+		_, err := o.buildContainerConfig(resolved, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
+	})
+}
+
+func TestUnit_Root_BuildContainerConfig_ResolvePathError(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		ExecPath: "/app/{{file:nonexistent-file-that-should-not-exist}}",
+	}
+	o := &rootOptions{
+		fs:     mfs,
+		logger: logging.NewLogger(),
+	}
+	resolved := &config.ResolvedConfig{
+		MountCderun: true,
+		HostContext: &config.HostContext{
+			Level: 1,
+		},
+	}
+	cfg, err := o.buildContainerConfig(resolved, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	found := false
+	for _, m := range cfg.Mounts {
+		if m.Target == "/usr/local/bin/cderun" {
+			assert.Equal(t, "/app/{{file:nonexistent-file-that-should-not-exist}}", m.Source)
+			found = true
+		}
+	}
+	assert.True(t, found)
+}
+
+func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
+	t.Parallel()
+	stdout, _, exitCode, err := runCderunCore(nil, "sh")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no image mapping found for tool: sh")
+	assert.Empty(t, stdout)
+	assert.Equal(t, 0, exitCode)
+}

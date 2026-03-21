@@ -1,5 +1,7 @@
 package command
 
+import "bytes"
+
 import (
 	"errors"
 	"os"
@@ -156,6 +158,7 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 }
 
 type errorFS struct {
+	wfFunc   func(path string, data []byte, perm os.FileMode) error
 	*config.MockFileSystem
 	mkdirErr error
 	writeErr error
@@ -169,12 +172,15 @@ func (f *errorFS) MkdirAll(path string, perm os.FileMode) error {
 }
 
 func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
+	if f.wfFunc != nil {
+		return f.wfFunc(path, data, perm)
+	}
 	if f.writeErr != nil {
 		return f.writeErr
 	}
 	return f.MockFileSystem.WriteFile(path, data, perm)
-}
 
+}
 func TestUnit_Snapshot_Errors(t *testing.T) {
 	t.Parallel()
 
@@ -205,4 +211,74 @@ func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
 	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
 	require.ErrorIs(t, err, sentinel)
+}
+
+func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
+	t.Parallel()
+	mfs := &errorFS{
+		MockFileSystem: &config.MockFileSystem{},
+	}
+	mfs.wfFunc = func(path string, data []byte, perm os.FileMode) error {
+		if strings.HasSuffix(path, ".tools.yaml") {
+			return os.ErrPermission
+		}
+		return mfs.MockFileSystem.WriteFile(path, data, perm)
+	}
+
+	_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, config.ToolsConfig{"node": {}}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write .tools.yaml to snapshot")
+}
+
+func TestUnit_Snapshot_Log_Failures(t *testing.T) {
+	t.Parallel()
+	mfs := &snapshotMockFS{
+		MockFileSystem: &config.MockFileSystem{
+			ExecErr: errors.New("exec error"),
+		},
+		wdErr:   errors.New("wd error"),
+		homeErr: errors.New("home error"),
+	}
+	var logBuf bytes.Buffer
+	logger := logging.NewLogger()
+	logger.Init("debug", "text", false)
+	logger.SetOutput(&logBuf)
+
+	containerDir, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
+	require.NoError(t, err)
+	if containerDir != "" {
+		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
+	}
+
+	assert.Contains(t, logBuf.String(), "failed to get executable path for snapshot: exec error")
+	assert.Contains(t, logBuf.String(), "failed to get working directory for snapshot: wd error")
+	assert.Contains(t, logBuf.String(), "failed to get home directory for snapshot: home error")
+}
+
+type snapshotMockFS struct {
+	*config.MockFileSystem
+	wdErr   error
+	homeErr error
+	wfFunc  func(path string, data []byte, perm os.FileMode) error
+}
+
+func (f *snapshotMockFS) Getwd() (string, error) {
+	if f.wdErr != nil {
+		return "", f.wdErr
+	}
+	return f.MockFileSystem.Getwd()
+}
+
+func (f *snapshotMockFS) UserHomeDir() (string, error) {
+	if f.homeErr != nil {
+		return "", f.homeErr
+	}
+	return f.MockFileSystem.UserHomeDir()
+}
+
+func (f *snapshotMockFS) WriteFile(path string, data []byte, perm os.FileMode) error {
+	if f.wfFunc != nil {
+		return f.wfFunc(path, data, perm)
+	}
+	return f.MockFileSystem.WriteFile(path, data, perm)
 }
