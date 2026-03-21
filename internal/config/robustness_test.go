@@ -29,7 +29,7 @@ func TestUnit_Config_ResolveMounts_Robustness(t *testing.T) {
 			ImageSet: true,
 		}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config in CDERUN_MOUNT")
 	})
 
@@ -40,7 +40,7 @@ func TestUnit_Config_ResolveMounts_Robustness(t *testing.T) {
 			CderunMounts: []string{"invalid_format"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config (override)")
 	})
 
@@ -51,7 +51,7 @@ func TestUnit_Config_ResolveMounts_Robustness(t *testing.T) {
 			Mounts:   []string{"invalid_format"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config")
 	})
 
@@ -99,7 +99,7 @@ func TestUnit_Config_ResolveDevices_Robustness(t *testing.T) {
 			ImageSet: true,
 		}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
 	})
 
@@ -110,7 +110,7 @@ func TestUnit_Config_ResolveDevices_Robustness(t *testing.T) {
 			CderunDevices: []string{":"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config (override)")
 	})
 
@@ -121,7 +121,7 @@ func TestUnit_Config_ResolveDevices_Robustness(t *testing.T) {
 			Devices:  []string{":"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
 	})
 }
@@ -180,7 +180,7 @@ func TestUnit_Config_ExpressionResolver_Robustness(t *testing.T) {
 		}
 		resolver, _ := NewExpressionResolverWithFS(nil, mfs)
 		_, err := resolver.ResolveString("{{file:missing.txt}}")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
 	})
 
@@ -190,7 +190,7 @@ func TestUnit_Config_ExpressionResolver_Robustness(t *testing.T) {
 		}
 		resolver, _ := NewExpressionResolverWithFS(nil, mfs)
 		_, err := resolver.ResolveString("{{find_dir:.git}}")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "item not found for find_dir")
 	})
 }
@@ -200,13 +200,13 @@ func TestUnit_Config_PathResolution_Robustness(t *testing.T) {
 
 	t.Run("ParseMountFlag invalid format", func(t *testing.T) {
 		_, err := ParseMountFlag("source=/tmp") // missing target
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target is required")
 	})
 
 	t.Run("ParseMountFlag invalid readonly", func(t *testing.T) {
 		_, err := ParseMountFlag("source=/tmp,target=/app,readonly=maybe")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid readonly value")
 	})
 
@@ -299,7 +299,7 @@ func TestUnit_Config_ExpressionResolver_Advanced_Robustness(t *testing.T) {
 
 		// One succeeds, one fails.
 		_, err := resolver.ResolveString("{{env:A}} and {{file:missing.txt}}")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
 	})
 
@@ -428,7 +428,7 @@ func TestUnit_Config_ConfigPath_Resolve_Error_Robustness(t *testing.T) {
 		mfs := &MockFileSystem{}
 		resolver, _ := NewExpressionResolverWithFS(nil, mfs)
 		_, err := cp.Resolve(resolver)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("ConfigPath.ResolveVolume error with expression", func(t *testing.T) {
@@ -436,7 +436,7 @@ func TestUnit_Config_ConfigPath_Resolve_Error_Robustness(t *testing.T) {
 		resolver, _ := NewExpressionResolverWithFS(nil, mfs)
 		cp := ConfigPath{Raw: "~/foo"}
 		_, err := cp.ResolveVolume(resolver)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("ConfigPath.ResolveDevice error with expression", func(t *testing.T) {
@@ -444,7 +444,7 @@ func TestUnit_Config_ConfigPath_Resolve_Error_Robustness(t *testing.T) {
 		resolver, _ := NewExpressionResolverWithFS(nil, mfs)
 		cp := ConfigPath{Raw: "~/foo"}
 		_, err := cp.ResolveDevice(resolver)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -459,7 +459,7 @@ func TestUnit_Config_DeviceConfig_Resolve_Error_Robustness(t *testing.T) {
 			Destination: ConfigPath{Raw: "/dest"},
 		}
 		_, err := dc.Resolve(resolver)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("DeviceConfig.Resolve error in Destination", func(t *testing.T) {
@@ -470,7 +470,7 @@ func TestUnit_Config_DeviceConfig_Resolve_Error_Robustness(t *testing.T) {
 			Destination: ConfigPath{Raw: "~/dest"},
 		}
 		_, err := dc.Resolve(resolver)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -505,7 +505,7 @@ func TestUnit_Config_ResolveDevices_ErrorInResolution(t *testing.T) {
 		}
 
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "home error")
 	})
 }
@@ -521,7 +521,7 @@ func TestUnit_Config_ResolveMounts_ErrorInResolution(t *testing.T) {
 			Mounts:   []string{"type=bind,source=~/src,target=/app"},
 		}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "home error")
 	})
 }
@@ -533,7 +533,7 @@ func TestUnit_Config_Helpers_Robustness(t *testing.T) {
 		f := 1.23
 		res := copyFloat64Ptr(&f)
 		require.NotNil(t, res)
-		assert.Equal(t, f, *res)
+		assert.InDelta(t, f, *res, 1e-9)
 	})
 }
 
@@ -573,7 +573,7 @@ func TestUnit_Config_ResolveDevices_InvalidInEnv_Robustness(t *testing.T) {
 		}
 		cli := CLIOptions{Image: "node", ImageSet: true}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
 	})
 }
@@ -588,7 +588,7 @@ func TestUnit_Config_ResolveDevices_Error_Robustness(t *testing.T) {
 			CderunDevices: []string{":container"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config (override)")
 	})
 }
@@ -653,7 +653,7 @@ func TestUnit_Config_ResolveDevices_CLI_Invalid_Robustness(t *testing.T) {
 			Devices:  []string{":container"},
 		}
 		_, err := Resolve("node", cli, nil, nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config:")
 	})
 }
@@ -709,7 +709,7 @@ func TestUnit_Config_ResolveFloat64Opt_Robustness(t *testing.T) {
 		}
 		// Should fallback to Global/Fallback if env is invalid
 		res := resolveFloat64Opt(def, false, 0, false, 0, "node", nil, nil, mfs)
-		assert.Equal(t, 2.0, res)
+		assert.InDelta(t, 2.0, res, 1e-9)
 	})
 }
 
@@ -721,6 +721,6 @@ func TestUnit_Config_ResolveFloat64Opt_More_Robustness(t *testing.T) {
 			Fallback: nil,
 		}
 		res := resolveFloat64Opt(def, false, 0, false, 0, "node", nil, nil, &MockFileSystem{})
-		assert.Equal(t, 0.0, res)
+		assert.InDelta(t, 0.0, res, 1e-9)
 	})
 }
