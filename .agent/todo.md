@@ -20,10 +20,3 @@ While our current DinD tests cover standard container workflows, Podman introduc
 
 **Success Criteria:**
 The CI pipeline successfully triggers and passes a full test run using the Podman v5.8.1 image.
-
-### Outstanding coverage gaps in internal/command
-- `newRootCmd`: 86.8% (Need to test `RunE` logic more thoroughly, specifically different resolution branches)
-- `snapshot.go`: `cleanupSnapshot`: 66.7% (Add test for successful cleanup with subdirectories)
-
-### Diagnosis Mode Improvement
-- Add a test for `handleDiagnosis` with malformed YAML or JSON in the config (though `loadConfigs` should catch this earlier).
