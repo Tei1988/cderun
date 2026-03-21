@@ -112,3 +112,17 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		assert.Equal(t, "alpine", requireConfig.Image)
 	})
 }
+
+func TestUnit_Polyglot_PreprocessArgs_Symlinks_Additions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("symlink to absolute path", func(t *testing.T) {
+		args := []string{"/usr/local/bin/node", "--version"}
+
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"cderun", "node", "--version"}, processed)
+	})
+}
