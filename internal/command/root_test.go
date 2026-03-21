@@ -140,7 +140,7 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			actual, err := preprocessArgs(cmd, tt.args)
 			if tt.expected == nil {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "must be placed after the subcommand")
+				require.ErrorContains(t, err, "must be placed after the subcommand")
 				return
 			}
 			require.NoError(t, err)
@@ -228,7 +228,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("dry-run requires a subcommand", func(t *testing.T) {
 		_, err := executeCommand("--dry-run")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
+		require.ErrorContains(t, err, "--dry-run requires a subcommand")
 	})
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
@@ -294,7 +294,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return true }
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+		require.ErrorContains(t, err, "failed to attach to container: attach failed")
 	})
 }
 
@@ -352,7 +352,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool", func(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found for tool: unknown-tool")
+		require.ErrorContains(t, err, "no image mapping found for tool: unknown-tool")
 	})
 
 	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
@@ -507,7 +507,7 @@ func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "required environment variable not found: NONEXISTENT")
+		require.ErrorContains(t, err, "required environment variable not found: NONEXISTENT")
 	})
 }
 
@@ -569,7 +569,7 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 	go func() {
 		n, err := sr.Read(p)
 		assert.Equal(t, 5, n)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "hello", string(p))
 		done <- true
 	}()
@@ -613,7 +613,7 @@ func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 	p := make([]byte, 5)
 	n, err := sr.Read(p)
 	assert.Equal(t, 0, n)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestUnit_Root_GetHangTimeout(t *testing.T) {
@@ -739,8 +739,8 @@ func TestUnit_Root_BuildContainerConfig_Additions(t *testing.T) {
 		}
 		_, err := o.buildContainerConfig(resolved, nil, toolsCfg)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "tool \"nonexistent\" not found in .tools.yaml")
-		assert.Contains(t, err.Error(), "available tools: node")
+		require.ErrorContains(t, err, "tool \"nonexistent\" not found in .tools.yaml")
+		require.ErrorContains(t, err, "available tools: node")
 	})
 }
 
@@ -823,7 +823,7 @@ func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "creation failed")
+		require.ErrorContains(t, err, "creation failed")
 	})
 }
 
@@ -863,7 +863,7 @@ func TestUnit_Root_BuildContainerConfig_Errors(t *testing.T) {
 		}
 		_, err := o.buildContainerConfig(resolved, nil, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get executable path: exec error")
+		require.ErrorContains(t, err, "failed to get executable path: exec error")
 	})
 }
 
@@ -900,7 +900,7 @@ func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
 	t.Parallel()
 	stdout, _, exitCode, err := runCderunCore(nil, "sh")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no image mapping found for tool: sh")
+	require.ErrorContains(t, err, "no image mapping found for tool: sh")
 	assert.Empty(t, stdout)
 	assert.Equal(t, 0, exitCode)
 }
@@ -916,7 +916,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return true }
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
+	require.ErrorContains(t, err, "invalid pull policy \"invalid\"")
 }
 
 func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
@@ -989,8 +989,8 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 		}
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "container configuration error")
-	assert.Contains(t, err.Error(), "tool \"nonexistent\" not found in .tools.yaml")
+	require.ErrorContains(t, err, "container configuration error")
+	require.ErrorContains(t, err, "tool \"nonexistent\" not found in .tools.yaml")
 }
 
 type rootErrorFS struct {
@@ -1051,7 +1051,7 @@ func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return true }
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load cderun config")
+	require.ErrorContains(t, err, "failed to load cderun config")
 }
 
 func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
@@ -1070,7 +1070,7 @@ func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return true }
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load cderun config")
+	require.ErrorContains(t, err, "failed to load cderun config")
 }
 
 func TestUnit_Root_DefaultOptions_RuntimeFactory_Extra(t *testing.T) {
@@ -1079,13 +1079,13 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory_Extra(t *testing.T) {
 
 	t.Run("docker runtime success", func(t *testing.T) {
 		rt, err := o.runtimeFactory("docker", "/tmp/docker.sock")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, rt)
 	})
 
 	t.Run("podman runtime success", func(t *testing.T) {
 		rt, err := o.runtimeFactory("podman", "/tmp/podman.sock")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, rt)
 	})
 
@@ -1093,7 +1093,7 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory_Extra(t *testing.T) {
 		rt, err := o.runtimeFactory("invalid", "")
 		require.Error(t, err)
 		assert.Nil(t, rt)
-		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
 	})
 }
 
@@ -1175,7 +1175,7 @@ func TestUnit_Root_Execute_ErrorPropagation_Extra(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return false }
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to pull image: pull failed")
+		require.ErrorContains(t, err, "failed to pull image: pull failed")
 	})
 
 	t.Run("StartContainer fails", func(t *testing.T) {
@@ -1187,7 +1187,7 @@ func TestUnit_Root_Execute_ErrorPropagation_Extra(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return false }
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to start container: start failed")
+		require.ErrorContains(t, err, "failed to start container: start failed")
 	})
 
 	t.Run("WaitContainer fails", func(t *testing.T) {
@@ -1199,7 +1199,7 @@ func TestUnit_Root_Execute_ErrorPropagation_Extra(t *testing.T) {
 			o.isTerminal = func(fd int) bool { return false }
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to wait for container: wait failed")
+		require.ErrorContains(t, err, "failed to wait for container: wait failed")
 	})
 }
 
@@ -1271,7 +1271,7 @@ func TestUnit_Root_Execute_CreateContainerFailure_Extra(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return false }
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create container: create failed")
+	require.ErrorContains(t, err, "failed to create container: create failed")
 }
 
 func TestUnit_Root_Execute_AttachFailure_Extra(t *testing.T) {
@@ -1286,7 +1286,7 @@ func TestUnit_Root_Execute_AttachFailure_Extra(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return false }
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to attach to container: attach failed early")
+	require.ErrorContains(t, err, "failed to attach to container: attach failed early")
 }
 
 func TestUnit_RunCderunCore_PreprocessError_Extra(t *testing.T) {
@@ -1294,7 +1294,7 @@ func TestUnit_RunCderunCore_PreprocessError_Extra(t *testing.T) {
 	// Using a valid dummy reader to avoid potential panic if runCderunCore dereferences stdin.
 	_, _, _, err := runCderunCore(strings.NewReader(""), "--cderun-image", "alpine", "sh")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be placed after the subcommand")
+	require.ErrorContains(t, err, "must be placed after the subcommand")
 }
 
 func TestUnit_Root_ResolveSettings_Coverage_Extra(t *testing.T) {
