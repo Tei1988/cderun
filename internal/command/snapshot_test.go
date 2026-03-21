@@ -282,3 +282,17 @@ func (f *snapshotMockFS) WriteFile(path string, data []byte, perm os.FileMode) e
 	}
 	return f.MockFileSystem.WriteFile(path, data, perm)
 }
+
+func TestUnit_Snapshot_Cleanup_Empty(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{}
+	err := cleanupSnapshot(mfs, "")
+	require.NoError(t, err)
+}
+
+func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{}
+	err := cleanupSnapshot(mfs, "/tmp/snapshot")
+	require.NoError(t, err)
+}

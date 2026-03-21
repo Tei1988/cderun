@@ -903,3 +903,145 @@ func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
 	assert.Empty(t, stdout)
 	assert.Equal(t, 0, exitCode)
 }
+
+func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
+	t.Parallel()
+	// Use --image to avoid configuration error about missing tool image mapping
+	// And use a mock runtime to avoid actual image pulling
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--pull", "invalid", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
+}
+
+func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		RemoveAllErr: errors.New("remove failed"),
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+	})
+	require.NoError(t, err)
+}
+
+func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		Env: map[string]string{"CDERUN_LOG_LEVEL": "debug"},
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.NoError(t, err)
+}
+
+func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
+	t.Parallel()
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.NoError(t, err)
+}
+
+func TestUnit_Root_ExecuteWrappers(t *testing.T) {
+	t.Parallel()
+	// These are just to cover the simple wrapper functions
+	_ = Execute(nil)
+	_ = ExecuteContext(context.Background(), nil)
+}
+
+
+func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
+	t.Parallel()
+	// Trigger buildContainerConfig failure by using --mount-tools with a tool not in .tools.yaml.
+	// We need a tool that exists (to pass resolveSettings) but fails in buildContainerConfig.
+	// Wait, resolveSettings also checks tool existence if it's the subcommand.
+	// If we use --mount-tools=nonexistent, buildContainerConfig will fail.
+
+	mfs := &config.MockFileSystem{}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-tools", "nonexistent", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "container configuration error")
+	assert.Contains(t, err.Error(), "tool \"nonexistent\" not found in .tools.yaml")
+}
+
+func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
+	t.Parallel()
+	mfs := &errorFS{
+		MockFileSystem: &config.MockFileSystem{},
+		mkdirErr:       os.ErrPermission,
+	}
+	// MountCderun triggers snapshot creation
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+		// Mock runtime to avoid actual execution if snapshot creation were to succeed (it shouldn't here)
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+	})
+	// snapshot failure is currently a warning, not a fatal error in RunE.
+	// Let's verify it continues but logs a warning.
+	require.NoError(t, err)
+}
+
+
+func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
+	t.Parallel()
+	mfs := &errorFS{
+		MockFileSystem: &config.MockFileSystem{
+			Files: map[string][]byte{
+				".cderun.yaml": []byte("invalid-yaml"),
+			},
+		},
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load cderun config")
+}
+
+func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
+	t.Parallel()
+	// diagnosis mode with malformed config
+	// resolveSettings might fail if config is technically valid YAML but semantically incorrect for resolution.
+	// But let's test if it handles it.
+	mfs := &config.MockFileSystem{
+		Files: map[string][]byte{
+			".cderun.yaml": []byte("invalid: ["), // Invalid YAML
+		},
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to load cderun config")
+}

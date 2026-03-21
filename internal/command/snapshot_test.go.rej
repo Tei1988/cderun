@@ -1,0 +1,19 @@
+--- snapshot_test.go
++++ snapshot_test.go
+@@ -190,4 +190,16 @@
+	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
+	err := cleanupSnapshot(mfs, "/tmp/snapshot")
+	require.ErrorIs(t, err, sentinel)
+ }
++
++func TestUnit_Snapshot_Cleanup_Empty(t *testing.T) {
++	t.Parallel()
++	mfs := &config.MockFileSystem{}
++	err := cleanupSnapshot(mfs, "")
++	require.NoError(t, err)
++}
++
++func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
++	t.Parallel()
++	mfs := &config.MockFileSystem{}
++	err := cleanupSnapshot(mfs, "/tmp/snapshot")
