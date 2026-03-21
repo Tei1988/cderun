@@ -1,7 +1,8 @@
 package command
 
+import "bytes"
+
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -157,10 +158,10 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 }
 
 type errorFS struct {
+	wfFunc   func(path string, data []byte, perm os.FileMode) error
 	*config.MockFileSystem
 	mkdirErr error
 	writeErr error
-	wfFunc   func(path string, data []byte, perm os.FileMode) error
 }
 
 func (f *errorFS) MkdirAll(path string, perm os.FileMode) error {
@@ -178,8 +179,8 @@ func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
 		return f.writeErr
 	}
 	return f.MockFileSystem.WriteFile(path, data, perm)
-}
 
+}
 func TestUnit_Snapshot_Errors(t *testing.T) {
 	t.Parallel()
 
@@ -217,7 +218,6 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 	mfs := &errorFS{
 		MockFileSystem: &config.MockFileSystem{},
 	}
-	// Make WriteFile fail specifically for .tools.yaml
 	mfs.wfFunc = func(path string, data []byte, perm os.FileMode) error {
 		if strings.HasSuffix(path, ".tools.yaml") {
 			return os.ErrPermission
