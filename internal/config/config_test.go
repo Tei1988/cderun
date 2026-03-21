@@ -376,6 +376,11 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 					{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
 				},
 			},
+			HostContext: &HostContext{
+				Mounts: []MountMapping{
+					{Source: "./relative"},
+				},
+			},
 		}
 		err := cfg.SetBaseDir("/base")
 		require.NoError(t, err)
@@ -386,6 +391,7 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
+		assert.Equal(t, "/base/relative", cfg.HostContext.Mounts[0].Source)
 	})
 
 	t.Run("ToolConfig", func(t *testing.T) {
