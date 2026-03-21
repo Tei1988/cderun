@@ -33,9 +33,26 @@ cderunが特別な意味を持つと定義しているキーワードです。
 
 ### 使用例
 
+#### バージョンの固定化 (`{{file:...}}`)
+
+プロジェクト内の `.go-version` や `.nvmrc` の内容をイメージタグに使用することで、ホストとコンテナのバージョンを一致させることができます。
+
 ```bash
-# コマンドライン引数での使用
 cderun --image="golang:{{file:.go-version}}" go version
+```
+
+#### プロジェクトルートの動的解決 (`{{find_dir:...}}`)
+
+`.git` や `package.json` が存在するディレクトリを基準にパスを指定できます。
+
+```bash
+# カレントディレクトリに関わらず、リポジトリルートの node_modules をマウントする例
+cderun --mount type=bind,source="{{find_dir:.git}}/node_modules",target=/node_modules node app.js
+```
+
+#### その他の使用例
+
+```bash
 cderun --workdir="{{PWD}}/src" node app.js
 cderun --image="node:{{env:NODE_VERSION}}" node --version
 ```

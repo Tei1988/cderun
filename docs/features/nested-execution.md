@@ -95,7 +95,7 @@ hostContext:
 
 コンテナランタイムデーモンは基底ホスト上で動作しているため、デーモンに渡すマウントの `source` パスは基底ホスト上に存在するパスである必要があります。
 
-`cderun` がコンテナ内（レベル >= 1）で実行されており、ディレクトリをマウントしたい場合（例: `--mount .:/src`）、コンテナローカルのパス（`/app`）を基底ホストのパス（`/home/user/project`）に翻訳する必要があります。
+`cderun` がコンテナ内（レベル >= 1）で実行されており、ディレクトリをマウントしたい場合（例: `--mount .:/src`）、コンテナローカルのパス（`/app`）を基底ホストのパス（`/home/user/project`）に翻訳する必要があります。これを **「逆パス解決 (Reverse Path Resolution)」** と呼びます。
 
 ### 解決ロジック
 
@@ -106,14 +106,39 @@ hostContext:
    - ターゲットパスの長さが同じ場合、より高い `level`（より新しいネストレベル）が優先されます。
 4. `target` プレフィックスを、対応する `source`（基底ホストパス）に置き換えます。
 
-例：
-レベル 1 で `/app` が `/home/user/project` にマップされている場合、コンテナ内から `/app/src` をマウントするリクエストは、コンテナランタイムに送られる前に `/home/user/project/src` に翻訳されます。
+### 具体的な解決例
+
+以下のシナリオを想定します：
+
+1. **レベル 0 (ホスト)**: `cderun --mount .:/app node` を実行
+   - ホストパス: `/home/user/project`
+   - コンテナパス (L1): `/app`
+2. **レベル 1 (コンテナ)**: コンテナ内で `cderun --mount ./src:/src go build` を実行
+   - 要求されたパス: `./src`
+   - コンテナ内絶対パス (L1): `/app/src`
+   - **逆解決プロセス**:
+     - `hostContext.mounts` に `/app` -> `/home/user/project` のマッピングが存在
+     - `/app/src` のプレフィックス `/app` が一致
+     - 結果のホストパス: `/home/user/project/src`
+3. **ランタイム呼び出し**: 基底ホストの Docker デーモンに対し、`source: /home/user/project/src, target: /src` のマウントを指示
+
+これにより、ネストされたコンテナ間でも一貫したファイルアクセスが可能になります。
 
 ## 自動ルート検出 (OverlayFS)
 
-`cderun` が OverlayFS ルートファイルシステムを持つコンテナ内で実行されていることを検出した場合、`/proc/self/mountinfo` を解析してホスト側の `upperdir` を自動的に発見します。そして、`hostContext` に `/` のベースマッピングを追加します。
+`cderun` が OverlayFS ルートファイルシステムを持つコンテナ内で実行されていることを検出した場合、`/proc/self/mountinfo` を解析してホスト側の `upperdir` を自動的に発見します。そして、`hostContext` に `/` のベースマッピング（`source: upperdir, target: /`）を追加します。
 
-これにより、ファイルが明示的にマウントされたボリューム内になくても、`cderun` はコンテナ内の任意のファイルをホスト側のパスに正しく解決できるようになります。
+### OverlayFS 検出のメリット
+
+明示的にマウントされたボリューム（例: `/app`）以外の場所にあるファイルも、ネストされたコンテナにマウントできるようになります。
+
+**例:**
+
+1. `cderun --mount-cderun alpine` を実行（特定のソースマウントなし）。
+2. コンテナ内で `touch /tmp/hello.txt` を実行。
+3. さらにコンテナ内で `cderun --mount /tmp/hello.txt:/hello.txt alpine cat /hello.txt` を実行。
+
+このとき、`/tmp/hello.txt` はボリュームではないため通常の逆解決では失敗しますが、OverlayFS 検出により `/` がホストの `upperdir`（例: `/var/lib/docker/overlay2/.../diff`）にマップされているため、正しくホストパスへ変換されます。
 詳細な仕様については [proc-self-mountinfo 仕様書](../references/proc-self-mountinfo.md) を参照してください。
 
 ## 設定発見の優先順位
