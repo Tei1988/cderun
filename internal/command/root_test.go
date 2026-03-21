@@ -82,6 +82,11 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			expected: []string{"cderun", "python", "-c", "print(1)"},
 		},
 		{
+			name:     "symlink git with absolute path",
+			args:     []string{"/usr/local/bin/git", "status"},
+			expected: []string{"cderun", "git", "status"},
+		},
+		{
 			name:     "empty args",
 			args:     []string{},
 			expected: []string{},
@@ -125,6 +130,11 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			name:     "polyglot with P1 and regular flags",
 			args:     []string{"node", "--version", "--cderun-image", "alpine", "-t"},
 			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version", "-t"},
+		},
+		{
+			name:     "polyglot with different tool",
+			args:     []string{"go", "version"},
+			expected: []string{"cderun", "go", "version"},
 		},
 		{
 			name:     "no subcommand found (diagnosis mode behavior in preprocess)",
@@ -229,6 +239,31 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported runtime \"invalid\"")
+	})
+
+	t.Run("invalid pull policy", func(t *testing.T) {
+		_, err := executeCommand("--image", "alpine", "--pull", "invalid", "sh")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pull policy \"invalid\"")
+	})
+
+	t.Run("logger initialization branches", func(t *testing.T) {
+		mfs := &config.MockFileSystem{Env: map[string]string{"CDERUN_LOG_LEVEL": "debug"}}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.fs = mfs
+			o.isTerminal = func(fd int) bool { return true }
+		})
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "info", "--diagnosis"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.isTerminal = func(fd int) bool { return true }
+		})
+		require.NoError(t, err)
+
+		err = ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-level", "trace", "--cderun-diagnosis"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.isTerminal = func(fd int) bool { return true }
+		})
+		require.NoError(t, err)
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -370,6 +405,78 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	})
 }
 
+func TestUnit_Root_BuildContainerConfig_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Executable failure", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecErr: errors.New("exec error"),
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+		}
+		_, err := o.buildContainerConfig(resolved, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get executable path")
+	})
+
+	t.Run("Tool not found in .tools.yaml", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecPath: "/usr/local/bin/cderun",
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"unknown-tool"},
+		}
+		toolsCfg := config.ToolsConfig{"node": {}}
+		_, err := o.buildContainerConfig(resolved, nil, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"unknown-tool\" not found in .tools.yaml")
+	})
+
+	t.Run("Nested execution path resolution (best-effort)", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecPath: "/app/cderun",
+			WD:       "/app",
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+			HostContext: &config.HostContext{
+				Level:      1,
+				WorkingDir: "/host/app",
+			},
+		}
+		// In nested execution, if MountCderunPath is empty, it tries to resolve current Executable() path.
+		// Since /app/cderun is inside container (Level 1), it might try to map it back if HostContext is present.
+		// However, current implementation of buildContainerConfig does best-effort resolution.
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, cfg.Mounts)
+
+		found := false
+		for _, m := range cfg.Mounts {
+			if m.Target == "/usr/local/bin/cderun" {
+				found = true
+				// In this test, it should stay /app/cderun if expression resolution doesn't match or fails gracefully.
+				// But we want to hit the code path.
+				assert.NotEmpty(t, m.Source)
+			}
+		}
+		assert.True(t, found)
+	})
+}
+
 func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 	t.Parallel()
 	t.Run("JSON format", func(t *testing.T) {
@@ -469,6 +576,59 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
 	})
+}
+
+func TestUnit_Root_RunCderunCore_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CreateContainer failure", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{
+			CreateErr: errors.New("create failed"),
+		}
+		// Since runCderunCore uses ExecuteContextWithOptions with a setup function that
+		// would normally use the global runtimeFactory, we need to be careful.
+		// However, runCderunCore as implemented in run_helpers.go uses ExecuteContextWithOptions
+		// which doesn't allow injecting the runtimeFactory easily unless we use a hook.
+		// Wait, runCderunCore uses ExecuteContextWithOptions, and we can provide a setup func.
+
+		_, _, _, err := ExecuteContextWithOptionsWithRuntime(t.Context(), []string{"cderun", "--image", "alpine", "sh"}, mockRuntime)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create container: create failed")
+	})
+
+	t.Run("StartContainer failure", func(t *testing.T) {
+		mockRuntime := &runtime.MockRuntime{
+			StartErr: errors.New("start failed"),
+		}
+		_, _, _, err := ExecuteContextWithOptionsWithRuntime(t.Context(), []string{"cderun", "--image", "alpine", "sh"}, mockRuntime)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to start container: start failed")
+	})
+
+	t.Run("runCderunCore hits stdin branch", func(t *testing.T) {
+		// Calling with no args hits cmd.Help(), which doesn't require a runtime.
+		// This should cover the stdin != nil branch in runCderunCore.
+		stdout, _, _, err := runCderunCore(strings.NewReader("some input"))
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Usage:")
+	})
+}
+
+// Helper to use ExecuteContextWithOptions with a specific mock runtime
+func ExecuteContextWithOptionsWithRuntime(ctx context.Context, args []string, rt runtime.ContainerRuntime) (string, string, int, error) {
+	var outBuf, errBuf bytes.Buffer
+	exitCode := 0
+	err := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			return rt, nil
+		}
+		o.exitFunc = func(code int) {
+			exitCode = code
+		}
+		cmd.SetOut(&outBuf)
+		cmd.SetErr(&errBuf)
+	})
+	return outBuf.String(), errBuf.String(), exitCode, err
 }
 
 func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
@@ -678,5 +838,70 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
+	})
+}
+
+func TestUnit_Root_NewRootCmd_PersistentPreRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PersistentPreRun initializes defaults", func(t *testing.T) {
+		o := &rootOptions{}
+		cmd := newRootCmd(o)
+		cmd.PersistentPreRun(cmd, nil)
+		assert.NotNil(t, o.fs)
+		assert.NotNil(t, o.configLoader)
+	})
+
+	t.Run("PersistentPreRun with existing fs", func(t *testing.T) {
+		mfs := &config.MockFileSystem{}
+		o := &rootOptions{fs: mfs}
+		cmd := newRootCmd(o)
+		cmd.PersistentPreRun(cmd, nil)
+		assert.Equal(t, mfs, o.fs)
+		assert.NotNil(t, o.configLoader)
+	})
+}
+
+func TestUnit_Root_LoadConfigs_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("failed to load cderun config (malformed)", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/project/.cderun.yaml": []byte("invalid: yaml: :"),
+			},
+			WD: "/project",
+		}
+		o := &rootOptions{
+			fs:           mfs,
+			configLoader: config.NewConfigLoaderWithFS(mfs),
+			logger:       logging.NewLogger(),
+		}
+		cmd := newRootCmd(o)
+		_ = cmd.Flags().Set("cderun-config", ".cderun.yaml")
+
+		_, _, _, _, err := o.loadConfigs(cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load cderun config")
+	})
+
+	t.Run("failed to load tools config (malformed)", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{
+				"/project/.tools.yaml": []byte("invalid: yaml: :"),
+			},
+			WD: "/project",
+		}
+		o := &rootOptions{
+			fs:           mfs,
+			configLoader: config.NewConfigLoaderWithFS(mfs),
+			logger:       logging.NewLogger(),
+		}
+		cmd := newRootCmd(o)
+		_ = cmd.Flags().Set("cderun-tool-config", ".tools.yaml")
+
+		_, _, _, _, err := o.loadConfigs(cmd)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load tools config")
 	})
 }

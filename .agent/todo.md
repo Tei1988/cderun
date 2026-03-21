@@ -21,14 +21,5 @@ While our current DinD tests cover standard container workflows, Podman introduc
 **Success Criteria:**
 The CI pipeline successfully triggers and passes a full test run using the Podman v5.8.1 image.
 
-### Outstanding coverage gaps in internal/command
-- `newRootCmd`: 88.2% (Need to test `PersistentPreRun` more thoroughly)
-- `buildContainerConfig`: 80.5% (Need to test more branch logic in config building)
-- `runCderunCore`: 83.3% (Need to test error cases in container creation/start)
-
-### Pending Tests for Symlink Mode
-- Test `preprocessArgs` with a symlink to an absolute path.
-- Test `preprocessArgs` with multiple symlinks mapping to different tools.
-
 ### Diagnosis Mode Improvement
 - Add a test for `handleDiagnosis` with malformed YAML or JSON in the config (though `loadConfigs` should catch this earlier).
