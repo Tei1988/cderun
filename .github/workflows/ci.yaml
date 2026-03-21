@@ -184,3 +184,54 @@ jobs:
           fail_ci_if_error: true
         env:
           DOCKER_VERSION: ${{ matrix.docker-version }}
+
+  runtime-test-podman:
+    name: Runtime Tests (Podman v5.8.1)
+    needs: [filter, build]
+    if: needs.filter.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/podman/stable:v5.8.1
+      options: --privileged
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Download Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: cderun-binary
+
+      - name: Make binary executable
+        run: chmod +x cderun
+
+      - name: Start Podman Service
+        run: |
+          mkdir -p /run/podman
+          podman system service --time=0 unix:///run/podman/podman.sock &
+          timeout 30s sh -c 'while [ ! -S /run/podman/podman.sock ]; do sleep 1; done'
+
+      - name: Runtime Tests
+        env:
+          CDERUN_RUNTIME: podman
+          CDERUN_SOCKET_PATH: /run/podman/podman.sock
+          TEST_HOST_TMP_DIR: /tmp/runtime-podman
+          CDERUN_HANG_TIMEOUT: 10s
+        run: |
+          mkdir -p $TEST_HOST_TMP_DIR
+          podman version
+          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-podman.out
+          flags: podman
+          fail_ci_if_error: true
