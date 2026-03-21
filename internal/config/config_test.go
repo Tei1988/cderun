@@ -472,6 +472,9 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		fCloned := vCloned.Field(i)
 		fieldName := vOrig.Type().Field(i).Name
 
+		// We only check kinds that need deep-copy verification (pointers, slices, maps, nested structs).
+		// Other kinds are already covered by the top-level assert.Equal.
+		//nolint:exhaustive
 		switch fOrig.Kind() {
 		case reflect.Ptr:
 			if !fOrig.IsNil() {
