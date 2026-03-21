@@ -78,60 +78,77 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are "Internal Overrides" (P1).
-They have the highest priority and **must** be placed **after**
-the subcommand in standard wrapper mode.
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority (P1 > P2 CLI Flags > P3 Env Vars > P4/P5 Config).
+
+In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the subcommand.
 
 ```bash
+# Standard mode: P1 flags go after the subcommand
 cderun node app.js --cderun-image node:20-alpine
 ```
 
+In **Symlink Mode**, only `--cderun-` prefixed flags are hoisted. This prevents collisions with flags intended for the wrapped tool (e.g., `node --tty` passes `--tty` to node, while `node --cderun-tty` sets the `cderun` TTY option).
+
 ### Available Flags
 
-- `--tty`, `-t`: Allocate a pseudo-TTY.
-- `--interactive`, `-i`: Keep STDIN open even if not attached.
-- `--image`: Docker image to use (overrides mapping).
-- `--env`, `-e`: Set environment variables (KEY=VALUE or KEY).
-- `--strict-env`: Require all environment variables to be present on the host.
-- `--mount`: Attach a filesystem mount to the container (type=bind,source=...,target=...[,readonly]).
+#### Execution & Identity
+
+- `--tty`, `-t`: Allocate a pseudo-TTY. (Default: `false`)
+- `--interactive`, `-i`: Keep STDIN open even if not attached. (Default: `false`)
+- `--image`: Container image to use (overrides `.tools.yaml`).
+- `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
+- `--user`, `-u`: Username or UID (format: `<name|uid>[:<group|gid>]`).
 - `--workdir`, `-w`: Working directory inside the container.
-- `--network`: Connect a container to a network (default: "bridge").
-- `--publish`, `-p`: Publish a container's port(s) to the host.
-- `--publish-all`, `-P`: Publish all exposed ports to random ports.
-- `--expose`: Expose a port or a range of ports.
+- `--env`, `-e`: Set environment variables (`KEY=VALUE` or `KEY` for host passthrough).
+- `--strict-env`: Require all passed environment variables to be present on the host. (Default: `false`)
+- `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
+- `--remove`: Automatically remove the container when it exits. (Default: `true`)
+- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `2s`, `500ms`). (Default: `2s`)
+
+#### Network & Ports
+
+- `--network`: Connect a container to a network. (Default: `bridge`)
 - `--hostname`: Container host name.
+- `--publish`, `-p`: Publish a container's port(s) to the host.
+- `--publish-all`, `-P`: Publish all exposed ports to random ports. (Default: `false`)
+- `--expose`: Expose a port or a range of ports.
 - `--dns`: Set custom DNS servers.
-- `--add-host`: Add a custom host-to-IP mapping (host:ip).
-- `--user`, `-u`: Username or UID (format: <name|uid>[:<group|gid>]).
-- `--privileged`: Give extended privileges to this container.
+- `--add-host`: Add a custom host-to-IP mapping (`host:ip`).
+
+#### Resources & Security
+
+- `--memory`, `-m`: Memory limit (e.g., `512m`, `1g`).
+- `--cpus`: Number of CPUs (float).
+- `--device`: Add a host device to the container.
+- `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
-- `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
-- `--pull`: Pull image before running (always, missing, never). Default is `missing`.
-- `--memory`, `-m`: Memory limit.
-- `--cpus`: Number of CPUs.
-- `--device`: Add a host device to the container.
-- `--remove`: Automatically remove the container when it exits (default: true).
-- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms).
-- `--config`: Path to cderun config file.
-- `--tool-config`: Path to tools config file.
-- `--runtime`: Container runtime to use (docker/podman).
-- `--socket-path`: Specify the path to the container runtime socket (e.g., `/var/run/docker.sock`).
-- `--mount-socket`: Mount the container runtime socket into the container.
-- `--mount-socket-path`: Path where the socket should be mounted inside the container.
-- `--mount-cderun`: Mount the cderun binary into the container. Automatically enables `--mount-socket`.
-- `--mount-cderun-path`: Host path to cderun binary to mount inside container.
-- `--mount-tools`: Mount specified tools (comma-separated) aliases into the container.
-- `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
-- `--dry-run`: Preview container configuration without execution. Requires a subcommand.
-- `--dry-run-format`, `-f`: Output format for dry-run (yaml, json, simple).
-- `--diagnosis`: Show system diagnostics and available tools.
-- `--diagnosis-format`: Output format for diagnosis (yaml, json, simple).
-- `--log-level`: Set log level (error, warn, info, debug, trace). Default log level is `warn`. Note: `-v` or `--verbose` are not supported.
-- `--log-format`: Set log format (text, json).
-- `--log-timestamp`: Include timestamp in logs (default: true).
 
-*(All flags have a corresponding `--cderun-` prefixed P1 override counterpart)*
+#### Mounting & Nested Execution
+
+- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly]`).
+- `--mount-socket`: Mount the container runtime socket into the container. (Default: `false`)
+- `--mount-cderun`: Mount the `cderun` binary into the container. (Enables `--mount-socket` automatically)
+- `--mount-tools`: Mount specified tools (comma-separated) defined in `.tools.yaml` into the container.
+- `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
+- `--socket-path`: Path to the runtime socket on the host.
+- `--mount-socket-path`: Path where the socket should be mounted inside the container.
+- `--mount-cderun-path`: Host path to the `cderun` binary to mount.
+
+#### Diagnostics & Logging
+
+- `--config`: Path to `cderun` config file (`.cderun.yaml`).
+- `--tool-config`: Path to tools config file (`.tools.yaml`).
+- `--runtime`: Container runtime to use (`docker`/`podman`).
+- `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
+- `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
+- `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
+- `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
+- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Default: `warn`)
+- `--log-format`: Set log format (`text`, `json`).
+- `--log-timestamp`: Include timestamp in logs. (Default: `true`)
+
+*(All flags have a corresponding `--cderun-` prefixed P1 override counterpart.)*
 
 ## Environment Variables
 
@@ -211,6 +228,13 @@ the available runtime by checking for common Unix socket paths.
 - Enables recursive container execution without installing tools
   in the container image.
 
+### Nested Execution Support
+
+- Transparently handles `cderun` execution inside a `cderun`-managed container.
+- Automatically propagates host context and settings via snapshots.
+- **Reverse Path Resolution**: Translates container-local paths back to host paths for nested mounts, ensuring the host-side Docker/Podman daemon can resolve volume sources.
+- **OverlayFS Detection**: Automatically detects the root filesystem's `upperdir` to map container files back to the host.
+
 ### Unified Value Resolution
 
 - **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
@@ -219,14 +243,6 @@ the available runtime by checking for common Unix socket paths.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the
   origin of the setting (config file location vs. current directory).
 - See [Value Resolution](docs/features/value-resolution.md) for details.
-
-### Nested Execution Support
-
-- Transparently handles `cderun` execution inside a `cderun`-managed container.
-- Automatically propagates host context and settings via snapshots.
-- Implements "Reverse Path Resolution" to translate container-local paths
-  back to host paths for nested mounts.
-- Detects OverlayFS upperdir for automatic root filesystem mapping.
 
 ## Development & Testing
 
