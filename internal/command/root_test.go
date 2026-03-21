@@ -680,3 +680,125 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
 }
+
+func TestUnit_Root_BuildContainerConfig_Additions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("MountCderun without MountCderunPath uses fs.Executable", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecPath: "/usr/bin/cderun-real",
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+		}
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+
+		found := false
+		for _, m := range cfg.Mounts {
+			if m.Target == "/usr/local/bin/cderun" {
+				assert.Equal(t, "/usr/bin/cderun-real", m.Source)
+				found = true
+			}
+		}
+		assert.True(t, found)
+	})
+
+	t.Run("MountAllTools with empty toolsCfg", func(t *testing.T) {
+		var logBuf bytes.Buffer
+		logger := logging.NewLogger()
+		logger.Init("warn", "text", false)
+		logger.SetOutput(&logBuf)
+
+		mfs := &config.MockFileSystem{ExecPath: "/usr/bin/cderun"}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logger,
+		}
+		resolved := &config.ResolvedConfig{
+			MountAllTools: true,
+		}
+		_, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+		assert.Contains(t, logBuf.String(), "--mount-all-tools specified but no tools defined in .tools.yaml")
+	})
+
+	t.Run("MountTools with invalid tool name", func(t *testing.T) {
+		mfs := &config.MockFileSystem{ExecPath: "/usr/bin/cderun"}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"nonexistent"},
+		}
+		toolsCfg := config.ToolsConfig{
+			"node": {},
+		}
+		_, err := o.buildContainerConfig(resolved, nil, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"nonexistent\" not found in .tools.yaml")
+		assert.Contains(t, err.Error(), "available tools: node")
+	})
+}
+
+func TestUnit_Root_BuildContainerConfig_Nested_Additions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nested execution path resolution success", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			ExecPath: "/app/cderun",
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		// Simulate nested execution: Level 1.
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+			HostContext: &config.HostContext{
+				Level: 1,
+				Mounts: []config.MountMapping{
+					{Source: "/host/app", Target: "/app"},
+				},
+			},
+		}
+
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+
+		found := false
+		for _, m := range cfg.Mounts {
+			if m.Target == "/usr/local/bin/cderun" {
+				assert.Equal(t, "/host/app/cderun", m.Source)
+				found = true
+			}
+		}
+		assert.True(t, found)
+	})
+}
+
+func TestUnit_Root_NewRootCmd_PersistentPreRun_Additions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("initializes fs and configLoader if nil", func(t *testing.T) {
+		o := &rootOptions{}
+		cmd := newRootCmd(o)
+
+		// Before PersistentPreRun
+		assert.Nil(t, o.fs)
+		assert.Nil(t, o.configLoader)
+
+		// Execute PersistentPreRun
+		if cmd.PersistentPreRun != nil {
+			cmd.PersistentPreRun(cmd, []string{})
+		}
+
+		assert.NotNil(t, o.fs)
+		assert.NotNil(t, o.configLoader)
+	})
+}
