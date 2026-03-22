@@ -123,9 +123,10 @@ func resolveStringSliceOpt(
 		vals = []string{}
 		for v := range strings.SplitSeq(env, envSep) {
 			v = strings.TrimSpace(v)
-			if v != "" {
-				vals = append(vals, v)
+			if v == "" {
+				continue
 			}
+			vals = append(vals, v)
 		}
 	} else if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {

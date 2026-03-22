@@ -787,9 +787,10 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 		envs = []string{}
 		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
-			if e != "" {
-				envs = append(envs, e)
+			if e == "" {
+				continue
 			}
+			envs = append(envs, e)
 		}
 	} else if tools != nil {
 		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
