@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -26,7 +27,7 @@ import (
 )
 
 const (
-	pullMaxRetries         = 3
+	pullMaxRetries         = 5
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -60,9 +61,18 @@ func NewDockerRuntime(socket string) (*DockerRuntime, error) {
 
 // NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
+	// Use a custom HTTP client with a slightly longer timeout and better connection handling
+	// to mitigate EOF issues during API version negotiation (especially with Podman).
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true, // Reduce EOF risk on reuse
+		},
+	}
+
 	cli, err := client.NewClientWithOpts(
 		client.WithHost("unix://"+socket),
 		client.WithAPIVersionNegotiation(),
+		client.WithHTTPClient(httpClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
@@ -105,7 +115,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	for i := range pullMaxRetries {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
-			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*500*time.Millisecond); err != nil {
 				return err
 			}
 		}
@@ -427,5 +437,7 @@ func isRetryablePullError(err error) bool {
 		strings.Contains(msg, "data limit exceeded") ||
 		strings.Contains(msg, "i/o timeout") ||
 		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "broken pipe") ||
 		eofRegex.MatchString(msg)
 }
