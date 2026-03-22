@@ -127,63 +127,55 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 }
 
 func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
-	mfs := &config.MockFileSystem{}
 	originalReader := defaultMountInfoReader
 	defer func() { defaultMountInfoReader = originalReader }()
 
-	t.Run("successfully discover upperdir", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+	tests := []struct {
+		name      string
+		mountinfo string
+		expected  string
+	}{
+		{
+			name:      "successfully discover upperdir",
+			mountinfo: "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n",
+			expected:  "/u",
+		},
+		{
+			name:      "no overlay found",
+			mountinfo: "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n",
+			expected:  "",
+		},
+		{
+			name:      "malformed mountinfo",
+			mountinfo: "too few fields\n",
+			expected:  "",
+		},
+		{
+			name:      "no separator",
+			mountinfo: "24 25 0:21 / / rw,relatime overlay overlay rw,upperdir=/u\n",
+			expected:  "",
+		},
+		{
+			name:      "non-root overlay",
+			mountinfo: "24 25 0:21 / /mnt/foo rw,relatime - overlay overlay rw,upperdir=/u\n",
+			expected:  "",
+		},
+		{
+			name:      "few fields after separator",
+			mountinfo: "24 25 0:21 / / rw,relatime - overlay\n",
+			expected:  "",
+		},
+	}
 
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "/u", upperdir)
-	})
-
-	t.Run("no overlay found", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("malformed mountinfo", func(t *testing.T) {
-		mountinfo := "too few fields\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("no separator", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime overlay overlay rw,upperdir=/u\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("non-root overlay", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / /mnt/foo rw,relatime - overlay overlay rw,upperdir=/u\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("few fields after separator", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - overlay\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// NOTE: MockFileSystem is unused when defaultMountInfoReader is replaced by mockMountInfoReader.
+			defaultMountInfoReader = &mockMountInfoReader{Content: []byte(tt.mountinfo)}
+			upperdir, err := discoverOverlayUpperDir(nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, upperdir)
+		})
+	}
 }
 
 type errorFS struct {

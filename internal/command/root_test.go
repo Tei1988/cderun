@@ -701,14 +701,7 @@ func TestUnit_Root_BuildContainerConfig_Additions(t *testing.T) {
 		cfg, err := o.buildContainerConfig(resolved, nil, nil)
 		require.NoError(t, err)
 
-		found := false
-		for _, m := range cfg.Mounts {
-			if m.Target == "/usr/local/bin/cderun" {
-				assert.Equal(t, "/usr/bin/cderun-real", m.Source)
-				found = true
-			}
-		}
-		assert.True(t, found)
+		assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/usr/bin/cderun-real")
 	})
 
 	t.Run("MountAllTools with empty toolsCfg", func(t *testing.T) {
@@ -774,14 +767,7 @@ func TestUnit_Root_BuildContainerConfig_Nested_Additions(t *testing.T) {
 		cfg, err := o.buildContainerConfig(resolved, nil, nil)
 		require.NoError(t, err)
 
-		found := false
-		for _, m := range cfg.Mounts {
-			if m.Target == "/usr/local/bin/cderun" {
-				assert.Equal(t, "/host/app/cderun", m.Source)
-				found = true
-			}
-		}
-		assert.True(t, found)
+		assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/host/app/cderun")
 	})
 }
 
@@ -822,7 +808,7 @@ func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
-			o.exitFunc = func(code int) {}
+			o.exitFunc = func(code int) { }
 			o.isTerminal = func(fd int) bool { return true }
 			cmd.SetErr(&errBuf)
 		})
@@ -891,14 +877,7 @@ func TestUnit_Root_BuildContainerConfig_ResolvePathError(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
-	found := false
-	for _, m := range cfg.Mounts {
-		if m.Target == "/usr/local/bin/cderun" {
-			assert.Equal(t, "/app/{{file:nonexistent-file-that-should-not-exist}}", m.Source)
-			found = true
-		}
-	}
-	assert.True(t, found)
+	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{file:nonexistent-file-that-should-not-exist}}")
 }
 
 func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
@@ -1209,7 +1188,7 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return false }
-				o.exitFunc = func(code int) {}
+				o.exitFunc = func(code int) { }
 			})
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.expected)
@@ -1315,14 +1294,7 @@ func TestUnit_Root_BuildContainerConfig_Nested_ResolvePathFailure(t *testing.T) 
 	cfg, err := o.buildContainerConfig(resolved, nil, nil)
 	require.NoError(t, err)
 
-	found := false
-	for _, m := range cfg.Mounts {
-		if m.Target == "/usr/local/bin/cderun" {
-			assert.Equal(t, "/app/{{file:nonexistent}}", m.Source)
-			found = true
-		}
-	}
-	assert.True(t, found)
+	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{file:nonexistent}}")
 }
 
 func TestUnit_Root_BuildContainerConfig_Nested_Level0_NoResolution(t *testing.T) {
@@ -1343,14 +1315,7 @@ func TestUnit_Root_BuildContainerConfig_Nested_Level0_NoResolution(t *testing.T)
 	cfg, err := o.buildContainerConfig(resolved, nil, nil)
 	require.NoError(t, err)
 
-	found := false
-	for _, m := range cfg.Mounts {
-		if m.Target == "/usr/local/bin/cderun" {
-			assert.Equal(t, "/app/{{HOME}}", m.Source)
-			found = true
-		}
-	}
-	assert.True(t, found)
+	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{HOME}}")
 }
 
 func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
@@ -1359,7 +1324,7 @@ func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
 		WaitErr: errors.New("wait interrupted"),
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 	})
@@ -1367,19 +1332,21 @@ func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
 	assert.ErrorContains(t, err, "failed to wait for container: wait interrupted")
 }
 
-func TestUnit_Root_Execute_AttachAfterExit_Error(t *testing.T) {
+func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 	t.Parallel()
+	// NOTE: MockRuntime.AttachContainer returns AttachErr immediately if it's not nil,
+	// which exercises the early-attach-failure path in ExecuteContextWithOptions (via execute).
 	mockRuntime := &runtime.MockRuntime{
-		AttachErr: errors.New("attach failed after exit"),
+		AttachErr: errors.New("attach failed early"),
 		ExitCode:  42,
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "failed to attach to container: attach failed after exit")
+	assert.ErrorContains(t, err, "failed to attach to container: attach failed early")
 }
 
 func TestUnit_Root_PreprocessArgs_NoSubcommandHoisting(t *testing.T) {
