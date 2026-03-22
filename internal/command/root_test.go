@@ -564,19 +564,21 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 	}
 
 	// Test before ready
-	p := make([]byte, 5)
-	done := make(chan bool)
-	go func() {
-		n, err := sr.Read(p)
-		assert.Equal(t, 5, n)
-		require.NoError(t, err)
-		assert.Equal(t, "hello", string(p))
-		done <- true
-	}()
+		type result struct {
+			n   int
+			err error
+			p   []byte
+		}
+		resCh := make(chan result)
+		go func() {
+			buf := make([]byte, 5)
+			n, err := sr.Read(buf)
+			resCh <- result{n: n, err: err, p: buf}
+		}()
 
 	// Ensure Read has reached the select block but is waiting for ready
 	select {
-	case <-done:
+	case <-resCh:
 		t.Fatal("Read should have blocked on ready")
 	case <-time.After(10 * time.Millisecond):
 		// OK
@@ -589,14 +591,17 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 
 	// And verify it's still blocked on unblock
 	select {
-	case <-done:
+	case <-resCh:
 		t.Fatal("Read should have blocked on inner reader")
 	case <-time.After(10 * time.Millisecond):
 		// OK
 	}
 
 	close(unblock)
-	<-done
+	res := <-resCh
+	assert.Equal(t, 5, res.n)
+	require.NoError(t, res.err)
+	assert.Equal(t, "hello", string(res.p))
 }
 
 func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
@@ -1073,7 +1078,7 @@ func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
 	require.ErrorContains(t, err, "failed to load cderun config")
 }
 
-func TestUnit_Root_DefaultOptions_RuntimeFactory_Extra(t *testing.T) {
+func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 	t.Parallel()
 	o := defaultOptions()
 
@@ -1097,7 +1102,7 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory_Extra(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_LoadConfigs_Priority_Extra(t *testing.T) {
+func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 	t.Parallel()
 
 	t.Run("cderun-config flag takes precedence over env", func(t *testing.T) {
@@ -1163,47 +1168,56 @@ func TestUnit_Root_LoadConfigs_Priority_Extra(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_Execute_ErrorPropagation_Extra(t *testing.T) {
+func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 	t.Parallel()
+	tests := []struct {
+		name     string
+		setup    func(*runtime.MockRuntime)
+		expected string
+	}{
+		{
+			name: "PullImage fails",
+			setup: func(m *runtime.MockRuntime) { m.PullErr = errors.New("pull failed") },
+			expected: "failed to pull image: pull failed",
+		},
+		{
+			name: "StartContainer fails",
+			setup: func(m *runtime.MockRuntime) { m.StartErr = errors.New("start failed") },
+			expected: "failed to start container: start failed",
+		},
+		{
+			name: "WaitContainer fails",
+			setup: func(m *runtime.MockRuntime) { m.WaitErr = errors.New("wait failed") },
+			expected: "failed to wait for container: wait failed",
+		},
+		{
+			name: "CreateContainer fails",
+			setup: func(m *runtime.MockRuntime) { m.CreateErr = errors.New("create failed") },
+			expected: "failed to create container: create failed",
+		},
+		{
+			name: "AttachContainer fails",
+			setup: func(m *runtime.MockRuntime) { m.AttachErr = errors.New("attach failed") },
+			expected: "failed to attach to container: attach failed",
+		},
+	}
 
-	t.Run("PullImage fails", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			PullErr: errors.New("pull failed"),
-		}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
-			o.isTerminal = func(fd int) bool { return false }
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRuntime := &runtime.MockRuntime{}
+			tt.setup(mockRuntime)
+			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+				o.isTerminal = func(fd int) bool { return false }
+				o.exitFunc = func(code int) {}
+			})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.expected)
 		})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to pull image: pull failed")
-	})
-
-	t.Run("StartContainer fails", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			StartErr: errors.New("start failed"),
-		}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
-			o.isTerminal = func(fd int) bool { return false }
-		})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to start container: start failed")
-	})
-
-	t.Run("WaitContainer fails", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			WaitErr: errors.New("wait failed"),
-		}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
-			o.isTerminal = func(fd int) bool { return false }
-		})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to wait for container: wait failed")
-	})
+	}
 }
 
-func TestUnit_Root_PreprocessArgs_FlagArguments_Extra(t *testing.T) {
+func TestUnit_Root_PreprocessArgs_FlagArguments(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -1247,7 +1261,7 @@ func TestUnit_Root_PreprocessArgs_FlagArguments_Extra(t *testing.T) {
 	}
 }
 
-func TestUnit_Signals_Unix_AllSignals_Extra(t *testing.T) {
+func TestUnit_Signals_Unix_AllSignals(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
 	assert.Equal(t, "SIGTERM", getSignalName(syscall.SIGTERM))
@@ -1259,37 +1273,7 @@ func TestUnit_Signals_Unix_AllSignals_Extra(t *testing.T) {
 	assert.Equal(t, quitName, getSignalName(syscall.SIGQUIT))
 }
 
-func TestUnit_Root_Execute_CreateContainerFailure_Extra(t *testing.T) {
-	t.Parallel()
-	mockRuntime := &runtime.MockRuntime{
-		CreateErr: errors.New("create failed"),
-	}
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		o.isTerminal = func(fd int) bool { return false }
-	})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to create container: create failed")
-}
-
-func TestUnit_Root_Execute_AttachFailure_Extra(t *testing.T) {
-	t.Parallel()
-	mockRuntime := &runtime.MockRuntime{
-		AttachErr: errors.New("attach failed early"),
-	}
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		o.isTerminal = func(fd int) bool { return false }
-	})
-	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to attach to container: attach failed early")
-}
-
-func TestUnit_RunCderunCore_PreprocessError_Extra(t *testing.T) {
+func TestUnit_RunCderunCore_PreprocessError(t *testing.T) {
 	t.Parallel()
 	// Using a valid dummy reader to avoid potential panic if runCderunCore dereferences stdin.
 	_, _, _, err := runCderunCore(strings.NewReader(""), "--cderun-image", "alpine", "sh")
@@ -1297,7 +1281,7 @@ func TestUnit_RunCderunCore_PreprocessError_Extra(t *testing.T) {
 	require.ErrorContains(t, err, "must be placed after the subcommand")
 }
 
-func TestUnit_Root_ResolveSettings_Coverage_Extra(t *testing.T) {
+func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	var buf bytes.Buffer
