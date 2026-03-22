@@ -121,7 +121,7 @@ func resolveStringSliceOpt(
 		vals = p2
 	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
 		vals = []string{}
-		for _, v := range strings.Split(env, envSep) {
+		for v := range strings.SplitSeq(env, envSep) {
 			v = strings.TrimSpace(v)
 			if v != "" {
 				vals = append(vals, v)
