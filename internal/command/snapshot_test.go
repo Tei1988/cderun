@@ -182,7 +182,6 @@ func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
 
 }
 func TestUnit_Snapshot_Errors(t *testing.T) {
-	t.Parallel()
 
 	t.Run("MkdirAll fails", func(t *testing.T) {
 		mfs := &errorFS{
@@ -206,7 +205,6 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 }
 
 func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
-	t.Parallel()
 	sentinel := errors.New("cleanup failed")
 	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
@@ -214,7 +212,6 @@ func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
 }
 
 func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
-	t.Parallel()
 	mfs := &errorFS{
 		MockFileSystem: &config.MockFileSystem{},
 	}
@@ -231,7 +228,6 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 }
 
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {
-	t.Parallel()
 	mfs := &snapshotMockFS{
 		MockFileSystem: &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -284,14 +280,12 @@ func (f *snapshotMockFS) WriteFile(path string, data []byte, perm os.FileMode) e
 }
 
 func TestUnit_Snapshot_Cleanup_Empty(t *testing.T) {
-	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	err := cleanupSnapshot(mfs, "")
 	require.NoError(t, err)
 }
 
 func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
-	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
 	require.NoError(t, err)
