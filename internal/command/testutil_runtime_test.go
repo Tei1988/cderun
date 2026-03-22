@@ -26,4 +26,8 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "timeout") && strings.Contains(msg, "sigkill") {
 		t.Skip("Skipping test due to Docker SIGKILL timeout (likely environment resource constraint)")
 	}
+	// Detect Podman/Docker socket connection failures
+	if strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "error during connect") {
+		t.Skipf("Skipping test due to container runtime socket connection issue: %v", err)
+	}
 }
