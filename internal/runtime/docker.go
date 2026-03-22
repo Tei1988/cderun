@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -61,18 +60,9 @@ func NewDockerRuntime(socket string) (*DockerRuntime, error) {
 
 // NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
-	// Use a custom HTTP client with a slightly longer timeout and better connection handling
-	// to mitigate EOF issues during API version negotiation (especially with Podman).
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DisableKeepAlives: true, // Reduce EOF risk on reuse
-		},
-	}
-
 	cli, err := client.NewClientWithOpts(
 		client.WithHost("unix://"+socket),
 		client.WithAPIVersionNegotiation(),
-		client.WithHTTPClient(httpClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
