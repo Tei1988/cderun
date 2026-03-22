@@ -245,6 +245,40 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
+	t.Run("missing policy - retry inspect success", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		count := 0
+		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+			count++
+			if count == 1 {
+				return image.InspectResponse{}, errors.New("eof")
+			}
+			return image.InspectResponse{}, nil
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing")
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+		assert.Equal(t, 0, mock.pullCount)
+	})
+
+	t.Run("missing policy - retry inspect not found", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		count := 0
+		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+			count++
+			if count == 1 {
+				return image.InspectResponse{}, errors.New("eof")
+			}
+			return image.InspectResponse{}, errNotFound{errors.New("not found")}
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing")
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+		assert.Equal(t, 1, mock.pullCount)
+	})
+
 
 	t.Run("non-retryable pull error", func(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
