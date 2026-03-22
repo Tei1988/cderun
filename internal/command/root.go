@@ -121,10 +121,13 @@ type rootOptions struct {
 	// Testing hooks
 	exitFunc       func(int)
 	isTerminal     func(int) bool
-	termGetSize    func(int) (int, int, error)
-	makeRaw        func(int) (*term.State, error)
-	restore        func(int, *term.State) error
-	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
+	termGetSize        func(int) (int, int, error)
+	makeRaw            func(int) (*term.State, error)
+	restore            func(int, *term.State) error
+	setupSignals       func(chan os.Signal)
+	setupResizeSignal  func(chan os.Signal)
+	stopSignalHandling func(chan os.Signal)
+	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
 }
 
 const (
@@ -157,6 +160,15 @@ func defaultOptions() rootOptions {
 		},
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
+		},
+		setupSignals: func(sigChan chan os.Signal) {
+			setupSignals(sigChan)
+		},
+		setupResizeSignal: func(resizeChan chan os.Signal) {
+			setupResizeSignal(resizeChan)
+		},
+		stopSignalHandling: func(sigChan chan os.Signal) {
+			signal.Stop(sigChan)
 		},
 		logger: logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
@@ -696,8 +708,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Handle signals and forward them to the container
 	sigChan := make(chan os.Signal, 1)
-	setupSignals(sigChan)
-	defer signal.Stop(sigChan)
+	o.setupSignals(sigChan)
+	defer o.stopSignalHandling(sigChan)
 	go func() {
 		firstSignal := true
 		for {
@@ -768,8 +780,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Handle window resize synchronization
 	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
-		setupResizeSignal(resizeChan)
-		defer signal.Stop(resizeChan)
+		o.setupResizeSignal(resizeChan)
+		defer o.stopSignalHandling(resizeChan)
 		go func() {
 			for {
 				select {

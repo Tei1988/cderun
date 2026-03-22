@@ -626,6 +626,8 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
+	// In Go 1.24+, we should ideally use t.Context().
+	// But here we need a manual cancel to test the behavior before calling Read.
 
 	sr := &syncReader{
 		inner: strings.NewReader("hello"),
@@ -1418,14 +1420,18 @@ func (m *blockingAttachMockRuntime) AttachContainer(ctx context.Context, contain
 }
 
 func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
-	// Cannot use t.Parallel() because it uses os.Signal and syscall.Kill which are process-global
+	t.Parallel()
 	mockRuntime := &runtime.MockRuntime{
 		SignalErr: errors.New("signal failed"),
 		WaitDelay: 1 * time.Second, // Give time to send signal
 	}
 	var errBuf safeBuffer
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
+
+	var triggerSignal chan<- os.Signal
+	setupSignalsMock := func(sigChan chan os.Signal) {
+		triggerSignal = sigChan
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -1433,6 +1439,8 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
+			o.setupSignals = setupSignalsMock
+			o.stopSignalHandling = func(chan os.Signal) {} // No-op
 			cmd.SetErr(&errBuf)
 		})
 	}()
@@ -1440,13 +1448,9 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	// Wait for container to start (WaitContainer is called)
 	time.Sleep(100 * time.Millisecond)
 
-	// Send signal to ourselves, which should be caught by setupSignals
-	p, err := os.FindProcess(os.Getpid())
-	require.NoError(t, err)
-
-	// We use SIGINT as it is supported on both Unix and Windows
-	err = p.Signal(os.Interrupt)
-	require.NoError(t, err)
+	// Trigger the signal manually via the captured channel
+	require.NotNil(t, triggerSignal)
+	triggerSignal <- syscall.SIGINT
 
 	// Wait for execution to finish
 	select {
@@ -1476,8 +1480,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	// The second one uses resolved.LogLevel.
 	// So we should just set --cderun-log-level=debug in args.
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	errCh := make(chan error, 1)
 	go func() {
