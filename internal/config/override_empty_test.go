@@ -82,13 +82,11 @@ func TestUnit_Resolver_EmptyEnvOverride(t *testing.T) {
 	cli := CLIOptions{}
 
 	// Case 1: CDERUN_ENV is empty string
-	fs := &customMockFS{
-		MockFileSystem: MockFileSystem{
-			Env: map[string]string{
-				"CDERUN_ENV":    "",
-				"CDERUN_MOUNT":  "",
-				"CDERUN_DEVICE": "",
-			},
+	fs := &MockFileSystem{
+		Env: map[string]string{
+			"CDERUN_ENV":    "",
+			"CDERUN_MOUNT":  "",
+			"CDERUN_DEVICE": "",
 		},
 	}
 
@@ -98,13 +96,4 @@ func TestUnit_Resolver_EmptyEnvOverride(t *testing.T) {
 	assert.Empty(t, res.Env, "Env should be empty (overridden by P3 CDERUN_ENV)")
 	assert.Empty(t, res.Mounts, "Mounts should be empty (overridden by P3 CDERUN_MOUNT)")
 	assert.Empty(t, res.Devices, "Devices should be empty (overridden by P3 CDERUN_DEVICE)")
-}
-
-type overrideEmptyMockFS struct {
-	MockFileSystem
-}
-
-func (m *overrideEmptyMockFS) LookupEnv(key string) (string, bool) {
-	val, ok := m.Env[key]
-	return val, ok
 }

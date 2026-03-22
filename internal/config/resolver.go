@@ -722,6 +722,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	var dcs []DeviceConfig
 
 	if p1 != nil {
+		dcs = []DeviceConfig{}
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -731,6 +732,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			dcs = append(dcs, parsed)
 		}
 	} else if p2 != nil {
+		dcs = []DeviceConfig{}
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -785,9 +787,6 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 		envs = []string{}
 		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
-			if e == "" {
-				continue
-			}
 			if e != "" {
 				envs = append(envs, e)
 			}
@@ -858,6 +857,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	var mcs []MountConfig
 
 	if p1 != nil {
+		mcs = []MountConfig{}
 		for _, m := range p1 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
@@ -867,6 +867,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			mcs = append(mcs, parsed)
 		}
 	} else if p2 != nil {
+		mcs = []MountConfig{}
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {

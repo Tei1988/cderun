@@ -120,7 +120,13 @@ func resolveStringSliceOpt(
 	} else if p2 != nil {
 		vals = p2
 	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
-		vals = strings.Split(env, envSep)
+		vals = []string{}
+		for _, v := range strings.Split(env, envSep) {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				vals = append(vals, v)
+			}
+		}
 	} else if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
@@ -130,8 +136,11 @@ func resolveStringSliceOpt(
 		vals = def.GlobalGetter(*global)
 	}
 	var res []string
-	for _, v := range vals {
-		res = append(res, r.resolveString(v))
+	if vals != nil {
+		res = []string{}
+		for _, v := range vals {
+			res = append(res, r.resolveString(v))
+		}
 	}
 	return res
 }
@@ -161,10 +170,13 @@ func resolveStringSliceCommaOpt(
 		vals = def.GlobalGetter(*global)
 	}
 	var res []string
-	for _, v := range vals {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			res = append(res, r.resolveString(v))
+	if vals != nil {
+		res = []string{}
+		for _, v := range vals {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				res = append(res, r.resolveString(v))
+			}
 		}
 	}
 	return res
