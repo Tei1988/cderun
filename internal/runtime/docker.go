@@ -26,6 +26,7 @@ import (
 
 const (
 	pullMaxRetries         = 3
+	pullBackoffBase        = 1 * time.Second
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -99,8 +100,8 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	var lastErr error
 	for i := range pullMaxRetries {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
-			if err := d.sleepFunc(ctx, time.Duration(1<<i)*500*time.Millisecond); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*pullBackoffBase); err != nil {
 				return err
 			}
 		}
@@ -437,7 +438,7 @@ func isRetryablePullError(err error) bool {
 		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
 		"i/o timeout", "connection refused", "connection reset", "broken pipe",
 		"cannot connect to the docker daemon", "is the docker daemon running",
-		"dial unix", "error during connect", "unexpected eof", "eof",
+		"dial unix", "error during connect", "eof",
 		"context deadline exceeded", "connection deadline exceeded",
 	}
 

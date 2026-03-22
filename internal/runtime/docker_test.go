@@ -61,8 +61,8 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
 		assert.Equal(t, 3, mock.pullCount)
 		assert.Len(t, sleeps, 2)
-		assert.Equal(t, 1000*time.Millisecond, sleeps[0]) // 1<<1 * 500ms
-		assert.Equal(t, 2000*time.Millisecond, sleeps[1]) // 1<<2 * 500ms
+		assert.Equal(t, 2000*time.Millisecond, sleeps[0]) // 1<<1 * 1s
+		assert.Equal(t, 4000*time.Millisecond, sleeps[1]) // 1<<2 * 1s
 	})
 
 	t.Run("success after retry", func(t *testing.T) {
