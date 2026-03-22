@@ -428,7 +428,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// Translate exePath for nested execution if it was determined from os.Executable()
 		// (MountCderunPath is already resolved during resolution if it came from config/flags)
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
-			r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
+			r, err := config.NewExpressionResolver(resolved.HostContext)
 			if err != nil {
 				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
 			} else {
