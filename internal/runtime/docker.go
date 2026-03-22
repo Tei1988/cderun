@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	pullMaxRetries         = 5
+	pullMaxRetries         = 8
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -87,20 +87,10 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string) error {
-	switch pullPolicy {
-	case "never":
+	if pullPolicy == "never" {
 		return nil
-	case "missing":
-		_, err := d.client.ImageInspect(ctx, img)
-		if err == nil {
-			return nil // Image exists locally
-		}
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to inspect image: %w", err)
-		}
 	}
 
-	// Policy is "always" or "missing" (and not found locally)
 	var lastErr error
 	for i := range pullMaxRetries {
 		if i > 0 {
@@ -110,6 +100,21 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			}
 		}
 
+		if pullPolicy == "missing" {
+			_, err := d.client.ImageInspect(ctx, img)
+			if err == nil {
+				return nil // Image exists locally
+			}
+			if !errdefs.IsNotFound(err) {
+				lastErr = err
+				if isRetryablePullError(err) {
+					continue
+				}
+				return fmt.Errorf("failed to inspect image: %w", err)
+			}
+		}
+
+		// Policy is "always" or "missing" (and not found locally)
 		logging.Info("Pulling image %s...", img)
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
@@ -432,5 +437,7 @@ func isRetryablePullError(err error) bool {
 		strings.Contains(msg, "cannot connect to the docker daemon") ||
 		strings.Contains(msg, "is the docker daemon running") ||
 		strings.Contains(msg, "dial unix") ||
+		strings.Contains(msg, "error during connect") ||
+		strings.Contains(msg, "unexpected eof") ||
 		eofRegex.MatchString(msg)
 }
