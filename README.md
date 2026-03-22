@@ -78,16 +78,16 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority (P1 > P2 CLI Flags > P3 Env Vars > P4/P5 Config).
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority (P1 > P2 CLI Flags > P3 Env Vars > P4 Tool Config > P5 Global Config > P6 Hardcoded Defaults).
 
-In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the subcommand.
+In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the subcommand. Placing a P1 flag before the subcommand will result in an error.
 
 ```bash
 # Standard mode: P1 flags go after the subcommand
 cderun node app.js --cderun-image node:20-alpine
 ```
 
-In **Symlink Mode**, only `--cderun-` prefixed flags are hoisted. This prevents collisions with flags intended for the wrapped tool (e.g., `node --tty` passes `--tty` to node, while `node --cderun-tty` sets the `cderun` TTY option).
+In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
 
 ### Available Flags
 
@@ -95,7 +95,7 @@ In **Symlink Mode**, only `--cderun-` prefixed flags are hoisted. This prevents 
 
 - `--tty`, `-t`: Allocate a pseudo-TTY. (Default: `false`)
 - `--interactive`, `-i`: Keep STDIN open even if not attached. (Default: `false`)
-- `--image`: Container image to use (overrides `.tools.yaml`).
+- `--image`: Container image to use.
 - `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
 - `--user`, `-u`: Username or UID (format: `<name|uid>[:<group|gid>]`).
 - `--workdir`, `-w`: Working directory inside the container.
@@ -103,7 +103,7 @@ In **Symlink Mode**, only `--cderun-` prefixed flags are hoisted. This prevents 
 - `--strict-env`: Require all passed environment variables to be present on the host. (Default: `false`)
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
-- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `2s`, `500ms`). (Default: `2s`)
+- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `2s`, `500ms`). This applies to non-interactive or non-TTY sessions. (Default: `2s`)
 
 #### Network & Ports
 
@@ -158,13 +158,16 @@ Key variables include:
 
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `2s`). Forcefully terminates the container (SIGKILL) if it hangs past the grace period after I/O completion.
+- `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `2s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
 - `CDERUN_DRY_RUN_FORMAT`: Output format for dry-run (yaml, json, simple).
 - `CDERUN_DIAGNOSIS`: If set to `true`, enables diagnosis mode.
 - `CDERUN_DIAGNOSIS_FORMAT`: Output format for diagnosis (yaml, json, simple).
 - `CDERUN_PUBLISH_ALL`: If set to `true`, publish all exposed ports to random ports.
+- `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
+- `CDERUN_LOG_FORMAT`: Set log format (text, json).
+- `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 
 Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
 

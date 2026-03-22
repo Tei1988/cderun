@@ -96,10 +96,12 @@ Available Tools: git, node, python
 
 ## P1 Internal Overrides
 
-他のフラグ同様、`--cderun-` プレフィックスを用いた Priority 1 オーバーライドが可能です。サブコマンドの後に指定する場合に使用します。
+他のフラグ同様、`--cderun-` プレフィックスを用いた Priority 1 オーバーライドが可能です。診断モードではサブコマンドが不要なため、フラグの配置場所に制限はありません（Wrapper Mode ではサブコマンドの後ろに置く必要があります）。
 
 ```bash
-cderun node app.js --cderun-diagnosis
+cderun --cderun-diagnosis
+# または
+cderun --diagnosis --cderun-diagnosis-format json
 ```
 
 ## 環境変数
