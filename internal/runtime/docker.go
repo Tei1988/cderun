@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"regexp"
 	"strings"
 	"time"
 
@@ -27,10 +26,10 @@ import (
 
 const (
 	pullMaxRetries         = 3
+	pullBackoffBase        = 1 * time.Second
 	attachCloseWriteGrace = 1 * time.Second
 )
 
-var eofRegex = regexp.MustCompile(`\beof\b`)
 
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
@@ -55,15 +54,22 @@ type DockerRuntime struct {
 
 // NewDockerRuntime creates a new DockerRuntime instance with name "docker".
 func NewDockerRuntime(socket string) (*DockerRuntime, error) {
-	return NewDockerRuntimeWithName(socket, "docker")
+	return NewDockerRuntimeWithOptions(socket, "docker", client.WithAPIVersionNegotiation())
 }
 
 // NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
+// It uses default API version negotiation.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
-	cli, err := client.NewClientWithOpts(
-		client.WithHost("unix://"+socket),
-		client.WithAPIVersionNegotiation(),
-	)
+	return NewDockerRuntimeWithOptions(socket, name, client.WithAPIVersionNegotiation())
+}
+
+// NewDockerRuntimeWithOptions creates a new DockerRuntime instance with specific client options.
+func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (*DockerRuntime, error) {
+	allOpts := append([]client.Opt{
+		client.WithHost("unix://" + socket),
+	}, opts...)
+
+	cli, err := client.NewClientWithOpts(allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
@@ -87,29 +93,34 @@ func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error
 
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string) error {
-	switch pullPolicy {
-	case "never":
+	if pullPolicy == "never" {
 		return nil
-	case "missing":
-		_, err := d.client.ImageInspect(ctx, img)
-		if err == nil {
-			return nil // Image exists locally
-		}
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to inspect image: %w", err)
-		}
 	}
 
-	// Policy is "always" or "missing" (and not found locally)
 	var lastErr error
 	for i := range pullMaxRetries {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
-			if err := d.sleepFunc(ctx, time.Duration(1<<i)*time.Second); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*pullBackoffBase); err != nil {
 				return err
 			}
 		}
 
+		if pullPolicy == "missing" {
+			_, err := d.client.ImageInspect(ctx, img)
+			if err == nil {
+				return nil // Image exists locally
+			}
+			if !errdefs.IsNotFound(err) {
+				lastErr = err
+				if isRetryablePullError(err) {
+					continue
+				}
+				return fmt.Errorf("failed to inspect image: %w", err)
+			}
+		}
+
+		// Policy is "always" or "missing" (and not found locally)
 		logging.Info("Pulling image %s...", img)
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
@@ -421,11 +432,18 @@ func isRetryablePullError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "toomanyrequests") ||
-		strings.Contains(msg, "rate exceeded") ||
-		strings.Contains(msg, "rate limit") ||
-		strings.Contains(msg, "data limit exceeded") ||
-		strings.Contains(msg, "i/o timeout") ||
-		strings.Contains(msg, "connection refused") ||
-		eofRegex.MatchString(msg)
+
+	// List of keywords indicating transient registry or connection issues.
+	retryableKeywords := []string{
+		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
+		"i/o timeout", "connection refused", "connection reset", "eof",
+	}
+
+	for _, kw := range retryableKeywords {
+		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+
+	return false
 }

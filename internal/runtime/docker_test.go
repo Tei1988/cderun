@@ -40,9 +40,61 @@ func TestUnit_Docker_New(t *testing.T) {
 	assert.Equal(t, "custom", runtimeWithName.Name())
 }
 
+func TestUnit_Docker_PullImage_Retry(t *testing.T) {
+	t.Run("retry on EOF", func(t *testing.T) {
+		mock := &mockDockerClient{
+			imagePullErr: errors.New("EOF"),
+		}
+
+		var sleeps []time.Duration
+		runtime := &DockerRuntime{
+			client: mock,
+			name:   "test",
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				sleeps = append(sleeps, d)
+				return nil
+			},
+		}
+
+		err := runtime.PullImage(context.Background(), "alpine", "always")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
+		assert.Equal(t, 3, mock.pullCount)
+		assert.Len(t, sleeps, 2)
+		assert.Equal(t, 2000*time.Millisecond, sleeps[0]) // 1<<1 * 1s
+		assert.Equal(t, 4000*time.Millisecond, sleeps[1]) // 1<<2 * 1s
+	})
+
+	t.Run("success after retry", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		// Override ImagePull to fail once then succeed
+		count := 0
+		mock.imagePullFunc = func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+			count++
+			if count == 1 {
+				return nil, errors.New("connection refused")
+			}
+			return io.NopCloser(strings.NewReader("")), nil
+		}
+
+		runtime := &DockerRuntime{
+			client:    mock,
+			name:      "test",
+			sleepFunc: noopSleepFunc,
+		}
+
+		err := runtime.PullImage(context.Background(), "alpine", "always")
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+	})
+}
+
 type mockDockerClient struct {
 	imageInspectErr error
+	imageInspectFunc func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
+	inspectCount    int
 	imagePullErr    error
+	imagePullFunc   func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	pullCount       int
 	pullReader      io.ReadCloser
 
@@ -78,11 +130,18 @@ type mockDockerClient struct {
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+	m.inspectCount++
+	if m.imageInspectFunc != nil {
+		return m.imageInspectFunc(ctx, imageID, options...)
+	}
 	return image.InspectResponse{}, m.imageInspectErr
 }
 
 func (m *mockDockerClient) ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
 	m.pullCount++
+	if m.imagePullFunc != nil {
+		return m.imagePullFunc(ctx, ref, options)
+	}
 	if m.imagePullErr != nil {
 		return nil, m.imagePullErr
 	}
@@ -186,6 +245,40 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
+	t.Run("missing policy - retry inspect success", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		count := 0
+		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+			count++
+			if count == 1 {
+				return image.InspectResponse{}, errors.New("eof")
+			}
+			return image.InspectResponse{}, nil
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing")
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+		assert.Equal(t, 0, mock.pullCount)
+	})
+
+	t.Run("missing policy - retry inspect not found", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		count := 0
+		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
+			count++
+			if count == 1 {
+				return image.InspectResponse{}, errors.New("eof")
+			}
+			return image.InspectResponse{}, errNotFound{errors.New("not found")}
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing")
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+		assert.Equal(t, 1, mock.pullCount)
+	})
+
 
 	t.Run("non-retryable pull error", func(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
