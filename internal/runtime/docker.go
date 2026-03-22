@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -26,7 +28,7 @@ import (
 )
 
 const (
-	pullMaxRetries         = 8
+	pullMaxRetries         = 5
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -60,10 +62,32 @@ func NewDockerRuntime(socket string) (*DockerRuntime, error) {
 
 // NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
-	cli, err := client.NewClientWithOpts(
-		client.WithHost("unix://"+socket),
-		client.WithAPIVersionNegotiation(),
-	)
+	// Create a custom transport to handle unix sockets and disable keep-alives.
+	// DisableKeepAlives: true is a known workaround for EOF issues with some
+	// container runtime proxies (especially Podman's system service).
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", socket)
+			},
+			DisableKeepAlives: true,
+		},
+	}
+
+	opts := []client.Opt{
+		client.WithHost("unix://" + socket),
+		client.WithHTTPClient(httpClient),
+	}
+
+	if name == "podman" {
+		// Podman sometimes has issues with version negotiation or higher API versions.
+		// Explicitly using 1.41 (compatible with Podman 4.0+) is more stable.
+		opts = append(opts, client.WithVersion("1.41"))
+	} else {
+		opts = append(opts, client.WithAPIVersionNegotiation())
+	}
+
+	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
@@ -426,18 +450,21 @@ func isRetryablePullError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "toomanyrequests") ||
-		strings.Contains(msg, "rate exceeded") ||
-		strings.Contains(msg, "rate limit") ||
-		strings.Contains(msg, "data limit exceeded") ||
-		strings.Contains(msg, "i/o timeout") ||
-		strings.Contains(msg, "connection refused") ||
-		strings.Contains(msg, "connection reset") ||
-		strings.Contains(msg, "broken pipe") ||
-		strings.Contains(msg, "cannot connect to the docker daemon") ||
-		strings.Contains(msg, "is the docker daemon running") ||
-		strings.Contains(msg, "dial unix") ||
-		strings.Contains(msg, "error during connect") ||
-		strings.Contains(msg, "unexpected eof") ||
-		eofRegex.MatchString(msg)
+
+	// List of keywords indicating transient registry or connection issues.
+	retryableKeywords := []string{
+		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
+		"i/o timeout", "connection refused", "connection reset", "broken pipe",
+		"cannot connect to the docker daemon", "is the docker daemon running",
+		"dial unix", "error during connect", "unexpected eof", "eof",
+		"context deadline exceeded", "connection deadline exceeded",
+	}
+
+	for _, kw := range retryableKeywords {
+		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+
+	return eofRegex.MatchString(msg)
 }

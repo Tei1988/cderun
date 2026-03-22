@@ -58,9 +58,9 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 
 		err := runtime.PullImage(context.Background(), "alpine", "always")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to pull image after 8 attempts")
-		assert.Equal(t, 8, mock.pullCount)
-		assert.Len(t, sleeps, 7)
+		assert.Contains(t, err.Error(), "failed to pull image after 5 attempts")
+		assert.Equal(t, 5, mock.pullCount)
+		assert.Len(t, sleeps, 4)
 		assert.Equal(t, 1000*time.Millisecond, sleeps[0]) // 1<<1 * 500ms
 		assert.Equal(t, 2000*time.Millisecond, sleeps[1]) // 1<<2 * 500ms
 	})
@@ -276,8 +276,8 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 		err := runtime.PullImage(context.Background(), "test-image", "always")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to pull image after 8 attempts")
-		assert.Equal(t, 8, mock.pullCount)
+		assert.Contains(t, err.Error(), "failed to pull image after 5 attempts")
+		assert.Equal(t, 5, mock.pullCount)
 	})
 
 	t.Run("succeeds after retries", func(t *testing.T) {
