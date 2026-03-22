@@ -1,8 +1,7 @@
 package command
 
-import "bytes"
-
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -17,10 +16,13 @@ import (
 	"cderun/internal/logging"
 )
 
+// NOTE: Tests in this file do NOT use t.Parallel() because they modify
+// or indirectly rely on the global defaultMountInfoReader variable.
+
 func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 	mfs := &config.MockFileSystem{}
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
+	oldReader := defaultMountInfoReader
+	t.Cleanup(func() { defaultMountInfoReader = oldReader })
 
 	// Simulate OverlayFS: container / maps to host /var/lib/docker/overlay2/abc/diff
 	mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/var/lib/docker/overlay2/abc/diff,workdir=/w\n"
@@ -125,36 +127,55 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 }
 
 func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
-	mfs := &config.MockFileSystem{}
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
+	tests := []struct {
+		name      string
+		mountinfo string
+		expected  string
+	}{
+		{
+			name:      "successfully discover upperdir",
+			mountinfo: "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n",
+			expected:  "/u",
+		},
+		{
+			name:      "no overlay found",
+			mountinfo: "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n",
+			expected:  "",
+		},
+		{
+			name:      "malformed mountinfo",
+			mountinfo: "too few fields\n",
+			expected:  "",
+		},
+		{
+			name:      "no separator",
+			mountinfo: "24 25 0:21 / / rw,relatime overlay overlay rw,upperdir=/u\n",
+			expected:  "",
+		},
+		{
+			name:      "non-root overlay",
+			mountinfo: "24 25 0:21 / /mnt/foo rw,relatime - overlay overlay rw,upperdir=/u\n",
+			expected:  "",
+		},
+		{
+			name:      "few fields after separator",
+			mountinfo: "24 25 0:21 / / rw,relatime - overlay\n",
+			expected:  "",
+		},
+	}
 
-	t.Run("successfully discover upperdir", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := defaultMountInfoReader
+			t.Cleanup(func() { defaultMountInfoReader = old })
 
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "/u", upperdir)
-	})
-
-	t.Run("no overlay found", func(t *testing.T) {
-		mountinfo := "24 25 0:21 / / rw,relatime - ext4 /dev/sda1 rw\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
-
-	t.Run("malformed mountinfo", func(t *testing.T) {
-		mountinfo := "too few fields\n"
-		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
-
-		upperdir, err := discoverOverlayUpperDir(mfs)
-		require.NoError(t, err)
-		assert.Empty(t, upperdir)
-	})
+			mfs := &config.MockFileSystem{}
+			defaultMountInfoReader = &mockMountInfoReader{Content: []byte(tt.mountinfo)}
+			upperdir, err := discoverOverlayUpperDir(mfs)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, upperdir)
+		})
+	}
 }
 
 type errorFS struct {
@@ -181,9 +202,8 @@ func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
 	return f.MockFileSystem.WriteFile(path, data, perm)
 
 }
-func TestUnit_Snapshot_Errors(t *testing.T) {
-	t.Parallel()
 
+func TestUnit_Snapshot_Errors(t *testing.T) {
 	t.Run("MkdirAll fails", func(t *testing.T) {
 		mfs := &errorFS{
 			MockFileSystem: &config.MockFileSystem{},
@@ -206,7 +226,6 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 }
 
 func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
-	t.Parallel()
 	sentinel := errors.New("cleanup failed")
 	mfs := &config.MockFileSystem{RemoveAllErr: sentinel}
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
@@ -214,7 +233,6 @@ func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
 }
 
 func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
-	t.Parallel()
 	mfs := &errorFS{
 		MockFileSystem: &config.MockFileSystem{},
 	}
@@ -231,7 +249,6 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 }
 
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {
-	t.Parallel()
 	mfs := &snapshotMockFS{
 		MockFileSystem: &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -284,14 +301,12 @@ func (f *snapshotMockFS) WriteFile(path string, data []byte, perm os.FileMode) e
 }
 
 func TestUnit_Snapshot_Cleanup_Empty(t *testing.T) {
-	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	err := cleanupSnapshot(mfs, "")
 	require.NoError(t, err)
 }
 
 func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
-	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
 	require.NoError(t, err)
