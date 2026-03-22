@@ -19,8 +19,13 @@ func skipIfDockerBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") {
 		t.Skip("Skipping test due to Docker Hub rate limit")
 	}
-	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
-		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
+	if strings.Contains(msg, "context deadline exceeded") ||
+		strings.Contains(msg, "cannot connect to the docker daemon") ||
+		strings.Contains(msg, "is the docker daemon running") ||
+		strings.Contains(msg, "dial unix") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "connection refused") {
+		t.Skipf("Skipping test due to transient container runtime unavailability or timeout: %v", err)
 	}
 	// Detect Docker SIGKILL timeout (likely environment resource constraint or slow CI)
 	if strings.Contains(msg, "timeout") && strings.Contains(msg, "sigkill") {
