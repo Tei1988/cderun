@@ -91,7 +91,7 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 
 	dockerSocket := "/var/run/docker.sock"
 	if cderun := os.Getenv("CDERUN_SOCKET_PATH"); cderun != "" {
-		dockerSocket = cderun
+		dockerSocket = strings.TrimPrefix(cderun, "unix://")
 	} else if host := os.Getenv("DOCKER_HOST"); strings.HasPrefix(host, "unix://") {
 		dockerSocket = strings.TrimPrefix(host, "unix://")
 	}
