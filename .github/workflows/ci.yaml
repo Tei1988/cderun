@@ -216,19 +216,18 @@ jobs:
           mkdir -p /run/podman
           podman --log-level=debug system service --time=0 unix:///run/podman/podman.sock > /tmp/podman.log 2>&1 &
           timeout 30s sh -c 'while ! podman --remote system info >/dev/null 2>&1; do sleep 1; done'
+          chmod 666 /run/podman/podman.sock
 
       - name: Runtime Tests
         env:
           CDERUN_RUNTIME: podman
           CDERUN_SOCKET_PATH: /run/podman/podman.sock
-          DOCKER_HOST: unix:///run/podman/podman.sock
-          CONTAINER_HOST: unix:///run/podman/podman.sock
           TEST_HOST_TMP_DIR: /tmp/runtime-podman
           CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
-          podman version
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
+          DOCKER_HOST=unix:///run/podman/podman.sock podman version
+          DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
 
       - name: Diagnostic on Failure
         if: failure()
