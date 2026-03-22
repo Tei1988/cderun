@@ -21,8 +21,8 @@ import (
 
 func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 	mfs := &config.MockFileSystem{}
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
+	oldReader := defaultMountInfoReader
+	t.Cleanup(func() { defaultMountInfoReader = oldReader })
 
 	// Simulate OverlayFS: container / maps to host /var/lib/docker/overlay2/abc/diff
 	mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/var/lib/docker/overlay2/abc/diff,workdir=/w\n"
@@ -127,9 +127,6 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 }
 
 func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
-	originalReader := defaultMountInfoReader
-	defer func() { defaultMountInfoReader = originalReader }()
-
 	tests := []struct {
 		name      string
 		mountinfo string
@@ -169,6 +166,9 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			old := defaultMountInfoReader
+			t.Cleanup(func() { defaultMountInfoReader = old })
+
 			mfs := &config.MockFileSystem{}
 			defaultMountInfoReader = &mockMountInfoReader{Content: []byte(tt.mountinfo)}
 			upperdir, err := discoverOverlayUpperDir(mfs)
