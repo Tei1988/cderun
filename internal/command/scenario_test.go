@@ -90,10 +90,9 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	require.NoError(t, err, "failed to resolve cderun binary path")
 
 	dockerSocket := "/var/run/docker.sock"
-	if env := os.Getenv("CDERUN_SOCKET_PATH"); env != "" {
-		dockerSocket = env
-	}
-	if host := os.Getenv("DOCKER_HOST"); os.Getenv("CDERUN_SOCKET_PATH") == "" && strings.HasPrefix(host, "unix://") {
+	if cderun := os.Getenv("CDERUN_SOCKET_PATH"); cderun != "" {
+		dockerSocket = cderun
+	} else if host := os.Getenv("DOCKER_HOST"); strings.HasPrefix(host, "unix://") {
 		dockerSocket = strings.TrimPrefix(host, "unix://")
 	}
 
