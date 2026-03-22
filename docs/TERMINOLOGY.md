@@ -15,13 +15,13 @@ cderun --mount-cderun gemini-cli
 
 ### 実行ホスト (Execution Host)
 
-直前にcderunを実行したホスト（コンテナまたは基底ホスト）。
+現在の `cderun` コマンドが物理的に実行されているホスト環境。基底ホスト、またはコンテナ（L1以上）のいずれかになります。
 
 ```bash
-# 基底ホスト
-cderun --mount-cderun gemini-cli
+# 1. 基底ホスト上で実行
+cderun --mount-cderun node
 
-# gemini-cliコンテナ（実行ホスト）
+# 2. node コンテナ内（実行ホスト）で実行
 cderun python script.py
 ```
 
@@ -57,9 +57,9 @@ cderunは、設定を読み込む際にこれらの式を評価し、対応す�
 
 ### cderun内部オーバーライド (Internal Overrides / P1)
 
-`--cderun-` で始まるフラグ。優先順位が最も高く（P1）、常にサブコマンドの**後ろ**
+`--cderun-` で始まるフラグ。優先順位が最も高く（P1）、Wrapper Mode では常にサブコマンドの**後ろ**
 に配置する必要があります。内部的な前処理（Hoisting）によってサブコマンドの前に
-移動した状態でパースされます。サブコマンドの前に配置するとエラーになります。
+移動した状態でパースされます。サブコマンドの前に配置するとエラーになります（Diagnosis Mode では場所を問いません）。
 
 ### cderun標準フラグ (Standard Flags / P2)
 

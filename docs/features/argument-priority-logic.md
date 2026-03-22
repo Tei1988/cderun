@@ -7,17 +7,22 @@
 
 ## 優先順位階層 (Resolution Hierarchy)
 
+設定は以下の P1（最高）から P6（最低）の順に解決されます。
+
 ### P1: CDERUN Internal Overrides (最高優先順位)
 
-- **定義**: 動作を強制的に変更するための専用フラグ。シンボリックリンク利用時でも `cderun` 側の設定を上書きすることを想定したフラグ。
-- **フラグ名**: `cderun` 標準フラグのすべてに対応する `--cderun-` プレフィックス付きフラグ。
+- **定義**: `cderun` の動作を強制的に変更・上書きするための専用フラグ。シンボリックリンク（ポリグロットモード）利用時でも、ラップされたツールの引数と衝突せずに `cderun` 側の設定を指定することを可能にします。
+- **フラグ名**: `cderun` 標準フラグ（P2）のすべてに対応する `--cderun-` プレフィックス付きフラグ。
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-hang-timeout`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`
-- **挙動**: これらが指定された場合、他の全て（P2〜P5）を無視してこの値を採用する。また、これらは**サブコマンドの後ろ**に配置する必要があります（実行時にサブコマンドの前方に移動＝ホイストされます）。
+- **挙動**: これらが指定された場合、他の全て（P2〜P6）を無視してこの値を採用する。
+- **配置規則**:
+  - **Wrapper Mode**: 必ず**サブコマンドの後ろ**に配置する必要があります。前処理（Hoisting）によって内部的にサブコマンドの前方に移動され、`cderun` のフラグとしてパースされます。サブコマンドより前に配置した場合はエラーとなります。
+  - **Diagnosis Mode**: サブコマンドを必要としないため、任意の場所に配置可能です。
 
 ### P2: CLI Flags (ユーザーの意図)
 
@@ -78,18 +83,21 @@
 `mounts`, `devices`, `env`, `ports`, `mountTools` などのリスト形式の設定も、スカラ型と同様に **「優先順位の高いソースに値があれば、それより低い優先順位のソースはすべて無視される（上書き）」** という挙動になります。
 
 **重要な注意点**:
-実装上、高い優先順位のソースにおいて**空のリスト（値なし）**が検出された場合、それは「未指定」とみなされ、より低い優先順位のソースへフォールバックします。例えば、`.tools.yaml` で `mounts: []` と明示的に空を指定しても、`.cderun.yaml` に `mounts` の定義があれば、そちらが採用されます。
+実装上、高い優先順位のソースにおいて**空のリスト（値なし）**が検出された場合、それは「未指定」とみなされ、より低い優先順位のソースへフォールバックします。
+
+- **例**: `.tools.yaml` (P4) で `mounts: []` と明示的に空のリストを指定しても、`.cderun.yaml` (P5) に `mounts` の定義があれば、P5 の値が採用されます。
+- **意図**: これにより、上位レベルでの意図しない「設定の全消去」を防ぎ、デフォルト設定を安全に維持します。
 
 ## 特殊な連動ロジック (Transitive Auto-enablement)
 
-一部のオプションは、他のオプションの状態に基づいて自動的に有効化される場合があります。これらは P1〜P5 のいずれでも明示的に値が設定（`nil` 以外）されていない場合にのみ適用されます。
+一部のオプションは、他のオプションの設定状況に基づいて連鎖的に自動有効化されます。これらのロジックは、対象のオプションが P1〜P5 のどのレベルでも**明示的に設定（`nil` 以外）されていない場合にのみ**適用されます。
 
 1. **`mountCderun` の自動有効化**:
-   `mountTools` または `mountAllTools` が有効な場合、`mountCderun` も自動的に `true` になります。
+   `mountTools`（指定あり）または `mountAllTools: true` の場合、`mountCderun` は自動的に `true` になります。
 2. **`mountSocket` の自動有効化**:
-   `mountCderun` が有効（自動有効化されたものを含む）な場合、`mountSocket` も自動的に `true` になります。
+   `mountCderun` が `true`（自動有効化されたものを含む）の場合、`mountSocket` は自動的に `true` になります。
 
-これらの自動有効化は、いずれかの優先順位で明示的に `false` が指定されている場合には行われません。
+**注意**: いずれかの優先順位（P1〜P5）で明示的に `false` が指定されている場合、上記の自動有効化は行われません。例えば、`.cderun.yaml` で `mountSocket: false` と設定されている場合、`mountCderun` が有効であってもソケットはマウントされません。
 
 ---
 *2026年3月17日時点の仕様である。*
