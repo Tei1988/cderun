@@ -429,5 +429,8 @@ func isRetryablePullError(err error) bool {
 		strings.Contains(msg, "connection refused") ||
 		strings.Contains(msg, "connection reset") ||
 		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "cannot connect to the docker daemon") ||
+		strings.Contains(msg, "is the docker daemon running") ||
+		strings.Contains(msg, "dial unix") ||
 		eofRegex.MatchString(msg)
 }

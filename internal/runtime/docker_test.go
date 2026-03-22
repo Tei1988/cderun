@@ -72,7 +72,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 		mock.imagePullFunc = func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
 			count++
 			if count == 1 {
-				return nil, errors.New("connection reset by peer")
+				return nil, errors.New("Cannot connect to the Docker daemon at unix:///run/podman/podman.sock. Is the docker daemon running?")
 			}
 			return io.NopCloser(strings.NewReader("")), nil
 		}
