@@ -7,7 +7,6 @@ import (
 	"maps"
 	"net"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -32,7 +31,6 @@ const (
 	attachCloseWriteGrace = 1 * time.Second
 )
 
-var eofRegex = regexp.MustCompile(`\beof\b`)
 
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
@@ -466,5 +464,5 @@ func isRetryablePullError(err error) bool {
 		}
 	}
 
-	return eofRegex.MatchString(msg)
+	return false
 }
