@@ -296,3 +296,70 @@ func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
 	require.NoError(t, err)
 }
+
+type snapshotErrorFS struct {
+	*config.MockFileSystem
+	absErr error
+}
+
+func (fs *snapshotErrorFS) Abs(path string) (string, error) {
+	if fs.absErr != nil {
+		return "", fs.absErr
+	}
+	return fs.MockFileSystem.Abs(path)
+}
+
+func TestUnit_Snapshot_CreateSnapshot_ResolutionFailure(t *testing.T) {
+	t.Parallel()
+	mfs := &snapshotErrorFS{
+		MockFileSystem: &config.MockFileSystem{
+			WD:           "/app",
+			Files:        map[string][]byte{},
+			TempDirValue: "relative-tmp",
+		},
+		absErr: errors.New("abs error"),
+	}
+	globalCfg := &config.CDERunConfig{
+		HostContext: &config.HostContext{
+			Level: 2, // Must be > 1 to trigger resolution
+			Mounts: []config.MountMapping{
+				{Source: "/h", Target: "/host-app", Level: 1},
+			},
+		},
+	}
+
+	_, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to resolve snapshot directory to host path")
+	assert.Contains(t, err.Error(), "abs error")
+}
+
+func TestUnit_Snapshot_OverlayFSDiscovery_EdgeCases(t *testing.T) {
+	mfs := &config.MockFileSystem{}
+	originalReader := defaultMountInfoReader
+	defer func() { defaultMountInfoReader = originalReader }()
+
+	t.Run("missing separator", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / / rw,relatime overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		upperdir, err := discoverOverlayUpperDir(mfs)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
+	})
+
+	t.Run("non-root overlay", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / /mnt/foo rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/u,workdir=/w\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		upperdir, err := discoverOverlayUpperDir(mfs)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
+	})
+
+	t.Run("missing fields after separator", func(t *testing.T) {
+		mountinfo := "24 25 0:21 / / rw,relatime - overlay\n"
+		defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+		upperdir, err := discoverOverlayUpperDir(mfs)
+		require.NoError(t, err)
+		assert.Empty(t, upperdir)
+	})
+}

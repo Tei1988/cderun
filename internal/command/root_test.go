@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/term"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -1295,4 +1298,146 @@ func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	// Check YAML output fields directly as handleDryRun marshals containerConfig
 	assert.Contains(t, buf.String(), "image: alpine")
 	assert.Contains(t, buf.String(), "tty: true")
+}
+
+type toolsErrorFS struct {
+	*config.MockFileSystem
+}
+
+func (fs *toolsErrorFS) ReadFile(name string) ([]byte, error) {
+	if strings.Contains(name, ".tools.yaml") {
+		return nil, errors.New("read tools error")
+	}
+	return fs.MockFileSystem.ReadFile(name)
+}
+
+func TestUnit_Root_LoadConfigs_ToolsConfigFailure(t *testing.T) {
+	t.Parallel()
+	mfs := &toolsErrorFS{
+		MockFileSystem: &config.MockFileSystem{
+			Files: map[string][]byte{
+				".cderun.yaml": []byte("runtime: docker\n"),
+				".tools.yaml":  []byte("node: { image: node }"),
+			},
+		},
+	}
+
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return runtime.NewMockRuntime(), nil }
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to load tools config: failed to read tools file")
+	require.ErrorContains(t, err, "read tools error")
+}
+
+func TestUnit_Root_Execute_RawModeFailure(t *testing.T) {
+	t.Parallel()
+	var logBuf bytes.Buffer
+	logger := logging.NewLogger()
+	// Use trace to ensure we see the log output even if it's buffered or redirected.
+	_ = logger.Init("trace", "text", false)
+	logger.SetOutput(&logBuf)
+
+	mockRuntime := runtime.NewMockRuntime()
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return true }
+		o.makeRaw = func(fd int) (*term.State, error) { return nil, errors.New("raw mode failed") }
+		o.logger = logger
+		cmd.SetErr(&logBuf) // Also redirect command stderr
+	})
+	require.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "failed to set terminal to raw mode: raw mode failed")
+}
+
+func TestUnit_Root_Execute_WindowResize(t *testing.T) {
+	mockRuntime := runtime.NewMockRuntime()
+
+	// Use a pipe to have a valid FD that is NOT a terminal by default,
+	// but we will mock isTerminal to return true.
+	r, w, _ := os.Pipe()
+	defer r.Close()
+	defer w.Close()
+
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return true }
+		o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }
+		cmd.SetOut(w)
+	})
+	require.NoError(t, err)
+
+	// Verify initial resize
+	rows, cols := mockRuntime.GetTTYSize()
+	assert.Equal(t, uint(24), rows)
+	assert.Equal(t, uint(80), cols)
+}
+
+func TestUnit_Root_DryRun_Formats(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		format   string
+		contains []string
+	}{
+		{"json", []string{"\"image\": \"alpine\"", "\"tty\": true"}},
+		{"simple", []string{"Image: alpine", "TTY: true"}},
+		{"yaml", []string{"image: alpine", "tty: true"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.format, func(t *testing.T) {
+			var buf bytes.Buffer
+			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "--dry-run", "--dry-run-format", tt.format, "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return &runtime.MockRuntime{}, nil }
+				o.isTerminal = func(fd int) bool { return true }
+				cmd.SetOut(&buf)
+			})
+			require.NoError(t, err)
+			for _, c := range tt.contains {
+				assert.Contains(t, buf.String(), c)
+			}
+		})
+	}
+}
+
+type timeoutMockRuntime struct {
+	*runtime.MockRuntime
+	attachUnblock chan struct{}
+}
+
+func (m *timeoutMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	_ = m.MockRuntime.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	select {
+	case <-m.attachUnblock:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func TestUnit_Root_Execute_AttachGracePeriodTimeout_Real(t *testing.T) {
+	// This test will take ~5 seconds because of the hardcoded grace period.
+	if testing.Short() {
+		t.Skip("skipping slow test in short mode")
+	}
+
+	mfs := &config.MockFileSystem{}
+	mockRuntime := &timeoutMockRuntime{
+		MockRuntime:   runtime.NewMockRuntime(),
+		attachUnblock: make(chan struct{}),
+	}
+	// Container exits quickly, then we wait for attach.
+	mockRuntime.WaitDelay = 100 * time.Millisecond
+
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return false }
+	})
+
+	require.NoError(t, err)
 }
