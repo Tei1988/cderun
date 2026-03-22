@@ -721,7 +721,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
 
-	if len(p1) > 0 {
+	if p1 != nil {
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -730,7 +730,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
-	} else if len(p2) > 0 {
+	} else if p2 != nil {
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -739,8 +739,13 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
-	} else if env := fs.Getenv("CDERUN_DEVICE"); env != "" {
+	} else if env, ok := fs.LookupEnv("CDERUN_DEVICE"); ok {
+		dcs = []DeviceConfig{}
 		for d := range strings.SplitSeq(env, ",") {
+			d = strings.TrimSpace(d)
+			if d == "" {
+				continue
+			}
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
 				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
@@ -749,12 +754,12 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			dcs = append(dcs, parsed)
 		}
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Devices) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
 			dcs = tool.Devices
 		}
 	}
 
-	if len(dcs) == 0 && global != nil {
+	if dcs == nil && global != nil {
 		dcs = global.Defaults.Devices
 	}
 
@@ -772,24 +777,28 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var envs []string
 
-	if len(p1) > 0 {
+	if p1 != nil {
 		envs = p1
-	} else if len(p2) > 0 {
+	} else if p2 != nil {
 		envs = p2
-	} else if env := fs.Getenv(envKey); env != "" {
+	} else if env, ok := fs.LookupEnv(envKey); ok {
+		envs = []string{}
 		for e := range strings.SplitSeq(env, ";") {
 			e = strings.TrimSpace(e)
+			if e == "" {
+				continue
+			}
 			if e != "" {
 				envs = append(envs, e)
 			}
 		}
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Env) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
 			envs = tool.Env
 		}
 	}
 
-	if len(envs) == 0 && global != nil {
+	if envs == nil && global != nil {
 		envs = global.Defaults.Env
 	}
 
@@ -848,7 +857,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	var mcs []MountConfig
 
-	if len(p1) > 0 {
+	if p1 != nil {
 		for _, m := range p1 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
@@ -857,7 +866,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
-	} else if len(p2) > 0 {
+	} else if p2 != nil {
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
@@ -866,7 +875,8 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
-	} else if env := fs.Getenv("CDERUN_MOUNT"); env != "" {
+	} else if env, ok := fs.LookupEnv("CDERUN_MOUNT"); ok {
+		mcs = []MountConfig{}
 		for m := range strings.SplitSeq(env, ";") {
 			m = strings.TrimSpace(m)
 			if m == "" {
@@ -880,12 +890,12 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			mcs = append(mcs, parsed)
 		}
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && len(tool.Mounts) > 0 {
+		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
 			mcs = tool.Mounts
 		}
 	}
 
-	if len(mcs) == 0 && global != nil {
+	if mcs == nil && global != nil {
 		mcs = global.Defaults.Mounts
 	}
 

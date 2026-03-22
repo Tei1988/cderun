@@ -115,18 +115,18 @@ func resolveStringSliceOpt(
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
 	var vals []string
-	if len(p1) > 0 {
+	if p1 != nil {
 		vals = p1
-	} else if len(p2) > 0 {
+	} else if p2 != nil {
 		vals = p2
-	} else if env := fs.Getenv(def.EnvKey); env != "" {
+	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
 		vals = strings.Split(env, envSep)
 	} else if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
 	}
-	if len(vals) == 0 && def.GlobalGetter != nil && global != nil {
+	if vals == nil && def.GlobalGetter != nil && global != nil {
 		vals = def.GlobalGetter(*global)
 	}
 	var res []string
@@ -150,14 +150,14 @@ func resolveStringSliceCommaOpt(
 		vals = strings.Split(p1Val, ",")
 	} else if p2Set {
 		vals = strings.Split(p2Val, ",")
-	} else if env := fs.Getenv(def.EnvKey); env != "" {
+	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
 		vals = strings.Split(env, ",")
 	} else if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
 	}
-	if len(vals) == 0 && def.GlobalGetter != nil && global != nil {
+	if vals == nil && def.GlobalGetter != nil && global != nil {
 		vals = def.GlobalGetter(*global)
 	}
 	var res []string
