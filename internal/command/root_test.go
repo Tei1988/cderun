@@ -858,26 +858,61 @@ func TestUnit_Root_BuildContainerConfig_Errors(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_BuildContainerConfig_ResolvePathError(t *testing.T) {
+func TestUnit_Root_BuildContainerConfig_UnresolvedPath(t *testing.T) {
 	t.Parallel()
-	mfs := &config.MockFileSystem{
-		ExecPath: "/app/{{file:nonexistent-file-that-should-not-exist}}",
-	}
-	o := &rootOptions{
-		fs:     mfs,
-		logger: logging.NewLogger(),
-	}
-	resolved := &config.ResolvedConfig{
-		MountCderun: true,
-		HostContext: &config.HostContext{
-			Level: 1,
+
+	tests := []struct {
+		name           string
+		execPath       string
+		hostContext    *config.HostContext
+		expectedSource string
+	}{
+		{
+			name:     "resolve error in nested level",
+			execPath: "/app/{{file:nonexistent}}",
+			hostContext: &config.HostContext{
+				Level: 1,
+			},
+			expectedSource: "/app/{{file:nonexistent}}",
+		},
+		{
+			name:     "no resolution in Level 0",
+			execPath: "/app/{{HOME}}",
+			hostContext: &config.HostContext{
+				Level: 0,
+			},
+			expectedSource: "/app/{{HOME}}",
+		},
+		{
+			name:     "fs.Executable path with unresolved template",
+			execPath: "/app/{{file:nonexistent-file-that-should-not-exist}}",
+			hostContext: &config.HostContext{
+				Level: 1,
+			},
+			expectedSource: "/app/{{file:nonexistent-file-that-should-not-exist}}",
 		},
 	}
-	cfg, err := o.buildContainerConfig(resolved, nil, nil)
-	require.NoError(t, err)
-	require.NotNil(t, cfg)
 
-	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{file:nonexistent-file-that-should-not-exist}}")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mfs := &config.MockFileSystem{
+				ExecPath: tt.execPath,
+			}
+			o := &rootOptions{
+				fs:     mfs,
+				logger: logging.NewLogger(),
+			}
+			resolved := &config.ResolvedConfig{
+				MountCderun: true,
+				HostContext: tt.hostContext,
+			}
+			cfg, err := o.buildContainerConfig(resolved, nil, nil)
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+
+			assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", tt.expectedSource)
+		})
+	}
 }
 
 func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
@@ -1276,55 +1311,13 @@ func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	assert.Contains(t, buf.String(), "tty: true")
 }
 
-func TestUnit_Root_BuildContainerConfig_Nested_ResolvePathFailure(t *testing.T) {
-	t.Parallel()
-	mfs := &config.MockFileSystem{
-		ExecPath: "/app/{{file:nonexistent}}",
-	}
-	o := &rootOptions{
-		fs:     mfs,
-		logger: logging.NewLogger(),
-	}
-	resolved := &config.ResolvedConfig{
-		MountCderun: true,
-		HostContext: &config.HostContext{
-			Level: 1,
-		},
-	}
-	cfg, err := o.buildContainerConfig(resolved, nil, nil)
-	require.NoError(t, err)
-
-	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{file:nonexistent}}")
-}
-
-func TestUnit_Root_BuildContainerConfig_Nested_Level0_NoResolution(t *testing.T) {
-	t.Parallel()
-	mfs := &config.MockFileSystem{
-		ExecPath: "/app/{{HOME}}",
-	}
-	o := &rootOptions{
-		fs:     mfs,
-		logger: logging.NewLogger(),
-	}
-	resolved := &config.ResolvedConfig{
-		MountCderun: true,
-		HostContext: &config.HostContext{
-			Level: 0,
-		},
-	}
-	cfg, err := o.buildContainerConfig(resolved, nil, nil)
-	require.NoError(t, err)
-
-	assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/app/{{HOME}}")
-}
-
 func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
 	t.Parallel()
 	mockRuntime := &runtime.MockRuntime{
 		WaitErr: errors.New("wait interrupted"),
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 	})

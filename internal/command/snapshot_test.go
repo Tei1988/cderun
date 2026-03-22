@@ -169,9 +169,9 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// NOTE: MockFileSystem is unused when defaultMountInfoReader is replaced by mockMountInfoReader.
+			mfs := &config.MockFileSystem{}
 			defaultMountInfoReader = &mockMountInfoReader{Content: []byte(tt.mountinfo)}
-			upperdir, err := discoverOverlayUpperDir(nil)
+			upperdir, err := discoverOverlayUpperDir(mfs)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, upperdir)
 		})
