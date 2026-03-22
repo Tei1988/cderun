@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net"
-	"net/http"
 	"strings"
 	"time"
 
@@ -27,7 +25,7 @@ import (
 )
 
 const (
-	pullMaxRetries         = 5
+	pullMaxRetries         = 3
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -55,37 +53,22 @@ type DockerRuntime struct {
 
 // NewDockerRuntime creates a new DockerRuntime instance with name "docker".
 func NewDockerRuntime(socket string) (*DockerRuntime, error) {
-	return NewDockerRuntimeWithName(socket, "docker")
+	return NewDockerRuntimeWithOptions(socket, "docker", client.WithAPIVersionNegotiation())
 }
 
 // NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
+// It uses default API version negotiation.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
-	// Create a custom transport to handle unix sockets and disable keep-alives.
-	// DisableKeepAlives: true is a known workaround for EOF issues with some
-	// container runtime proxies (especially Podman's system service).
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", socket)
-			},
-			DisableKeepAlives: true,
-		},
-	}
+	return NewDockerRuntimeWithOptions(socket, name, client.WithAPIVersionNegotiation())
+}
 
-	opts := []client.Opt{
+// NewDockerRuntimeWithOptions creates a new DockerRuntime instance with specific client options.
+func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (*DockerRuntime, error) {
+	allOpts := append([]client.Opt{
 		client.WithHost("unix://" + socket),
-		client.WithHTTPClient(httpClient),
-	}
+	}, opts...)
 
-	if name == "podman" {
-		// Podman sometimes has issues with version negotiation or higher API versions.
-		// Explicitly using 1.41 (compatible with Podman 4.0+) is more stable.
-		opts = append(opts, client.WithVersion("1.41"))
-	} else {
-		opts = append(opts, client.WithAPIVersionNegotiation())
-	}
-
-	cli, err := client.NewClientWithOpts(opts...)
+	cli, err := client.NewClientWithOpts(allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
