@@ -436,10 +436,7 @@ func isRetryablePullError(err error) bool {
 	// List of keywords indicating transient registry or connection issues.
 	retryableKeywords := []string{
 		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
-		"i/o timeout", "connection refused", "connection reset", "broken pipe",
-		"cannot connect to the docker daemon", "is the docker daemon running",
-		"dial unix", "error during connect", "eof",
-		"context deadline exceeded", "connection deadline exceeded",
+		"i/o timeout", "connection refused", "connection reset", "eof",
 	}
 
 	for _, kw := range retryableKeywords {
