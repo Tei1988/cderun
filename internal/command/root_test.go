@@ -1731,7 +1731,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 				o.exitFunc = func(code int) {}
 				cmd.SetOut(mockFdWriter{io.Discard})
 				// Block WaitContainer to keep the command running
-				mockRuntime.MockRuntime.WaitDelay = 10 * time.Second
+				mockRuntime.WaitDelay = 10 * time.Second
 			})
 		}()
 
