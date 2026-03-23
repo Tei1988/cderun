@@ -40,6 +40,11 @@ type MockRuntime struct {
 	AttachErr           error
 	ResizeErr           error
 	SignalErr           error
+
+	// Custom behavior hooks
+	WaitFunc   func(ctx context.Context, containerID string) (int, error)
+	AttachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
 }
 
 // WithLockedMock executes the provided function while holding the mock's mutex.
@@ -74,6 +79,11 @@ func (m *MockRuntime) StartContainer(ctx context.Context, containerID string) er
 
 func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	m.mu.RLock()
+	if m.WaitFunc != nil {
+		f := m.WaitFunc
+		m.mu.RUnlock()
+		return f(ctx, containerID)
+	}
 	delay := m.WaitDelay
 	m.mu.RUnlock()
 	if delay > 0 {
@@ -116,6 +126,14 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 }
 
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	m.mu.RLock()
+	if m.AttachFunc != nil {
+		f := m.AttachFunc
+		m.mu.RUnlock()
+		return f(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	}
+	m.mu.RUnlock()
+
 	m.mu.Lock()
 	m.AttachedContainerID = containerID
 	m.mu.Unlock()
@@ -196,6 +214,11 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 
 func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	m.mu.RLock()
+	if m.InspectFunc != nil {
+		f := m.InspectFunc
+		m.mu.RUnlock()
+		return f(ctx, containerID)
+	}
 	defer m.mu.RUnlock()
 	return false, m.ExitCode, nil
 }

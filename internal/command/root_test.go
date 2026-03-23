@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/term"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,14 @@ func (s *safeBuffer) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.buf.String()
+}
+
+type mockFdWriter struct {
+	io.Writer
+}
+
+func (m mockFdWriter) Fd() uintptr {
+	return 1
 }
 
 func (m *terminationMockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
@@ -154,6 +163,31 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			name:     "no subcommand found (diagnosis mode behavior in preprocess)",
 			args:     []string{"cderun", "--diagnosis"},
 			expected: []string{"cderun", "--diagnosis"},
+		},
+		{
+			name:     "no subcommand found but has flags and arguments for flags",
+			args:     []string{"cderun", "--config", "my.yaml"},
+			expected: []string{"cderun", "--config", "my.yaml"},
+		},
+		{
+			name:     "shorthand flag at the end",
+			args:     []string{"cderun", "-t"},
+			expected: []string{"cderun", "-t"},
+		},
+		{
+			name:     "polyglot mode with executable only",
+			args:     []string{"node"},
+			expected: []string{"cderun", "node"},
+		},
+		{
+			name:     "shorthand cluster with argument at the end",
+			args:     []string{"cderun", "-itp", "8080", "node"},
+			expected: []string{"cderun", "-itp", "8080", "node"},
+		},
+		{
+			name:     "P1 flag at the end of standard mode",
+			args:     []string{"cderun", "node", "--cderun-tty"},
+			expected: []string{"cderun", "--cderun-tty", "node"},
 		},
 	}
 
@@ -295,15 +329,44 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "\"command\": [")
 
 		// Dry-run with simple
-		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "--device", "/dev/fuse", "--memory", "512MiB", "--cpus", "2", "sh", "echo", "hello")
+		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "--device", "/dev/fuse", "--device", "/dev/snd:/dev/snd:rw", "--memory", "512MiB", "--cpus", "2", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
 		assert.Contains(t, output, "Env: K=V")
 		assert.Contains(t, output, "Mounts: type=bind,source=/s,target=/t,readonly=false")
-		assert.Contains(t, output, "Devices: /dev/fuse")
+		assert.Contains(t, output, "Devices: /dev/fuse, /dev/snd:/dev/snd:rw")
 		assert.Contains(t, output, "Memory: 512MiB") // go-units formatting
 		assert.Contains(t, output, "CPUs: 2")
+	})
+
+	t.Run("dry-run simple format exhaustive", func(t *testing.T) {
+		output, err := executeCommand("--dry-run", "-f", "simple",
+			"--image", "alpine",
+			"--entrypoint", "/bin/sh",
+			"--user", "1000:1000",
+			"--hostname", "myhost",
+			"--network", "bridge",
+			"--dns", "8.8.8.8",
+			"--add-host", "host:1.2.3.4",
+			"--publish", "80:80",
+			"--expose", "8080",
+			"--privileged",
+			"--cap-add", "SYS_ADMIN",
+			"--cap-drop", "KILL",
+			"sh", "echo", "hello")
+		require.NoError(t, err)
+		assert.Contains(t, output, "Entrypoint: /bin/sh")
+		assert.Contains(t, output, "User: 1000:1000")
+		assert.Contains(t, output, "Hostname: myhost")
+		assert.Contains(t, output, "Network: bridge")
+		assert.Contains(t, output, "DNS: 8.8.8.8")
+		assert.Contains(t, output, "AddHosts: host:1.2.3.4")
+		assert.Contains(t, output, "Ports: 80:80")
+		assert.Contains(t, output, "Expose: 8080")
+		assert.Contains(t, output, "Privileged: true")
+		assert.Contains(t, output, "CapAdd: SYS_ADMIN")
+		assert.Contains(t, output, "CapDrop: KILL")
 	})
 
 	t.Run("returns error if AttachContainer fails", func(t *testing.T) {
@@ -491,6 +554,30 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
+	})
+
+	t.Run("JSON format exhaustive", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		mfs := &config.MockFileSystem{
+			Files: map[string][]byte{"/var/run/docker.sock": {}},
+		}
+		opts := &rootOptions{fs: mfs}
+		resolved := &config.ResolvedConfig{
+			Runtime:         "docker",
+			SocketPath:      "/var/run/docker.sock",
+			Diagnosis:       true,
+			DiagnosisFormat: "json",
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"})
+		require.NoError(t, err)
+		assert.Contains(t, out.String(), "\"name\": \"docker\"")
+		assert.Contains(t, out.String(), "\"available_tools\":")
+		assert.Contains(t, out.String(), "\"node\"")
+		assert.Contains(t, out.String(), "\"global\":")
+		assert.Contains(t, out.String(), "\"/etc/cderun.yaml\"")
 	})
 }
 
@@ -1128,6 +1215,22 @@ func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
 	require.ErrorContains(t, err, "failed to load cderun config")
 }
 
+func TestUnit_Root_RunE_LoadToolsConfigFailure(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		Files: map[string][]byte{
+			".tools.yaml": []byte("invalid-yaml: ["),
+		},
+	}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		o.isTerminal = func(fd int) bool { return true }
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to load tools config")
+}
+
 func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
 	t.Parallel()
 	// diagnosis mode with malformed config
@@ -1350,6 +1453,16 @@ func TestUnit_RunCderunCore_PreprocessError(t *testing.T) {
 	require.ErrorContains(t, err, "must be placed after the subcommand")
 }
 
+func TestUnit_RunCderunCore_WithStdin(t *testing.T) {
+	t.Parallel()
+	// We want to reach cmd.SetIn(stdin) in runCderunCore.
+	// Since runCderunCore calls ExecuteContextWithOptions which runs the command,
+	// we use a subcommand that fails early to avoid actual execution but ensure the path is taken.
+	stdin := strings.NewReader("hello")
+	_, _, _, err := runCderunCore(stdin, "sh")
+	require.Error(t, err)
+}
+
 func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	t.Parallel()
 	mfs := &config.MockFileSystem{}
@@ -1532,6 +1645,176 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	}
 
 	assert.Contains(t, logBuf.String(), "AttachContainer timed out after container exit")
+}
+
+func TestUnit_Root_Execute_AttachFailureAfterExit(t *testing.T) {
+	t.Parallel()
+	// To reach the error check for attachDone after waitDone:
+	// 1. WaitContainer must finish.
+	// 2. AttachContainer must return an error (not Canceled) within the grace period.
+
+	attached := make(chan struct{})
+	mockRuntime := &runtime.MockRuntime{
+		AttachFunc: func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+			close(ready)
+			close(attached)
+			// Delay error until after container exit
+			time.Sleep(200 * time.Millisecond)
+			return errors.New("attach error after exit")
+		},
+		WaitDelay: 100 * time.Millisecond,
+		ExitCode:  77,
+	}
+
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return false }
+		o.exitFunc = func(code int) {}
+		o.attachGracePeriod = 500 * time.Millisecond
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to attach to container: attach error after exit")
+}
+
+func TestUnit_Root_Execute_MakeRawFailure_Warning(t *testing.T) {
+	t.Parallel()
+	mockRuntime := &runtime.MockRuntime{}
+	var stderrBuf bytes.Buffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return true }
+		o.makeRaw = func(fd int) (*term.State, error) { return nil, errors.New("makeRaw failed") }
+		o.exitFunc = func(code int) {}
+		cmd.SetErr(&stderrBuf)
+	})
+	require.NoError(t, err)
+	assert.Contains(t, stderrBuf.String(), "failed to set terminal to raw mode: makeRaw failed")
+}
+
+type resizeMockRuntime struct {
+	*runtime.MockRuntime
+	resizeCalled chan struct{}
+}
+
+func (m *resizeMockRuntime) ResizeContainerTTY(ctx context.Context, id string, rows, cols uint) error {
+	m.resizeCalled <- struct{}{}
+	return m.MockRuntime.ResizeContainerTTY(ctx, id, rows, cols)
+}
+
+func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
+	// Not t.Parallel() because it depends on signals
+
+	t.Run("Initial resize and signal resize", func(t *testing.T) {
+		resizeCalled := make(chan struct{}, 10)
+		mockRuntime := &resizeMockRuntime{
+			MockRuntime:  runtime.NewMockRuntime(),
+			resizeCalled: resizeCalled,
+		}
+
+		resizeChanHolder := make(chan chan os.Signal, 1)
+		setupResizeSignalMock := func(c chan os.Signal) {
+			resizeChanHolder <- c
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+				o.isTerminal = func(fd int) bool { return true }
+				o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }
+				o.setupResizeSignal = setupResizeSignalMock
+				o.stopSignalHandling = func(c chan os.Signal) {}
+				o.exitFunc = func(code int) {}
+				cmd.SetOut(mockFdWriter{io.Discard})
+				// Block WaitContainer to keep the command running
+				mockRuntime.MockRuntime.WaitDelay = 10 * time.Second
+			})
+		}()
+
+		// Initial resize
+		select {
+		case <-resizeCalled:
+		case <-time.After(2 * time.Second):
+			t.Fatal("initial resize not called")
+		}
+
+		// Signal resize
+		var rc chan os.Signal
+		select {
+		case rc = <-resizeChanHolder:
+		case <-time.After(2 * time.Second):
+			t.Fatal("resize signal channel not registered")
+		}
+
+		// In root.go, the resize goroutine waits on <-resizeChan.
+		// We need to send a signal to the channel.
+		// We use os.Interrupt for portability across platforms in this test.
+
+		// We use a loop to send signals until it's processed, to avoid race
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+	loop:
+		for {
+			select {
+			case rc <- os.Interrupt:
+			case <-resizeCalled:
+				break loop
+			case <-timer.C:
+				t.Fatal("signal resize not called (timeout)")
+			}
+		}
+
+		cancel()
+		<-errCh
+	})
+}
+
+type hangTimeoutMockRuntime struct {
+	*runtime.MockRuntime
+	waitStarted chan struct{}
+	isRunning   bool
+}
+
+func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (int, error) {
+	close(m.waitStarted)
+	<-ctx.Done()
+	return 137, ctx.Err()
+}
+
+func (m *hangTimeoutMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
+	return m.isRunning, 0, nil
+}
+
+func (m *hangTimeoutMockRuntime) AttachContainer(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	close(ready)
+	return nil
+}
+
+func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
+	t.Parallel()
+	waitStarted := make(chan struct{})
+	mockRuntime := &hangTimeoutMockRuntime{
+		MockRuntime: runtime.NewMockRuntime(),
+		waitStarted: waitStarted,
+		isRunning:   true,
+	}
+
+	var logBuf safeBuffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "100ms"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.isTerminal = func(fd int) bool { return false } // Non-terminal
+		o.exitFunc = func(code int) {}
+		cmd.SetErr(&logBuf)
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, logBuf.String(), "IO finished, waiting up to 100ms for container")
+	assert.Contains(t, logBuf.String(), "forcing termination")
+	assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 }
 
 func TestUnit_Root_PreprocessArgs_UnknownP1Flag(t *testing.T) {
