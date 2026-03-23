@@ -121,10 +121,15 @@ type rootOptions struct {
 	// Testing hooks
 	exitFunc       func(int)
 	isTerminal     func(int) bool
-	termGetSize    func(int) (int, int, error)
-	makeRaw        func(int) (*term.State, error)
-	restore        func(int, *term.State) error
-	runtimeFactory func(string, string) (runtime.ContainerRuntime, error)
+	termGetSize        func(int) (int, int, error)
+	makeRaw            func(int) (*term.State, error)
+	restore            func(int, *term.State) error
+	setupSignals       func(chan os.Signal)
+	setupResizeSignal  func(chan os.Signal)
+	stopSignalHandling func(chan os.Signal)
+	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
+
+	attachGracePeriod time.Duration
 }
 
 const (
@@ -158,7 +163,17 @@ func defaultOptions() rootOptions {
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
 		},
-		logger: logging.GetGlobalLogger(),
+		setupSignals: func(sigChan chan os.Signal) {
+			setupSignals(sigChan)
+		},
+		setupResizeSignal: func(resizeChan chan os.Signal) {
+			setupResizeSignal(resizeChan)
+		},
+		stopSignalHandling: func(sigChan chan os.Signal) {
+			signal.Stop(sigChan)
+		},
+		attachGracePeriod: attachGracePeriod,
+		logger:            logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -428,7 +443,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		// Translate exePath for nested execution if it was determined from os.Executable()
 		// (MountCderunPath is already resolved during resolution if it came from config/flags)
 		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
-			r, err := config.NewExpressionResolver(resolved.HostContext)
+			r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
 			if err != nil {
 				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
 			} else {
@@ -696,8 +711,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	// Handle signals and forward them to the container
 	sigChan := make(chan os.Signal, 1)
-	setupSignals(sigChan)
-	defer signal.Stop(sigChan)
+	o.setupSignals(sigChan)
+	defer o.stopSignalHandling(sigChan)
 	go func() {
 		firstSignal := true
 		for {
@@ -768,8 +783,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Handle window resize synchronization
 	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
-		setupResizeSignal(resizeChan)
-		defer signal.Stop(resizeChan)
+		o.setupResizeSignal(resizeChan)
+		defer o.stopSignalHandling(resizeChan)
 		go func() {
 			for {
 				select {
@@ -815,7 +830,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 		// After container exits, wait a short grace period for remaining output
 		if !attachDoneConsumed {
-			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 			select {
 			case err := <-attachDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
@@ -823,7 +838,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 				}
 				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-			case <-time.After(attachGracePeriod):
+			case <-time.After(o.attachGracePeriod):
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 				cancelAttach()
 				<-attachDone

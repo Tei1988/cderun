@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -23,6 +26,26 @@ type terminationMockRuntime struct {
 	*runtime.MockRuntime
 	isRunning  bool
 	inspectErr error
+}
+
+type safeBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+var _ io.Writer = (*safeBuffer)(nil)
+var _ fmt.Stringer = (*safeBuffer)(nil)
+
+func (s *safeBuffer) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *safeBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
 }
 
 func (m *terminationMockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
@@ -606,6 +629,8 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 
 func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 	t.Parallel()
+	// We wrap t.Context() with WithCancel to allow manual cancellation
+	// for testing the behavior when the context is already cancelled.
 	ctx, cancel := context.WithCancel(t.Context())
 
 	sr := &syncReader{
@@ -768,6 +793,36 @@ func TestUnit_Root_BuildContainerConfig_Nested_Additions(t *testing.T) {
 		require.NoError(t, err)
 
 		assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/host/app/cderun")
+	})
+
+	t.Run("nested execution path resolution respects o.fs", func(t *testing.T) {
+		// Use a path that requires o.fs to be used in the ExpressionResolver.
+		// {{HOME}} will be resolved using o.fs.
+		mfs := &config.MockFileSystem{
+			ExecPath: "/app/{{HOME}}/cderun",
+			HomeDir:  "myhome",
+		}
+		o := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
+		// Simulate nested execution: Level 1.
+		resolved := &config.ResolvedConfig{
+			MountCderun: true,
+			HostContext: &config.HostContext{
+				Level: 1,
+				Mounts: []config.MountMapping{
+					{Source: "/host/app", Target: "/app"},
+				},
+			},
+		}
+
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+
+		// If o.fs is used, "{{HOME}}" resolves to "myhome".
+		// Then "/app/myhome/cderun" is reverse-resolved to "/host/app/myhome/cderun".
+		assertMountSourceEquals(t, cfg.Mounts, "/usr/local/bin/cderun", "/host/app/myhome/cderun")
 	})
 }
 
@@ -1354,6 +1409,129 @@ func TestUnit_Root_PreprocessArgs_NoSubcommandHoisting(t *testing.T) {
 	actual, err := preprocessArgs(cmd, args)
 	require.NoError(t, err)
 	assert.Equal(t, expected, actual)
+}
+
+type blockingAttachMockRuntime struct {
+	*runtime.MockRuntime
+	attached chan struct{}
+}
+
+func (m *blockingAttachMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	close(ready)
+	if m.attached != nil {
+		close(m.attached)
+	}
+	<-ctx.Done() // Block until context is canceled by the timeout logic
+	return ctx.Err()
+}
+
+type syncWaitMockRuntime struct {
+	*runtime.MockRuntime
+	waitStarted chan struct{}
+}
+
+func (m *syncWaitMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	close(m.waitStarted)
+	return m.MockRuntime.WaitContainer(ctx, containerID)
+}
+
+func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
+	t.Parallel()
+	waitStarted := make(chan struct{})
+	mockRuntime := &syncWaitMockRuntime{
+		MockRuntime: &runtime.MockRuntime{
+			SignalErr: errors.New("signal failed"),
+			WaitDelay: 1 * time.Second, // Give time to send signal
+		},
+		waitStarted: waitStarted,
+	}
+	var errBuf safeBuffer
+	ctx := t.Context()
+
+	sigChanHolder := make(chan chan os.Signal, 1)
+	setupSignalsMock := func(sigChan chan os.Signal) {
+		sigChanHolder <- sigChan
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.isTerminal = func(fd int) bool { return false }
+			o.exitFunc = func(code int) {}
+			o.setupSignals = setupSignalsMock
+			o.stopSignalHandling = func(chan os.Signal) {} // No-op
+			cmd.SetErr(&errBuf)
+		})
+	}()
+
+	// Wait for container to start (WaitContainer is called)
+	select {
+	case <-waitStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for WaitContainer to be called")
+	}
+
+	// Trigger the signal manually via the captured channel
+	var triggerSignal chan os.Signal
+	select {
+	case triggerSignal = <-sigChanHolder:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for signal channel registration")
+	}
+	require.NotNil(t, triggerSignal)
+	triggerSignal <- syscall.SIGINT
+
+	// Wait for execution to finish
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for execution")
+	}
+
+	assert.Contains(t, errBuf.String(), "[WARN] failed to forward signal")
+	assert.Contains(t, errBuf.String(), "signal failed")
+}
+
+func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
+	t.Parallel()
+	attached := make(chan struct{})
+	mockRuntime := &blockingAttachMockRuntime{
+		MockRuntime: runtime.NewMockRuntime(),
+		attached:    attached,
+	}
+
+	var logBuf safeBuffer
+	ctx := t.Context()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.isTerminal = func(fd int) bool { return false }
+			o.exitFunc = func(code int) {}
+			o.attachGracePeriod = 100 * time.Millisecond
+			cmd.SetErr(&logBuf)
+		})
+	}()
+
+	// Wait for attachment to be established
+	select {
+	case <-attached:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for attachment")
+	}
+
+	// Wait for execution to finish (it should wait 100ms for the grace period)
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for execution")
+	}
+
+	assert.Contains(t, logBuf.String(), "AttachContainer timed out after container exit")
 }
 
 func TestUnit_Root_PreprocessArgs_UnknownP1Flag(t *testing.T) {
