@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -31,6 +32,9 @@ type safeBuffer struct {
 	buf bytes.Buffer
 	mu  sync.Mutex
 }
+
+var _ io.Writer = (*safeBuffer)(nil)
+var _ fmt.Stringer = (*safeBuffer)(nil)
 
 func (s *safeBuffer) Write(p []byte) (n int, err error) {
 	s.mu.Lock()
@@ -625,9 +629,9 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 
 func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 	t.Parallel()
+	// We wrap t.Context() with WithCancel to allow manual cancellation
+	// for testing the behavior when the context is already cancelled.
 	ctx, cancel := context.WithCancel(t.Context())
-	// In Go 1.24+, we should ideally use t.Context().
-	// But here we need a manual cancel to test the behavior before calling Read.
 
 	sr := &syncReader{
 		inner: strings.NewReader("hello"),
