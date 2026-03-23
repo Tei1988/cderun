@@ -215,13 +215,14 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 
 func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	m.mu.RLock()
-	if m.InspectFunc != nil {
-		f := m.InspectFunc
-		m.mu.RUnlock()
+	f := m.InspectFunc
+	exitCode := m.ExitCode
+	m.mu.RUnlock()
+
+	if f != nil {
 		return f(ctx, containerID)
 	}
-	defer m.mu.RUnlock()
-	return false, m.ExitCode, nil
+	return false, exitCode, nil
 }
 
 func (m *MockRuntime) Name() string {

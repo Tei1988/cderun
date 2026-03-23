@@ -1787,18 +1787,16 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		// We need to send a signal to the channel.
 		// We use os.Interrupt for portability across platforms in this test.
 
-		// We use a loop to send signals until it's processed, to avoid race
+		// Send a signal and wait for the handler to be called.
 		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
-	loop:
-		for {
-			select {
-			case rc <- os.Interrupt:
-			case <-resizeCalled:
-				break loop
-			case <-timer.C:
-				t.Fatal("signal resize not called (timeout)")
-			}
+
+		rc <- os.Interrupt
+		select {
+		case <-resizeCalled:
+			// Success
+		case <-timer.C:
+			t.Fatal("signal resize not called (timeout)")
 		}
 
 		cancel()
