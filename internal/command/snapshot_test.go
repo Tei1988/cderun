@@ -248,6 +248,25 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to write .tools.yaml to snapshot")
 }
 
+func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
+	t.Run("ResolvePath failure when Level > 1", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			// ResolvePath calls r.ResolveString which uses mfs.Getenv for {{env:...}}
+			// If we use {{file:nonexistent}}, it should fail.
+			TempDirValue: "/tmp/{{file:nonexistent}}",
+		}
+		globalCfg := &config.CDERunConfig{
+			HostContext: &config.HostContext{
+				Level: 1, // Will be incremented to 2
+			},
+		}
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
+	})
+
+}
+
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {
 	mfs := &snapshotMockFS{
 		MockFileSystem: &config.MockFileSystem{

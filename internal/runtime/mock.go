@@ -40,6 +40,11 @@ type MockRuntime struct {
 	AttachErr           error
 	ResizeErr           error
 	SignalErr           error
+
+	// Custom behavior hooks
+	WaitFunc   func(ctx context.Context, containerID string) (int, error)
+	AttachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
 }
 
 // WithLockedMock executes the provided function while holding the mock's mutex.
@@ -73,9 +78,16 @@ func (m *MockRuntime) StartContainer(ctx context.Context, containerID string) er
 }
 
 func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	m.mu.RLock()
+	m.mu.Lock()
+	m.WaitedContainerID = containerID
+	f := m.WaitFunc
 	delay := m.WaitDelay
-	m.mu.RUnlock()
+	m.mu.Unlock()
+
+	if f != nil {
+		return f(ctx, containerID)
+	}
+
 	if delay > 0 {
 		t := time.NewTimer(delay)
 		select {
@@ -102,9 +114,9 @@ func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (in
 		default:
 		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.WaitedContainerID = containerID
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.ExitCode, m.WaitErr
 }
 
@@ -118,11 +130,18 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	m.mu.Lock()
 	m.AttachedContainerID = containerID
+	f := m.AttachFunc
+	err := m.AttachErr
 	m.mu.Unlock()
+
+	if f != nil {
+		return f(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	}
+
 	if ready != nil {
 		close(ready)
 	}
-	return m.AttachErr
+	return err
 }
 
 func (m *MockRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
@@ -196,8 +215,14 @@ func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, s
 
 func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return false, m.ExitCode, nil
+	f := m.InspectFunc
+	exitCode := m.ExitCode
+	m.mu.RUnlock()
+
+	if f != nil {
+		return f(ctx, containerID)
+	}
+	return false, exitCode, nil
 }
 
 func (m *MockRuntime) Name() string {
