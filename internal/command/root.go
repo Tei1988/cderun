@@ -128,6 +128,8 @@ type rootOptions struct {
 	setupResizeSignal  func(chan os.Signal)
 	stopSignalHandling func(chan os.Signal)
 	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
+
+	attachGracePeriod time.Duration
 }
 
 const (
@@ -170,7 +172,8 @@ func defaultOptions() rootOptions {
 		stopSignalHandling: func(sigChan chan os.Signal) {
 			signal.Stop(sigChan)
 		},
-		logger: logging.GetGlobalLogger(),
+		attachGracePeriod: attachGracePeriod,
+		logger:            logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -827,7 +830,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 		// After container exits, wait a short grace period for remaining output
 		if !attachDoneConsumed {
-			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, attachGracePeriod)
+			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 			select {
 			case err := <-attachDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
@@ -835,7 +838,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 				}
 				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-			case <-time.After(attachGracePeriod):
+			case <-time.After(o.attachGracePeriod):
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 				cancelAttach()
 				<-attachDone

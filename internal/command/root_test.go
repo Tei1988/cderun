@@ -1414,23 +1414,39 @@ type blockingAttachMockRuntime struct {
 
 func (m *blockingAttachMockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	close(ready)
-	close(m.attached)
+	if m.attached != nil {
+		close(m.attached)
+	}
 	<-ctx.Done() // Block until context is canceled by the timeout logic
 	return ctx.Err()
 }
 
+type syncWaitMockRuntime struct {
+	*runtime.MockRuntime
+	waitStarted chan struct{}
+}
+
+func (m *syncWaitMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	close(m.waitStarted)
+	return m.MockRuntime.WaitContainer(ctx, containerID)
+}
+
 func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	t.Parallel()
-	mockRuntime := &runtime.MockRuntime{
-		SignalErr: errors.New("signal failed"),
-		WaitDelay: 1 * time.Second, // Give time to send signal
+	waitStarted := make(chan struct{})
+	mockRuntime := &syncWaitMockRuntime{
+		MockRuntime: &runtime.MockRuntime{
+			SignalErr: errors.New("signal failed"),
+			WaitDelay: 1 * time.Second, // Give time to send signal
+		},
+		waitStarted: waitStarted,
 	}
 	var errBuf safeBuffer
 	ctx := t.Context()
 
-	var triggerSignal chan<- os.Signal
+	sigChanHolder := make(chan chan os.Signal, 1)
 	setupSignalsMock := func(sigChan chan os.Signal) {
-		triggerSignal = sigChan
+		sigChanHolder <- sigChan
 	}
 
 	errCh := make(chan error, 1)
@@ -1446,9 +1462,19 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	}()
 
 	// Wait for container to start (WaitContainer is called)
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-waitStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for WaitContainer to be called")
+	}
 
 	// Trigger the signal manually via the captured channel
+	var triggerSignal chan os.Signal
+	select {
+	case triggerSignal = <-sigChanHolder:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for signal channel registration")
+	}
 	require.NotNil(t, triggerSignal)
 	triggerSignal <- syscall.SIGINT
 
@@ -1465,8 +1491,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 }
 
 func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
-	// Cannot use t.Parallel() because it depends on the 5s constant
-	// and we want to capture the specific debug log.
+	t.Parallel()
 	attached := make(chan struct{})
 	mockRuntime := &blockingAttachMockRuntime{
 		MockRuntime: runtime.NewMockRuntime(),
@@ -1474,12 +1499,6 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	}
 
 	var logBuf safeBuffer
-	// We MUST NOT use a fresh logger if we want to bypass the Init calls in RunE.
-	// Actually, ExecuteContextWithOptions(..., setup) allows us to inject things.
-	// But RunE calls o.logger.Init twice.
-	// The second one uses resolved.LogLevel.
-	// So we should just set --cderun-log-level=debug in args.
-
 	ctx := t.Context()
 
 	errCh := make(chan error, 1)
@@ -1488,6 +1507,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
+			o.attachGracePeriod = 100 * time.Millisecond
 			cmd.SetErr(&logBuf)
 		})
 	}()
@@ -1499,11 +1519,11 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 		t.Fatal("timed out waiting for attachment")
 	}
 
-	// Wait for execution to finish (it should wait 5s for the grace period)
+	// Wait for execution to finish (it should wait 100ms for the grace period)
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(10 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for execution")
 	}
 
