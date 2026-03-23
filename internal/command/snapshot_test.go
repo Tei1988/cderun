@@ -265,33 +265,6 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
 	})
 
-	t.Run("empty result from ResolvePath", func(t *testing.T) {
-		// To trigger an empty result, we need ResolvePath to return an empty string without error.
-		// This happens if the input is empty or resolves to empty.
-		// But snapshotDir is TempDir() + UUID.
-		// If we mock NewExpressionResolverWithFS to fail or return a resolver that returns empty,
-		// we could test it. But NewExpressionResolverWithFS is not easily mockable as it's a function call.
-
-		// Wait, createSnapshot does:
-		/*
-		r, err := config.NewExpressionResolverWithFS(&hostCtx, fs)
-		...
-		resolvedSnapshotDir, err := config.ResolvePath(snapshotDir, "", r)
-		*/
-
-		// If I can make ResolvePath return empty...
-		// In internal/config/path.go:
-		/*
-		func ResolvePath(path string, baseDir string, r ExpressionResolver) (string, error) {
-			if path == "" {
-				return "", nil
-			}
-			...
-		}
-		*/
-		// If TempDir() returns empty, and UUID is empty (not possible), then it's empty.
-		// Actually, let's just focus on triggering the error for now to reach 92.3%.
-	})
 }
 
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {

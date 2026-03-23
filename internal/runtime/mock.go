@@ -78,14 +78,16 @@ func (m *MockRuntime) StartContainer(ctx context.Context, containerID string) er
 }
 
 func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	m.mu.RLock()
-	if m.WaitFunc != nil {
-		f := m.WaitFunc
-		m.mu.RUnlock()
+	m.mu.Lock()
+	m.WaitedContainerID = containerID
+	f := m.WaitFunc
+	delay := m.WaitDelay
+	m.mu.Unlock()
+
+	if f != nil {
 		return f(ctx, containerID)
 	}
-	delay := m.WaitDelay
-	m.mu.RUnlock()
+
 	if delay > 0 {
 		t := time.NewTimer(delay)
 		select {
@@ -112,9 +114,9 @@ func (m *MockRuntime) WaitContainer(ctx context.Context, containerID string) (in
 		default:
 		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.WaitedContainerID = containerID
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.ExitCode, m.WaitErr
 }
 
@@ -126,21 +128,20 @@ func (m *MockRuntime) RemoveContainer(ctx context.Context, containerID string) e
 }
 
 func (m *MockRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	m.mu.RLock()
-	if m.AttachFunc != nil {
-		f := m.AttachFunc
-		m.mu.RUnlock()
-		return f(ctx, containerID, tty, stdin, stdout, stderr, ready)
-	}
-	m.mu.RUnlock()
-
 	m.mu.Lock()
 	m.AttachedContainerID = containerID
+	f := m.AttachFunc
+	err := m.AttachErr
 	m.mu.Unlock()
+
+	if f != nil {
+		return f(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	}
+
 	if ready != nil {
 		close(ready)
 	}
-	return m.AttachErr
+	return err
 }
 
 func (m *MockRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {

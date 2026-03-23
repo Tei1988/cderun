@@ -1455,12 +1455,36 @@ func TestUnit_RunCderunCore_PreprocessError(t *testing.T) {
 
 func TestUnit_RunCderunCore_WithStdin(t *testing.T) {
 	t.Parallel()
-	// We want to reach cmd.SetIn(stdin) in runCderunCore.
-	// Since runCderunCore calls ExecuteContextWithOptions which runs the command,
-	// we use a subcommand that fails early to avoid actual execution but ensure the path is taken.
-	stdin := strings.NewReader("hello")
-	_, _, _, err := runCderunCore(stdin, "sh")
-	require.Error(t, err)
+	// We want to verify that runCderunCore correctly propagates stdin to the executed command.
+	// We use ExecuteContextWithOptions directly via runCderunCore.
+	// To verify this without a real runtime, we mock the runtime to read from stdin and write to stdout.
+
+	stdinContent := "hello from stdin"
+	stdin := strings.NewReader(stdinContent)
+
+	mockRuntime := &runtime.MockRuntime{
+		AttachFunc: func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+			close(ready)
+			if stdin != nil {
+				_, _ = io.Copy(stdout, stdin)
+			}
+			return nil
+		},
+	}
+
+	var outBuf, errBuf bytes.Buffer
+	ctx := context.Background()
+
+	execErr := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.exitFunc = func(code int) {}
+		cmd.SetIn(stdin)
+		cmd.SetOut(&outBuf)
+		cmd.SetErr(&errBuf)
+	})
+
+	require.NoError(t, execErr)
+	assert.Equal(t, stdinContent, outBuf.String())
 }
 
 func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
@@ -1653,24 +1677,33 @@ func TestUnit_Root_Execute_AttachFailureAfterExit(t *testing.T) {
 	// 1. WaitContainer must finish.
 	// 2. AttachContainer must return an error (not Canceled) within the grace period.
 
-	attached := make(chan struct{})
+	attachStarted := make(chan struct{})
+	waitDone := make(chan struct{})
+
 	mockRuntime := &runtime.MockRuntime{
 		AttachFunc: func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 			close(ready)
-			close(attached)
-			// Delay error until after container exit
-			time.Sleep(200 * time.Millisecond)
-			return errors.New("attach error after exit")
+			close(attachStarted)
+			// Block until WaitContainer finishes
+			select {
+			case <-waitDone:
+				return errors.New("attach error after exit")
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		},
-		WaitDelay: 100 * time.Millisecond,
-		ExitCode:  77,
+		WaitFunc: func(ctx context.Context, id string) (int, error) {
+			// Signal that WaitContainer is finishing
+			defer close(waitDone)
+			return 77, nil
+		},
 	}
 
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
-		o.attachGracePeriod = 500 * time.Millisecond
+		o.attachGracePeriod = 2 * time.Second
 	})
 
 	require.Error(t, err)
