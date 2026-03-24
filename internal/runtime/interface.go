@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"io"
+	"time"
 
 	"cderun/internal/container"
 )
@@ -10,7 +11,7 @@ import (
 // ContainerRuntime defines the interface for interacting with container runtimes.
 type ContainerRuntime interface {
 	// Image management
-	PullImage(ctx context.Context, image string, pullPolicy string) error
+	PullImage(ctx context.Context, image string, pullPolicy string, maxRetries int, backoffBase time.Duration) error
 
 	// Container lifecycle
 	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)

@@ -28,6 +28,14 @@ type stringSliceFlagDef struct {
 	p1Field        *[]string
 }
 
+type intFlagDef struct {
+	p2Name, p1Name string
+	defaultVal     int
+	p2Usage        string
+	p2Field        *int
+	p1Field        *int
+}
+
 type float64FlagDef struct {
 	p2Name, p1Name string
 	defaultVal     float64
@@ -66,12 +74,17 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		{"hostname", "cderun-hostname", "", "", "Container host name", &o.hostname, &o.cderunHostname},
 		{"user", "cderun-user", "u", "", "Username or UID (format: <name|uid>[:<group|gid>])", &o.user, &o.cderunUser},
 		{"pull", "cderun-pull", "", "missing", "Pull image before running (always, missing, never)", &o.pull, &o.cderunPull},
+		{"pull-backoff-base", "cderun-pull-backoff-base", "", "", "Base duration for exponential backoff during image pull (e.g. 1s, 500ms)", &o.pullBackoffBase, &o.cderunPullBackoffBase},
 		{"memory", "cderun-memory", "m", "", "Memory limit", &o.memory, &o.cderunMemory},
 		{"dry-run-format", "cderun-dry-run-format", "f", "yaml", "Output format (yaml, json, simple)", &o.dryRunFormat, &o.cderunDryRunFormat},
 		{"diagnosis-format", "cderun-diagnosis-format", "", "yaml", "Diagnosis output format (yaml, json, simple)", &o.diagnosisFormat, &o.cderunDiagnosisFormat},
 		{"log-level", "cderun-log-level", "", "", "Set log level (error, warn, info, debug, trace)", &o.logLevel, &o.cderunLogLevel},
 		{"log-format", "cderun-log-format", "", "text", "Set log format (text, json)", &o.logFormat, &o.cderunLogFormat},
 		{"hang-timeout", "cderun-hang-timeout", "", "", "Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms)", &o.hangTimeout, &o.cderunHangTimeout},
+	}
+
+	intDefs := []intFlagDef{
+		{"pull-max-retries", "cderun-pull-max-retries", 3, "Maximum number of retries for image pull", &o.pullMaxRetries, &o.cderunPullMaxRetries},
 	}
 
 	stringSliceDefs := []stringSliceFlagDef{
@@ -107,6 +120,10 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 			f.StringVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
 		}
 		f.StringVar(d.p1Field, d.p1Name, "", "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+	}
+	for _, d := range intDefs {
+		f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+		f.IntVar(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
 	}
 	for _, d := range stringSliceDefs {
 		if d.p2Short != "" {
