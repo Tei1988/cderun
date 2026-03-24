@@ -649,6 +649,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		cli.PullSet, cli.Pull,
 		subcommand, tools, global, r, fs,
 	)
+
 	res.PullMaxRetries = resolveIntOpt(
 		OptionDef[*int]{EnvKey: "CDERUN_PULL_MAX_RETRIES",
 			ToolGetter:   func(t ToolConfig) *int { return t.PullMaxRetries },
@@ -658,6 +659,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		cli.PullMaxRetriesSet, cli.PullMaxRetries,
 		subcommand, tools, global, fs,
 	)
+	if res.PullMaxRetries <= 0 {
+		return nil, fmt.Errorf("invalid PullMaxRetries (%d) resolved via resolveIntOpt: must be greater than 0", res.PullMaxRetries)
+	}
+
 	pullBackoffBaseStr := resolveStringOpt(
 		OptionDef[string]{EnvKey: "CDERUN_PULL_BACKOFF_BASE",
 			ToolGetter:   func(t ToolConfig) string { return t.PullBackoffBase },
@@ -669,11 +674,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	)
 	if pullBackoffBaseStr != "" {
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
+			if d <= 0 {
+				return nil, fmt.Errorf("invalid PullBackoffBase duration %q (res.PullBackoffBase) parsed via time.ParseDuration from pullBackoffBaseStr (resolveStringOpt): must be positive", pullBackoffBaseStr)
+			}
 			res.PullBackoffBase = d
 		} else {
-			return nil, fmt.Errorf("invalid pull-backoff-base value %q: %w", pullBackoffBaseStr, err)
+			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q (resolveStringOpt) using time.ParseDuration: %w", pullBackoffBaseStr, err)
 		}
 	}
+
 	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r, fs)
 	if err != nil {
 		return nil, err
