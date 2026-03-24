@@ -9,23 +9,36 @@
 ### コア機能
 
 1. **[引数解析 (完了)](./argument-parsing.md)**
+
   - 厳密な境界解析
   - cderunフラグとサブコマンド引数の分離
+
 2. **[引数・設定優先順位 (完了)](./argument-priority-logic.md)**
+
   - P1〜P6の優先順位階層
   - CLI、環境変数、設定ファイルの解決ロジック
+
 3. **[ポリグロットエントリーポイント (完了)](./polyglot-entry.md)**
+
   - シンボリックリンクによる自動ツール検出
   - 単一バイナリで複数ツールとして動作
+
 4. **[設定ファイルサポート (完了)](./configuration-file-support.md)**
+
   - `.cderun.yaml`: cderun自体の設定
   - `.tools.yaml`: 各ツールでの実行設定
+
 5. **[標準入力同期 (完了)](./stdin-synchronization.md)**
+
   - コンテナ起動と標準入力アタッチの同期
   - パイプ入力の信頼性向上
+
 6. **[値の解決 (完了)](./value-resolution.md)**
+
   - 式（Expressions）、チルダ展開、相対パス解決
+
 7. **[ハングタイムアウト (完了)](./hang-timeout.md)**
+
   - 非TTY・非インタラクティブ実行時のハング対策
   - IO完了後の自動終了ロジック
 
