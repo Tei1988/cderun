@@ -389,6 +389,17 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	select {
 	case err := <-outputDone:
 		logging.Trace("AttachContainer: output goroutine finished")
+		if err == nil {
+			// If output finished successfully, check if there was a pending stdin error.
+			select {
+			case <-stdinDone:
+				if stdinErr != nil {
+					logging.Trace("AttachContainer: output finished but returning pending stdin error")
+					return stdinErr
+				}
+			default:
+			}
+		}
 		return err
 	case <-stdinDone:
 		if stdinErr != nil {
