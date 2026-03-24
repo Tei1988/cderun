@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -155,4 +157,46 @@ func TestUnit_Mock_GetExitCode(t *testing.T) {
 	mock := NewMockRuntime()
 	mock.ExitCode = 99
 	assert.Equal(t, 99, mock.GetExitCode())
+}
+
+func TestUnit_Mock_AttachContainer_Func(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New("custom attach error")
+	}
+
+	err := mock.AttachContainer(context.Background(), "c1", false, nil, nil, nil, nil)
+	require.Error(t, err)
+	assert.Equal(t, "custom attach error", err.Error())
+}
+
+func TestUnit_Mock_InspectContainer_Func(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.InspectFunc = func(ctx context.Context, containerID string) (bool, int, error) {
+		return true, 123, nil
+	}
+
+	running, code, err := mock.InspectContainer(context.Background(), "c1")
+	require.NoError(t, err)
+	assert.True(t, running)
+	assert.Equal(t, 123, code)
+}
+
+func TestUnit_Mock_WaitContainer_TimerStop(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WaitDelay = 10 * time.Millisecond
+
+	// This test exercises the !t.Stop() path in WaitContainer when the timer has already fired or stopped.
+	// Since we can't easily race the timer and the Stop call precisely,
+	// we use a very short delay and wait for it to finish.
+	time.Sleep(20 * time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel context to enter the select block with context cancelled
+
+	_, err := mock.WaitContainer(ctx, "c1")
+	require.ErrorIs(t, err, context.Canceled)
 }

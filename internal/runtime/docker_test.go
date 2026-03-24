@@ -769,3 +769,130 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
+
+func TestUnit_Docker_New_Error(t *testing.T) {
+	// client.WithHost("invalid") should fail during client.NewClientWithOpts
+	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create docker client")
+}
+
+type failingReader struct{}
+
+func (f *failingReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("read error")
+}
+
+func TestUnit_Docker_Attach_Errors(t *testing.T) {
+	t.Run("attach error with ready channel", func(t *testing.T) {
+		mock := &mockDockerClient{attachErr: errors.New("attach failed")}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		ready := make(chan struct{})
+		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil, ready)
+		require.Error(t, err)
+		_, ok := <-ready
+		assert.False(t, ok, "ready channel should be closed on error")
+	})
+
+	t.Run("stdin copy error", func(t *testing.T) {
+		conn := &mockConn{}
+		// We need the output goroutine to stay alive or finish with no error
+		// while the stdin goroutine fails.
+		// Use a pipe for the output reader so it blocks until we close it.
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			_ = pw.Close()
+		}()
+
+		err := runtime.AttachContainer(context.Background(), "id", false, &failingReader{}, nil, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "read error")
+	})
+
+	t.Run("nil output writers", func(t *testing.T) {
+		conn := &mockConn{}
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(strings.NewReader("some output")),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		// This should not panic and should succeed
+		err := runtime.AttachContainer(context.Background(), "id", true, nil, nil, nil, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("output copy error (TTY)", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		go func() {
+			_ = pw.CloseWithError(errors.New("pipe error"))
+		}()
+
+		err := runtime.AttachContainer(context.Background(), "id", true, nil, io.Discard, io.Discard, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pipe error")
+	})
+
+	t.Run("output copy error (non-TTY)", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		go func() {
+			// Write invalid multiplexed header to trigger stdcopy error
+			_, _ = pw.Write([]byte{1, 0, 0, 0, 0, 0, 0, 0})
+			_ = pw.CloseWithError(errors.New("multiplex error"))
+		}()
+
+		err := runtime.AttachContainer(context.Background(), "id", false, nil, io.Discard, io.Discard, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("output goroutine finishes after stdinDone", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		stdin := strings.NewReader("input")
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			_, _ = pw.Write([]byte("output"))
+			_ = pw.Close()
+		}()
+
+		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, nil)
+		require.NoError(t, err)
+	})
+}
