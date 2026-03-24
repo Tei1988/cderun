@@ -223,7 +223,12 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 
 // resolveEnv returns the value of an environment variable.
 // It mirrors os.Getenv behavior and returns an empty string if the key is missing.
-func (r *ExpressionResolver) resolveEnv(key string) (string, error) {
+// It supports default value syntax: {{env:KEY:-default}}.
+func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
+	key, defaultValue, hasDefault := strings.Cut(input, ":-")
 	val := r.fs.Getenv(key)
+	if hasDefault && val == "" {
+		return defaultValue, nil
+	}
 	return val, nil
 }

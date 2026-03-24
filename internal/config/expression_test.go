@@ -334,3 +334,61 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		assert.Equal(t, "{{ PWD }}", val) // Unchanged because of sticky error
 	})
 }
+
+func TestUnit_Expression_EnvWithDefault(t *testing.T) {
+	fs := &MockFileSystem{
+		Env: map[string]string{
+			"VAR_SET":   "value",
+			"VAR_EMPTY": "",
+		},
+	}
+
+	hostCtx := &HostContext{}
+	r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "env set",
+			input:    "{{ env:VAR_SET }}",
+			expected: "value",
+		},
+		{
+			name:     "env unset",
+			input:    "{{ env:VAR_UNSET }}",
+			expected: "",
+		},
+		{
+			name:     "env set with default",
+			input:    "{{ env:VAR_SET:-default }}",
+			expected: "value",
+		},
+		{
+			name:     "env empty with default",
+			input:    "{{ env:VAR_EMPTY:-default }}",
+			expected: "default",
+		},
+		{
+			name:     "env unset with default",
+			input:    "{{ env:VAR_UNSET:-default }}",
+			expected: "default",
+		},
+		{
+			name:     "env with complex default",
+			input:    "{{ env:VAR_UNSET:-default-value }}",
+			expected: "default-value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val := r.resolveString(tt.input)
+			require.NoError(t, r.Error())
+			assert.Equal(t, tt.expected, val)
+		})
+	}
+}

@@ -3,7 +3,9 @@
 ## Container Runtime
 
 ## Expression
-- `{{env:KEY:-default}}` — 環境変数が未定義時のデフォルト値構文（シェルの `${VAR:-default}` と同じセマンティクス）
+
+## Documentation
+- Update `docs/features/value-resolution.md` to include documentation for the `{{env:KEY:-default}}` syntax.
 
 ## Proposals
 
