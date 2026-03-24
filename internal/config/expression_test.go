@@ -387,7 +387,7 @@ func TestUnit_Expression_EnvWithDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			val := r.resolveString(tt.input)
-			assert.NoError(t, r.Error())
+			require.NoError(t, r.Error())
 			assert.Equal(t, tt.expected, val)
 		})
 	}
