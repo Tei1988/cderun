@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"errors"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -155,4 +157,47 @@ func TestUnit_Mock_GetExitCode(t *testing.T) {
 	mock := NewMockRuntime()
 	mock.ExitCode = 99
 	assert.Equal(t, 99, mock.GetExitCode())
+}
+
+func TestUnit_Mock_AttachContainer_Func(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New("custom attach error")
+	}
+
+	err := mock.AttachContainer(context.Background(), "c1", false, nil, nil, nil, nil)
+	require.Error(t, err)
+	assert.Equal(t, "custom attach error", err.Error())
+}
+
+func TestUnit_Mock_InspectContainer_Func(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.InspectFunc = func(ctx context.Context, containerID string) (bool, int, error) {
+		return true, 123, nil
+	}
+
+	running, code, err := mock.InspectContainer(context.Background(), "c1")
+	require.NoError(t, err)
+	assert.True(t, running)
+	assert.Equal(t, 123, code)
+}
+
+func TestUnit_Mock_WaitContainer_TimerStop(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WaitDelay = 10 * time.Millisecond
+
+	// Wait for the duration of WaitDelay to ensure any internal timer would have fired,
+	// exercising the branch in WaitContainer where t.Stop() returns false.
+	time.Sleep(20 * time.Millisecond)
+
+	// Verifying that WaitContainer(ctx, "c1") returns context.Canceled when
+	// the context is already canceled before the call.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := mock.WaitContainer(ctx, "c1")
+	require.ErrorIs(t, err, context.Canceled)
 }
