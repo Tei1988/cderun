@@ -777,9 +777,12 @@ func TestUnit_Docker_New_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to create docker client")
 }
 
-type failingReader struct{}
+type syncFailingReader struct {
+	started chan struct{}
+}
 
-func (f *failingReader) Read(p []byte) (n int, err error) {
+func (f *syncFailingReader) Read(p []byte) (n int, err error) {
+	close(f.started)
 	return 0, errors.New("read error")
 }
 
@@ -808,18 +811,14 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
 
-		done := make(chan struct{})
+		started := make(chan struct{})
 		ready := make(chan struct{})
 		go func() {
-			<-ready
-			close(done)
-		}()
-		go func() {
-			<-done
+			<-started
 			_ = pw.Close()
 		}()
 
-		err := runtime.AttachContainer(context.Background(), "id", false, &failingReader{}, nil, nil, ready)
+		err := runtime.AttachContainer(context.Background(), "id", false, &syncFailingReader{started: started}, nil, nil, ready)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "read error")
 	})
