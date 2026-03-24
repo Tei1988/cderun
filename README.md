@@ -87,7 +87,13 @@ In standard **Wrapper Mode**, these flags **must** be placed **after** the subco
 cderun node app.js --cderun-image node:20-alpine
 ```
 
-In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
+In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool.
+
+```bash
+ln -s cderun node
+./node --tty  # Passes --tty to the node process inside the container
+./node --cderun-tty  # Enables cderun's TTY allocation
+```
 
 ### Available Flags
 
@@ -230,6 +236,7 @@ the available runtime by checking for common Unix socket paths.
 - Mount the `cderun` binary and other defined tools into the container.
 - Enables recursive container execution without installing tools
   in the container image.
+- Uses `--mount-tools`, `--mount-all-tools`, and `--mount-cderun`.
 
 ### Nested Execution Support
 
@@ -240,7 +247,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, `{{find_dir:name}}`, and `{{env:name}}`
   in configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the

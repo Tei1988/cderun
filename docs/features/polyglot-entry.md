@@ -14,9 +14,9 @@
    `os.Args[0]` のベース名（パスを除いた部分）を確認する。
 
 2. **条件分岐**
-   - 名前が `cderun` である場合: 何もしない。
-   - 名前が `cderun` **ではない**場合:
-     - `os.Args` を書き換え、`[プログラム名, 実行ファイル名, 元の引数...]` という形にする。
+  - 名前が `cderun` である場合: 何もしない。
+  - 名前が `cderun` **ではない**場合:
+    - `os.Args` を書き換え、`[プログラム名, 実行ファイル名, 元の引数...]` という形にする。
 
 ### 具体例
 
@@ -24,7 +24,6 @@
   - 実際のプロセス起動: `os.Args = ["node", "--version"]`
   - 書き換え後の内部状態: `os.Args = ["cderun", "node", "--version"]`
   - 結果として、`cderun` のサブコマンドとして `node` が呼び出される。
-
 - ユーザーが `node --cderun-tty=false --version` と実行した場合（シンボリックリンク経由で `cderun` の設定を上書き）:
   - 実際のプロセス起動: `os.Args = ["node", "--cderun-tty=false", "--version"]`
   - 書き換え後の内部状態: `os.Args = ["cderun", "--cderun-tty=false", "node", "--version"]`

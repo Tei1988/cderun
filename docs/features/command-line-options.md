@@ -13,7 +13,9 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 - **[cderun-flags]**: `cderun` の動作を制御するフラグ。
   - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
 - **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
-- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグは `cderun` の優先設定（P1オーバーライド）としてパースされ、それ以外の全ての引数はサブコマンドにそのまま渡されます。
+- **[passthrough-args]**: サブコマンドに渡される引数。
+  - **内部オーバーライドフラグ (P1)**: `--cderun-` で始まるフラグは `cderun` の最高優先設定としてパースされます。サブコマンドの**後ろ**に置く必要があります。
+  - **プログラム引数**: それ以外の全ての引数はサブコマンドにそのまま渡されます。
 
 ## グローバルオプション
 
@@ -110,7 +112,7 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 - **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
 - **補足**:
   - `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になります。
-  - ネスト実行が検出された場合も自動的にマウントが構成されます。
+  - ネスト実行（Host Contextが存在する場合）が検出された場合も自動的にマウントが構成されます。
   - このフラグが有効な場合、`--mount-socket` が明示的に `false` に設定されていない限り、`--mount-socket` も自動的に有効になります。
 
 ```bash
@@ -158,11 +160,12 @@ cderun --mount-all-tools alpine sh
 
 - **型**: string
 - **環境変数**: `CDERUN_IMAGE`
-- **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
+- **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）。パスの解決ルール（Expressionsや相対パス解決）が適用されます。
 - **注意**: アドホック実行（設定にないツール名の指定）時には必須となります。
 
 ```bash
 cderun --image node:18-alpine node --version
+cderun --image "golang:{{file:.go-version}}" go version
 ```
 
 ### `--env`, `-e`
@@ -471,7 +474,9 @@ cderun --hang-timeout 5s node script.js
 - **環境変数**: `CDERUN_LOG_LEVEL`
 - **説明**: ログレベルを直接指定
 - **値**: `error`, `warn`, `info`, `debug`, `trace`
-- **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
+- **注意**:
+  - `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
+  - 設定ファイル読み込み中のログは、環境変数または CLI フラグの設定が優先的に反映されます。
 
 ```bash
 cderun --log-level info node app.js
@@ -503,27 +508,13 @@ cderun --log-timestamp=false node app.js
 
 - **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
 - **カテゴリ別の対応フラグ例**:
-
-  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
-    `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
-    `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
-    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`,
-    `--cderun-cap-drop`, `--cderun-hang-timeout`
-  - **ネットワーク**: `--cderun-network`, `--cderun-publish`,
-    `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`,
-    `--cderun-dns`, `--cderun-add-host`
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-hang-timeout`
+  - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`,
-    `--cderun-mount-socket`, `--cderun-mount-socket-path`,
-    `--cderun-mount-cderun`, `--cderun-mount-cderun-path`,
-    `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
+  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`,
-    `--cderun-diagnosis`, `--cderun-diagnosis-format`,
-    `--cderun-log-level`, `--cderun-log-format`,
-    `--cderun-log-timestamp`
-
-- **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`
+- **挙動**: これらは原則として**サブコマンドの後ろ**に配置する必要があります。内部的な前処理（Hoisting）によって `cderun` のフラグとしてパースされます。サブコマンドより前に配置した場合はエラーとなります。
 
 ## その他の設定オプション
 

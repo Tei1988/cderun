@@ -25,9 +25,10 @@
 ネスト実行は、主に以下の3つの機能に基づいています。
 
 1. **バイナリマウント (`--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`)**: 基底ホストの `cderun` バイナリがコンテナ内にマウントされます（通常は `/usr/local/bin/cderun`）。`--mount-cderun-path` を使用することで、マウントするホスト側のバイナリを明示的に指定できます。
-   - **自動有効化**: `--mount-tools` または `--mount-all-tools` を使用する場合、`--mount-cderun` は自動的に有効になります。
+  - **自動有効化**: `--mount-tools` または `--mount-all-tools` を使用する場合、`--mount-cderun` は自動的に有効になります。
+  - **ネスト時**: 既にコンテナ内で実行されている場合、自分自身のバイナリパスも逆パス解決により基底ホスト上のパスに翻訳された上でマウントされます。
 2. **ソケットマウント (`--mount-socket`)**: コンテナランタイムのソケット（例: `/var/run/docker.sock`）がコンテナ内にマウントされ、コンテナ内の `cderun` が基底ホスト上の Docker/Podman デーモンと通信できるようになります。
-   - **自動有効化**: `--mount-cderun`（自動有効化されたものを含む）が有効な場合、`--mount-socket` は自動的に有効になります（明示的に `false` が指定されている場合を除く）。
+  - **自動有効化**: `--mount-cderun`（自動有効化されたものを含む）が有効な場合、`--mount-socket` は自動的に有効になります（明示的に `false` が指定されている場合を除く）。
 3. **コンテキスト伝播 (スナップショット)**: ネスト実行が有効な状態でコンテナが開始されると（上記マウントフラグのいずれかが有効、または既にネスト環境である場合）、`cderun` は現在の設定とホストコンテキストの「スナップショット」を作成し、コンテナ内にマウントします。
 
 ## コンテキスト伝播とスナップショット
@@ -105,24 +106,25 @@ hostContext:
 1. 要求されたパス（例: `./src`, `~/data`, `/app/src`）を、現在の環境における絶対パスに解決します（例: `/app/src`）。
 2. `hostContext.mounts` を検索し、解決した絶対パスのプレフィックスとして最もよく一致する `target` を探します。
 3. **一致の優先順位**:
-   - **最長一致（Longest Match）**: より長い `target` パスが優先されます（例: `/tmp` への一致は `/` への一致より優先される）。これにより、OverlayFS によるルートマッピングよりも明示的なボリュームマウントが優先されます。
-   - **最新レベル（Deepest Level）**: ターゲットパスの長さが同じ場合、より高い `level`（より深いネストで追加されたマッピング）が優先されます。
+  - **最長一致（Longest Match）**: より長い `target` パスが優先されます（例: `/tmp` への一致は `/` への一致より優先される）。これにより、OverlayFS によるルートマッピングよりも明示的なボリュームマウントが優先されます。
+  - **最新レベル（Deepest Level）**: ターゲットパスの長さが同じ場合、より高い `level`（より深いネストで追加されたマッピング）が優先されます。
 4. 一致した `target` プレフィックスを、対応する `source`（基底ホスト上のパス）に置き換えます。
+5. **解決不能な場合**: 一致するマッピングが見つからない場合、逆パス解決は行われず、絶対パスがそのまま使用されます（この場合、基底ホストのデーモンがそのパスを解決できないため、通常はマウントに失敗します）。
 
 ### 具体的な解決例
 
 以下のシナリオを想定します：
 
 1. **レベル 0 (ホスト)**: `cderun --mount .:/app node` を実行
-   - ホストパス: `/home/user/project`
-   - コンテナパス (L1): `/app`
+  - ホストパス: `/home/user/project`
+  - コンテナパス (L1): `/app`
 2. **レベル 1 (コンテナ)**: コンテナ内で `cderun --mount ./src:/src go build` を実行
-   - 要求されたパス: `./src`
-   - コンテナ内絶対パス (L1): `/app/src`
-   - **逆解決プロセス**:
-     - `hostContext.mounts` に `/app` -> `/home/user/project` のマッピングが存在
-     - `/app/src` のプレフィックス `/app` が一致
-     - 結果のホストパス: `/home/user/project/src`
+  - 要求されたパス: `./src`
+  - コンテナ内絶対パス (L1): `/app/src`
+  - **逆解決プロセス**:
+    - `hostContext.mounts` に `/app` -> `/home/user/project` のマッピングが存在
+    - `/app/src` のプレフィックス `/app` が一致
+    - 結果のホストパス: `/home/user/project/src`
 3. **ランタイム呼び出し**: 基底ホストの Docker デーモンに対し、`source: /home/user/project/src, target: /src` のマウントを指示
 
 これにより、ネストされたコンテナ間でも一貫したファイルアクセスが可能になります。
@@ -152,15 +154,15 @@ hostContext:
 2. **P2: コマンドライン引数**
 3. **P3: 環境変数**
 4. **P4: ツール固有設定** (`.tools.yaml`)
-   - カレントディレクトリから親へ遡って検索
-   - `~/.config/cderun/.tools.yaml`
-   - `/etc/cderun/.tools.yaml`
-   - **/run/cderun/.tools.yaml** (ネスト注入された設定)
+  - カレントディレクトリから親へ遡って検索
+  - `~/.config/cderun/.tools.yaml`
+  - `/etc/cderun/.tools.yaml`
+  - **/run/cderun/.tools.yaml** (ネスト注入された設定)
 5. **P5: cderunデフォルト設定** (`.cderun.yaml`)
-   - カレントディレクトリから親へ遡って検索
-   - `~/.config/cderun/.cderun.yaml`
-   - `/etc/cderun/.cderun.yaml`
-   - **/run/cderun/.cderun.yaml** (ネスト注入された設定)
+  - カレントディレクトリから親へ遡って検索
+  - `~/.config/cderun/.cderun.yaml`
+  - `/etc/cderun/.cderun.yaml`
+  - **/run/cderun/.cderun.yaml** (ネスト注入された設定)
 6. **P6: ハードコードされたデフォルト値**
 
 ※ `/run/cderun/` は「真のデフォルト」として機能し、ユーザーがコンテナ内で明示的に用意した設定ファイルがある場合はそちらが優先されます。

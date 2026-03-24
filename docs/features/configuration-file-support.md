@@ -57,21 +57,21 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 設定ファイルは以下の順序で検索され、先に見つかった（優先順位が高い）ファイルの設定が、後のファイルの設定を上書きします。
 
 1. **プロジェクト設定（親ディレクトリへの探索）**:
-   - カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
-   - 例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
+  - カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
+  - 例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
 
 2. **ユーザー設定**:
-   - `~/.config/cderun/.cderun.yaml`
-   - `~/.config/cderun/.tools.yaml`
+  - `~/.config/cderun/.cderun.yaml`
+  - `~/.config/cderun/.tools.yaml`
 
 3. **システム全体設定**:
-   - `/etc/cderun/.cderun.yaml`
-   - `/etc/cderun/.tools.yaml`
+  - `/etc/cderun/.cderun.yaml`
+  - `/etc/cderun/.tools.yaml`
 
 4. **ネスト実行時の注入設定**:
-   - `/run/cderun/.cderun.yaml`
-   - `/run/cderun/.tools.yaml`
-   - ※この設定はネスト実行（`--mount-cderun`）時に動的に生成・マウントされます。
+  - `/run/cderun/.cderun.yaml`
+  - `/run/cderun/.tools.yaml`
+  - ※この設定はネスト実行（`--mount-cderun`）時に動的に生成・マウントされます。
 
 #### マージのルール
 
