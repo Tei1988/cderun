@@ -128,6 +128,8 @@ type rootOptions struct {
 	setupResizeSignal  func(chan os.Signal)
 	stopSignalHandling func(chan os.Signal)
 	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
+	jsonMarshalIndent  func(v any, prefix, indent string) ([]byte, error)
+	yamlMarshal        func(v any) ([]byte, error)
 
 	attachGracePeriod time.Duration
 }
@@ -184,6 +186,8 @@ func defaultOptions() rootOptions {
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
 		},
+		jsonMarshalIndent: json.MarshalIndent,
+		yamlMarshal:       yaml.Marshal,
 	}
 }
 
@@ -239,6 +243,15 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 		o.logger.Debug("Loaded tools config from: %s", strings.Join(toolsPaths, ", "))
 	}
 	return toolsCfg, globalCfg, globalPaths, toolsPaths, nil
+}
+
+func (o *rootOptions) ensureHooks() {
+	if o.jsonMarshalIndent == nil {
+		o.jsonMarshalIndent = json.MarshalIndent
+	}
+	if o.yamlMarshal == nil {
+		o.yamlMarshal = yaml.Marshal
+	}
 }
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
@@ -531,6 +544,7 @@ type diagnosticsInfo struct {
 }
 
 func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+	o.ensureHooks()
 	info := diagnosticsInfo{}
 	info.Runtime.Name = resolved.Runtime
 	info.Runtime.Socket = resolved.SocketPath
@@ -548,7 +562,7 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 
 	switch strings.ToLower(resolved.DiagnosisFormat) {
 	case "json":
-		data, err := json.MarshalIndent(info, "", "  ")
+		data, err := o.jsonMarshalIndent(info, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
@@ -560,7 +574,7 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
 	default: // Default to YAML
-		data, err := yaml.Marshal(info)
+		data, err := o.yamlMarshal(info)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
@@ -570,9 +584,10 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
+	o.ensureHooks()
 	switch strings.ToLower(resolved.DryRunFormat) {
 	case "json":
-		data, err := json.MarshalIndent(containerConfig, "", "  ")
+		data, err := o.jsonMarshalIndent(containerConfig, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
@@ -615,7 +630,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
 	default: // Default to YAML
-		data, err := yaml.Marshal(containerConfig)
+		data, err := o.yamlMarshal(containerConfig)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}

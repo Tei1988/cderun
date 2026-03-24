@@ -1858,3 +1858,47 @@ func TestUnit_Root_PreprocessArgs_UnknownP1Flag(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expected, actual)
 }
+
+func TestUnit_Root_MarshalingErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("handleDiagnosis JSON error", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
+				return nil, errors.New("json error")
+			}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to marshal JSON: json error")
+	})
+
+	t.Run("handleDiagnosis YAML error", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.yamlMarshal = func(v any) ([]byte, error) {
+				return nil, errors.New("yaml error")
+			}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml error")
+	})
+
+	t.Run("handleDryRun JSON error", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
+				return nil, errors.New("json dry-run error")
+			}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to marshal JSON: json dry-run error")
+	})
+
+	t.Run("handleDryRun YAML error", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.yamlMarshal = func(v any) ([]byte, error) {
+				return nil, errors.New("yaml dry-run error")
+			}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml dry-run error")
+	})
+}
