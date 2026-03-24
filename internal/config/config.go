@@ -74,6 +74,8 @@ type ConfigDefaults struct {
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
+	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
+	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            *float64       `yaml:"cpus,omitempty"`
 	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
@@ -100,6 +102,7 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.DryRun = copyBoolPtr(d.DryRun)
 	res.Diagnosis = copyBoolPtr(d.Diagnosis)
 	res.CPUs = copyFloat64Ptr(d.CPUs)
+	res.PullMaxRetries = copyIntPtr(d.PullMaxRetries)
 
 	res.MountTools = copyStringSlice(d.MountTools)
 	res.Ports = copyStringSlice(d.Ports)
@@ -199,6 +202,8 @@ type ToolConfig struct {
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
+	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
+	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
 	CPUs            *float64       `yaml:"cpus,omitempty"`
 	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
@@ -229,6 +234,7 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.DryRun = copyBoolPtr(t.DryRun)
 	res.Diagnosis = copyBoolPtr(t.Diagnosis)
 	res.CPUs = copyFloat64Ptr(t.CPUs)
+	res.PullMaxRetries = copyIntPtr(t.PullMaxRetries)
 
 	res.MountTools = copyStringSlice(t.MountTools)
 	res.Ports = copyStringSlice(t.Ports)
@@ -614,5 +620,13 @@ func copyFloat64Ptr(f *float64) *float64 {
 		return nil
 	}
 	res := *f
+	return &res
+}
+
+func copyIntPtr(i *int) *int {
+	if i == nil {
+		return nil
+	}
+	res := *i
 	return &res
 }

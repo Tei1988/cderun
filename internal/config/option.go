@@ -219,3 +219,40 @@ func resolveFloat64Opt(
 	}
 	return 0
 }
+
+// resolveIntOpt resolves an int option through P1-P6.
+func resolveIntOpt(
+	def OptionDef[*int],
+	p1Set bool, p1Val int,
+	p2Set bool, p2Val int,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	fs FileSystem,
+) int {
+	if p1Set {
+		return p1Val
+	}
+	if p2Set {
+		return p2Val
+	}
+	if env := fs.Getenv(def.EnvKey); env != "" {
+		if i, err := strconv.Atoi(env); err == nil {
+			return i
+		}
+	}
+	if def.ToolGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if i := def.ToolGetter(tool); i != nil {
+				return *i
+			}
+		}
+	}
+	if def.GlobalGetter != nil && global != nil {
+		if i := def.GlobalGetter(*global); i != nil {
+			return *i
+		}
+	}
+	if def.Fallback != nil {
+		return *def.Fallback
+	}
+	return 0
+}

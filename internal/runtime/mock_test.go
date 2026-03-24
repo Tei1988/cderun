@@ -17,7 +17,7 @@ func TestUnit_Mock_Methods(t *testing.T) {
 	ctx := context.Background()
 
 	// PullImage
-	_ = mock.PullImage(ctx, "img", "always")
+	_ = mock.PullImage(ctx, "img", "always", 3, 1*time.Second)
 	assert.Equal(t, "img", mock.GetPulledImage())
 
 	// CreateContainer
@@ -85,7 +85,7 @@ func TestUnit_Mock_ConcurrentAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := range iterations {
-				_ = mock.PullImage(ctx, "img", "always")
+				_ = mock.PullImage(ctx, "img", "always", 3, 1*time.Second)
 				_ = mock.GetPulledImage()
 				_, _ = mock.CreateContainer(ctx, &container.ContainerConfig{})
 				_ = mock.GetCreatedConfig()

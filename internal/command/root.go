@@ -112,6 +112,10 @@ type rootOptions struct {
 	cderunMemory     string
 	cderunCPUs       float64
 	cderunDevices    []string
+	pullMaxRetries       int
+	cderunPullMaxRetries int
+	pullBackoffBase      string
+	cderunPullBackoffBase string
 
 	// Dependencies
 	fs           config.FileSystem
@@ -388,6 +392,14 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		PullSet:             cmd.Flags().Changed("pull"),
 		CderunPull:          o.cderunPull,
 		CderunPullSet:       cmd.Flags().Changed("cderun-pull"),
+		PullMaxRetries:           o.pullMaxRetries,
+		PullMaxRetriesSet:        cmd.Flags().Changed("pull-max-retries"),
+		CderunPullMaxRetries:    o.cderunPullMaxRetries,
+		CderunPullMaxRetriesSet: cmd.Flags().Changed("cderun-pull-max-retries"),
+		PullBackoffBase:         o.pullBackoffBase,
+		PullBackoffBaseSet:      cmd.Flags().Changed("pull-backoff-base"),
+		CderunPullBackoffBase:    o.cderunPullBackoffBase,
+		CderunPullBackoffBaseSet: cmd.Flags().Changed("cderun-pull-backoff-base"),
 		Memory:              o.memory,
 		MemorySet:           cmd.Flags().Changed("memory"),
 		CderunMemory:        o.cderunMemory,
@@ -685,7 +697,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 
 	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull); err != nil {
+	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
 		return 0, fmt.Errorf("failed to pull image: %w", err)
 	}
 

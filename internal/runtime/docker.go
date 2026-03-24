@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	pullMaxRetries         = 3
-	pullBackoffBase        = 1 * time.Second
 	attachCloseWriteGrace = 1 * time.Second
 )
 
@@ -92,16 +90,16 @@ func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt)
 }
 
 // PullImage pulls the specified image based on the pull policy.
-func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string) error {
+func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
 		return nil
 	}
 
 	var lastErr error
-	for i := range pullMaxRetries {
+	for i := 0; i < maxRetries; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, pullMaxRetries-1, img, lastErr)
-			if err := d.sleepFunc(ctx, time.Duration(1<<i)*pullBackoffBase); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
+			if err := d.sleepFunc(ctx, time.Duration(1<<i)*backoffBase); err != nil {
 				return err
 			}
 		}
@@ -145,7 +143,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", pullMaxRetries, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 }
 
 // CreateContainer creates a new container based on the provided config.

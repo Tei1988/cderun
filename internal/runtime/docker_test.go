@@ -56,7 +56,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 			},
 		}
 
-		err := runtime.PullImage(context.Background(), "alpine", "always")
+		err := runtime.PullImage(context.Background(), "alpine", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
 		assert.Equal(t, 3, mock.pullCount)
@@ -83,7 +83,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 			sleepFunc: noopSleepFunc,
 		}
 
-		err := runtime.PullImage(context.Background(), "alpine", "always")
+		err := runtime.PullImage(context.Background(), "alpine", "always", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
 	})
@@ -225,7 +225,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("never policy", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "never")
+		err := runtime.PullImage(context.Background(), "test", "never", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
 	})
@@ -233,7 +233,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("missing policy - exists", func(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: nil}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "missing")
+		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
 	})
@@ -241,7 +241,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("missing policy - unexpected error", func(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: errors.New("boom")}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "missing")
+		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
@@ -256,7 +256,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			return image.InspectResponse{}, nil
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "missing")
+		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
 		assert.Equal(t, 0, mock.pullCount)
@@ -273,7 +273,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			return image.InspectResponse{}, errNotFound{errors.New("not found")}
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "missing")
+		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
 		assert.Equal(t, 1, mock.pullCount)
@@ -283,7 +283,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("non-retryable pull error", func(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "always")
+		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image")
 		assert.Equal(t, 1, mock.pullCount)
@@ -294,7 +294,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			pullReader: io.NopCloser(strings.NewReader("invalid json")),
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "always")
+		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image (stream)")
 	})
@@ -308,7 +308,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			sleepFunc: noopSleepFunc,
 		}
 
-		err := runtime.PullImage(context.Background(), "test-image", "always")
+		err := runtime.PullImage(context.Background(), "test-image", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
 		assert.Equal(t, 3, mock.pullCount)
@@ -320,7 +320,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			client:    mock,
 			sleepFunc: noopSleepFunc,
 		}
-		err := runtime.PullImage(context.Background(), "test-image", "always")
+		err := runtime.PullImage(context.Background(), "test-image", "always", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 3, mock.pullCount)
 	})
@@ -335,7 +335,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 				return context.Canceled
 			},
 		}
-		err := runtime.PullImage(context.Background(), "test", "always")
+		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
 	})

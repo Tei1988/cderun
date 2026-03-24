@@ -55,11 +55,13 @@ func (m *MockRuntime) WithLockedMock(f func(m *MockRuntime)) {
 	f(m)
 }
 
-func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string) error {
+func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.PulledImage = image
 	m.PullPolicy = pullPolicy
+	_ = maxRetries
+	_ = backoffBase
 	return m.PullErr
 }
 
