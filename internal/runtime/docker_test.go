@@ -808,12 +808,18 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
 
+		done := make(chan struct{})
+		ready := make(chan struct{})
 		go func() {
-			time.Sleep(50 * time.Millisecond)
+			<-ready
+			close(done)
+		}()
+		go func() {
+			<-done
 			_ = pw.Close()
 		}()
 
-		err := runtime.AttachContainer(context.Background(), "id", false, &failingReader{}, nil, nil, nil)
+		err := runtime.AttachContainer(context.Background(), "id", false, &failingReader{}, nil, nil, ready)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "read error")
 	})
@@ -885,14 +891,20 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		}
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
 
+		done := make(chan struct{})
+		ready := make(chan struct{})
+		go func() {
+			<-ready
+			close(done)
+		}()
 		stdin := strings.NewReader("input")
 		go func() {
-			time.Sleep(50 * time.Millisecond)
+			<-done
 			_, _ = pw.Write([]byte("output"))
 			_ = pw.Close()
 		}()
 
-		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, nil)
+		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, ready)
 		require.NoError(t, err)
 	})
 }

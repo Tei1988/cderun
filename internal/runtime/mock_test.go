@@ -189,13 +189,14 @@ func TestUnit_Mock_WaitContainer_TimerStop(t *testing.T) {
 	mock := NewMockRuntime()
 	mock.WaitDelay = 10 * time.Millisecond
 
-	// This test exercises the !t.Stop() path in WaitContainer when the timer has already fired or stopped.
-	// Since we can't easily race the timer and the Stop call precisely,
-	// we use a very short delay and wait for it to finish.
+	// Wait for the duration of WaitDelay to ensure any internal timer would have fired,
+	// exercising the branch in WaitContainer where t.Stop() returns false.
 	time.Sleep(20 * time.Millisecond)
 
+	// Verifying that WaitContainer(ctx, "c1") returns context.Canceled when
+	// the context is already canceled before the call.
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel context to enter the select block with context cancelled
+	cancel()
 
 	_, err := mock.WaitContainer(ctx, "c1")
 	require.ErrorIs(t, err, context.Canceled)
