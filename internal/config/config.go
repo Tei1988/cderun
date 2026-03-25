@@ -376,6 +376,7 @@ func NewConfigLoader() *ConfigLoader {
 		fs:              RealFileSystem{},
 		systemConfigDir: "/etc/cderun",
 		runConfigDir:    "/run/cderun",
+		statCache:       make(map[string]statResult),
 	}
 }
 
@@ -385,6 +386,7 @@ func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 		fs:              fs,
 		systemConfigDir: defaultLoader.systemConfigDir,
 		runConfigDir:    defaultLoader.runConfigDir,
+		statCache:       make(map[string]statResult),
 	}
 }
 
