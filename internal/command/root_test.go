@@ -744,8 +744,70 @@ func TestUnit_Root_GetHangTimeout(t *testing.T) {
 	resolved := &config.ResolvedConfig{HangTimeout: 5 * time.Second}
 	assert.Equal(t, 5*time.Second, o.getHangTimeout(false, true, resolved))
 
-	// Case 3: Fallback to default (2s)
-	assert.Equal(t, 2*time.Second, o.getHangTimeout(false, false, nil))
+	// Case 3: Fallback to default (10s)
+	assert.Equal(t, 10*time.Second, o.getHangTimeout(false, false, nil))
+
+	// Case 4: Explicit 0
+	resolved0 := &config.ResolvedConfig{HangTimeout: 0}
+	assert.Equal(t, time.Duration(0), o.getHangTimeout(false, false, resolved0))
+}
+
+func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
+	t.Parallel()
+	waitStarted := make(chan struct{})
+	waitUnblock := make(chan struct{})
+	mockRuntime := &hangTimeoutMockRuntime{
+		MockRuntime: runtime.NewMockRuntime(),
+		waitStarted: waitStarted,
+		isRunning:   true,
+	}
+	mockRuntime.WaitFunc = func(ctx context.Context, id string) (int, error) {
+		close(waitStarted)
+		<-waitUnblock
+		return 0, nil
+	}
+
+	var logBuf safeBuffer
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "0"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.isTerminal = func(fd int) bool { return false }
+			o.exitFunc = func(code int) {}
+			cmd.SetErr(&logBuf)
+		})
+	}()
+
+	// Wait for container to start (WaitContainer is called)
+	select {
+	case <-waitStarted:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for WaitContainer to be called")
+	}
+
+	// Wait a bit to ensure it's not killing the container immediately
+	select {
+	case err := <-errCh:
+		t.Fatalf("Execute finished prematurely: %v", err)
+	case <-time.After(200 * time.Millisecond):
+		// Still waiting, good.
+	}
+
+	// Unblock WaitContainer
+	close(waitUnblock)
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for execution to finish")
+	}
+
+	assert.Contains(t, logBuf.String(), "IO finished, waiting indefinitely for container")
+	assert.Empty(t, mockRuntime.Signal)
 }
 
 func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
@@ -1811,6 +1873,9 @@ type hangTimeoutMockRuntime struct {
 }
 
 func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (int, error) {
+	if m.WaitFunc != nil {
+		return m.WaitFunc(ctx, id)
+	}
 	close(m.waitStarted)
 	<-ctx.Done()
 	return 137, ctx.Err()

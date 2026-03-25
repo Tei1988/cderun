@@ -140,7 +140,7 @@ type rootOptions struct {
 
 const (
 	attachGracePeriod = 5 * time.Second
-	hangTimeout       = 2 * time.Second
+	hangTimeout       = 10 * time.Second
 )
 
 var (
@@ -890,14 +890,15 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
 		// If host stdin is not a terminal, we use a much shorter timeout because we don't expect interactive behavior.
 		if !isHostStdinTerminal || !containerConfig.Interactive {
-			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
-			select {
-			case result := <-waitDone:
-				if result.err != nil {
-					return 0, fmt.Errorf("failed to wait for container: %w", result.err)
-				}
-				exitCode = result.code
-			case <-time.After(effectiveHangTimeout):
+			if effectiveHangTimeout > 0 {
+				o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
+				select {
+				case result := <-waitDone:
+					if result.err != nil {
+						return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+					}
+					exitCode = result.code
+				case <-time.After(effectiveHangTimeout):
 					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
 					if err != nil {
 						return 0, err
@@ -908,6 +909,15 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					case <-time.After(effectiveHangTimeout):
 						return exitCode, nil
 					}
+				}
+			} else {
+				// effectiveHangTimeout is 0, wait indefinitely
+				o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
+				result := <-waitDone
+				if result.err != nil {
+					return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+				}
+				exitCode = result.code
 			}
 		} else {
 			// TTY mode: it's normal to wait for container exit even after IO might seem "done"

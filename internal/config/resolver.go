@@ -487,7 +487,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		OptionDef[string]{EnvKey: "CDERUN_HANG_TIMEOUT",
 			ToolGetter:   func(t ToolConfig) string { return t.HangTimeout },
 			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.HangTimeout },
-			Fallback:     "2s"},
+			Fallback:     "10s"},
 		cli.CderunHangTimeoutSet, cli.CderunHangTimeout,
 		cli.HangTimeoutSet, cli.HangTimeout,
 		subcommand, tools, global, r, fs,

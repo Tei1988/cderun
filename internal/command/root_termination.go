@@ -14,11 +14,11 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool,
 		return 0
 	}
 
-	if resolved != nil && resolved.HangTimeout > 0 {
+	if resolved != nil {
 		return resolved.HangTimeout
 	}
 
-	// Fallback to default hangTimeout (e.g. 2s)
+	// Fallback to default hangTimeout (e.g. 10s)
 	return hangTimeout
 }
 
