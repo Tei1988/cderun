@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -351,14 +352,22 @@ func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(filename, data, perm)
 }
-func (RealFileSystem) RemoveAll(path string) error { return os.RemoveAll(path) }
+func (RealFileSystem) RemoveAll(path string) error     { return os.RemoveAll(path) }
 func (RealFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
+
+// statResult holds file info and any stat error.
+type statResult struct {
+	info os.FileInfo
+	err  error
+}
 
 // ConfigLoader handles finding and loading configuration files.
 type ConfigLoader struct {
 	fs              FileSystem
 	systemConfigDir string
 	runConfigDir    string
+	statCache       map[string]statResult
+	mu              sync.RWMutex
 }
 
 // NewConfigLoader creates a new ConfigLoader with a RealFileSystem.
@@ -367,6 +376,7 @@ func NewConfigLoader() *ConfigLoader {
 		fs:              RealFileSystem{},
 		systemConfigDir: "/etc/cderun",
 		runConfigDir:    "/run/cderun",
+		statCache:       make(map[string]statResult),
 	}
 }
 
@@ -376,6 +386,7 @@ func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 		fs:              fs,
 		systemConfigDir: defaultLoader.systemConfigDir,
 		runConfigDir:    defaultLoader.runConfigDir,
+		statCache:       make(map[string]statResult),
 	}
 }
 
@@ -400,6 +411,31 @@ func FindConfigs(filename string) []string {
 	return defaultLoader.FindConfigs(filename)
 }
 
+func (l *ConfigLoader) cachedStat(name string) (os.FileInfo, error) {
+	l.mu.RLock()
+	if l.statCache != nil {
+		if res, ok := l.statCache[name]; ok {
+			l.mu.RUnlock()
+			return res.info, res.err
+		}
+	}
+	l.mu.RUnlock()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.statCache == nil {
+		l.statCache = make(map[string]statResult)
+	}
+	// Double-check after acquiring write lock
+	if res, ok := l.statCache[name]; ok {
+		return res.info, res.err
+	}
+
+	info, err := l.fs.Stat(name)
+	l.statCache[name] = statResult{info: info, err: err}
+	return info, err
+}
+
 // FindConfigs searches for config files in hierarchical order using the loader's filesystem and directories.
 func (l *ConfigLoader) FindConfigs(filename string) []string {
 	var paths []string
@@ -407,7 +443,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 	if err == nil {
 		for {
 			p := filepath.Join(curr, filename)
-			if _, err := l.fs.Stat(p); err == nil {
+			if _, err := l.cachedStat(p); err == nil {
 				if abs, err := l.fs.Abs(p); err == nil {
 					paths = append(paths, abs)
 				} else {
@@ -425,7 +461,7 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 	// Add home dir
 	if home, err := l.fs.UserHomeDir(); err == nil {
 		p := filepath.Join(home, ".config", "cderun", filename)
-		if _, err := l.fs.Stat(p); err == nil {
+		if _, err := l.cachedStat(p); err == nil {
 			if abs, err := l.fs.Abs(p); err == nil {
 				paths = append(paths, abs)
 			} else {
@@ -436,13 +472,13 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 
 	// Add system path
 	p := filepath.Join(l.systemConfigDir, filename)
-	if _, err := l.fs.Stat(p); err == nil {
+	if _, err := l.cachedStat(p); err == nil {
 		paths = append(paths, p)
 	}
 
 	// Add run directory path (used for nested execution config injection)
 	p = filepath.Join(l.runConfigDir, filename)
-	if _, err := l.fs.Stat(p); err == nil {
+	if _, err := l.cachedStat(p); err == nil {
 		paths = append(paths, p)
 	}
 

@@ -44,11 +44,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Pwd:         pwd,
 		HostContext: hostCtx,
 		fileCache:   make(map[string]fileCacheEntry),
-		loader: &ConfigLoader{
-			fs:              fs,
-			systemConfigDir: defaultLoader.systemConfigDir,
-			runConfigDir:    defaultLoader.runConfigDir,
-		},
+		loader:      NewConfigLoaderWithFS(fs),
 	}, nil
 }
 
@@ -61,7 +57,7 @@ func (r *ExpressionResolver) Error() error {
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
-	clone:= *r
+	clone := *r
 	clone.HostContext = nil
 	return &clone
 }

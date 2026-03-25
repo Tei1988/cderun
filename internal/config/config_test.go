@@ -671,3 +671,39 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	})
 
 }
+
+func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
+	fs := &MockFileSystem{
+		WD:      "/work",
+		HomeDir: "/home/user",
+		Dirs: map[string]bool{
+			"/work":      true,
+			"/home/user": true,
+		},
+		Files: map[string][]byte{
+			"/work/.cderun.yaml": []byte("runtime: docker"),
+		},
+	}
+	loader := NewConfigLoaderWithFS(fs)
+
+	// First call to FindConfigs
+	paths1 := loader.FindConfigs(".cderun.yaml")
+	assert.Len(t, paths1, 1)
+	assert.Equal(t, "/work/.cderun.yaml", paths1[0])
+
+	count1 := len(fs.StatCalls)
+	assert.Positive(t, count1)
+
+	// Second call to FindConfigs for the same file should use cache
+	paths2 := loader.FindConfigs(".cderun.yaml")
+	assert.Equal(t, paths1, paths2)
+
+	count2 := len(fs.StatCalls)
+	assert.Equal(t, count1, count2, "Stat should not be called again for cached paths")
+
+	// Call for a different file should trigger more Stat calls
+	paths3 := loader.FindConfigs(".tools.yaml")
+	assert.Empty(t, paths3)
+	count3 := len(fs.StatCalls)
+	assert.Greater(t, count3, count2, "Stat should be called for new filename")
+}
