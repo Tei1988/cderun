@@ -5,7 +5,6 @@
 ## Expression
 
 ## Documentation
-- Update `docs/features/value-resolution.md` to include documentation for the `{{env:KEY:-default}}` syntax.
 
 ## Proposals
 
