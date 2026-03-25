@@ -1,43 +1,13 @@
 # TODO
 
-## Container Runtime
+## Code Improvement
 
-## Expression
+### P-1: Unified Option Definition Table
 
-## Documentation
-
-## Proposals
-
-### P-1: Table-Driven Flag Definitions (Priority: High)
-
-Adding a single flag currently requires changes across 5 locations:
-`rootOptions`, `CLIOptions`, `flags.go`, `resolveSettings()`, and `resolver.go`.
-
-Define a single table that drives everything:
-
-```go
-// internal/command/flagdefs.go
-type FlagDef struct {
-    Name      string // "tty"
-    Short     string // "t"
-    EnvKey    string // "CDERUN_TTY"
-    Type      string // "bool", "string", "stringSlice", "float64"
-    Default   any
-    Usage     string
-    ToolGet   func(config.ToolConfig) any
-    GlobalGet func(config.CDERunConfig) any
-}
-
-var flagDefs = []FlagDef{
-    {Name: "tty", Short: "t", EnvKey: "CDERUN_TTY", Type: "bool", Default: false,
-     Usage: "Allocate a pseudo-TTY",
-     ToolGet:   func(t config.ToolConfig) any { return t.TTY },
-     GlobalGet: func(g config.CDERunConfig) any { return g.Defaults.TTY }},
-    // ... one line per flag
-}
-```
-
-Replace `rootOptions` with `map[string]any` or struct+reflection, and generate
+Options are currently duplicated across `flags.go` (P1/P2), `resolver.go` (P3/P4/P5/P6),
+and `config.go`. Define a central `OptionRegistry` that maps flag names to their
+respective environment variables, YAML keys, and defaults.
+Use a unified schema like `map[string]any` or struct+reflection, and generate
 `registerFlags()` / `resolveSettings()` / `ResolveWithFS()` from this table via loops.
 
 Scope: `flags.go`, `root.go` (resolveSettings), `resolver.go` (ResolveWithFS), `option.go`
@@ -219,29 +189,6 @@ func toDockerContainerConfig(cc *container.ContainerConfig) (
 
 Move conversion logic from `CreateContainer` in `docker.go` to `docker_adapter.go`.
 Future Podman native API support only requires adding `podman_adapter.go`.
-
-### P-8: Cache `FindConfigs` Directory Traversal
-
-`FindConfigs` walks directories upward and calls `fs.Stat` for each candidate.
-It runs twice per execution (for `.cderun.yaml` and `.tools.yaml`), duplicating Stat calls.
-
-Add a per-instance cache to `ConfigLoader`:
-
-```go
-type ConfigLoader struct {
-    fs        FileSystem
-    statCache map[string]statResult
-}
-
-type statResult struct {
-    info os.FileInfo
-    err  error
-}
-```
-
-Route `FindConfigs` Stat calls through the cache. Scoped to a single `ConfigLoader`
-instance, so no state leaks between executions. Reduces redundant Stat calls during
-nested execution where both config files are searched.
 
 ### P-9: Add containerd Runtime Support (Priority: Medium)
 

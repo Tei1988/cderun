@@ -17,6 +17,7 @@ type MockFileSystem struct {
 	ExecPath     string
 	ExecErr      error
 	StatErr      error
+	StatCalls    []string
 	ReadFileErr  error
 	MkdirAllErr  error
 	WriteFileErr error
@@ -43,6 +44,7 @@ func (m *mockFileInfo) IsDir() bool        { return m.isDir }
 func (m *mockFileInfo) Sys() any           { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
+	m.StatCalls = append(m.StatCalls, name)
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}
@@ -137,12 +139,12 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 		return nil
 	}
 	for d := range m.Dirs {
-		if d == path || (strings.HasPrefix(d, path) && (d[len(path)] == '/' || d[len(path)] == '\\')) {
+		if d == path || (strings.HasPrefix(d, path) && len(d) > len(path) && (d[len(path)] == '/' || d[len(path)] == '\\')) {
 			delete(m.Dirs, d)
 		}
 	}
 	for f := range m.Files {
-		if f == path || (strings.HasPrefix(f, path) && (f[len(path)] == '/' || f[len(path)] == '\\')) {
+		if f == path || (strings.HasPrefix(f, path) && len(f) > len(path) && (f[len(path)] == '/' || f[len(path)] == '\\')) {
 			delete(m.Files, f)
 		}
 	}
