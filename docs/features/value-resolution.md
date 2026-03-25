@@ -55,7 +55,7 @@ cderun --mount type=bind,source="{{find_dir:.git}}/node_modules",target=/node_mo
 ```bash
 cderun --workdir="{{PWD}}/src" node app.js
 cderun --image="node:{{env:NODE_VERSION}}" node --version
-# 環境変数が未設定の場合のデフォルト値を指定する例
+# 環境変数が未設定または空の場合のデフォルト値を指定する例
 cderun --image="node:{{env:NODE_VERSION:-20-alpine}}" node --version
 ```
 
