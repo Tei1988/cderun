@@ -1,7 +1,6 @@
 package config
 
 import (
-	"sync"
 	"bytes"
 	"errors"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -352,7 +352,7 @@ func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(filename, data, perm)
 }
-func (RealFileSystem) RemoveAll(path string) error { return os.RemoveAll(path) }
+func (RealFileSystem) RemoveAll(path string) error     { return os.RemoveAll(path) }
 func (RealFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
 
 // statResult holds file info and any stat error.
