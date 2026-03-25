@@ -692,7 +692,7 @@ func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
 	assert.Equal(t, "/work/.cderun.yaml", paths1[0])
 
 	count1 := len(fs.StatCalls)
-	assert.Greater(t, count1, 0)
+	assert.Positive(t, count1)
 
 	// Second call to FindConfigs for the same file should use cache
 	paths2 := loader.FindConfigs(".cderun.yaml")
@@ -703,7 +703,7 @@ func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
 
 	// Call for a different file should trigger more Stat calls
 	paths3 := loader.FindConfigs(".tools.yaml")
-	assert.Len(t, paths3, 0)
+	assert.Empty(t, paths3)
 	count3 := len(fs.StatCalls)
 	assert.Greater(t, count3, count2, "Stat should be called for new filename")
 }
