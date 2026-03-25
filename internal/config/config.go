@@ -355,7 +355,7 @@ func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) 
 func (RealFileSystem) RemoveAll(path string) error { return os.RemoveAll(path) }
 func (RealFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
 
-// ConfigLoader handles finding and loading configuration files.
+// statResult holds file info and any stat error.
 type statResult struct {
 	info os.FileInfo
 	err  error

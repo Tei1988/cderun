@@ -166,7 +166,7 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 		return r.resolveEnv(after)
 	}
 
-	return "{{" + content + "}}" , nil // Keep as is if unknown
+	return "{{" + content + "}}", nil // Keep as is if unknown
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
