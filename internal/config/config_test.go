@@ -139,10 +139,14 @@ defaults:
 		}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		paths := loader.FindConfigs(".cderun.yaml")
-		assert.Contains(t, paths, "/a/b/c/.cderun.yaml")
-		assert.Contains(t, paths, "/a/.cderun.yaml")
-		assert.Contains(t, paths, "/.cderun.yaml")
-		assert.NotContains(t, paths, "/a/b/.cderun.yaml")
+
+		// Assert exact order: current dir -> parents -> root
+		expected := []string{
+			"/a/b/c/.cderun.yaml",
+			"/a/.cderun.yaml",
+			"/.cderun.yaml",
+		}
+		assert.Equal(t, expected, paths)
 	})
 
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
