@@ -478,6 +478,38 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ssh://git@github.com/org/repo", val)
 	})
+
+	t.Run("resolveVolumePath - no separator", func(t *testing.T) {
+		val, err := resolveVolumePath("my-volume", "/base", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "my-volume", val)
+	})
+
+	t.Run("resolveDevicePath - no separator", func(t *testing.T) {
+		val, err := resolveDevicePath("/dev/fuse", "/base", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/dev/fuse", val)
+	})
+
+	t.Run("resolveVolumePath - ResolvePath error", func(t *testing.T) {
+		mfs := &customMockFS{
+			homeDirErr: assert.AnError,
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = resolveVolumePath("~/host:/container", "/base", r)
+		require.Error(t, err)
+	})
+
+	t.Run("resolveDevicePath - ResolvePath error", func(t *testing.T) {
+		mfs := &customMockFS{
+			homeDirErr: assert.AnError,
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = resolveDevicePath("~/dev:/dev", "/base", r)
+		require.Error(t, err)
+	})
 }
 
 func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {
