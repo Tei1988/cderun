@@ -83,6 +83,50 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
+	t.Run("resolveIntOpt", func(t *testing.T) {
+		def := OptionDef[*int]{
+			EnvKey:   "TEST_INT",
+			Fallback: ptr(10),
+		}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
+
+		// Env
+		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 20, res)
+
+		// Fallback
+		mfs.Env = nil
+		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 10, res)
+
+		// Invalid env
+		mfs.Env = map[string]string{"TEST_INT": "invalid"}
+		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Equal(t, 10, res)
+
+		// Tool getter
+		mfs.Env = nil
+		i2 := 30
+		def.ToolGetter = func(tc ToolConfig) *int { return &i2 }
+		res = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		assert.Equal(t, 30, res)
+
+		// Global getter
+		def.ToolGetter = nil
+		i3 := 40
+		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
+		res = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		assert.Equal(t, 40, res)
+
+		// P2 CLI
+		res = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		assert.Equal(t, 50, res)
+
+		// P1 Override
+		res = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		assert.Equal(t, 60, res)
+	})
+
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		r, _ := NewExpressionResolver(nil)
 		mfs := &MockFileSystem{}

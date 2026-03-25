@@ -122,6 +122,33 @@ defaults:
 		assert.Equal(t, "host", cfg.Defaults.Network)
 	})
 
+	t.Run("FindConfigs hierarchical search", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Dirs: map[string]bool{
+				"/a/b/c": true,
+				"/a/b":   true,
+				"/a":     true,
+				"/":      true,
+			},
+			Files: map[string][]byte{
+				"/a/b/c/.cderun.yaml": []byte(""),
+				"/a/.cderun.yaml":     []byte(""),
+				"/.cderun.yaml":        []byte(""),
+			},
+			WD: "/a/b/c",
+		}
+		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
+		paths := loader.FindConfigs(".cderun.yaml")
+
+		// Assert exact order: current dir -> parents -> root
+		expected := []string{
+			"/a/b/c/.cderun.yaml",
+			"/a/.cderun.yaml",
+			"/.cderun.yaml",
+		}
+		assert.Equal(t, expected, paths)
+	})
+
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
 		content := `
 hostContext:
@@ -427,6 +454,18 @@ func TestUnit_Config_Helpers(t *testing.T) {
 
 	t.Run("copyFloat64Ptr nil", func(t *testing.T) {
 		assert.Nil(t, copyFloat64Ptr(nil))
+	})
+
+	t.Run("copyIntPtr nil", func(t *testing.T) {
+		assert.Nil(t, copyIntPtr(nil))
+	})
+
+	t.Run("copyIntPtr non-nil", func(t *testing.T) {
+		i := 123
+		res := copyIntPtr(&i)
+		assert.NotNil(t, res)
+		assert.Equal(t, i, *res)
+		assert.NotSame(t, &i, res)
 	})
 }
 
