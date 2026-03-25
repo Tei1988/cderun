@@ -494,6 +494,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	)
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
+			if d < 0 {
+				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
+			}
 			res.HangTimeout = d
 		} else {
 			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
