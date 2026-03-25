@@ -523,7 +523,10 @@ cderun --log-timestamp=false node app.js
     `--cderun-log-level`, `--cderun-log-format`,
     `--cderun-log-timestamp`
 
-- **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります。
+- **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります（Diagnosis Mode を除く）。
+- **配置規則**:
+  - **Wrapper Mode**: 必ずサブコマンドの後ろに配置してください。
+  - **Diagnosis Mode**: サブコマンドがないため、任意の場所に配置可能です。
 
 ## その他の設定オプション
 
@@ -606,14 +609,18 @@ cderun node --tty --version
 ---
 *2026年3月14日時点の仕様である。*
 
-**例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。
+**例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、通常**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。ただし、サブコマンドを必要としない **Diagnosis Mode** では任意の場所に配置できます。
 
 ```bash
-# 正しい（内部オーバーライドフラグ）
+# 正しい（Wrapper Mode での内部オーバーライドフラグ）
 cderun node --version --cderun-tty
 
-# 間違い
+# 間違い（Wrapper Mode）
 cderun --cderun-tty node --version
+
+# 正しい（Diagnosis Mode）
+cderun --diagnosis --cderun-log-level=debug
+cderun --cderun-log-level=debug --diagnosis
 ```
 
 ### 短縮形
