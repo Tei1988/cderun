@@ -80,6 +80,7 @@ jobs:
              - **機能の維持**: 既存の機能（特に複雑な引数パース、ネスト実行時のパス解決など）の挙動を一切破壊しないこと。
              - **可読性とのバランス**: 処理速度と引き換えに、過度に可読性や保守性を損なうような「黒魔術的」でトリッキーなコードは避けてください。
         EOF
+            ;;
           5)
             read -r -d '' CURRENT_TASK <<'EOF'
         # Current Task: Refactoring & Tech Debt Reduction
@@ -143,7 +144,6 @@ jobs:
           cat full_prompt.txt
           echo "EOF"
         } >> "$GITHUB_ENV"
-        echo "::set-output name=PROMPT::$CURRENT_TASK"
     - name: Call Jules API
       env:
         JULES_KEY: ${{ secrets.JULES_KEY }}
