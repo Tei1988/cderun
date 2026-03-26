@@ -459,13 +459,13 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 	t.Run("CDERunConfig SetBaseDir HostContext resolution", func(t *testing.T) {
 		cfg := &CDERunConfig{
 			HostContext: &HostContext{
-				Mounts: []MountMapping{{Source: "/relative"}},
+				Mounts: []MountMapping{{Source: "/absolute/path"}},
 			},
 		}
 		// SetBaseDir calls ResolvePath(..., nil) which uses RealFileSystem.
 		err := cfg.SetBaseDir("/base")
 		require.NoError(t, err)
-		assert.Equal(t, "/relative", cfg.HostContext.Mounts[0].Source)
+		assert.Equal(t, "/absolute/path", cfg.HostContext.Mounts[0].Source)
 
 		cfg.HostContext.Mounts[0].Source = "./rel"
 		err = cfg.SetBaseDir("/base")

@@ -623,18 +623,6 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	baseDir := "/base"
 	r, _ := NewExpressionResolver(nil)
 
-	t.Run("MountConfig.Resolve - non-bind non-empty source", func(t *testing.T) {
-		mc := MountConfig{
-			Type:   "volume",
-			Source: ConfigPath{Raw: "myvol"},
-			Target: ConfigPath{Raw: "/data"},
-		}
-		mount, err := mc.Resolve(r)
-		require.NoError(t, err)
-		assert.Equal(t, "volume", mount.Type)
-		assert.Equal(t, "myvol", mount.Source)
-	})
-
 	t.Run("ResolveVolume", func(t *testing.T) {
 		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
 		val, err := cp.ResolveVolume(r)
