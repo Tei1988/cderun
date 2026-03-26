@@ -105,7 +105,7 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 - `--pull-max-retries`: Maximum number of retries for image pull. (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
-- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `2s`). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
+- `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
 
 #### Network & Ports
 
