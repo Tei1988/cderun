@@ -337,7 +337,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		}
 		p = resolved
 	} else {
-		expanded, err := expandHome(p, fs)
+		expanded, err := expandHome(p, "", fs)
 		if err != nil {
 			return "", err
 		}

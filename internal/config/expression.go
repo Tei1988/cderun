@@ -98,7 +98,7 @@ func (r *ExpressionResolver) ResolveString(s string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
-	if r.err != nil {
+	if r.err != nil || s == "" {
 		return s
 	}
 
@@ -125,7 +125,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	}
 
 	// 2. Expand ~ if it's at the beginning
-	expanded, err := expandHome(resolved, r.fs)
+	expanded, err := expandHome(resolved, r.Home, r.fs)
 	if err != nil {
 		r.setError(err)
 		return resolved
@@ -174,8 +174,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	if cached, ok := r.fileCache[filename]; ok {
-		return cached.content, cached.err
+	if r.fileCache != nil {
+		if cached, ok := r.fileCache[filename]; ok {
+			return cached.content, cached.err
+		}
+	} else {
+		r.fileCache = make(map[string]fileCacheEntry)
 	}
 
 	paths := r.loader.FindConfigs(filename)

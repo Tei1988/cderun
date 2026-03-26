@@ -304,11 +304,14 @@ func copyStringSlice(s []string) []string {
 	return res
 }
 
-func expandHome(p string, fs FileSystem) (string, error) {
+func expandHome(p string, home string, fs FileSystem) (string, error) {
 	if strings.HasPrefix(p, "~/") || p == "~" {
-		home, err := fs.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
+		if home == "" {
+			var err error
+			home, err = fs.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("failed to get home directory: %w", err)
+			}
 		}
 		if p == "~" {
 			return home, nil
@@ -423,12 +426,13 @@ func (l *ConfigLoader) cachedStat(name string) (os.FileInfo, error) {
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.statCache == nil {
-		l.statCache = make(map[string]statResult)
-	}
 	// Double-check after acquiring write lock
-	if res, ok := l.statCache[name]; ok {
-		return res.info, res.err
+	if l.statCache != nil {
+		if res, ok := l.statCache[name]; ok {
+			return res.info, res.err
+		}
+	} else {
+		l.statCache = make(map[string]statResult)
 	}
 
 	info, err := l.fs.Stat(name)
@@ -592,7 +596,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
-	expanded, err := expandHome(path, l.fs)
+	expanded, err := expandHome(path, "", l.fs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -622,7 +626,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
-	expanded, err := expandHome(path, l.fs)
+	expanded, err := expandHome(path, "", l.fs)
 	if err != nil {
 		return nil, nil, err
 	}
