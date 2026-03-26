@@ -149,6 +149,20 @@ defaults:
 		assert.Equal(t, expected, paths)
 	})
 
+	t.Run("FindConfigs Abs failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/a/.cderun.yaml": []byte("")},
+				Dirs:  map[string]bool{"/a": true},
+				WD:    "/a",
+			},
+			absErr: assert.AnError,
+		}
+		loader := &ConfigLoader{fs: mfs}
+		paths := loader.FindConfigs(".cderun.yaml")
+		assert.Contains(t, paths, "/a/.cderun.yaml") // Still included even if Abs fails, using the calculated path
+	})
+
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
 		content := `
 hostContext:
@@ -441,6 +455,23 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
 		assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
 	})
+
+	t.Run("CDERunConfig SetBaseDir HostContext resolution", func(t *testing.T) {
+		cfg := &CDERunConfig{
+			HostContext: &HostContext{
+				Mounts: []MountMapping{{Source: "/relative"}},
+			},
+		}
+		// SetBaseDir calls ResolvePath(..., nil) which uses RealFileSystem.
+		err := cfg.SetBaseDir("/base")
+		require.NoError(t, err)
+		assert.Equal(t, "/relative", cfg.HostContext.Mounts[0].Source)
+
+		cfg.HostContext.Mounts[0].Source = "./rel"
+		err = cfg.SetBaseDir("/base")
+		require.NoError(t, err)
+		assert.Equal(t, "/base/rel", cfg.HostContext.Mounts[0].Source)
+	})
 }
 
 func TestUnit_Config_Helpers(t *testing.T) {
@@ -706,4 +737,23 @@ func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
 	assert.Empty(t, paths3)
 	count3 := len(fs.StatCalls)
 	assert.Greater(t, count3, count2, "Stat should be called for new filename")
+}
+
+func TestUnit_Config_CachedStat_DoubleCheck(t *testing.T) {
+	fs := &MockFileSystem{
+		Files: map[string][]byte{"/test": []byte("foo")},
+	}
+	loader := NewConfigLoaderWithFS(fs)
+
+	// Access via cachedStat directly
+	_, err := loader.cachedStat("/test")
+	require.NoError(t, err)
+
+	// stats should be 1
+	assert.Len(t, fs.StatCalls, 1)
+
+	// Access again
+	_, err = loader.cachedStat("/test")
+	require.NoError(t, err)
+	assert.Len(t, fs.StatCalls, 1)
 }

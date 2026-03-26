@@ -332,6 +332,64 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		// Subsequent call should stay in error state
 		val := r.resolveString("{{ PWD }}")
 		assert.Equal(t, "{{ PWD }}", val) // Unchanged because of sticky error
+
+		// Resolve should also be affected
+		res := r.Resolve("{{ PWD }}")
+		assert.Equal(t, "{{ PWD }}", res)
+	})
+}
+
+func TestUnit_Expression_Resolve_Complex(t *testing.T) {
+	fs := &MockFileSystem{
+		WD: "/work",
+	}
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
+
+	t.Run("Resolve []any", func(t *testing.T) {
+		input := []any{"{{PWD}}", 123, []any{"{{PWD}}"}}
+		expected := []any{"/work", 123, []any{"/work"}}
+		actual := r.Resolve(input)
+		assert.Equal(t, expected, actual)
+	})
+
+	t.Run("Resolve map[string]any", func(t *testing.T) {
+		input := map[string]any{
+			"a": "{{PWD}}",
+			"b": 456,
+			"c": map[string]any{"d": "{{PWD}}"},
+		}
+		expected := map[string]any{
+			"a": "/work",
+			"b": 456,
+			"c": map[string]any{"d": "/work"},
+		}
+		actual := r.Resolve(input)
+		assert.Equal(t, expected, actual)
+	})
+
+	t.Run("Resolve other types", func(t *testing.T) {
+		assert.Equal(t, 123, r.Resolve(123))
+		assert.Equal(t, true, r.Resolve(true))
+	})
+}
+
+func TestUnit_Expression_Security_Advanced(t *testing.T) {
+	fs := &MockFileSystem{WD: "/work"}
+	r, _ := NewExpressionResolverWithFS(nil, fs)
+
+	t.Run("resolveFindDir absolute path", func(t *testing.T) {
+		r2 := *r
+		r2.resolveString("{{ find_dir:/etc }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "absolute paths")
+	})
+
+	t.Run("resolveFindDir parent directory", func(t *testing.T) {
+		r2 := *r
+		r2.resolveString("{{ find_dir:../secret }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "parent directory references")
 	})
 }
 
