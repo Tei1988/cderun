@@ -55,6 +55,7 @@ type Mount struct {
 	Source   string `json:"source,omitempty" yaml:"source,omitempty"`
 	Target   string `json:"target" yaml:"target"`
 	ReadOnly bool   `json:"read_only,omitempty" yaml:"read_only,omitempty"`
+	Optional bool   `json:"optional,omitempty" yaml:"optional,omitempty"`
 }
 
 // DeviceMapping represents a host device to container device mapping.

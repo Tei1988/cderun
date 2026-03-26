@@ -684,3 +684,50 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Contains(t, err.Error(), "file not found")
 	})
 }
+
+func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{
+		WD: "/app",
+		Files: map[string][]byte{
+			"/app/exists": []byte("content"),
+		},
+	}
+
+	t.Run("Skip optional mount when source is missing", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"source=/app/missing,target=/data,optional"},
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.Mounts)
+	})
+
+	t.Run("Keep optional mount when source exists", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"source=/app/exists,target=/data,optional"},
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/app/exists", res.Mounts[0].Source)
+		assert.True(t, res.Mounts[0].Optional)
+	})
+
+	t.Run("Non-optional mount remains even if source is missing (handled by runtime)", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"source=/app/missing,target=/data"},
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/app/missing", res.Mounts[0].Source)
+		assert.False(t, res.Mounts[0].Optional)
+	})
+}

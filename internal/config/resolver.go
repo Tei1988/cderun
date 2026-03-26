@@ -950,6 +950,17 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 
 	var res []container.Mount
 	for _, mc := range mcs {
+		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
+			hostPath, err := mc.Source.Resolve(r.WithoutHostContext())
+			if err != nil {
+				return nil, err
+			}
+			if _, err := fs.Stat(hostPath); err != nil {
+				// Skip if source doesn't exist
+				continue
+			}
+		}
+
 		resolved, err := mc.Resolve(r)
 		if err != nil {
 			return nil, err

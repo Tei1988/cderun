@@ -155,6 +155,18 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, "/d", mc.Target.Raw)
 		assert.True(t, mc.ReadOnly)
 
+		mc, err = ParseMountFlag("source=./data,target=/app/data,optional")
+		require.NoError(t, err)
+		assert.True(t, mc.Optional)
+
+		mc, err = ParseMountFlag("source=./data,target=/app/data,optional=true")
+		require.NoError(t, err)
+		assert.True(t, mc.Optional)
+
+		mc, err = ParseMountFlag("source=./data,target=/app/data,optional=false")
+		require.NoError(t, err)
+		assert.False(t, mc.Optional)
+
 		_, err = ParseMountFlag("invalid-format")
 		require.Error(t, err)
 
