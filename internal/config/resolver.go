@@ -487,13 +487,16 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		OptionDef[string]{EnvKey: "CDERUN_HANG_TIMEOUT",
 			ToolGetter:   func(t ToolConfig) string { return t.HangTimeout },
 			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.HangTimeout },
-			Fallback:     "2s"},
+			Fallback:     "10s"},
 		cli.CderunHangTimeoutSet, cli.CderunHangTimeout,
 		cli.HangTimeoutSet, cli.HangTimeout,
 		subcommand, tools, global, r, fs,
 	)
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
+			if d < 0 {
+				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
+			}
 			res.HangTimeout = d
 		} else {
 			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)

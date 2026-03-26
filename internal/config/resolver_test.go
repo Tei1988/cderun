@@ -135,6 +135,13 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
 
+	t.Run("negative hang-timeout duration", func(t *testing.T) {
+		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
+		_, err := Resolve("node", cli, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duration cannot be negative")
+	})
+
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
 		r, _ := NewExpressionResolverWithFS(nil, mfs)
