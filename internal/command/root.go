@@ -558,22 +558,24 @@ type diagnosticsInfo struct {
 func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
 	switch strings.ToLower(format) {
 	case "json":
-		data, err := o.jsonMarshalIndent(data, "", "  ")
+		marshaled, err := o.jsonMarshalIndent(data, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		_, err = fmt.Fprintln(w, string(data))
+		_, err = fmt.Fprintln(w, string(marshaled))
 		return err
 	case "simple":
 		simpleWriter(w)
 		return nil
-	default: // Default to YAML
-		data, err := o.yamlMarshal(data)
+	case "yaml", "": // Default to YAML if format is empty
+		marshaled, err := o.yamlMarshal(data)
 		if err != nil {
 			return fmt.Errorf("failed to marshal YAML: %w", err)
 		}
-		_, err = fmt.Fprint(w, string(data))
+		_, err = fmt.Fprint(w, string(marshaled))
 		return err
+	default:
+		return fmt.Errorf("unsupported output format: %q", format)
 	}
 }
 
