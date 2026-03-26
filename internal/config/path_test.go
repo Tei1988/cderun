@@ -142,12 +142,18 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, "/app/data", mc.Target.Raw)
 		assert.True(t, mc.ReadOnly)
 
-		mc, err = ParseMountFlag("source=/host/path,target=/container/path")
+		mc, err = ParseMountFlag("source=/host/path,target=/container/path,readonly=false")
 		require.NoError(t, err)
 		assert.Equal(t, "bind", mc.Type)
 		assert.Equal(t, "/host/path", mc.Source.Raw)
 		assert.Equal(t, "/container/path", mc.Target.Raw)
 		assert.False(t, mc.ReadOnly)
+
+		mc, err = ParseMountFlag("src=/s,dst=/d,readonly=true")
+		require.NoError(t, err)
+		assert.Equal(t, "/s", mc.Source.Raw)
+		assert.Equal(t, "/d", mc.Target.Raw)
+		assert.True(t, mc.ReadOnly)
 
 		_, err = ParseMountFlag("invalid-format")
 		require.Error(t, err)
@@ -159,6 +165,9 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		_, err = ParseMountFlag("type=bind,source=./src,target=/dst,readonly=invalid")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid readonly value")
+
+		_, err = ParseMountFlag("type=bind,src=/s,target=/t,unknown=val")
+		require.NoError(t, err) // unknown keys are ignored
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
@@ -444,6 +453,48 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		val, err := cp.Resolve(nil)
 		require.NoError(t, err)
 		assert.Empty(t, val)
+	})
+
+	t.Run("MountConfig.Resolve - Source error", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "{{file:missing}}"},
+			Target: ConfigPath{Raw: "/target"},
+		}
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		_, err := mc.Resolve(r)
+		require.Error(t, err)
+	})
+
+	t.Run("MountConfig.Resolve - Target error", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/source"},
+			Target: ConfigPath{Raw: "{{file:missing}}"},
+		}
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		_, err := mc.Resolve(r)
+		require.Error(t, err)
+	})
+
+	t.Run("DeviceConfig.Resolve - Source error", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "{{file:missing}}"},
+			Destination: ConfigPath{Raw: "/dev/v"},
+		}
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		_, err := dc.Resolve(r)
+		require.Error(t, err)
+	})
+
+	t.Run("DeviceConfig.Resolve - Destination error", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/h"},
+			Destination: ConfigPath{Raw: "{{file:missing}}"},
+		}
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		_, err := dc.Resolve(r)
+		require.Error(t, err)
 	})
 
 	t.Run("ResolvePath empty", func(t *testing.T) {

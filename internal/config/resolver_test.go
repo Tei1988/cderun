@@ -135,6 +135,14 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
 
+	t.Run("resolveEnvValues with expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r.setError(assert.AnError)
+		_, err := resolveEnvValues([]string{"ANY"}, false, r, mfs)
+		require.Error(t, err)
+	})
+
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
 		_, err := Resolve("node", cli, nil, nil)
@@ -577,6 +585,18 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found")
 
+		// resolveDevices invalid format in CLI
+		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
+		_, err = ResolveWithFS("sh", cliDev, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device config")
+
+		// resolveMounts invalid format in CLI
+		cliMnt := CLIOptions{Image: "alpine", ImageSet: true, Mounts: []string{"invalid"}}
+		_, err = ResolveWithFS("sh", cliMnt, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid mount config")
+
 		// invalid memory
 		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
@@ -617,5 +637,50 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/s", res.Mounts[0].Source)
+	})
+
+	t.Run("PullMaxRetries and PullBackoffBase errors", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := CLIOptions{Image: "alpine", ImageSet: true}
+
+		// PullMaxRetries <= 0
+		cli.CderunPullMaxRetries = 0
+		cli.CderunPullMaxRetriesSet = true
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be greater than 0")
+
+		// PullBackoffBase invalid
+		cli.CderunPullMaxRetries = 3
+		cli.CderunPullBackoffBase = "invalid"
+		cli.CderunPullBackoffBaseSet = true
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+
+		// PullBackoffBase non-positive
+		cli.CderunPullBackoffBase = "0s"
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be positive")
+	})
+
+	t.Run("Memory and Expression errors", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := CLIOptions{Image: "alpine", ImageSet: true}
+
+		// Invalid memory format
+		cli.CderunMemory = "invalid"
+		cli.CderunMemorySet = true
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value")
+
+		// Expression error already present
+		mfsExpr := &MockFileSystem{WD: "/app"}
+		cliExpr := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}, Memory: "1G", MemorySet: true}
+		_, err = ResolveWithFS("node", cliExpr, nil, nil, mfsExpr)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
 	})
 }
