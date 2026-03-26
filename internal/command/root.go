@@ -555,6 +555,30 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
+func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
+	switch strings.ToLower(format) {
+	case "json":
+		marshaled, err := o.jsonMarshalIndent(data, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		_, err = fmt.Fprintln(w, string(marshaled))
+		return err
+	case "simple":
+		simpleWriter(w)
+		return nil
+	case "yaml", "": // Default to YAML if format is empty
+		marshaled, err := o.yamlMarshal(data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal YAML: %w", err)
+		}
+		_, err = fmt.Fprint(w, string(marshaled))
+		return err
+	default:
+		return fmt.Errorf("unsupported output format: %q", format)
+	}
+}
+
 func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	o.ensureHooks()
 	info := diagnosticsInfo{}
@@ -572,66 +596,45 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	}
 	sort.Strings(info.AvailableTools)
 
-	switch strings.ToLower(resolved.DiagnosisFormat) {
-	case "json":
-		data, err := o.jsonMarshalIndent(info, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
-	default: // Default to YAML
-		data, err := o.yamlMarshal(info)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
-	}
-	return nil
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) {
+		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
+		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
+		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
+		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
+		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+	})
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	o.ensureHooks()
-	switch strings.ToLower(resolved.DryRunFormat) {
-	case "json":
-		data, err := o.jsonMarshalIndent(containerConfig, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-	case "simple":
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Image: %s\n", containerConfig.Image)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Command: %s\n", strings.Join(containerConfig.Command, " "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "TTY: %v\n", containerConfig.TTY)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Interactive: %v\n", containerConfig.Interactive)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Network: %s\n", containerConfig.Network)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Remove: %v\n", containerConfig.Remove)
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, containerConfig, func(w io.Writer) {
+		_, _ = fmt.Fprintf(w, "Image: %s\n", containerConfig.Image)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(containerConfig.Command, " "))
+		_, _ = fmt.Fprintf(w, "TTY: %v\n", containerConfig.TTY)
+		_, _ = fmt.Fprintf(w, "Interactive: %v\n", containerConfig.Interactive)
+		_, _ = fmt.Fprintf(w, "Network: %s\n", containerConfig.Network)
+		_, _ = fmt.Fprintf(w, "Remove: %v\n", containerConfig.Remove)
 		var mounts []string
 		for _, m := range containerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workdir: %s\n", containerConfig.Workdir)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "User: %s\n", containerConfig.User)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "PublishAll: %v\n", containerConfig.PublishAll)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Hostname: %s\n", containerConfig.Hostname)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Privileged: %v\n", containerConfig.Privileged)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pull: %s\n", containerConfig.Pull)
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "CPUs: %g\n", containerConfig.CPUs)
+		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		_, _ = fmt.Fprintf(w, "Workdir: %s\n", containerConfig.Workdir)
+		_, _ = fmt.Fprintf(w, "User: %s\n", containerConfig.User)
+		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
+		_, _ = fmt.Fprintf(w, "PublishAll: %v\n", containerConfig.PublishAll)
+		_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
+		_, _ = fmt.Fprintf(w, "Hostname: %s\n", containerConfig.Hostname)
+		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
+		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
+		_, _ = fmt.Fprintf(w, "Privileged: %v\n", containerConfig.Privileged)
+		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
+		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
+		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
+		_, _ = fmt.Fprintf(w, "Pull: %s\n", containerConfig.Pull)
+		_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
+		_, _ = fmt.Fprintf(w, "CPUs: %g\n", containerConfig.CPUs)
 		var devices []string
 		for _, d := range containerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
@@ -640,15 +643,8 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 			}
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Devices: %s\n", strings.Join(devices, ", "))
-	default: // Default to YAML
-		data, err := o.yamlMarshal(containerConfig)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		_, _ = fmt.Fprint(cmd.OutOrStdout(), string(data))
-	}
-	return nil
+		_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
+	})
 }
 
 func getFd(r any) (int, bool) {

@@ -113,33 +113,6 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 
 Production and test paths become identical. No state leaks between runs.
 
-### P-5: Unify Format Output for dry-run / diagnosis
-
-Both `handleDryRun` and `handleDiagnosis` duplicate the same json/yaml/simple switch.
-Extract a shared helper:
-
-```go
-func writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
-    switch strings.ToLower(format) {
-    case "json":
-        enc := json.NewEncoder(w)
-        enc.SetIndent("", "  ")
-        return enc.Encode(data)
-    case "simple":
-        simpleWriter(w)
-        return nil
-    default:
-        d, err := yaml.Marshal(data)
-        if err != nil { return err }
-        _, err = w.Write(d)
-        return err
-    }
-}
-```
-
-Each handler only provides its `simpleWriter` closure. Adding a new format (e.g., TOML)
-requires a single change.
-
 ### P-6: Typed Error Handling
 
 All errors are currently `fmt.Errorf` strings, making programmatic error inspection difficult.
