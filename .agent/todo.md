@@ -264,4 +264,12 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 ## Hang Timeout
 - CodeRabbit CLI を cderun 経由で実行すると、処理途中で exit status 137 (SIGKILL) により強制終了される。Attach の出力コピーが先に完了（`AttachContainer finished successfully before container exit`）し、`hang-timeout`（デフォルト 2s）経過後にコンテナが kill される。CodeRabbit CLI のように処理中に stdout/stderr への出力が一時停止するツールで再現する。
 
+## Mounts
+- `mounts` で `source` が明示的に指定されている場合に、そのパスが存在しなければマウントをスキップ（無視）するオプションを追加する。
+  - `.tools.yaml` のマウント定義に `optional: true` のようなフィールドを導入し、`true` の場合は source パスが存在しなくてもエラーにせずそのマウントエントリを除外する。
+  - デフォルトは `false`（現行動作を維持：存在しなければエラー）。
+  - CLI フラグや P1 オーバーライドでの個別マウント指定（`--mount`）にも対応を検討する（例: `--mount type=bind,source=./foo,target=/foo,optional`）。
+  - `optional` は明示的な `source` を持つ bind マウント（`type=bind` かつ `source` 指定時）のみに適用し、named volume 等には適用しない。
+  - 優先順位: CLI/P1 の個別指定（`--mount`）＞ `.tools.yaml` のマウント定義。対象シンボル: `MountConfig.Optional`（新規追加）、`.tools.yaml` の `mounts[].optional`、`ParseMountFlag` での `optional` キーワード解析。
+
 ## Testing & Maintenance
