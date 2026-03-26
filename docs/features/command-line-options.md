@@ -358,6 +358,20 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **値**: `always`, `missing`, `never`
 - **説明**: 実行前のイメージプルポリシー
 
+### `--pull-max-retries`
+
+- **型**: int
+- **デフォルト**: `3`
+- **環境変数**: `CDERUN_PULL_MAX_RETRIES`
+- **説明**: イメージプル時の最大リトライ回数
+
+### `--pull-backoff-base`
+
+- **型**: string (Duration)
+- **デフォルト**: `1s`
+- **環境変数**: `CDERUN_PULL_BACKOFF_BASE`
+- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）
+
 ### `--memory`, `-m`
 
 - **型**: string
@@ -454,7 +468,7 @@ cderun --diagnosis --diagnosis-format json
 ### `--hang-timeout`
 
 - **型**: string
-- **デフォルト**: `2s`
+- **デフォルト**: `10s`
 - **環境変数**: `CDERUN_HANG_TIMEOUT`
 - **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間
 - **形式**: Go の Duration 形式（例: `500ms`, `5s`, `10s`）
@@ -507,7 +521,8 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
     `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
-    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`,
+    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`,
+    `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`,
     `--cderun-cap-drop`, `--cderun-hang-timeout`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`,
     `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`,
@@ -544,7 +559,7 @@ cderun --log-timestamp=false node app.js
 
 これらは優先順位階層（P1-P6）とは別に、実行時の挙動を直接制御するために使用されます。
 
-- **`CDERUN_HANG_TIMEOUT`**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の終了猶予時間（デフォルト: `2s`）。詳細な動作条件については [ハングタイムアウト](./hang-timeout.md) を参照してください。
+- **`CDERUN_HANG_TIMEOUT`**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の終了猶予時間（デフォルト: `10s`）。詳細な動作条件については [ハングタイムアウト](./hang-timeout.md) を参照してください。
 - **`CDERUN_REMOVE`**: 自動的にコンテナを削除するかどうか（デフォルト: `true`）。
 
 ## 使用例

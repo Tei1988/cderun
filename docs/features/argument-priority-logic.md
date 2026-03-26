@@ -13,7 +13,7 @@
 
 - **定義**: `cderun` の動作を強制的に変更・上書きするための専用フラグ。シンボリックリンク（ポリグロットモード）利用時でも、ラップされたツールの引数と衝突せずに `cderun` 側の設定を指定することを可能にします。
 - **フラグ名**: `cderun` 標準フラグ（P2）のすべてに対応する `--cderun-` プレフィックス付きフラグ。
-  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-strict-env`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-hang-timeout`
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-hang-timeout`
   - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
   - **リソース**: `--cderun-memory`, `--cderun-cpus`
   - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
@@ -75,7 +75,7 @@
   - `dryRunFormat: yaml`
   - `diagnosis: false`
   - `diagnosisFormat: yaml`
-  - `hangTimeout: 2s`
+  - `hangTimeout: 10s`
   - `image`: なし (Fatal Error)
 
 ## コレクション型（リスト型）の設定について
