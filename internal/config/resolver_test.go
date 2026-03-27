@@ -731,3 +731,50 @@ func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
 		assert.False(t, res.Mounts[0].Optional)
 	})
 }
+
+func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{
+		WD: "/app",
+		Files: map[string][]byte{
+			"/host/config/foo": []byte("content"),
+		},
+	}
+	hostCtx := &HostContext{
+		Level: 1,
+		Mounts: []MountMapping{
+			{Source: "/host/config", Target: "/config", Level: 1},
+		},
+	}
+	r, _ := NewExpressionResolverWithFS(hostCtx, mfs)
+
+	t.Run("Resolve source with HostContext correctly", func(t *testing.T) {
+		mcs := []MountConfig{
+			{
+				Type:     "bind",
+				Source:   ConfigPath{Raw: "/config/foo"},
+				Target:   ConfigPath{Raw: "/data"},
+				Optional: true,
+			},
+		}
+		// Resolve the mounts. /config/foo should resolve to /host/config/foo via HostContext.
+		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+		assert.Equal(t, "/host/config/foo", res[0].Source)
+	})
+
+	t.Run("Skip when source resolved via HostContext is missing", func(t *testing.T) {
+		mcs := []MountConfig{
+			{
+				Type:     "bind",
+				Source:   ConfigPath{Raw: "/config/missing"},
+				Target:   ConfigPath{Raw: "/data"},
+				Optional: true,
+			},
+		}
+		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res)
+	})
+}

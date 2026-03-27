@@ -208,7 +208,7 @@ func (r *ContainerdRuntime) Name() string { return "containerd" }
 Auto-detection changes in `resolver.go`:
 
 ```go
-// Add containerd socket detection (after docker, before podman fallback)
+// Add containerd socket detection (after docker, before_podman fallback)
 } else if _, err := fs.Stat("/run/containerd/containerd.sock"); err == nil {
     res.Runtime = "containerd"
     res.SocketPath = "/run/containerd/containerd.sock"
