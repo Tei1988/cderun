@@ -54,6 +54,7 @@ export CDERUN_LOG_TIMESTAMP=true
 - `--cderun-log-level`
 - `--cderun-log-format`
 - `--cderun-log-timestamp`
+- `--cderun-hang-timeout`
 
 ## ログ出力例
 
