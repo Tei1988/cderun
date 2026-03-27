@@ -173,6 +173,14 @@ func TestUnit_Mock_AttachContainer_Func(t *testing.T) {
 	assert.Equal(t, "custom attach error", err.Error())
 }
 
+func TestUnit_Mock_AttachContainer_ReadyChannel(t *testing.T) {
+	mock := NewMockRuntime()
+	ready := make(chan struct{})
+	_ = mock.AttachContainer(context.Background(), "c1", false, nil, nil, nil, ready)
+	_, ok := <-ready
+	assert.False(t, ok)
+}
+
 func TestUnit_Mock_InspectContainer_Func(t *testing.T) {
 	mock := NewMockRuntime()
 	mock.InspectFunc = func(ctx context.Context, containerID string) (bool, int, error) {
@@ -200,4 +208,50 @@ func TestUnit_Mock_WaitContainer_TimerStop(t *testing.T) {
 
 	_, err := mock.WaitContainer(ctx, "c1")
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestUnit_Mock_WaitContainer_TimerFires(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WaitDelay = 10 * time.Millisecond
+	mock.ExitCode = 123
+
+	start := time.Now()
+	code, err := mock.WaitContainer(context.Background(), "c1")
+	require.NoError(t, err)
+	assert.Equal(t, 123, code)
+	assert.GreaterOrEqual(t, time.Since(start), 10*time.Millisecond)
+}
+
+func TestUnit_Mock_WaitContainer_Signal_TimerStops(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WaitDelay = 1 * time.Second
+	mock.ExitCode = 42
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		_ = mock.SignalContainer(context.Background(), "c1", "SIGKILL")
+	}()
+
+	code, err := mock.WaitContainer(context.Background(), "c1")
+	require.NoError(t, err)
+	assert.Equal(t, 42, code)
+}
+
+func TestUnit_Mock_WaitContainer_AlreadySignaled(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.ExitCode = 7
+	_ = mock.SignalContainer(context.Background(), "c", "SIGTERM")
+
+	code, _ := mock.WaitContainer(context.Background(), "c")
+	assert.Equal(t, 7, code)
+}
+
+func TestUnit_Mock_WaitContainer_AlreadySignaled_WithDelay(t *testing.T) {
+	mock := NewMockRuntime()
+	mock.WaitDelay = 10 * time.Millisecond
+	mock.ExitCode = 7
+	_ = mock.SignalContainer(context.Background(), "c", "SIGTERM")
+
+	code, _ := mock.WaitContainer(context.Background(), "c")
+	assert.Equal(t, 7, code)
 }

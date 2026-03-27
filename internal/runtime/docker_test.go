@@ -205,6 +205,12 @@ func TestUnit_Docker_RetryablePullError(t *testing.T) {
 	assert.False(t, isRetryablePullError(nil))
 	assert.True(t, isRetryablePullError(errors.New("toomanyrequests")))
 	assert.True(t, isRetryablePullError(errors.New("Rate exceeded")))
+	assert.True(t, isRetryablePullError(errors.New("rate limit")))
+	assert.True(t, isRetryablePullError(errors.New("data limit exceeded")))
+	assert.True(t, isRetryablePullError(errors.New("i/o timeout")))
+	assert.True(t, isRetryablePullError(errors.New("connection refused")))
+	assert.True(t, isRetryablePullError(errors.New("connection reset")))
+	assert.True(t, isRetryablePullError(errors.New("EOF")))
 	assert.False(t, isRetryablePullError(errors.New("other error")))
 }
 
@@ -338,6 +344,30 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("retry on stream error", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		count := 0
+		mock.imagePullFunc = func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
+			count++
+			if count == 1 {
+				// Return a reader that will cause jsonmessage.DisplayJSONMessagesStream to return "EOF" error
+				return io.NopCloser(strings.NewReader(`{"errorDetail":{"message":"EOF"}}`)), nil
+			}
+			return io.NopCloser(strings.NewReader(`{"status":"success"}`)), nil
+		}
+
+		runtime := &DockerRuntime{
+			client:    mock,
+			name:      "test",
+			sleepFunc: noopSleepFunc,
+		}
+
+		// maxRetries must be at least 2 for one retry to happen.
+		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
 	})
 }
 
@@ -905,5 +935,59 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 
 		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, ready)
 		require.NoError(t, err)
+	})
+
+	t.Run("context cancel after stdin done", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		stdin := strings.NewReader("input")
+		ready := make(chan struct{})
+
+		go func() {
+			<-ready
+			// Wait for stdin to be copied and then cancel the context
+			// We can't easily know when stdin is done without another channel or looking at mockConn
+			// But since we are using noopSleepFunc, it should be quick.
+			time.Sleep(50 * time.Millisecond)
+			cancel()
+			_ = pw.Close() // Avoid leaking output goroutine
+		}()
+
+		err := runtime.AttachContainer(ctx, "id", true, stdin, io.Discard, io.Discard, ready)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("output error after stdin done", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+
+		stdin := strings.NewReader("input")
+		ready := make(chan struct{})
+
+		go func() {
+			<-ready
+			time.Sleep(50 * time.Millisecond)
+			_ = pw.CloseWithError(errors.New("output failed"))
+		}()
+
+		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, ready)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "output failed")
 	})
 }
