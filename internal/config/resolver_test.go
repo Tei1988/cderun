@@ -746,7 +746,8 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 			{Source: "/host/config", Target: "/config", Level: 1},
 		},
 	}
-	r, _ := NewExpressionResolverWithFS(hostCtx, mfs)
+	r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+	require.NoError(t, err)
 
 	t.Run("Resolve source with HostContext correctly", func(t *testing.T) {
 		mcs := []MountConfig{
@@ -776,5 +777,26 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res)
+	})
+
+	t.Run("Error when Stat fails with non-NotExist error", func(t *testing.T) {
+		mfsError := &MockFileSystem{
+			WD:      "/app",
+			StatErr: assert.AnError,
+		}
+		mcs := []MountConfig{
+			{
+				Type:     "bind",
+				Source:   ConfigPath{Raw: "/host/config/foo"},
+				Target:   ConfigPath{Raw: "/data"},
+				Optional: true,
+			},
+		}
+		rError, err := NewExpressionResolverWithFS(nil, mfsError)
+		require.NoError(t, err)
+
+		_, err = resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, rError, mfsError)
+		require.Error(t, err)
+		assert.Equal(t, assert.AnError, err)
 	})
 }

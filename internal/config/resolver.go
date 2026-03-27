@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -956,8 +958,11 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 				return nil, err
 			}
 			if _, err := fs.Stat(hostPath); err != nil {
-				// Skip if source doesn't exist
-				continue
+				if errors.Is(err, os.ErrNotExist) {
+					// Skip if source doesn't exist
+					continue
+				}
+				return nil, err
 			}
 		}
 
