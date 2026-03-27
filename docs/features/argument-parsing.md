@@ -57,7 +57,7 @@ cderun は実行時に引数リストをスキャンし、`--cderun-` プレフ�
 cderun node app.js --cderun-tty --cderun-image node:20-alpine
 
 # 内部的なホイスト後の引数
-cderun --tty --image node:20-alpine node app.js
+cderun --cderun-tty --cderun-image node:20-alpine node app.js
 ```
 
 ### ホイストの重要性とシンボリックリンク
