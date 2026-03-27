@@ -475,7 +475,7 @@ cderun --diagnosis --diagnosis-format json
 - **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
 ```bash
-cderun --hang-timeout 10s node script.js
+cderun --hang-timeout 5s node script.js
 ```
 
 ### `--log-level`
