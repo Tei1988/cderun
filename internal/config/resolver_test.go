@@ -19,7 +19,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env priority
 		res := resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
@@ -128,18 +129,20 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 		mfs := &MockFileSystem{}
-		_, err := resolveEnvValues([]string{"UNSET"}, true, r, mfs)
+		_, err = resolveEnvValues([]string{"UNSET"}, true, r, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
 
 	t.Run("resolveEnvValues with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		r.setError(assert.AnError)
-		_, err := resolveEnvValues([]string{"ANY"}, false, r, mfs)
+		_, err = resolveEnvValues([]string{"ANY"}, false, r, mfs)
 		require.Error(t, err)
 	})
 
@@ -152,7 +155,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		res, err := resolveConfigPath(false, "", false, "", "UNSET", "sub", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/home/user/sock", res)
@@ -161,7 +165,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringOpt exhaustive", func(t *testing.T) {
 		def := OptionDef[string]{EnvKey: "TEST_STR", Fallback: "fallback"}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_STR": "env"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env
 		res := resolveStringOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
@@ -183,7 +188,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceOpt exhaustive", func(t *testing.T) {
 		def := OptionDef[[]string]{EnvKey: "TEST_SLICE"}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "a:b"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env
 		res := resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, r, mfs)
@@ -552,7 +558,8 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 	t.Run("Resolve coverage final", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
 		// resolveDevices P2
 		resDevices, err := resolveDevices(nil, []string{"/dev/p2:/dev/p2"}, "", nil, nil, r, mfs)

@@ -413,7 +413,8 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 
 func TestUnit_Path_Helpers(t *testing.T) {
 	baseDir := "/base"
-	r, _ := NewExpressionResolver(nil)
+	r, err := NewExpressionResolver(nil)
+	require.NoError(t, err)
 
 	t.Run("resolveVolumePath", func(t *testing.T) {
 		val, err := resolveVolumePath("./host:/container", baseDir, r)
@@ -473,8 +474,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 			Source: ConfigPath{Raw: "{{file:missing}}"},
 			Target: ConfigPath{Raw: "/target"},
 		}
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
-		_, err := mc.Resolve(r)
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = mc.Resolve(r)
 		require.Error(t, err)
 	})
 
@@ -484,8 +486,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 			Source: ConfigPath{Raw: "/source"},
 			Target: ConfigPath{Raw: "{{file:missing}}"},
 		}
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
-		_, err := mc.Resolve(r)
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = mc.Resolve(r)
 		require.Error(t, err)
 	})
 
@@ -494,8 +497,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 			Source:      ConfigPath{Raw: "{{file:missing}}"},
 			Destination: ConfigPath{Raw: "/dev/v"},
 		}
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
-		_, err := dc.Resolve(r)
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = dc.Resolve(r)
 		require.Error(t, err)
 	})
 
@@ -504,8 +508,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 			Source:      ConfigPath{Raw: "/dev/h"},
 			Destination: ConfigPath{Raw: "{{file:missing}}"},
 		}
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
-		_, err := dc.Resolve(r)
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = dc.Resolve(r)
 		require.Error(t, err)
 	})
 
@@ -633,7 +638,8 @@ source: ./data
 
 func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	baseDir := "/base"
-	r, _ := NewExpressionResolver(nil)
+	r, err := NewExpressionResolver(nil)
+	require.NoError(t, err)
 
 	t.Run("ResolveVolume", func(t *testing.T) {
 		cp := ConfigPath{Raw: "./host:/container", BaseDir: baseDir}
