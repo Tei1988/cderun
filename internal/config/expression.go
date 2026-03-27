@@ -43,7 +43,6 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]fileCacheEntry),
 		loader:      NewConfigLoaderWithFS(fs),
 	}, nil
 }

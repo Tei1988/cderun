@@ -219,80 +219,78 @@ func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERu
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
-var (
-	getToolDiagnosis     = func(t ToolConfig) *bool { return t.Diagnosis }
-	getGlobalDiagnosis   = func(g CDERunConfig) *bool { return g.Defaults.Diagnosis }
-	getToolImage         = func(t ToolConfig) string { return t.Image }
-	getGlobalEmptyString = func(g CDERunConfig) string { return "" }
-	getToolTTY           = func(t ToolConfig) *bool { return t.TTY }
-	getGlobalTTY         = func(g CDERunConfig) *bool { return g.Defaults.TTY }
-	getToolInteractive   = func(t ToolConfig) *bool { return t.Interactive }
-	getGlobalInteractive = func(g CDERunConfig) *bool { return g.Defaults.Interactive }
-	getToolNetwork       = func(t ToolConfig) string { return t.Network }
-	getGlobalNetwork     = func(g CDERunConfig) string { return g.Defaults.Network }
-	getToolRemove        = func(t ToolConfig) *bool { return t.Remove }
-	getGlobalRemove      = func(g CDERunConfig) *bool { return g.Defaults.Remove }
-	getToolWorkdir       = func(t ToolConfig) string { return t.Workdir }
-	getGlobalWorkdir     = func(g CDERunConfig) string { return g.Defaults.Workdir }
-	getToolStrictEnv     = func(t ToolConfig) *bool { return t.StrictEnv }
-	getGlobalStrictEnv   = func(g CDERunConfig) *bool { return g.Defaults.StrictEnv }
-	getToolRuntime       = func(t ToolConfig) string { return "" } // Tools don't define runtime
-	getGlobalRuntime     = func(g CDERunConfig) string { return g.Runtime }
-	getToolMountTools    = func(t ToolConfig) []string { return t.MountTools }
-	getGlobalMountTools  = func(g CDERunConfig) []string { return g.Defaults.MountTools }
-	getToolMountAllTools = func(t ToolConfig) *bool { return t.MountAllTools }
-	getGlobalMountAllTools = func(g CDERunConfig) *bool { return g.Defaults.MountAllTools }
-	getToolMountCderun   = func(t ToolConfig) *bool { return t.MountCderun }
-	getGlobalMountCderun = func(g CDERunConfig) *bool { return g.Defaults.MountCderun }
-	getToolMountSocket   = func(t ToolConfig) *bool { return t.MountSocket }
-	getGlobalMountSocket = func(g CDERunConfig) *bool { return g.Defaults.MountSocket }
-	getToolHangTimeout   = func(t ToolConfig) string { return t.HangTimeout }
-	getGlobalHangTimeout = func(g CDERunConfig) string { return g.Defaults.HangTimeout }
-	getToolDryRun        = func(t ToolConfig) *bool { return t.DryRun }
-	getGlobalDryRun      = func(g CDERunConfig) *bool { return g.Defaults.DryRun }
-	getToolDryRunFormat  = func(t ToolConfig) string { return t.DryRunFormat }
-	getGlobalDryRunFormat = func(g CDERunConfig) string { return g.Defaults.DryRunFormat }
-	getToolDiagnosisFormat = func(t ToolConfig) string { return t.DiagnosisFormat }
-	getGlobalDiagnosisFormat = func(g CDERunConfig) string { return g.Defaults.DiagnosisFormat }
-	getToolLogLevel      = func(t ToolConfig) string { return t.LogLevel }
-	getGlobalLogLevel    = func(g CDERunConfig) string { return g.Logging.Level }
-	getToolLogFormat     = func(t ToolConfig) string { return t.LogFormat }
-	getGlobalLogFormat   = func(g CDERunConfig) string { return g.Logging.Format }
-	getToolLogTimestamp  = func(t ToolConfig) *bool { return t.LogTimestamp }
-	getGlobalLogTimestamp = func(g CDERunConfig) *bool { return g.Logging.Timestamp }
-	getToolPorts         = func(t ToolConfig) []string { return t.Ports }
-	getGlobalPorts       = func(g CDERunConfig) []string { return g.Defaults.Ports }
-	getToolPublishAll    = func(t ToolConfig) *bool { return t.PublishAll }
-	getGlobalPublishAll  = func(g CDERunConfig) *bool { return g.Defaults.PublishAll }
-	getToolExpose        = func(t ToolConfig) []string { return t.Expose }
-	getGlobalExpose      = func(g CDERunConfig) []string { return g.Defaults.Expose }
-	getToolHostname      = func(t ToolConfig) string { return t.Hostname }
-	getGlobalHostname    = func(g CDERunConfig) string { return g.Defaults.Hostname }
-	getToolDNS           = func(t ToolConfig) []string { return t.DNS }
-	getGlobalDNS         = func(g CDERunConfig) []string { return g.Defaults.DNS }
-	getToolAddHosts      = func(t ToolConfig) []string { return t.AddHosts }
-	getGlobalAddHosts    = func(g CDERunConfig) []string { return g.Defaults.AddHosts }
-	getToolUser          = func(t ToolConfig) string { return t.User }
-	getGlobalUser        = func(g CDERunConfig) string { return g.Defaults.User }
-	getToolPrivileged    = func(t ToolConfig) *bool { return t.Privileged }
-	getGlobalPrivileged  = func(g CDERunConfig) *bool { return g.Defaults.Privileged }
-	getToolCapAdd        = func(t ToolConfig) []string { return t.CapAdd }
-	getGlobalCapAdd      = func(g CDERunConfig) []string { return g.Defaults.CapAdd }
-	getToolCapDrop       = func(t ToolConfig) []string { return t.CapDrop }
-	getGlobalCapDrop     = func(g CDERunConfig) []string { return g.Defaults.CapDrop }
-	getToolEntrypoint    = func(t ToolConfig) []string { return t.Entrypoint }
-	getGlobalEntrypoint  = func(g CDERunConfig) []string { return g.Defaults.Entrypoint }
-	getToolPull          = func(t ToolConfig) string { return t.Pull }
-	getGlobalPull        = func(g CDERunConfig) string { return g.Defaults.Pull }
-	getToolPullMaxRetries = func(t ToolConfig) *int { return t.PullMaxRetries }
-	getGlobalPullMaxRetries = func(g CDERunConfig) *int { return g.Defaults.PullMaxRetries }
-	getToolPullBackoffBase = func(t ToolConfig) string { return t.PullBackoffBase }
-	getGlobalPullBackoffBase = func(g CDERunConfig) string { return g.Defaults.PullBackoffBase }
-	getToolMemory        = func(t ToolConfig) string { return t.Memory }
-	getGlobalMemory      = func(g CDERunConfig) string { return g.Defaults.Memory }
-	getToolCPUs          = func(t ToolConfig) *float64 { return t.CPUs }
-	getGlobalCPUs        = func(g CDERunConfig) *float64 { return g.Defaults.CPUs }
-)
+func getToolDiagnosis(t ToolConfig) *bool       { return t.Diagnosis }
+func getGlobalDiagnosis(g CDERunConfig) *bool   { return g.Defaults.Diagnosis }
+func getToolImage(t ToolConfig) string           { return t.Image }
+func getGlobalEmptyString(g CDERunConfig) string { return "" }
+func getToolTTY(t ToolConfig) *bool             { return t.TTY }
+func getGlobalTTY(g CDERunConfig) *bool         { return g.Defaults.TTY }
+func getToolInteractive(t ToolConfig) *bool     { return t.Interactive }
+func getGlobalInteractive(g CDERunConfig) *bool { return g.Defaults.Interactive }
+func getToolNetwork(t ToolConfig) string         { return t.Network }
+func getGlobalNetwork(g CDERunConfig) string     { return g.Defaults.Network }
+func getToolRemove(t ToolConfig) *bool          { return t.Remove }
+func getGlobalRemove(g CDERunConfig) *bool      { return g.Defaults.Remove }
+func getToolWorkdir(t ToolConfig) string         { return t.Workdir }
+func getGlobalWorkdir(g CDERunConfig) string     { return g.Defaults.Workdir }
+func getToolStrictEnv(t ToolConfig) *bool       { return t.StrictEnv }
+func getGlobalStrictEnv(g CDERunConfig) *bool   { return g.Defaults.StrictEnv }
+func getToolRuntime(t ToolConfig) string         { return "" } // Tools don't define runtime
+func getGlobalRuntime(g CDERunConfig) string     { return g.Runtime }
+func getToolMountTools(t ToolConfig) []string   { return t.MountTools }
+func getGlobalMountTools(g CDERunConfig) []string { return g.Defaults.MountTools }
+func getToolMountAllTools(t ToolConfig) *bool   { return t.MountAllTools }
+func getGlobalMountAllTools(g CDERunConfig) *bool { return g.Defaults.MountAllTools }
+func getToolMountCderun(t ToolConfig) *bool     { return t.MountCderun }
+func getGlobalMountCderun(g CDERunConfig) *bool { return g.Defaults.MountCderun }
+func getToolMountSocket(t ToolConfig) *bool     { return t.MountSocket }
+func getGlobalMountSocket(g CDERunConfig) *bool { return g.Defaults.MountSocket }
+func getToolHangTimeout(t ToolConfig) string     { return t.HangTimeout }
+func getGlobalHangTimeout(g CDERunConfig) string { return g.Defaults.HangTimeout }
+func getToolDryRun(t ToolConfig) *bool          { return t.DryRun }
+func getGlobalDryRun(g CDERunConfig) *bool      { return g.Defaults.DryRun }
+func getToolDryRunFormat(t ToolConfig) string    { return t.DryRunFormat }
+func getGlobalDryRunFormat(g CDERunConfig) string { return g.Defaults.DryRunFormat }
+func getToolDiagnosisFormat(t ToolConfig) string { return t.DiagnosisFormat }
+func getGlobalDiagnosisFormat(g CDERunConfig) string { return g.Defaults.DiagnosisFormat }
+func getToolLogLevel(t ToolConfig) string        { return t.LogLevel }
+func getGlobalLogLevel(g CDERunConfig) string      { return g.Logging.Level }
+func getToolLogFormat(t ToolConfig) string       { return t.LogFormat }
+func getGlobalLogFormat(g CDERunConfig) string     { return g.Logging.Format }
+func getToolLogTimestamp(t ToolConfig) *bool    { return t.LogTimestamp }
+func getGlobalLogTimestamp(g CDERunConfig) *bool { return g.Logging.Timestamp }
+func getToolPorts(t ToolConfig) []string         { return t.Ports }
+func getGlobalPorts(g CDERunConfig) []string     { return g.Defaults.Ports }
+func getToolPublishAll(t ToolConfig) *bool      { return t.PublishAll }
+func getGlobalPublishAll(g CDERunConfig) *bool  { return g.Defaults.PublishAll }
+func getToolExpose(t ToolConfig) []string        { return t.Expose }
+func getGlobalExpose(g CDERunConfig) []string    { return g.Defaults.Expose }
+func getToolHostname(t ToolConfig) string        { return t.Hostname }
+func getGlobalHostname(g CDERunConfig) string    { return g.Defaults.Hostname }
+func getToolDNS(t ToolConfig) []string           { return t.DNS }
+func getGlobalDNS(g CDERunConfig) []string       { return g.Defaults.DNS }
+func getToolAddHosts(t ToolConfig) []string      { return t.AddHosts }
+func getGlobalAddHosts(g CDERunConfig) []string  { return g.Defaults.AddHosts }
+func getToolUser(t ToolConfig) string            { return t.User }
+func getGlobalUser(g CDERunConfig) string        { return g.Defaults.User }
+func getToolPrivileged(t ToolConfig) *bool      { return t.Privileged }
+func getGlobalPrivileged(g CDERunConfig) *bool  { return g.Defaults.Privileged }
+func getToolCapAdd(t ToolConfig) []string        { return t.CapAdd }
+func getGlobalCapAdd(g CDERunConfig) []string    { return g.Defaults.CapAdd }
+func getToolCapDrop(t ToolConfig) []string       { return t.CapDrop }
+func getGlobalCapDrop(g CDERunConfig) []string   { return g.Defaults.CapDrop }
+func getToolEntrypoint(t ToolConfig) []string    { return t.Entrypoint }
+func getGlobalEntrypoint(g CDERunConfig) []string { return g.Defaults.Entrypoint }
+func getToolPull(t ToolConfig) string            { return t.Pull }
+func getGlobalPull(g CDERunConfig) string        { return g.Defaults.Pull }
+func getToolPullMaxRetries(t ToolConfig) *int   { return t.PullMaxRetries }
+func getGlobalPullMaxRetries(g CDERunConfig) *int { return g.Defaults.PullMaxRetries }
+func getToolPullBackoffBase(t ToolConfig) string { return t.PullBackoffBase }
+func getGlobalPullBackoffBase(g CDERunConfig) string { return g.Defaults.PullBackoffBase }
+func getToolMemory(t ToolConfig) string          { return t.Memory }
+func getGlobalMemory(g CDERunConfig) string      { return g.Defaults.Memory }
+func getToolCPUs(t ToolConfig) *float64          { return t.CPUs }
+func getGlobalCPUs(g CDERunConfig) *float64      { return g.Defaults.CPUs }
 
 // ResolveWithFS combines CLI flags, environment variables, tool-specific config, and global defaults using the provided filesystem.
 func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {

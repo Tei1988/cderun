@@ -48,7 +48,10 @@ func BenchmarkResolveWithFS(b *testing.B) {
 	b.Run("SubcommandWithTool", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, _ = ResolveWithFS("node", cli, tools, global, mfs)
+			_, err := ResolveWithFS("node", cli, tools, global, mfs)
+			if err != nil {
+				b.Fatalf("failed to resolve config: %v", err)
+			}
 		}
 	})
 
@@ -56,7 +59,10 @@ func BenchmarkResolveWithFS(b *testing.B) {
 	b.Run("Polyglot", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, _ = ResolveWithFS("python", CLIOptions{}, tools, global, mfs)
+			_, err := ResolveWithFS("python", CLIOptions{}, tools, global, mfs)
+			if err != nil {
+				b.Fatalf("failed to resolve config: %v", err)
+			}
 		}
 	})
 }
