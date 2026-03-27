@@ -702,8 +702,6 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 				{Source: "/host", Target: "/container", Level: 1},
 			},
 		}
-		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
-		require.NoError(t, err)
 
 		cli := CLIOptions{
 			Image:    "alpine",
@@ -711,21 +709,20 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			Mounts:   []string{"type=bind,source=/container/missing,target=/app/missing,optional"},
 		}
 
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		// Optional mount should be skipped when source does not exist
+		global := &CDERunConfig{
+			HostContext: hostCtx,
+		}
+		res, err := ResolveWithFS("node", cli, nil, global, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res.Mounts)
 
 		// Non-optional mount should NOT be skipped
 		cli.Mounts = []string{"type=bind,source=/container/missing,target=/app/missing"}
-		// Note: We need a resolver with host mapping to see "/host/missing"
-		global := &CDERunConfig{
-			HostContext: hostCtx,
-		}
 		res, err = ResolveWithFS("node", cli, nil, global, mfs)
 		require.NoError(t, err)
 		assert.NotEmpty(t, res.Mounts)
 		assert.Equal(t, "/host/missing", res.Mounts[0].Source)
-		_ = r
 	})
 
 	t.Run("TestUnit_Resolver_Optional_Mount_With_Expression filesystem error", func(t *testing.T) {
