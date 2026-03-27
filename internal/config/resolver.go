@@ -954,6 +954,11 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		if err != nil {
 			return nil, err
 		}
+		if mc.Optional && mc.Type == "bind" {
+			if _, err := r.WithoutHostContext().fs.Stat(resolved.Source); err != nil {
+				continue
+			}
+		}
 		res = append(res, resolved)
 	}
 	return res, nil

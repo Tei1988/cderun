@@ -314,6 +314,18 @@ func TestUnit_Resolver_Mounts_Exhaustive(t *testing.T) {
 		assert.Equal(t, "/a", res.Mounts[0].Source)
 		assert.True(t, res.Mounts[1].ReadOnly)
 	})
+
+	t.Run("Optional mounts are skipped if source missing", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{"/exists": {}},
+			Env:   map[string]string{"CDERUN_MOUNT": "source=/exists,target=/e,optional ; source=/missing,target=/m,optional ; source=/required,target=/r"},
+		}
+		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 2)
+		assert.Equal(t, "/e", res.Mounts[0].Target)
+		assert.Equal(t, "/r", res.Mounts[1].Target)
+	})
 }
 
 func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {

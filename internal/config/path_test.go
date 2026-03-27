@@ -155,6 +155,18 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, "/d", mc.Target.Raw)
 		assert.True(t, mc.ReadOnly)
 
+		mc, err = ParseMountFlag("source=/host,target=/container,optional")
+		require.NoError(t, err)
+		assert.True(t, mc.Optional)
+
+		mc, err = ParseMountFlag("source=/host,target=/container,optional=true")
+		require.NoError(t, err)
+		assert.True(t, mc.Optional)
+
+		mc, err = ParseMountFlag("source=/host,target=/container,optional=false")
+		require.NoError(t, err)
+		assert.False(t, mc.Optional)
+
 		_, err = ParseMountFlag("invalid-format")
 		require.Error(t, err)
 
@@ -602,6 +614,16 @@ source: ./data
 		err = yaml.Unmarshal([]byte(yamlStr), &mc)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target is required")
+
+		// Optional field
+		yamlStr = `
+source: ./opt
+target: /opt
+optional: true
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &mc)
+		require.NoError(t, err)
+		assert.True(t, mc.Optional)
 	})
 
 	t.Run("DeviceConfig", func(t *testing.T) {
