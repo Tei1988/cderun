@@ -130,11 +130,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker-version: ["20.10", "25.0", "29.0"]
+        docker-version: ["20.10", "24.0", "27.0"]
 
     services:
       docker:
-        image: docker:${{ matrix.docker-version }}-dind
+        image: public.ecr.aws/docker/library/docker:${{ matrix.docker-version }}-dind
         options: >-
           --privileged
           --health-cmd "docker info"
