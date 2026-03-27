@@ -11,7 +11,9 @@ jobs:
       id: set-prompt
       run: |
         # 1. 時間インデックスの算出 (日本時間 JST ベース)
-        TOTAL_MINUTES=$(TZ="Asia/Tokyo" date +'%H * 60 + %M' | bc)
+        read HOUR MINUTE < <(TZ="Asia/Tokyo" date '+%H %M')
+        # 10# を付与して 08, 09 などの数値を 8進数として扱わないようにする
+        TOTAL_MINUTES=$(( 10#$HOUR * 60 + 10#$MINUTE ))
         INDEX=$(( TOTAL_MINUTES / 240 )) # 240分（4時間）ごとにインデックスが1つ増える
 
         case $INDEX in
@@ -46,7 +48,7 @@ jobs:
         あなたの現在の任務は「実装コードの修正、バグ修正、または機能追加」です。
 
         ## Task Constraints
-        - **対象**: プロダクトの実装コード、およびそれに伴うテストコードの修正。
+        - **対象**: プロダクトの実装コード、およびそれに伴うテストコードの修正.
         - **目的**: .agent/todo.md や依頼内容に基づき、cderun の機能を実装または修正すること。
         - **品質基準**:
            - 変更を加えた場合、それが既存の機能（Polyglot Entry Point, Nested Executionなど）を破壊していないか十分に検証してください。
@@ -73,7 +75,7 @@ jobs:
           あなたの現在の任務は「ツールの高速化と効率化（パフォーマンスチューニング）」です。
           
           ## Task Constraints
-          - **対象**: プロダクトの実装コード、およびベンチマークテスト。
+          - **対象**: プロダクトの実装コード、およびベンチマークテスト.
           - **目的**: cderun の実行速度の向上、起動時間の短縮、メモリアロケーションの削減など、効率的な記述への調査・修正・実装を行うこと。
           - **品質基準**:
              - **証拠に基づく最適化**: 推測による最適化ではなく、可能な限りGoの標準機能（ベンチマークテストや pprof など）を用いてボトルネックを特定し、改善を合理的に判断して実装してください。
@@ -87,7 +89,7 @@ jobs:
         あなたの現在の任務は「リファクタリング・技術的負債の解消」です。
         
         ## Task Constraints
-        - **対象**: プロダクトの実装コード、およびテストコード。
+        - **対象**: プロダクトの実装コード、およびテストコード.
         - **目的**: 「機能の追加」や「バグの修正」は一切行わず、既存のコードを読みやすく、保守しやすく整理することだけに専念してください。関数の分割、重複コードの排除、変数名の改善、パッケージ間の依存関係の整理などが含まれます。
         - **品質基準**:
            - **機能不変の原則**: リファクタリング前後で外部から見た振る舞い（テストの成否を含む）が絶対に変わらないことを保証してください。
@@ -96,7 +98,7 @@ jobs:
             ;;
         esac
 
-        cat <EOF > full_prompt.txt
+        cat <<EOF > full_prompt.txt
         # Role
         あなたは cderun リポジトリの開発・メンテナンスを担当する、極めて優秀で自律的なAIエージェント（Jules）です。
         cderunは、DockerやPodmanを利用してエフェメラルコンテナを生成し、ホスト環境を汚さずにコマンドを実行するCLIツールです。
@@ -147,15 +149,11 @@ jobs:
     - name: Call Jules API
       env:
         JULES_KEY: ${{ secrets.JULES_KEY }}
-        SELECTED_PROMPT: ${{ steps.set-prompt.outputs.PROMPT }}
       run: |
         # プロンプトを安全に JSON エスケープして送信
-        PROMPT_JSON=$(jq -n --arg p "$FINAL_PROMPT" '$p')
+        BODY=$(jq -n --arg prompt "$FINAL_PROMPT" '{prompt: $prompt, sourceContext: {source: "sources/github/Tei1988/cderun"}}')
 
         curl -X POST "https://jules.googleapis.com/v1alpha/sessions" \
           -H "X-Goog-Api-Key: ${JULES_KEY}" \
           -H "Content-Type: application/json" \
-          -d "{
-            \"prompt\": \"${PROMPT_JSON}\",
-            \"sourceContext\": { \"source\": \"sources/github/Tei1988/cderun\" }
-          }"
+          -d "$BODY"
