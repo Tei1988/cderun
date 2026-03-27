@@ -11,8 +11,7 @@ jobs:
       id: set-prompt
       run: |
         # 1. 時間インデックスの算出 (日本時間 JST ベース)
-        HOUR=$(TZ="Asia/Tokyo" date +%H)
-        MINUTE=$(TZ="Asia/Tokyo" date +%M)
+        read HOUR MINUTE < <(TZ="Asia/Tokyo" date '+%H %M')
         # 10# を付与して 08, 09 などの数値を 8進数として扱わないようにする
         TOTAL_MINUTES=$(( 10#$HOUR * 60 + 10#$MINUTE ))
         INDEX=$(( TOTAL_MINUTES / 240 )) # 240分（4時間）ごとにインデックスが1つ増える
