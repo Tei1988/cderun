@@ -68,6 +68,7 @@ type MountConfig struct {
 	Source   ConfigPath
 	Target   ConfigPath
 	ReadOnly bool
+	Optional bool
 }
 
 func (mc MountConfig) DeepCopy() MountConfig {
@@ -81,6 +82,7 @@ func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
 		Source   ConfigPath `yaml:"source"`
 		Target   ConfigPath `yaml:"target"`
 		ReadOnly bool       `yaml:"read_only"`
+		Optional bool       `yaml:"optional"`
 	}
 	if err := node.Decode(&a); err == nil {
 		mc.Type = a.Type
@@ -90,6 +92,7 @@ func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
 		mc.Source = a.Source
 		mc.Target = a.Target
 		mc.ReadOnly = a.ReadOnly
+		mc.Optional = a.Optional
 
 		if mc.Target.IsEmpty() {
 			return fmt.Errorf("mount target is required at line %d (tag %s)", node.Line, node.Tag)
@@ -114,11 +117,13 @@ func (mc MountConfig) MarshalYAML() (any, error) {
 		Source   ConfigPath `yaml:"source,omitempty"`
 		Target   ConfigPath `yaml:"target"`
 		ReadOnly bool       `yaml:"read_only,omitempty"`
+		Optional bool       `yaml:"optional,omitempty"`
 	}
 	a.Type = mc.Type
 	a.Source = mc.Source
 	a.Target = mc.Target
 	a.ReadOnly = mc.ReadOnly
+	a.Optional = mc.Optional
 	return a, nil
 }
 
@@ -159,6 +164,7 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		Source:   source,
 		Target:   target,
 		ReadOnly: mc.ReadOnly,
+		Optional: mc.Optional,
 	}, nil
 }
 
@@ -240,6 +246,10 @@ func ParseMountFlag(s string) (MountConfig, error) {
 				res.ReadOnly = true
 				continue
 			}
+			if part == "optional" {
+				res.Optional = true
+				continue
+			}
 			return MountConfig{}, fmt.Errorf("invalid mount format: %s", s)
 		}
 
@@ -259,6 +269,12 @@ func ParseMountFlag(s string) (MountConfig, error) {
 				return MountConfig{}, fmt.Errorf("invalid readonly value: %s", val)
 			}
 			res.ReadOnly = b
+		case "optional":
+			b, err := strconv.ParseBool(val)
+			if err != nil {
+				return MountConfig{}, fmt.Errorf("invalid optional value: %s", val)
+			}
+			res.Optional = b
 		default:
 		}
 	}

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -898,6 +900,20 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		if err != nil {
 			return nil, err
 		}
+
+		if resolved.Optional && resolved.Type == "bind" && resolved.Source != "" {
+			if _, err := fs.Stat(resolved.Source); err != nil {
+				// Propagate errors other than NotExist
+				if !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("failed to check source for optional mount %q: %w", resolved.Source, err)
+				}
+				if r.WithoutHostContext().fs.Getenv("CDERUN_LOG_LEVEL") == "debug" {
+					logging.Debug("Skipping optional mount as source does not exist: %s", resolved.Source)
+				}
+				continue
+			}
+		}
+
 		res = append(res, resolved)
 	}
 	return res, nil

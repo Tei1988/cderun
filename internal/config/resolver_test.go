@@ -19,7 +19,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env priority
 		res := resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
@@ -128,18 +129,20 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 		mfs := &MockFileSystem{}
-		_, err := resolveEnvValues([]string{"UNSET"}, true, r, mfs)
+		_, err = resolveEnvValues([]string{"UNSET"}, true, r, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
 
 	t.Run("resolveEnvValues with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		r.setError(assert.AnError)
-		_, err := resolveEnvValues([]string{"ANY"}, false, r, mfs)
+		_, err = resolveEnvValues([]string{"ANY"}, false, r, mfs)
 		require.Error(t, err)
 	})
 
@@ -152,7 +155,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 		res, err := resolveConfigPath(false, "", false, "", "UNSET", "sub", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/home/user/sock", res)
@@ -161,7 +165,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringOpt exhaustive", func(t *testing.T) {
 		def := OptionDef[string]{EnvKey: "TEST_STR", Fallback: "fallback"}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_STR": "env"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env
 		res := resolveStringOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
@@ -183,7 +188,8 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceOpt exhaustive", func(t *testing.T) {
 		def := OptionDef[[]string]{EnvKey: "TEST_SLICE"}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "a:b"}}
-		r, _ := NewExpressionResolver(nil)
+		r, err := NewExpressionResolver(nil)
+		require.NoError(t, err)
 
 		// Env
 		res := resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, r, mfs)
@@ -552,7 +558,8 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 	t.Run("Resolve coverage final", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
 		// resolveDevices P2
 		resDevices, err := resolveDevices(nil, []string{"/dev/p2:/dev/p2"}, "", nil, nil, r, mfs)
@@ -682,5 +689,56 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		_, err = ResolveWithFS("node", cliExpr, nil, nil, mfsExpr)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
+	})
+
+	t.Run("Optional mount skipping when source does not exist", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Dirs: map[string]bool{"/host": true},
+			// /host/missing does not exist
+		}
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host", Target: "/container", Level: 1},
+			},
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
+
+		cli := CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"type=bind,source=/container/missing,target=/app/missing,optional"},
+		}
+
+		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.Mounts)
+
+		// Non-optional mount should NOT be skipped
+		cli.Mounts = []string{"type=bind,source=/container/missing,target=/app/missing"}
+		// Note: We need a resolver with host mapping to see "/host/missing"
+		global := &CDERunConfig{
+			HostContext: hostCtx,
+		}
+		res, err = ResolveWithFS("node", cli, nil, global, mfs)
+		require.NoError(t, err)
+		assert.NotEmpty(t, res.Mounts)
+		assert.Equal(t, "/host/missing", res.Mounts[0].Source)
+		_ = r
+	})
+
+	t.Run("TestUnit_Resolver_Optional_Mount_With_Expression filesystem error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD:      "/app",
+			StatErr: assert.AnError,
+		}
+		hostCtx := &HostContext{Level: 0}
+		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
+
+		mcs := []string{"type=bind,source=/host/config/foo,target=/config/foo,optional"}
+		_, err = resolveMounts(nil, mcs, "node", nil, nil, r, mfs)
+		require.Error(t, err)
 	})
 }
