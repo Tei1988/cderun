@@ -98,7 +98,12 @@ func (r *ExpressionResolver) ResolveString(s string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
-	if r.err != nil {
+	if r.err != nil || s == "" {
+		return s
+	}
+
+	// Fast-path: no expressions and no tilde expansion
+	if !strings.Contains(s, "{{") && !strings.HasPrefix(s, "~") {
 		return s
 	}
 
