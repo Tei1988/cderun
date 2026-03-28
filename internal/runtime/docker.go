@@ -445,7 +445,7 @@ func isRetryablePullError(err error) bool {
 	// List of keywords indicating transient registry or connection issues.
 	retryableKeywords := []string{
 		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
-		"i/o timeout", "connection refused", "connection reset", "eof", "unauthorized",
+		"i/o timeout", "connection refused", "connection reset", "eof",
 	}
 
 	for _, kw := range retryableKeywords {
@@ -454,5 +454,18 @@ func isRetryablePullError(err error) bool {
 		}
 	}
 
+	if isTemporaryAuthError(err) {
+		return true
+	}
+
 	return false
+}
+
+func isTemporaryAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	// Catch temporary token issues or specific hints for re-authentication
+	return strings.Contains(msg, "token expired")
 }
