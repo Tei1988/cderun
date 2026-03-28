@@ -738,4 +738,33 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		_, err = resolveMounts(nil, mcs, "node", nil, nil, r, mfs)
 		require.Error(t, err)
 	})
+
+	t.Run("Resolve source with HostContext correctly", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+			Dirs: map[string]bool{
+				"/container/data": true,
+			},
+		}
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/data", Target: "/container/data", Level: 1},
+			},
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
+
+		mcs := []string{"type=bind,source=/container/data,target=/app/data,optional"}
+		res, err := resolveMounts(nil, mcs, "node", nil, nil, r, mfs)
+		require.NoError(t, err)
+		require.Len(t, res, 1)
+		assert.Equal(t, "/host/data", res[0].Source)
+
+		// Test skipped when missing in current context
+		mcs = []string{"type=bind,source=/container/missing,target=/app/missing,optional"}
+		res, err = resolveMounts(nil, mcs, "node", nil, nil, r, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res)
+	})
 }
