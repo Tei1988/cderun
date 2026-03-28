@@ -713,7 +713,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	stopResize := o.startResizeHandler(ctxG, cmd, rt, containerID, containerConfig)
 	defer stopResize()
 
-	return o.waitForCompletion(ctxG, cancel, cancelAttach, cmd, rt, containerID, containerConfig, resolved, attachDone, attachDoneConsumed)
+	return o.waitForCompletion(ctxG, cancelAttach, cmd, rt, containerID, containerConfig, resolved, attachDone, attachDoneConsumed)
 }
 
 func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (runtime.ContainerRuntime, string, func(), error) {
@@ -867,7 +867,7 @@ func (o *rootOptions) startResizeHandler(ctx context.Context, cmd *cobra.Command
 	return func() {}
 }
 
-func (o *rootOptions) waitForCompletion(ctx context.Context, cancel, cancelAttach context.CancelFunc, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, attachDone chan error, attachDoneConsumed bool) (int, error) {
+func (o *rootOptions) waitForCompletion(ctx context.Context, cancelAttach context.CancelFunc, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, attachDone chan error, attachDoneConsumed bool) (int, error) {
 	o.logger.Trace("Waiting for container: %s", containerID)
 
 	// Detect if host stdin is a terminal for hang timeout calculation
@@ -918,7 +918,8 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cancel, cancelAttac
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
 			// Wait for container to finish (best effort)
-			cancel()
+			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
+			// until it finishes, the timeout expires, or a second signal is received.
 			select {
 			case res := <-waitDone:
 				exitCode = res.code
