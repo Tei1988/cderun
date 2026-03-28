@@ -55,37 +55,6 @@ Method signatures:
 
 Scope: `root.go` only. No external interface changes. Existing tests remain valid.
 
-### P-3: Declarative Table-Driven Resolver (Priority: High)
-
-`ResolveWithFS` is ~600 lines of near-identical patterns. Convert to table loops:
-
-```go
-type stringOptEntry struct {
-    target *string
-    def    OptionDef[string]
-    p1Set  bool; p1Val string
-    p2Set  bool; p2Val string
-}
-
-stringOpts := []stringOptEntry{
-    {&res.Image, OptionDef[string]{EnvKey: "CDERUN_IMAGE",
-        ToolGetter: func(t ToolConfig) string { return t.Image }},
-        cli.CderunImageSet, cli.CderunImage, cli.ImageSet, cli.Image},
-    {&res.Network, OptionDef[string]{EnvKey: "CDERUN_NETWORK",
-        ToolGetter:   func(t ToolConfig) string { return t.Network },
-        GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Network },
-        Fallback: "bridge"},
-        cli.CderunNetworkSet, cli.CderunNetwork, cli.NetworkSet, cli.Network},
-    // ...
-}
-for _, o := range stringOpts {
-    *o.target = resolveStringOpt(o.def, o.p1Set, o.p1Val, o.p2Set, o.p2Val, subcommand, tools, global, r, fs)
-}
-```
-
-Same pattern for bool / stringSlice / float64 tables.
-Special logic (Image empty check, Runtime auto-detection) stays outside the loop.
-Combines well with P-1 — `FlagDef` table can derive resolver tables automatically.
 
 ### P-4: Remove Global Variables `opts` / `rootCmd`
 
