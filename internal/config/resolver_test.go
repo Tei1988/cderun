@@ -249,7 +249,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 			Fallback: nil,
 		}
 		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, &MockFileSystem{})
-		assert.Equal(t, 0, res)
+		assert.Zero(t, res)
 	})
 
 	t.Run("resolveFloat64Opt fallback nil", func(t *testing.T) {
