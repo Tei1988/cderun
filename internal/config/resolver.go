@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -12,15 +13,6 @@ import (
 
 	"github.com/docker/go-units"
 )
-
-type stringOptEntry struct {
-	target        *string
-	def           OptionDef[string]
-	cderunFlagSet bool
-	cderunFlagVal string
-	cliFlagSet    bool
-	cliFlagVal    string
-}
 
 type boolOptEntry struct {
 	target        *bool
@@ -295,22 +287,45 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		*o.target = resolveBoolOpt(o.def, o.fallback, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, fs)
 	}
 
-	// Phase 2: String-based options
-	stringOpts := []stringOptEntry{
-		{target: &res.Image, def: OptionDef[string]{EnvKey: "CDERUN_IMAGE", ToolGetter: func(t ToolConfig) string { return t.Image }}, cderunFlagSet: cli.CderunImageSet, cderunFlagVal: cli.CderunImage, cliFlagSet: cli.ImageSet, cliFlagVal: cli.Image},
-		{target: &res.Network, def: OptionDef[string]{EnvKey: "CDERUN_NETWORK", ToolGetter: func(t ToolConfig) string { return t.Network }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Network }, Fallback: "bridge"}, cderunFlagSet: cli.CderunNetworkSet, cderunFlagVal: cli.CderunNetwork, cliFlagSet: cli.NetworkSet, cliFlagVal: cli.Network},
-		{target: &res.Workdir, def: OptionDef[string]{EnvKey: "CDERUN_WORKDIR", ToolGetter: func(t ToolConfig) string { return t.Workdir }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Workdir }}, cderunFlagSet: cli.CderunWorkdirSet, cderunFlagVal: cli.CderunWorkdir, cliFlagSet: cli.WorkdirSet, cliFlagVal: cli.Workdir},
-		{target: &res.Runtime, def: OptionDef[string]{EnvKey: "CDERUN_RUNTIME", GlobalGetter: func(g CDERunConfig) string { return g.Runtime }}, cderunFlagSet: cli.CderunRuntimeSet, cderunFlagVal: cli.CderunRuntime, cliFlagSet: cli.RuntimeSet, cliFlagVal: cli.Runtime},
-		{target: &res.DryRunFormat, def: OptionDef[string]{EnvKey: "CDERUN_DRY_RUN_FORMAT", ToolGetter: func(t ToolConfig) string { return t.DryRunFormat }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.DryRunFormat }, Fallback: "yaml"}, cderunFlagSet: cli.CderunDryRunFormatSet, cderunFlagVal: cli.CderunDryRunFormat, cliFlagSet: cli.DryRunFormatSet, cliFlagVal: cli.DryRunFormat},
-		{target: &res.DiagnosisFormat, def: OptionDef[string]{EnvKey: "CDERUN_DIAGNOSIS_FORMAT", ToolGetter: func(t ToolConfig) string { return t.DiagnosisFormat }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.DiagnosisFormat }, Fallback: "yaml"}, cderunFlagSet: cli.CderunDiagnosisFormatSet, cderunFlagVal: cli.CderunDiagnosisFormat, cliFlagSet: cli.DiagnosisFormatSet, cliFlagVal: cli.DiagnosisFormat},
-		{target: &res.LogLevel, def: OptionDef[string]{EnvKey: "CDERUN_LOG_LEVEL", ToolGetter: func(t ToolConfig) string { return t.LogLevel }, GlobalGetter: func(g CDERunConfig) string { return g.Logging.Level }, Fallback: "warn"}, cderunFlagSet: cli.CderunLogLevelSet, cderunFlagVal: cli.CderunLogLevel, cliFlagSet: cli.LogLevelSet, cliFlagVal: cli.LogLevel},
-		{target: &res.LogFormat, def: OptionDef[string]{EnvKey: "CDERUN_LOG_FORMAT", ToolGetter: func(t ToolConfig) string { return t.LogFormat }, GlobalGetter: func(g CDERunConfig) string { return g.Logging.Format }, Fallback: "text"}, cderunFlagSet: cli.CderunLogFormatSet, cderunFlagVal: cli.CderunLogFormat, cliFlagSet: cli.LogFormatSet, cliFlagVal: cli.LogFormat},
-		{target: &res.Hostname, def: OptionDef[string]{EnvKey: "CDERUN_HOSTNAME", ToolGetter: func(t ToolConfig) string { return t.Hostname }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Hostname }}, cderunFlagSet: cli.CderunHostnameSet, cderunFlagVal: cli.CderunHostname, cliFlagSet: cli.HostnameSet, cliFlagVal: cli.Hostname},
-		{target: &res.User, def: OptionDef[string]{EnvKey: "CDERUN_USER", ToolGetter: func(t ToolConfig) string { return t.User }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.User }}, cderunFlagSet: cli.CderunUserSet, cderunFlagVal: cli.CderunUser, cliFlagSet: cli.UserSet, cliFlagVal: cli.User},
-		{target: &res.Pull, def: OptionDef[string]{EnvKey: "CDERUN_PULL", ToolGetter: func(t ToolConfig) string { return t.Pull }, GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Pull }, Fallback: "missing"}, cderunFlagSet: cli.CderunPullSet, cderunFlagVal: cli.CderunPull, cliFlagSet: cli.PullSet, cliFlagVal: cli.Pull},
-	}
-	for _, o := range stringOpts {
-		*o.target = resolveStringOpt(o.def, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, r, fs)
+	// Phase 2: String-based options from registry
+	cliVal := reflect.ValueOf(cli)
+	resVal := reflect.ValueOf(res).Elem()
+
+	for _, opt := range StringOptions {
+		if opt.SkipResolution {
+			continue
+		}
+
+		// Map Name (e.g. "dry-run-format") to field name (e.g. "DryRunFormat")
+		fieldName := PascalCase(opt.Name)
+		targetField := resVal.FieldByName(fieldName)
+		if !targetField.IsValid() {
+			continue // Might be handled elsewhere if SkipResolution was false but field not in ResolvedConfig
+		}
+
+		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
+		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
+		p2SetField := cliVal.FieldByName(fieldName + "Set")
+		p2ValField := cliVal.FieldByName(fieldName)
+
+		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() {
+			continue
+		}
+
+		p1Set := p1SetField.Bool()
+		p1Val := p1ValField.String()
+		p2Set := p2SetField.Bool()
+		p2Val := p2ValField.String()
+
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+
+		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+		targetField.SetString(resolved)
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
@@ -459,15 +474,17 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// Phase 7: Duration and Slice options
-	hangTimeoutStr := resolveStringOpt(
-		OptionDef[string]{EnvKey: "CDERUN_HANG_TIMEOUT",
-			ToolGetter:   func(t ToolConfig) string { return t.HangTimeout },
-			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.HangTimeout },
-			Fallback:     "10s"},
-		cli.CderunHangTimeoutSet, cli.CderunHangTimeout,
-		cli.HangTimeoutSet, cli.HangTimeout,
-		subcommand, tools, global, r, fs,
-	)
+	// Resolve hang-timeout via registry entry (skipped in Phase 2)
+	var hangTimeoutStr string
+	if opt, ok := GetStringOption("hang-timeout"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		hangTimeoutStr = resolveStringOpt(def, cli.CderunHangTimeoutSet, cli.CderunHangTimeout, cli.HangTimeoutSet, cli.HangTimeout, subcommand, tools, global, r, fs)
+	}
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
 			if d < 0 {
@@ -503,15 +520,18 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
 	}
 
-	pullBackoffBaseStr := resolveStringOpt(
-		OptionDef[string]{EnvKey: "CDERUN_PULL_BACKOFF_BASE",
-			ToolGetter:   func(t ToolConfig) string { return t.PullBackoffBase },
-			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.PullBackoffBase },
-			Fallback:     "1s"},
-		cli.CderunPullBackoffBaseSet, cli.CderunPullBackoffBase,
-		cli.PullBackoffBaseSet, cli.PullBackoffBase,
-		subcommand, tools, global, r, fs,
-	)
+	// Resolve pull-backoff-base via registry
+	var pullBackoffBaseStr string
+	if opt, ok := GetStringOption("pull-backoff-base"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		pullBackoffBaseStr = resolveStringOpt(def, cli.CderunPullBackoffBaseSet, cli.CderunPullBackoffBase, cli.PullBackoffBaseSet, cli.PullBackoffBase, subcommand, tools, global, r, fs)
+	}
+
 	if pullBackoffBaseStr != "" {
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
 			if d <= 0 {
@@ -528,14 +548,17 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, err
 	}
 
-	memStr := resolveStringOpt(
-		OptionDef[string]{EnvKey: "CDERUN_MEMORY",
-			ToolGetter:   func(t ToolConfig) string { return t.Memory },
-			GlobalGetter: func(g CDERunConfig) string { return g.Defaults.Memory }},
-		cli.CderunMemorySet, cli.CderunMemory,
-		cli.MemorySet, cli.Memory,
-		subcommand, tools, global, r, fs,
-	)
+	// Resolve memory via registry
+	var memStr string
+	if opt, ok := GetStringOption("memory"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		memStr = resolveStringOpt(def, cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, subcommand, tools, global, r, fs)
+	}
 	if memStr != "" {
 		bytes, err := units.RAMInBytes(memStr)
 		if err != nil {
