@@ -109,7 +109,9 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
 
-#### Network & Ports
+#### Mounting & Nested Execution
+
+- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly][,optional]`).
 
 - `--network`: Connect a container to a network. (Default: `bridge`)
 - `--hostname`: Container host name.

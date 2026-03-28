@@ -193,11 +193,13 @@ cderun node app.js --cderun-env=NODE_ENV=production
 - **型**: stringArray
 - **環境変数**: `CDERUN_MOUNT` (セパレータ: `;`)
 - **説明**: マウントの設定（bind, volume, tmpfsをサポート）
-- **用途**: `type=bind,source=hostPath,target=containerPath[,readonly]`
+- **用途**: `type=bind,source=hostPath,target=containerPath[,readonly][,optional]`
+- **補足**: `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
 
 ```bash
 cderun --mount type=bind,source=./data,target=/data python script.py
 cderun --mount type=bind,source=~/.ssh,target=/root/.ssh,readonly git clone ...
+cderun --mount type=bind,source=./config,target=/config,optional node app.js
 cderun --mount type=tmpfs,target=/tmp alpine
 ```
 
@@ -467,11 +469,12 @@ cderun --diagnosis --diagnosis-format json
 
 ### `--hang-timeout`
 
-- **型**: string
+- **型**: string (Duration)
 - **デフォルト**: `10s`
 - **環境変数**: `CDERUN_HANG_TIMEOUT`
 - **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間
 - **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）
+- **補足**: `0` を指定すると、コンテナが自然に終了するまで無期限に待機します。
 - **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
 ```bash

@@ -162,3 +162,5 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 
 ## Testing & Maintenance
+
+- Outdated usage string for `hang-timeout` in `internal/command/flags.go` still mentions `2s` instead of the 10s default.
