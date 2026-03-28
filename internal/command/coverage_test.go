@@ -77,7 +77,7 @@ func TestUnit_Root_AttachContainer_Coverage(t *testing.T) {
 
 		cancel()
 		att, err := o.attachContainer(ctx, cmd, mockRuntime, "test-container", &container.ContainerConfig{Interactive: true})
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 		assert.Nil(t, att)
 	})
 }
