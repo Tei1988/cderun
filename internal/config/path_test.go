@@ -119,6 +119,28 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Equal(t, "volume", mount.Type)
 		assert.Equal(t, "myvol", mount.Source)
 		assert.Equal(t, "/data", mount.Target)
+
+		// volume with no source
+		mc = MountConfig{
+			Type:   "volume",
+			Target: ConfigPath{Raw: "/data"},
+		}
+		mount, err = mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "volume", mount.Type)
+		assert.Equal(t, "", mount.Source)
+		assert.Equal(t, "/data", mount.Target)
+
+		// volume with source error
+		mfsMissing := &MockFileSystem{WD: "/"}
+		rMissing, _ := NewExpressionResolverWithFS(nil, mfsMissing)
+		mc = MountConfig{
+			Type:   "volume",
+			Source: ConfigPath{Raw: "{{file:missing}}"},
+			Target: ConfigPath{Raw: "/data"},
+		}
+		_, err = mc.Resolve(rMissing)
+		require.Error(t, err)
 	})
 
 	t.Run("DeviceConfig.Resolve", func(t *testing.T) {
@@ -195,6 +217,27 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		val, err = ResolvePath("http://example.com/path", baseDir, r)
 		require.NoError(t, err)
 		assert.Equal(t, "http://example.com/path", val)
+
+		// r.HostContext.Level > 0 but path already absolute
+		hostCtx := &HostContext{Level: 1, Mounts: []MountMapping{{Source: "/h", Target: "/t"}}}
+		rNested, _ := NewExpressionResolverWithFS(hostCtx, mfs)
+		val, err = ResolvePath("/t/file", baseDir, rNested)
+		require.NoError(t, err)
+		assert.Equal(t, "/h/file", val)
+
+		// r.HostContext.Level > 0 and path not absolute but cleans to absolute (unlikely but for coverage)
+		// Actually filepath.Clean("p") only returns absolute if p is absolute or starts with /.
+
+		// ResolvePath with r == nil
+		val, err = ResolvePath("./rel", "/base", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "/base/rel", val)
+
+		// ResolvePath with expandHome error and r == nil
+		// We can't pass fs to ResolvePath directly if r is nil, it uses RealFileSystem.
+		// Wait, ResolvePath uses RealFileSystem if r == nil.
+		// To test expandHome error with r == nil, we'd need to mock RealFileSystem which is not possible.
+		// But ResolvePath with r != nil and r.fs != nil already covers expandHome indirectly via r.ResolveString.
 	})
 
 	t.Run("Reverse Path Resolution (Nested)", func(t *testing.T) {
@@ -433,6 +476,25 @@ func TestUnit_Path_Helpers(t *testing.T) {
 		_, _, ok = SplitHostRemainder("/no-sep")
 		assert.False(t, ok)
 	})
+
+	t.Run("ParseMountFlag - malformed with missing values", func(t *testing.T) {
+		_, err := ParseMountFlag("source=,target=")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target is required")
+	})
+
+	t.Run("ParseDeviceConfig - malformed", func(t *testing.T) {
+		_, ok := ParseDeviceConfig(":/dev/b")
+		assert.False(t, ok)
+
+		_, ok = ParseDeviceConfig("/dev/a:")
+		assert.False(t, ok)
+
+		// perms branch
+		dc, ok := ParseDeviceConfig("/dev/a:/dev/b:invalid_perms")
+		assert.True(t, ok)
+		assert.Equal(t, "/dev/b:invalid_perms", dc.Destination.Raw)
+	})
 }
 
 func TestUnit_Path_ParseDeviceConfig_Errors(t *testing.T) {
@@ -616,6 +678,10 @@ source: ./data
 		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
+
+		// Invalid type
+		err = yaml.Unmarshal([]byte("[]"), &dc)
+		require.Error(t, err)
 	})
 }
 

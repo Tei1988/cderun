@@ -614,7 +614,7 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 	baseDir := filepath.Dir(absPath)
 	if err := cfg.SetBaseDir(baseDir); err != nil {
-		return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", path, err)
 	}
 
 	return &cfg, []string{absPath}, nil

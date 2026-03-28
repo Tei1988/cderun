@@ -208,6 +208,62 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		// P1 Override
 		res = resolveStringSliceOpt(def, ":", []string{"p1"}, nil, "sub", nil, nil, r, mfs)
 		assert.Equal(t, []string{"p1"}, res)
+
+		// Env with empty/whitespace values
+		mfs.Env = map[string]string{"TEST_SLICE": " : a : : b : "}
+		res = resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, r, mfs)
+		assert.Equal(t, []string{"a", "b"}, res)
+	})
+
+	t.Run("resolveIntOpt missing subcommand", func(t *testing.T) {
+		def := OptionDef[*int]{
+			ToolGetter: func(tc ToolConfig) *int { return ptr(100) },
+			Fallback:   ptr(10),
+		}
+		mfs := &MockFileSystem{}
+		// Subcommand "unknown" not in ToolsConfig
+		res := resolveIntOpt(def, false, 0, false, 0, "unknown", ToolsConfig{"known": ToolConfig{}}, nil, mfs)
+		assert.Equal(t, 10, res)
+	})
+
+	t.Run("resolveIntOpt tool returning nil", func(t *testing.T) {
+		def := OptionDef[*int]{
+			ToolGetter: func(tc ToolConfig) *int { return nil },
+			Fallback:   ptr(10),
+		}
+		res := resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, &MockFileSystem{})
+		assert.Equal(t, 10, res)
+	})
+
+	t.Run("resolveIntOpt global returning nil", func(t *testing.T) {
+		def := OptionDef[*int]{
+			GlobalGetter: func(c CDERunConfig) *int { return nil },
+			Fallback:     ptr(10),
+		}
+		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, &MockFileSystem{})
+		assert.Equal(t, 10, res)
+	})
+
+	t.Run("resolveIntOpt fallback nil", func(t *testing.T) {
+		def := OptionDef[*int]{
+			Fallback: nil,
+		}
+		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, &MockFileSystem{})
+		assert.Equal(t, 0, res)
+	})
+
+	t.Run("resolveFloat64Opt fallback nil", func(t *testing.T) {
+		def := OptionDef[*float64]{
+			Fallback: nil,
+		}
+		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, &MockFileSystem{})
+		assert.InDelta(t, 0.0, res, 1e-9)
+	})
+
+	t.Run("resolveStringSliceOpt nil everything", func(t *testing.T) {
+		def := OptionDef[[]string]{}
+		res := resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, nil, &MockFileSystem{})
+		assert.Nil(t, res)
 	})
 }
 
@@ -637,6 +693,61 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/s", res.Mounts[0].Source)
+	})
+
+	t.Run("resolveEnv priority exhaustive", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_ENV": "P3=p3"}}
+		tools := ToolsConfig{"node": ToolConfig{Env: []string{"P4=p4"}}}
+		global := &CDERunConfig{Defaults: ConfigDefaults{Env: []string{"P5=p5"}}}
+
+		// P1
+		res, _ := ResolveWithFS("node", CLIOptions{CderunEnv: []string{"P1=p1"}, Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Contains(t, res.Env, "P1=p1")
+		assert.NotContains(t, res.Env, "P2=p2")
+
+		// P2
+		res, _ = ResolveWithFS("node", CLIOptions{Env: []string{"P2=p2"}, Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Contains(t, res.Env, "P2=p2")
+
+		// P3
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Contains(t, res.Env, "P3=p3")
+
+		// P4
+		mfs.Env = nil
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Contains(t, res.Env, "P4=p4")
+
+		// P5
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, ToolsConfig{}, global, mfs)
+		assert.Contains(t, res.Env, "P5=p5")
+	})
+
+	t.Run("resolveDevices priority exhaustive", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": "/dev/p3:/dev/p3"}}
+		tools := ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/p4"}, Destination: ConfigPath{Raw: "/dev/p4"}}}}}
+		global := &CDERunConfig{Defaults: ConfigDefaults{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/p5"}, Destination: ConfigPath{Raw: "/dev/p5"}}}}}
+
+		// P1
+		res, _ := ResolveWithFS("node", CLIOptions{CderunDevices: []string{"/dev/p1:/dev/p1"}, Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Equal(t, "/dev/p1", res.Devices[0].PathOnHost)
+
+		// P2
+		res, _ = ResolveWithFS("node", CLIOptions{Devices: []string{"/dev/p2:/dev/p2"}, Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Equal(t, "/dev/p2", res.Devices[0].PathOnHost)
+
+		// P3
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Equal(t, "/dev/p3", res.Devices[0].PathOnHost)
+
+		// P4
+		mfs.Env = nil
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, tools, global, mfs)
+		assert.Equal(t, "/dev/p4", res.Devices[0].PathOnHost)
+
+		// P5
+		res, _ = ResolveWithFS("node", CLIOptions{Image: "a", ImageSet: true}, ToolsConfig{}, global, mfs)
+		assert.Equal(t, "/dev/p5", res.Devices[0].PathOnHost)
 	})
 
 	t.Run("PullMaxRetries and PullBackoffBase errors", func(t *testing.T) {

@@ -149,18 +149,84 @@ defaults:
 		assert.Equal(t, expected, paths)
 	})
 
+	t.Run("FindConfigs exhaustive locations", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Dirs: map[string]bool{
+				"/project/sub": true,
+				"/project":     true,
+				"/home/user/.config/cderun": true,
+				"/etc/cderun":  true,
+				"/run/cderun":  true,
+			},
+			Files: map[string][]byte{
+				"/project/sub/.cderun.yaml": []byte(""),
+				"/project/.cderun.yaml":     []byte(""),
+				"/home/user/.config/cderun/.cderun.yaml": []byte(""),
+				"/etc/cderun/.cderun.yaml":  []byte(""),
+				"/run/cderun/.cderun.yaml":  []byte(""),
+			},
+			WD:      "/project/sub",
+			HomeDir: "/home/user",
+		}
+		loader := &ConfigLoader{
+			fs:              mfs,
+			systemConfigDir: "/etc/cderun",
+			runConfigDir:    "/run/cderun",
+		}
+		paths := loader.FindConfigs(".cderun.yaml")
+
+		expected := []string{
+			"/project/sub/.cderun.yaml",
+			"/project/.cderun.yaml",
+			"/.cderun.yaml", // Not in Files but calculated by loop until root
+			"/home/user/.config/cderun/.cderun.yaml",
+			"/etc/cderun/.cderun.yaml",
+			"/run/cderun/.cderun.yaml",
+		}
+		// Filter expected to only those that would be 'Stat'ed successfully by loader
+		// Actually FindConfigs only appends if Stat returns nil error.
+		var existingExpected []string
+		for _, p := range expected {
+			if _, ok := mfs.Files[p]; ok {
+				existingExpected = append(existingExpected, p)
+			}
+		}
+
+		assert.Equal(t, existingExpected, paths)
+	})
+
+	t.Run("FindConfigs Getwd failure", func(t *testing.T) {
+		mfs := &customMockFS{
+			MockFileSystem: MockFileSystem{
+				HomeDir: "/home/user",
+				Files:   map[string][]byte{"/home/user/.config/cderun/.cderun.yaml": []byte("")},
+			},
+		}
+		// mfs.Getwd() will return "", error
+		loader := &ConfigLoader{fs: mfs}
+		paths := loader.FindConfigs(".cderun.yaml")
+		assert.Len(t, paths, 1)
+		assert.Equal(t, "/home/user/.config/cderun/.cderun.yaml", paths[0])
+	})
+
 	t.Run("FindConfigs Abs failure", func(t *testing.T) {
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/a/.cderun.yaml": []byte("")},
-				Dirs:  map[string]bool{"/a": true},
-				WD:    "/a",
+				Files:   map[string][]byte{"/a/.cderun.yaml": []byte(""), "/home/user/.config/cderun/.cderun.yaml": []byte("")},
+				Dirs:    map[string]bool{"/a": true, "/": true, "/home/user/.config/cderun": true},
+				WD:      "/a",
+				HomeDir: "/home/user",
 			},
 			absErr: assert.AnError,
 		}
-		loader := &ConfigLoader{fs: mfs}
+		loader := &ConfigLoader{
+			fs:              mfs,
+			systemConfigDir: "/etc/cderun",
+			runConfigDir:    "/run/cderun",
+		}
 		paths := loader.FindConfigs(".cderun.yaml")
-		assert.Contains(t, paths, "/a/.cderun.yaml") // Still included even if Abs fails, using the calculated path
+		assert.Contains(t, paths, "/a/.cderun.yaml")
+		assert.Contains(t, paths, "/home/user/.config/cderun/.cderun.yaml")
 	})
 
 	t.Run("HostContext is loaded and merged", func(t *testing.T) {
@@ -756,4 +822,31 @@ func TestUnit_Config_CachedStat_DoubleCheck(t *testing.T) {
 	_, err = loader.cachedStat("/test")
 	require.NoError(t, err)
 	assert.Len(t, fs.StatCalls, 1)
+
+	// Test cache hit with error
+	fs.Files = nil
+	_, err = loader.cachedStat("/test") // already cached as success
+	require.NoError(t, err)
+
+	loader2 := NewConfigLoaderWithFS(fs)
+	_, err = loader2.cachedStat("/missing")
+	require.Error(t, err)
+	assert.Len(t, fs.StatCalls, 2)
+	_, err = loader2.cachedStat("/missing")
+	require.Error(t, err)
+	assert.Len(t, fs.StatCalls, 2) // Cache hit for error
+}
+
+func TestUnit_Config_LoadErrors_Exhaustive(t *testing.T) {
+	t.Run("LoadToolsConfig - unmarshal error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD:    "/work",
+			Files: map[string][]byte{"/work/.tools.yaml": []byte("malformed: yaml: [")},
+		}
+		loader := NewConfigLoaderWithFS(mfs)
+		_, _, err := loader.LoadToolsConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal tools file")
+	})
+
 }
