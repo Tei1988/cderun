@@ -471,7 +471,7 @@ cderun --diagnosis --diagnosis-format json
 - **デフォルト**: `10s`
 - **環境変数**: `CDERUN_HANG_TIMEOUT`
 - **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間
-- **形式**: Go の Duration 形式（例: `500ms`, `5s`, `10s`）
+- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）
 - **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
 ```bash
