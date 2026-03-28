@@ -454,5 +454,14 @@ func isRetryablePullError(err error) bool {
 		}
 	}
 
-	return false
+	return isTemporaryAuthError(err)
+}
+
+func isTemporaryAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	// Catch temporary token issues or specific hints for re-authentication
+	return strings.Contains(msg, "token expired")
 }

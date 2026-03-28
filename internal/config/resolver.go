@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -950,6 +952,20 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 
 	var res []container.Mount
 	for _, mc := range mcs {
+		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
+			hostPath, err := mc.Source.Resolve(r)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := fs.Stat(hostPath); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					// Skip if source doesn't exist
+					continue
+				}
+				return nil, err
+			}
+		}
+
 		resolved, err := mc.Resolve(r)
 		if err != nil {
 			return nil, err
