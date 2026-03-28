@@ -454,11 +454,7 @@ func isRetryablePullError(err error) bool {
 		}
 	}
 
-	if isTemporaryAuthError(err) {
-		return true
-	}
-
-	return false
+	return isTemporaryAuthError(err)
 }
 
 func isTemporaryAuthError(err error) bool {
