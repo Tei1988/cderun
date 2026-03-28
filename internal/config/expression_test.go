@@ -376,7 +376,8 @@ func TestUnit_Expression_Resolve_Complex(t *testing.T) {
 
 func TestUnit_Expression_Security_Advanced(t *testing.T) {
 	fs := &MockFileSystem{WD: "/work"}
-	r, _ := NewExpressionResolverWithFS(nil, fs)
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
 
 	t.Run("resolveFindDir absolute path", func(t *testing.T) {
 		r2 := *r

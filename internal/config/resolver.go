@@ -901,18 +901,23 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			return nil, err
 		}
 
-		if resolved.Optional && resolved.Type == "bind" && resolved.Source != "" {
+		if resolved.Optional && resolved.Type == "bind" && !mc.Source.IsEmpty() {
 			// Existence check must be done against the current process-visible filesystem.
-			// resolved.Source was resolved with r (which may include host mapping),
-			// so we must check it against the filesystem without host context to verify its existence
-			// in the current environment context (which might be inside another container).
-			if _, err := r.WithoutHostContext().fs.Stat(resolved.Source); err != nil {
+			// The host-side source (resolved.Source) might not be visible if we are already
+			// in a container (nested execution). We resolve the source path without
+			// host context to get the path as seen by the current process.
+			processVisiblePath, err := mc.Source.Resolve(r.WithoutHostContext())
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve process-visible path for optional mount: %w", err)
+			}
+
+			if _, err := r.WithoutHostContext().fs.Stat(processVisiblePath); err != nil {
 				// Propagate errors other than NotExist
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to check source for optional mount %q: %w", resolved.Source, err)
+					return nil, fmt.Errorf("failed to check source for optional mount %q: %w", processVisiblePath, err)
 				}
 				if r.WithoutHostContext().fs.Getenv("CDERUN_LOG_LEVEL") == "debug" {
-					logging.Debug("Skipping optional mount as source does not exist: %s", resolved.Source)
+					logging.Debug("Skipping optional mount as source does not exist in current context: %s", processVisiblePath)
 				}
 				continue
 			}

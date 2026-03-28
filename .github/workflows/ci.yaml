@@ -122,6 +122,27 @@ jobs:
           flags: unit
           fail_ci_if_error: true
 
+  verify-images:
+    name: Verify Registry Images
+    needs: filter
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check ECR Public Image Manifests
+        run: |
+          for version in "20.10" "24.0" "27.0"; do
+            tag="${version}-dind"
+            url="https://public.ecr.aws/v2/docker/library/docker/manifests/${tag}"
+            echo "Verifying image: public.ecr.aws/docker/library/docker:${tag}"
+
+            # Use HEAD request to check existence
+            if ! curl -sI -o /dev/null -f "$url"; then
+              echo "::error::Image manifest not found in ECR Public: ${tag}"
+              exit 1
+            fi
+            echo "Successfully verified ${tag}"
+          done
+
   runtime-test:
     name: Runtime Tests (Docker ${{ matrix.docker-version }})
     needs: [filter, build]
