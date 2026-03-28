@@ -27,7 +27,10 @@ func BenchmarkResolveWithFS(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = ResolveWithFS("node", cli, tools, global, mfs)
+		_, err := ResolveWithFS("node", cli, tools, global, mfs)
+		if err != nil {
+			b.Fatalf("ResolveWithFS failed: %v", err)
+		}
 	}
 }
 
@@ -36,7 +39,10 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 		HomeDir: "/home/user",
 		WD:      "/app",
 	}
-	r, _ := NewExpressionResolverWithFS(nil, mfs)
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	if err != nil {
+		b.Fatalf("NewExpressionResolverWithFS failed: %v", err)
+	}
 	input := "prefix-{{HOME}}-{{PWD}}-suffix"
 
 	b.ResetTimer()
@@ -50,7 +56,10 @@ func BenchmarkExpressionResolver_ResolveString_NoExpr(b *testing.B) {
 		HomeDir: "/home/user",
 		WD:      "/app",
 	}
-	r, _ := NewExpressionResolverWithFS(nil, mfs)
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	if err != nil {
+		b.Fatalf("NewExpressionResolverWithFS failed: %v", err)
+	}
 	input := "just-a-plain-string"
 
 	b.ResetTimer()
