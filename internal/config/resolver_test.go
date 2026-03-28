@@ -326,6 +326,28 @@ func TestUnit_Resolver_Mounts_Exhaustive(t *testing.T) {
 		assert.Equal(t, "/e", res.Mounts[0].Target)
 		assert.Equal(t, "/r", res.Mounts[1].Target)
 	})
+
+	t.Run("Optional volume mounts are NOT skipped even if source missing", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		// Note: "type=volume" doesn't care about host path existence.
+		// "optional" should only apply to bind mounts.
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image: "node",
+				Mounts: []MountConfig{{
+					Type:     "volume",
+					Source:   ConfigPath{Raw: "myvol"},
+					Target:   ConfigPath{Raw: "/data"},
+					Optional: true,
+				}},
+			},
+		}
+		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "volume", res.Mounts[0].Type)
+		assert.Equal(t, "myvol", res.Mounts[0].Source)
+	})
 }
 
 func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
