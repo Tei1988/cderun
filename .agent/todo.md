@@ -13,49 +13,6 @@ Use a unified schema like `map[string]any` or struct+reflection, and generate
 Scope: `flags.go`, `root.go` (resolveSettings), `resolver.go` (ResolveWithFS), `option.go`
 Migration: Incremental — start with string flags → bool → slice → float64
 
-### P-2: Split `execute()` into Focused Methods
-
-The ~250-line `execute()` mixes runtime init, terminal setup, signal forwarding,
-attach synchronization, resize handling, and wait+timeout logic.
-
-Split into an orchestrator calling focused methods:
-
-```go
-func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (int, error) {
-    rt, containerID, cleanup, err := o.initContainer(cmd.Context(), resolved, cc)
-    if err != nil { return 0, err }
-    defer cleanup()
-
-    restoreTerminal := o.setupTerminal(cmd, cc)
-    defer restoreTerminal()
-
-    stopSignals := o.startSignalForwarder(cmd.Context(), rt, containerID)
-    defer stopSignals()
-
-    startSignal, attachDone, err := o.attachContainer(cmd, rt, containerID, cc)
-    if err != nil { return 0, err }
-
-    if err := rt.StartContainer(cmd.Context(), containerID); err != nil {
-        return 0, fmt.Errorf("failed to start container: %w", err)
-    }
-    close(startSignal)
-
-    o.startResizeHandler(cmd, rt, containerID, cc)
-
-    return o.waitForCompletion(cmd.Context(), rt, containerID, cc, resolved, attachDone)
-}
-```
-
-Method signatures:
-- `initContainer() → (runtime, containerID, cleanupFunc, error)` — Pull + Create + defer Remove
-- `setupTerminal() → restoreFunc` — raw mode; returns noop for easy testing
-- `startSignalForwarder() → stopFunc` — goroutine with chan + context
-- `attachContainer() → (startSignal, attachDone chan, error)` — Attach goroutine + ready wait
-- `waitForCompletion() → (exitCode, error)` — Wait + hang timeout + attach drain
-
-Scope: `root.go` only. No external interface changes. Existing tests remain valid.
-
-
 ### P-4: Remove Global Variables `opts` / `rootCmd`
 
 Current `init()` creates global state, forcing a separate code path for tests via

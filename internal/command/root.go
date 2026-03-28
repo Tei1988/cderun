@@ -660,6 +660,13 @@ type syncReader struct {
 	ctx   context.Context
 }
 
+type attachResult struct {
+	startSignal        chan struct{}
+	attachDone         chan error
+	cancelAttach       context.CancelFunc
+	attachDoneConsumed bool
+}
+
 func (s *syncReader) Read(p []byte) (n int, err error) {
 	select {
 	case <-s.ctx.Done():
@@ -686,56 +693,92 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Initialize Runtime
-	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
+	rt, containerID, cleanup, err := o.initContainer(ctx, resolved, containerConfig)
 	if err != nil {
-		return 0, fmt.Errorf("failed to initialize runtime: %w", err)
+		return 0, err
 	}
+	defer cleanup()
 
-	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, containerConfig.Image, containerConfig.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
-		return 0, fmt.Errorf("failed to pull image: %w", err)
-	}
-
-	containerID, err := rt.CreateContainer(ctx, containerConfig)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create container: %w", err)
-	}
-
-	if containerConfig.Remove {
-		cleanupCtx := context.WithoutCancel(ctx)
-		defer func() {
-			o.logger.Trace("Removing container: %s", containerID)
-			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
-				o.logger.Warn("failed to remove container (defer): %v", err)
-			}
-		}()
-	}
-
-	// Detect if host stdin is a terminal and get its FD
+	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
 	if isHostStdinTerminal {
 		isHostStdinTerminal = o.isTerminal(stdinFd)
 	}
+
+	restoreTerminal := o.setupTerminal(stdinFd, isHostStdinTerminal, containerConfig)
+	defer restoreTerminal()
+
+	stopSignals := o.startSignalForwarder(ctxG, cancel, rt, containerID)
+	defer stopSignals()
+
+	att, err := o.attachContainer(ctxG, cmd, rt, containerID, containerConfig)
+	if err != nil {
+		return 0, err
+	}
+	defer att.cancelAttach()
+
+	o.logger.Trace("Starting container: %s", containerID)
+	if err := rt.StartContainer(ctx, containerID); err != nil {
+		return 0, fmt.Errorf("failed to start container: %w", err)
+	}
+	close(att.startSignal) // Signal stdin to start reading
+
+	stopResize := o.startResizeHandler(ctxG, cmd, rt, containerID, containerConfig)
+	defer stopResize()
+
+	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
+}
+
+func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (runtime.ContainerRuntime, string, func(), error) {
+	// Initialize Runtime
+	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to initialize runtime: %w", err)
+	}
+
+	o.logger.Trace("Creating container...")
+	if err := rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
+		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
+	}
+
+	containerID, err := rt.CreateContainer(ctx, cc)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
+	}
+
+	cleanup := func() {}
+	if cc.Remove {
+		cleanupCtx := context.WithoutCancel(ctx)
+		cleanup = func() {
+			o.logger.Trace("Removing container: %s", containerID)
+			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
+				o.logger.Warn("failed to remove container (defer): %v", err)
+			}
+		}
+	}
+
+	return rt, containerID, cleanup, nil
+}
+
+func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *container.ContainerConfig) func() {
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
-	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, containerConfig.Interactive, resolved)
-
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
-	if isHostStdinTerminal && containerConfig.TTY {
+	if isHostStdinTerminal && cc.TTY {
 		o.logger.Trace("Setting terminal to raw mode")
 		state, err := o.makeRaw(stdinFd)
 		if err != nil {
 			o.logger.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			defer func() { _ = o.restore(stdinFd, state) }() //nolint:errcheck
+			return func() { _ = o.restore(stdinFd, state) } //nolint:errcheck
 		}
 	}
+	return func() {}
+}
 
-	// Handle signals and forward them to the container
+func (o *rootOptions) startSignalForwarder(ctx context.Context, cancel context.CancelFunc, rt runtime.ContainerRuntime, containerID string) func() {
 	sigChan := make(chan os.Signal, 1)
 	o.setupSignals(sigChan)
-	defer o.stopSignalHandling(sigChan)
 	go func() {
 		firstSignal := true
 		for {
@@ -744,7 +787,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				if firstSignal {
 					sigName := getSignalName(sig)
 					o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
-					if err := rt.SignalContainer(ctxG, containerID, sigName); err != nil {
+					if err := rt.SignalContainer(ctx, containerID, sigName); err != nil {
 						o.logger.Warn("failed to forward signal %v: %v", sig, err)
 					} else {
 						o.logger.Debug("Successfully forwarded signal %v to container", sig)
@@ -755,81 +798,92 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					cancel()
 					return
 				}
-			case <-ctxG.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
+	return func() { o.stopSignalHandling(sigChan) }
+}
 
+func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) (*attachResult, error) {
 	// Attach to container IO concurrently
 	var stdin io.Reader
 	startSignal := make(chan struct{})
-	if containerConfig.Interactive {
+	if cc.Interactive {
 		stdin = &syncReader{
 			inner: cmd.InOrStdin(),
 			ready: startSignal,
-			ctx:   ctxG,
+			ctx:   ctx,
 		}
 	}
 
-	var attachDoneConsumed bool
-	attachCtx, cancelAttach := context.WithCancel(ctxG)
-	defer cancelAttach()
-
+	attachCtx, cancelAttach := context.WithCancel(ctx)
 	attachReady := make(chan struct{})
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- rt.AttachContainer(attachCtx, containerID, containerConfig.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr(), attachReady)
+		attachDone <- rt.AttachContainer(attachCtx, containerID, cc.TTY, stdin, cmd.OutOrStdout(), cmd.ErrOrStderr(), attachReady)
 	}()
 
 	// Give a tiny bit of time for the goroutine to reach AttachContainer call,
 	// reducing race condition where container starts and finishes before attachment.
-	if !attachDoneConsumed {
-		select {
-		case <-attachReady:
-		case err := <-attachDone:
-			attachDoneConsumed = true
-			if err != nil {
-				return 0, fmt.Errorf("failed to attach to container: %w", err)
-			}
-		case <-ctxG.Done():
-			return 0, ctxG.Err()
+	var attachDoneConsumed bool
+	select {
+	case <-attachReady:
+	case err := <-attachDone:
+		attachDoneConsumed = true
+		if err != nil {
+			cancelAttach()
+			return nil, fmt.Errorf("failed to attach to container: %w", err)
 		}
+	case <-ctx.Done():
+		cancelAttach()
+		return nil, ctx.Err()
 	}
 
-	o.logger.Trace("Starting container: %s", containerID)
-	if err := rt.StartContainer(ctx, containerID); err != nil {
-		return 0, fmt.Errorf("failed to start container: %w", err)
-	}
-	close(startSignal) // Signal stdin to start reading
+	return &attachResult{
+		startSignal:        startSignal,
+		attachDone:         attachDone,
+		cancelAttach:       cancelAttach,
+		attachDoneConsumed: attachDoneConsumed,
+	}, nil
+}
 
-	// Handle window resize synchronization
-	if fd, ok := getFd(cmd.OutOrStdout()); ok && containerConfig.TTY && o.isTerminal(fd) {
+func (o *rootOptions) startResizeHandler(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) func() {
+	if fd, ok := getFd(cmd.OutOrStdout()); ok && cc.TTY && o.isTerminal(fd) {
 		resizeChan := make(chan os.Signal, 1)
 		o.setupResizeSignal(resizeChan)
-		defer o.stopSignalHandling(resizeChan)
+
+		handleResize := func() {
+			w, h, err := o.termGetSize(fd)
+			if err == nil && h >= 0 && w >= 0 {
+				_ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
+			}
+		}
+
 		go func() {
 			for {
 				select {
 				case <-resizeChan:
-					w, h, err := o.termGetSize(fd)
-					if err == nil && h >= 0 && w >= 0 {
-						_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
-					}
-				case <-ctxG.Done():
+					handleResize()
+				case <-ctx.Done():
 					return
 				}
 			}
 		}()
 
 		// Initial resize to match current terminal size
-		w, h, err := o.termGetSize(fd)
-		if err == nil && h >= 0 && w >= 0 {
-			_ = rt.ResizeContainerTTY(ctxG, containerID, uint(h), uint(w)) //nolint:gosec,errcheck
-		}
-	}
+		handleResize()
 
+		return func() { o.stopSignalHandling(resizeChan) }
+	}
+	return func() {}
+}
+
+func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, isHostStdinTerminal bool, att *attachResult) (int, error) {
 	o.logger.Trace("Waiting for container: %s", containerID)
+
+	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, cc.Interactive, resolved)
 
 	type waitResult struct {
 		code int
@@ -837,7 +891,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	waitDone := make(chan waitResult, 1)
 	go func() {
-		code, err := rt.WaitContainer(ctxG, containerID)
+		code, err := rt.WaitContainer(ctx, containerID)
 		waitDone <- waitResult{code, err}
 	}()
 
@@ -852,10 +906,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		if !attachDoneConsumed {
+		if !att.attachDoneConsumed {
 			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 			select {
-			case err := <-attachDone:
+			case err := <-att.attachDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
 					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
 					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
@@ -863,16 +917,17 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 			case <-time.After(o.attachGracePeriod):
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-				cancelAttach()
-				<-attachDone
+				att.cancelAttach()
+				<-att.attachDone
 			}
 		}
 
-	case err := <-attachDone:
+	case err := <-att.attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
 			// Wait for container to finish (best effort)
-			cancel()
+			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
+			// until it finishes, the timeout expires, or a second signal is received.
 			select {
 			case res := <-waitDone:
 				exitCode = res.code
@@ -882,10 +937,9 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 			return exitCode, fmt.Errorf("failed to attach to container: %w", err)
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
+
 		// IO finished before container exited.
-		// In non-TTY mode, or if the host input is a pipe, if it doesn't exit soon, we might be hitting the Docker 29.1.5 hang.
-		// If host stdin is not a terminal, we use a much shorter timeout because we don't expect interactive behavior.
-		if !isHostStdinTerminal || !containerConfig.Interactive {
+		if !isHostStdinTerminal || !cc.Interactive {
 			if effectiveHangTimeout > 0 {
 				o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
 				select {
@@ -895,6 +949,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 					}
 					exitCode = result.code
 				case <-time.After(effectiveHangTimeout):
+					var err error
 					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
 					if err != nil {
 						return 0, err
