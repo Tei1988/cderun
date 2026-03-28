@@ -660,6 +660,13 @@ type syncReader struct {
 	ctx   context.Context
 }
 
+type attachResult struct {
+	startSignal        chan struct{}
+	attachDone         chan error
+	cancelAttach       context.CancelFunc
+	attachDoneConsumed bool
+}
+
 func (s *syncReader) Read(p []byte) (n int, err error) {
 	select {
 	case <-s.ctx.Done():
@@ -692,28 +699,34 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	defer cleanup()
 
-	restoreTerminal := o.setupTerminal(cmd, containerConfig)
+	// Detect if host stdin is a terminal once
+	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
+	if isHostStdinTerminal {
+		isHostStdinTerminal = o.isTerminal(stdinFd)
+	}
+
+	restoreTerminal := o.setupTerminal(stdinFd, isHostStdinTerminal, containerConfig)
 	defer restoreTerminal()
 
 	stopSignals := o.startSignalForwarder(ctxG, cancel, rt, containerID)
 	defer stopSignals()
 
-	startSignal, attachDone, cancelAttach, attachDoneConsumed, err := o.attachContainer(ctxG, cmd, rt, containerID, containerConfig)
+	att, err := o.attachContainer(ctxG, cmd, rt, containerID, containerConfig)
 	if err != nil {
 		return 0, err
 	}
-	defer cancelAttach()
+	defer att.cancelAttach()
 
 	o.logger.Trace("Starting container: %s", containerID)
 	if err := rt.StartContainer(ctx, containerID); err != nil {
 		return 0, fmt.Errorf("failed to start container: %w", err)
 	}
-	close(startSignal) // Signal stdin to start reading
+	close(att.startSignal) // Signal stdin to start reading
 
 	stopResize := o.startResizeHandler(ctxG, cmd, rt, containerID, containerConfig)
 	defer stopResize()
 
-	return o.waitForCompletion(ctxG, cancelAttach, cmd, rt, containerID, containerConfig, resolved, attachDone, attachDoneConsumed)
+	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
 }
 
 func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (runtime.ContainerRuntime, string, func(), error) {
@@ -747,12 +760,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	return rt, containerID, cleanup, nil
 }
 
-func (o *rootOptions) setupTerminal(cmd *cobra.Command, cc *container.ContainerConfig) func() {
-	// Detect if host stdin is a terminal and get its FD
-	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
-	if isHostStdinTerminal {
-		isHostStdinTerminal = o.isTerminal(stdinFd)
-	}
+func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *container.ContainerConfig) func() {
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
 	// Set up terminal raw mode if TTY is requested and we are in a terminal
@@ -798,7 +806,7 @@ func (o *rootOptions) startSignalForwarder(ctx context.Context, cancel context.C
 	return func() { o.stopSignalHandling(sigChan) }
 }
 
-func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) (chan struct{}, chan error, context.CancelFunc, bool, error) {
+func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) (*attachResult, error) {
 	// Attach to container IO concurrently
 	var stdin io.Reader
 	startSignal := make(chan struct{})
@@ -826,14 +834,19 @@ func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, r
 		attachDoneConsumed = true
 		if err != nil {
 			cancelAttach()
-			return nil, nil, nil, false, fmt.Errorf("failed to attach to container: %w", err)
+			return nil, fmt.Errorf("failed to attach to container: %w", err)
 		}
 	case <-ctx.Done():
 		cancelAttach()
-		return nil, nil, nil, false, ctx.Err()
+		return nil, ctx.Err()
 	}
 
-	return startSignal, attachDone, cancelAttach, attachDoneConsumed, nil
+	return &attachResult{
+		startSignal:        startSignal,
+		attachDone:         attachDone,
+		cancelAttach:       cancelAttach,
+		attachDoneConsumed: attachDoneConsumed,
+	}, nil
 }
 
 func (o *rootOptions) startResizeHandler(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) func() {
@@ -867,14 +880,9 @@ func (o *rootOptions) startResizeHandler(ctx context.Context, cmd *cobra.Command
 	return func() {}
 }
 
-func (o *rootOptions) waitForCompletion(ctx context.Context, cancelAttach context.CancelFunc, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, attachDone chan error, attachDoneConsumed bool) (int, error) {
+func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, isHostStdinTerminal bool, att *attachResult) (int, error) {
 	o.logger.Trace("Waiting for container: %s", containerID)
 
-	// Detect if host stdin is a terminal for hang timeout calculation
-	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
-	if isHostStdinTerminal {
-		isHostStdinTerminal = o.isTerminal(stdinFd)
-	}
 	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, cc.Interactive, resolved)
 
 	type waitResult struct {
@@ -898,10 +906,10 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cancelAttach contex
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
 		// After container exits, wait a short grace period for remaining output
-		if !attachDoneConsumed {
+		if !att.attachDoneConsumed {
 			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
 			select {
-			case err := <-attachDone:
+			case err := <-att.attachDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
 					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
 					return exitCode, fmt.Errorf("failed to attach to container: %w", err)
@@ -909,12 +917,12 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cancelAttach contex
 				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 			case <-time.After(o.attachGracePeriod):
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-				cancelAttach()
-				<-attachDone
+				att.cancelAttach()
+				<-att.attachDone
 			}
 		}
 
-	case err := <-attachDone:
+	case err := <-att.attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
 			// Wait for container to finish (best effort)
