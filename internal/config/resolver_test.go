@@ -8,9 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptr[T any](v T) *T {
-	return &v
-}
 
 func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
