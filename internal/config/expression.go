@@ -180,7 +180,7 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
-	if filepath.IsAbs(filename) || strings.Contains(filename, "..") {
+	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
@@ -208,7 +208,7 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
-	if filepath.IsAbs(name) || strings.Contains(name, "..") {
+	if filepath.IsAbs(name) || !filepath.IsLocal(name) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
 	}
 

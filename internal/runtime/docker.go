@@ -338,9 +338,9 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 
 				// Give a small grace period before closing the write side.
-				// In some Docker versions (e.g. 29.1.5), calling CloseWrite immediately
-				// after io.Copy can cause the entire connection to be closed or
-				// the EOF to be processed before the data has been fully consumed by the daemon.
+				// In some Docker versions, calling CloseWrite immediately after io.Copy
+				// can cause the entire connection to be closed or the EOF to be processed
+				// before the data has been fully consumed by the daemon.
 				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
 				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
 				if err := d.sleepFunc(ctx, attachCloseWriteGrace); err == nil {
