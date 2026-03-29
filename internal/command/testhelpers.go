@@ -19,7 +19,7 @@ func (m *TerminationMockRuntime) InspectContainer(ctx context.Context, container
 }
 
 type RootErrorFS struct {
-	WfFunc func(path string, data []byte, perm os.FileMode) error
+	WriteFileFunc func(path string, data []byte, perm os.FileMode) error
 	*config.MockFileSystem
 	MkdirErr error
 	WriteErr error
@@ -33,8 +33,8 @@ func (fs *RootErrorFS) MkdirAll(path string, perm os.FileMode) error {
 }
 
 func (fs *RootErrorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
-	if fs.WfFunc != nil {
-		return fs.WfFunc(path, data, perm)
+	if fs.WriteFileFunc != nil {
+		return fs.WriteFileFunc(path, data, perm)
 	}
 	if fs.WriteErr != nil {
 		return fs.WriteErr

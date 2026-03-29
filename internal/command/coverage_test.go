@@ -160,7 +160,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 	t.Run("WriteFile .cderun.yaml failure", func(t *testing.T) {
 		mfs := &RootErrorFS{
 			MockFileSystem: &config.MockFileSystem{},
-			WfFunc: func(path string, data []byte, perm os.FileMode) error {
+			WriteFileFunc: func(path string, data []byte, perm os.FileMode) error {
 				if filepath.Base(path) == ".cderun.yaml" {
 					return errors.New("write cderun failed")
 				}
@@ -175,7 +175,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 	t.Run("WriteFile .tools.yaml failure", func(t *testing.T) {
 		mfs := &RootErrorFS{
 			MockFileSystem: &config.MockFileSystem{},
-			WfFunc: func(path string, data []byte, perm os.FileMode) error {
+			WriteFileFunc: func(path string, data []byte, perm os.FileMode) error {
 				if filepath.Base(path) == ".tools.yaml" {
 					return errors.New("write tools failed")
 				}
