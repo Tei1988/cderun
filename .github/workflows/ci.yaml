@@ -24,7 +24,7 @@ jobs:
               - 'go.sum'
               - '.go-version'
               - 'Makefile'
-              - '.github/workflows/*.yml'
+              - '.github/workflows/*.{yml,yaml}'
             docs:
               - '**/*.md'
               - 'scripts/check-links.sh'
@@ -115,7 +115,7 @@ jobs:
           name: coverage-report
           path: coverage.out
       - name: Upload to Codecov
-        uses: codecov/codecov-action@0561704f0f02c16a585d4c7555e57fa2e44cf909 # v5.5.2
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
@@ -175,7 +175,7 @@ jobs:
           go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-runtime.out ./internal/command/...
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@0561704f0f02c16a585d4c7555e57fa2e44cf909 # v5.5.2
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage-runtime.out
@@ -238,7 +238,7 @@ jobs:
           CONTAINER_HOST=unix:///run/podman/podman.sock podman system info || true
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@0561704f0f02c16a585d4c7555e57fa2e44cf909 # v5.5.2
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage-podman.out
