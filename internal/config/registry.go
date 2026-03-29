@@ -8,6 +8,7 @@ import (
 // StringOption defines a string-based configuration option.
 type StringOption struct {
 	Name           string // kebab-case, used for flags (e.g. "image")
+	FieldName      string // PascalCase, used for reflection (pre-calculated)
 	Shorthand      string
 	Usage          string
 	Default        string
@@ -248,9 +249,10 @@ var (
 // GetStringOption returns a string option by its kebab-case name.
 func GetStringOption(name string) (StringOption, bool) {
 	registryOnce.Do(func() {
-		stringOptionsMap = make(map[string]StringOption)
-		for _, opt := range StringOptions {
-			stringOptionsMap[opt.Name] = opt
+		stringOptionsMap = make(map[string]StringOption, len(StringOptions))
+		for i := range StringOptions {
+			StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+			stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
 		}
 	})
 	opt, ok := stringOptionsMap[name]
@@ -266,15 +268,18 @@ var initialisms = map[string]string{
 // PascalCase converts kebab-case (e.g. "dry-run-format") to PascalCase (e.g. "DryRunFormat").
 // It respects known initialisms (e.g. "tty" -> "TTY").
 func PascalCase(s string) string {
+	var builder strings.Builder
 	parts := strings.Split(s, "-")
-	for i := range parts {
-		if val, ok := initialisms[strings.ToLower(parts[i])]; ok {
-			parts[i] = val
+	for _, part := range parts {
+		if part == "" {
 			continue
 		}
-		if len(parts[i]) > 0 {
-			parts[i] = strings.ToUpper(parts[i][0:1]) + parts[i][1:]
+		if val, ok := initialisms[strings.ToLower(part)]; ok {
+			builder.WriteString(val)
+			continue
 		}
+		builder.WriteString(strings.ToUpper(part[0:1]))
+		builder.WriteString(part[1:])
 	}
-	return strings.Join(parts, "")
+	return builder.String()
 }
