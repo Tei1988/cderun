@@ -19,15 +19,19 @@ test-runtime:
 .PHONY: lint
 lint: lint-go lint-md lint-actions link-check
 
+# Pinned version of pinact is used for consistency between local and CI environments.
+# v3.9.0 is selected following the aged stable policy.
+PINACT_CMD := go run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0
+
 .PHONY: pin-actions
 pin-actions:
 	@echo "Pinning GitHub Actions..."
-	@go run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0 run
+	@$(PINACT_CMD) run
 
 .PHONY: lint-actions
 lint-actions:
 	@echo "Checking GitHub Actions pinning..."
-	@go run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0 run --verify --check
+	@$(PINACT_CMD) run --verify --check
 
 .PHONY: lint-go
 lint-go:
