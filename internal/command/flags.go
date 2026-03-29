@@ -51,91 +51,63 @@ type float64FlagDef struct {
 }
 
 func registerFlags(cmd *cobra.Command, o *rootOptions) {
-	boolDefs := []boolFlagDef{
-		{"tty", "cderun-tty", "t", false, "Allocate a pseudo-TTY", &o.tty, &o.cderunTTY},
-		{"interactive", "cderun-interactive", "i", false, "Keep STDIN open even if not attached", &o.interactive, &o.cderunInteractive},
-		{"mount-socket", "cderun-mount-socket", "", false, "Mount the container runtime socket into the container", &o.mountSocket, &o.cderunMountSocket},
-		{"mount-cderun", "cderun-mount-cderun", "", false, "Mount cderun binary for use inside container", &o.mountCderun, &o.cderunMountCderun},
-		{"mount-all-tools", "cderun-mount-all-tools", "", false, "Mount all defined tools into the container", &o.mountAllTools, &o.cderunMountAllTools},
-		{"remove", "cderun-remove", "", true, "Automatically remove the container when it exits", &o.remove, &o.cderunRemove},
-		{"publish-all", "cderun-publish-all", "P", false, "Publish all exposed ports to random ports", &o.publishAll, &o.cderunPublishAll},
-		{"privileged", "cderun-privileged", "", false, "Give extended privileges to this container", &o.privileged, &o.cderunPrivileged},
-		{"strict-env", "cderun-strict-env", "", false, "Require all environment variables to be present on the host", &o.strictEnv, &o.cderunStrictEnv},
-		{"dry-run", "cderun-dry-run", "", false, "Preview container configuration without execution", &o.dryRun, &o.cderunDryRun},
-		{"diagnosis", "cderun-diagnosis", "", false, "Show system diagnostics and available tools", &o.diagnosis, &o.cderunDiagnosis},
-		{"log-timestamp", "cderun-log-timestamp", "", true, "Include timestamp in logs", &o.logTimestamp, &o.cderunLogTimestamp},
+	f := cmd.PersistentFlags()
+
+	for _, opt := range config.BoolOptions {
+		p2Field, p1Field := getBoolPointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for bool option %q", opt.Name))
+		}
+		if opt.Shorthand != "" {
+			f.BoolVarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
+		} else {
+			f.BoolVar(p2Field, opt.Name, opt.Default, opt.Usage)
+		}
+		f.BoolVar(p1Field, "cderun-"+opt.Name, opt.Default, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
 
-	stringDefs := make([]stringFlagDef, 0, len(config.StringOptions))
 	for _, opt := range config.StringOptions {
 		p2Field, p1Field := getStringPointers(o, opt.Name)
 		if p2Field == nil || p1Field == nil {
 			panic(fmt.Sprintf("could not find fields for string option %q", opt.Name))
 		}
-		stringDefs = append(stringDefs, stringFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	intDefs := []intFlagDef{
-		{"pull-max-retries", "cderun-pull-max-retries", 3, "Maximum number of retries for image pull", &o.pullMaxRetries, &o.cderunPullMaxRetries},
-	}
-
-	stringSliceDefs := []stringSliceFlagDef{
-		{"env", "cderun-env", "e", "Set environment variables", &o.env, &o.cderunEnv},
-		{"mount", "cderun-mount", "", "Attach a filesystem mount to the container", &o.mounts, &o.cderunMounts},
-		{"publish", "cderun-publish", "p", "Publish a container's port(s) to the host", &o.ports, &o.cderunPorts},
-		{"expose", "cderun-expose", "", "Expose a port or a range of ports", &o.expose, &o.cderunExpose},
-		{"dns", "cderun-dns", "", "Set custom DNS servers", &o.dns, &o.cderunDNS},
-		{"add-host", "cderun-add-host", "", "Add a custom host-to-IP mapping (host:ip)", &o.addHosts, &o.cderunAddHosts},
-		{"cap-add", "cderun-cap-add", "", "Add Linux capabilities", &o.capAdd, &o.cderunCapAdd},
-		{"cap-drop", "cderun-cap-drop", "", "Drop Linux capabilities", &o.capDrop, &o.cderunCapDrop},
-		{"entrypoint", "cderun-entrypoint", "", "Overwrite the default ENTRYPOINT of the image", &o.entrypoint, &o.cderunEntrypoint},
-		{"device", "cderun-device", "", "Add a host device to the container", &o.devices, &o.cderunDevices},
-	}
-
-	float64Defs := []float64FlagDef{
-		{"cpus", "cderun-cpus", 0, "Number of CPUs", &o.cpus, &o.cderunCPUs},
-	}
-
-	f := cmd.PersistentFlags()
-	for _, d := range boolDefs {
-		if d.p2Short != "" {
-			f.BoolVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+		if opt.Shorthand != "" {
+			f.StringVarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
 		} else {
-			f.BoolVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+			f.StringVar(p2Field, opt.Name, opt.Default, opt.Usage)
 		}
-		f.BoolVar(d.p1Field, d.p1Name, d.defaultVal, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.StringVar(p1Field, "cderun-"+opt.Name, "", "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range stringDefs {
-		if d.p2Short != "" {
-			f.StringVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+
+	for _, opt := range config.IntOptions {
+		p2Field, p1Field := getIntPointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for int option %q", opt.Name))
+		}
+		f.IntVar(p2Field, opt.Name, opt.Default, opt.Usage)
+		f.IntVar(p1Field, "cderun-"+opt.Name, 0, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
+	}
+
+	for _, opt := range config.StringSliceOptions {
+		p2Field, p1Field := getStringSlicePointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for string slice option %q", opt.Name))
+		}
+		if opt.Shorthand != "" {
+			f.StringArrayVarP(p2Field, opt.Name, opt.Shorthand, nil, opt.Usage)
 		} else {
-			f.StringVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+			f.StringArrayVar(p2Field, opt.Name, nil, opt.Usage)
 		}
-		f.StringVar(d.p1Field, d.p1Name, "", "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.StringArrayVar(p1Field, "cderun-"+opt.Name, nil, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range intDefs {
-		f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
-		f.IntVar(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range stringSliceDefs {
-		if d.p2Short != "" {
-			f.StringArrayVarP(d.p2Field, d.p2Name, d.p2Short, nil, d.p2Usage)
-		} else {
-			f.StringArrayVar(d.p2Field, d.p2Name, nil, d.p2Usage)
+
+	for _, opt := range config.Float64Options {
+		p2Field, p1Field := getFloat64Pointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for float64 option %q", opt.Name))
 		}
-		f.StringArrayVar(d.p1Field, d.p1Name, nil, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range float64Defs {
-		f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
-		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.Float64Var(p2Field, opt.Name, opt.Default, opt.Usage)
+		f.Float64Var(p1Field, "cderun-"+opt.Name, 0, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
 }
 
@@ -181,6 +153,82 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 		return &o.logFormat, &o.cderunLogFormat
 	case "hang-timeout":
 		return &o.hangTimeout, &o.cderunHangTimeout
+	default:
+		return nil, nil
+	}
+}
+
+func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
+	switch name {
+	case "tty":
+		return &o.tty, &o.cderunTTY
+	case "interactive":
+		return &o.interactive, &o.cderunInteractive
+	case "mount-socket":
+		return &o.mountSocket, &o.cderunMountSocket
+	case "mount-cderun":
+		return &o.mountCderun, &o.cderunMountCderun
+	case "mount-all-tools":
+		return &o.mountAllTools, &o.cderunMountAllTools
+	case "remove":
+		return &o.remove, &o.cderunRemove
+	case "publish-all":
+		return &o.publishAll, &o.cderunPublishAll
+	case "privileged":
+		return &o.privileged, &o.cderunPrivileged
+	case "strict-env":
+		return &o.strictEnv, &o.cderunStrictEnv
+	case "dry-run":
+		return &o.dryRun, &o.cderunDryRun
+	case "diagnosis":
+		return &o.diagnosis, &o.cderunDiagnosis
+	case "log-timestamp":
+		return &o.logTimestamp, &o.cderunLogTimestamp
+	default:
+		return nil, nil
+	}
+}
+
+func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
+	switch name {
+	case "pull-max-retries":
+		return &o.pullMaxRetries, &o.cderunPullMaxRetries
+	default:
+		return nil, nil
+	}
+}
+
+func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
+	switch name {
+	case "cpus":
+		return &o.cpus, &o.cderunCPUs
+	default:
+		return nil, nil
+	}
+}
+
+func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
+	switch name {
+	case "env":
+		return &o.env, &o.cderunEnv
+	case "mount":
+		return &o.mounts, &o.cderunMounts
+	case "publish":
+		return &o.ports, &o.cderunPorts
+	case "expose":
+		return &o.expose, &o.cderunExpose
+	case "dns":
+		return &o.dns, &o.cderunDNS
+	case "add-host":
+		return &o.addHosts, &o.cderunAddHosts
+	case "cap-add":
+		return &o.capAdd, &o.cderunCapAdd
+	case "cap-drop":
+		return &o.capDrop, &o.cderunCapDrop
+	case "entrypoint":
+		return &o.entrypoint, &o.cderunEntrypoint
+	case "device":
+		return &o.devices, &o.cderunDevices
 	default:
 		return nil, nil
 	}
