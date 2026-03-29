@@ -14,41 +14,6 @@ import (
 	"github.com/docker/go-units"
 )
 
-type boolOptEntry struct {
-	target        *bool
-	def           OptionDef[*bool]
-	fallback      bool
-	cderunFlagSet bool
-	cderunFlagVal bool
-	cliFlagSet    bool
-	cliFlagVal    bool
-}
-
-type stringSliceOptEntry struct {
-	target     *[]string
-	def        OptionDef[[]string]
-	sep        string
-	cderunFlag []string
-	cliFlag    []string
-}
-
-type float64OptEntry struct {
-	target        *float64
-	def           OptionDef[*float64]
-	cderunFlagSet bool
-	cderunFlagVal float64
-	cliFlagSet    bool
-	cliFlagVal    float64
-}
-
-type intOptEntry struct {
-	target        *int
-	def           OptionDef[*int]
-	cderunFlagSet bool
-	cderunFlagVal int
-	cliFlagSet    bool
-	cliFlagVal    int
-}
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
@@ -558,8 +523,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, opt.Name)
 		}
 
-		cderunFlag := cliVal.FieldByName("Cderun" + fieldName).Interface().([]string)
-		cliFlag := cliVal.FieldByName(fieldName).Interface().([]string)
+		cderunFlag, ok1 := cliVal.FieldByName("Cderun" + fieldName).Interface().([]string)
+		cliFlag, ok2 := cliVal.FieldByName(fieldName).Interface().([]string)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: field %q for option %q is not []string", fieldName, opt.Name)
+		}
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,

@@ -8,47 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type boolFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     bool
-	p2Usage        string
-	p2Field        *bool
-	p1Field        *bool
-}
-
-type stringFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     string
-	p2Usage        string
-	p2Field        *string
-	p1Field        *string
-}
-
-type stringSliceFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	p2Usage        string
-	p2Field        *[]string
-	p1Field        *[]string
-}
-
-type intFlagDef struct {
-	p2Name, p1Name string
-	defaultVal     int
-	p2Usage        string
-	p2Field        *int
-	p1Field        *int
-}
-
-type float64FlagDef struct {
-	p2Name, p1Name string
-	defaultVal     float64
-	p2Usage        string
-	p2Field        *float64
-	p1Field        *float64
-}
 
 func registerFlags(cmd *cobra.Command, o *rootOptions) {
 	f := cmd.PersistentFlags()
