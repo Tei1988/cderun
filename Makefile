@@ -22,14 +22,12 @@ lint: lint-go lint-md lint-actions link-check
 .PHONY: pin-actions
 pin-actions:
 	@echo "Pinning GitHub Actions..."
-	@go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0
-	@$(shell go env GOPATH)/bin/pinact run
+	@go run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0 run
 
 .PHONY: lint-actions
 lint-actions:
 	@echo "Checking GitHub Actions pinning..."
-	@go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0
-	@$(shell go env GOPATH)/bin/pinact run --verify --check
+	@go run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.9.0 run --verify --check
 
 .PHONY: lint-go
 lint-go:
