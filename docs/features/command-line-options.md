@@ -546,6 +546,8 @@ cderun --log-timestamp=false node app.js
   - **Wrapper Mode**: 必ずサブコマンドの後ろに配置してください。
   - **Diagnosis Mode**: サブコマンドがないため、任意の場所に配置可能です。
 
+詳細な動作（ホイスト機能）については [引数解析](./argument-parsing.md) を参照してください。
+
 ## その他の設定オプション
 
 ### `strictEnv`

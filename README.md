@@ -87,6 +87,14 @@ In standard **Wrapper Mode**, these flags **must** be placed **after** the subco
 cderun node app.js --cderun-image node:20-alpine
 ```
 
+#### Hoisting Mechanics
+
+Hoisting works by scanning for `--cderun-` prefixed flags after the subcommand and internally moving them before the subcommand during preprocessing. This allows `cderun` to separate its internal overrides from the wrapped command's own arguments.
+
+1. **Detection**: Scans the argument list for the first non-flag argument (the subcommand).
+2. **Extraction**: Gathers all `--cderun-` flags (and their associated values) located *after* the subcommand.
+3. **Hoisting**: Reconstructs the internal argument list by placing the gathered P1 flags immediately after `cderun` and before the subcommand.
+
 In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
 
 **Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
@@ -130,7 +138,7 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 
 #### Mounting & Nested Execution
 
-- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly][,optional]`).
+- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly][,optional]`). The `optional` parameter skips bind mounts if the source path is missing on the host.
 - `--mount-socket`: Mount the container runtime socket into the container. (Default: `false`)
 - `--mount-cderun`: Mount the `cderun` binary into the container. (Enables `--mount-socket` automatically)
 - `--mount-tools`: Mount specified tools (comma-separated) defined in `.tools.yaml` into the container.
@@ -246,7 +254,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, and `{{find_dir:name}}`
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
   in configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the
