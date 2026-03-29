@@ -23,12 +23,6 @@ import (
 	"cderun/internal/runtime"
 )
 
-type terminationMockRuntime struct {
-	*runtime.MockRuntime
-	isRunning  bool
-	inspectErr error
-}
-
 type safeBuffer struct {
 	buf bytes.Buffer
 	mu  sync.Mutex
@@ -55,10 +49,6 @@ type mockFdWriter struct {
 
 func (m mockFdWriter) Fd() uintptr {
 	return 1
-}
-
-func (m *terminationMockRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
-	return m.isRunning, m.ExitCode, m.inspectErr
 }
 
 func executeCommand(args ...string) (string, error) {
@@ -815,9 +805,9 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 	o := &rootOptions{logger: &logging.Logger{}}
 
 	t.Run("Container already stopped", func(t *testing.T) {
-		mockRuntime := &terminationMockRuntime{
+		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{ExitCode: 123},
-			isRunning:   false,
+			IsRunning:   false,
 		}
 		exitCode, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
@@ -826,9 +816,9 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 	})
 
 	t.Run("Container running, signal success", func(t *testing.T) {
-		mockRuntime := &terminationMockRuntime{
+		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: runtime.NewMockRuntime(),
-			isRunning:   true,
+			IsRunning:   true,
 		}
 		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
@@ -837,9 +827,9 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 	})
 
 	t.Run("Inspect fails, fallback to signal", func(t *testing.T) {
-		mockRuntime := &terminationMockRuntime{
+		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: runtime.NewMockRuntime(),
-			inspectErr:  errors.New("inspect failed"),
+			InspectErr:  errors.New("inspect failed"),
 		}
 		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
@@ -847,9 +837,9 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 	})
 
 	t.Run("Signal fails, ignore error", func(t *testing.T) {
-		mockRuntime := &terminationMockRuntime{
+		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
-			isRunning:   true,
+			IsRunning:   true,
 		}
 		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
@@ -1216,36 +1206,12 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 	require.ErrorContains(t, err, "tool \"nonexistent\" not found in .tools.yaml")
 }
 
-type rootErrorFS struct {
-	wfFunc func(path string, data []byte, perm os.FileMode) error
-	*config.MockFileSystem
-	mkdirErr error
-	writeErr error
-}
-
-func (fs *rootErrorFS) MkdirAll(path string, perm os.FileMode) error {
-	if fs.mkdirErr != nil {
-		return fs.mkdirErr
-	}
-	return fs.MockFileSystem.MkdirAll(path, perm)
-}
-
-func (fs *rootErrorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
-	if fs.wfFunc != nil {
-		return fs.wfFunc(path, data, perm)
-	}
-	if fs.writeErr != nil {
-		return fs.writeErr
-	}
-	return fs.MockFileSystem.WriteFile(path, data, perm)
-}
-
 func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 	t.Parallel()
 	var logBuf bytes.Buffer
-	mfs := &rootErrorFS{
+	mfs := &RootErrorFS{
 		MockFileSystem: &config.MockFileSystem{},
-		mkdirErr:       os.ErrPermission,
+		MkdirErr:       os.ErrPermission,
 	}
 	// MountCderun triggers snapshot creation
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {

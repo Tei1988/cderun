@@ -20,7 +20,7 @@ import (
 	"cderun/internal/runtime"
 )
 
-func TestUnit_Root_SetupTerminal_Coverage(t *testing.T) {
+func TestUnit_Root_SetupTerminal(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no-op when not a terminal", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestUnit_Root_SetupTerminal_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_AttachContainer_Coverage(t *testing.T) {
+func TestUnit_Root_AttachContainer(t *testing.T) {
 	t.Parallel()
 
 	t.Run("context canceled before attachment ready", func(t *testing.T) {
@@ -82,19 +82,19 @@ func TestUnit_Root_AttachContainer_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_WaitForCompletion_Coverage(t *testing.T) {
+func TestUnit_Root_WaitForCompletion(t *testing.T) {
 	t.Parallel()
 
 	t.Run("attachDone error before container exit, timeout expires", func(t *testing.T) {
 		o := &rootOptions{logger: logging.NewLogger()}
-		mockRuntime := &terminationMockRuntime{
+		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{
 				WaitFunc: func(ctx context.Context, id string) (int, error) {
 					<-ctx.Done()
 					return 137, ctx.Err()
 				},
 			},
-			isRunning: true,
+			IsRunning: true,
 		}
 		cmd := &cobra.Command{}
 		att := &attachResult{
@@ -110,7 +110,7 @@ func TestUnit_Root_WaitForCompletion_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_WriteFormatted_Coverage(t *testing.T) {
+func TestUnit_Root_WriteFormatted(t *testing.T) {
 	t.Parallel()
 
 	o := &rootOptions{logger: logging.NewLogger()}
@@ -119,7 +119,7 @@ func TestUnit_Root_WriteFormatted_Coverage(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported output format: \"invalid\"")
 }
 
-func TestUnit_Root_PreprocessArgs_Coverage(t *testing.T) {
+func TestUnit_Root_PreprocessArgs(t *testing.T) {
 	t.Parallel()
 
 	cmd := newRootCmd(&rootOptions{})
@@ -142,15 +142,15 @@ func TestUnit_Root_PreprocessArgs_Coverage(t *testing.T) {
 	})
 }
 
-func TestUnit_Root_CreateSnapshot_Coverage(t *testing.T) {
+func TestUnit_Root_CreateSnapshot(t *testing.T) {
 	t.Parallel()
 
 	logger := logging.NewLogger()
 
 	t.Run("MkdirAll failure", func(t *testing.T) {
-		mfs := &rootErrorFS{
+		mfs := &RootErrorFS{
 			MockFileSystem: &config.MockFileSystem{},
-			mkdirErr:       errors.New("mkdir failed"),
+			MkdirErr:       errors.New("mkdir failed"),
 		}
 		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
 		require.Error(t, err)
@@ -158,9 +158,9 @@ func TestUnit_Root_CreateSnapshot_Coverage(t *testing.T) {
 	})
 
 	t.Run("WriteFile .cderun.yaml failure", func(t *testing.T) {
-		mfs := &rootErrorFS{
+		mfs := &RootErrorFS{
 			MockFileSystem: &config.MockFileSystem{},
-			wfFunc: func(path string, data []byte, perm os.FileMode) error {
+			WfFunc: func(path string, data []byte, perm os.FileMode) error {
 				if filepath.Base(path) == ".cderun.yaml" {
 					return errors.New("write cderun failed")
 				}
@@ -173,9 +173,9 @@ func TestUnit_Root_CreateSnapshot_Coverage(t *testing.T) {
 	})
 
 	t.Run("WriteFile .tools.yaml failure", func(t *testing.T) {
-		mfs := &rootErrorFS{
+		mfs := &RootErrorFS{
 			MockFileSystem: &config.MockFileSystem{},
-			wfFunc: func(path string, data []byte, perm os.FileMode) error {
+			WfFunc: func(path string, data []byte, perm os.FileMode) error {
 				if filepath.Base(path) == ".tools.yaml" {
 					return errors.New("write tools failed")
 				}
