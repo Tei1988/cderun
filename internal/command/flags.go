@@ -1,6 +1,12 @@
 package command
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"cderun/internal/config"
+
+	"github.com/spf13/cobra"
+)
 
 type boolFlagDef struct {
 	p2Name, p1Name string
@@ -60,27 +66,21 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		{"log-timestamp", "cderun-log-timestamp", "", true, "Include timestamp in logs", &o.logTimestamp, &o.cderunLogTimestamp},
 	}
 
-	stringDefs := []stringFlagDef{
-		{"network", "cderun-network", "", "bridge", "Connect a container to a network", &o.network, &o.cderunNetwork},
-		{"socket-path", "cderun-socket-path", "", "", "Path to the container runtime socket on the host", &o.socketPath, &o.cderunSocketPath},
-		{"mount-socket-path", "cderun-mount-socket-path", "", "", "Path where the socket should be mounted inside the container (defaults to host path)", &o.mountSocketPath, &o.cderunMountSocketPath},
-		{"mount-cderun-path", "cderun-mount-cderun-path", "", "", "Host path to cderun binary to mount inside container", &o.mountCderunPath, &o.cderunMountCderunPath},
-		{"image", "cderun-image", "", "", "Docker image to use", &o.image, &o.cderunImage},
-		{"runtime", "cderun-runtime", "", "docker", "Container runtime to use (docker/podman)", &o.runtimeName, &o.cderunRuntime},
-		{"workdir", "cderun-workdir", "w", "", "Working directory inside the container", &o.workdir, &o.cderunWorkdir},
-		{"mount-tools", "cderun-mount-tools", "", "", "Mount specified tools into the container", &o.mountTools, &o.cderunMountTools},
-		{"config", "cderun-config", "", "", "Path to cderun config file", &o.configPath, &o.cderunConfigPath},
-		{"tool-config", "cderun-tool-config", "", "", "Path to tools config file", &o.toolConfigPath, &o.cderunToolConfigPath},
-		{"hostname", "cderun-hostname", "", "", "Container host name", &o.hostname, &o.cderunHostname},
-		{"user", "cderun-user", "u", "", "Username or UID (format: <name|uid>[:<group|gid>])", &o.user, &o.cderunUser},
-		{"pull", "cderun-pull", "", "missing", "Pull image before running (always, missing, never)", &o.pull, &o.cderunPull},
-		{"pull-backoff-base", "cderun-pull-backoff-base", "", "", "Base duration for exponential backoff during image pull (e.g. 1s, 500ms)", &o.pullBackoffBase, &o.cderunPullBackoffBase},
-		{"memory", "cderun-memory", "m", "", "Memory limit", &o.memory, &o.cderunMemory},
-		{"dry-run-format", "cderun-dry-run-format", "f", "yaml", "Output format (yaml, json, simple)", &o.dryRunFormat, &o.cderunDryRunFormat},
-		{"diagnosis-format", "cderun-diagnosis-format", "", "yaml", "Diagnosis output format (yaml, json, simple)", &o.diagnosisFormat, &o.cderunDiagnosisFormat},
-		{"log-level", "cderun-log-level", "", "", "Set log level (error, warn, info, debug, trace)", &o.logLevel, &o.cderunLogLevel},
-		{"log-format", "cderun-log-format", "", "text", "Set log format (text, json)", &o.logFormat, &o.cderunLogFormat},
-		{"hang-timeout", "cderun-hang-timeout", "", "", "Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms)", &o.hangTimeout, &o.cderunHangTimeout},
+	stringDefs := make([]stringFlagDef, 0, len(config.StringOptions))
+	for _, opt := range config.StringOptions {
+		p2Field, p1Field := getStringPointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for string option %q", opt.Name))
+		}
+		stringDefs = append(stringDefs, stringFlagDef{
+			p2Name:     opt.Name,
+			p1Name:     "cderun-" + opt.Name,
+			p2Short:    opt.Shorthand,
+			defaultVal: opt.Default,
+			p2Usage:    opt.Usage,
+			p2Field:    p2Field,
+			p1Field:    p1Field,
+		})
 	}
 
 	intDefs := []intFlagDef{
@@ -136,5 +136,52 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 	for _, d := range float64Defs {
 		f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
 		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+	}
+}
+
+func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
+	switch name {
+	case "network":
+		return &o.network, &o.cderunNetwork
+	case "socket-path":
+		return &o.socketPath, &o.cderunSocketPath
+	case "mount-socket-path":
+		return &o.mountSocketPath, &o.cderunMountSocketPath
+	case "mount-cderun-path":
+		return &o.mountCderunPath, &o.cderunMountCderunPath
+	case "image":
+		return &o.image, &o.cderunImage
+	case "runtime":
+		return &o.runtimeName, &o.cderunRuntime
+	case "workdir":
+		return &o.workdir, &o.cderunWorkdir
+	case "mount-tools":
+		return &o.mountTools, &o.cderunMountTools
+	case "config":
+		return &o.configPath, &o.cderunConfigPath
+	case "tool-config":
+		return &o.toolConfigPath, &o.cderunToolConfigPath
+	case "hostname":
+		return &o.hostname, &o.cderunHostname
+	case "user":
+		return &o.user, &o.cderunUser
+	case "pull":
+		return &o.pull, &o.cderunPull
+	case "pull-backoff-base":
+		return &o.pullBackoffBase, &o.cderunPullBackoffBase
+	case "memory":
+		return &o.memory, &o.cderunMemory
+	case "dry-run-format":
+		return &o.dryRunFormat, &o.cderunDryRunFormat
+	case "diagnosis-format":
+		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
+	case "log-level":
+		return &o.logLevel, &o.cderunLogLevel
+	case "log-format":
+		return &o.logFormat, &o.cderunLogFormat
+	case "hang-timeout":
+		return &o.hangTimeout, &o.cderunHangTimeout
+	default:
+		return nil, nil
 	}
 }
