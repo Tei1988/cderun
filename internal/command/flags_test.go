@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"cderun/internal/config"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,4 +103,15 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 		assert.Equal(t, int64(2*1024*1024*1024), cfg.Memory)
 		assert.InDelta(t, 2.0, cfg.CPUs, 0.0001)
 	})
+}
+
+func TestUnit_Flags_GetStringPointers_Coverage(t *testing.T) {
+	o := &rootOptions{}
+	for _, opt := range config.StringOptions {
+		t.Run(opt.Name, func(t *testing.T) {
+			p2, p1 := getStringPointers(o, opt.Name)
+			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
+			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
+		})
+	}
 }

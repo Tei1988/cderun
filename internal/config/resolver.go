@@ -300,7 +300,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		fieldName := PascalCase(opt.Name)
 		targetField := resVal.FieldByName(fieldName)
 		if !targetField.IsValid() {
-			continue // Might be handled elsewhere if SkipResolution was false but field not in ResolvedConfig
+			if opt.SkipResolution {
+				continue
+			}
+			return nil, fmt.Errorf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, opt.Name)
 		}
 
 		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
@@ -309,7 +312,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		p2ValField := cliVal.FieldByName(fieldName)
 
 		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() {
-			continue
+			if opt.SkipResolution {
+				continue
+			}
+			return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q (field %q) missing in CLIOptions", opt.Name, fieldName)
 		}
 
 		p1Set := p1SetField.Bool()

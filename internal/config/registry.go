@@ -257,10 +257,21 @@ func GetStringOption(name string) (StringOption, bool) {
 	return opt, ok
 }
 
+var initialisms = map[string]string{
+	"tty":  "TTY",
+	"dns":  "DNS",
+	"cpus": "CPUs",
+}
+
 // PascalCase converts kebab-case (e.g. "dry-run-format") to PascalCase (e.g. "DryRunFormat").
+// It respects known initialisms (e.g. "tty" -> "TTY").
 func PascalCase(s string) string {
 	parts := strings.Split(s, "-")
 	for i := range parts {
+		if val, ok := initialisms[strings.ToLower(parts[i])]; ok {
+			parts[i] = val
+			continue
+		}
 		if len(parts[i]) > 0 {
 			parts[i] = strings.ToUpper(parts[i][0:1]) + parts[i][1:]
 		}
