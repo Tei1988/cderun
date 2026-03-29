@@ -2,7 +2,6 @@ package config
 
 import (
 	"strings"
-	"sync"
 )
 
 // StringOption defines a string-based configuration option.
@@ -243,18 +242,18 @@ var StringOptions = []StringOption{
 
 var (
 	stringOptionsMap map[string]StringOption
-	registryOnce     sync.Once
 )
+
+func init() {
+	stringOptionsMap = make(map[string]StringOption, len(StringOptions))
+	for i := range StringOptions {
+		StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+		stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
+	}
+}
 
 // GetStringOption returns a string option by its kebab-case name.
 func GetStringOption(name string) (StringOption, bool) {
-	registryOnce.Do(func() {
-		stringOptionsMap = make(map[string]StringOption, len(StringOptions))
-		for i := range StringOptions {
-			StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
-			stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
-		}
-	})
 	opt, ok := stringOptionsMap[name]
 	return opt, ok
 }

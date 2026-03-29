@@ -367,10 +367,17 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 				return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
 			}
 
-			p1Set := p1SetField.Bool()
-			p1Val := p1ValField.String()
-			p2Set := p2SetField.Bool()
-			p2Val := p2ValField.String()
+			p1Set := p1SetField.IsValid() && p1SetField.Bool()
+			p2Set := p2SetField.IsValid() && p2SetField.Bool()
+
+			p1ValStr := ""
+			if p1ValField.IsValid() {
+				p1ValStr = p1ValField.String()
+			}
+			p2ValStr := ""
+			if p2ValField.IsValid() {
+				p2ValStr = p2ValField.String()
+			}
 
 			def := OptionDef[string]{
 				EnvKey:       opt.EnvKey,
@@ -378,7 +385,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 				GlobalGetter: opt.GlobalGetter,
 				Fallback:     opt.Default,
 			}
-			resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+			resolved := resolveStringOpt(def, p1Set, p1ValStr, p2Set, p2ValStr, subcommand, tools, global, r, fs)
 			targetField.SetString(resolved)
 			continue
 		}
