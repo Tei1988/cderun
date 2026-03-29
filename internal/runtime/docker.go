@@ -24,6 +24,11 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const (
+	attachCloseWriteGrace = 1 * time.Second
+)
+
+
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
@@ -332,9 +337,17 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			} else {
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 
-				logging.Trace("Calling CloseWrite on container %s connection", containerID)
-				if err := resp.CloseWrite(); err != nil {
-					logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+				// Give a small grace period before closing the write side.
+				// In some Docker versions, calling CloseWrite immediately after io.Copy
+				// can cause the entire connection to be closed or the EOF to be processed
+				// before the data has been fully consumed by the daemon.
+				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
+				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
+				if err := d.sleepFunc(ctx, attachCloseWriteGrace); err == nil {
+					logging.Trace("Calling CloseWrite on container %s connection", containerID)
+					if err := resp.CloseWrite(); err != nil {
+						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+					}
 				}
 			}
 			close(stdinDone)

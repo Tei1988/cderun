@@ -657,6 +657,29 @@ func TestUnit_Docker_AttachOptions(t *testing.T) {
 }
 
 func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
+	t.Run("CloseWrite is skipped if sleepFunc returns error", func(t *testing.T) {
+		conn := &mockConn{}
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(strings.NewReader("")),
+			},
+		}
+		// sleepFunc returns error to simulate cancellation
+		runtime := &DockerRuntime{
+			client: mock,
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				return context.Canceled
+			},
+		}
+
+		stdin := strings.NewReader("input")
+		// We use a small output that finishes quickly
+		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, io.Discard, io.Discard, nil)
+		require.NoError(t, err)
+		assert.False(t, conn.closeWriteCalled.Load(), "CloseWrite should not be called if sleep was canceled")
+	})
+
 	t.Run("CloseWrite is called if sleepFunc succeeds", func(t *testing.T) {
 		conn := &mockConn{}
 		mock := &mockDockerClient{
