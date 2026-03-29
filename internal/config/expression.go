@@ -102,14 +102,16 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
+	hasExpr := strings.Contains(s, "{{")
+
 	// Fast-path: no expressions and no tilde expansion
-	if !strings.Contains(s, "{{") && !strings.HasPrefix(s, "~") {
+	if !hasExpr && !strings.HasPrefix(s, "~") {
 		return s
 	}
 
 	// 1. Resolve {{...}} expressions
 	resolved := s
-	if strings.Contains(s, "{{") {
+	if hasExpr {
 		resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
 			if r.err != nil {
 				return match
@@ -130,13 +132,16 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	}
 
 	// 2. Expand ~ if it's at the beginning
-	expanded, err := expandHome(resolved, r.fs)
-	if err != nil {
-		r.setError(err)
-		return resolved
+	if strings.HasPrefix(resolved, "~") {
+		expanded, err := expandHome(resolved, r.fs)
+		if err != nil {
+			r.setError(err)
+			return resolved
+		}
+		return expanded
 	}
 
-	return expanded
+	return resolved
 }
 
 func (r *ExpressionResolver) resolveDirective(content string) (string, error) {

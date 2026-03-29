@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"cderun/internal/container"
@@ -263,6 +264,54 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+var (
+	cliType   = reflect.TypeFor[CLIOptions]()
+	resType   = reflect.TypeFor[ResolvedConfig]()
+	fieldInfo map[string]optionFields
+	fieldOnce sync.Once
+)
+
+type optionFields struct {
+	targetIdx []int
+	p1SetIdx  []int
+	p1ValIdx  []int
+	p2SetIdx  []int
+	p2ValIdx  []int
+}
+
+func initFieldInfo() {
+	fieldInfo = make(map[string]optionFields)
+	for _, opt := range StringOptions {
+		if opt.SkipResolution {
+			continue
+		}
+		fieldName := opt.FieldName
+		if fieldName == "" {
+			fieldName = PascalCase(opt.Name)
+		}
+
+		targetField, ok := resType.FieldByName(fieldName)
+		if !ok {
+			continue
+		}
+
+		p1SetField, ok1 := cliType.FieldByName("Cderun" + fieldName + "Set")
+		p1ValField, ok2 := cliType.FieldByName("Cderun" + fieldName)
+		p2SetField, ok3 := cliType.FieldByName(fieldName + "Set")
+		p2ValField, ok4 := cliType.FieldByName(fieldName)
+
+		if ok1 && ok2 && ok3 && ok4 {
+			fieldInfo[opt.Name] = optionFields{
+				targetIdx: targetField.Index,
+				p1SetIdx:  p1SetField.Index,
+				p1ValIdx:  p1ValField.Index,
+				p2SetIdx:  p2SetField.Index,
+				p2ValIdx:  p2ValField.Index,
+			}
+		}
+	}
+}
+
 func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
@@ -288,6 +337,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// Phase 2: String-based options from registry
+	fieldOnce.Do(initFieldInfo)
+
 	cliVal := reflect.ValueOf(cli)
 	resVal := reflect.ValueOf(res).Elem()
 
@@ -296,32 +347,53 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			continue
 		}
 
-		// Map Name (e.g. "dry-run-format") to field name (e.g. "DryRunFormat")
-		fieldName := PascalCase(opt.Name)
-		targetField := resVal.FieldByName(fieldName)
-		if !targetField.IsValid() {
-			if opt.SkipResolution {
-				continue
+		info, ok := fieldInfo[opt.Name]
+		if !ok {
+			// Fallback to slow path if not in fieldInfo
+			fieldName := opt.FieldName
+			if fieldName == "" {
+				fieldName = PascalCase(opt.Name)
 			}
-			return nil, fmt.Errorf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, opt.Name)
+			targetField := resVal.FieldByName(fieldName)
+			if !targetField.IsValid() {
+				return nil, fmt.Errorf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, opt.Name)
+			}
+			p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
+			p1ValField := cliVal.FieldByName("Cderun" + fieldName)
+			p2SetField := cliVal.FieldByName(fieldName + "Set")
+			p2ValField := cliVal.FieldByName(fieldName)
+
+			if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() {
+				return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
+			}
+
+			p1Set := p1SetField.IsValid() && p1SetField.Bool()
+			p2Set := p2SetField.IsValid() && p2SetField.Bool()
+
+			p1ValStr := ""
+			if p1ValField.IsValid() {
+				p1ValStr = p1ValField.String()
+			}
+			p2ValStr := ""
+			if p2ValField.IsValid() {
+				p2ValStr = p2ValField.String()
+			}
+
+			def := OptionDef[string]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+				Fallback:     opt.Default,
+			}
+			resolved := resolveStringOpt(def, p1Set, p1ValStr, p2Set, p2ValStr, subcommand, tools, global, r, fs)
+			targetField.SetString(resolved)
+			continue
 		}
 
-		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
-		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
-		p2SetField := cliVal.FieldByName(fieldName + "Set")
-		p2ValField := cliVal.FieldByName(fieldName)
-
-		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() {
-			if opt.SkipResolution {
-				continue
-			}
-			return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q (field %q) missing in CLIOptions", opt.Name, fieldName)
-		}
-
-		p1Set := p1SetField.Bool()
-		p1Val := p1ValField.String()
-		p2Set := p2SetField.Bool()
-		p2Val := p2ValField.String()
+		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
+		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
 
 		def := OptionDef[string]{
 			EnvKey:       opt.EnvKey,
@@ -331,7 +403,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		}
 
 		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
-		targetField.SetString(resolved)
+		resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
