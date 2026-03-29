@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -649,7 +650,11 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 
 func getFd(r any) (int, bool) {
 	if f, ok := r.(interface{ Fd() uintptr }); ok {
-		return int(f.Fd()), true
+		fd := f.Fd()
+		if fd > math.MaxInt {
+			return -1, false
+		}
+		return int(fd), true
 	}
 	return -1, false
 }
