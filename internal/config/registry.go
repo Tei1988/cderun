@@ -269,8 +269,7 @@ var initialisms = map[string]string{
 // It respects known initialisms (e.g. "tty" -> "TTY").
 func PascalCase(s string) string {
 	var builder strings.Builder
-	parts := strings.Split(s, "-")
-	for _, part := range parts {
+	for part := range strings.SplitSeq(s, "-") {
 		if part == "" {
 			continue
 		}
