@@ -112,6 +112,7 @@ func TestUnit_Flags_GetStringPointers_Coverage(t *testing.T) {
 			p2, p1 := getStringPointers(o, opt.Name)
 			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
 			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
+			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
 		})
 	}
 }
