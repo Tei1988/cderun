@@ -130,7 +130,7 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 
 #### Mounting & Nested Execution
 
-- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly]`).
+- `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly][,optional]`).
 - `--mount-socket`: Mount the container runtime socket into the container. (Default: `false`)
 - `--mount-cderun`: Mount the `cderun` binary into the container. (Enables `--mount-socket` automatically)
 - `--mount-tools`: Mount specified tools (comma-separated) defined in `.tools.yaml` into the container.
