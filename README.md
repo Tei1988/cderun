@@ -91,9 +91,9 @@ cderun node app.js --cderun-image node:20-alpine
 
 Hoisting works by scanning for `--cderun-` prefixed flags after the subcommand and internally moving them before the subcommand during preprocessing. This allows `cderun` to separate its internal overrides from the wrapped command's own arguments.
 
-1.  **Detection**: Scans the argument list for the first non-flag argument (the subcommand).
-2.  **Extraction**: Gathers all `--cderun-` flags (and their associated values) located *after* the subcommand.
-3.  **Hoisting**: Reconstructs the internal argument list by placing the gathered P1 flags immediately after `cderun` and before the subcommand.
+1. **Detection**: Scans the argument list for the first non-flag argument (the subcommand).
+2. **Extraction**: Gathers all `--cderun-` flags (and their associated values) located *after* the subcommand.
+3. **Hoisting**: Reconstructs the internal argument list by placing the gathered P1 flags immediately after `cderun` and before the subcommand.
 
 In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
 
