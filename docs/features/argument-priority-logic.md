@@ -80,6 +80,19 @@
   - `hangTimeout: 10s`
   - `image`: なし (Fatal Error)
 
+## 解決の具体例 (Resolution Example)
+
+例えば、`tty` オプションが以下の複数の場所で指定されている場合を考えます。
+
+1. **P6 (Fallback)**: `false` (ハードコード)
+2. **P5 (Global)**: `.cderun.yaml` で `tty: true`
+3. **P4 (Tool)**: `.tools.yaml` の `node` セクションで `tty: false`
+4. **P3 (Env)**: `export CDERUN_TTY=true`
+5. **P2 (CLI P2)**: `cderun --tty=false node ...`
+6. **P1 (CLI P1)**: `cderun node ... --cderun-tty=true`
+
+この場合、**P1 の `true`** が最終的な値として採用されます。もし P1 が指定されていなければ P2 (`false`)、P2 がなければ P3 (`true`) ... と順に下がっていきます。
+
 ## コレクション型（リスト型）の設定について
 
 `mounts`, `devices`, `env`, `ports`, `mountTools` などのリスト形式の設定も、スカラ型と同様に **「優先順位の高いソースに値があれば、それより低い優先順位のソースはすべて無視される（上書き）」** という挙動になります。
