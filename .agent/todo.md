@@ -2,16 +2,6 @@
 
 ## Code Improvement
 
-### P-1: Unified Option Definition Table
-
-Options are currently duplicated across `flags.go` (P1/P2), `resolver.go` (P3/P4/P5/P6),
-and `config.go`. Define a central `OptionRegistry` that maps flag names to their
-respective environment variables, YAML keys, and defaults.
-Use a unified schema like `map[string]any` or struct+reflection, and generate
-`registerFlags()` / `resolveSettings()` / `ResolveWithFS()` from this table via loops.
-
-Scope: `flags.go`, `root.go` (resolveSettings), `resolver.go` (ResolveWithFS), `option.go`
-Migration: Incremental — **String flags COMPLETED**. Remaining: bool → slice → float64
 
 ### P-4: Remove Global Variables `opts` / `rootCmd`
 
@@ -161,6 +151,3 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 - macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソルがターミナルの右端に到達するとターミナル自体が強制終了される。TTY ハンドリングまたはリサイズシグナル周りの問題の可能性あり。
 
 
-## Testing & Maintenance
-
-- Outdated usage string for `hang-timeout` in `internal/command/flags.go` still mentions `2s` instead of the 10s default.

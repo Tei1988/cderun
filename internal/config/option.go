@@ -136,6 +136,10 @@ func resolveStringSliceOpt(
 	if vals == nil && def.GlobalGetter != nil && global != nil {
 		vals = def.GlobalGetter(*global)
 	}
+	if vals == nil {
+		vals = def.Fallback
+	}
+
 	var res []string
 	if vals != nil {
 		res = []string{}
