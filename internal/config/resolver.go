@@ -592,8 +592,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		if !ok {
 			continue
 		}
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string) //nolint:errcheck
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string) //nolint:errcheck
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
