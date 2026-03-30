@@ -17,6 +17,18 @@ type StringOption struct {
 	SkipResolution bool // If true, only used for flag registration or handled specially in ResolveWithFS
 }
 
+// BoolOption defines a boolean configuration option.
+type BoolOption struct {
+	Name         string // kebab-case, used for flags (e.g. "tty")
+	FieldName    string // PascalCase, used for reflection (pre-calculated)
+	Shorthand    string
+	Usage        string
+	Default      bool
+	EnvKey       string
+	ToolGetter   func(ToolConfig) *bool
+	GlobalGetter func(CDERunConfig) *bool
+}
+
 var StringOptions = []StringOption{
 	{
 		Name:    "network",
@@ -240,8 +252,151 @@ var StringOptions = []StringOption{
 	},
 }
 
+var BoolOptions = []BoolOption{
+	{
+		Name:      "tty",
+		Shorthand: "t",
+		EnvKey:    "CDERUN_TTY",
+		Usage:     "Allocate a pseudo-TTY",
+		Default:   false,
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.TTY
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.TTY
+		},
+	},
+	{
+		Name:      "interactive",
+		Shorthand: "i",
+		EnvKey:    "CDERUN_INTERACTIVE",
+		Usage:     "Keep STDIN open even if not attached",
+		Default:   false,
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Interactive
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Interactive
+		},
+	},
+	{
+		Name:   "mount-socket",
+		EnvKey: "CDERUN_MOUNT_SOCKET",
+		Usage:  "Mount the container runtime socket into the container",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.MountSocket
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.MountSocket
+		},
+	},
+	{
+		Name:   "mount-cderun",
+		EnvKey: "CDERUN_MOUNT_CDERUN",
+		Usage:  "Mount cderun binary for use inside container",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.MountCderun
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.MountCderun
+		},
+	},
+	{
+		Name:   "mount-all-tools",
+		EnvKey: "CDERUN_MOUNT_ALL_TOOLS",
+		Usage:  "Mount all defined tools into the container",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.MountAllTools
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.MountAllTools
+		},
+	},
+	{
+		Name:    "remove",
+		EnvKey:  "CDERUN_REMOVE",
+		Usage:   "Automatically remove the container when it exits",
+		Default: true,
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Remove
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Remove
+		},
+	},
+	{
+		Name:      "publish-all",
+		Shorthand: "P",
+		EnvKey:    "CDERUN_PUBLISH_ALL",
+		Usage:     "Publish all exposed ports to random ports",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.PublishAll
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.PublishAll
+		},
+	},
+	{
+		Name:   "privileged",
+		EnvKey: "CDERUN_PRIVILEGED",
+		Usage:  "Give extended privileges to this container",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Privileged
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Privileged
+		},
+	},
+	{
+		Name:   "strict-env",
+		EnvKey: "CDERUN_STRICT_ENV",
+		Usage:  "Require all environment variables to be present on the host",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.StrictEnv
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.StrictEnv
+		},
+	},
+	{
+		Name:   "dry-run",
+		EnvKey: "CDERUN_DRY_RUN",
+		Usage:  "Preview container configuration without execution",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.DryRun
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.DryRun
+		},
+	},
+	{
+		Name:   "diagnosis",
+		EnvKey: "CDERUN_DIAGNOSIS",
+		Usage:  "Show system diagnostics and available tools",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Diagnosis
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Diagnosis
+		},
+	},
+	{
+		Name:    "log-timestamp",
+		EnvKey:  "CDERUN_LOG_TIMESTAMP",
+		Usage:   "Include timestamp in logs",
+		Default: true,
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.LogTimestamp
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Logging.Timestamp
+		},
+	},
+}
+
 var (
 	stringOptionsMap map[string]StringOption
+	boolOptionsMap   map[string]BoolOption
 )
 
 func init() {
@@ -250,11 +405,23 @@ func init() {
 		StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
 		stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
 	}
+
+	boolOptionsMap = make(map[string]BoolOption, len(BoolOptions))
+	for i := range BoolOptions {
+		BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+		boolOptionsMap[BoolOptions[i].Name] = BoolOptions[i]
+	}
 }
 
 // GetStringOption returns a string option by its kebab-case name.
 func GetStringOption(name string) (StringOption, bool) {
 	opt, ok := stringOptionsMap[name]
+	return opt, ok
+}
+
+// GetBoolOption returns a boolean option by its kebab-case name.
+func GetBoolOption(name string) (BoolOption, bool) {
+	opt, ok := boolOptionsMap[name]
 	return opt, ok
 }
 

@@ -15,16 +15,6 @@ import (
 	"github.com/docker/go-units"
 )
 
-type boolOptEntry struct {
-	target        *bool
-	def           OptionDef[*bool]
-	fallback      bool
-	cderunFlagSet bool
-	cderunFlagVal bool
-	cliFlagSet    bool
-	cliFlagVal    bool
-}
-
 type stringSliceOptEntry struct {
 	target     *[]string
 	def        OptionDef[[]string]
@@ -281,18 +271,18 @@ type optionFields struct {
 
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
-	for _, opt := range StringOptions {
-		if opt.SkipResolution {
-			continue
+
+	process := func(name, fieldName string, skip bool) {
+		if skip {
+			return
 		}
-		fieldName := opt.FieldName
 		if fieldName == "" {
-			fieldName = PascalCase(opt.Name)
+			fieldName = PascalCase(name)
 		}
 
 		targetField, ok := resType.FieldByName(fieldName)
 		if !ok {
-			continue
+			return
 		}
 
 		p1SetField, ok1 := cliType.FieldByName("Cderun" + fieldName + "Set")
@@ -301,7 +291,7 @@ func initFieldInfo() {
 		p2ValField, ok4 := cliType.FieldByName(fieldName)
 
 		if ok1 && ok2 && ok3 && ok4 {
-			fieldInfo[opt.Name] = optionFields{
+			fieldInfo[name] = optionFields{
 				targetIdx: targetField.Index,
 				p1SetIdx:  p1SetField.Index,
 				p1ValIdx:  p1ValField.Index,
@@ -309,6 +299,13 @@ func initFieldInfo() {
 				p2ValIdx:  p2ValField.Index,
 			}
 		}
+	}
+
+	for _, opt := range StringOptions {
+		process(opt.Name, opt.FieldName, opt.SkipResolution)
+	}
+	for _, opt := range BoolOptions {
+		process(opt.Name, opt.FieldName, false)
 	}
 }
 
@@ -327,20 +324,48 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	// Phase 1: Early resolution (Diagnosis & StrictEnv)
-	earlyBoolOpts := []boolOptEntry{
-		{target: &res.Diagnosis, def: OptionDef[*bool]{EnvKey: "CDERUN_DIAGNOSIS", ToolGetter: func(t ToolConfig) *bool { return t.Diagnosis }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.Diagnosis }}, fallback: false, cderunFlagSet: cli.CderunDiagnosisSet, cderunFlagVal: cli.CderunDiagnosis, cliFlagSet: cli.DiagnosisSet, cliFlagVal: cli.Diagnosis},
-		{target: &res.StrictEnv, def: OptionDef[*bool]{EnvKey: "CDERUN_STRICT_ENV", ToolGetter: func(t ToolConfig) *bool { return t.StrictEnv }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.StrictEnv }}, fallback: false, cderunFlagSet: cli.CderunStrictEnvSet, cderunFlagVal: cli.CderunStrictEnv, cliFlagSet: cli.StrictEnvSet, cliFlagVal: cli.StrictEnv},
-	}
-	for _, o := range earlyBoolOpts {
-		*o.target = resolveBoolOpt(o.def, o.fallback, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, fs)
-	}
-
-	// Phase 2: String-based options from registry
-	fieldOnce.Do(initFieldInfo)
-
 	cliVal := reflect.ValueOf(cli)
 	resVal := reflect.ValueOf(res).Elem()
+
+	// Phase 1: Early resolution (Diagnosis & StrictEnv)
+	for _, name := range []string{"diagnosis", "strict-env"} {
+		opt, ok := GetBoolOption(name)
+		if !ok {
+			continue
+		}
+		def := OptionDef[*bool]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+		}
+
+		fieldName := opt.FieldName
+		if fieldName == "" {
+			fieldName = PascalCase(opt.Name)
+		}
+
+		// Use reflection for early resolution as well to avoid duplication
+		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
+		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
+		p2SetField := cliVal.FieldByName(fieldName + "Set")
+		p2ValField := cliVal.FieldByName(fieldName)
+		targetField := resVal.FieldByName(fieldName)
+
+		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() || !targetField.IsValid() {
+			continue
+		}
+
+		p1Set := p1SetField.Bool()
+		p1Val := p1ValField.Bool()
+		p2Set := p2SetField.Bool()
+		p2Val := p2ValField.Bool()
+
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		targetField.SetBool(resolved)
+	}
+
+	// Phase 2: Registry-based options (String & Bool)
+	fieldOnce.Do(initFieldInfo)
 
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
@@ -414,18 +439,34 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// Phase 3: Remaining Boolean options
-	boolOpts := []boolOptEntry{
-		{target: &res.TTY, def: OptionDef[*bool]{EnvKey: "CDERUN_TTY", ToolGetter: func(t ToolConfig) *bool { return t.TTY }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.TTY }}, fallback: false, cderunFlagSet: cli.CderunTTYSet, cderunFlagVal: cli.CderunTTY, cliFlagSet: cli.TTYSet, cliFlagVal: cli.TTY},
-		{target: &res.Interactive, def: OptionDef[*bool]{EnvKey: "CDERUN_INTERACTIVE", ToolGetter: func(t ToolConfig) *bool { return t.Interactive }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.Interactive }}, fallback: false, cderunFlagSet: cli.CderunInteractiveSet, cderunFlagVal: cli.CderunInteractive, cliFlagSet: cli.InteractiveSet, cliFlagVal: cli.Interactive},
-		{target: &res.Remove, def: OptionDef[*bool]{EnvKey: "CDERUN_REMOVE", ToolGetter: func(t ToolConfig) *bool { return t.Remove }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.Remove }}, fallback: true, cderunFlagSet: cli.CderunRemoveSet, cderunFlagVal: cli.CderunRemove, cliFlagSet: cli.RemoveSet, cliFlagVal: cli.Remove},
-		{target: &res.MountAllTools, def: OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_ALL_TOOLS", ToolGetter: func(t ToolConfig) *bool { return t.MountAllTools }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.MountAllTools }}, fallback: false, cderunFlagSet: cli.CderunMountAllToolsSet, cderunFlagVal: cli.CderunMountAllTools, cliFlagSet: cli.MountAllToolsSet, cliFlagVal: cli.MountAllTools},
-		{target: &res.DryRun, def: OptionDef[*bool]{EnvKey: "CDERUN_DRY_RUN", ToolGetter: func(t ToolConfig) *bool { return t.DryRun }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.DryRun }}, fallback: false, cderunFlagSet: cli.CderunDryRunSet, cderunFlagVal: cli.CderunDryRun, cliFlagSet: cli.DryRunSet, cliFlagVal: cli.DryRun},
-		{target: &res.LogTimestamp, def: OptionDef[*bool]{EnvKey: "CDERUN_LOG_TIMESTAMP", ToolGetter: func(t ToolConfig) *bool { return t.LogTimestamp }, GlobalGetter: func(g CDERunConfig) *bool { return g.Logging.Timestamp }}, fallback: true, cderunFlagSet: cli.CderunLogTimestampSet, cderunFlagVal: cli.CderunLogTimestamp, cliFlagSet: cli.LogTimestampSet, cliFlagVal: cli.LogTimestamp},
-		{target: &res.PublishAll, def: OptionDef[*bool]{EnvKey: "CDERUN_PUBLISH_ALL", ToolGetter: func(t ToolConfig) *bool { return t.PublishAll }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.PublishAll }}, fallback: false, cderunFlagSet: cli.CderunPublishAllSet, cderunFlagVal: cli.CderunPublishAll, cliFlagSet: cli.PublishAllSet, cliFlagVal: cli.PublishAll},
-		{target: &res.Privileged, def: OptionDef[*bool]{EnvKey: "CDERUN_PRIVILEGED", ToolGetter: func(t ToolConfig) *bool { return t.Privileged }, GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.Privileged }}, fallback: false, cderunFlagSet: cli.CderunPrivilegedSet, cderunFlagVal: cli.CderunPrivileged, cliFlagSet: cli.PrivilegedSet, cliFlagVal: cli.Privileged},
-	}
-	for _, o := range boolOpts {
-		*o.target = resolveBoolOpt(o.def, o.fallback, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, fs)
+	for _, opt := range BoolOptions {
+		// Skip early options already resolved in Phase 1
+		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
+			continue
+		}
+		// Skip transitive options handled in Phase 6
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+			continue
+		}
+
+		info, ok := fieldInfo[opt.Name]
+		if !ok {
+			return nil, fmt.Errorf("registry mismatch: info for bool option %q not found", opt.Name)
+		}
+
+		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
+		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
+
+		def := OptionDef[*bool]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+		}
+
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
 	// Phase 4: Complex types (Mounts, Env)
@@ -495,15 +536,35 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		subcommand, tools, global, r, fs,
 	)
 
+	// Resolve mount-all-tools (transitive trigger)
+	{
+		opt, ok := GetBoolOption("mount-all-tools")
+		info, ok2 := fieldInfo["mount-all-tools"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-all-tools' not found")
+		}
+		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
+		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+	}
+
 	var mountCderunSpecified bool
-	res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(
-		OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_CDERUN",
-			ToolGetter:   func(t ToolConfig) *bool { return t.MountCderun },
-			GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.MountCderun }},
-		cli.CderunMountCderunSet, cli.CderunMountCderun,
-		cli.MountCderunSet, cli.MountCderun,
-		subcommand, tools, global, fs,
-	)
+	{
+		opt, ok := GetBoolOption("mount-cderun")
+		info, ok2 := fieldInfo["mount-cderun"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-cderun' not found")
+		}
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
+		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
+		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+	}
 	if !mountCderunSpecified {
 		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
 	}
@@ -524,14 +585,19 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	var mountSocketSpecified bool
-	res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(
-		OptionDef[*bool]{EnvKey: "CDERUN_MOUNT_SOCKET",
-			ToolGetter:   func(t ToolConfig) *bool { return t.MountSocket },
-			GlobalGetter: func(g CDERunConfig) *bool { return g.Defaults.MountSocket }},
-		cli.CderunMountSocketSet, cli.CderunMountSocket,
-		cli.MountSocketSet, cli.MountSocket,
-		subcommand, tools, global, fs,
-	)
+	{
+		opt, ok := GetBoolOption("mount-socket")
+		info, ok2 := fieldInfo["mount-socket"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-socket' not found")
+		}
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
+		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
+		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+	}
 	if !mountSocketSpecified {
 		res.MountSocket = res.MountCderun
 	}
