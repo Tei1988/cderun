@@ -585,10 +585,10 @@ var StringSliceOptions = []StringSliceOption{
 		},
 	},
 	{
-		Name:   "device",
-		FieldName: "Devices",
-		EnvKey: "CDERUN_DEVICE",
-		Usage:  "Add a host device to the container",
+		Name:           "device",
+		FieldName:      "Devices",
+		EnvKey:         "CDERUN_DEVICE",
+		Usage:          "Add a host device to the container",
 		SkipResolution: true, // Phase 8: custom logic
 	},
 }
