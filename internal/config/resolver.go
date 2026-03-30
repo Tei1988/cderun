@@ -459,6 +459,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		if res.SocketPath != "" {
 			if strings.Contains(res.SocketPath, "podman") {
 				res.Runtime = "podman"
+			} else if strings.Contains(res.SocketPath, "containerd") {
+				res.Runtime = "containerd"
 			} else {
 				res.Runtime = "docker"
 			}
@@ -469,6 +471,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
 				res.Runtime = "podman"
 				res.SocketPath = "/run/podman/podman.sock"
+			} else if _, err := fs.Stat("/run/containerd/containerd.sock"); err == nil {
+				res.Runtime = "containerd"
+				res.SocketPath = "/run/containerd/containerd.sock"
 			} else {
 				res.Runtime = "docker"
 				res.SocketPath = "/var/run/docker.sock"
@@ -479,6 +484,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	if res.SocketPath == "" {
 		if res.Runtime == "podman" {
 			res.SocketPath = "/run/podman/podman.sock"
+		} else if res.Runtime == "containerd" {
+			res.SocketPath = "/run/containerd/containerd.sock"
 		} else {
 			res.SocketPath = "/var/run/docker.sock"
 		}
