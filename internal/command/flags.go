@@ -51,19 +51,21 @@ type float64FlagDef struct {
 }
 
 func registerFlags(cmd *cobra.Command, o *rootOptions) {
-	boolDefs := []boolFlagDef{
-		{"tty", "cderun-tty", "t", false, "Allocate a pseudo-TTY", &o.tty, &o.cderunTTY},
-		{"interactive", "cderun-interactive", "i", false, "Keep STDIN open even if not attached", &o.interactive, &o.cderunInteractive},
-		{"mount-socket", "cderun-mount-socket", "", false, "Mount the container runtime socket into the container", &o.mountSocket, &o.cderunMountSocket},
-		{"mount-cderun", "cderun-mount-cderun", "", false, "Mount cderun binary for use inside container", &o.mountCderun, &o.cderunMountCderun},
-		{"mount-all-tools", "cderun-mount-all-tools", "", false, "Mount all defined tools into the container", &o.mountAllTools, &o.cderunMountAllTools},
-		{"remove", "cderun-remove", "", true, "Automatically remove the container when it exits", &o.remove, &o.cderunRemove},
-		{"publish-all", "cderun-publish-all", "P", false, "Publish all exposed ports to random ports", &o.publishAll, &o.cderunPublishAll},
-		{"privileged", "cderun-privileged", "", false, "Give extended privileges to this container", &o.privileged, &o.cderunPrivileged},
-		{"strict-env", "cderun-strict-env", "", false, "Require all environment variables to be present on the host", &o.strictEnv, &o.cderunStrictEnv},
-		{"dry-run", "cderun-dry-run", "", false, "Preview container configuration without execution", &o.dryRun, &o.cderunDryRun},
-		{"diagnosis", "cderun-diagnosis", "", false, "Show system diagnostics and available tools", &o.diagnosis, &o.cderunDiagnosis},
-		{"log-timestamp", "cderun-log-timestamp", "", true, "Include timestamp in logs", &o.logTimestamp, &o.cderunLogTimestamp},
+	boolDefs := make([]boolFlagDef, 0, len(config.BoolOptions))
+	for _, opt := range config.BoolOptions {
+		p2Field, p1Field := getBoolPointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for bool option %q", opt.Name))
+		}
+		boolDefs = append(boolDefs, boolFlagDef{
+			p2Name:     opt.Name,
+			p1Name:     "cderun-" + opt.Name,
+			p2Short:    opt.Shorthand,
+			defaultVal: opt.Default,
+			p2Usage:    opt.Usage,
+			p2Field:    p2Field,
+			p1Field:    p1Field,
+		})
 	}
 
 	stringDefs := make([]stringFlagDef, 0, len(config.StringOptions))
@@ -136,6 +138,37 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 	for _, d := range float64Defs {
 		f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
 		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+	}
+}
+
+func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
+	switch name {
+	case "tty":
+		return &o.tty, &o.cderunTTY
+	case "interactive":
+		return &o.interactive, &o.cderunInteractive
+	case "mount-socket":
+		return &o.mountSocket, &o.cderunMountSocket
+	case "mount-cderun":
+		return &o.mountCderun, &o.cderunMountCderun
+	case "mount-all-tools":
+		return &o.mountAllTools, &o.cderunMountAllTools
+	case "remove":
+		return &o.remove, &o.cderunRemove
+	case "publish-all":
+		return &o.publishAll, &o.cderunPublishAll
+	case "privileged":
+		return &o.privileged, &o.cderunPrivileged
+	case "strict-env":
+		return &o.strictEnv, &o.cderunStrictEnv
+	case "dry-run":
+		return &o.dryRun, &o.cderunDryRun
+	case "diagnosis":
+		return &o.diagnosis, &o.cderunDiagnosis
+	case "log-timestamp":
+		return &o.logTimestamp, &o.cderunLogTimestamp
+	default:
+		return nil, nil
 	}
 }
 
