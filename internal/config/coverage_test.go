@@ -67,15 +67,45 @@ func TestUnit_Coverage_Config_FindConfigs_AbsError(t *testing.T) {
 }
 
 func TestUnit_Coverage_Config_FindConfigs_Errors(t *testing.T) {
-	mfs := &CoverageErrorFS{MockFileSystem: &MockFileSystem{}, WDErr: errors.New("getwd failed")}
+	// Case 1: WDErr should skip working directory search but still include others (home, system, run)
+	mfs := &CoverageErrorFS{
+		MockFileSystem: &MockFileSystem{
+			HomeDir: "/home/user",
+			Dirs: map[string]bool{
+				"/home/user/.config/cderun/.cderun.yaml": true,
+				"/etc/cderun/.cderun.yaml":               true,
+				"/run/cderun/.cderun.yaml":               true,
+			},
+		},
+		WDErr: errors.New("getwd failed"),
+	}
 	l := NewConfigLoaderWithFS(mfs)
-	assert.Empty(t, l.FindConfigs(".cderun.yaml"))
-
-	mfs = &CoverageErrorFS{MockFileSystem: &MockFileSystem{}, HomeErr: errors.New("home error")}
-	l = NewConfigLoaderWithFS(mfs)
 	paths := l.FindConfigs(".cderun.yaml")
+	assert.NotEmpty(t, paths)
+	assert.Contains(t, paths, "/home/user/.config/cderun/.cderun.yaml")
+	assert.Contains(t, paths, "/etc/cderun/.cderun.yaml")
+	assert.Contains(t, paths, "/run/cderun/.cderun.yaml")
+
+	// Case 2: HomeErr should skip home directory search but include others (WD, system, run)
+	mfs = &CoverageErrorFS{
+		MockFileSystem: &MockFileSystem{
+			WD: "/app",
+			Dirs: map[string]bool{
+				"/app/.cderun.yaml":        true,
+				"/etc/cderun/.cderun.yaml": true,
+				"/run/cderun/.cderun.yaml": true,
+			},
+		},
+		HomeErr: errors.New("home error"),
+	}
+	l = NewConfigLoaderWithFS(mfs)
+	paths = l.FindConfigs(".cderun.yaml")
+	assert.NotEmpty(t, paths)
+	assert.Contains(t, paths, "/app/.cderun.yaml")
+	assert.Contains(t, paths, "/etc/cderun/.cderun.yaml")
+	assert.Contains(t, paths, "/run/cderun/.cderun.yaml")
 	for _, p := range paths {
-		assert.NotContains(t, p, ".config")
+		assert.NotContains(t, p, "/home/user")
 	}
 }
 
@@ -377,6 +407,19 @@ func TestUnit_Coverage_Config_DeepCopy_Exhaustive(t *testing.T) {
 	cp := d.DeepCopy()
 	assert.Len(t, cp.Devices, 1)
 	assert.Len(t, cp.Mounts, 1)
+
+	// Verify independence
+	cp.Devices[0].Source.Raw = "/mutated-d"
+	cp.Mounts[0].Source.Raw = "/mutated-s"
+	cp.Mounts[0].Target.Raw = "/mutated-t"
+
+	assert.Equal(t, "/mutated-d", cp.Devices[0].Source.Raw)
+	assert.Equal(t, "/mutated-s", cp.Mounts[0].Source.Raw)
+	assert.Equal(t, "/mutated-t", cp.Mounts[0].Target.Raw)
+
+	assert.Equal(t, "/d", d.Devices[0].Source.Raw)
+	assert.Equal(t, "/s", d.Mounts[0].Source.Raw)
+	assert.Equal(t, "/t", d.Mounts[0].Target.Raw)
 }
 
 func TestUnit_Coverage_Option_StringSlice_Priority(t *testing.T) {
@@ -487,11 +530,20 @@ func TestUnit_Coverage_Expression_Resolve_MapSlice(t *testing.T) {
 }
 
 func TestUnit_Coverage_Config_SetDirs_Reset(t *testing.T) {
+	origRun := defaultLoader.runConfigDir
+	origSys := defaultLoader.systemConfigDir
+
 	r1 := SetRunConfigDirForTest("/tmp/run")
+	t.Cleanup(r1)
 	r2 := SetSystemConfigDirForTest("/tmp/sys")
+	t.Cleanup(r2)
+
 	assert.Equal(t, "/tmp/run", defaultLoader.runConfigDir)
 	assert.Equal(t, "/tmp/sys", defaultLoader.systemConfigDir)
+
 	r1()
 	r2()
-	assert.NotEqual(t, "/tmp/run", defaultLoader.runConfigDir)
+
+	assert.Equal(t, origRun, defaultLoader.runConfigDir)
+	assert.Equal(t, origSys, defaultLoader.systemConfigDir)
 }
