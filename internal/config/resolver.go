@@ -289,7 +289,7 @@ func getFieldInfo(name string, fieldName string, expectedType reflect.Type) (opt
 
 	boolType := reflect.TypeFor[bool]()
 	if p1SetField.Type != boolType || p2SetField.Type != boolType {
-		return optionFields{}, fmt.Errorf("Set fields for %q must be boolean (option %q)", fieldName, name)
+		return optionFields{}, fmt.Errorf("set fields for %q must be boolean (option %q)", fieldName, name)
 	}
 
 	return optionFields{
