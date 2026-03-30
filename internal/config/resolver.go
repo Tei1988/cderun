@@ -243,80 +243,121 @@ type optionFields struct {
 	p2ValIdx  []int
 }
 
-func getFieldInfo(name string, fieldName string) (optionFields, bool) {
+func getFieldInfo(name string, fieldName string, expectedType reflect.Type) (optionFields, error) {
 	targetField, ok := resType.FieldByName(fieldName)
 	if !ok {
-		return optionFields{}, false
+		return optionFields{}, fmt.Errorf("field %q not found in ResolvedConfig (option %q)", fieldName, name)
+	}
+
+	if targetField.Type != expectedType {
+		return optionFields{}, fmt.Errorf("type mismatch for field %q in ResolvedConfig: expected %v, got %v (option %q)", fieldName, expectedType, targetField.Type, name)
 	}
 
 	p1ValField, ok1 := cliType.FieldByName("Cderun" + fieldName)
-	p2ValField, ok2 := cliType.FieldByName(fieldName)
+	if !ok1 {
+		return optionFields{}, fmt.Errorf("field %q not found in CLIOptions (option %q)", "Cderun"+fieldName, name)
+	}
+	if p1ValField.Type != expectedType {
+		return optionFields{}, fmt.Errorf("type mismatch for field %q in CLIOptions: expected %v, got %v (option %q)", "Cderun"+fieldName, expectedType, p1ValField.Type, name)
+	}
 
-	if !ok1 || !ok2 {
-		return optionFields{}, false
+	p2ValField, ok2 := cliType.FieldByName(fieldName)
+	if !ok2 {
+		return optionFields{}, fmt.Errorf("field %q not found in CLIOptions (option %q)", fieldName, name)
+	}
+	if p2ValField.Type != expectedType {
+		return optionFields{}, fmt.Errorf("type mismatch for field %q in CLIOptions: expected %v, got %v (option %q)", fieldName, expectedType, p2ValField.Type, name)
+	}
+
+	// Slices do not have "Set" fields, we check Nil-ness instead.
+	if expectedType.Kind() == reflect.Slice {
+		return optionFields{
+			targetIdx: targetField.Index,
+			p1ValIdx:  p1ValField.Index,
+			p2ValIdx:  p2ValField.Index,
+		}, nil
 	}
 
 	p1SetField, ok3 := cliType.FieldByName("Cderun" + fieldName + "Set")
-	p2SetField, ok4 := cliType.FieldByName(fieldName + "Set")
-
-	var p1SetIdx, p2SetIdx []int
-	if ok3 {
-		p1SetIdx = p1SetField.Index
+	if !ok3 {
+		return optionFields{}, fmt.Errorf("field %q not found in CLIOptions (option %q)", "Cderun"+fieldName+"Set", name)
 	}
-	if ok4 {
-		p2SetIdx = p2SetField.Index
+	p2SetField, ok4 := cliType.FieldByName(fieldName + "Set")
+	if !ok4 {
+		return optionFields{}, fmt.Errorf("field %q not found in CLIOptions (option %q)", fieldName+"Set", name)
+	}
+
+	boolType := reflect.TypeFor[bool]()
+	if p1SetField.Type != boolType || p2SetField.Type != boolType {
+		return optionFields{}, fmt.Errorf("Set fields for %q must be boolean (option %q)", fieldName, name)
 	}
 
 	return optionFields{
 		targetIdx: targetField.Index,
-		p1SetIdx:  p1SetIdx,
+		p1SetIdx:  p1SetField.Index,
 		p1ValIdx:  p1ValField.Index,
-		p2SetIdx:  p2SetIdx,
+		p2SetIdx:  p2SetField.Index,
 		p2ValIdx:  p2ValField.Index,
-	}, true
+	}, nil
 }
 
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
+	stringType := reflect.TypeFor[string]()
+	boolType := reflect.TypeFor[bool]()
+	intType := reflect.TypeFor[int]()
+	floatType := reflect.TypeFor[float64]()
+	stringSliceType := reflect.TypeFor[[]string]()
+
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
 			continue
 		}
-		if info, ok := getFieldInfo(opt.Name, opt.FieldName); ok {
-			fieldInfo[opt.Name] = info
+		info, err := getFieldInfo(opt.Name, opt.FieldName, stringType)
+		if err != nil {
+			panic(err)
 		}
+		fieldInfo[opt.Name] = info
 	}
 	for _, opt := range BoolOptions {
 		if opt.SkipResolution {
 			continue
 		}
-		if info, ok := getFieldInfo(opt.Name, opt.FieldName); ok {
-			fieldInfo[opt.Name] = info
+		info, err := getFieldInfo(opt.Name, opt.FieldName, boolType)
+		if err != nil {
+			panic(err)
 		}
+		fieldInfo[opt.Name] = info
 	}
 	for _, opt := range IntOptions {
 		if opt.SkipResolution {
 			continue
 		}
-		if info, ok := getFieldInfo(opt.Name, opt.FieldName); ok {
-			fieldInfo[opt.Name] = info
+		info, err := getFieldInfo(opt.Name, opt.FieldName, intType)
+		if err != nil {
+			panic(err)
 		}
+		fieldInfo[opt.Name] = info
 	}
 	for _, opt := range Float64Options {
 		if opt.SkipResolution {
 			continue
 		}
-		if info, ok := getFieldInfo(opt.Name, opt.FieldName); ok {
-			fieldInfo[opt.Name] = info
+		info, err := getFieldInfo(opt.Name, opt.FieldName, floatType)
+		if err != nil {
+			panic(err)
 		}
+		fieldInfo[opt.Name] = info
 	}
 	for _, opt := range StringSliceOptions {
 		if opt.SkipResolution {
 			continue
 		}
-		if info, ok := getFieldInfo(opt.Name, opt.FieldName); ok {
-			fieldInfo[opt.Name] = info
+		info, err := getFieldInfo(opt.Name, opt.FieldName, stringSliceType)
+		if err != nil {
+			panic(err)
 		}
+		fieldInfo[opt.Name] = info
 	}
 }
 

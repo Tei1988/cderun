@@ -471,6 +471,7 @@ var Float64Options = []Float64Option{
 var StringSliceOptions = []StringSliceOption{
 	{
 		Name:      "env",
+		FieldName: "Env",
 		Shorthand: "e",
 		EnvKey:    "CDERUN_ENV",
 		Usage:     "Set environment variables",
@@ -484,12 +485,11 @@ var StringSliceOptions = []StringSliceOption{
 		SkipResolution: true, // Phase 4
 	},
 	{
-		Name:   "mount",
-		EnvKey: "CDERUN_MOUNT",
-		Usage:  "Attach a filesystem mount to the container",
-		ToolGetter: func(t ToolConfig) []string {
-			return nil
-		},
+		Name:           "mount",
+		FieldName:      "Mounts",
+		EnvKey:         "CDERUN_MOUNT",
+		Usage:          "Attach a filesystem mount to the container",
+		ToolGetter:     func(t ToolConfig) []string { return nil },
 		SkipResolution: true, // Phase 4
 	},
 	{
