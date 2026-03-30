@@ -329,7 +329,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	// Phase 1: Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
-		opt, _ := GetBoolOption(name)
+		opt, ok := GetBoolOption(name)
+		if !ok {
+			continue
+		}
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -342,13 +345,23 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		}
 
 		// Use reflection for early resolution as well to avoid duplication
-		p1Set := cliVal.FieldByName("Cderun" + fieldName + "Set").Bool()
-		p1Val := cliVal.FieldByName("Cderun" + fieldName).Bool()
-		p2Set := cliVal.FieldByName(fieldName + "Set").Bool()
-		p2Val := cliVal.FieldByName(fieldName).Bool()
+		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
+		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
+		p2SetField := cliVal.FieldByName(fieldName + "Set")
+		p2ValField := cliVal.FieldByName(fieldName)
+		targetField := resVal.FieldByName(fieldName)
+
+		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() || !targetField.IsValid() {
+			continue
+		}
+
+		p1Set := p1SetField.Bool()
+		p1Val := p1ValField.Bool()
+		p2Set := p2SetField.Bool()
+		p2Val := p2ValField.Bool()
 
 		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
-		resVal.FieldByName(fieldName).SetBool(resolved)
+		targetField.SetBool(resolved)
 	}
 
 	// Phase 2: Registry-based options (String & Bool)
@@ -525,8 +538,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	// Resolve mount-all-tools (transitive trigger)
 	{
-		opt, _ := GetBoolOption("mount-all-tools")
-		info := fieldInfo[opt.Name]
+		opt, ok := GetBoolOption("mount-all-tools")
+		info, ok2 := fieldInfo["mount-all-tools"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-all-tools' not found")
+		}
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
 		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
@@ -537,9 +553,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	var mountCderunSpecified bool
 	{
-		opt, _ := GetBoolOption("mount-cderun")
+		opt, ok := GetBoolOption("mount-cderun")
+		info, ok2 := fieldInfo["mount-cderun"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-cderun' not found")
+		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		info := fieldInfo[opt.Name]
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
 		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
@@ -567,9 +586,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	var mountSocketSpecified bool
 	{
-		opt, _ := GetBoolOption("mount-socket")
+		opt, ok := GetBoolOption("mount-socket")
+		info, ok2 := fieldInfo["mount-socket"]
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: 'mount-socket' not found")
+		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		info := fieldInfo[opt.Name]
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
 		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
