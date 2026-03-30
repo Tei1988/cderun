@@ -482,11 +482,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	if res.SocketPath == "" {
-		if res.Runtime == "podman" {
+		switch res.Runtime {
+		case "podman":
 			res.SocketPath = "/run/podman/podman.sock"
-		} else if res.Runtime == "containerd" {
+		case "containerd":
 			res.SocketPath = "/run/containerd/containerd.sock"
-		} else {
+		default:
 			res.SocketPath = "/var/run/docker.sock"
 		}
 	}
