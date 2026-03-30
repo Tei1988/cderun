@@ -32,7 +32,7 @@ func (f *CoverageErrorFS) UserHomeDir() (string, error) {
 func TestUnit_Coverage_PascalCase_Exhaustive(t *testing.T) {
 	assert.Equal(t, "MyOption", PascalCase("my--option"))
 	assert.Equal(t, "Option", PascalCase("-option-"))
-	assert.Equal(t, "", PascalCase("--"))
+	assert.Empty(t, PascalCase("--"))
 	assert.Equal(t, "TTYOption", PascalCase("tty-option"))
 	assert.Equal(t, "OptionTTY", PascalCase("option-tty"))
 	assert.Equal(t, "CPUsOption", PascalCase("cpus-option"))
@@ -410,9 +410,9 @@ func TestUnit_Coverage_Option_IntOpt_Fallback(t *testing.T) {
 
 func TestUnit_Coverage_Option_Float64Opt_Fallback(t *testing.T) {
 	def := OptionDef[*float64]{Fallback: ptr(3.14)}
-	assert.Equal(t, 3.14, resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{}))
+	assert.InDelta(t, 3.14, resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{}), 1e-9)
 	def.Fallback = nil
-	assert.Equal(t, 0.0, resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{}))
+	assert.InDelta(t, 0.0, resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{}), 1e-9)
 }
 
 func TestUnit_Coverage_Option_BoolOpt_EnvKeyEmpty(t *testing.T) {
@@ -453,12 +453,12 @@ func TestUnit_Coverage_Config_Hierarchical_Load_NoConfigs(t *testing.T) {
 	mfs := &MockFileSystem{}
 	l := NewConfigLoaderWithFS(mfs)
 	cfg, paths, err := l.LoadCDERunConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, cfg)
 	assert.Nil(t, paths)
 
 	tcfg, tpaths, err := l.LoadToolsConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, tcfg)
 	assert.Nil(t, tpaths)
 }
