@@ -43,6 +43,8 @@ jobs:
           cache: true
       - name: Verify Pinning (Makefile)
         run: make lint-actions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   lint-go:
     name: Lint Go

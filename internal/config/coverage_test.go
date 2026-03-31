@@ -148,6 +148,21 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields")
+
+	// Reset StringOptions before Phase 1 test to avoid triggering same error again
+	StringOptions = originalOptions
+	// Phase 1 Early resolution mismatch
+	originalBool := BoolOptions
+	BoolOptions = append(BoolOptions, BoolOption{Name: "diagnosis", FieldName: "NonExistent"})
+	defer func() { BoolOptions = originalBool }()
+	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	require.NoError(t, err) // It continues if mismatch in Phase 1 (currently)
+
+	// Phase 3 remaining bool mismatch
+	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
+	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry mismatch: info for bool option \"bad-bool\" not found")
 }
 
 func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
@@ -173,6 +188,16 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ExpressionError(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	cli := CLIOptions{Image: "{{file:missing}}", ImageSet: true}
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.Error(t, err)
+
+	// Expression error in SocketPath
+	cli = CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{file:missing}}", SocketPathSet: true}
+	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.Error(t, err)
+
+	// Expression error in Memory
+	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "{{file:missing}}", MemorySet: true}
+	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
 	require.Error(t, err)
 }
 
@@ -206,6 +231,117 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Error(t *testing.T) {
 	r.setError(errors.New("err"))
 	_, err := resolveConfigPath(true, "val", false, "", "E", "s", nil, nil, nil, nil, "", r, "path", mfs)
 	require.Error(t, err)
+}
+
+func TestUnit_Coverage_Resolver_ResolveConfigPath_ExpressionError(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/app"}
+	r, _ := NewExpressionResolver(nil)
+	_, err := resolveConfigPath(true, "{{file:missing}}", false, "", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+	require.Error(t, err)
+}
+
+func TestUnit_Coverage_Resolver_ResolveConfigPath_Hierarchy(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/app"}
+	r, _ := NewExpressionResolver(nil)
+
+	// Tool config match
+	tools := ToolsConfig{"node": {MountCderunPath: ConfigPath{Raw: "/tool/path"}}}
+	res, err := resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, nil, nil, "/fallback", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/tool/path", res)
+
+	// Tool config exists but empty, falls back to global
+	tools = ToolsConfig{"node": {}}
+	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}}
+	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/global/path", res)
+
+	// Both tool and global empty, falls back to fallback
+	global = &CDERunConfig{}
+	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/fallback", res)
+
+	// Test "volume" and "device" path types
+	res, err = resolveConfigPath(true, "vol", false, "", "", "", nil, nil, nil, nil, "", r, "volume", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "vol", res)
+
+	res, err = resolveConfigPath(true, "dev", false, "", "", "", nil, nil, nil, nil, "", r, "device", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "dev", res)
+}
+
+func TestUnit_Coverage_Resolver_ResolveDevices_Env(t *testing.T) {
+	mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": "/dev/a, /dev/b:/dev/c, "}}
+	r, _ := NewExpressionResolver(nil)
+	res, err := resolveDevices(nil, nil, "sh", nil, nil, r, mfs)
+	require.NoError(t, err)
+	assert.Len(t, res, 2)
+	assert.Equal(t, "/dev/a", res[0].PathOnHost)
+	assert.Equal(t, "/dev/b", res[1].PathOnHost)
+
+	mfs.Env["CDERUN_DEVICE"] = ":" // Invalid: empty host and container
+	_, err = resolveDevices(nil, nil, "sh", nil, nil, r, mfs)
+	require.Error(t, err)
+}
+
+func TestUnit_Coverage_Resolver_ResolveEnv_Strict(t *testing.T) {
+	mfs := &MockFileSystem{Env: map[string]string{"CDERUN_ENV": "A=1;B;C=3"}}
+	r, _ := NewExpressionResolver(nil)
+
+	// B is missing from host environment
+	_, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required environment variable not found: B")
+
+	// B exists on host
+	mfs.Env["B"] = "2"
+	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
+	require.NoError(t, err)
+	assert.Len(t, res, 3)
+	assert.Contains(t, res, "B=2")
+}
+
+func TestUnit_Coverage_Resolver_ResolveMounts_Optional_Exists(t *testing.T) {
+	mfs := &MockFileSystem{
+		Files: map[string][]byte{"/exists": {}},
+		WD:    "/",
+	}
+	r, _ := NewExpressionResolver(nil)
+	mcs := []string{"source=/exists,target=/t,optional"}
+	res, err := resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
+	require.NoError(t, err)
+	assert.Len(t, res, 1)
+	assert.Equal(t, "/exists", res[0].Source)
+
+	// Stat error (not NotExist)
+	mfs.StatErr = errors.New("perm denied")
+	_, err = resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
+	require.Error(t, err)
+}
+
+func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
+	mfs := &MockFileSystem{Env: map[string]string{"CDERUN_ENV": "B", "B": "2"}}
+	r, _ := NewExpressionResolver(nil)
+	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, false, r, mfs)
+	require.NoError(t, err)
+	assert.Contains(t, res, "B=2")
+}
+
+func TestUnit_Coverage_Path_ResolvePath_NoResolver(t *testing.T) {
+	mfs := &MockFileSystem{HomeDir: "/home"}
+	// Test ResolvePath with a minimal ExpressionResolver to verify home (~) expansion using MockFileSystem
+	res, err := ResolvePath("~/foo", "/base", &ExpressionResolver{fs: mfs})
+	require.NoError(t, err)
+	// On Linux mock filesystem it should use /home
+	assert.Equal(t, "/home/foo", res)
+
+	// Test with scheme
+	res, err = ResolvePath("http://example.com", "/base", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "http://example.com", res)
 }
 
 func TestUnit_Coverage_Path_UnmarshalYAML_Malformed(t *testing.T) {
