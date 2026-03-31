@@ -170,8 +170,8 @@ Key variables include:
 
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull.
-- `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull.
+- `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
+- `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
@@ -183,7 +183,7 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 
-Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
+Note: For list-type options on the CLI (P1/P2 flags), the flag must be repeated for each item (e.g., `--env A=1 --env B=2`). Environment variables (P3) use separators: `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`), while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
 
 ## Configuration
 
