@@ -649,8 +649,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for string slice option %q not found", opt.Name)
 		}
 
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).([]string)
+		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).([]string)
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("internal error: field %s in CLIOptions is not []string", opt.Name)
+			}
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
@@ -673,13 +676,16 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		if info.p1SetIdx[0] != -1 {
 			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		}
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().(int)
+		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).(int)
 
 		p2Set := false
 		if info.p2SetIdx[0] != -1 {
 			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
 		}
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().(int)
+		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).(int)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not int", opt.Name)
+		}
 
 		def := OptionDef[*int]{
 			EnvKey:       opt.EnvKey,
@@ -756,13 +762,16 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		if info.p1SetIdx[0] != -1 {
 			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		}
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Float()
+		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).(float64)
 
 		p2Set := false
 		if info.p2SetIdx[0] != -1 {
 			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
 		}
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Float()
+		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).(float64)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not float64", opt.Name)
+		}
 
 		def := OptionDef[*float64]{
 			EnvKey:       opt.EnvKey,
