@@ -487,8 +487,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for string slice option %q not found in CLIOptions", opt.Name)
 		}
 
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		p1Val, ok1 := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
+		p2Val, ok2 := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("registry mismatch: field for option %q is not a string slice", opt.Name)
+		}
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
