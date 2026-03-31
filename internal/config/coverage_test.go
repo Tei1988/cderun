@@ -332,7 +332,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
 
 func TestUnit_Coverage_Path_ResolvePath_NoResolver(t *testing.T) {
 	mfs := &MockFileSystem{HomeDir: "/home"}
-	// Test without resolver (uses expandHome)
+	// Test ResolvePath with a minimal ExpressionResolver to verify home (~) expansion using MockFileSystem
 	res, err := ResolvePath("~/foo", "/base", &ExpressionResolver{fs: mfs})
 	require.NoError(t, err)
 	// On Linux mock filesystem it should use /home
