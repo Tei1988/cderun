@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -19,14 +21,54 @@ type StringOption struct {
 
 // BoolOption defines a boolean configuration option.
 type BoolOption struct {
-	Name         string // kebab-case, used for flags (e.g. "tty")
-	FieldName    string // PascalCase, used for reflection (pre-calculated)
-	Shorthand    string
-	Usage        string
-	Default      bool
-	EnvKey       string
-	ToolGetter   func(ToolConfig) *bool
-	GlobalGetter func(CDERunConfig) *bool
+	Name           string // kebab-case, used for flags (e.g. "tty")
+	FieldName      string // PascalCase, used for reflection (pre-calculated)
+	Shorthand      string
+	Usage          string
+	Default        bool
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *bool
+	GlobalGetter   func(CDERunConfig) *bool
+	SkipResolution bool
+}
+
+// IntOption defines an integer configuration option.
+type IntOption struct {
+	Name           string
+	FieldName      string
+	Shorthand      string
+	Usage          string
+	Default        int
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *int
+	GlobalGetter   func(CDERunConfig) *int
+	SkipResolution bool
+}
+
+// Float64Option defines a float64 configuration option.
+type Float64Option struct {
+	Name           string
+	FieldName      string
+	Shorthand      string
+	Usage          string
+	Default        float64
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *float64
+	GlobalGetter   func(CDERunConfig) *float64
+	SkipResolution bool
+}
+
+// StringSliceOption defines a string slice configuration option.
+type StringSliceOption struct {
+	Name           string
+	FieldName      string
+	Shorthand      string
+	Usage          string
+	EnvKey         string
+	Separator      string
+	ToolGetter     func(ToolConfig) []string
+	GlobalGetter   func(CDERunConfig) []string
+	SkipResolution bool
 }
 
 var StringOptions = []StringOption{
@@ -113,16 +155,18 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return strings.Join(g.Defaults.MountTools, ",")
 		},
-		SkipResolution: true, // Phase 6: Transitive options (comma-separated string)
+		SkipResolution: true, // Phase 6: Transitive options (handled via resolveStringSliceCommaOpt)
 	},
 	{
 		Name:           "config",
+		FieldName:      "ConfigPath",
 		EnvKey:         "CDERUN_CONFIG",
 		Usage:          "Path to cderun config file",
 		SkipResolution: true,
 	},
 	{
 		Name:           "tool-config",
+		FieldName:      "ToolConfigPath",
 		EnvKey:         "CDERUN_TOOL_CONFIG",
 		Usage:          "Path to tools config file",
 		SkipResolution: true,
@@ -289,6 +333,7 @@ var BoolOptions = []BoolOption{
 		GlobalGetter: func(g CDERunConfig) *bool {
 			return g.Defaults.MountSocket
 		},
+		SkipResolution: true, // Handled in Phase 6 (transitive)
 	},
 	{
 		Name:   "mount-cderun",
@@ -300,6 +345,7 @@ var BoolOptions = []BoolOption{
 		GlobalGetter: func(g CDERunConfig) *bool {
 			return g.Defaults.MountCderun
 		},
+		SkipResolution: true, // Handled in Phase 6 (transitive)
 	},
 	{
 		Name:   "mount-all-tools",
@@ -311,6 +357,7 @@ var BoolOptions = []BoolOption{
 		GlobalGetter: func(g CDERunConfig) *bool {
 			return g.Defaults.MountAllTools
 		},
+		SkipResolution: true, // Handled in Phase 6 (transitive)
 	},
 	{
 		Name:    "remove",
@@ -394,23 +441,291 @@ var BoolOptions = []BoolOption{
 	},
 }
 
+var IntOptions = []IntOption{
+	{
+		Name:    "pull-max-retries",
+		EnvKey:  "CDERUN_PULL_MAX_RETRIES",
+		Usage:   "Maximum number of retries for image pull",
+		Default: 3,
+		ToolGetter: func(t ToolConfig) *int {
+			return t.PullMaxRetries
+		},
+		GlobalGetter: func(g CDERunConfig) *int {
+			return g.Defaults.PullMaxRetries
+		},
+	},
+}
+
+var Float64Options = []Float64Option{
+	{
+		Name:   "cpus",
+		EnvKey: "CDERUN_CPUS",
+		Usage:  "Number of CPUs",
+		ToolGetter: func(t ToolConfig) *float64 {
+			return t.CPUs
+		},
+		GlobalGetter: func(g CDERunConfig) *float64 {
+			return g.Defaults.CPUs
+		},
+	},
+}
+
+var StringSliceOptions = []StringSliceOption{
+	{
+		Name:      "env",
+		Shorthand: "e",
+		EnvKey:    "CDERUN_ENV",
+		Usage:     "Set environment variables",
+		Separator: ";",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Env
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Env
+		},
+	},
+	{
+		Name:      "mount",
+		FieldName: "Mounts",
+		EnvKey:    "CDERUN_MOUNT",
+		Usage:     "Attach a filesystem mount to the container",
+		Separator: ";",
+		ToolGetter: func(t ToolConfig) []string {
+			// Convert MountConfig back to string format for unified resolution
+			// This is a bit tricky, but resolveMounts handles mc.Resolve(r)
+			// Actually resolveMounts DOES NOT use resolveStringSliceOpt.
+			// It has its own logic.
+			return nil
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return nil
+		},
+		SkipResolution: true,
+	},
+	{
+		Name:      "device",
+		FieldName: "Devices",
+		EnvKey:    "CDERUN_DEVICE",
+		Usage:     "Add a host device to the container",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return nil
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return nil
+		},
+		SkipResolution: true,
+	},
+	{
+		Name:      "publish",
+		FieldName: "Ports",
+		Shorthand: "p",
+		EnvKey:    "CDERUN_PUBLISH",
+		Usage:     "Publish a container's port(s) to the host",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Ports
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Ports
+		},
+	},
+	{
+		Name:      "expose",
+		EnvKey:    "CDERUN_EXPOSE",
+		Usage:     "Expose a port or a range of ports",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Expose
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Expose
+		},
+	},
+	{
+		Name:      "dns",
+		EnvKey:    "CDERUN_DNS",
+		Usage:     "Set custom DNS servers",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.DNS
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.DNS
+		},
+	},
+	{
+		Name:      "add-host",
+		FieldName: "AddHosts",
+		EnvKey:    "CDERUN_ADD_HOST",
+		Usage:     "Add a custom host-to-IP mapping (host:ip)",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.AddHosts
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.AddHosts
+		},
+	},
+	{
+		Name:      "cap-add",
+		EnvKey:    "CDERUN_CAP_ADD",
+		Usage:     "Add Linux capabilities",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.CapAdd
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.CapAdd
+		},
+	},
+	{
+		Name:      "cap-drop",
+		EnvKey:    "CDERUN_CAP_DROP",
+		Usage:     "Drop Linux capabilities",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.CapDrop
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.CapDrop
+		},
+	},
+	{
+		Name:      "entrypoint",
+		EnvKey:    "CDERUN_ENTRYPOINT",
+		Usage:     "Overwrite the default ENTRYPOINT of the image",
+		Separator: ",",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Entrypoint
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Entrypoint
+		},
+	},
+}
+
 var (
-	stringOptionsMap map[string]StringOption
-	boolOptionsMap   map[string]BoolOption
+	stringOptionsMap      map[string]StringOption
+	boolOptionsMap        map[string]BoolOption
+	intOptionsMap         map[string]IntOption
+	float64OptionsMap     map[string]Float64Option
+	stringSliceOptionsMap map[string]StringSliceOption
 )
 
 func init() {
+	cliType := reflect.TypeFor[CLIOptions]()
+	resType := reflect.TypeFor[ResolvedConfig]()
+
 	stringOptionsMap = make(map[string]StringOption, len(StringOptions))
 	for i := range StringOptions {
-		StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+		if StringOptions[i].FieldName == "" {
+			StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+		}
 		stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
+	}
+	for i := range StringOptions {
+		validateOption(StringOptions[i].Name, StringOptions[i].FieldName, cliType, resType)
 	}
 
 	boolOptionsMap = make(map[string]BoolOption, len(BoolOptions))
 	for i := range BoolOptions {
-		BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+		if BoolOptions[i].FieldName == "" {
+			BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+		}
+		validateOption(BoolOptions[i].Name, BoolOptions[i].FieldName, cliType, resType)
 		boolOptionsMap[BoolOptions[i].Name] = BoolOptions[i]
 	}
+
+	intOptionsMap = make(map[string]IntOption, len(IntOptions))
+	for i := range IntOptions {
+		if IntOptions[i].FieldName == "" {
+			IntOptions[i].FieldName = PascalCase(IntOptions[i].Name)
+		}
+		validateOption(IntOptions[i].Name, IntOptions[i].FieldName, cliType, resType)
+		intOptionsMap[IntOptions[i].Name] = IntOptions[i]
+	}
+
+	float64OptionsMap = make(map[string]Float64Option, len(Float64Options))
+	for i := range Float64Options {
+		if Float64Options[i].FieldName == "" {
+			Float64Options[i].FieldName = PascalCase(Float64Options[i].Name)
+		}
+		validateOption(Float64Options[i].Name, Float64Options[i].FieldName, cliType, resType)
+		float64OptionsMap[Float64Options[i].Name] = Float64Options[i]
+	}
+
+	stringSliceOptionsMap = make(map[string]StringSliceOption, len(StringSliceOptions))
+	for i := range StringSliceOptions {
+		if StringSliceOptions[i].FieldName == "" {
+			StringSliceOptions[i].FieldName = PascalCase(StringSliceOptions[i].Name)
+		}
+		stringSliceOptionsMap[StringSliceOptions[i].Name] = StringSliceOptions[i]
+	}
+	for i := range StringSliceOptions {
+		validateOption(StringSliceOptions[i].Name, StringSliceOptions[i].FieldName, cliType, resType)
+	}
+}
+
+func validateOption(name, fieldName string, cliType, resType reflect.Type) {
+	// Skip validation for options that are special or handled separately
+	if name == "config" || name == "tool-config" {
+		return
+	}
+
+	// Options with SkipResolution=true might not be in ResolvedConfig
+	skipResolved := false
+	if opt, ok := GetStringOption(name); ok && opt.SkipResolution {
+		skipResolved = true
+	} else if opt, ok := GetBoolOption(name); ok && opt.SkipResolution {
+		skipResolved = true
+	} else if opt, ok := GetIntOption(name); ok && opt.SkipResolution {
+		skipResolved = true
+	} else if opt, ok := GetFloat64Option(name); ok && opt.SkipResolution {
+		skipResolved = true
+	} else if opt, ok := GetStringSliceOption(name); ok && opt.SkipResolution {
+		skipResolved = true
+	}
+
+	if skipResolved {
+		// skip ResolvedConfig check
+	} else if _, ok := resType.FieldByName(fieldName); !ok {
+		panic(fmt.Sprintf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, name))
+	}
+
+	// For CLIOptions, we expect several variants:
+	// 1. P2 value: <FieldName>
+	// 2. P2 set: <FieldName>Set (optional for some types)
+	// 3. P1 value: Cderun<FieldName>
+	// 4. P1 set: Cderun<FieldName>Set (optional for some types)
+
+	check := func(fName string) {
+		if _, ok := cliType.FieldByName(fName); !ok {
+			panic(fmt.Sprintf("registry mismatch: field %q for option %q not found in CLIOptions", fName, name))
+		}
+	}
+
+	check(fieldName)
+	check("Cderun" + fieldName)
+
+	// Bool, Int, Float64 always have Set markers.
+	// String also has them in our current CLIOptions definition.
+	// StringSlice usually doesn't need them because nil check works, but let's see.
+	// Actually CLIOptions has 'Set' fields for most of them.
+
+	// Helper to check for Set fields
+	checkSet := func(fName string) {
+		if _, ok := cliType.FieldByName(fName + "Set"); !ok {
+			// Some fields might not have Set fields if they are slices
+			field, _ := cliType.FieldByName(fName)
+			if field.Type.Kind() != reflect.Slice {
+				panic(fmt.Sprintf("registry mismatch: field %q for option %q not found in CLIOptions", fName+"Set", name))
+			}
+		}
+	}
+
+	checkSet(fieldName)
+	checkSet("Cderun" + fieldName)
 }
 
 // GetStringOption returns a string option by its kebab-case name.
@@ -422,6 +737,24 @@ func GetStringOption(name string) (StringOption, bool) {
 // GetBoolOption returns a boolean option by its kebab-case name.
 func GetBoolOption(name string) (BoolOption, bool) {
 	opt, ok := boolOptionsMap[name]
+	return opt, ok
+}
+
+// GetIntOption returns an int option by its kebab-case name.
+func GetIntOption(name string) (IntOption, bool) {
+	opt, ok := intOptionsMap[name]
+	return opt, ok
+}
+
+// GetFloat64Option returns a float64 option by its kebab-case name.
+func GetFloat64Option(name string) (Float64Option, bool) {
+	opt, ok := float64OptionsMap[name]
+	return opt, ok
+}
+
+// GetStringSliceOption returns a string slice option by its kebab-case name.
+func GetStringSliceOption(name string) (StringSliceOption, bool) {
+	opt, ok := stringSliceOptionsMap[name]
 	return opt, ok
 }
 

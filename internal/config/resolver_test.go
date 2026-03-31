@@ -338,6 +338,9 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "ENV_VAR=env-val")
 		assert.Contains(t, res.Env, "HOST_VAR=host-val")
+		// Note: resolveEnv only picks the winning source, it doesn't merge across layers for Env.
+		// Since CDERUN_ENV is present in mfs, it wins over Tool config.
+		assert.NotContains(t, res.Env, "TOOL_VAR=tool-val")
 	})
 
 	t.Run("Strict mode env validation", func(t *testing.T) {

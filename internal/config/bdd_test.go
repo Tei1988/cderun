@@ -446,9 +446,9 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues expression error", func(t *testing.T) {
-		mfs := &customMockFS{
-			MockFileSystem: MockFileSystem{WD: "/app"},
-			readFileErr:    assert.AnError,
+		mfs := &MockFileSystem{
+			WD:          "/app",
+			ReadFileErr: assert.AnError,
 		}
 		// Create a resolver that will error on some expression
 		rErr, err := NewExpressionResolverWithFS(nil, mfs)

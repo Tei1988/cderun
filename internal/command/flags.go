@@ -8,136 +8,72 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type boolFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     bool
-	p2Usage        string
-	p2Field        *bool
-	p1Field        *bool
-}
-
-type stringFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     string
-	p2Usage        string
-	p2Field        *string
-	p1Field        *string
-}
-
-type stringSliceFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	p2Usage        string
-	p2Field        *[]string
-	p1Field        *[]string
-}
-
-type intFlagDef struct {
-	p2Name, p1Name string
-	defaultVal     int
-	p2Usage        string
-	p2Field        *int
-	p1Field        *int
-}
-
-type float64FlagDef struct {
-	p2Name, p1Name string
-	defaultVal     float64
-	p2Usage        string
-	p2Field        *float64
-	p1Field        *float64
-}
-
 func registerFlags(cmd *cobra.Command, o *rootOptions) {
-	boolDefs := make([]boolFlagDef, 0, len(config.BoolOptions))
+	f := cmd.PersistentFlags()
+
 	for _, opt := range config.BoolOptions {
 		p2Field, p1Field := getBoolPointers(o, opt.Name)
 		if p2Field == nil || p1Field == nil {
 			panic(fmt.Sprintf("could not find fields for bool option %q", opt.Name))
 		}
-		boolDefs = append(boolDefs, boolFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
+		if opt.Shorthand != "" {
+			f.BoolVarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
+		} else {
+			f.BoolVar(p2Field, opt.Name, opt.Default, opt.Usage)
+		}
+		f.BoolVar(p1Field, "cderun-"+opt.Name, opt.Default, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
 
-	stringDefs := make([]stringFlagDef, 0, len(config.StringOptions))
 	for _, opt := range config.StringOptions {
 		p2Field, p1Field := getStringPointers(o, opt.Name)
 		if p2Field == nil || p1Field == nil {
 			panic(fmt.Sprintf("could not find fields for string option %q", opt.Name))
 		}
-		stringDefs = append(stringDefs, stringFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	intDefs := []intFlagDef{
-		{"pull-max-retries", "cderun-pull-max-retries", 3, "Maximum number of retries for image pull", &o.pullMaxRetries, &o.cderunPullMaxRetries},
-	}
-
-	stringSliceDefs := []stringSliceFlagDef{
-		{"env", "cderun-env", "e", "Set environment variables", &o.env, &o.cderunEnv},
-		{"mount", "cderun-mount", "", "Attach a filesystem mount to the container", &o.mounts, &o.cderunMounts},
-		{"publish", "cderun-publish", "p", "Publish a container's port(s) to the host", &o.ports, &o.cderunPorts},
-		{"expose", "cderun-expose", "", "Expose a port or a range of ports", &o.expose, &o.cderunExpose},
-		{"dns", "cderun-dns", "", "Set custom DNS servers", &o.dns, &o.cderunDNS},
-		{"add-host", "cderun-add-host", "", "Add a custom host-to-IP mapping (host:ip)", &o.addHosts, &o.cderunAddHosts},
-		{"cap-add", "cderun-cap-add", "", "Add Linux capabilities", &o.capAdd, &o.cderunCapAdd},
-		{"cap-drop", "cderun-cap-drop", "", "Drop Linux capabilities", &o.capDrop, &o.cderunCapDrop},
-		{"entrypoint", "cderun-entrypoint", "", "Overwrite the default ENTRYPOINT of the image", &o.entrypoint, &o.cderunEntrypoint},
-		{"device", "cderun-device", "", "Add a host device to the container", &o.devices, &o.cderunDevices},
-	}
-
-	float64Defs := []float64FlagDef{
-		{"cpus", "cderun-cpus", 0, "Number of CPUs", &o.cpus, &o.cderunCPUs},
-	}
-
-	f := cmd.PersistentFlags()
-	for _, d := range boolDefs {
-		if d.p2Short != "" {
-			f.BoolVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+		if opt.Shorthand != "" {
+			f.StringVarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
 		} else {
-			f.BoolVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+			f.StringVar(p2Field, opt.Name, opt.Default, opt.Usage)
 		}
-		f.BoolVar(d.p1Field, d.p1Name, d.defaultVal, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.StringVar(p1Field, "cderun-"+opt.Name, "", "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range stringDefs {
-		if d.p2Short != "" {
-			f.StringVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+
+	for _, opt := range config.IntOptions {
+		p2Field, p1Field := getIntPointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for int option %q", opt.Name))
+		}
+		if opt.Shorthand != "" {
+			f.IntVarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
 		} else {
-			f.StringVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+			f.IntVar(p2Field, opt.Name, opt.Default, opt.Usage)
 		}
-		f.StringVar(d.p1Field, d.p1Name, "", "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.IntVar(p1Field, "cderun-"+opt.Name, 0, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range intDefs {
-		f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
-		f.IntVar(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range stringSliceDefs {
-		if d.p2Short != "" {
-			f.StringArrayVarP(d.p2Field, d.p2Name, d.p2Short, nil, d.p2Usage)
+
+	for _, opt := range config.Float64Options {
+		p2Field, p1Field := getFloat64Pointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for float64 option %q", opt.Name))
+		}
+		if opt.Shorthand != "" {
+			f.Float64VarP(p2Field, opt.Name, opt.Shorthand, opt.Default, opt.Usage)
 		} else {
-			f.StringArrayVar(d.p2Field, d.p2Name, nil, d.p2Usage)
+			f.Float64Var(p2Field, opt.Name, opt.Default, opt.Usage)
 		}
-		f.StringArrayVar(d.p1Field, d.p1Name, nil, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+		f.Float64Var(p1Field, "cderun-"+opt.Name, 0, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range float64Defs {
-		f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
-		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
+
+	for _, opt := range config.StringSliceOptions {
+		p2Field, p1Field := getStringSlicePointers(o, opt.Name)
+		if p2Field == nil || p1Field == nil {
+			panic(fmt.Sprintf("could not find fields for string slice option %q", opt.Name))
+		}
+		if opt.Shorthand != "" {
+			f.StringArrayVarP(p2Field, opt.Name, opt.Shorthand, nil, opt.Usage)
+		} else {
+			f.StringArrayVar(p2Field, opt.Name, nil, opt.Usage)
+		}
+		f.StringArrayVar(p1Field, "cderun-"+opt.Name, nil, "Override "+opt.Name+" setting (highest priority, can be used after subcommand)")
 	}
 }
 
@@ -214,6 +150,51 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 		return &o.logFormat, &o.cderunLogFormat
 	case "hang-timeout":
 		return &o.hangTimeout, &o.cderunHangTimeout
+	default:
+		return nil, nil
+	}
+}
+
+func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
+	switch name {
+	case "pull-max-retries":
+		return &o.pullMaxRetries, &o.cderunPullMaxRetries
+	default:
+		return nil, nil
+	}
+}
+
+func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
+	switch name {
+	case "cpus":
+		return &o.cpus, &o.cderunCPUs
+	default:
+		return nil, nil
+	}
+}
+
+func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
+	switch name {
+	case "publish":
+		return &o.ports, &o.cderunPorts
+	case "expose":
+		return &o.expose, &o.cderunExpose
+	case "dns":
+		return &o.dns, &o.cderunDNS
+	case "add-host":
+		return &o.addHosts, &o.cderunAddHosts
+	case "cap-add":
+		return &o.capAdd, &o.cderunCapAdd
+	case "cap-drop":
+		return &o.capDrop, &o.cderunCapDrop
+	case "entrypoint":
+		return &o.entrypoint, &o.cderunEntrypoint
+	case "env":
+		return &o.env, &o.cderunEnv
+	case "mount":
+		return &o.mounts, &o.cderunMounts
+	case "device":
+		return &o.devices, &o.cderunDevices
 	default:
 		return nil, nil
 	}
