@@ -183,7 +183,13 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 
-Note: For list-type options on the CLI (P1/P2 flags), the flag must be repeated for each item (e.g., `--env A=1 --env B=2`). Environment variables (P3) use separators: `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`), while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
+**Note on List-type Options:**
+
+- **CLI Flags (P1/P2)**: List-type flags must be repeated for each item.
+  - Example: `--env A=1 --env B=2`
+- **Environment Variables (P3)**: Use specific separators depending on the variable.
+  - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
+  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`
 
 ## Configuration
 
