@@ -651,9 +651,9 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).([]string)
 		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).([]string)
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("internal error: field %s in CLIOptions is not []string", opt.Name)
-			}
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not []string", opt.Name)
+		}
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
@@ -777,6 +777,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
+			Fallback:     &opt.Default,
 		}
 
 		resolved := resolveFloat64Opt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
