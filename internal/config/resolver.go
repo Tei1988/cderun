@@ -471,8 +471,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			continue
 		}
 
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		p1Val, ok1 := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
+		p2Val, ok2 := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("internal error: type assertion failed for %q", opt.Name)
+		}
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
