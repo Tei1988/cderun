@@ -290,7 +290,7 @@ func TestRobustness_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
 	var capturedExitCode int
 	done := make(chan error, 1)
 	go func() {
-		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "--cderun-hang-timeout=100ms", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout=100ms"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}

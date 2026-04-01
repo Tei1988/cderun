@@ -68,10 +68,10 @@ func TestScenario_Stdin_PipedInput(t *testing.T) {
 	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
 		[]string{
 			"--image", "public.ecr.aws/docker/library/alpine:latest",
-			"--interactive", "--cderun-tty=false", "--cderun-memory=512m",
+			"--interactive",
 		},
 		"alpine",
-		[]string{"cat"},
+		[]string{"cat", "--cderun-tty=false", "--cderun-memory=512m"},
 	)
 
 	skipIfDockerBroken(t, err)
