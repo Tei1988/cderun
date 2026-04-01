@@ -114,9 +114,10 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	})
 
 	t.Run("find_dir existing file", func(t *testing.T) {
-		val := r.resolveString("{{ find_dir:modules/foo }}")
-		require.NoError(t, r.Error())
-		assert.Equal(t, "../../modules", val)
+		// modules/foo is now forbidden because of directory segments
+		r.resolveString("{{ find_dir:modules/foo }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "directory segments are not allowed")
 	})
 
 	t.Run("find_dir not found", func(t *testing.T) {
@@ -449,4 +450,31 @@ func TestUnit_Expression_EnvWithDefault(t *testing.T) {
 			assert.Equal(t, tt.expected, val)
 		})
 	}
+}
+
+func TestUnit_Expression_PathTraversalReproduction(t *testing.T) {
+	fs := &MockFileSystem{
+		Files: map[string][]byte{
+			"/etc/passwd": []byte("root:x:0:0:root:/root:/bin/bash"),
+		},
+		Dirs: map[string]bool{
+			"/":                  true,
+			"/etc":               true,
+			"/home":              true,
+			"/home/user":         true,
+			"/home/user/project": true,
+		},
+		WD: "/home/user/project",
+	}
+
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
+
+	t.Run("demonstrate vulnerability: upward search reaches root", func(t *testing.T) {
+		r.resolveString("{{ file:etc/passwd }}")
+
+		// After the fix, this should be an error because directory segments are forbidden.
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "directory segments are not allowed")
+	})
 }

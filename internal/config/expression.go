@@ -38,13 +38,19 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 	if err != nil {
 		pwd = ""
 	}
+	loader := NewConfigLoaderWithFS(fs)
+	// We allow searching up to the root for config files,
+	// but we will restrict expressions to not use path separators
+	// to prevent escaping to sensitive system directories during upward search.
+	loader.SearchRoot = ""
+
 	return &ExpressionResolver{
 		fs:          fs,
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
 		fileCache:   make(map[string]fileCacheEntry),
-		loader:      NewConfigLoaderWithFS(fs),
+		loader:      loader,
 	}, nil
 }
 
@@ -183,6 +189,9 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
+	if strings.ContainsAny(filename, "/\\") {
+		return "", fmt.Errorf("directory segments are not allowed in file directive: %s", filename)
+	}
 
 	if cached, ok := r.fileCache[filename]; ok {
 		return cached.content, cached.err
@@ -210,6 +219,9 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	if filepath.IsAbs(name) || !filepath.IsLocal(name) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
+	}
+	if strings.ContainsAny(name, "/\\") {
+		return "", fmt.Errorf("directory segments are not allowed in find_dir directive: %s", name)
 	}
 
 	paths := r.loader.FindConfigs(name)

@@ -448,6 +448,40 @@ func TestUnit_Path_Helpers(t *testing.T) {
 	})
 }
 
+func TestUnit_Path_Validation(t *testing.T) {
+	baseDir := "/base"
+
+	t.Run("rejects null bytes", func(t *testing.T) {
+		_, err := ResolvePath("/path/with\x00null", baseDir, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid characters")
+	})
+
+	t.Run("rejects control characters", func(t *testing.T) {
+		_, err := ResolvePath("/path/with\nnewline", baseDir, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid characters")
+
+		_, err = ResolvePath("/path/with\tkey", baseDir, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid characters")
+	})
+
+	t.Run("rejects invalid characters after expression resolution", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"BAD_PATH": "/path/with\x00null",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		_, err = ResolvePath("{{ env:BAD_PATH }}", baseDir, r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid characters")
+	})
+}
+
 func TestUnit_Path_ParseDeviceConfig_Errors(t *testing.T) {
 	t.Run("empty string", func(t *testing.T) {
 		_, ok := ParseDeviceConfig("")

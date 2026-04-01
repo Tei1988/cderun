@@ -332,10 +332,23 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 )
 
+func validatePathChars(s string) error {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 32 || s[i] == 127 {
+			return fmt.Errorf("path contains invalid characters (control characters or null bytes): %q", s)
+		}
+	}
+	return nil
+}
+
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
 	if p == "" {
 		return p, nil
+	}
+
+	if err := validatePathChars(p); err != nil {
+		return "", err
 	}
 
 	prefix := schemeRegex.FindString(p)
@@ -352,6 +365,9 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 			return "", err
 		}
 		p = resolved
+		if err := validatePathChars(p); err != nil {
+			return "", err
+		}
 	} else {
 		expanded, err := expandHome(p, fs)
 		if err != nil {

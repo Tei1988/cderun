@@ -1933,3 +1933,64 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml dry-run error")
 	})
 }
+
+func TestUnit_Root_SecretMasking(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		env      []string
+		expected []string
+	}{
+		{
+			name:     "no sensitive vars",
+			env:      []string{"PATH=/bin", "USER=jules"},
+			expected: []string{"PATH=/bin", "USER=jules"},
+		},
+		{
+			name:     "mask password",
+			env:      []string{"DB_PASSWORD=secret123", "NORMAL_VAR=val"},
+			expected: []string{"DB_PASSWORD=****", "NORMAL_VAR=val"},
+		},
+		{
+			name:     "mask secret and token",
+			env:      []string{"AWS_SECRET_ACCESS_KEY=key123", "GITHUB_TOKEN=tok123"},
+			expected: []string{"AWS_SECRET_ACCESS_KEY=****", "GITHUB_TOKEN=****"},
+		},
+		{
+			name:     "mask case insensitive",
+			env:      []string{"my_password=pass"},
+			expected: []string{"my_password=****"},
+		},
+		{
+			name:     "mask auth and sig",
+			env:      []string{"AUTH_HEADER=bearer", "WEBHOOK_SIG=abc"},
+			expected: []string{"AUTH_HEADER=****", "WEBHOOK_SIG=****"},
+		},
+		{
+			name:     "no equals sign",
+			env:      []string{"INVALIDVAR"},
+			expected: []string{"INVALIDVAR"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := maskSensitiveEnv(tt.env)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+
+	t.Run("dry-run output masks secrets", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--env", "MY_PASSWORD=secret", "--env", "NORMAL=val", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetOut(&buf)
+		})
+		require.NoError(t, err)
+		output := buf.String()
+		assert.Contains(t, output, "MY_PASSWORD=****")
+		assert.Contains(t, output, "NORMAL=val")
+		assert.NotContains(t, output, "MY_PASSWORD=secret")
+	})
+}

@@ -366,6 +366,7 @@ type ConfigLoader struct {
 	fs              FileSystem
 	systemConfigDir string
 	runConfigDir    string
+	SearchRoot      string
 	statCache       map[string]statResult
 	mu              sync.RWMutex
 }
@@ -376,6 +377,7 @@ func NewConfigLoader() *ConfigLoader {
 		fs:              RealFileSystem{},
 		systemConfigDir: "/etc/cderun",
 		runConfigDir:    "/run/cderun",
+		SearchRoot:      "",
 		statCache:       make(map[string]statResult),
 	}
 }
@@ -386,6 +388,7 @@ func NewConfigLoaderWithFS(fs FileSystem) *ConfigLoader {
 		fs:              fs,
 		systemConfigDir: defaultLoader.systemConfigDir,
 		runConfigDir:    defaultLoader.runConfigDir,
+		SearchRoot:      "",
 		statCache:       make(map[string]statResult),
 	}
 }
@@ -450,6 +453,11 @@ func (l *ConfigLoader) FindConfigs(filename string) []string {
 					paths = append(paths, p)
 				}
 			}
+
+			if l.SearchRoot != "" && curr == l.SearchRoot {
+				break
+			}
+
 			parent := filepath.Dir(curr)
 			if parent == curr {
 				break
