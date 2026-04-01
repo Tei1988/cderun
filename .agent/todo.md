@@ -153,17 +153,3 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 ## Testing & Maintenance
 
-### P-10: Review and Unify List Fallback Behavior
-
-The `argument-priority-logic.md` was updated to reflect that explicit empty lists `[]` in higher-priority sources should override lower-priority defaults. However, the current implementation in `internal/config/resolver.go` for `resolveEnv`, `resolveMounts`, and `resolveDevices` treats `nil` or empty slices as "unset" and continues to fallback.
-
-```go
-// internal/config/resolver.go
-if p1 != nil {
-    envs = p1
-} else if p2 != nil {
-    envs = p2
-} // ... and so on
-```
-
-If `p1` or `p2` is an empty slice `[]string{}`, the `if p1 != nil` check may pass but the logic might need to be more explicit about "intentionally empty" vs "unset". A review is needed to ensure consistent behavior across all types (Scalar vs List) and to match the documentation's "Explicit Override" principle.
