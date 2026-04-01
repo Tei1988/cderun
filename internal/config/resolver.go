@@ -309,6 +309,29 @@ func initFieldInfo() {
 	}
 }
 
+// MaskSensitiveEnv redacts sensitive values in environment variables.
+// It matches keys containing 'KEY', 'SECRET', 'TOKEN', or 'PASSWORD' (case-insensitive).
+func MaskSensitiveEnv(env []string) []string {
+	res := make([]string, len(env))
+	for i, e := range env {
+		key, val, found := strings.Cut(e, "=")
+		if !found {
+			res[i] = e
+			continue
+		}
+		upperKey := strings.ToUpper(key)
+		if strings.Contains(upperKey, "KEY") ||
+			strings.Contains(upperKey, "SECRET") ||
+			strings.Contains(upperKey, "TOKEN") ||
+			strings.Contains(upperKey, "PASSWORD") {
+			res[i] = key + "=[REDACTED]"
+		} else {
+			res[i] = key + "=" + val
+		}
+	}
+	return res
+}
+
 func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}

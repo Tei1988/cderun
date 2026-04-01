@@ -620,7 +620,8 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		maskedEnv := config.MaskSensitiveEnv(containerConfig.Env)
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedEnv, ", "))
 		_, _ = fmt.Fprintf(w, "Workdir: %s\n", containerConfig.Workdir)
 		_, _ = fmt.Fprintf(w, "User: %s\n", containerConfig.User)
 		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
@@ -691,6 +692,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	o.logger.Debug("Image: %s", containerConfig.Image)
 	o.logger.Debug("Command: %v", containerConfig.Command)
 	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
+	maskedEnv := config.MaskSensitiveEnv(containerConfig.Env)
+	o.logger.Debug("Env: %v", maskedEnv)
 	o.logger.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
 	o.logger.Debug("Runtime: %s", resolved.Runtime)
 	o.logger.Debug("Socket: %s", resolved.SocketPath)
@@ -1190,7 +1193,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
 			if strings.HasPrefix(arg, "--") {
 				name := strings.SplitN(arg[2:], "=", 2)[0]
-				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+				f := cmd.Flags().Lookup(name)
+				if f == nil {
+					f = cmd.PersistentFlags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
 					// Flag exists, takes an argument, and no '=' used, so skip next argument.
 					i++
 				}
@@ -1198,7 +1205,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 				// Shorthand(s), e.g., -i, -it, -p 80:80
 				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
 				lastChar := string(arg[len(arg)-1])
-				if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+				f := cmd.Flags().ShorthandLookup(lastChar)
+				if f == nil {
+					f = cmd.PersistentFlags().ShorthandLookup(lastChar)
+				}
+				if f != nil && f.NoOptDefVal == "" {
 					// Last shorthand takes an argument, skip next argument.
 					i++
 				}
@@ -1256,8 +1267,19 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
+					// Check if it's a boolean flag. Boolean flags should never consume the next argument.
+					isBool := false
+					if f.Value.Type() == "bool" {
+						isBool = true
+					}
+
+					if !isBool {
+						// Ensure we don't accidentally consume the next P1 flag as a value
+						if !strings.HasPrefix(args[i+1], "--cderun-") {
+							overrides = append(overrides, args[i+1])
+							i++
+						}
+					}
 				}
 			}
 		} else {

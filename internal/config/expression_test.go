@@ -230,6 +230,27 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 	})
 }
 
+func TestUnit_Expression_FileTooLarge(t *testing.T) {
+	fs := &MockFileSystem{
+		Files: map[string][]byte{
+			"/too-large.txt": make([]byte, MaxDirectiveFileSize+1),
+		},
+		Dirs: map[string]bool{
+			"/": true,
+		},
+		WD: "/",
+	}
+
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
+
+	t.Run("file too large", func(t *testing.T) {
+		r.resolveString("{{ file:too-large.txt }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "too large")
+	})
+}
+
 func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
