@@ -1137,11 +1137,7 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	// Always create fresh state to avoid global state leaks.
 	localOpts := defaultOptions()
 	localOpts.logger = logging.NewLogger()
-
-	if setup == nil {
-		// In production, use os.Exit
-		localOpts.exitFunc = os.Exit
-	}
+	localOpts.exitFunc = os.Exit // Default to os.Exit
 
 	cmd := newRootCmd(&localOpts)
 
@@ -1150,6 +1146,8 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 
 	if setup != nil {
 		setup(&localOpts, cmd)
+		// Re-bind logger output in case setup() replaced the command's error writer.
+		localOpts.logger.SetOutput(cmd.ErrOrStderr())
 	}
 
 	args, err := preprocessArgs(cmd, rawArgs)

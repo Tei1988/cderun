@@ -67,9 +67,12 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 	var buf bytes.Buffer
 
 	execErr := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		// Default to terminal mode for tests to avoid auto-detection of pipes
 		// unless specifically overridden in a test.
 		o.isTerminal = func(fd int) bool { return true }
+		// Default to no-op for exitFunc to prevent tests from terminating the process.
+		o.exitFunc = func(code int) {}
 		cmd.SetOut(&buf)
 		cmd.SetErr(&buf)
 	})
@@ -251,6 +254,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -263,6 +267,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "-t", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -364,6 +369,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 			AttachErr: errors.New("attach failed"),
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -379,6 +385,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -403,6 +410,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 			},
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -434,6 +442,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "ls", "-l", "/tmp"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -1123,6 +1132,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 	// Use --image to avoid configuration error about missing tool image mapping
 	// And use a mock runtime to avoid actual image pulling
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--pull", "invalid", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
@@ -1139,6 +1149,7 @@ func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 		RemoveAllErr: errors.New("remove failed"),
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1157,6 +1168,7 @@ func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
 		Env: map[string]string{"CDERUN_LOG_LEVEL": "debug"},
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
@@ -1170,6 +1182,7 @@ func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
 func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
 	t.Parallel()
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
@@ -1194,6 +1207,7 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 
 	mfs := &config.MockFileSystem{}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-tools", "nonexistent", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1215,6 +1229,7 @@ func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 	}
 	// MountCderun triggers snapshot creation
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1235,6 +1250,7 @@ func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
 		},
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1251,6 +1267,7 @@ func TestUnit_Root_RunE_LoadToolsConfigFailure(t *testing.T) {
 		},
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1270,6 +1287,7 @@ func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
 		},
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
@@ -1317,6 +1335,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-diagnosis", "--cderun-config", "/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1337,6 +1356,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--config", "/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1357,6 +1377,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--tool-config", "/t1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1520,6 +1541,7 @@ func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	mfs := &config.MockFileSystem{}
 	var buf bytes.Buffer
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.isTerminal = func(fd int) bool { return true }
 		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return &runtime.MockRuntime{}, nil }
@@ -1895,6 +1917,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDiagnosis JSON error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 				return nil, errors.New("json error")
 			}
@@ -1905,6 +1928,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDiagnosis YAML error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.yamlMarshal = func(v any) ([]byte, error) {
 				return nil, errors.New("yaml error")
 			}
@@ -1915,6 +1939,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDryRun JSON error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 				return nil, errors.New("json dry-run error")
 			}
@@ -1925,6 +1950,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDryRun YAML error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = func(int) {}
 			o.yamlMarshal = func(v any) ([]byte, error) {
 				return nil, errors.New("yaml dry-run error")
 			}
