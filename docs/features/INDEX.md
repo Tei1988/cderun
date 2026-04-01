@@ -4,6 +4,10 @@
 
 このディレクトリには`cderun`の各機能の詳細仕様が含まれています。
 
+## 基本概念
+
+- **[用語定義](../TERMINOLOGY.md)**: 基底ホスト、実行ホスト、ホイスト、パススルーなどの専門用語の解説。
+
 ## 機能一覧
 
 ### コア機能
@@ -70,9 +74,9 @@
 
 ### 高度な機能
 
-1. **[Docker互換フラグ (完了)](./command-line-options.md)**
+1. **[コマンドラインオプション (完了)](./command-line-options.md)**
 
-  - ポート公開、リソース制限（CPU/メモリ）、ユーザー指定など、主要なDocker CLIオプションとの互換性について網羅的に解説します。
+  - ポート公開、リソース制限（CPU/メモリ）、ユーザー指定など、主要なDocker CLIオプションとの互換性およびcderun固有の全フラグについて網羅的に解説します。
 
 2. **[cderunバイナリマウント・ネスト実行 (完了)](./nested-execution.md)**
 
@@ -115,6 +119,7 @@
 ## 技術リファレンス
 
 - **[/proc/self/mountinfo 仕様](../references/proc-self-mountinfo.md)**
+- **[Go CLI コンテナ相互作用技術](../references/go-cli-container-interaction.md)**
 
 ## 機能間の関係
 

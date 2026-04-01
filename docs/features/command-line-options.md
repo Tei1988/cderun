@@ -254,7 +254,14 @@ cderun --remove=false node app.js  # コンテナを残す
 - **用途**: コンテナのポートをホストに公開
 
 ```bash
+# 8080ポートをコンテナの80ポートにマッピング
 cderun -p 8080:80 nginx
+
+# 特定のインターフェースにバインド
+cderun -p 127.0.0.1:8080:80 nginx
+
+# UDPポートのマッピング
+cderun -p 53:53/udp alpine
 ```
 
 ### `--publish-all`, `-P`
@@ -365,7 +372,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: int
 - **デフォルト**: `3`
 - **環境変数**: `CDERUN_PULL_MAX_RETRIES`
-- **説明**: イメージプル時の最大リトライ回数
+- **説明**: イメージプル時の最大リトライ回数。ネットワークエラーや `toomanyrequests` などの一時的なエラーが発生した場合に、指数バックオフを伴って再試行します。
 
 ### `--pull-backoff-base`
 
@@ -393,7 +400,13 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **説明**: ホストデバイスをコンテナに追加
 
 ```bash
+# 基本的な使用方法（ホストとコンテナで同じパス）
 cderun --device /dev/fuse alpine ls /dev/fuse
+
+# ホストパスとコンテナパスを別々に指定し、権限を制限する
+# 形式: <host-path>:<container-path>[:<permissions>]
+# permissions は 'r' (read), 'w' (write), 'm' (mknod) の組み合わせ
+cderun --device /dev/snd:/dev/snd:rw alpine
 ```
 
 ### `--config`
