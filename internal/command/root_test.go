@@ -1684,7 +1684,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	// Wait for attachment to be established
 	select {
 	case <-attached:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for attachment")
 	}
 
