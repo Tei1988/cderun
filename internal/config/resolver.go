@@ -314,6 +314,9 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 
 func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
+	if cli == nil {
+		return nil, fmt.Errorf("cli options cannot be nil")
+	}
 	res := &ResolvedConfig{}
 	var err error
 
