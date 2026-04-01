@@ -417,7 +417,7 @@ var StringOptions = []StringOption{
 	{
 		Name:    "hang-timeout",
 		EnvKey:  "CDERUN_HANG_TIMEOUT",
-		Usage:   "Grace period after I/O completion before force-terminating the container (e.g. 2s, 500ms)",
+		Usage:   "Grace period after I/O completion before force-terminating the container (e.g. 10s, 5s)",
 		Default: "10s",
 		ToolGetter: func(t ToolConfig) string {
 			return t.HangTimeout

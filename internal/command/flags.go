@@ -36,6 +36,7 @@ type stringSliceFlagDef struct {
 
 type intFlagDef struct {
 	p2Name, p1Name string
+	p2Short        string
 	defaultVal     int
 	p2Usage        string
 	p2Field        *int
@@ -44,6 +45,7 @@ type intFlagDef struct {
 
 type float64FlagDef struct {
 	p2Name, p1Name string
+	p2Short        string
 	defaultVal     float64
 	p2Usage        string
 	p2Field        *float64
@@ -94,6 +96,7 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		intDefs = append(intDefs, intFlagDef{
 			p2Name:     opt.Name,
 			p1Name:     "cderun-" + opt.Name,
+			p2Short:    opt.Shorthand,
 			defaultVal: opt.Default,
 			p2Usage:    opt.Usage,
 			p2Field:    p2Field,
@@ -110,6 +113,7 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		float64Defs = append(float64Defs, float64FlagDef{
 			p2Name:     opt.Name,
 			p1Name:     "cderun-" + opt.Name,
+			p2Short:    opt.Shorthand,
 			defaultVal: opt.Default,
 			p2Usage:    opt.Usage,
 			p2Field:    p2Field,
@@ -151,11 +155,19 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		f.StringVar(d.p1Field, d.p1Name, "", "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
 	}
 	for _, d := range intDefs {
-		f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+		if d.p2Short != "" {
+			f.IntVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+		} else {
+			f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+		}
 		f.IntVar(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
 	}
 	for _, d := range float64Defs {
-		f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+		if d.p2Short != "" {
+			f.Float64VarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
+		} else {
+			f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+		}
 		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
 	}
 	for _, d := range stringSliceDefs {

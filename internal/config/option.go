@@ -33,8 +33,10 @@ func resolveStringOpt(
 	if p2Set {
 		return r.resolveString(p2Val)
 	}
-	if env := fs.Getenv(def.EnvKey); env != "" {
-		return r.resolveString(env)
+	if def.EnvKey != "" {
+		if env := fs.Getenv(def.EnvKey); env != "" {
+			return r.resolveString(env)
+		}
 	}
 	if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
@@ -119,16 +121,19 @@ func resolveStringSliceOpt(
 		vals = p1
 	} else if p2 != nil {
 		vals = p2
-	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
-		vals = []string{}
-		for v := range strings.SplitSeq(env, envSep) {
-			v = strings.TrimSpace(v)
-			if v == "" {
-				continue
+	} else if def.EnvKey != "" {
+		if env, ok := fs.LookupEnv(def.EnvKey); ok {
+			vals = []string{}
+			for v := range strings.SplitSeq(env, envSep) {
+				v = strings.TrimSpace(v)
+				if v == "" {
+					continue
+				}
+				vals = append(vals, v)
 			}
-			vals = append(vals, v)
 		}
-	} else if def.ToolGetter != nil && tools != nil {
+	}
+	if vals == nil && def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
@@ -160,9 +165,12 @@ func resolveStringSliceCommaOpt(
 		vals = strings.Split(p1Val, ",")
 	} else if p2Set {
 		vals = strings.Split(p2Val, ",")
-	} else if env, ok := fs.LookupEnv(def.EnvKey); ok {
-		vals = strings.Split(env, ",")
-	} else if def.ToolGetter != nil && tools != nil {
+	} else if def.EnvKey != "" {
+		if env, ok := fs.LookupEnv(def.EnvKey); ok {
+			vals = strings.Split(env, ",")
+		}
+	}
+	if vals == nil && def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
@@ -197,9 +205,11 @@ func resolveFloat64Opt(
 	if p2Set {
 		return p2Val
 	}
-	if env := fs.Getenv(def.EnvKey); env != "" {
-		if f, err := strconv.ParseFloat(env, 64); err == nil {
-			return f
+	if def.EnvKey != "" {
+		if env := fs.Getenv(def.EnvKey); env != "" {
+			if f, err := strconv.ParseFloat(env, 64); err == nil {
+				return f
+			}
 		}
 	}
 	if def.ToolGetter != nil && tools != nil {
@@ -234,9 +244,11 @@ func resolveIntOpt(
 	if p2Set {
 		return p2Val
 	}
-	if env := fs.Getenv(def.EnvKey); env != "" {
-		if i, err := strconv.Atoi(env); err == nil {
-			return i
+	if def.EnvKey != "" {
+		if env := fs.Getenv(def.EnvKey); env != "" {
+			if i, err := strconv.Atoi(env); err == nil {
+				return i
+			}
 		}
 	}
 	if def.ToolGetter != nil && tools != nil {

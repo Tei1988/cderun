@@ -260,34 +260,23 @@ func initFieldInfo() {
 			return
 		}
 
-		p1SetIdx := []int{-1}
-		p1SetField, ok1 := cliType.FieldByName("Cderun" + fieldName + "Set")
-		if ok1 {
-			p1SetIdx = p1SetField.Index
+		info := optionFields{targetIdx: targetField.Index}
+
+		if f, ok := cliType.FieldByName("Cderun" + fieldName + "Set"); ok {
+			info.p1SetIdx = f.Index
+		}
+		if f, ok := cliType.FieldByName("Cderun" + fieldName); ok {
+			info.p1ValIdx = f.Index
+		}
+		if f, ok := cliType.FieldByName(fieldName + "Set"); ok {
+			info.p2SetIdx = f.Index
+		}
+		if f, ok := cliType.FieldByName(fieldName); ok {
+			info.p2ValIdx = f.Index
 		}
 
-		p1ValField, ok2 := cliType.FieldByName("Cderun" + fieldName)
-		if !ok2 {
-			return
-		}
-
-		p2SetIdx := []int{-1}
-		p2SetField, ok3 := cliType.FieldByName(fieldName + "Set")
-		if ok3 {
-			p2SetIdx = p2SetField.Index
-		}
-
-		p2ValField, ok4 := cliType.FieldByName(fieldName)
-		if !ok4 {
-			return
-		}
-
-		fieldInfo[name] = optionFields{
-			targetIdx: targetField.Index,
-			p1SetIdx:  p1SetIdx,
-			p1ValIdx:  p1ValField.Index,
-			p2SetIdx:  p2SetIdx,
-			p2ValIdx:  p2ValField.Index,
+		if info.p1ValIdx != nil && info.p2ValIdx != nil {
+			fieldInfo[name] = info
 		}
 	}
 
@@ -306,6 +295,15 @@ func initFieldInfo() {
 	for _, opt := range StringSliceOptions {
 		process(opt.Name, opt.FieldName, opt.SkipResolution)
 	}
+}
+
+func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value) {
+	if len(setIdx) > 0 {
+		return val.FieldByIndex(setIdx).Bool(), val.FieldByIndex(valIdx)
+	}
+	// For slices and other types without a explicit Set flag
+	v := val.FieldByIndex(valIdx)
+	return !v.IsNil(), v
 }
 
 func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
@@ -373,51 +371,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			// Fallback to slow path if not in fieldInfo
-			fieldName := opt.FieldName
-			if fieldName == "" {
-				fieldName = PascalCase(opt.Name)
-			}
-			targetField := resVal.FieldByName(fieldName)
-			if !targetField.IsValid() {
-				return nil, fmt.Errorf("registry mismatch: field %q for option %q not found in ResolvedConfig", fieldName, opt.Name)
-			}
-			p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
-			p1ValField := cliVal.FieldByName("Cderun" + fieldName)
-			p2SetField := cliVal.FieldByName(fieldName + "Set")
-			p2ValField := cliVal.FieldByName(fieldName)
-
-			if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() {
-				return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
-			}
-
-			p1Set := p1SetField.IsValid() && p1SetField.Bool()
-			p2Set := p2SetField.IsValid() && p2SetField.Bool()
-
-			p1ValStr := ""
-			if p1ValField.IsValid() {
-				p1ValStr = p1ValField.String()
-			}
-			p2ValStr := ""
-			if p2ValField.IsValid() {
-				p2ValStr = p2ValField.String()
-			}
-
-			def := OptionDef[string]{
-				EnvKey:       opt.EnvKey,
-				ToolGetter:   opt.ToolGetter,
-				GlobalGetter: opt.GlobalGetter,
-				Fallback:     opt.Default,
-			}
-			resolved := resolveStringOpt(def, p1Set, p1ValStr, p2Set, p2ValStr, subcommand, tools, global, r, fs)
-			targetField.SetString(resolved)
-			continue
+			return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
 		}
 
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[string]{
 			EnvKey:       opt.EnvKey,
@@ -426,7 +384,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			Fallback:     opt.Default,
 		}
 
-		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
 		resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	}
 
@@ -453,10 +411,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for bool option %q not found", opt.Name)
 		}
 
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -464,7 +420,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
@@ -649,10 +605,19 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for string slice option %q not found", opt.Name)
 		}
 
-		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).([]string)
-		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).([]string)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not []string", opt.Name)
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
+
+		var p1v, p2v []string
+		if p1Set {
+			if v, ok := p1Val.Interface().([]string); ok {
+				p1v = v
+			}
+		}
+		if p2Set {
+			if v, ok := p2Val.Interface().([]string); ok {
+				p2v = v
+			}
 		}
 
 		def := OptionDef[[]string]{
@@ -661,7 +626,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		resolved := resolveStringSliceOpt(def, ",", p1Val, p2Val, subcommand, tools, global, r, fs)
+		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, subcommand, tools, global, r, fs)
 		resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
 	}
 
@@ -672,20 +637,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for int option %q not found", opt.Name)
 		}
 
-		p1Set := false
-		if info.p1SetIdx[0] != -1 {
-			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		}
-		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).(int)
-
-		p2Set := false
-		if info.p2SetIdx[0] != -1 {
-			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		}
-		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).(int)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not int", opt.Name)
-		}
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[*int]{
 			EnvKey:       opt.EnvKey,
@@ -694,7 +647,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveIntOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resolved := resolveIntOpt(def, p1Set, int(p1Val.Int()), p2Set, int(p2Val.Int()), subcommand, tools, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 
@@ -758,20 +711,8 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for float64 option %q not found", opt.Name)
 		}
 
-		p1Set := false
-		if info.p1SetIdx[0] != -1 {
-			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		}
-		p1Val, ok1 := (cliVal.FieldByIndex(info.p1ValIdx).Interface()).(float64)
-
-		p2Set := false
-		if info.p2SetIdx[0] != -1 {
-			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		}
-		p2Val, ok2 := (cliVal.FieldByIndex(info.p2ValIdx).Interface()).(float64)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("internal error: field %s in CLIOptions is not float64", opt.Name)
-		}
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[*float64]{
 			EnvKey:       opt.EnvKey,
@@ -780,7 +721,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveFloat64Opt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resolved := resolveFloat64Opt(def, p1Set, p1Val.Float(), p2Set, p2Val.Float(), subcommand, tools, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
