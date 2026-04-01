@@ -960,7 +960,6 @@ func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
 	t.Run("Float64 mismatch", func(t *testing.T) {
 		info := fieldInfo["cpus"]
 		origP1ValIdx := info.p1ValIdx
-		fieldInfo["cpus"] = info
 
 		imgField, _ := cliType.FieldByName("CderunImage")
 		info.p1ValIdx = imgField.Index

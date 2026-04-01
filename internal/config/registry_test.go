@@ -26,7 +26,7 @@ func TestPascalCase(t *testing.T) {
 	}
 }
 
-func TestGetOptions(t *testing.T) {
+func TestUnit_Registry_GetOptions(t *testing.T) {
 	t.Run("GetStringOption", func(t *testing.T) {
 		opt, ok := GetStringOption("image")
 		assert.True(t, ok)
