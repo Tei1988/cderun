@@ -664,11 +664,18 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	assert.Equal(t, "/tmp/docker.sock", res.SocketPath)
 }
 
+func saveAndReplaceBoolOptionsMap(t *testing.T, newMap map[string]BoolOption) {
+	t.Helper()
+	old := boolOptionsMap
+	boolOptionsMap = newMap
+	t.Cleanup(func() {
+		boolOptionsMap = old
+	})
+}
+
 func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatchErrors(t *testing.T) {
 	// Registry mismatch: 'mount-all-tools' not found (simulated by corrupted registry)
-	originalBoolMap := boolOptionsMap
-	boolOptionsMap = make(map[string]BoolOption)
-	defer func() { boolOptionsMap = originalBoolMap }()
+	saveAndReplaceBoolOptionsMap(t, make(map[string]BoolOption))
 
 	mfs := &MockFileSystem{}
 	cli := CLIOptions{Image: "a", ImageSet: true}
@@ -690,6 +697,18 @@ func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {
 	res, err = resolveConfigPath(true, "/d", false, "", "", "s", nil, nil, nil, nil, "", r, "device", mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/d", res)
+
+	// Fallback to ENV (should override tools and global)
+	mfs.Env = map[string]string{"CDERUN_SOCKET_PATH": "/env/socket"}
+	res, err = resolveConfigPath(false, "", false, "", "CDERUN_SOCKET_PATH", "node",
+		ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/path"}}},
+		func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		&CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}},
+		func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		"", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/env/socket", res)
+	mfs.Env = nil // Cleanup
 
 	// Fallback to tools
 	tools := ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/cderun"}}}
