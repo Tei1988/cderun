@@ -140,12 +140,12 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	defer func() { StringOptions = originalOptions }()
 
 	cli := CLIOptions{CderunImage: "alpine", CderunImageSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err := ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch:")
 
 	StringOptions = append(originalOptions, StringOption{Name: "hc", FieldName: "HostContext"})
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields")
 
@@ -155,12 +155,12 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	originalBool := BoolOptions
 	BoolOptions = append(BoolOptions, BoolOption{Name: "diagnosis", FieldName: "NonExistent"})
 	defer func() { BoolOptions = originalBool }()
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.NoError(t, err) // It continues if mismatch in Phase 1 (currently)
 
 	// Phase 3 remaining bool mismatch
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch: info for bool option \"bad-bool\" not found")
 }
@@ -168,36 +168,36 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
 	mfs := &MockFileSystem{}
 	cli := CLIOptions{Image: "alpine", ImageSet: true, HangTimeout: "invalid", HangTimeoutSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_ExpressionError(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	cli := CLIOptions{Image: "{{file:missing}}", ImageSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	// Expression error in SocketPath
 	cli = CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{file:missing}}", SocketPathSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	// Expression error in Memory
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "{{file:missing}}", MemorySet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 }
 

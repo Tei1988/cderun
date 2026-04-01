@@ -413,7 +413,7 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunDevices:       o.cderunDevices,
 	}
 
-	return config.ResolveWithFS(subcommand, cliOpts, toolsCfg, globalCfg, o.fs)
+	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
 }
 
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {

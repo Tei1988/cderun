@@ -220,7 +220,7 @@ type CLIOptions struct {
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
-func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
+func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
@@ -301,12 +301,18 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 	if len(setIdx) > 0 {
 		return val.FieldByIndex(setIdx).Bool(), val.FieldByIndex(valIdx)
 	}
-	// For slices and other types without a explicit Set flag
+	// For slices and other types without an explicit Set flag
 	v := val.FieldByIndex(valIdx)
-	return !v.IsNil(), v
+	// We check for nil (slices) or presence (other types) to determine if a value was set.
+	// For types that are not slices and don't have a Set flag, we check if they are non-zero.
+	k := v.Kind()
+	if k == reflect.Slice || k == reflect.Map || k == reflect.Ptr || k == reflect.Interface || k == reflect.Chan || k == reflect.Func {
+		return !v.IsNil(), v
+	}
+	return !v.IsZero(), v
 }
 
-func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
+func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
@@ -321,48 +327,36 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	cliVal := reflect.ValueOf(cli)
+	// Phase 1: Initialize reflection cache
+	fieldOnce.Do(initFieldInfo)
+
+	cliVal := reflect.ValueOf(cli).Elem()
 	resVal := reflect.ValueOf(res).Elem()
 
 	// Phase 1: Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
-		opt, ok := GetBoolOption(name)
-		if !ok {
+		opt, okOpt := GetBoolOption(name)
+		if !okOpt {
 			continue
 		}
+
+		info, okInfo := fieldInfo[name]
+		if !okInfo {
+			continue
+		}
+
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		fieldName := opt.FieldName
-		if fieldName == "" {
-			fieldName = PascalCase(opt.Name)
-		}
+		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
-		// Use reflection for early resolution as well to avoid duplication
-		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
-		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
-		p2SetField := cliVal.FieldByName(fieldName + "Set")
-		p2ValField := cliVal.FieldByName(fieldName)
-		targetField := resVal.FieldByName(fieldName)
-
-		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() || !targetField.IsValid() {
-			continue
-		}
-
-		p1Set := p1SetField.Bool()
-		p1Val := p1ValField.Bool()
-		p2Set := p2SetField.Bool()
-		p2Val := p2ValField.Bool()
-
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
-		targetField.SetBool(resolved)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
-
-	// Phase 2: Registry-based options (String & Bool)
-	fieldOnce.Do(initFieldInfo)
 
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
