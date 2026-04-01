@@ -15,31 +15,6 @@ import (
 	"github.com/docker/go-units"
 )
 
-type stringSliceOptEntry struct {
-	target     *[]string
-	def        OptionDef[[]string]
-	sep        string
-	cderunFlag []string
-	cliFlag    []string
-}
-
-type float64OptEntry struct {
-	target        *float64
-	def           OptionDef[*float64]
-	cderunFlagSet bool
-	cderunFlagVal float64
-	cliFlagSet    bool
-	cliFlagVal    float64
-}
-
-type intOptEntry struct {
-	target        *int
-	def           OptionDef[*int]
-	cderunFlagSet bool
-	cderunFlagVal int
-	cliFlagSet    bool
-	cliFlagVal    int
-}
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
@@ -290,21 +265,37 @@ func initFieldInfo() {
 		p2SetField, ok3 := cliType.FieldByName(fieldName + "Set")
 		p2ValField, ok4 := cliType.FieldByName(fieldName)
 
-		if ok1 && ok2 && ok3 && ok4 {
-			fieldInfo[name] = optionFields{
+		// Some options (like string slices) might not have a dedicated Set marker in CLIOptions
+		// and instead rely on the slice being non-nil.
+		if ok2 && ok4 {
+			info := optionFields{
 				targetIdx: targetField.Index,
-				p1SetIdx:  p1SetField.Index,
 				p1ValIdx:  p1ValField.Index,
-				p2SetIdx:  p2SetField.Index,
 				p2ValIdx:  p2ValField.Index,
 			}
+			if ok1 {
+				info.p1SetIdx = p1SetField.Index
+			}
+			if ok3 {
+				info.p2SetIdx = p2SetField.Index
+			}
+			fieldInfo[name] = info
 		}
 	}
 
 	for _, opt := range StringOptions {
-		process(opt.Name, opt.FieldName, opt.SkipResolution)
+		process(opt.Name, opt.FieldName, false)
 	}
 	for _, opt := range BoolOptions {
+		process(opt.Name, opt.FieldName, false)
+	}
+	for _, opt := range IntOptions {
+		process(opt.Name, opt.FieldName, false)
+	}
+	for _, opt := range Float64Options {
+		process(opt.Name, opt.FieldName, false)
+	}
+	for _, opt := range StringSliceOptions {
 		process(opt.Name, opt.FieldName, false)
 	}
 }
@@ -415,9 +406,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			continue
 		}
 
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
 		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
 
 		def := OptionDef[string]{
@@ -454,9 +451,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: info for bool option %q not found", opt.Name)
 		}
 
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
 		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
 
 		def := OptionDef[*bool]{
@@ -543,9 +546,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		if !ok || !ok2 {
 			return nil, fmt.Errorf("registry mismatch: 'mount-all-tools' not found")
 		}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
 		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
@@ -559,9 +568,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: 'mount-cderun' not found")
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
 		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
 		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
 	}
@@ -592,9 +607,15 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			return nil, fmt.Errorf("registry mismatch: 'mount-socket' not found")
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
 		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
 		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
 	}
@@ -617,108 +638,150 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, err
 	}
 
-	// Phase 7: Duration and Slice options
-	// Resolve hang-timeout via registry entry (skipped in Phase 2)
-	var hangTimeoutStr string
-	if opt, ok := GetStringOption("hang-timeout"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
+	// Phase 7: Registry-based options (Int, Float, Slice)
+	for _, opt := range IntOptions {
+		info, ok := fieldInfo[opt.Name]
+		if !ok {
+			return nil, fmt.Errorf("registry mismatch: info for int option %q not found", opt.Name)
 		}
-		hangTimeoutStr = resolveStringOpt(def, cli.CderunHangTimeoutSet, cli.CderunHangTimeout, cli.HangTimeoutSet, cli.HangTimeout, subcommand, tools, global, r, fs)
-	}
-	if hangTimeoutStr != "" {
-		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
-			if d < 0 {
-				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
-			}
-			res.HangTimeout = d
-		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		}
-	}
-
-	sliceOpts := []stringSliceOptEntry{
-		{target: &res.Ports, def: OptionDef[[]string]{EnvKey: "CDERUN_PUBLISH", ToolGetter: func(t ToolConfig) []string { return t.Ports }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.Ports }}, sep: ",", cderunFlag: cli.CderunPorts, cliFlag: cli.Ports},
-		{target: &res.Expose, def: OptionDef[[]string]{EnvKey: "CDERUN_EXPOSE", ToolGetter: func(t ToolConfig) []string { return t.Expose }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.Expose }}, sep: ",", cderunFlag: cli.CderunExpose, cliFlag: cli.Expose},
-		{target: &res.DNS, def: OptionDef[[]string]{EnvKey: "CDERUN_DNS", ToolGetter: func(t ToolConfig) []string { return t.DNS }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.DNS }}, sep: ",", cderunFlag: cli.CderunDNS, cliFlag: cli.DNS},
-		{target: &res.AddHosts, def: OptionDef[[]string]{EnvKey: "CDERUN_ADD_HOST", ToolGetter: func(t ToolConfig) []string { return t.AddHosts }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.AddHosts }}, sep: ",", cderunFlag: cli.CderunAddHosts, cliFlag: cli.AddHosts},
-		{target: &res.CapAdd, def: OptionDef[[]string]{EnvKey: "CDERUN_CAP_ADD", ToolGetter: func(t ToolConfig) []string { return t.CapAdd }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.CapAdd }}, sep: ",", cderunFlag: cli.CderunCapAdd, cliFlag: cli.CapAdd},
-		{target: &res.CapDrop, def: OptionDef[[]string]{EnvKey: "CDERUN_CAP_DROP", ToolGetter: func(t ToolConfig) []string { return t.CapDrop }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.CapDrop }}, sep: ",", cderunFlag: cli.CderunCapDrop, cliFlag: cli.CapDrop},
-		{target: &res.Entrypoint, def: OptionDef[[]string]{EnvKey: "CDERUN_ENTRYPOINT", ToolGetter: func(t ToolConfig) []string { return t.Entrypoint }, GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.Entrypoint }}, sep: ",", cderunFlag: cli.CderunEntrypoint, cliFlag: cli.Entrypoint},
-	}
-	for _, o := range sliceOpts {
-		*o.target = resolveStringSliceOpt(o.def, o.sep, o.cderunFlag, o.cliFlag, subcommand, tools, global, r, fs)
-	}
-
-	// Phase 8: Integer & Float options
-	intOpts := []intOptEntry{
-		{target: &res.PullMaxRetries, def: OptionDef[*int]{EnvKey: "CDERUN_PULL_MAX_RETRIES", ToolGetter: func(t ToolConfig) *int { return t.PullMaxRetries }, GlobalGetter: func(g CDERunConfig) *int { return g.Defaults.PullMaxRetries }, Fallback: ptr(3)}, cderunFlagSet: cli.CderunPullMaxRetriesSet, cderunFlagVal: cli.CderunPullMaxRetries, cliFlagSet: cli.PullMaxRetriesSet, cliFlagVal: cli.PullMaxRetries},
-	}
-	for _, o := range intOpts {
-		*o.target = resolveIntOpt(o.def, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, fs)
+		p1Val := int(cliVal.FieldByIndex(info.p1ValIdx).Int())
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
+		p2Val := int(cliVal.FieldByIndex(info.p2ValIdx).Int())
+		def := OptionDef[*int]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: &opt.Default}
+		resolved := resolveIntOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 	if res.PullMaxRetries <= 0 {
 		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
 	}
 
-	// Resolve pull-backoff-base via registry
-	var pullBackoffBaseStr string
-	if opt, ok := GetStringOption("pull-backoff-base"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
+	for _, opt := range Float64Options {
+		info, ok := fieldInfo[opt.Name]
+		if !ok {
+			return nil, fmt.Errorf("registry mismatch: info for float64 option %q not found", opt.Name)
 		}
-		pullBackoffBaseStr = resolveStringOpt(def, cli.CderunPullBackoffBaseSet, cli.CderunPullBackoffBase, cli.PullBackoffBaseSet, cli.PullBackoffBase, subcommand, tools, global, r, fs)
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Float()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Float()
+		def := OptionDef[*float64]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: &opt.Default}
+		resolved := resolveFloat64Opt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
-	if pullBackoffBaseStr != "" {
-		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
-			if d <= 0 {
-				return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
+	for _, opt := range StringSliceOptions {
+		info, ok := fieldInfo[opt.Name]
+		if !ok {
+			return nil, fmt.Errorf("registry mismatch: info for slice option %q not found", opt.Name)
+		}
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Interface().([]string)
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Interface().([]string)
+		def := OptionDef[[]string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		resolved := resolveStringSliceOpt(def, opt.Separator, p1Val, p2Val, subcommand, tools, global, r, fs)
+		resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
+	}
+
+	// Phase 8: Post-resolution parsing (Durations & Bytes & Devices)
+	if opt, ok := GetStringOption("hang-timeout"); ok {
+		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+		info := fieldInfo[opt.Name]
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
+		s := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+		if s != "" {
+			if d, err := time.ParseDuration(s); err == nil {
+				if d < 0 {
+					return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", s)
+				}
+				res.HangTimeout = d
+			} else {
+				if exprErr := r.Error(); exprErr != nil {
+					return nil, exprErr
+				}
+				return nil, fmt.Errorf("invalid hang-timeout value %q: %w", s, err)
 			}
-			res.PullBackoffBase = d
-		} else {
-			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
+		}
+	}
+
+	if opt, ok := GetStringOption("pull-backoff-base"); ok {
+		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+		info := fieldInfo[opt.Name]
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
+		s := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+		if s != "" {
+			if d, err := time.ParseDuration(s); err == nil {
+				if d <= 0 {
+					return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", s)
+				}
+				res.PullBackoffBase = d
+			} else {
+				if exprErr := r.Error(); exprErr != nil {
+					return nil, exprErr
+				}
+				return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", s, err)
+			}
+		}
+	}
+
+	if opt, ok := GetStringOption("memory"); ok {
+		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+		info := fieldInfo[opt.Name]
+		p1Set := false
+		if info.p1SetIdx != nil {
+			p1Set = cliVal.FieldByIndex(info.p1SetIdx).Bool()
+		}
+		p1Val := cliVal.FieldByIndex(info.p1ValIdx).String()
+		p2Set := false
+		if info.p2SetIdx != nil {
+			p2Set = cliVal.FieldByIndex(info.p2SetIdx).Bool()
+		}
+		p2Val := cliVal.FieldByIndex(info.p2ValIdx).String()
+		s := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, r, fs)
+		if s != "" {
+			bytes, err := units.RAMInBytes(s)
+			if err != nil {
+				if exprErr := r.Error(); exprErr != nil {
+					return nil, exprErr
+				}
+				return nil, fmt.Errorf("invalid memory value %q: %w", s, err)
+			}
+			res.Memory = bytes
 		}
 	}
 
 	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r, fs)
 	if err != nil {
 		return nil, err
-	}
-
-	// Resolve memory via registry
-	var memStr string
-	if opt, ok := GetStringOption("memory"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		memStr = resolveStringOpt(def, cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, subcommand, tools, global, r, fs)
-	}
-	if memStr != "" {
-		bytes, err := units.RAMInBytes(memStr)
-		if err != nil {
-			if exprErr := r.Error(); exprErr != nil {
-				return nil, exprErr
-			}
-			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
-		}
-		res.Memory = bytes
-	}
-
-	floatOpts := []float64OptEntry{
-		{target: &res.CPUs, def: OptionDef[*float64]{EnvKey: "CDERUN_CPUS", ToolGetter: func(t ToolConfig) *float64 { return t.CPUs }, GlobalGetter: func(g CDERunConfig) *float64 { return g.Defaults.CPUs }}, cderunFlagSet: cli.CderunCPUsSet, cderunFlagVal: cli.CderunCPUs, cliFlagSet: cli.CPUsSet, cliFlagVal: cli.CPUs},
-	}
-	for _, o := range floatOpts {
-		*o.target = resolveFloat64Opt(o.def, o.cderunFlagSet, o.cderunFlagVal, o.cliFlagSet, o.cliFlagVal, subcommand, tools, global, fs)
 	}
 
 	res.HostContext = hostCtx
