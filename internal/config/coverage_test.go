@@ -917,3 +917,64 @@ func TestUnit_Coverage_Resolver_resolveEnv_Strict(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required environment variable not found")
 }
+
+func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
+	// To cover the 'else' branch in Phase 8 where a field's Kind is not numeric,
+	// we manually manipulate fieldInfo to point an Int/Float option to a String field in CLIOptions,
+	// while keeping the target field in ResolvedConfig numeric to avoid panic on SetInt/SetFloat.
+
+	fieldOnce.Do(initFieldInfo)
+
+	t.Run("Int mismatch", func(t *testing.T) {
+		info := fieldInfo["pull-max-retries"]
+		origP1ValIdx := info.p1ValIdx
+		origP2ValIdx := info.p2ValIdx
+
+		// Point CLI value lookups to 'Image' (string) instead of 'PullMaxRetries' (int)
+		imgField, _ := cliType.FieldByName("CderunImage")
+		info.p1ValIdx = imgField.Index
+		imgField2, _ := cliType.FieldByName("Image")
+		info.p2ValIdx = imgField2.Index
+		fieldInfo["pull-max-retries"] = info
+
+		defer func() {
+			info.p1ValIdx = origP1ValIdx
+			info.p2ValIdx = origP2ValIdx
+			fieldInfo["pull-max-retries"] = info
+		}()
+
+		mfs := &MockFileSystem{}
+		// Set string values in fields that are now pointed to for pull-max-retries
+		cli := CLIOptions{
+			CderunImage: "not-an-int", CderunImageSet: true,
+			Image: "also-not-int", ImageSet: true,
+		}
+		// ResolveWithFS will now encounter reflect.String when resolving pull-max-retries,
+		// triggering the 'else' branch and setting p1Set/p2Set to false.
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		// It should fall back to default (3)
+		assert.Equal(t, 3, res.PullMaxRetries)
+	})
+
+	t.Run("Float64 mismatch", func(t *testing.T) {
+		info := fieldInfo["cpus"]
+		origP1ValIdx := info.p1ValIdx
+		fieldInfo["cpus"] = info
+
+		imgField, _ := cliType.FieldByName("CderunImage")
+		info.p1ValIdx = imgField.Index
+		fieldInfo["cpus"] = info
+
+		defer func() {
+			info.p1ValIdx = origP1ValIdx
+			fieldInfo["cpus"] = info
+		}()
+
+		mfs := &MockFileSystem{}
+		cli := CLIOptions{CderunImage: "not-a-float", CderunImageSet: true}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
+	})
+}
