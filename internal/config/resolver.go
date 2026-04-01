@@ -642,20 +642,20 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		p1Int := 0
 		if p1Set && p1Val.IsValid() {
-			switch p1Val.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			k := p1Val.Kind()
+			if k >= reflect.Int && k <= reflect.Int64 {
 				p1Int = int(p1Val.Int())
-			default:
+			} else {
 				p1Set = false
 			}
 		}
 
 		p2Int := 0
 		if p2Set && p2Val.IsValid() {
-			switch p2Val.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			k := p2Val.Kind()
+			if k >= reflect.Int && k <= reflect.Int64 {
 				p2Int = int(p2Val.Int())
-			default:
+			} else {
 				p2Set = false
 			}
 		}
@@ -736,20 +736,20 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		p1Float := 0.0
 		if p1Set && p1Val.IsValid() {
-			switch p1Val.Kind() {
-			case reflect.Float32, reflect.Float64:
+			k := p1Val.Kind()
+			if k == reflect.Float32 || k == reflect.Float64 {
 				p1Float = p1Val.Float()
-			default:
+			} else {
 				p1Set = false
 			}
 		}
 
 		p2Float := 0.0
 		if p2Set && p2Val.IsValid() {
-			switch p2Val.Kind() {
-			case reflect.Float32, reflect.Float64:
+			k := p2Val.Kind()
+			if k == reflect.Float32 || k == reflect.Float64 {
 				p2Float = p2Val.Float()
-			default:
+			} else {
 				p2Set = false
 			}
 		}
