@@ -640,6 +640,26 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
 		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
+		p1Int := 0
+		if p1Set && p1Val.IsValid() {
+			switch p1Val.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				p1Int = int(p1Val.Int())
+			default:
+				p1Set = false
+			}
+		}
+
+		p2Int := 0
+		if p2Set && p2Val.IsValid() {
+			switch p2Val.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				p2Int = int(p2Val.Int())
+			default:
+				p2Set = false
+			}
+		}
+
 		def := OptionDef[*int]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -647,7 +667,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveIntOpt(def, p1Set, int(p1Val.Int()), p2Set, int(p2Val.Int()), subcommand, tools, global, fs)
+		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, subcommand, tools, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 
@@ -714,6 +734,26 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
 		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
+		p1Float := 0.0
+		if p1Set && p1Val.IsValid() {
+			switch p1Val.Kind() {
+			case reflect.Float32, reflect.Float64:
+				p1Float = p1Val.Float()
+			default:
+				p1Set = false
+			}
+		}
+
+		p2Float := 0.0
+		if p2Set && p2Val.IsValid() {
+			switch p2Val.Kind() {
+			case reflect.Float32, reflect.Float64:
+				p2Float = p2Val.Float()
+			default:
+				p2Set = false
+			}
+		}
+
 		def := OptionDef[*float64]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -721,7 +761,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveFloat64Opt(def, p1Set, p1Val.Float(), p2Set, p2Val.Float(), subcommand, tools, global, fs)
+		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, subcommand, tools, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
