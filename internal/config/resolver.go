@@ -247,7 +247,7 @@ type optionFields struct {
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
 
-	process := func(name, fieldName string, _ bool) {
+	process := func(name, fieldName string) {
 		if fieldName == "" {
 			fieldName = PascalCase(name)
 		}
@@ -278,19 +278,19 @@ func initFieldInfo() {
 	}
 
 	for _, opt := range StringOptions {
-		process(opt.Name, opt.FieldName, opt.SkipResolution)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range BoolOptions {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range IntOptions {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range Float64Options {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range StringSliceOptions {
-		process(opt.Name, opt.FieldName, opt.SkipResolution)
+		process(opt.Name, opt.FieldName)
 	}
 }
 
@@ -447,9 +447,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	if res.Runtime == "" {
 		if res.SocketPath != "" {
@@ -582,9 +579,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		if err != nil {
 			return nil, err
 		}
-	}
-	if err != nil {
-		return nil, err
 	}
 
 	// Phase 7: Duration and Slice options

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -23,6 +24,9 @@ type ExpressionResolver struct {
 	fileCache   map[string]fileCacheEntry
 	loader      *ConfigLoader
 	err         error
+
+	loaderOnce sync.Once
+	cacheOnce  sync.Once
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
@@ -142,6 +146,22 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	return resolved
 }
 
+func (r *ExpressionResolver) ensureLoader() {
+	r.loaderOnce.Do(func() {
+		if r.loader == nil {
+			r.loader = NewConfigLoaderWithFS(r.fs)
+		}
+	})
+}
+
+func (r *ExpressionResolver) ensureCache() {
+	r.cacheOnce.Do(func() {
+		if r.fileCache == nil {
+			r.fileCache = make(map[string]fileCacheEntry)
+		}
+	})
+}
+
 func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 	// 1. Magic Words
 	switch content {
@@ -182,17 +202,13 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	if r.fileCache == nil {
-		r.fileCache = make(map[string]fileCacheEntry)
-	}
+	r.ensureCache()
 
 	if cached, ok := r.fileCache[filename]; ok {
 		return cached.content, cached.err
 	}
 
-	if r.loader == nil {
-		r.loader = NewConfigLoaderWithFS(r.fs)
-	}
+	r.ensureLoader()
 
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
@@ -218,9 +234,7 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
 	}
 
-	if r.loader == nil {
-		r.loader = NewConfigLoaderWithFS(r.fs)
-	}
+	r.ensureLoader()
 
 	paths := r.loader.FindConfigs(name)
 	if len(paths) == 0 {
