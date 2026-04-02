@@ -307,6 +307,9 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 }
 
 func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
+	if cli == nil {
+		cli = &CLIOptions{}
+	}
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error

@@ -977,3 +977,19 @@ func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
 		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
 	})
 }
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_NilCLI(t *testing.T) {
+	mfs := &MockFileSystem{}
+	// Should not panic and should return error due to missing image
+	res, err := ResolveWithFS("node", nil, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no image mapping found")
+	assert.Nil(t, res)
+
+	// Should work if diagnosis is requested via env
+	mfs.Env = map[string]string{"CDERUN_DIAGNOSIS": "true"}
+	res, err = ResolveWithFS("node", nil, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.True(t, res.Diagnosis)
+}
