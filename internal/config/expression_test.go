@@ -378,14 +378,16 @@ func TestUnit_Expression_Security_Advanced(t *testing.T) {
 	fs := &MockFileSystem{WD: "/work"}
 
 	t.Run("resolveFindDir absolute path", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, fs)
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ find_dir:/etc }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "absolute paths")
 	})
 
 	t.Run("resolveFindDir parent directory", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, fs)
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ find_dir:../secret }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "parent directory references")
