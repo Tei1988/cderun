@@ -27,7 +27,7 @@ func BenchmarkResolveWithFS(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ResolveWithFS("node", cli, tools, global, mfs)
+		_, err := ResolveWithFS("node", &cli, tools, global, mfs)
 		if err != nil {
 			b.Fatalf("ResolveWithFS failed: %v", err)
 		}

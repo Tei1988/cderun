@@ -43,8 +43,6 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]fileCacheEntry),
-		loader:      NewConfigLoaderWithFS(fs),
 	}, nil
 }
 
@@ -184,8 +182,16 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
+	if r.fileCache == nil {
+		r.fileCache = make(map[string]fileCacheEntry)
+	}
+
 	if cached, ok := r.fileCache[filename]; ok {
 		return cached.content, cached.err
+	}
+
+	if r.loader == nil {
+		r.loader = NewConfigLoaderWithFS(r.fs)
 	}
 
 	paths := r.loader.FindConfigs(filename)
@@ -210,6 +216,10 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	if filepath.IsAbs(name) || !filepath.IsLocal(name) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
+	}
+
+	if r.loader == nil {
+		r.loader = NewConfigLoaderWithFS(r.fs)
 	}
 
 	paths := r.loader.FindConfigs(name)
