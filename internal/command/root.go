@@ -608,20 +608,23 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	o.ensureHooks()
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, containerConfig, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Image: %s\n", containerConfig.Image)
-		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(containerConfig.Command, " "))
-		_, _ = fmt.Fprintf(w, "TTY: %v\n", containerConfig.TTY)
-		_, _ = fmt.Fprintf(w, "Interactive: %v\n", containerConfig.Interactive)
-		_, _ = fmt.Fprintf(w, "Network: %s\n", containerConfig.Network)
-		_, _ = fmt.Fprintf(w, "Remove: %v\n", containerConfig.Remove)
+
+	maskedContainerConfig := *containerConfig
+	maskedContainerConfig.Env = config.MaskSensitiveEnv(containerConfig.Env)
+
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
+		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(maskedContainerConfig.Command, " "))
+		_, _ = fmt.Fprintf(w, "TTY: %v\n", maskedContainerConfig.TTY)
+		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
+		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
+		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
 		var mounts []string
-		for _, m := range containerConfig.Mounts {
+		for _, m := range maskedContainerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		maskedEnv := config.MaskSensitiveEnv(containerConfig.Env)
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedEnv, ", "))
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedContainerConfig.Env, ", "))
 		_, _ = fmt.Fprintf(w, "Workdir: %s\n", containerConfig.Workdir)
 		_, _ = fmt.Fprintf(w, "User: %s\n", containerConfig.User)
 		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))

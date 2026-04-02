@@ -955,6 +955,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 var (
 	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG)$`)
 	wordBoundaryRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	camelCaseRegex    = regexp.MustCompile(`([a-z])([A-Z])`)
 )
 
 // MaskSensitiveEnv redacts sensitive values from environment variables.
@@ -969,8 +970,11 @@ func MaskSensitiveEnv(env []string) []string {
 		}
 
 		isSensitive := false
+		// Normalize camelCase (apiToken -> api Token) before splitting
+		normalizedKey := camelCaseRegex.ReplaceAllString(key, "$1 $2")
+
 		// Match keywords within word boundaries (e.g. MY_PASSWORD matches, MONKEY does not)
-		parts := wordBoundaryRegex.Split(key, -1)
+		parts := wordBoundaryRegex.Split(normalizedKey, -1)
 		for _, part := range parts {
 			if part == "" {
 				continue

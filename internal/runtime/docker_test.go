@@ -799,6 +799,14 @@ func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "SIGUSR1", mock.killSignal)
 
+		err = runtime.SignalContainer(ctx, "id", "USR1")
+		require.NoError(t, err)
+		assert.Equal(t, "USR1", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "sigterm")
+		require.NoError(t, err)
+		assert.Equal(t, "sigterm", mock.killSignal)
+
 		err = runtime.SignalContainer(ctx, "id", "15")
 		require.NoError(t, err)
 		assert.Equal(t, "15", mock.killSignal)

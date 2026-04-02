@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	signalRegex = regexp.MustCompile(`^(SIG[A-Z0-9]+|[0-9]+)$`)
+	signalRegex = regexp.MustCompile(`(?i)^(SIG)?([A-Z0-9]+)$`)
 )
 
 const (

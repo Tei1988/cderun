@@ -668,6 +668,21 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 
+	t.Run("MaskSensitiveEnv CamelCase", func(t *testing.T) {
+		env := []string{
+			"dbPassword=secret",
+			"apiToken=abc",
+			"secretKey=123",
+		}
+		expected := []string{
+			"dbPassword=[REDACTED]",
+			"apiToken=[REDACTED]",
+			"secretKey=[REDACTED]",
+		}
+		actual := MaskSensitiveEnv(env)
+		assert.Equal(t, expected, actual)
+	})
+
 	t.Run("PullMaxRetries and PullBackoffBase errors", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := CLIOptions{Image: "alpine", ImageSet: true}
