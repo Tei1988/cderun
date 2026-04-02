@@ -77,7 +77,7 @@ func TestUnit_Priority_ListFallback(t *testing.T) {
 		assert.Equal(t, "/tool", res.Mounts[0].Source)
 	})
 
-	t.Run("P1 overrides everything including empty P2", func(t *testing.T) {
+	t.Run("non-empty P1 overrides non-empty P2", func(t *testing.T) {
 		tools := ToolsConfig{
 			subcommand: ToolConfig{Image: "alpine"},
 		}
@@ -88,12 +88,17 @@ func TestUnit_Priority_ListFallback(t *testing.T) {
 		res, err := Resolve(subcommand, cli, tools, global)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"P1=1"}, res.Env)
+	})
 
-		cli = CLIOptions{
+	t.Run("explicit empty P1 overrides non-empty P2", func(t *testing.T) {
+		tools := ToolsConfig{
+			subcommand: ToolConfig{Image: "alpine"},
+		}
+		cli := CLIOptions{
 			Env:       []string{"P2=1"},
 			CderunEnv: []string{}, // P1 empty slice -> should win
 		}
-		res, err = Resolve(subcommand, cli, tools, global)
+		res, err := Resolve(subcommand, cli, tools, global)
 		require.NoError(t, err)
 		assert.Empty(t, res.Env)
 	})
