@@ -17,6 +17,7 @@ type MockFileSystem struct {
 	ExecPath     string
 	ExecErr      error
 	StatErr      error
+	StatFunc     func(name string) (os.FileInfo, error)
 	StatCalls    []string
 	ReadFileErr  error
 	MkdirAllErr  error
@@ -46,6 +47,9 @@ func (m *mockFileInfo) Sys() any           { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	m.StatCalls = append(m.StatCalls, name)
+	if m.StatFunc != nil {
+		return m.StatFunc(name)
+	}
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}

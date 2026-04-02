@@ -443,8 +443,27 @@ func TestUnit_Path_Helpers(t *testing.T) {
 		assert.Equal(t, "C:\\host", host)
 		assert.Equal(t, "/container", rem)
 
+		host, rem, ok = SplitHostRemainder("C:/host:/container")
+		assert.True(t, ok)
+		assert.Equal(t, "C:/host", host)
+		assert.Equal(t, "/container", rem)
+
+		host, rem, ok = SplitHostRemainder("/host:with:colons:/container")
+		assert.True(t, ok)
+		assert.Equal(t, "/host", host)
+		assert.Equal(t, "with:colons:/container", rem)
+
 		_, _, ok = SplitHostRemainder("/no-sep")
 		assert.False(t, ok)
+
+		_, _, ok = SplitHostRemainder("C:\\no-sep")
+		assert.False(t, ok)
+
+		// Mixed colons
+		host, rem, ok = SplitHostRemainder("C:\\host:with:colons:/container")
+		assert.True(t, ok)
+		assert.Equal(t, "C:\\host", host)
+		assert.Equal(t, "with:colons:/container", rem)
 	})
 }
 
@@ -524,9 +543,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-			r, err := NewExpressionResolverWithFS(nil, mfs)
-			require.NoError(t, err)
-			_, err = ResolvePath("~/foo", "/base", r)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = ResolvePath("~/foo", "/base", r)
 		require.Error(t, err)
 	})
 
@@ -569,6 +588,18 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("resolveVolumePath - Invalid resolved path", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/path\x00with\x00null",
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		// Use {{PWD}} to avoid colons in expression interfering with SplitHostRemainder
+		_, err = resolveVolumePath("{{PWD}}:/container", "/base", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "null byte")
+	})
+
 	t.Run("resolveDevicePath - ResolvePath error", func(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
@@ -577,6 +608,17 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.NoError(t, err)
 		_, err = resolveDevicePath("~/dev:/dev", "/base", r)
 		require.Error(t, err)
+	})
+
+	t.Run("resolveDevicePath - Invalid resolved path", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/path\x1fwith\x1fctrl",
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = resolveDevicePath("{{PWD}}:/dev/foo", "/base", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "control character")
 	})
 
 	t.Run("validatePathChars", func(t *testing.T) {

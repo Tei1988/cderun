@@ -191,6 +191,51 @@ func TestUnit_Expression_FileError(t *testing.T) {
 		r2.resolveString("{{ file:.go-version }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "failed to read file")
+
+		// Subsequent call should return cached error
+		r2.err = nil // Reset sticky error to see if resolveFile returns new error
+		_, err = r2.resolveFile(".go-version")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read file")
+	})
+
+	t.Run("resolveFile - Empty filename", func(t *testing.T) {
+		_, err := r.resolveFile("")
+		require.Error(t, err)
+	})
+
+	t.Run("resolveFile - Parent directory reference", func(t *testing.T) {
+		_, err := r.resolveFile("../secret")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory references are not allowed")
+	})
+
+	t.Run("resolveFile - Absolute path", func(t *testing.T) {
+		_, err := r.resolveFile("/etc/passwd")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "absolute paths")
+	})
+
+	t.Run("resolveFile - Stat failure", func(t *testing.T) {
+		mfs := &exprMockFS{
+			MockFileSystem: MockFileSystem{
+				Dirs: map[string]bool{"/project": true},
+				WD:   "/project",
+			},
+		}
+		mfs.Files = map[string][]byte{"/project/f": []byte("data")}
+
+		r2, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		// FindConfigs will call Stat and it will succeed.
+		paths := r2.loader.FindConfigs("f")
+		require.NotEmpty(t, paths)
+
+		// Set StatErr to trigger failure in resolveFile
+		mfs.MockFileSystem.StatErr = assert.AnError
+		_, err := r2.resolveFile("f")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to stat file")
 	})
 }
 

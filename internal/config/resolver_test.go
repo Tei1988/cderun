@@ -469,11 +469,12 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	})
 
 	t.Run("resolveDevices from environment", func(t *testing.T) {
-		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/b:rw"}}
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": " /dev/a:/dev/b:rw , , /dev/c:/dev/c "}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
-		require.Len(t, res.Devices, 1)
+		require.Len(t, res.Devices, 2)
 		assert.Equal(t, "/dev/a", res.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/c", res.Devices[1].PathOnHost)
 	})
 
 	t.Run("resolveDevices invalid format in CDERUN_DEVICE", func(t *testing.T) {
@@ -483,17 +484,26 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	})
 
 	t.Run("resolveMounts from environment", func(t *testing.T) {
-		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "source=/a,target=/b"}}
+		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": " ; source=/a,target=/b ; ; source=/c,target=/d "}}
 		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
-		require.Len(t, res.Mounts, 1)
+		require.Len(t, res.Mounts, 2)
 		assert.Equal(t, "/a", res.Mounts[0].Source)
+		assert.Equal(t, "/c", res.Mounts[1].Source)
 	})
 
 	t.Run("resolveMounts invalid format in CDERUN_MOUNT", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "invalid"}}
 		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.Error(t, err)
+	})
+
+	t.Run("resolveEnvValues with expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
 	})
 
 	t.Run("resolveConfigPath from CDERUN_SOCKET_PATH", func(t *testing.T) {
