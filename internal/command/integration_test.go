@@ -96,3 +96,55 @@ func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+func TestIntegration_Security_TraversalPrevention(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		WD: "/project",
+		Files: map[string][]byte{
+			"/etc/passwd": []byte("root:x:0:0:root:/root:/bin/bash"),
+			"/project/.cderun.yaml": []byte("defaults:\n  env: [\"PASSWORD={{file:/etc/passwd}}\"]"),
+		},
+		Dirs: map[string]bool{
+			"/project": true,
+			"/etc":     true,
+		},
+	}
+
+	mockRuntime := &runtime.MockRuntime{}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, withMockFS(mfs)))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "absolute paths and parent directory references are not allowed")
+}
+
+func TestIntegration_Security_TraversalPrevention_FindDir(t *testing.T) {
+	t.Parallel()
+	mfs := &config.MockFileSystem{
+		WD: "/project/sub",
+		Files: map[string][]byte{
+			"/project/.cderun.yaml": []byte("defaults:\n  env: [\"DIR={{find_dir:../../etc}}\"]"),
+		},
+		Dirs: map[string]bool{
+			"/project":     true,
+			"/project/sub": true,
+			"/etc":         true,
+		},
+	}
+
+	mockRuntime := &runtime.MockRuntime{}
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, withMockRuntime(mockRuntime, withMockFS(mfs)))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "absolute paths and parent directory references are not allowed")
+}
+
+func TestIntegration_Security_DryRunMasking(t *testing.T) {
+	t.Parallel()
+	stdout, _, _, err := runCderun("--image", "alpine", "--env", "DB_PASSWORD=secret123", "--env", "SAFE_VAR=hello", "--dry-run", "sh")
+	require.NoError(t, err)
+
+	assert.Contains(t, stdout, "DB_PASSWORD=****")
+	assert.Contains(t, stdout, "SAFE_VAR=hello")
+	assert.NotContains(t, stdout, "secret123")
+}

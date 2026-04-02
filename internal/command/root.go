@@ -144,12 +144,6 @@ const (
 	hangTimeout       = 10 * time.Second
 )
 
-var (
-	opts = defaultOptions()
-
-	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
-	rootCmd *cobra.Command
-)
 
 func defaultOptions() rootOptions {
 	return rootOptions{
@@ -619,9 +613,21 @@ func maskSensitiveEnv(envs []string) []string {
 
 		upperKey := strings.ToUpper(key)
 		isSensitive := false
-		for _, kw := range sensitiveKeywords {
-			if strings.Contains(upperKey, kw) {
-				isSensitive = true
+
+		// Split by non-alphanumeric characters to match on word boundaries.
+		// Env vars typically use underscores.
+		parts := strings.FieldsFunc(upperKey, func(r rune) bool {
+			return !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
+		})
+
+		for _, part := range parts {
+			for _, kw := range sensitiveKeywords {
+				if part == kw {
+					isSensitive = true
+					break
+				}
+			}
+			if isSensitive {
 				break
 			}
 		}
@@ -724,6 +730,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	o.logger.Debug("Image: %s", containerConfig.Image)
 	o.logger.Debug("Command: %v", containerConfig.Command)
 	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
+	maskedEnv := maskSensitiveEnv(containerConfig.Env)
+	o.logger.Debug("Env: %v", maskedEnv)
 	o.logger.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
 	o.logger.Debug("Runtime: %s", resolved.Runtime)
 	o.logger.Debug("Socket: %s", resolved.SocketPath)
@@ -1174,20 +1182,21 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	var cmd *cobra.Command
+	// Create fresh state for execution
+	localOpts := defaultOptions()
+	localOpts.logger = logging.NewLogger() // Fresh logger for isolation
 
 	if setup == nil {
-		// Use global state for standard execution
-		cmd = rootCmd
-	} else {
-		// Create fresh state for testing
-		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
-		cmd = newRootCmd(&localOpts)
-		setup(&localOpts, cmd)
-		// Redirect logger to the command's error writer early to capture initial logs.
-		localOpts.logger.SetOutput(cmd.ErrOrStderr())
+		// Default to os.Exit for standard execution
+		localOpts.exitFunc = os.Exit
 	}
+
+	cmd := newRootCmd(&localOpts)
+	if setup != nil {
+		setup(&localOpts, cmd)
+	}
+	// Redirect logger to the command's error writer early to capture initial logs.
+	localOpts.logger.SetOutput(cmd.ErrOrStderr())
 
 	args, err := preprocessArgs(cmd, rawArgs)
 	if err != nil {
@@ -1289,8 +1298,19 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
+					// Check if it's a boolean flag. Boolean flags should never consume the next argument.
+					isBool := false
+					if f.Value.Type() == "bool" {
+						isBool = true
+					}
+
+					if !isBool {
+						// Ensure we don't accidentally consume the next P1 flag as a value
+						if !strings.HasPrefix(args[i+1], "--cderun-") {
+							overrides = append(overrides, args[i+1])
+							i++
+						}
+					}
 				}
 			}
 		} else {
@@ -1311,7 +1331,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	return processedArgs, nil
 }
 
-func init() {
-	opts.exitFunc = os.Exit
-	rootCmd = newRootCmd(&opts)
-}

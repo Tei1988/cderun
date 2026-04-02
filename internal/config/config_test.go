@@ -757,3 +757,34 @@ func TestUnit_Config_CachedStat_DoubleCheck(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, fs.StatCalls, 1)
 }
+
+func TestUnit_Config_FindConfigs_SearchRoot(t *testing.T) {
+	fs := &MockFileSystem{
+		WD:      "/home/user/project/sub",
+		HomeDir: "/home/user",
+		Dirs: map[string]bool{
+			"/home":              true,
+			"/home/user":         true,
+			"/home/user/project": true,
+			"/home/user/project/sub": true,
+		},
+		Files: map[string][]byte{
+			"/home/user/project/.cderun.yaml": []byte("runtime: docker"),
+			"/.cderun.yaml": []byte("runtime: global"),
+		},
+	}
+	loader := NewConfigLoaderWithFS(fs)
+
+	t.Run("no SearchRoot - finds all up to root", func(t *testing.T) {
+		paths := loader.FindConfigs(".cderun.yaml")
+		assert.Contains(t, paths, "/home/user/project/.cderun.yaml")
+		assert.Contains(t, paths, "/.cderun.yaml")
+	})
+
+	t.Run("with SearchRoot - stops search early", func(t *testing.T) {
+		loader.SearchRoot = "/home/user/project"
+		paths := loader.FindConfigs(".cderun.yaml")
+		assert.Contains(t, paths, "/home/user/project/.cderun.yaml")
+		assert.NotContains(t, paths, "/.cderun.yaml")
+	})
+}

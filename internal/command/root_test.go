@@ -1856,6 +1856,68 @@ func (m *hangTimeoutMockRuntime) AttachContainer(ctx context.Context, id string,
 	return nil
 }
 
+func TestUnit_Root_MaskSensitiveEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "masks common secrets",
+			input:    []string{"PASSWORD=secret123", "MY_SECRET=shh", "API_TOKEN=xyz", "DB_KEY=key123", "AUTH_DATA=abc", "SIG_VAL=sig123"},
+			expected: []string{"PASSWORD=****", "MY_SECRET=****", "API_TOKEN=****", "DB_KEY=****", "AUTH_DATA=****", "SIG_VAL=****"},
+		},
+		{
+			name:     "does not mask non-secrets",
+			input:    []string{"USER=jdoe", "PATH=/usr/bin", "SHELL=/bin/bash", "MONKEY=funny", "DESIGN=modern"},
+			expected: []string{"USER=jdoe", "PATH=/usr/bin", "SHELL=/bin/bash", "MONKEY=funny", "DESIGN=modern"},
+		},
+		{
+			name:     "handles non-key-value strings",
+			input:    []string{"INVALID_ENV_VAR", "ANOTHER_ONE"},
+			expected: []string{"INVALID_ENV_VAR", "ANOTHER_ONE"},
+		},
+		{
+			name:     "masks mixed keys",
+			input:    []string{"GITHUB_TOKEN=token123", "LOG_LEVEL=info", "SECRET_KEY=key456"},
+			expected: []string{"GITHUB_TOKEN=****", "LOG_LEVEL=info", "SECRET_KEY=****"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := maskSensitiveEnv(tt.input)
+			assert.Equal(t, tt.expected, actual)
+
+			// Ensure input was not mutated
+			for i, v := range tt.input {
+				key, _, _ := strings.Cut(v, "=")
+				if strings.Contains(actual[i], "****") {
+					assert.NotContains(t, tt.input[i], "****", "Input was mutated")
+					assert.Contains(t, tt.input[i], key, "Input key was lost")
+				}
+			}
+		})
+	}
+}
+
+func TestUnit_Root_Execute_DryRun_Masking(t *testing.T) {
+	t.Parallel()
+	var stdoutBuf bytes.Buffer
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "--dry-run", "--env", "MY_PASSWORD=secret", "--env", "MONKEY=banana", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return &runtime.MockRuntime{}, nil }
+		o.isTerminal = func(fd int) bool { return true }
+		o.exitFunc = func(code int) {}
+		cmd.SetOut(&stdoutBuf)
+	})
+
+	require.NoError(t, err)
+	output := stdoutBuf.String()
+	assert.Contains(t, output, "MY_PASSWORD=****")
+	assert.Contains(t, output, "MONKEY=banana")
+	assert.NotContains(t, output, "secret")
+}
+
 func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 	t.Parallel()
 	waitStarted := make(chan struct{})
@@ -1931,66 +1993,5 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml dry-run error")
-	})
-}
-
-func TestUnit_Root_SecretMasking(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		env      []string
-		expected []string
-	}{
-		{
-			name:     "no sensitive vars",
-			env:      []string{"PATH=/bin", "USER=jules"},
-			expected: []string{"PATH=/bin", "USER=jules"},
-		},
-		{
-			name:     "mask password",
-			env:      []string{"DB_PASSWORD=secret123", "NORMAL_VAR=val"},
-			expected: []string{"DB_PASSWORD=****", "NORMAL_VAR=val"},
-		},
-		{
-			name:     "mask secret and token",
-			env:      []string{"AWS_SECRET_ACCESS_KEY=key123", "GITHUB_TOKEN=tok123"},
-			expected: []string{"AWS_SECRET_ACCESS_KEY=****", "GITHUB_TOKEN=****"},
-		},
-		{
-			name:     "mask case insensitive",
-			env:      []string{"my_password=pass"},
-			expected: []string{"my_password=****"},
-		},
-		{
-			name:     "mask auth and sig",
-			env:      []string{"AUTH_HEADER=bearer", "WEBHOOK_SIG=abc"},
-			expected: []string{"AUTH_HEADER=****", "WEBHOOK_SIG=****"},
-		},
-		{
-			name:     "no equals sign",
-			env:      []string{"INVALIDVAR"},
-			expected: []string{"INVALIDVAR"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := maskSensitiveEnv(tt.env)
-			assert.Equal(t, tt.expected, actual)
-		})
-	}
-
-	t.Run("dry-run output masks secrets", func(t *testing.T) {
-		var buf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--env", "MY_PASSWORD=secret", "--env", "NORMAL=val", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.isTerminal = func(fd int) bool { return true }
-			cmd.SetOut(&buf)
-		})
-		require.NoError(t, err)
-		output := buf.String()
-		assert.Contains(t, output, "MY_PASSWORD=****")
-		assert.Contains(t, output, "NORMAL=val")
-		assert.NotContains(t, output, "MY_PASSWORD=secret")
 	})
 }

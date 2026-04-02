@@ -14,6 +14,9 @@ type fileCacheEntry struct {
 	err     error
 }
 
+// MaxDirectiveFileSize is the maximum size (1MB) allowed for files read via {{file:...}} directive.
+const MaxDirectiveFileSize = 1024 * 1024 // 1MB
+
 // ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
@@ -200,6 +203,18 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
+	info, err := r.fs.Stat(paths[0])
+	if err != nil {
+		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
+		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		return "", wrappedErr
+	}
+	if info.Size() > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large: %d bytes (limit: %d)", paths[0], info.Size(), MaxDirectiveFileSize)
 		r.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
