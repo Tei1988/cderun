@@ -58,10 +58,19 @@ func (r *ExpressionResolver) Error() error {
 // WithoutHostContext returns a shallow copy of the resolver with HostContext set to nil.
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
+// It creates a new instance to avoid copying sync.Once fields.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
-	clone := *r
-	clone.HostContext = nil
-	return &clone
+	return &ExpressionResolver{
+		fs:        r.fs,
+		Home:      r.Home,
+		Pwd:       r.Pwd,
+		fileCache: r.fileCache,
+		loader:    r.loader,
+		err:       r.err,
+		// loaderOnce and cacheOnce are left at zero value for the new instance
+		// if they were already used, the new instance will just re-initialize them
+		// if needed, which is safe since loader and fileCache are also copied.
+	}
 }
 
 func (r *ExpressionResolver) setError(err error) {
