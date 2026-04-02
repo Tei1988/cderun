@@ -137,6 +137,7 @@ type rootOptions struct {
 	yamlMarshal        func(v any) ([]byte, error)
 
 	attachGracePeriod time.Duration
+	exitCode          int
 }
 
 const (
@@ -1110,7 +1111,7 @@ intended for the subcommand.`,
 			if err != nil {
 				return err
 			}
-			o.exitFunc(exitCode)
+			o.exitCode = exitCode
 			return nil
 		}
 
@@ -1136,28 +1137,51 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	// Always create fresh state
+	// Always create fresh state to avoid global state leaks.
 	o := defaultOptions()
-	o.logger = logging.NewLogger() // Fresh logger for isolation
+	o.logger = logging.NewLogger()
+	o.exitFunc = os.Exit // Default to os.Exit for production use
+
+	// Default to no-op for internal use unless overridden.
+	actualExitFunc := func(code int) {}
+
 	cmd := newRootCmd(&o)
 
 	if setup != nil {
 		setup(&o, cmd)
 	}
 
+	// Capture the configured exitFunc and ensure internal calls don't trigger it prematurely.
+	if o.exitFunc != nil {
+		actualExitFunc = o.exitFunc
+	}
+	o.exitFunc = func(int) {}
+
 	// Redirect logger to the command's error writer early to capture initial logs.
 	o.logger.SetOutput(cmd.ErrOrStderr())
 
 	args, err := preprocessArgs(cmd, rawArgs)
+	if err == nil {
+		if len(args) >= 1 {
+			cmd.SetArgs(args[1:])
+		} else {
+			cmd.SetArgs([]string{})
+		}
+		err = cmd.ExecuteContext(ctx)
+	}
+
 	if err != nil {
-		return err
+		fmt.Fprintf(cmd.ErrOrStderr(), "error: %v\n", err)
+		if o.exitCode == 0 {
+			o.exitCode = 1
+		}
 	}
-	if len(args) >= 1 {
-		cmd.SetArgs(args[1:])
-	} else {
-		cmd.SetArgs([]string{})
+
+	if o.exitCode != 0 {
+		actualExitFunc(o.exitCode)
 	}
-	return cmd.ExecuteContext(ctx)
+
+	return err
 }
 
 func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
