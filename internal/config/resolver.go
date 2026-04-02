@@ -860,7 +860,11 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		dcs = global.Defaults.Devices
 	}
 
-	var res []container.DeviceMapping
+	if dcs == nil {
+		return nil, nil
+	}
+
+	res := []container.DeviceMapping{}
 	for _, dc := range dcs {
 		resolved, err := dc.Resolve(r)
 		if err != nil {
@@ -905,6 +909,9 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
+	if base == nil && p2 == nil && p1 == nil {
+		return nil
+	}
 	m := make(map[string]string)
 	var keys []string
 
@@ -922,7 +929,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 	add(p2)
 	add(p1)
 
-	var res []string
+	res := []string{}
 	for _, k := range keys {
 		res = append(res, m[k])
 	}
@@ -930,7 +937,10 @@ func mergeEnv(base, p2, p1 []string) []string {
 }
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var res []string
+	if env == nil {
+		return nil, nil
+	}
+	res := []string{}
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
@@ -996,7 +1006,11 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		mcs = global.Defaults.Mounts
 	}
 
-	var res []container.Mount
+	if mcs == nil {
+		return nil, nil
+	}
+
+	res := []container.Mount{}
 	for _, mc := range mcs {
 		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
 			hostPath, err := mc.Source.Resolve(r)
