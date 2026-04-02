@@ -232,7 +232,7 @@ func TestUnit_Expression_FileError(t *testing.T) {
 		require.NotEmpty(t, paths)
 
 		// Set StatErr to trigger failure in resolveFile
-		mfs.MockFileSystem.StatErr = assert.AnError
+		mfs.StatErr = assert.AnError
 		_, err := r2.resolveFile("f")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to stat file")
