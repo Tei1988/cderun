@@ -643,6 +643,31 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "/s", res.Mounts[0].Source)
 	})
 
+	t.Run("MaskSensitiveEnv", func(t *testing.T) {
+		env := []string{
+			"MY_PASSWORD=secret123",
+			"API_TOKEN=abc-123",
+			"SAFE_VAR=hello",
+			"MONKEY=banana", // Should not match
+			"DB_SECRET_KEY=highly-confidential",
+			"AUTH_CALLBACK=http://localhost",
+			"SIG_STORE=/tmp",
+			"no-equal",
+		}
+		expected := []string{
+			"MY_PASSWORD=[REDACTED]",
+			"API_TOKEN=[REDACTED]",
+			"SAFE_VAR=hello",
+			"MONKEY=banana",
+			"DB_SECRET_KEY=[REDACTED]",
+			"AUTH_CALLBACK=[REDACTED]",
+			"SIG_STORE=[REDACTED]",
+			"no-equal",
+		}
+		actual := MaskSensitiveEnv(env)
+		assert.Equal(t, expected, actual)
+	})
+
 	t.Run("PullMaxRetries and PullBackoffBase errors", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := CLIOptions{Image: "alpine", ImageSet: true}

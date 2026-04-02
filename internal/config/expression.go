@@ -9,6 +9,8 @@ import (
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
+const MaxDirectiveFileSize = 1024 * 1024 // 1MB
+
 type fileCacheEntry struct {
 	content string
 	err     error
@@ -191,6 +193,19 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	paths := r.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
+	info, err := r.fs.Stat(paths[0])
+	if err != nil {
+		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
+		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		return "", wrappedErr
+	}
+
+	if info.Size() > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
 		r.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}

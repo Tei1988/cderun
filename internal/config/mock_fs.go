@@ -33,11 +33,12 @@ func (m *MockFileSystem) Getwd() (string, error) {
 
 type mockFileInfo struct {
 	name  string
+	size  int64
 	isDir bool
 }
 
 func (m *mockFileInfo) Name() string       { return m.name }
-func (m *mockFileInfo) Size() int64        { return 0 }
+func (m *mockFileInfo) Size() int64        { return m.size }
 func (m *mockFileInfo) Mode() os.FileMode  { return 0 }
 func (m *mockFileInfo) ModTime() time.Time { return time.Time{} }
 func (m *mockFileInfo) IsDir() bool        { return m.isDir }
@@ -49,8 +50,8 @@ func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 		return nil, m.StatErr
 	}
 	baseName := filepath.Base(name)
-	if _, ok := m.Files[name]; ok {
-		return &mockFileInfo{name: baseName, isDir: false}, nil
+	if data, ok := m.Files[name]; ok {
+		return &mockFileInfo{name: baseName, size: int64(len(data)), isDir: false}, nil
 	}
 	if m.Dirs[name] {
 		return &mockFileInfo{name: baseName, isDir: true}, nil

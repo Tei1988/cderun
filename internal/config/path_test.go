@@ -578,6 +578,28 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		_, err = resolveDevicePath("~/dev:/dev", "/base", r)
 		require.Error(t, err)
 	})
+
+	t.Run("validatePathChars", func(t *testing.T) {
+		err := validatePathChars("/good/path")
+		assert.NoError(t, err)
+
+		err = validatePathChars("/path/with\x00null")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "null byte")
+
+		err = validatePathChars("/path/with\x1fcontrol")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "control character")
+
+		err = validatePathChars("/path/with\x7fcontrol")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "control character")
+	})
+
+	t.Run("ResolvePath with invalid chars", func(t *testing.T) {
+		_, err := ResolvePath("/path/with\x00null", "/base", nil)
+		assert.Error(t, err)
+	})
 }
 
 func TestUnit_Path_UnmarshalYAMLErrors(t *testing.T) {

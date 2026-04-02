@@ -620,7 +620,8 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(containerConfig.Env, ", "))
+		maskedEnv := config.MaskSensitiveEnv(containerConfig.Env)
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedEnv, ", "))
 		_, _ = fmt.Fprintf(w, "Workdir: %s\n", containerConfig.Workdir)
 		_, _ = fmt.Fprintf(w, "User: %s\n", containerConfig.User)
 		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
@@ -691,6 +692,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	o.logger.Debug("Image: %s", containerConfig.Image)
 	o.logger.Debug("Command: %v", containerConfig.Command)
 	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
+	maskedEnv := config.MaskSensitiveEnv(containerConfig.Env)
+	o.logger.Debug("Env: %v", maskedEnv)
 	o.logger.Debug("Interactive: %v, TTY: %v", containerConfig.Interactive, containerConfig.TTY)
 	o.logger.Debug("Runtime: %s", resolved.Runtime)
 	o.logger.Debug("Socket: %s", resolved.SocketPath)
