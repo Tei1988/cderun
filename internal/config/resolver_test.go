@@ -216,7 +216,35 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 	t.Parallel()
-	t.Run("P1 Override takes priority over P2 CLI", func(t *testing.T) {
+
+	t.Run("List Fallback Logic", func(t *testing.T) {
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Env: []string{"GLOBAL=1"},
+			},
+		}
+		subcommand := "test-tool"
+
+		t.Run("nil at higher level falls through", func(t *testing.T) {
+			tools := ToolsConfig{
+				subcommand: ToolConfig{Image: "alpine", Env: nil},
+			}
+			res, err := Resolve(subcommand, CLIOptions{}, tools, global)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"GLOBAL=1"}, res.Env)
+		})
+
+		t.Run("empty slice at higher level overrides", func(t *testing.T) {
+			tools := ToolsConfig{
+				subcommand: ToolConfig{Image: "alpine", Env: []string{}},
+			}
+			res, err := Resolve(subcommand, CLIOptions{}, tools, global)
+			require.NoError(t, err)
+			assert.Empty(t, res.Env)
+		})
+	})
+
+	t.Run("P1 overrides everything including empty P2", func(t *testing.T) {
 		cli := CLIOptions{
 			Image:        "alpine",
 			ImageSet:     true,

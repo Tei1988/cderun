@@ -152,3 +152,7 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 
 ## Testing & Maintenance
+
+### P-11: Investigate Flaky GPG Verification in CI
+
+The Codecov uploader integrity check occasionally fails with `gpg: Can't check signature: No public key`. This was observed during documentation updates and needs a robust fix (e.g., pre-importing the Codecov GPG key or ensuring the action is configured correctly). Secure uploader validation should be maintained.
