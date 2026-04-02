@@ -183,7 +183,7 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := newRootCmd(&rootOptions{})
+			cmd := newRootCmd(&rootOptions{logger: logging.NewLogger()})
 			actual, err := preprocessArgs(cmd, tt.args)
 			if tt.expected == nil {
 				require.Error(t, err)
@@ -456,7 +456,8 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			},
 		}
 		opts := &rootOptions{
-			fs: mfs,
+			fs:     mfs,
+			logger: logging.NewLogger(),
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
@@ -481,7 +482,8 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			},
 		}
 		opts := &rootOptions{
-			fs: mfs,
+			fs:     mfs,
+			logger: logging.NewLogger(),
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
@@ -506,7 +508,8 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			},
 		}
 		opts := &rootOptions{
-			fs: mfs,
+			fs:     mfs,
+			logger: logging.NewLogger(),
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
@@ -530,7 +533,8 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		out := &bytes.Buffer{}
 		mfs := &config.MockFileSystem{} // Empty filesystem
 		opts := &rootOptions{
-			fs: mfs,
+			fs:     mfs,
+			logger: logging.NewLogger(),
 		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
@@ -551,7 +555,10 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			Files: map[string][]byte{"/var/run/docker.sock": {}},
 		}
-		opts := &rootOptions{fs: mfs}
+		opts := &rootOptions{
+			fs:     mfs,
+			logger: logging.NewLogger(),
+		}
 		resolved := &config.ResolvedConfig{
 			Runtime:         "docker",
 			SocketPath:      "/var/run/docker.sock",
@@ -620,6 +627,7 @@ func TestUnit_Root_DefaultOptions(t *testing.T) {
 	assert.NotNil(t, o.termGetSize)
 	assert.NotNil(t, o.makeRaw)
 	assert.NotNil(t, o.restore)
+	assert.Nil(t, o.logger)
 }
 
 func TestUnit_Root_GetFd(t *testing.T) {
@@ -725,7 +733,7 @@ func TestUnit_Root_SyncReader_ContextCancel(t *testing.T) {
 
 func TestUnit_Root_GetHangTimeout(t *testing.T) {
 	t.Parallel()
-	o := &rootOptions{logger: &logging.Logger{}}
+	o := &rootOptions{logger: logging.NewLogger()}
 
 	// Case 1: TTY + Interactive -> Timeout 0
 	assert.Equal(t, time.Duration(0), o.getHangTimeout(true, true, nil))
@@ -802,7 +810,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 
 func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 	t.Parallel()
-	o := &rootOptions{logger: &logging.Logger{}}
+	o := &rootOptions{logger: logging.NewLogger()}
 
 	t.Run("Container already stopped", func(t *testing.T) {
 		mockRuntime := &TerminationMockRuntime{
@@ -969,7 +977,7 @@ func TestUnit_Root_NewRootCmd_PersistentPreRun_Additions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("initializes fs and configLoader if nil", func(t *testing.T) {
-		o := &rootOptions{}
+		o := &rootOptions{logger: logging.NewLogger()}
 		cmd := newRootCmd(o)
 
 		// Before PersistentPreRun
@@ -1453,7 +1461,7 @@ func TestUnit_Root_PreprocessArgs_FlagArguments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := newRootCmd(&rootOptions{})
+			cmd := newRootCmd(&rootOptions{logger: logging.NewLogger()})
 			actual, err := preprocessArgs(cmd, tt.args)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
@@ -1564,7 +1572,7 @@ func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 
 func TestUnit_Root_PreprocessArgs_NoSubcommandHoisting(t *testing.T) {
 	t.Parallel()
-	cmd := newRootCmd(&rootOptions{})
+	cmd := newRootCmd(&rootOptions{logger: logging.NewLogger()})
 	// Standard mode, no subcommand found, but has P1 flag after some other flag.
 	// preprocessArgs should still work and hoist if it's after where it *thinks* a subcommand might be,
 	// but actually subcmdIdx will be -1 if no non-flag arg is found.
@@ -1881,7 +1889,7 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 
 func TestUnit_Root_PreprocessArgs_UnknownP1Flag(t *testing.T) {
 	t.Parallel()
-	cmd := newRootCmd(&rootOptions{})
+	cmd := newRootCmd(&rootOptions{logger: logging.NewLogger()})
 	// Hoisted flag that is not in the flag set (coverage for f == nil)
 	args := []string{"cderun", "sh", "--cderun-unknown", "value"}
 	expected := []string{"cderun", "--cderun-unknown", "sh", "value"}

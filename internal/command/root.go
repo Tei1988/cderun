@@ -173,7 +173,7 @@ func defaultOptions() rootOptions {
 			signal.Stop(sigChan)
 		},
 		attachGracePeriod: attachGracePeriod,
-		logger:            logging.GetGlobalLogger(),
+		logger:            nil, // Initialized in ExecuteContextWithOptions
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
