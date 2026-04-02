@@ -138,6 +138,7 @@ jobs:
           files: ./coverage.out
           flags: unit
           fail_ci_if_error: true
+          skip_validation: true
 
   runtime-test:
     name: Runtime Tests (Docker ${{ matrix.docker-version }})
@@ -199,6 +200,7 @@ jobs:
           flags: runtime
           env_vars: DOCKER_VERSION
           fail_ci_if_error: true
+          skip_validation: true
         env:
           DOCKER_VERSION: ${{ matrix.docker-version }}
 
@@ -261,3 +263,4 @@ jobs:
           files: ./coverage-podman.out
           flags: podman
           fail_ci_if_error: true
+          skip_validation: true
