@@ -241,7 +241,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 			res, err := Resolve(subcommand, CLIOptions{}, tools, global)
 			require.NoError(t, err)
 			require.NotNil(t, res.Env)
-			assert.Len(t, res.Env, 0)
+			assert.Empty(t, res.Env)
 		})
 	})
 
