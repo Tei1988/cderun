@@ -225,6 +225,11 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
+	if len(data) > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
 
 	result := strings.TrimSpace(string(data))
 	r.fileCache[filename] = fileCacheEntry{content: result}
