@@ -144,19 +144,11 @@ const (
 	hangTimeout       = 10 * time.Second
 )
 
-var (
-	opts = defaultOptions()
-
-	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
-	rootCmd *cobra.Command
-)
-
 func defaultOptions() rootOptions {
 	return rootOptions{
 		fs: config.RealFileSystem{},
 		exitFunc: func(code int) {
 			// Default to no-op for safety in tests.
-			// The global 'opts' is updated in init() to use os.Exit.
 		},
 		isTerminal: func(fd int) bool {
 			return term.IsTerminal(fd)
@@ -180,7 +172,6 @@ func defaultOptions() rootOptions {
 			signal.Stop(sigChan)
 		},
 		attachGracePeriod: attachGracePeriod,
-		logger:            logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -1128,33 +1119,31 @@ registerFlags(cmd, o)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// This is called by main.main().
 func Execute(rawArgs []string) error {
 	return ExecuteContext(context.Background(), rawArgs)
 }
 
 // ExecuteContext adds all child commands to the root command and sets flags appropriately, using the provided context.
 func ExecuteContext(ctx context.Context, rawArgs []string) error {
-	return ExecuteContextWithOptions(ctx, rawArgs, nil)
+	return ExecuteContextWithOptions(ctx, rawArgs, func(o *rootOptions, cmd *cobra.Command) {
+		o.exitFunc = os.Exit
+	})
 }
 
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	var cmd *cobra.Command
+	o := defaultOptions()
+	o.logger = logging.NewLogger() // Fresh logger for isolation
+	cmd := newRootCmd(&o)
 
-	if setup == nil {
-		// Use global state for standard execution
-		cmd = rootCmd
-	} else {
-		// Create fresh state for testing
-		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
-		cmd = newRootCmd(&localOpts)
-		setup(&localOpts, cmd)
-		// Redirect logger to the command's error writer early to capture initial logs.
-		localOpts.logger.SetOutput(cmd.ErrOrStderr())
+	if setup != nil {
+		setup(&o, cmd)
 	}
+
+	// Redirect logger to the command's error writer early to capture initial logs.
+	o.logger.SetOutput(cmd.ErrOrStderr())
 
 	args, err := preprocessArgs(cmd, rawArgs)
 	if err != nil {
@@ -1278,7 +1267,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	return processedArgs, nil
 }
 
-func init() {
-	opts.exitFunc = os.Exit
-	rootCmd = newRootCmd(&opts)
-}
