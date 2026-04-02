@@ -332,10 +332,14 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 )
 
-func validatePathChars(s string) error {
-	for i := 0; i < len(s); i++ {
-		if s[i] < 32 || s[i] == 127 {
-			return fmt.Errorf("path contains invalid characters (control characters or null bytes): %q", s)
+func validatePathChars(p string) error {
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		if c == 0 {
+			return fmt.Errorf("path contains null byte")
+		}
+		if c < 32 || c == 127 {
+			return fmt.Errorf("path contains control character: 0x%02x", c)
 		}
 	}
 	return nil
@@ -416,12 +420,19 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		}
 	}
 
-	return prefix + absPath, nil
+	res := prefix + absPath
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
+	if err := validatePathChars(v); err != nil {
+		return "", err
+	}
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
 		return ResolvePath(v, baseDir, r)
@@ -430,10 +441,17 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string,
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	res := resolvedHost + ":" + remainder
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
+	if err := validatePathChars(d); err != nil {
+		return "", err
+	}
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
 		return ResolvePath(d, baseDir, r)
@@ -442,7 +460,11 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	res := resolvedHost + ":" + remainder
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {

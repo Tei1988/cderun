@@ -454,17 +454,17 @@ func TestUnit_Path_Validation(t *testing.T) {
 	t.Run("rejects null bytes", func(t *testing.T) {
 		_, err := ResolvePath("/path/with\x00null", baseDir, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid characters")
+		assert.Contains(t, err.Error(), "null byte")
 	})
 
 	t.Run("rejects control characters", func(t *testing.T) {
 		_, err := ResolvePath("/path/with\nnewline", baseDir, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid characters")
+		assert.Contains(t, err.Error(), "control character")
 
 		_, err = ResolvePath("/path/with\tkey", baseDir, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid characters")
+		assert.Contains(t, err.Error(), "control character")
 	})
 
 	t.Run("rejects invalid characters after expression resolution", func(t *testing.T) {
@@ -478,7 +478,7 @@ func TestUnit_Path_Validation(t *testing.T) {
 
 		_, err = ResolvePath("{{ env:BAD_PATH }}", baseDir, r)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid characters")
+		assert.Contains(t, err.Error(), "null byte")
 	})
 }
 
