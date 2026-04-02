@@ -204,7 +204,7 @@ func TestUnit_Config_MockFS_FileDetails(t *testing.T) {
 	require.NoError(t, err)
 	// After fix in Stat, Name() should return only the base name "f"
 	assert.Equal(t, "f", info.Name())
-	assert.Equal(t, int64(0), info.Size())
+	assert.Equal(t, int64(4), info.Size())
 	assert.Equal(t, os.FileMode(0), info.Mode())
 	assert.False(t, info.IsDir())
 	assert.Nil(t, info.Sys())

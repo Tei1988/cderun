@@ -22,6 +22,11 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"regexp"
+)
+
+var (
+	signalRegex = regexp.MustCompile(`(?i)^(SIG)?([A-Z0-9]+)$`)
 )
 
 const (
@@ -286,6 +291,9 @@ func (d *DockerRuntime) ResizeContainerTTY(ctx context.Context, containerID stri
 
 // SignalContainer sends a signal to a container.
 func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if sig != "" && !signalRegex.MatchString(sig) {
+		return fmt.Errorf("invalid signal format: %q", sig)
+	}
 	err := d.client.ContainerKill(ctx, containerID, sig)
 	if err != nil {
 		// Suppress errors if the container is already gone or not running.

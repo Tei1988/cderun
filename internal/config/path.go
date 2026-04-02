@@ -332,10 +332,27 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 )
 
+func validatePathChars(p string) error {
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		if c == 0 {
+			return fmt.Errorf("path contains null byte")
+		}
+		if c < 32 || c == 127 {
+			return fmt.Errorf("path contains control character: 0x%02x", c)
+		}
+	}
+	return nil
+}
+
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
 	if p == "" {
 		return p, nil
+	}
+
+	if err := validatePathChars(p); err != nil {
+		return "", err
 	}
 
 	prefix := schemeRegex.FindString(p)
@@ -400,12 +417,19 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		}
 	}
 
-	return prefix + absPath, nil
+	res := prefix + absPath
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
+	if err := validatePathChars(v); err != nil {
+		return "", err
+	}
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
 		return ResolvePath(v, baseDir, r)
@@ -414,10 +438,17 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string,
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	res := resolvedHost + ":" + remainder
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
+	if err := validatePathChars(d); err != nil {
+		return "", err
+	}
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
 		return ResolvePath(d, baseDir, r)
@@ -426,7 +457,11 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	res := resolvedHost + ":" + remainder
+	if err := validatePathChars(res); err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {

@@ -11,6 +11,7 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
+	"regexp"
 
 	"github.com/docker/go-units"
 )
@@ -937,6 +938,8 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			return nil, err
 		}
 		if strings.Contains(resolvedE, "=") {
+			masked := MaskSensitiveEnv([]string{resolvedE})
+			logging.Debug("Environment variable: %s", masked[0])
 			res = append(res, resolvedE)
 		} else {
 			val, found := fs.LookupEnv(resolvedE)
@@ -947,6 +950,48 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 	}
 	return res, nil
+}
+
+var (
+	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG)$`)
+	wordBoundaryRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	camelCaseRegex    = regexp.MustCompile(`([a-z])([A-Z])`)
+)
+
+// MaskSensitiveEnv redacts sensitive values from environment variables.
+// It matches keys containing common sensitive keywords.
+func MaskSensitiveEnv(env []string) []string {
+	res := make([]string, len(env))
+	for i, e := range env {
+		key, val, ok := strings.Cut(e, "=")
+		if !ok {
+			res[i] = e
+			continue
+		}
+
+		isSensitive := false
+		// Normalize camelCase (apiToken -> api Token) before splitting
+		normalizedKey := camelCaseRegex.ReplaceAllString(key, "$1 $2")
+
+		// Match keywords within word boundaries (e.g. MY_PASSWORD matches, MONKEY does not)
+		parts := wordBoundaryRegex.Split(normalizedKey, -1)
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			if sensitiveRegex.MatchString(part) {
+				isSensitive = true
+				break
+			}
+		}
+
+		if isSensitive {
+			res[i] = key + "=[REDACTED]"
+		} else {
+			res[i] = key + "=" + val
+		}
+	}
+	return res
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {

@@ -2,33 +2,6 @@
 
 ## Code Improvement
 
-
-### P-4: Remove Global Variables `opts` / `rootCmd`
-
-Current `init()` creates global state, forcing a separate code path for tests via
-`ExecuteContextWithOptions`. Unify by always creating fresh state:
-
-```go
-// Before
-var opts = defaultOptions()
-var rootCmd *cobra.Command
-func init() { rootCmd = newRootCmd(&opts) }
-
-// After — delete init() and globals
-func Execute(rawArgs []string) error {
-    return ExecuteContext(context.Background(), rawArgs)
-}
-func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(*rootOptions, *cobra.Command)) error {
-    o := defaultOptions()
-    o.logger = logging.NewLogger()
-    cmd := newRootCmd(&o)
-    if setup != nil { setup(&o, cmd) }
-    // ... same flow
-}
-```
-
-Production and test paths become identical. No state leaks between runs.
-
 ### P-6: Typed Error Handling
 
 All errors are currently `fmt.Errorf` strings, making programmatic error inspection difficult.

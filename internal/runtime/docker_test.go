@@ -780,6 +780,37 @@ func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
 		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
 		require.Error(t, err)
 	})
+
+	t.Run("invalid signal format", func(t *testing.T) {
+		runtime := &DockerRuntime{}
+		err := runtime.SignalContainer(ctx, "id", "INVALID_SIG")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid signal format")
+
+		err = runtime.SignalContainer(ctx, "id", "99; rm -rf /")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid signal format")
+	})
+
+	t.Run("valid signal format", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.SignalContainer(ctx, "id", "SIGUSR1")
+		require.NoError(t, err)
+		assert.Equal(t, "SIGUSR1", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "USR1")
+		require.NoError(t, err)
+		assert.Equal(t, "USR1", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "sigterm")
+		require.NoError(t, err)
+		assert.Equal(t, "sigterm", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "15")
+		require.NoError(t, err)
+		assert.Equal(t, "15", mock.killSignal)
+	})
 }
 
 func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
