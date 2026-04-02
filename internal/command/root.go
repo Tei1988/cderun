@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -617,17 +618,12 @@ func maskSensitiveEnv(envs []string) []string {
 		// Split by non-alphanumeric characters to match on word boundaries.
 		// Env vars typically use underscores.
 		parts := strings.FieldsFunc(upperKey, func(r rune) bool {
-			return !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
+			return (r < 'A' || r > 'Z') && (r < '0' || r > '9')
 		})
 
 		for _, part := range parts {
-			for _, kw := range sensitiveKeywords {
-				if part == kw {
-					isSensitive = true
-					break
-				}
-			}
-			if isSensitive {
+			if slices.Contains(sensitiveKeywords, part) {
+				isSensitive = true
 				break
 			}
 		}
