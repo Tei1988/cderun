@@ -1148,7 +1148,7 @@ func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no image mapping found for tool: sh")
 	assert.Empty(t, stdout)
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 1, exitCode)
 }
 
 func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {

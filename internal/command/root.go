@@ -125,6 +125,7 @@ type rootOptions struct {
 
 	// Testing hooks
 	exitFunc       func(int)
+	exitCode       int
 	isTerminal     func(int) bool
 	termGetSize        func(int) (int, int, error)
 	makeRaw            func(int) (*term.State, error)
@@ -1108,7 +1109,7 @@ intended for the subcommand.`,
 			if err != nil {
 				return err
 			}
-			o.exitFunc(exitCode)
+			o.exitCode = exitCode
 			return nil
 		}
 
@@ -1136,11 +1137,23 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
 	o := defaultOptions()
 	o.logger = logging.NewLogger() // Fresh logger for isolation
+
+	// Default to no-op for tests. The standard Execute/ExecuteContext set it to os.Exit.
+	// We want to capture the intent and call it only if it's set to something like os.Exit.
+	actualExitFunc := func(code int) {}
+
 	cmd := newRootCmd(&o)
 
 	if setup != nil {
 		setup(&o, cmd)
 	}
+
+	// Capture the configured exitFunc and replace it with a no-op during the cmd.ExecuteContext(ctx) call
+	// because we will call it manually at the end.
+	if o.exitFunc != nil {
+		actualExitFunc = o.exitFunc
+	}
+	o.exitFunc = func(int) {}
 
 	// Redirect logger to the command's error writer early to capture initial logs.
 	o.logger.SetOutput(cmd.ErrOrStderr())
@@ -1154,7 +1167,19 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	} else {
 		cmd.SetArgs([]string{})
 	}
-	return cmd.ExecuteContext(ctx)
+
+	err = cmd.ExecuteContext(ctx)
+	if err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "error: %v\n", err)
+		if o.exitCode == 0 {
+			o.exitCode = 1
+		}
+	}
+
+	if o.exitCode != 0 {
+		actualExitFunc(o.exitCode)
+	}
+	return err
 }
 
 func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
