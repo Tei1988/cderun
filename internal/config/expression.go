@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
+var (
+	exprRegex   = regexp.MustCompile(`\{\{([^}]+)\}\}`)
+	envKeyRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+)
 
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
 
@@ -120,6 +123,11 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			}
 			content := strings.TrimSpace(match[2 : len(match)-2])
 
+			// Special case: if content is empty (e.g. {{ }}), resolveDirective will be skipped or handle it
+			if content == "" {
+				return match
+			}
+
 			res, err := r.resolveDirective(content)
 			if err != nil {
 				r.setError(err)
@@ -167,15 +175,15 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 
 	// 2. Directives
 	if after, ok := strings.CutPrefix(content, "file:"); ok {
-		return r.resolveFile(after)
+		return r.resolveFile(strings.TrimSpace(after))
 	}
 
 	if after, ok := strings.CutPrefix(content, "find_dir:"); ok {
-		return r.resolveFindDir(after)
+		return r.resolveFindDir(strings.TrimSpace(after))
 	}
 
 	if after, ok := strings.CutPrefix(content, "env:"); ok {
-		return r.resolveEnv(after)
+		return r.resolveEnv(strings.TrimSpace(after))
 	}
 
 	return "{{" + content + "}}", nil // Keep as is if unknown
@@ -247,6 +255,9 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 // It supports default value syntax: {{env:KEY:-default}}.
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	key, defaultValue, hasDefault := strings.Cut(input, ":-")
+	if !envKeyRegex.MatchString(key) {
+		return "", fmt.Errorf("invalid environment variable key: %q", key)
+	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
 		return defaultValue, nil

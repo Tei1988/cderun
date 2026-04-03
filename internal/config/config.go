@@ -286,6 +286,17 @@ func (t ToolsConfig) DeepCopy() ToolsConfig {
 	return res
 }
 
+// ValidateToolName checks if a tool name is valid (no path separators or ..).
+func ValidateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("invalid tool name %q: absolute paths, parent directory references, and path separators are not allowed", name)
+	}
+	return nil
+}
+
 func copyBoolPtr(b *bool) *bool {
 	if b == nil {
 		return nil
@@ -569,6 +580,9 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		}
 
 		for k, v := range layer {
+			if err := ValidateToolName(k); err != nil {
+				return nil, nil, fmt.Errorf("invalid tool name in %s: %w", path, err)
+			}
 			v.SetBaseDir(baseDir)
 
 			if existing, ok := merged[k]; ok {
@@ -644,6 +658,9 @@ func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []stri
 
 	baseDir := filepath.Dir(absPath)
 	for k, v := range cfg {
+		if err := ValidateToolName(k); err != nil {
+			return nil, nil, fmt.Errorf("invalid tool name in %s: %w", absPath, err)
+		}
 		v.SetBaseDir(baseDir)
 		cfg[k] = v
 	}

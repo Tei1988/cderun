@@ -341,6 +341,15 @@ func validatePathChars(p string) error {
 		if c < 32 || c == 127 {
 			return fmt.Errorf("path contains control character: 0x%02x", c)
 		}
+		// Reject dangerous shell metacharacters in paths to prevent injection
+		// We allow some common path characters like '.', '-', '_', '/', ':', '@'
+		// Note: '{' and '}' are allowed because they are used in cderun expressions.
+		// Note: '\' is needed for Windows paths but can be dangerous on Unix.
+		// Since we use filepath.Clean later, we allow some, but reject others.
+		switch c {
+		case ';', '&', '|', '<', '>', '$', '(', ')', '`', '*', '?', '[', ']', '!', '#', '"', '\'':
+			return fmt.Errorf("path contains forbidden character: %q", c)
+		}
 	}
 	return nil
 }
