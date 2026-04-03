@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
+	"syscall"
 )
 
 type rootOptions struct {
@@ -144,19 +145,11 @@ const (
 	hangTimeout       = 10 * time.Second
 )
 
-var (
-	opts = defaultOptions()
-
-	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
-	rootCmd *cobra.Command
-)
-
 func defaultOptions() rootOptions {
 	return rootOptions{
 		fs: config.RealFileSystem{},
 		exitFunc: func(code int) {
-			// Default to no-op for safety in tests.
-			// The global 'opts' is updated in init() to use os.Exit.
+			os.Exit(code)
 		},
 		isTerminal: func(fd int) bool {
 			return term.IsTerminal(fd)
@@ -170,17 +163,15 @@ func defaultOptions() rootOptions {
 		restore: func(fd int, state *term.State) error {
 			return term.Restore(fd, state)
 		},
-		setupSignals: func(sigChan chan os.Signal) {
-			setupSignals(sigChan)
+		setupSignals: func(c chan os.Signal) {
+			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		},
-		setupResizeSignal: func(resizeChan chan os.Signal) {
-			setupResizeSignal(resizeChan)
+		setupResizeSignal: func(c chan os.Signal) {
+			setupResizeSignal(c)
 		},
-		stopSignalHandling: func(sigChan chan os.Signal) {
-			signal.Stop(sigChan)
+		stopSignalHandling: func(c chan os.Signal) {
+			signal.Stop(c)
 		},
-		attachGracePeriod: attachGracePeriod,
-		logger:            logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
@@ -193,6 +184,8 @@ func defaultOptions() rootOptions {
 		},
 		jsonMarshalIndent: json.MarshalIndent,
 		yamlMarshal:       yaml.Marshal,
+		attachGracePeriod: attachGracePeriod,
+		logger:            logging.GetGlobalLogger(),
 	}
 }
 
@@ -1143,24 +1136,20 @@ func Execute(rawArgs []string) error {
 func ExecuteContext(ctx context.Context, rawArgs []string) error {
 	return ExecuteContextWithOptions(ctx, rawArgs, nil)
 }
-
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	var cmd *cobra.Command
+	// Create fresh state for every execution to ensure isolation
+	localOpts := defaultOptions()
+	localOpts.logger = logging.NewLogger() // Fresh logger for isolation
+	cmd := newRootCmd(&localOpts)
 
-	if setup == nil {
-		// Use global state for standard execution
-		cmd = rootCmd
-	} else {
-		// Create fresh state for testing
-		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
-		cmd = newRootCmd(&localOpts)
+	if setup != nil {
 		setup(&localOpts, cmd)
-		// Redirect logger to the command's error writer early to capture initial logs.
-		localOpts.logger.SetOutput(cmd.ErrOrStderr())
 	}
+
+	// Redirect logger to the command's error writer early to capture initial logs.
+	localOpts.logger.SetOutput(cmd.ErrOrStderr())
 
 	args, err := preprocessArgs(cmd, rawArgs)
 	if err != nil {
@@ -1173,6 +1162,14 @@ func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func
 	}
 	return cmd.ExecuteContext(ctx)
 }
+
+
+// ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
+// using the provided context and allowing for option customization.
+
+
+// ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
+// using the provided context and allowing for option customization.
 
 func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	if len(args) == 0 {
@@ -1284,7 +1281,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	return processedArgs, nil
 }
 
-func init() {
-	opts.exitFunc = os.Exit
-	rootCmd = newRootCmd(&opts)
-}

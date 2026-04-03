@@ -71,6 +71,7 @@ func executeCommandRawContext(ctx context.Context, args []string) (string, error
 		// Default to terminal mode for tests to avoid auto-detection of pipes
 		// unless specifically overridden in a test.
 		o.isTerminal = func(fd int) bool { return true }
+		o.exitFunc = func(code int) {}
 		cmd.SetOut(&buf)
 		cmd.SetErr(&buf)
 	})
@@ -276,6 +277,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		})
 		require.NoError(t, err)
 		assert.False(t, mockRuntime.CreatedConfig.TTY)
@@ -288,6 +290,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		})
 		require.NoError(t, err)
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
@@ -389,6 +392,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to attach to container: attach failed")
@@ -404,6 +408,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		})
 		require.NoError(t, err)
 
@@ -428,6 +433,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
@@ -459,6 +465,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		})
 		require.NoError(t, err)
 
@@ -1160,6 +1167,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid pull policy \"invalid\"")
@@ -1175,6 +1183,7 @@ func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
@@ -1196,6 +1205,7 @@ func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.NoError(t, err)
 }
@@ -1207,6 +1217,7 @@ func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.NoError(t, err)
 }
@@ -1230,6 +1241,7 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
@@ -1251,6 +1263,7 @@ func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
@@ -1271,6 +1284,7 @@ func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to load cderun config")
@@ -1287,6 +1301,7 @@ func TestUnit_Root_RunE_LoadToolsConfigFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to load tools config")
@@ -1306,6 +1321,7 @@ func TestUnit_Root_Diagnosis_MalformedConfig(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "failed to load cderun config")
@@ -1555,6 +1571,7 @@ func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.fs = mfs
 		o.isTerminal = func(fd int) bool { return true }
+			o.exitFunc = func(code int) {}
 		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return &runtime.MockRuntime{}, nil }
 		cmd.SetOut(&buf)
 	})
