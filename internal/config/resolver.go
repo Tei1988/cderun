@@ -11,6 +11,7 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
+	"regexp"
 
 	"github.com/docker/go-units"
 )
@@ -964,12 +965,17 @@ func mergeEnv(base, p2, p1 []string) []string {
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var res []string
+	isDebug := logging.GetGlobalLogger().GetLevel() >= logging.DebugLevel
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
 			return nil, err
 		}
 		if strings.Contains(resolvedE, "=") {
+			if isDebug {
+				masked := MaskSensitiveEnv([]string{resolvedE})
+				logging.Debug("Environment variable: %s", masked[0])
+			}
 			res = append(res, resolvedE)
 		} else {
 			val, found := fs.LookupEnv(resolvedE)
@@ -980,6 +986,48 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 	}
 	return res, nil
+}
+
+var (
+	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG|CERT|CREDENTIALS|PRIVATE|PASSPHRASE|APIKEY|ACCESSKEY|SECRETKEY)$`)
+	wordBoundaryRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	camelCaseRegex    = regexp.MustCompile(`([a-z])([A-Z])`)
+)
+
+// MaskSensitiveEnv redacts sensitive values from environment variables.
+// It matches keys containing common sensitive keywords.
+func MaskSensitiveEnv(env []string) []string {
+	res := make([]string, len(env))
+	for i, e := range env {
+		key, val, ok := strings.Cut(e, "=")
+		if !ok {
+			res[i] = e
+			continue
+		}
+
+		isSensitive := false
+		// Normalize camelCase (apiToken -> api Token) before splitting
+		normalizedKey := camelCaseRegex.ReplaceAllString(key, "$1 $2")
+
+		// Match keywords within word boundaries (e.g. MY_PASSWORD matches, MONKEY does not)
+		parts := wordBoundaryRegex.Split(normalizedKey, -1)
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			if sensitiveRegex.MatchString(part) {
+				isSensitive = true
+				break
+			}
+		}
+
+		if isSensitive {
+			res[i] = key + "=[REDACTED]"
+		} else {
+			res[i] = key + "=" + val
+		}
+	}
+	return res
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
