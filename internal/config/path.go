@@ -360,10 +360,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return p, nil
 	}
 
-	if err := validatePathChars(p); err != nil {
-		return "", err
-	}
-
 	prefix := schemeRegex.FindString(p)
 	p = strings.TrimPrefix(p, prefix)
 
@@ -436,9 +432,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
-	if err := validatePathChars(v); err != nil {
-		return "", err
-	}
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
 		return ResolvePath(v, baseDir, r)
@@ -455,9 +448,6 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string,
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
-	if err := validatePathChars(d); err != nil {
-		return "", err
-	}
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
 		return ResolvePath(d, baseDir, r)

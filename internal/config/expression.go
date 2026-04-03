@@ -123,11 +123,6 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			}
 			content := strings.TrimSpace(match[2 : len(match)-2])
 
-			// Special case: if content is empty (e.g. {{ }}), resolveDirective will be skipped or handle it
-			if content == "" {
-				return match
-			}
-
 			res, err := r.resolveDirective(content)
 			if err != nil {
 				r.setError(err)
