@@ -95,7 +95,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		case "tmpfs":
 			mType = mount.TypeTmpfs
 		default:
-			mType = mount.TypeBind
+			return nil, nil, nil, fmt.Errorf("invalid mount type %q", m.Type)
 		}
 
 		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
