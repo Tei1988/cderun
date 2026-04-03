@@ -161,11 +161,12 @@ cderun --mount-all-tools alpine sh
 - **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
 - **注意**:
   - アドホック実行（設定にないツール名の指定）時には必須となります。
-  - `{{env:KEY}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
+  - `{{file:...}}`, `{{find_dir:...}}`, `{{env:KEY}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --image node:18-alpine node --version
 cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
+cderun --image "golang:{{file:.go-version}}" go version
 ```
 
 ### `--env`, `-e`
@@ -401,14 +402,14 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: int
 - **デフォルト**: `3`
 - **環境変数**: `CDERUN_PULL_MAX_RETRIES`
-- **説明**: イメージプル時の最大リトライ回数
+- **説明**: イメージプル時の最大リトライ回数。1以上の整数を指定する必要があります。
 
 ### `--pull-backoff-base`
 
 - **型**: string (Duration)
 - **デフォルト**: `1s`
 - **環境変数**: `CDERUN_PULL_BACKOFF_BASE`
-- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）
+- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）。正の期間を指定する必要があります。
 
 ### `--memory`, `-m`
 

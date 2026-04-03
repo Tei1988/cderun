@@ -98,6 +98,10 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 ## Terminal / TTY
 - macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソルがターミナルの右端に到達するとターミナル自体が強制終了される。TTY ハンドリングまたはリサイズシグナル周りの問題の可能性あり。
 
+## Documentation Discrepancies (Found during doc update)
+- **Security Check Renaming**: `internal/config/path.go` uses `validatePathChars`. Consider renaming it to `ValidateSafeString` as mentioned in some memories for better clarity across the codebase.
+- **Sensitive Keyword List**: `MaskSensitiveEnv` in `internal/config/resolver.go` has a shorter keyword list (`PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `AUTH`, `SIG`) compared to what was documented in architecture memories. Synchronize these or verify if the shorter list is intentional.
+- **Validation Consistency**: Ensure all critical fields in `ResolvedConfig` (like `Image`, `User`, `Network`) are consistently passed through `validatePathChars` before use in the runtime.
 
 ## Testing & Maintenance
 

@@ -19,7 +19,7 @@
   - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
   - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
   - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`
-- **挙動**: これらが指定された場合、他の全て（P2〜P6）を無視してこの値を採用する。
+- **挙動**: これらが指定された場合、他の全て（P2〜P6）を無視してこの値を採用する。**リスト型オプション（`env`, `mount`, `device`, `ports` 等）**においても、P1 の指定（空の指定を含む）がある場合は、それより低い優先順位（P2〜P6）の内容は一切考慮されません。
 - **配置規則**:
   - **Wrapper Mode**: 必ず**サブコマンドの後ろ**に配置する必要があります。前処理（Hoisting）によって内部的にサブコマンドの前方に移動され、`cderun` のフラグとしてパースされます。サブコマンドより前に配置した場合はエラーとなります。
   - **Diagnosis Mode**: サブコマンドを必要としないため、任意の場所に配置可能です。
@@ -38,7 +38,7 @@
 ### P3: Environment Variables (グローバルオーバーライド)
 
 - **定義**: 実行環境全体に適用される設定。
-- **主要なキー**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_REMOVE`, `CDERUN_WORKDIR`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_STRICT_ENV`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_ENV`, `CDERUN_MOUNT`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_ALL_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_HOSTNAME`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_USER`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_PULL`, `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_DEVICE`, `CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`, `CDERUN_DIAGNOSIS`, `CDERUN_DIAGNOSIS_FORMAT`, `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`, `CDERUN_HANG_TIMEOUT`
+- **主要なキー**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_REMOVE`, `CDERUN_WORKDIR`, `CDERUN_NETWORK`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_STRICT_ENV`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_ENV`, `CDERUN_MOUNT`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_ALL_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_HOSTNAME`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_USER`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_PULL`, `CDERUN_PULL_MAX_RETRIES`, `CDERUN_PULL_BACKOFF_BASE`, `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_DEVICE`, `CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`, `CDERUN_DIAGNOSIS`, `CDERUN_DIAGNOSIS_FORMAT`, `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`, `CDERUN_HANG_TIMEOUT`
 - **注記 (`CDERUN_CONFIG` / `CDERUN_TOOL_CONFIG`)**: これらは P4/P5 の設定ファイルの**読み込み先パスを決める**ために、設定ファイルの探索前に評価されます。
 - **セパレータ**:
   - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
@@ -102,6 +102,9 @@
 
 - **例**: `.tools.yaml` (P4) で `mounts: []` と明示的に空のリストを指定しても、`.cderun.yaml` (P5) に `mounts` の定義があれば、P5 の値が採用されます。
 - **意図**: これにより、上位レベルでの意図しない「設定の全消去」を防ぎ、デフォルト設定を安全に維持します。
+
+**例外: P1 (Internal Overrides) における空の指定**:
+P1 フラグ (`--cderun-env`, `--cderun-mount` 等) が指定された場合、たとえ引数が空であっても、それは「明示的な空の指定」として扱われ、下位レベル（P2〜P6）の設定はすべて無効化されます。これにより、環境変数や設定ファイルで定義されたマウントや環境変数を、コマンドラインから一時的にすべて解除することが可能です。
 
 ## 特殊な連動ロジック (Transitive Auto-enablement)
 

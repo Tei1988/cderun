@@ -70,11 +70,22 @@ The final command executed in the container consists of the passthrough-args.
 ```text
 cderun --tty docker --tty
   |      |     |      |
-  |      |     |      +-- Passthrough argument (passed to docker)
-  |      |     +--------- Subcommand
-  |      +--------------- cderun flag (TTY: true)
+  |      |     |      +-- Passthrough argument (passed to containerized 'docker')
+  |      |     +--------- Subcommand (Lookup key)
+  |      +--------------- cderun flag (P2: Standard Flag)
   +---------------------- cderun command
 ```
+
+### Argument Priority (P1 to P6)
+
+`cderun` resolves its configuration using a strict hierarchy to ensure predictable behavior:
+
+1. **P1: Internal Overrides** (`--cderun-image`, etc.) - Highest priority.
+2. **P2: CLI Flags** (`--image`, etc.) - Standard user flags.
+3. **P3: Environment Variables** (`CDERUN_IMAGE`, etc.) - Global overrides.
+4. **P4: Tool-specific Config** (`.tools.yaml`) - Per-tool settings.
+5. **P5: Global Defaults** (`.cderun.yaml`) - Project-wide defaults.
+6. **P6: Hardcoded Defaults** - Final fallbacks.
 
 ### P1 Internal Overrides
 
@@ -260,8 +271,10 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
-  in configuration files and CLI flags.
+- **Expressions**: Use dynamic placeholders in configuration files and CLI flags:
+  - **Magic Words**: `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`.
+  - **Directives**: `{{file:.nvmrc}}`, `{{find_dir:.git}}`, `{{env:GITHUB_TOKEN:-default}}`.
+- **Recursive Resolution**: Expressions are resolved recursively within slices and maps in configuration files.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the
   origin of the setting (config file location vs. current directory).
