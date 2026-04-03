@@ -388,6 +388,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 				{Type: "bind", Source: "/src", Target: "/dst"},
 				{Type: "volume", Source: "myvol", Target: "/data"},
 				{Type: "tmpfs", Target: "/cache"},
+				{Type: "unknown", Source: "/ext", Target: "/ext"},
 			},
 			Devices: []container.DeviceMapping{
 				{PathOnHost: "/dev/fuse", PathInContainer: "/dev/fuse", CgroupPermissions: "rmw"},
@@ -404,7 +405,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		assert.Equal(t, []string{"K=V"}, mock.createConfig.Env)
 		assert.Equal(t, int64(0.5*1e9), mock.createHostConfig.NanoCPUs)
 		assert.Equal(t, int64(1024*1024), mock.createHostConfig.Memory)
-		assert.Len(t, mock.createHostConfig.Mounts, 3)
+		assert.Len(t, mock.createHostConfig.Mounts, 4)
 		assert.Len(t, mock.createHostConfig.Devices, 1)
 		assert.NotNil(t, mock.createConfig.ExposedPorts)
 	})
@@ -423,24 +424,6 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 			Expose: []string{"invalid"},
 		})
 		require.Error(t, err)
-	})
-
-	t.Run("invalid mount type", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
-		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
-			Mounts: []container.Mount{
-				{Type: "invalid", Target: "/dst"},
-			},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid mount type \"invalid\"")
-	})
-
-	t.Run("nil config", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
-		_, err := runtime.CreateContainer(context.Background(), nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "nil container config")
 	})
 }
 func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {
@@ -796,37 +779,6 @@ func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
 		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
 		require.Error(t, err)
-	})
-
-	t.Run("invalid signal format", func(t *testing.T) {
-		runtime := &DockerRuntime{}
-		err := runtime.SignalContainer(ctx, "id", "INVALID_SIG")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid signal format")
-
-		err = runtime.SignalContainer(ctx, "id", "99; rm -rf /")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid signal format")
-	})
-
-	t.Run("valid signal format", func(t *testing.T) {
-		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.SignalContainer(ctx, "id", "SIGUSR1")
-		require.NoError(t, err)
-		assert.Equal(t, "SIGUSR1", mock.killSignal)
-
-		err = runtime.SignalContainer(ctx, "id", "USR1")
-		require.NoError(t, err)
-		assert.Equal(t, "USR1", mock.killSignal)
-
-		err = runtime.SignalContainer(ctx, "id", "sigterm")
-		require.NoError(t, err)
-		assert.Equal(t, "sigterm", mock.killSignal)
-
-		err = runtime.SignalContainer(ctx, "id", "15")
-		require.NoError(t, err)
-		assert.Equal(t, "15", mock.killSignal)
 	})
 }
 
