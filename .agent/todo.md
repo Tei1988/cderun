@@ -27,31 +27,6 @@ Usage: `return nil, &ImageNotFoundError{Tool: subcommand}`
 Tests: `assert.ErrorAs(t, err, &ImageNotFoundError{})`
 Migrate from `fmt.Errorf` gradually — image-not-found, invalid-config, runtime-init first.
 
-### P-7: Isolate Docker SDK Dependency via Adapter Layer
-
-`docker.go` directly uses Docker SDK types (`dockercontainer.Config`, `network.NetworkingConfig`).
-Extract conversion logic into a dedicated adapter:
-
-```
-internal/runtime/
-  interface.go          # ContainerRuntime (unchanged)
-  docker.go             # DockerRuntime — delegates to adapter for type conversion
-  docker_adapter.go     # Docker SDK type conversion (new)
-  podman.go             # Wraps DockerRuntime (unchanged)
-```
-
-```go
-// docker_adapter.go
-func toDockerContainerConfig(cc *container.ContainerConfig) (
-    *dockercontainer.Config, *dockercontainer.HostConfig, *network.NetworkingConfig,
-) {
-    // Consolidate all container.ContainerConfig → Docker SDK type mapping here
-}
-```
-
-Move conversion logic from `CreateContainer` in `docker.go` to `docker_adapter.go`.
-Future Podman native API support only requires adding `podman_adapter.go`.
-
 ### P-9: Add containerd Runtime Support (Priority: Medium)
 
 Runtime implementation と CI pipeline を同時に進める。
