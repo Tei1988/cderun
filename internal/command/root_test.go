@@ -296,7 +296,10 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
+		var runtimeErr *runtime.RuntimeInitError
+		assert.ErrorAs(t, err, &runtimeErr)
+		assert.Equal(t, "invalid", runtimeErr.Runtime)
+		require.ErrorContains(t, err, "unsupported runtime")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -449,6 +452,9 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool", func(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
+		var imgErr *config.ImageNotFoundError
+		assert.ErrorAs(t, err, &imgErr)
+		assert.Equal(t, "unknown-tool", imgErr.Tool)
 		require.ErrorContains(t, err, "no image mapping found for tool: unknown-tool")
 	})
 
@@ -1162,7 +1168,11 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return true }
 	})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "invalid pull policy \"invalid\"")
+	var invalidErr *config.InvalidConfigError
+	assert.ErrorAs(t, err, &invalidErr)
+	assert.Equal(t, "pull", invalidErr.Field)
+	assert.Equal(t, "invalid", invalidErr.Value)
+	require.ErrorContains(t, err, "invalid pull value \"invalid\"")
 }
 
 func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
@@ -1331,7 +1341,10 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 		rt, err := o.runtimeFactory("invalid", "")
 		require.Error(t, err)
 		assert.Nil(t, rt)
-		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
+		var runtimeErr *runtime.RuntimeInitError
+		assert.ErrorAs(t, err, &runtimeErr)
+		assert.Equal(t, "invalid", runtimeErr.Runtime)
+		require.ErrorContains(t, err, "unsupported runtime")
 	})
 }
 

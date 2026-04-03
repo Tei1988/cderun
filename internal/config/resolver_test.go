@@ -147,6 +147,9 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
 		_, err := Resolve("node", cli, nil, nil)
 		require.Error(t, err)
+		var invalidErr *InvalidConfigError
+		assert.ErrorAs(t, err, &invalidErr)
+		assert.Equal(t, "hang-timeout", invalidErr.Field)
 		assert.Contains(t, err.Error(), "duration cannot be negative")
 	})
 
@@ -480,6 +483,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": ":"}}
 		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.Error(t, err)
+		var invalidErr *InvalidConfigError
+		assert.ErrorAs(t, err, &invalidErr)
+		assert.Equal(t, "CDERUN_DEVICE", invalidErr.Field)
 	})
 
 	t.Run("resolveMounts from environment", func(t *testing.T) {
@@ -494,6 +500,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "invalid"}}
 		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.Error(t, err)
+		var invalidErr *InvalidConfigError
+		assert.ErrorAs(t, err, &invalidErr)
+		assert.Equal(t, "CDERUN_MOUNT", invalidErr.Field)
 	})
 
 	t.Run("resolveConfigPath from CDERUN_SOCKET_PATH", func(t *testing.T) {
@@ -587,24 +596,32 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// no image
 		_, err := ResolveWithFS("sh", CLIOptions{}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found")
+		var imgErr *ImageNotFoundError
+		assert.ErrorAs(t, err, &imgErr)
+		assert.Equal(t, "sh", imgErr.Tool)
 
 		// resolveDevices invalid format in CLI
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
 		_, err = ResolveWithFS("sh", cliDev, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config")
+		var devErr *InvalidConfigError
+		assert.ErrorAs(t, err, &devErr)
+		assert.Equal(t, "device", devErr.Field)
 
 		// resolveMounts invalid format in CLI
 		cliMnt := CLIOptions{Image: "alpine", ImageSet: true, Mounts: []string{"invalid"}}
 		_, err = ResolveWithFS("sh", cliMnt, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid mount config")
+		var mntErr *InvalidConfigError
+		assert.ErrorAs(t, err, &mntErr)
+		assert.Equal(t, "mount", mntErr.Field)
 
 		// invalid memory
 		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value")
+		var memErr *InvalidConfigError
+		assert.ErrorAs(t, err, &memErr)
+		assert.Equal(t, "memory", memErr.Field)
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
@@ -692,6 +709,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullMaxRetriesSet = true
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
 		require.Error(t, err)
+		var pullRetryErr *InvalidConfigError
+		assert.ErrorAs(t, err, &pullRetryErr)
+		assert.Equal(t, "PullMaxRetries", pullRetryErr.Field)
 		assert.Contains(t, err.Error(), "must be greater than 0")
 
 		// PullBackoffBase invalid
@@ -700,7 +720,10 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		var pullBackoffErr *InvalidConfigError
+		assert.ErrorAs(t, err, &pullBackoffErr)
+		assert.Equal(t, "PullBackoffBase", pullBackoffErr.Field)
+		assert.Contains(t, err.Error(), "invalid PullBackoffBase value \"invalid\"")
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"

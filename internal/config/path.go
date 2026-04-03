@@ -95,12 +95,12 @@ func (mc *MountConfig) UnmarshalYAML(node *yaml.Node) error {
 		mc.Optional = a.Optional
 
 		if mc.Target.IsEmpty() {
-			return fmt.Errorf("mount target is required at line %d (tag %s)", node.Line, node.Tag)
+			return &InvalidConfigError{Field: "mount", Value: "empty target", Err: fmt.Errorf("mount target is required at line %d (tag %s)", node.Line, node.Tag)}
 		}
 		return nil
 	}
 
-	return fmt.Errorf("invalid mount config at line %d (tag %s): %v", node.Line, node.Tag, node.Value)
+	return &InvalidConfigError{Field: "mount", Value: node.Value, Err: fmt.Errorf("invalid mount config at line %d (tag %s)", node.Line, node.Tag)}
 }
 
 func (mc MountConfig) IsEmpty() bool {
@@ -186,7 +186,7 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	}
 	parsed, ok := ParseDeviceConfig(s)
 	if !ok {
-		return fmt.Errorf("invalid device config: %s", s)
+		return &InvalidConfigError{Field: "device", Value: s}
 	}
 	*dc = parsed
 	return nil
@@ -250,7 +250,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 				res.Optional = true
 				continue
 			}
-			return MountConfig{}, fmt.Errorf("invalid mount format: %s", s)
+			return MountConfig{}, &InvalidConfigError{Field: "mount", Value: s, Err: fmt.Errorf("invalid mount format")}
 		}
 
 		key := kv[0]
@@ -266,13 +266,13 @@ func ParseMountFlag(s string) (MountConfig, error) {
 		case "readonly":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid readonly value: %s", val)
+				return MountConfig{}, &InvalidConfigError{Field: "readonly", Value: val, Err: err}
 			}
 			res.ReadOnly = b
 		case "optional":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid optional value: %s", val)
+				return MountConfig{}, &InvalidConfigError{Field: "optional", Value: val, Err: err}
 			}
 			res.Optional = b
 		default:
@@ -280,7 +280,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 	}
 
 	if res.Target.IsEmpty() {
-		return MountConfig{}, fmt.Errorf("mount target is required: %s", s)
+		return MountConfig{}, &InvalidConfigError{Field: "mount", Value: s, Err: fmt.Errorf("mount target is required")}
 	}
 
 	return res, nil

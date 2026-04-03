@@ -654,7 +654,7 @@ source: ./data
 		// Invalid
 		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config")
+		assert.Contains(t, err.Error(), "invalid device value \":/container:rwm\"")
 	})
 }
 

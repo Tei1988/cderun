@@ -2,30 +2,6 @@
 
 ## Code Improvement
 
-### P-6: Typed Error Handling
-
-All errors are currently `fmt.Errorf` strings, making programmatic error inspection difficult.
-Introduce typed errors incrementally, starting with the most common patterns:
-
-```go
-// internal/errors.go (new file)
-type ImageNotFoundError struct{ Tool string }
-func (e *ImageNotFoundError) Error() string { return "no image mapping found for tool: " + e.Tool }
-
-type RuntimeInitError struct{ Runtime string; Err error }
-func (e *RuntimeInitError) Error() string { return "failed to initialize runtime: " + e.Err.Error() }
-func (e *RuntimeInitError) Unwrap() error { return e.Err }
-
-type InvalidConfigError struct{ Field, Value string; Err error }
-func (e *InvalidConfigError) Error() string {
-    return fmt.Sprintf("invalid %s value %q: %v", e.Field, e.Value, e.Err)
-}
-func (e *InvalidConfigError) Unwrap() error { return e.Err }
-```
-
-Usage: `return nil, &ImageNotFoundError{Tool: subcommand}`
-Tests: `assert.ErrorAs(t, err, &ImageNotFoundError{})`
-Migrate from `fmt.Errorf` gradually — image-not-found, invalid-config, runtime-init first.
 
 ### P-9: Add containerd Runtime Support (Priority: Medium)
 

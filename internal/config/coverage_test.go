@@ -714,7 +714,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "invalid", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+	assert.Contains(t, err.Error(), "invalid PullBackoffBase value \"invalid\"")
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_TransitiveLogic(t *testing.T) {
@@ -866,18 +866,18 @@ func TestUnit_Coverage_Resolver_resolveDevices_Errors(t *testing.T) {
 	// Malformed in p1 (empty container path)
 	_, err := resolveDevices([]string{"a:"}, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config (override)")
+	assert.Contains(t, err.Error(), "invalid device value \"a:\"")
 
 	// Malformed in p2 (empty host path)
 	_, err = resolveDevices(nil, []string{":b"}, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config")
+	assert.Contains(t, err.Error(), "invalid device value \":b\"")
 
 	// Malformed in Env (empty parts)
 	mfs.Env = map[string]string{"CDERUN_DEVICE": "a:"}
 	_, err = resolveDevices(nil, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
+	assert.Contains(t, err.Error(), "invalid CDERUN_DEVICE value \"a:\"")
 }
 
 func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
@@ -887,18 +887,18 @@ func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
 	// Malformed in p1
 	_, err := resolveMounts([]string{"invalid"}, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config (override)")
+	assert.Contains(t, err.Error(), "invalid mount value \"invalid\"")
 
 	// Malformed in p2
 	_, err = resolveMounts(nil, []string{"invalid"}, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config")
+	assert.Contains(t, err.Error(), "invalid mount value \"invalid\"")
 
 	// Malformed in Env
 	mfs.Env = map[string]string{"CDERUN_MOUNT": "invalid"}
 	_, err = resolveMounts(nil, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config in CDERUN_MOUNT")
+	assert.Contains(t, err.Error(), "invalid CDERUN_MOUNT value \"invalid\"")
 
 	// Optional mount Stat error (other than NotExist)
 	mfs.Env = map[string]string{"CDERUN_MOUNT": "source=/s,target=/t,optional"}

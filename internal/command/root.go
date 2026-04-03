@@ -184,11 +184,19 @@ func defaultOptions() rootOptions {
 		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
-				return runtime.NewDockerRuntime(socket)
+				rt, err := runtime.NewDockerRuntime(socket)
+				if err != nil {
+					return nil, &runtime.RuntimeInitError{Runtime: "docker", Err: err}
+				}
+				return rt, nil
 			case "podman":
-				return runtime.NewPodmanRuntime(socket)
+				rt, err := runtime.NewPodmanRuntime(socket)
+				if err != nil {
+					return nil, &runtime.RuntimeInitError{Runtime: "podman", Err: err}
+				}
+				return rt, nil
 			default:
-				return nil, fmt.Errorf("unsupported runtime %q", name)
+				return nil, &runtime.RuntimeInitError{Runtime: name, Err: fmt.Errorf("unsupported runtime")}
 			}
 		},
 		jsonMarshalIndent: json.MarshalIndent,
@@ -744,7 +752,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Initialize Runtime
 	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to initialize runtime: %w", err)
+		return nil, "", nil, err
 	}
 
 	o.logger.Trace("Creating container...")
@@ -1054,7 +1062,7 @@ intended for the subcommand.`,
 			case "always", "missing", "never":
 				// Valid
 			default:
-				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
+				return &config.InvalidConfigError{Field: "pull", Value: resolved.Pull, Err: fmt.Errorf("allowed values are \"always\", \"missing\", or \"never\"")}
 			}
 
 			if resolved.Diagnosis {

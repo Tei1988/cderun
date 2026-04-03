@@ -372,7 +372,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("CLI reflection fields for option %q missing in CLIOptions", opt.Name)}
 		}
 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -390,7 +390,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
+		return nil, &ImageNotFoundError{Tool: subcommand}
 	}
 	if res.Image != "" {
 		logging.Debug("Resolved Image: %s", res.Image)
@@ -409,7 +409,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for bool option %q not found", opt.Name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("info for bool option %q not found", opt.Name)}
 		}
 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -497,7 +497,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		opt, ok := GetBoolOption("mount-all-tools")
 		info, ok2 := fieldInfo["mount-all-tools"]
 		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-all-tools' not found")
+			return nil, &RegistryMismatchError{Message: "'mount-all-tools' not found"}
 		}
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
 		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
@@ -512,7 +512,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		opt, ok := GetBoolOption("mount-cderun")
 		info, ok2 := fieldInfo["mount-cderun"]
 		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-cderun' not found")
+			return nil, &RegistryMismatchError{Message: "'mount-cderun' not found"}
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
@@ -545,7 +545,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		opt, ok := GetBoolOption("mount-socket")
 		info, ok2 := fieldInfo["mount-socket"]
 		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-socket' not found")
+			return nil, &RegistryMismatchError{Message: "'mount-socket' not found"}
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
@@ -588,11 +588,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
 			if d < 0 {
-				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
+				return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
 			}
 			res.HangTimeout = d
 		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+			return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: err}
 		}
 	}
 
@@ -603,7 +603,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for string slice option %q not found", opt.Name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("info for string slice option %q not found", opt.Name)}
 		}
 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -635,7 +635,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	for _, opt := range IntOptions {
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for int option %q not found", opt.Name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("info for int option %q not found", opt.Name)}
 		}
 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -673,7 +673,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	if res.PullMaxRetries <= 0 {
-		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
+		return nil, &InvalidConfigError{Field: "PullMaxRetries", Value: fmt.Sprintf("%d", res.PullMaxRetries), Err: errors.New("must be greater than 0")}
 	}
 
 	// Resolve pull-backoff-base via registry
@@ -691,11 +691,11 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	if pullBackoffBaseStr != "" {
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
 			if d <= 0 {
-				return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
+				return nil, &InvalidConfigError{Field: "PullBackoffBase", Value: pullBackoffBaseStr, Err: errors.New("must be positive")}
 			}
 			res.PullBackoffBase = d
 		} else {
-			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
+			return nil, &InvalidConfigError{Field: "PullBackoffBase", Value: pullBackoffBaseStr, Err: err}
 		}
 	}
 
@@ -721,7 +721,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			if exprErr := r.Error(); exprErr != nil {
 				return nil, exprErr
 			}
-			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
+			return nil, &InvalidConfigError{Field: "memory", Value: memStr, Err: err}
 		}
 		res.Memory = bytes
 	}
@@ -729,7 +729,7 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	for _, opt := range Float64Options {
 		info, ok := fieldInfo[opt.Name]
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for float64 option %q not found", opt.Name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("info for float64 option %q not found", opt.Name)}
 		}
 
 		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -822,7 +822,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %s", d)
+				return nil, &InvalidConfigError{Field: "device", Value: d}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -832,7 +832,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config: %s", d)
+				return nil, &InvalidConfigError{Field: "device", Value: d}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -846,7 +846,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
+				return nil, &InvalidConfigError{Field: "CDERUN_DEVICE", Value: d}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -1002,7 +1002,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		for _, m := range p1 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
-				return nil, fmt.Errorf("invalid mount config (override): %w", err)
+				return nil, &InvalidConfigError{Field: "mount", Value: m, Err: err}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
@@ -1012,7 +1012,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
-				return nil, fmt.Errorf("invalid mount config: %w", err)
+				return nil, &InvalidConfigError{Field: "mount", Value: m, Err: err}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
@@ -1026,7 +1026,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			}
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
-				return nil, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
+				return nil, &InvalidConfigError{Field: "CDERUN_MOUNT", Value: m, Err: err}
 			}
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
