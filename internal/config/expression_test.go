@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -245,6 +247,40 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 		r2.resolveString("{{ file:large.txt }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "is too large")
+	})
+
+	t.Run("file too large after read (TOCTOU hardening)", func(t *testing.T) {
+		largeContent := make([]byte, MaxDirectiveFileSize+1)
+		// Mock FS that returns small size in Stat but large content in ReadFile
+		fsTOCTOU := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/toctou.txt": largeContent,
+			},
+			Dirs: map[string]bool{
+				"/project": true,
+			},
+			WD: "/project",
+		}
+		fsTOCTOU.StatFunc = func(name string) (os.FileInfo, error) {
+			if name == "/project/toctou.txt" {
+				return &mockFileInfo{name: "toctou.txt", size: 10, isDir: false}, nil
+			}
+			// Important: don't call fsTOCTOU.Stat recursively!
+			baseName := filepath.Base(name)
+			if data, ok := fsTOCTOU.Files[name]; ok {
+				return &mockFileInfo{name: baseName, size: int64(len(data)), isDir: false}, nil
+			}
+			if fsTOCTOU.Dirs[name] {
+				return &mockFileInfo{name: baseName, isDir: true}, nil
+			}
+			return nil, os.ErrNotExist
+		}
+
+		r2, err := NewExpressionResolverWithFS(hostCtx, fsTOCTOU)
+		require.NoError(t, err)
+		r2.resolveString("{{ file:toctou.txt }}")
+		require.Error(t, r2.Error())
+		assert.Contains(t, r2.Error().Error(), "exceeds max size after read")
 	})
 }
 

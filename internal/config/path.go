@@ -159,6 +159,10 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		return container.Mount{}, err
 	}
 
+	if !filepath.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %s", target)
+	}
+
 	return container.Mount{
 		Type:     mc.Type,
 		Source:   source,
@@ -332,14 +336,15 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 )
 
-func validatePathChars(p string) error {
-	for i := 0; i < len(p); i++ {
-		c := p[i]
+// ValidateSafeString ensures a string does not contain null bytes or control characters.
+func ValidateSafeString(s string) error {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		if c == 0 {
-			return fmt.Errorf("path contains null byte")
+			return fmt.Errorf("string contains null byte")
 		}
 		if c < 32 || c == 127 {
-			return fmt.Errorf("path contains control character: 0x%02x", c)
+			return fmt.Errorf("string contains control character: 0x%02x", c)
 		}
 	}
 	return nil
@@ -351,7 +356,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return p, nil
 	}
 
-	if err := validatePathChars(p); err != nil {
+	if err := ValidateSafeString(p); err != nil {
 		return "", err
 	}
 
@@ -418,7 +423,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 	}
 
 	res := prefix + absPath
-	if err := validatePathChars(res); err != nil {
+	if err := ValidateSafeString(res); err != nil {
 		return "", err
 	}
 	return res, nil
@@ -427,7 +432,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
-	if err := validatePathChars(v); err != nil {
+	if err := ValidateSafeString(v); err != nil {
 		return "", err
 	}
 	host, remainder, ok := SplitHostRemainder(v)
@@ -439,14 +444,14 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string,
 		return "", err
 	}
 	res := resolvedHost + ":" + remainder
-	if err := validatePathChars(res); err != nil {
+	if err := ValidateSafeString(res); err != nil {
 		return "", err
 	}
 	return res, nil
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
-	if err := validatePathChars(d); err != nil {
+	if err := ValidateSafeString(d); err != nil {
 		return "", err
 	}
 	host, remainder, ok := SplitHostRemainder(d)
@@ -458,7 +463,7 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 		return "", err
 	}
 	res := resolvedHost + ":" + remainder
-	if err := validatePathChars(res); err != nil {
+	if err := ValidateSafeString(res); err != nil {
 		return "", err
 	}
 	return res, nil

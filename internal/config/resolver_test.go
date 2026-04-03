@@ -652,6 +652,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			"DB_SECRET_KEY=highly-confidential",
 			"AUTH_CALLBACK=http://localhost",
 			"SIG_STORE=/tmp",
+			"SSL_CERT=content",
+			"DB_CREDENTIALS=user:pass",
+			"SSH_PRIVATE_KEY=key",
+			"KEY_PASSPHRASE=secret",
+			"GOOGLE_APIKEY=key",
+			"AWS_ACCESSKEY=id",
+			"MINIO_SECRETKEY=key",
 			"no-equal",
 		}
 		expected := []string{
@@ -662,6 +669,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			"DB_SECRET_KEY=[REDACTED]",
 			"AUTH_CALLBACK=[REDACTED]",
 			"SIG_STORE=[REDACTED]",
+			"SSL_CERT=[REDACTED]",
+			"DB_CREDENTIALS=[REDACTED]",
+			"SSH_PRIVATE_KEY=[REDACTED]",
+			"KEY_PASSPHRASE=[REDACTED]",
+			"GOOGLE_APIKEY=[REDACTED]",
+			"AWS_ACCESSKEY=[REDACTED]",
+			"MINIO_SECRETKEY=[REDACTED]",
 			"no-equal",
 		}
 		actual := MaskSensitiveEnv(env)
@@ -726,6 +740,46 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		_, err = ResolveWithFS("node", cliExpr, nil, nil, mfsExpr)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
+	})
+
+	t.Run("Resolve safe string validation", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+
+		// Image with null byte
+		cli := CLIOptions{Image: "alpine\x00", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid image")
+
+		// User with control char
+		cli = CLIOptions{Image: "alpine", ImageSet: true, User: "user\n", UserSet: true}
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid user")
+
+		// Network with control char
+		cli = CLIOptions{Image: "alpine", ImageSet: true, Network: "net\t", NetworkSet: true}
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid network")
+
+		// Hostname with control char
+		cli = CLIOptions{Image: "alpine", ImageSet: true, Hostname: "host\r", HostnameSet: true}
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid hostname")
+
+		// Workdir with control char
+		cli = CLIOptions{Image: "alpine", ImageSet: true, Workdir: "dir\x1b", WorkdirSet: true}
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid workdir")
+
+		// Entrypoint with control char
+		cli = CLIOptions{Image: "alpine", ImageSet: true, Entrypoint: []string{"ls", "\x01"}}
+		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid entrypoint element")
 	})
 }
 

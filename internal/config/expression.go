@@ -217,6 +217,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", wrappedErr
 	}
 
+	if len(data) > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s data exceeds max size after read (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
 	result := strings.TrimSpace(string(data))
 	r.fileCache[filename] = fileCacheEntry{content: result}
 	return result, nil

@@ -480,6 +480,19 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("MountConfig.Resolve - Relative target error", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/source"},
+			Target: ConfigPath{Raw: "relative/path"},
+		}
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = mc.Resolve(r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be an absolute path")
+	})
+
 	t.Run("MountConfig.Resolve - Target error", func(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
@@ -579,19 +592,19 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("validatePathChars", func(t *testing.T) {
-		err := validatePathChars("/good/path")
+	t.Run("ValidateSafeString", func(t *testing.T) {
+		err := ValidateSafeString("/good/path")
 		require.NoError(t, err)
 
-		err = validatePathChars("/path/with\x00null")
+		err = ValidateSafeString("/path/with\x00null")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "null byte")
 
-		err = validatePathChars("/path/with\x1fcontrol")
+		err = ValidateSafeString("/path/with\x1fcontrol")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "control character")
 
-		err = validatePathChars("/path/with\x7fcontrol")
+		err = ValidateSafeString("/path/with\x7fcontrol")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "control character")
 	})

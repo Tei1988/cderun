@@ -772,6 +772,28 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, err
 	}
 
+	// Final security validation for critical fields
+	if err := ValidateSafeString(res.Image); err != nil {
+		return nil, fmt.Errorf("invalid image: %w", err)
+	}
+	if err := ValidateSafeString(res.User); err != nil {
+		return nil, fmt.Errorf("invalid user: %w", err)
+	}
+	if err := ValidateSafeString(res.Network); err != nil {
+		return nil, fmt.Errorf("invalid network: %w", err)
+	}
+	if err := ValidateSafeString(res.Hostname); err != nil {
+		return nil, fmt.Errorf("invalid hostname: %w", err)
+	}
+	if err := ValidateSafeString(res.Workdir); err != nil {
+		return nil, fmt.Errorf("invalid workdir: %w", err)
+	}
+	for _, e := range res.Entrypoint {
+		if err := ValidateSafeString(e); err != nil {
+			return nil, fmt.Errorf("invalid entrypoint element: %w", err)
+		}
+	}
+
 	return res, nil
 }
 
@@ -953,7 +975,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 }
 
 var (
-	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG)$`)
+	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG|CERT|CREDENTIALS|PRIVATE|PASSPHRASE|APIKEY|ACCESSKEY|SECRETKEY)$`)
 	wordBoundaryRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 	camelCaseRegex    = regexp.MustCompile(`([a-z])([A-Z])`)
 )
