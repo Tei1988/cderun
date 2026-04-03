@@ -297,7 +297,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
 		var runtimeErr *runtime.RuntimeInitError
-		assert.ErrorAs(t, err, &runtimeErr)
+		require.ErrorAs(t, err, &runtimeErr)
 		assert.Equal(t, "invalid", runtimeErr.Runtime)
 		require.ErrorContains(t, err, "unsupported runtime")
 	})
@@ -453,7 +453,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
 		var imgErr *config.ImageNotFoundError
-		assert.ErrorAs(t, err, &imgErr)
+		require.ErrorAs(t, err, &imgErr)
 		assert.Equal(t, "unknown-tool", imgErr.Tool)
 		require.ErrorContains(t, err, "no image mapping found for tool: unknown-tool")
 	})
@@ -1169,7 +1169,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 	})
 	require.Error(t, err)
 	var invalidErr *config.InvalidConfigError
-	assert.ErrorAs(t, err, &invalidErr)
+	require.ErrorAs(t, err, &invalidErr)
 	assert.Equal(t, "pull", invalidErr.Field)
 	assert.Equal(t, "invalid", invalidErr.Value)
 	require.ErrorContains(t, err, "invalid pull value \"invalid\"")
@@ -1342,7 +1342,7 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, rt)
 		var runtimeErr *runtime.RuntimeInitError
-		assert.ErrorAs(t, err, &runtimeErr)
+		require.ErrorAs(t, err, &runtimeErr)
 		assert.Equal(t, "invalid", runtimeErr.Runtime)
 		require.ErrorContains(t, err, "unsupported runtime")
 	})
@@ -1458,7 +1458,7 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 				o.exitFunc = func(code int) { }
 			})
 			require.Error(t, err)
-			assert.ErrorContains(t, err, tt.expected)
+			require.ErrorContains(t, err, tt.expected)
 		})
 	}
 }
@@ -1588,7 +1588,7 @@ func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
 		o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "failed to wait for container: wait interrupted")
+	require.ErrorContains(t, err, "failed to wait for container: wait interrupted")
 }
 
 func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
@@ -1605,7 +1605,7 @@ func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 		o.exitFunc = func(code int) {}
 	})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "failed to attach to container: attach failed early")
+	require.ErrorContains(t, err, "failed to attach to container: attach failed early")
 }
 
 func TestUnit_Root_PreprocessArgs_NoSubcommandHoisting(t *testing.T) {

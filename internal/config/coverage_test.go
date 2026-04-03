@@ -445,7 +445,7 @@ func TestUnit_Coverage_Expression_ResolveString_Errors(t *testing.T) {
 	r.setError(nil)
 	s := "{{file:missing}} {{HOME}}"
 	r.resolveString(s)
-	assert.Error(t, r.err)
+	require.Error(t, r.err)
 }
 
 func TestUnit_Coverage_Expression_Resolve_Complex(t *testing.T) {
