@@ -211,7 +211,15 @@ func TestUnit_Docker_RetryablePullError(t *testing.T) {
 	assert.True(t, isRetryablePullError(errors.New("connection refused")))
 	assert.True(t, isRetryablePullError(errors.New("connection reset")))
 	assert.True(t, isRetryablePullError(errors.New("EOF")))
+	assert.True(t, isRetryablePullError(errors.New("token expired")))
 	assert.False(t, isRetryablePullError(errors.New("other error")))
+}
+
+func TestUnit_Docker_IsTemporaryAuthError(t *testing.T) {
+	assert.False(t, isTemporaryAuthError(nil))
+	assert.True(t, isTemporaryAuthError(errors.New("token expired")))
+	assert.True(t, isTemporaryAuthError(errors.New("TOKEN EXPIRED")))
+	assert.False(t, isTemporaryAuthError(errors.New("unauthorized")))
 }
 
 type mockRetryDockerClient struct {
@@ -827,7 +835,23 @@ func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
 		err = runtime.SignalContainer(ctx, "id", "15")
 		require.NoError(t, err)
 		assert.Equal(t, "15", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "SIG9")
+		require.NoError(t, err)
+		assert.Equal(t, "SIG9", mock.killSignal)
+
+		err = runtime.SignalContainer(ctx, "id", "HUP")
+		require.NoError(t, err)
+		assert.Equal(t, "HUP", mock.killSignal)
 	})
+}
+
+func TestUnit_Docker_ResizeContainerTTY_Error(t *testing.T) {
+	mock := &mockDockerClient{resizeErr: errors.New("resize failed")}
+	runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+	err := runtime.ResizeContainerTTY(context.Background(), "id", 24, 80)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resize failed")
 }
 
 func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
