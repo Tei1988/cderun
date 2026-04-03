@@ -16,6 +16,10 @@ import (
 func toDockerContainerConfig(config *container.ContainerConfig) (
 	*dockercontainer.Config, *dockercontainer.HostConfig, *network.NetworkingConfig, error,
 ) {
+	if config == nil {
+		return nil, nil, nil, fmt.Errorf("nil container config")
+	}
+
 	containerConfig := &dockercontainer.Config{
 		Image:        config.Image,
 		Cmd:          config.Command,
