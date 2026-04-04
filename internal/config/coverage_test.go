@@ -140,14 +140,14 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	defer func() { StringOptions = originalOptions }()
 
 	cli := CLIOptions{CderunImage: "alpine", CderunImageSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err := ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch:")
 
 	StringOptions = append(originalOptions, StringOption{Name: "hc", FieldName: "HostContext"})
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields")
+	assert.Contains(t, err.Error(), "registry mismatch: info for option \"hc\" not found")
 
 	// Reset StringOptions before Phase 1 test to avoid triggering same error again
 	StringOptions = originalOptions
@@ -155,49 +155,49 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	originalBool := BoolOptions
 	BoolOptions = append(BoolOptions, BoolOption{Name: "diagnosis", FieldName: "NonExistent"})
 	defer func() { BoolOptions = originalBool }()
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.NoError(t, err) // It continues if mismatch in Phase 1 (currently)
 
 	// Phase 3 remaining bool mismatch
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
-	_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: info for bool option \"bad-bool\" not found")
+	assert.Contains(t, err.Error(), "registry mismatch: info for option \"bad-bool\" not found")
 }
 
 func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
 	mfs := &MockFileSystem{}
 	cli := CLIOptions{Image: "alpine", ImageSet: true, HangTimeout: "invalid", HangTimeoutSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_ExpressionError(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	cli := CLIOptions{Image: "{{file:missing}}", ImageSet: true}
-	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	// Expression error in SocketPath
 	cli = CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{file:missing}}", SocketPathSet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 
 	// Expression error in Memory
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "{{file:missing}}", MemorySet: true}
-	_, err = ResolveWithFS("sh", cli, nil, nil, mfs)
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
 }
 
@@ -682,4 +682,314 @@ func TestUnit_Coverage_Config_SetDirs_Reset(t *testing.T) {
 
 	assert.Equal(t, origRun, defaultLoader.runConfigDir)
 	assert.Equal(t, origSys, defaultLoader.systemConfigDir)
+}
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T) {
+	mfs := &MockFileSystem{}
+
+	// No image mapping
+	_, err := ResolveWithFS("missing", &CLIOptions{}, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no image mapping found for tool: missing")
+
+	// Negative hang-timeout
+	cli := CLIOptions{Image: "a", ImageSet: true, HangTimeout: "-1s", HangTimeoutSet: true}
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duration cannot be negative")
+
+	// Non-positive pull-max-retries
+	cli = CLIOptions{Image: "a", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be greater than 0")
+
+	// Non-positive pull-backoff-base
+	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be positive")
+
+	// Invalid pull-backoff-base format
+	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "invalid", PullBackoffBaseSet: true}
+	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+}
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_TransitiveLogic(t *testing.T) {
+	mfs := &MockFileSystem{}
+
+	// Case 1: mount-tools triggers mount-cderun and mount-socket
+	cli := CLIOptions{Image: "a", ImageSet: true, MountTools: "node", MountToolsSet: true}
+	res, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.True(t, res.MountCderun)
+	assert.True(t, res.MountSocket)
+
+	// Case 2: mount-all-tools triggers mount-cderun and mount-socket
+	cli = CLIOptions{Image: "a", ImageSet: true, MountAllTools: true, MountAllToolsSet: true}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.True(t, res.MountCderun)
+	assert.True(t, res.MountSocket)
+
+	// Case 3: Explicit override breaks the chain
+	cli = CLIOptions{
+		Image: "a", ImageSet: true,
+		MountTools: "node", MountToolsSet: true,
+		MountCderun: false, MountCderunSet: true,
+	}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.False(t, res.MountCderun)
+	assert.False(t, res.MountSocket) // Also false because it defaults to MountCderun
+
+	// Case 4: Explicit mount-socket override
+	cli = CLIOptions{
+		Image: "a", ImageSet: true,
+		MountCderun: true, MountCderunSet: true,
+		MountSocket: false, MountSocketSet: true,
+	}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.True(t, res.MountCderun)
+	assert.False(t, res.MountSocket)
+}
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) {
+	// Case 1: Docker socket exists
+	mfs := &MockFileSystem{
+		Dirs: map[string]bool{"/var/run/docker.sock": true},
+	}
+	cli := CLIOptions{Image: "a", ImageSet: true}
+	res, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
+	assert.Equal(t, "/var/run/docker.sock", res.MountSocketPath) // Fallback to SocketPath
+
+	// Case 2: Podman socket exists
+	mfs = &MockFileSystem{
+		Dirs: map[string]bool{"/run/podman/podman.sock": true},
+	}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
+
+	// Case 3: Explicit Runtime Podman without SocketPath
+	cli = CLIOptions{Image: "a", ImageSet: true, Runtime: "podman", RuntimeSet: true}
+	mfs = &MockFileSystem{}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
+
+	// Case 4: Explicit SocketPath with podman in it
+	cli = CLIOptions{Image: "a", ImageSet: true, SocketPath: "/tmp/podman.sock", SocketPathSet: true}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "/tmp/podman.sock", res.SocketPath)
+
+	// Case 5: unix:// prefix removal
+	cli = CLIOptions{Image: "a", ImageSet: true, SocketPath: "unix:///tmp/docker.sock", SocketPathSet: true}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/tmp/docker.sock", res.SocketPath)
+}
+
+func saveAndReplaceBoolOptionsMap(t *testing.T, newMap map[string]BoolOption) {
+	t.Helper()
+	old := boolOptionsMap
+	boolOptionsMap = newMap
+	t.Cleanup(func() {
+		boolOptionsMap = old
+	})
+}
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatchErrors(t *testing.T) {
+	// Registry mismatch: 'mount-all-tools' not found (simulated by corrupted registry)
+	saveAndReplaceBoolOptionsMap(t, make(map[string]BoolOption))
+
+	mfs := &MockFileSystem{}
+	cli := CLIOptions{Image: "a", ImageSet: true}
+	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry mismatch: early boolean option \"diagnosis\" not found")
+}
+
+func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolver(nil)
+
+	// Mode: volume
+	res, err := resolveConfigPath(true, "/v", false, "", "", "s", nil, nil, nil, nil, "", r, "volume", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/v", res)
+
+	// Mode: device
+	res, err = resolveConfigPath(true, "/d", false, "", "", "s", nil, nil, nil, nil, "", r, "device", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/d", res)
+
+	// Fallback to ENV (should override tools and global)
+	mfs.Env = map[string]string{"CDERUN_SOCKET_PATH": "/env/socket"}
+	res, err = resolveConfigPath(false, "", false, "", "CDERUN_SOCKET_PATH", "node",
+		ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/path"}}},
+		func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		&CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}},
+		func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		"", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/env/socket", res)
+	mfs.Env = nil // Cleanup
+
+	// Fallback to tools
+	tools := ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/cderun"}}}
+	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, nil, nil, "", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/tools/cderun", res)
+
+	// Fallback to global
+	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/cderun"}}}
+	res, err = resolveConfigPath(false, "", false, "", "", "node", nil, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "", r, "path", mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/global/cderun", res)
+}
+
+func TestUnit_Coverage_Resolver_resolveDevices_Errors(t *testing.T) {
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolver(nil)
+
+	// Malformed in p1 (empty container path)
+	_, err := resolveDevices([]string{"a:"}, nil, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid device config (override)")
+
+	// Malformed in p2 (empty host path)
+	_, err = resolveDevices(nil, []string{":b"}, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid device config")
+
+	// Malformed in Env (empty parts)
+	mfs.Env = map[string]string{"CDERUN_DEVICE": "a:"}
+	_, err = resolveDevices(nil, nil, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
+}
+
+func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolver(nil)
+
+	// Malformed in p1
+	_, err := resolveMounts([]string{"invalid"}, nil, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid mount config (override)")
+
+	// Malformed in p2
+	_, err = resolveMounts(nil, []string{"invalid"}, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid mount config")
+
+	// Malformed in Env
+	mfs.Env = map[string]string{"CDERUN_MOUNT": "invalid"}
+	_, err = resolveMounts(nil, nil, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid mount config in CDERUN_MOUNT")
+
+	// Optional mount Stat error (other than NotExist)
+	mfs.Env = map[string]string{"CDERUN_MOUNT": "source=/s,target=/t,optional"}
+	mfs.StatErr = errors.New("perm denied")
+	_, err = resolveMounts(nil, nil, "s", nil, nil, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "perm denied")
+}
+
+func TestUnit_Coverage_Resolver_resolveEnv_Strict(t *testing.T) {
+	mfs := &MockFileSystem{}
+	r, _ := NewExpressionResolver(nil)
+
+	// Strict env failure
+	_, err := resolveEnv(nil, []string{"MISSING"}, "E", "s", nil, nil, true, r, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required environment variable not found")
+}
+
+func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
+	// To cover the 'else' branch in Phase 8 where a field's Kind is not numeric,
+	// we manually manipulate fieldInfo to point an Int/Float option to a String field in CLIOptions,
+	// while keeping the target field in ResolvedConfig numeric to avoid panic on SetInt/SetFloat.
+
+	fieldOnce.Do(initFieldInfo)
+
+	t.Run("Int mismatch", func(t *testing.T) {
+		info := fieldInfo["pull-max-retries"]
+		origP1ValIdx := info.p1ValIdx
+		origP2ValIdx := info.p2ValIdx
+
+		// Point CLI value lookups to 'Image' (string) instead of 'PullMaxRetries' (int)
+		imgField, _ := cliType.FieldByName("CderunImage")
+		info.p1ValIdx = imgField.Index
+		imgField2, _ := cliType.FieldByName("Image")
+		info.p2ValIdx = imgField2.Index
+		fieldInfo["pull-max-retries"] = info
+
+		defer func() {
+			info.p1ValIdx = origP1ValIdx
+			info.p2ValIdx = origP2ValIdx
+			fieldInfo["pull-max-retries"] = info
+		}()
+
+		mfs := &MockFileSystem{}
+		// Set string values in fields that are now pointed to for pull-max-retries
+		cli := CLIOptions{
+			CderunImage: "not-an-int", CderunImageSet: true,
+			Image: "also-not-int", ImageSet: true,
+		}
+		// ResolveWithFS will now encounter reflect.String when resolving pull-max-retries,
+		// triggering the 'else' branch and setting p1Set/p2Set to false.
+		res, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
+		require.NoError(t, err)
+		// It should fall back to default (3)
+		assert.Equal(t, 3, res.PullMaxRetries)
+	})
+
+	t.Run("Float64 mismatch", func(t *testing.T) {
+		info := fieldInfo["cpus"]
+		origP1ValIdx := info.p1ValIdx
+
+		imgField, _ := cliType.FieldByName("CderunImage")
+		info.p1ValIdx = imgField.Index
+		fieldInfo["cpus"] = info
+
+		defer func() {
+			info.p1ValIdx = origP1ValIdx
+			fieldInfo["cpus"] = info
+		}()
+
+		mfs := &MockFileSystem{}
+		cli := CLIOptions{CderunImage: "not-a-float", CderunImageSet: true}
+		res, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
+	})
+}
+
+func TestUnit_Coverage_Resolver_ResolveWithFS_NilCLI(t *testing.T) {
+	mfs := &MockFileSystem{}
+	// Should not panic and should return error due to missing image
+	res, err := ResolveWithFS("node", nil, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no image mapping found")
+	assert.Nil(t, res)
+
+	// Should work if diagnosis is requested via env
+	mfs.Env = map[string]string{"CDERUN_DIAGNOSIS": "true"}
+	res, err = ResolveWithFS("node", nil, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.True(t, res.Diagnosis)
 }

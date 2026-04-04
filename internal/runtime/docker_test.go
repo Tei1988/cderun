@@ -388,7 +388,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 				{Type: "bind", Source: "/src", Target: "/dst"},
 				{Type: "volume", Source: "myvol", Target: "/data"},
 				{Type: "tmpfs", Target: "/cache"},
-				{Type: "unknown", Source: "/ext", Target: "/ext"},
+				{Type: "bind", Source: "/ext", Target: "/ext"},
 			},
 			Devices: []container.DeviceMapping{
 				{PathOnHost: "/dev/fuse", PathInContainer: "/dev/fuse", CgroupPermissions: "rmw"},
@@ -424,6 +424,22 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 			Expose: []string{"invalid"},
 		})
 		require.Error(t, err)
+	})
+
+	t.Run("nil config", func(t *testing.T) {
+		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nil container config")
+	})
+
+	t.Run("invalid mount type", func(t *testing.T) {
+		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
+			Mounts: []container.Mount{{Type: "invalid", Source: "/src", Target: "/dst"}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid mount type")
 	})
 }
 func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {

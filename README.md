@@ -168,10 +168,12 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 
 Key variables include:
 
+- `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull.
-- `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull.
+- `CDERUN_RUNTIME`: Container runtime to use (docker/podman).
+- `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
+- `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
@@ -183,7 +185,13 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 
-Note: List-type variables like `CDERUN_ENV` and `CDERUN_MOUNT` use semicolon (`;`) as a separator, while others like `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, and `CDERUN_ENTRYPOINT` use comma (`,`).
+**Note on List-type Options:**
+
+- **CLI Flags (P1/P2)**: List-type flags must be repeated for each item.
+  - Example: `--env A=1 --env B=2`
+- **Environment Variables (P3)**: Use specific separators depending on the variable.
+  - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
+  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`
 
 ## Configuration
 
@@ -254,7 +262,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
   in configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the

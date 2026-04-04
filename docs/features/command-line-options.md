@@ -159,22 +159,30 @@ cderun --mount-all-tools alpine sh
 - **型**: string
 - **環境変数**: `CDERUN_IMAGE`
 - **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
-- **注意**: アドホック実行（設定にないツール名の指定）時には必須となります。
+- **注意**:
+  - アドホック実行（設定にないツール名の指定）時には必須となります。
+  - `{{env:KEY}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --image node:18-alpine node --version
+cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 ```
 
 ### `--env`, `-e`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_ENV` (セパレータ: `;`)
+- **環境変数**: `CDERUN_ENV`
 - **説明**: 環境変数の設定・パススルー
 - **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数の環境変数を指定する場合、フラグを繰り返す必要があります（例: `-e A=1 -e B=2`）。
+  - 環境変数 `CDERUN_ENV` (P3) では、セミコロン (`;`) をセパレータとして使用します（例: `export CDERUN_ENV="A=1;B=2"`）。
+  - 値には `{{PWD}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --env NODE_ENV=production node app.js
 cderun --env NPM_TOKEN node app.js  # ホストから取得
+cderun --env "PROJECT_DIR={{PWD}}" node app.js
 ```
 
 ### `--cderun-env`
@@ -191,16 +199,21 @@ cderun node app.js --cderun-env=NODE_ENV=production
 ### `--mount`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_MOUNT` (セパレータ: `;`)
+- **環境変数**: `CDERUN_MOUNT`
 - **説明**: マウントの設定（bind, volume, tmpfsをサポート）
 - **用途**: `type=bind,source=hostPath,target=containerPath[,readonly][,optional]`
-- **補足**: `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
+- **補足**:
+  - `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
+  - CLIフラグ（P1/P2）では、複数のマウントを指定する場合、フラグを繰り返す必要があります。
+  - 環境変数 `CDERUN_MOUNT` (P3) では、セミコロン (`;`) をセパレータとして使用します。
+  - `source` や `target` には `{{HOME}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --mount type=bind,source=./data,target=/data python script.py
 cderun --mount type=bind,source=~/.ssh,target=/root/.ssh,readonly git clone ...
 cderun --mount type=bind,source=./config,target=/config,optional node app.js
 cderun --mount type=tmpfs,target=/tmp alpine
+cderun --mount "type=bind,source={{HOME}}/.npmrc,target=/root/.npmrc" node app.js
 ```
 
 ### `--workdir`, `-w`
@@ -208,9 +221,11 @@ cderun --mount type=tmpfs,target=/tmp alpine
 - **型**: string
 - **環境変数**: `CDERUN_WORKDIR`
 - **説明**: 作業ディレクトリの指定
+- **補足**: `{{PWD}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --workdir /app node server.js
+cderun --workdir "{{PWD}}/src" node app.js
 ```
 
 ### `--strict-env`
@@ -249,9 +264,12 @@ cderun --remove=false node app.js  # コンテナを残す
 ### `--publish`, `-p`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_PUBLISH` (セパレータ: `,`)
+- **環境変数**: `CDERUN_PUBLISH`
 - **説明**: ポートマッピング（ホストポート:コンテナポート）
 - **用途**: コンテナのポートをホストに公開
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数のポートを指定する場合、フラグを繰り返す必要があります。
+  - 環境変数 `CDERUN_PUBLISH` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun -p 8080:80 nginx
@@ -267,8 +285,11 @@ cderun -p 8080:80 nginx
 ### `--expose`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_EXPOSE` (セパレータ: `,`)
+- **環境変数**: `CDERUN_EXPOSE`
 - **説明**: 特定のポートまたはポート範囲を公開
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_EXPOSE` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --expose 80 node app.js
@@ -288,8 +309,11 @@ cderun --hostname my-container alpine hostname
 ### `--dns`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_DNS` (セパレータ: `,`)
+- **環境変数**: `CDERUN_DNS`
 - **説明**: カスタムDNSサーバの設定
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_DNS` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --dns 8.8.8.8 alpine ping google.com
@@ -298,8 +322,11 @@ cderun --dns 8.8.8.8 alpine ping google.com
 ### `--add-host`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_ADD_HOST` (セパレータ: `,`)
+- **環境変数**: `CDERUN_ADD_HOST`
 - **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_ADD_HOST` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --add-host my-server:192.168.1.10 alpine ping my-server
@@ -329,8 +356,11 @@ cderun --privileged alpine ls /dev
 ### `--cap-add`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_CAP_ADD` (セパレータ: `,`)
+- **環境変数**: `CDERUN_CAP_ADD`
 - **説明**: Linuxケーパビリティの追加
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_CAP_ADD` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --cap-add SYS_ADMIN alpine mount ...
@@ -339,14 +369,20 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 ### `--cap-drop`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_CAP_DROP` (セパレータ: `,`)
+- **環境変数**: `CDERUN_CAP_DROP`
 - **説明**: Linuxケーパビリティの削除
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_CAP_DROP` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ### `--entrypoint`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_ENTRYPOINT` (セパレータ: `,`)
+- **環境変数**: `CDERUN_ENTRYPOINT`
 - **説明**: イメージのデフォルトENTRYPOINTを上書き
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_ENTRYPOINT` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --entrypoint /bin/sh node -c "ls"
@@ -365,14 +401,14 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: int
 - **デフォルト**: `3`
 - **環境変数**: `CDERUN_PULL_MAX_RETRIES`
-- **説明**: イメージプル時の最大リトライ回数
+- **説明**: イメージプル失敗時の最大リトライ回数。
 
 ### `--pull-backoff-base`
 
 - **型**: string (Duration)
 - **デフォルト**: `1s`
 - **環境変数**: `CDERUN_PULL_BACKOFF_BASE`
-- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）
+- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）。
 
 ### `--memory`, `-m`
 
@@ -389,8 +425,11 @@ cderun --entrypoint /bin/sh node -c "ls"
 ### `--device`
 
 - **型**: stringArray
-- **環境変数**: `CDERUN_DEVICE` (セパレータ: `,`)
+- **環境変数**: `CDERUN_DEVICE`
 - **説明**: ホストデバイスをコンテナに追加
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_DEVICE` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --device /dev/fuse alpine ls /dev/fuse
@@ -472,9 +511,11 @@ cderun --diagnosis --diagnosis-format json
 - **型**: string (Duration)
 - **デフォルト**: `10s`
 - **環境変数**: `CDERUN_HANG_TIMEOUT`
-- **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間
-- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）
-- **補足**: `0` を指定すると、コンテナが自然に終了するまで無期限に待機します。
+- **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間。
+- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）。
+- **補足**:
+  - `0` を指定すると、コンテナが自然に終了するまで無期限に待機します。
+  - ホストの標準入力が端末であり、かつインタラクティブモード（`--interactive` / `-i`）が有効な場合は、この設定に関わらず無期限に待機します。
 - **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
 ```bash

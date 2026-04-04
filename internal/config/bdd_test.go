@@ -46,7 +46,7 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 		}
 
 		// When: Resolving configuration
-		res, err := ResolveWithFS("node", cli, tools, global, mfs)
+		res, err := ResolveWithFS("node", &cli, tools, global, mfs)
 
 		// Then: Priority and expressions should be resolved correctly
 		require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 		}
 
 		// When: Resolving configuration for "app" with isolated FS
-		res, err := ResolveWithFS("app", CLIOptions{}, tools, global, mfs)
+		res, err := ResolveWithFS("app", &CLIOptions{}, tools, global, mfs)
 
 		// Then: Tool settings should override global ones, and slices should not merge across layers
 		require.NoError(t, err)
@@ -229,14 +229,14 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT_TOOLS": "t1,t2"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"t1", "t2"}, res.MountTools)
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.InDelta(t, 0.5, res.CPUs, 0.0001)
 	})
@@ -244,14 +244,14 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"MISSING"}, StrictEnv: true, StrictEnvSet: true}
-		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{PWD}}/docker.sock", SocketPathSet: true}
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/work/docker.sock", res.SocketPath)
 	})
