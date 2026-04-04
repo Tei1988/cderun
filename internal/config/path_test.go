@@ -593,14 +593,14 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 	})
 
 	t.Run("ValidateToolName", func(t *testing.T) {
-		assert.NoError(t, ValidateToolName("node"))
-		assert.NoError(t, ValidateToolName("git-flow"))
-		assert.Error(t, ValidateToolName(""))
-		assert.Error(t, ValidateToolName(".."))
-		assert.Error(t, ValidateToolName("foo/bar"))
-		assert.Error(t, ValidateToolName("foo\\bar"))
-		assert.Error(t, ValidateToolName("/abs"))
-		assert.Error(t, ValidateToolName("./rel"))
+		require.NoError(t, ValidateToolName("node"))
+		require.NoError(t, ValidateToolName("git-flow"))
+		require.Error(t, ValidateToolName(""))
+		require.Error(t, ValidateToolName(".."))
+		require.Error(t, ValidateToolName("foo/bar"))
+		require.Error(t, ValidateToolName("foo\\bar"))
+		require.Error(t, ValidateToolName("/abs"))
+		require.Error(t, ValidateToolName("./rel"))
 	})
 
 	t.Run("validatePathChars", func(t *testing.T) {

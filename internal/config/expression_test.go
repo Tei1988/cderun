@@ -494,10 +494,10 @@ func TestUnit_Expression_EnvValidation(t *testing.T) {
 			r2.err = nil
 			r2.resolveString(tt.input)
 			if tt.wantErr {
-				assert.Error(t, r2.Error())
+				require.Error(t, r2.Error())
 				assert.Contains(t, r2.Error().Error(), "invalid environment variable key")
 			} else {
-				assert.NoError(t, r2.Error())
+				require.NoError(t, r2.Error())
 			}
 		})
 	}
