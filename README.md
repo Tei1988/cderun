@@ -168,8 +168,10 @@ In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are 
 
 Key variables include:
 
+- `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
+- `CDERUN_RUNTIME`: Container runtime to use (docker/podman).
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
@@ -260,7 +262,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}`, `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
   in configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the
