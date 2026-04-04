@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 	"io"
+	"fmt"
 	"sync"
 
 	"cderun/internal/container"
@@ -204,6 +205,9 @@ func (m *MockRuntime) GetExitCode() int {
 }
 
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if sig != "" && !signalRegex.MatchString(sig) {
+		return fmt.Errorf("invalid signal: %s", sig)
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.SignaledContainerID = containerID

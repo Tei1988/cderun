@@ -466,8 +466,16 @@ func ValidateToolName(name string) error {
 	if filepath.IsAbs(name) {
 		return fmt.Errorf("absolute path not allowed for tool name: %s", name)
 	}
-	if strings.Contains(name, "..") {
-		return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
+	{
+		splitter := func(r rune) bool {
+			return r == '/' || r == '\\'
+		}
+		segments := strings.FieldsFunc(name, splitter)
+		for _, s := range segments {
+			if s == ".." {
+				return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
+			}
+		}
 	}
 	if strings.ContainsAny(name, "/\\") {
 		return fmt.Errorf("directory separators not allowed in tool name: %s", name)

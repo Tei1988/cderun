@@ -503,6 +503,9 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			sort.Strings(toolNames)
 
 			for _, toolName := range toolNames {
+				if err := config.ValidateToolName(toolName); err != nil {
+					return nil, fmt.Errorf("invalid tool name in tools configuration %q: %w", toolName, err)
+				}
 				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
 					Type:     "bind",
 					Source:   exePath,
@@ -512,6 +515,9 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			}
 		} else if len(resolved.MountTools) > 0 {
 			for _, toolName := range resolved.MountTools {
+				if err := config.ValidateToolName(toolName); err != nil {
+					return nil, fmt.Errorf("invalid tool name in mount-tools %q: %w", toolName, err)
+				}
 				if _, ok := toolsCfg[toolName]; !ok {
 					available := make([]string, 0, len(toolsCfg))
 					for k := range toolsCfg {

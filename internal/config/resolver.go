@@ -327,6 +327,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		cli = &CLIOptions{}
 	}
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
+	if subcommand != "" {
+		if err := ValidateToolName(subcommand); err != nil {
+			return nil, err
+		}
+	}
 	res := &ResolvedConfig{}
 	var err error
 
@@ -495,6 +500,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		cli.MountToolsSet, cli.MountTools,
 		subcommand, tools, global, r, fs,
 	)
+	for _, tool := range res.MountTools {
+		if err := ValidateToolName(tool); err != nil {
+			return nil, fmt.Errorf("invalid tool name in mount-tools: %w", err)
+		}
+	}
 
 	// Resolve mount-all-tools (transitive trigger)
 	{
@@ -784,6 +794,28 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, err
 	}
 
+	// Security: validate resolved configuration for injection characters.
+	criticalFields := []struct {
+		name  string
+		value string
+	}{
+		{"image", res.Image},
+		{"user", res.User},
+		{"network", res.Network},
+		{"hostname", res.Hostname},
+		{"workdir", res.Workdir},
+	}
+	for _, f := range criticalFields {
+		if err := validatePathChars(f.value); err != nil {
+			return nil, fmt.Errorf("security validation failed for %s: %w", f.name, err)
+		}
+	}
+	for i, e := range res.Entrypoint {
+		if err := validatePathChars(e); err != nil {
+			return nil, fmt.Errorf("security validation failed for entrypoint[%d]: %w", i, err)
+		}
+	}
+
 	return res, nil
 }
 
@@ -1048,24 +1080,33 @@ func MaskSensitiveEnv(key, value string) string {
 	if value == "" {
 		return ""
 	}
-	upperKey := strings.ToUpper(key)
 
 	// Split by non-alphanumeric characters and also split camelCase.
-	// This ensures segments like 'AppKey' are correctly identified.
+	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
 	var segments []string
 	var current strings.Builder
-	for _, r := range upperKey {
+	var lastRune rune
+	for i, r := range key {
+		// CamelCase split: lowercase followed by uppercase
+		if i > 0 && unicode.IsLower(lastRune) && unicode.IsUpper(r) {
+			if current.Len() > 0 {
+				segments = append(segments, strings.ToUpper(current.String()))
+				current.Reset()
+			}
+		}
+
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			current.WriteRune(r)
 		} else {
 			if current.Len() > 0 {
-				segments = append(segments, current.String())
+				segments = append(segments, strings.ToUpper(current.String()))
 				current.Reset()
 			}
 		}
+		lastRune = r
 	}
 	if current.Len() > 0 {
-		segments = append(segments, current.String())
+		segments = append(segments, strings.ToUpper(current.String()))
 	}
 
 	sensitiveKeywords := map[string]struct{}{
