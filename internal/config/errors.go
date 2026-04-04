@@ -39,17 +39,19 @@ func (e *RegistryMismatchError) Error() string {
 	return fmt.Sprintf("registry mismatch: %s", e.Reason)
 }
 
-// Validation Error compat helpers to match existing tests
+// Is reports whether the error is an ImageNotFoundError.
 func (e *ImageNotFoundError) Is(target error) bool {
 	_, ok := target.(*ImageNotFoundError)
 	return ok
 }
 
+// Is reports whether the error is an InvalidConfigError.
 func (e *InvalidConfigError) Is(target error) bool {
 	_, ok := target.(*InvalidConfigError)
 	return ok
 }
 
+// Is reports whether the error is a RegistryMismatchError.
 func (e *RegistryMismatchError) Is(target error) bool {
 	_, ok := target.(*RegistryMismatchError)
 	return ok
