@@ -445,3 +445,32 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 	return s[:sepIdx], s[sepIdx+1:], true
 }
+
+// validatePathChars ensures the string does not contain null bytes or control characters.
+func validatePathChars(s string) error {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == 0 || (c < 32 && c != '\t' && c != '\n' && c != '\r') || c == 127 {
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", c, i)
+		}
+	}
+	return nil
+}
+
+// ValidateToolName ensures the tool name is a safe identifier.
+// It rejects empty strings, absolute paths, parent directory references, and directory separators.
+func ValidateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if filepath.IsAbs(name) {
+		return fmt.Errorf("absolute path not allowed for tool name: %s", name)
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
+	}
+	if strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("directory separators not allowed in tool name: %s", name)
+	}
+	return nil
+}

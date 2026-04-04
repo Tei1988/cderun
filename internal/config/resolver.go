@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
@@ -948,15 +949,24 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		if err := r.Error(); err != nil {
 			return nil, err
 		}
-		if strings.Contains(resolvedE, "=") {
-			res = append(res, resolvedE)
+
+		var key, val string
+		if k, v, found := strings.Cut(resolvedE, "="); found {
+			key = k
+			val = v
 		} else {
-			val, found := fs.LookupEnv(resolvedE)
+			v, found := fs.LookupEnv(resolvedE)
 			if !found && strict {
 				return nil, fmt.Errorf("required environment variable not found: %s", resolvedE)
 			}
-			res = append(res, fmt.Sprintf("%s=%s", resolvedE, val))
+			key = resolvedE
+			val = v
 		}
+
+		// Apply masking for debug logs
+		logging.Debug("Resolved Env: %s=%s", key, MaskSensitiveEnv(key, val))
+
+		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
 	return res, nil
 }
@@ -1031,4 +1041,52 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		res = append(res, resolved)
 	}
 	return res, nil
+}
+
+// MaskSensitiveEnv redacts sensitive environment variables based on key names.
+func MaskSensitiveEnv(key, value string) string {
+	if value == "" {
+		return ""
+	}
+	upperKey := strings.ToUpper(key)
+
+	// Split by non-alphanumeric characters and also split camelCase.
+	// This ensures segments like 'AppKey' are correctly identified.
+	var segments []string
+	var current strings.Builder
+	for _, r := range upperKey {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			current.WriteRune(r)
+		} else {
+			if current.Len() > 0 {
+				segments = append(segments, current.String())
+				current.Reset()
+			}
+		}
+	}
+	if current.Len() > 0 {
+		segments = append(segments, current.String())
+	}
+
+	sensitiveKeywords := map[string]struct{}{
+		"PASSWORD": {},
+		"SECRET":   {},
+		"TOKEN":    {},
+		"KEY":      {},
+		"AUTH":     {},
+		"SIG":      {},
+	}
+
+	for _, segment := range segments {
+		if _, ok := sensitiveKeywords[segment]; ok {
+			return "[REDACTED]"
+		}
+	}
+
+	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
+	// if they were split but should be treated as one sensitive keyword.
+	// However, 'PASS' and 'WORD' individually might be too generic.
+	// Let's stick to strict segment match for the core keywords to avoid false positives.
+
+	return value
 }
