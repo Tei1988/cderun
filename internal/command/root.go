@@ -144,19 +144,12 @@ const (
 	hangTimeout       = 10 * time.Second
 )
 
-var (
-	opts = defaultOptions()
-
-	// rootCmd is initialized in init() to ensure it uses the properly initialized opts
-	rootCmd *cobra.Command
-)
-
 func defaultOptions() rootOptions {
 	return rootOptions{
 		fs: config.RealFileSystem{},
 		exitFunc: func(code int) {
-			// Default to no-op for safety in tests.
-			// The global 'opts' is updated in init() to use os.Exit.
+			// Default to no-op for safety.
+			// Updated to os.Exit in ExecuteContextWithOptions for production use.
 		},
 		isTerminal: func(fd int) bool {
 			return term.IsTerminal(fd)
@@ -1141,18 +1134,19 @@ func ExecuteContext(ctx context.Context, rawArgs []string) error {
 // ExecuteContextWithOptions adds all child commands to a new command instance and sets flags appropriately,
 // using the provided context and allowing for option customization.
 func ExecuteContextWithOptions(ctx context.Context, rawArgs []string, setup func(o *rootOptions, cmd *cobra.Command)) error {
-	var cmd *cobra.Command
+	// Always create fresh state to avoid global state leaks.
+	localOpts := defaultOptions()
+	localOpts.logger = logging.NewLogger()
+	localOpts.exitFunc = os.Exit // Default to os.Exit
 
-	if setup == nil {
-		// Use global state for standard execution
-		cmd = rootCmd
-	} else {
-		// Create fresh state for testing
-		localOpts := defaultOptions()
-		localOpts.logger = logging.NewLogger() // Fresh logger for isolation
-		cmd = newRootCmd(&localOpts)
+	cmd := newRootCmd(&localOpts)
+
+	// Redirect logger to the command's error writer early to capture initial logs.
+	localOpts.logger.SetOutput(cmd.ErrOrStderr())
+
+	if setup != nil {
 		setup(&localOpts, cmd)
-		// Redirect logger to the command's error writer early to capture initial logs.
+		// Re-bind logger output in case setup() replaced the command's error writer.
 		localOpts.logger.SetOutput(cmd.ErrOrStderr())
 	}
 
@@ -1278,7 +1272,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	return processedArgs, nil
 }
 
-func init() {
-	opts.exitFunc = os.Exit
-	rootCmd = newRootCmd(&opts)
-}
