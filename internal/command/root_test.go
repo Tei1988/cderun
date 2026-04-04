@@ -279,7 +279,9 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
-		require.Error(t, err)
+		var initErr *runtime.RuntimeInitError
+		require.ErrorAs(t, err, &initErr)
+		assert.Equal(t, "invalid", initErr.Runtime)
 		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
 	})
 

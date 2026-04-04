@@ -819,8 +819,10 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 func TestUnit_Docker_New_Error(t *testing.T) {
 	// client.WithHost("invalid") should fail during client.NewClientWithOpts
 	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create docker client")
+	var initErr *RuntimeInitError
+	require.ErrorAs(t, err, &initErr)
+	assert.Equal(t, "test", initErr.Runtime)
+	assert.Contains(t, err.Error(), "failed to initialize runtime")
 }
 
 type syncFailingReader struct {
