@@ -995,10 +995,11 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			val = v
 		}
 
+		masked := MaskSensitiveEnv(key, val)
 		// Apply masking for debug logs
-		logging.Debug("Resolved Env: %s=%s", key, MaskSensitiveEnv(key, val))
+		logging.Debug("Resolved Env: %s=%s", key, masked)
 
-		res = append(res, fmt.Sprintf("%s=%s", key, val))
+		res = append(res, fmt.Sprintf("%s=%s", key, masked))
 	}
 	return res, nil
 }
@@ -1087,11 +1088,15 @@ func MaskSensitiveEnv(key, value string) string {
 	var current strings.Builder
 	var lastRune rune
 	for i, r := range key {
-		// CamelCase split: lowercase followed by uppercase
-		if i > 0 && unicode.IsLower(lastRune) && unicode.IsUpper(r) {
-			if current.Len() > 0 {
-				segments = append(segments, strings.ToUpper(current.String()))
-				current.Reset()
+		// Boundary split logic
+		if i > 0 {
+			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
+			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
+			if isCamel || isLetterDigit {
+				if current.Len() > 0 {
+					segments = append(segments, strings.ToUpper(current.String()))
+					current.Reset()
+				}
 			}
 		}
 

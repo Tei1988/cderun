@@ -13,9 +13,9 @@ func TestValidatePathChars(t *testing.T) {
 	}{
 		{"Safe path", "safe/path", false},
 		{"Path with space", "safe path", false},
-		{"Path with tab", "path/with/\t/tab", false},
-		{"Path with newline", "path/with/\n/newline", false},
-		{"Path with carriage return", "path/with/\r/return", false},
+		{"Path with tab (control)", "path/with/\t/tab", true},
+		{"Path with newline (control)", "path/with/\n/newline", true},
+		{"Path with carriage return (control)", "path/with/\r/return", true},
 		{"Path with null byte", "path/with/\x00/null", true},
 		{"Path with escape char", "path/with/\x1b/escape", true},
 		{"Path with delete char", "path/with/\x7f/delete", true},
@@ -48,6 +48,7 @@ func TestValidateToolName(t *testing.T) {
 		{"Parent directory traversal", "../parent", true},
 		{"Subdirectory tool name (Linux)", "subdir/tool", true},
 		{"Subdirectory tool name (Windows)", "subdir\\tool", true},
+		{"Control character in tool name", "tool\tname", true},
 	}
 
 	for _, tt := range tests {

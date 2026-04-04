@@ -28,6 +28,8 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Already masked value", "APPKEY", "[REDACTED]", "[REDACTED]"},
 		{"Empty value", "EMPTY_SECRET", "", ""},
 		{"Lowercase password", "my_password", "secret", "[REDACTED]"},
+		{"Letter-digit boundary password", "PASSWORD2", "secret", "[REDACTED]"},
+		{"Digit-letter boundary key", "1KEY", "secret", "[REDACTED]"},
 	}
 
 	for _, tt := range tests {

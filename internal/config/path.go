@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"slices"
 
 	"cderun/internal/container"
 
@@ -446,19 +447,19 @@ func SplitHostRemainder(s string) (string, string, bool) {
 	return s[:sepIdx], s[sepIdx+1:], true
 }
 
-// validatePathChars ensures the string does not contain null bytes or control characters.
+// validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == 0 || (c < 32 && c != '\t' && c != '\n' && c != '\r') || c == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", c, i)
+	for i, r := range s {
+		if r <= 31 || r == 127 {
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
 		}
 	}
 	return nil
 }
 
 // ValidateToolName ensures the tool name is a safe identifier.
-// It rejects empty strings, absolute paths, parent directory references, and directory separators.
+// It rejects empty strings, absolute paths, parent directory references, directory separators,
+// and control characters.
 func ValidateToolName(name string) error {
 	if name == "" {
 		return fmt.Errorf("tool name cannot be empty")
@@ -466,17 +467,18 @@ func ValidateToolName(name string) error {
 	if filepath.IsAbs(name) {
 		return fmt.Errorf("absolute path not allowed for tool name: %s", name)
 	}
-	{
-		splitter := func(r rune) bool {
-			return r == '/' || r == '\\'
-		}
-		segments := strings.FieldsFunc(name, splitter)
-		for _, s := range segments {
-			if s == ".." {
-				return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
-			}
-		}
+	if err := validatePathChars(name); err != nil {
+		return fmt.Errorf("invalid tool name %q: %w", name, err)
 	}
+	// Check for path traversal segments
+	splitter := func(r rune) bool {
+		return r == '/' || r == '\\'
+	}
+	segments := strings.FieldsFunc(name, splitter)
+	if slices.Contains(segments, "..") {
+		return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
+	}
+	// Re-check for any separators that might have been missed or are leading/trailing
 	if strings.ContainsAny(name, "/\\") {
 		return fmt.Errorf("directory separators not allowed in tool name: %s", name)
 	}
