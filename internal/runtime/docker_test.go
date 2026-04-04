@@ -425,6 +425,22 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+
+	t.Run("nil config", func(t *testing.T) {
+		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nil container config")
+	})
+
+	t.Run("invalid mount type", func(t *testing.T) {
+		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
+			Mounts: []container.Mount{{Type: "invalid", Source: "/src", Target: "/dst"}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid mount type")
+	})
 }
 func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {
 	t.Run("interactive sets StdinOnce", func(t *testing.T) {
