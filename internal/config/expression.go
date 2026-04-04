@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
+var (
+	exprRegex   = regexp.MustCompile(`\{\{([^}]+)\}\}`)
+	envKeyRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+)
 
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
 
@@ -217,6 +220,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", wrappedErr
 	}
 
+	if int64(len(data)) > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large after read (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
 	result := strings.TrimSpace(string(data))
 	r.fileCache[filename] = fileCacheEntry{content: result}
 	return result, nil
@@ -247,6 +256,9 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 // It supports default value syntax: {{env:KEY:-default}}.
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	key, defaultValue, hasDefault := strings.Cut(input, ":-")
+	if !envKeyRegex.MatchString(key) {
+		return "", fmt.Errorf("invalid environment variable key: %q", key)
+	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
 		return defaultValue, nil

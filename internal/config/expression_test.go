@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -467,4 +468,67 @@ func TestUnit_Expression_EnvWithDefault(t *testing.T) {
 			assert.Equal(t, tt.expected, val)
 		})
 	}
+}
+
+func TestUnit_Expression_EnvValidation(t *testing.T) {
+	fs := &MockFileSystem{}
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"valid key", "{{ env:VALID_KEY }}", false},
+		{"valid with default", "{{ env:VALID_KEY:-def }}", false},
+		{"invalid char", "{{ env:INVALID-KEY }}", true},
+		{"starts with digit", "{{ env:1DIGIT }}", true},
+		{"empty key", "{{ env: }}", true},
+		{"special chars", "{{ env:KEY$ }}", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r2 := *r
+			r2.err = nil
+			r2.resolveString(tt.input)
+			if tt.wantErr {
+				assert.Error(t, r2.Error())
+				assert.Contains(t, r2.Error().Error(), "invalid environment variable key")
+			} else {
+				assert.NoError(t, r2.Error())
+			}
+		})
+	}
+}
+
+func TestUnit_Expression_FileTOCTOU(t *testing.T) {
+	// Large content that exceeds the limit
+	largeContent := make([]byte, MaxDirectiveFileSize+10)
+
+	fs := &exprMockFS{
+		MockFileSystem: MockFileSystem{
+			Files: map[string][]byte{
+				"/project/swap.txt": largeContent,
+			},
+			Dirs: map[string]bool{"/project": true},
+			WD:   "/project",
+		},
+	}
+
+	// We override Stat to return a small size, but ReadFile will return largeContent
+	fs.StatFunc = func(name string) (os.FileInfo, error) {
+		return &mockFileInfo{
+			name: "swap.txt",
+			size: 10, // Small size to pass first check
+		}, nil
+	}
+
+	r, err := NewExpressionResolverWithFS(nil, fs)
+	require.NoError(t, err)
+
+	r.resolveString("{{ file:swap.txt }}")
+	require.Error(t, r.Error())
+	assert.Contains(t, r.Error().Error(), "too large after read")
 }

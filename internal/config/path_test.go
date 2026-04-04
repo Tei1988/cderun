@@ -492,6 +492,19 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("MountConfig.Resolve - Relative Target rejected", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/source"},
+			Target: ConfigPath{Raw: "./rel"},
+		}
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		require.NoError(t, err)
+		_, err = mc.Resolve(r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "absolute path")
+	})
+
 	t.Run("DeviceConfig.Resolve - Source error", func(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "{{file:missing}}"},
@@ -577,6 +590,17 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		require.NoError(t, err)
 		_, err = resolveDevicePath("~/dev:/dev", "/base", r)
 		require.Error(t, err)
+	})
+
+	t.Run("ValidateToolName", func(t *testing.T) {
+		assert.NoError(t, ValidateToolName("node"))
+		assert.NoError(t, ValidateToolName("git-flow"))
+		assert.Error(t, ValidateToolName(""))
+		assert.Error(t, ValidateToolName(".."))
+		assert.Error(t, ValidateToolName("foo/bar"))
+		assert.Error(t, ValidateToolName("foo\\bar"))
+		assert.Error(t, ValidateToolName("/abs"))
+		assert.Error(t, ValidateToolName("./rel"))
 	})
 
 	t.Run("validatePathChars", func(t *testing.T) {

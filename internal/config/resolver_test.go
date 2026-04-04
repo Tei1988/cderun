@@ -421,6 +421,36 @@ func TestUnit_Resolver_Expressions_Exhaustive(t *testing.T) {
 	})
 }
 
+func TestUnit_Resolver_SecurityValidation(t *testing.T) {
+	mfs := &MockFileSystem{}
+	baseCLI := CLIOptions{Image: "alpine", ImageSet: true}
+
+	t.Run("Reject null byte in image", func(t *testing.T) {
+		cli := baseCLI
+		cli.Image = "alpine\x00"
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid image")
+	})
+
+	t.Run("Reject control char in user", func(t *testing.T) {
+		cli := baseCLI
+		cli.User = "root\n"
+		cli.UserSet = true
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid user")
+	})
+
+	t.Run("Reject control char in entrypoint", func(t *testing.T) {
+		cli := baseCLI
+		cli.Entrypoint = []string{"sh", "ls\t"}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid entrypoint element")
+	})
+}
+
 func TestUnit_Resolver_Exhaustive_Additional(t *testing.T) {
 	t.Parallel()
 	t.Run("Diagnosis mode bypasses image check", func(t *testing.T) {

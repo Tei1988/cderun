@@ -25,6 +25,7 @@ type MockFileSystem struct {
 	AbsErr       error
 	TempDirValue string
 	Perms        map[string]os.FileMode
+	StatFunc     func(name string) (os.FileInfo, error)
 }
 
 func (m *MockFileSystem) Getwd() (string, error) {
@@ -46,6 +47,9 @@ func (m *mockFileInfo) Sys() any           { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	m.StatCalls = append(m.StatCalls, name)
+	if m.StatFunc != nil {
+		return m.StatFunc(name)
+	}
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}

@@ -309,6 +309,11 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 
 func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
+	if subcommand != "" {
+		if err := ValidateToolName(subcommand); err != nil {
+			return nil, err
+		}
+	}
 	res := &ResolvedConfig{}
 	var err error
 
@@ -770,6 +775,28 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	if err := r.Error(); err != nil {
 		return nil, err
+	}
+
+	// Final security validation of critical fields
+	if err := validatePathChars(res.Image); err != nil {
+		return nil, fmt.Errorf("invalid image: %w", err)
+	}
+	if err := validatePathChars(res.User); err != nil {
+		return nil, fmt.Errorf("invalid user: %w", err)
+	}
+	if err := validatePathChars(res.Network); err != nil {
+		return nil, fmt.Errorf("invalid network: %w", err)
+	}
+	if err := validatePathChars(res.Hostname); err != nil {
+		return nil, fmt.Errorf("invalid hostname: %w", err)
+	}
+	if err := validatePathChars(res.Workdir); err != nil {
+		return nil, fmt.Errorf("invalid workdir: %w", err)
+	}
+	for _, e := range res.Entrypoint {
+		if err := validatePathChars(e); err != nil {
+			return nil, fmt.Errorf("invalid entrypoint element: %w", err)
+		}
 	}
 
 	return res, nil

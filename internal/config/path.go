@@ -137,6 +137,14 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 }
 
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
+	target, err := mc.Target.Resolve(r.WithoutHostContext())
+	if err != nil {
+		return container.Mount{}, err
+	}
+	if !filepath.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %s", target)
+	}
+
 	source := ""
 	if mc.Type == "bind" {
 		s, err := mc.Source.Resolve(r)
@@ -152,11 +160,6 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 			}
 			source = s
 		}
-	}
-
-	target, err := mc.Target.Resolve(r.WithoutHostContext())
-	if err != nil {
-		return container.Mount{}, err
 	}
 
 	return container.Mount{
@@ -462,6 +465,17 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 		return "", err
 	}
 	return res, nil
+}
+
+// ValidateToolName ensures the tool name is a simple identifier without path traversal.
+func ValidateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("invalid tool name: %s", name)
+	}
+	return nil
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {
