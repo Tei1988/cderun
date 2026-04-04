@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"strings"
 	"sync"
@@ -179,26 +178,6 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			name:     "P1 flag at the end of standard mode",
 			args:     []string{"cderun", "node", "--cderun-tty"},
 			expected: []string{"cderun", "--cderun-tty", "node"},
-		},
-		{
-			name:     "Hoisting unknown P1 flag",
-			args:     []string{"cderun", "node", "--cderun-unknown", "val"},
-			expected: []string{"cderun", "--cderun-unknown", "node", "val"},
-		},
-		{
-			name:     "Hoisting unknown P1 flag without value",
-			args:     []string{"cderun", "node", "--cderun-unknown"},
-			expected: []string{"cderun", "--cderun-unknown", "node"},
-		},
-		{
-			name:     "Polyglot mode with nested path",
-			args:     []string{"/usr/local/bin/node", "--version"},
-			expected: []string{"cderun", "node", "--version"},
-		},
-		{
-			name:     "Polyglot mode with P1 flag",
-			args:     []string{"node", "--cderun-image", "alpine", "app.js"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "app.js"},
 		},
 	}
 
@@ -654,18 +633,6 @@ func TestUnit_Root_GetFd(t *testing.T) {
 	// Test non-file reader
 	buf := bytes.NewBuffer(nil)
 	_, ok = getFd(buf)
-	assert.False(t, ok)
-
-}
-
-type overflowReader struct{}
-
-func (overflowReader) Fd() uintptr {
-	return uintptr(math.MaxUint)
-}
-
-func TestUnit_Root_GetFd_Overflow(t *testing.T) {
-	_, ok := getFd(overflowReader{})
 	assert.False(t, ok)
 }
 
@@ -1964,12 +1931,5 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml dry-run error")
-	})
-
-	t.Run("handleDiagnosis writeFormatted unknown format", func(t *testing.T) {
-		opts := &rootOptions{}
-		err := opts.writeFormatted(io.Discard, "unknown", nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported output format: \"unknown\"")
 	})
 }

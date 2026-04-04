@@ -41,7 +41,7 @@ func TestUnit_Resolver_EmptyListOverride(t *testing.T) {
 
 	cli := CLIOptions{}
 
-	res, err := Resolve("empty-tool", cli, tools, global)
+	res, err := Resolve("empty-tool", &cli, tools, global)
 	require.NoError(t, err)
 
 	// These assertions ensure that an explicit empty list in tool config (P4)
@@ -90,7 +90,7 @@ func TestUnit_Resolver_EmptyEnvOverride(t *testing.T) {
 		},
 	}
 
-	res, err := ResolveWithFS("test-tool", cli, tools, global, fs)
+	res, err := ResolveWithFS("test-tool", &cli, tools, global, fs)
 	require.NoError(t, err)
 
 	assert.Empty(t, res.Env, "Env should be empty (overridden by P3 CDERUN_ENV)")

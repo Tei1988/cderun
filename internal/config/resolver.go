@@ -11,7 +11,6 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
-	"regexp"
 
 	"github.com/docker/go-units"
 )
@@ -221,7 +220,7 @@ type CLIOptions struct {
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
-func Resolve(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
+func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
@@ -248,10 +247,7 @@ type optionFields struct {
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
 
-	process := func(name, fieldName string, skip bool) {
-		if skip {
-			return
-		}
+	process := func(name, fieldName string) {
 		if fieldName == "" {
 			fieldName = PascalCase(name)
 		}
@@ -282,19 +278,19 @@ func initFieldInfo() {
 	}
 
 	for _, opt := range StringOptions {
-		process(opt.Name, opt.FieldName, opt.SkipResolution)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range BoolOptions {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range IntOptions {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range Float64Options {
-		process(opt.Name, opt.FieldName, false)
+		process(opt.Name, opt.FieldName)
 	}
 	for _, opt := range StringSliceOptions {
-		process(opt.Name, opt.FieldName, opt.SkipResolution)
+		process(opt.Name, opt.FieldName)
 	}
 }
 
@@ -304,10 +300,31 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 	}
 	// For slices and other types without a explicit Set flag
 	v := val.FieldByIndex(valIdx)
-	return !v.IsNil(), v
+	if v.Kind() == reflect.Slice || v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface || v.Kind() == reflect.Map {
+		return !v.IsNil(), v
+	}
+	return !v.IsZero(), v
 }
 
-func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
+func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
+	info, ok := fieldInfo[key]
+	if !ok {
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
+	}
+
+	if info.p1ValIdx == nil || info.p2ValIdx == nil {
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
+	}
+
+	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
+	p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
+	return info, p1Set, p1Val, p2Set, p2Val, nil
+}
+
+func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
+	if cli == nil {
+		cli = &CLIOptions{}
+	}
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
@@ -322,14 +339,16 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	cliVal := reflect.ValueOf(cli)
+	fieldOnce.Do(initFieldInfo)
+
+	cliVal := reflect.ValueOf(cli).Elem()
 	resVal := reflect.ValueOf(res).Elem()
 
 	// Phase 1: Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("registry mismatch: early boolean option %q not found", name)
 		}
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -337,46 +356,26 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		fieldName := opt.FieldName
-		if fieldName == "" {
-			fieldName = PascalCase(opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
 
-		// Use reflection for early resolution as well to avoid duplication
-		p1SetField := cliVal.FieldByName("Cderun" + fieldName + "Set")
-		p1ValField := cliVal.FieldByName("Cderun" + fieldName)
-		p2SetField := cliVal.FieldByName(fieldName + "Set")
-		p2ValField := cliVal.FieldByName(fieldName)
-		targetField := resVal.FieldByName(fieldName)
-
-		if !p1SetField.IsValid() || !p1ValField.IsValid() || !p2SetField.IsValid() || !p2ValField.IsValid() || !targetField.IsValid() {
-			continue
-		}
-
-		p1Set := p1SetField.Bool()
-		p1Val := p1ValField.Bool()
-		p2Set := p2SetField.Bool()
-		p2Val := p2ValField.Bool()
-
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
-		targetField.SetBool(resolved)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
 	// Phase 2: Registry-based options (String & Bool)
-	fieldOnce.Do(initFieldInfo)
 
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
 			continue
 		}
 
-		info, ok := fieldInfo[opt.Name]
-		if !ok {
-			return nil, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
-
-		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[string]{
 			EnvKey:       opt.EnvKey,
@@ -407,13 +406,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			continue
 		}
 
-		info, ok := fieldInfo[opt.Name]
-		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for bool option %q not found", opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
-
-		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -437,19 +433,26 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	// Phase 5: Path resolution & Auto-detection (Socket)
-	res.SocketPath, err = resolveConfigPath(
-		cli.CderunSocketPathSet, cli.CderunSocketPath,
-		cli.SocketPathSet, cli.SocketPath,
-		"CDERUN_SOCKET_PATH",
-		"", nil, nil,
-		global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
-		"",
-		r,
-		"path",
-		fs,
-	)
-	if err != nil {
-		return nil, err
+	{
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		res.SocketPath, err = resolveConfigPath(
+			p1Set, p1Val.String(),
+			p2Set, p2Val.String(),
+			"CDERUN_SOCKET_PATH",
+			"", nil, nil,
+			global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			"",
+			r,
+			"path",
+			fs,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if res.Runtime == "" {
@@ -494,83 +497,85 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	// Resolve mount-all-tools (transitive trigger)
 	{
-		opt, ok := GetBoolOption("mount-all-tools")
-		info, ok2 := fieldInfo["mount-all-tools"]
-		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-all-tools' not found")
+		opt, _ := GetBoolOption("mount-all-tools")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", cliVal)
+		if err != nil {
+			return nil, err
 		}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
 	}
 
 	var mountCderunSpecified bool
 	{
-		opt, ok := GetBoolOption("mount-cderun")
-		info, ok2 := fieldInfo["mount-cderun"]
-		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-cderun' not found")
+		opt, _ := GetBoolOption("mount-cderun")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", cliVal)
+		if err != nil {
+			return nil, err
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
-		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
 	}
 	if !mountCderunSpecified {
 		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
 	}
 
-	res.MountCderunPath, err = resolveConfigPath(
-		cli.CderunMountCderunPathSet, cli.CderunMountCderunPath,
-		cli.MountCderunPathSet, cli.MountCderunPath,
-		"CDERUN_MOUNT_CDERUN_PATH",
-		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-		"",
-		r,
-		"path",
-		fs,
-	)
-	if err != nil {
-		return nil, err
+	{
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		res.MountCderunPath, err = resolveConfigPath(
+			p1Set, p1Val.String(),
+			p2Set, p2Val.String(),
+			"CDERUN_MOUNT_CDERUN_PATH",
+			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			"",
+			r,
+			"path",
+			fs,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var mountSocketSpecified bool
 	{
-		opt, ok := GetBoolOption("mount-socket")
-		info, ok2 := fieldInfo["mount-socket"]
-		if !ok || !ok2 {
-			return nil, fmt.Errorf("registry mismatch: 'mount-socket' not found")
+		opt, _ := GetBoolOption("mount-socket")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", cliVal)
+		if err != nil {
+			return nil, err
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		p1Set := cliVal.FieldByIndex(info.p1SetIdx).Bool()
-		p1Val := cliVal.FieldByIndex(info.p1ValIdx).Bool()
-		p2Set := cliVal.FieldByIndex(info.p2SetIdx).Bool()
-		p2Val := cliVal.FieldByIndex(info.p2ValIdx).Bool()
-		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
 	}
 	if !mountSocketSpecified {
 		res.MountSocket = res.MountCderun
 	}
 
-	res.MountSocketPath, err = resolveConfigPath(
-		cli.CderunMountSocketPathSet, cli.CderunMountSocketPath,
-		cli.MountSocketPathSet, cli.MountSocketPath,
-		"CDERUN_MOUNT_SOCKET_PATH",
-		subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-		global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-		res.SocketPath,
-		r,
-		"path",
-		fs,
-	)
-	if err != nil {
-		return nil, err
+	{
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		res.MountSocketPath, err = resolveConfigPath(
+			p1Set, p1Val.String(),
+			p2Set, p2Val.String(),
+			"CDERUN_MOUNT_SOCKET_PATH",
+			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			res.SocketPath,
+			r,
+			"path",
+			fs,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Phase 7: Duration and Slice options
@@ -583,7 +588,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		hangTimeoutStr = resolveStringOpt(def, cli.CderunHangTimeoutSet, cli.CderunHangTimeout, cli.HangTimeoutSet, cli.HangTimeout, subcommand, tools, global, r, fs)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
 	}
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
@@ -601,13 +611,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			continue
 		}
 
-		info, ok := fieldInfo[opt.Name]
-		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for string slice option %q not found", opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
-
-		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		var p1v, p2v []string
 		if p1Set {
@@ -633,13 +640,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 
 	// Phase 8: Integer & Float options
 	for _, opt := range IntOptions {
-		info, ok := fieldInfo[opt.Name]
-		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for int option %q not found", opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
-
-		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		p1Int := 0
 		if p1Set && p1Val.IsValid() {
@@ -685,7 +689,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		pullBackoffBaseStr = resolveStringOpt(def, cli.CderunPullBackoffBaseSet, cli.CderunPullBackoffBase, cli.PullBackoffBaseSet, cli.PullBackoffBase, subcommand, tools, global, r, fs)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
 	}
 
 	if pullBackoffBaseStr != "" {
@@ -713,7 +722,12 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		memStr = resolveStringOpt(def, cli.CderunMemorySet, cli.CderunMemory, cli.MemorySet, cli.Memory, subcommand, tools, global, r, fs)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", cliVal)
+		if err != nil {
+			return nil, err
+		}
+
+		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
 	}
 	if memStr != "" {
 		bytes, err := units.RAMInBytes(memStr)
@@ -727,13 +741,10 @@ func ResolveWithFS(subcommand string, cli CLIOptions, tools ToolsConfig, global 
 	}
 
 	for _, opt := range Float64Options {
-		info, ok := fieldInfo[opt.Name]
-		if !ok {
-			return nil, fmt.Errorf("registry mismatch: info for float64 option %q not found", opt.Name)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		if err != nil {
+			return nil, err
 		}
-
-		p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-		p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		p1Float := 0.0
 		if p1Set && p1Val.IsValid() {
@@ -938,8 +949,6 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			return nil, err
 		}
 		if strings.Contains(resolvedE, "=") {
-			masked := MaskSensitiveEnv([]string{resolvedE})
-			logging.Debug("Environment variable: %s", masked[0])
 			res = append(res, resolvedE)
 		} else {
 			val, found := fs.LookupEnv(resolvedE)
@@ -950,48 +959,6 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 	}
 	return res, nil
-}
-
-var (
-	sensitiveRegex    = regexp.MustCompile(`(?i)^(PASSWORD|SECRET|TOKEN|KEY|AUTH|SIG)$`)
-	wordBoundaryRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
-	camelCaseRegex    = regexp.MustCompile(`([a-z])([A-Z])`)
-)
-
-// MaskSensitiveEnv redacts sensitive values from environment variables.
-// It matches keys containing common sensitive keywords.
-func MaskSensitiveEnv(env []string) []string {
-	res := make([]string, len(env))
-	for i, e := range env {
-		key, val, ok := strings.Cut(e, "=")
-		if !ok {
-			res[i] = e
-			continue
-		}
-
-		isSensitive := false
-		// Normalize camelCase (apiToken -> api Token) before splitting
-		normalizedKey := camelCaseRegex.ReplaceAllString(key, "$1 $2")
-
-		// Match keywords within word boundaries (e.g. MY_PASSWORD matches, MONKEY does not)
-		parts := wordBoundaryRegex.Split(normalizedKey, -1)
-		for _, part := range parts {
-			if part == "" {
-				continue
-			}
-			if sensitiveRegex.MatchString(part) {
-				isSensitive = true
-				break
-			}
-		}
-
-		if isSensitive {
-			res[i] = key + "=[REDACTED]"
-		} else {
-			res[i] = key + "=" + val
-		}
-	}
-	return res
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {

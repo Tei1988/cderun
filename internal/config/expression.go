@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -22,9 +23,15 @@ type ExpressionResolver struct {
 	Home        string
 	Pwd         string
 	HostContext *HostContext
-	fileCache   map[string]fileCacheEntry
-	loader      *ConfigLoader
+	shared      *resolverSharedState
 	err         error
+}
+
+type resolverSharedState struct {
+	fileCache  map[string]fileCacheEntry
+	loader     *ConfigLoader
+	cacheOnce  sync.Once
+	loaderOnce sync.Once
 }
 
 func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
@@ -45,8 +52,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]fileCacheEntry),
-		loader:      NewConfigLoaderWithFS(fs),
+		shared:      &resolverSharedState{},
 	}, nil
 }
 
@@ -55,13 +61,34 @@ func (r *ExpressionResolver) Error() error {
 	return r.err
 }
 
-// WithoutHostContext returns a shallow copy of the resolver with HostContext set to nil.
+// WithoutHostContext returns a new instance of the resolver with HostContext set to nil.
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
-	clone := *r
-	clone.HostContext = nil
-	return &clone
+	return &ExpressionResolver{
+		fs:          r.fs,
+		Home:        r.Home,
+		Pwd:         r.Pwd,
+		HostContext: nil,
+		shared:      r.shared,
+		err:         r.err,
+	}
+}
+
+func (r *ExpressionResolver) ensureFileCache() {
+	r.shared.cacheOnce.Do(func() {
+		if r.shared.fileCache == nil {
+			r.shared.fileCache = make(map[string]fileCacheEntry)
+		}
+	})
+}
+
+func (r *ExpressionResolver) ensureLoader() {
+	r.shared.loaderOnce.Do(func() {
+		if r.shared.loader == nil {
+			r.shared.loader = NewConfigLoaderWithFS(r.fs)
+		}
+	})
 }
 
 func (r *ExpressionResolver) setError(err error) {
@@ -186,39 +213,47 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	if cached, ok := r.fileCache[filename]; ok {
+	r.ensureFileCache()
+	if cached, ok := r.shared.fileCache[filename]; ok {
 		return cached.content, cached.err
 	}
 
-	paths := r.loader.FindConfigs(filename)
+	r.ensureLoader()
+	paths := r.shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
-		r.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	info, err := r.fs.Stat(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
-		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
 	if info.Size() > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
-		r.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
-		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
+	if int64(len(data)) > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
 	result := strings.TrimSpace(string(data))
-	r.fileCache[filename] = fileCacheEntry{content: result}
+	r.shared.fileCache[filename] = fileCacheEntry{content: result}
 	return result, nil
 }
 
@@ -227,7 +262,8 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
 	}
 
-	paths := r.loader.FindConfigs(name)
+	r.ensureLoader()
+	paths := r.shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
 		return "", fmt.Errorf("item not found for find_dir: %s", name)
 	}

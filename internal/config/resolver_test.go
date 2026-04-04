@@ -145,7 +145,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
-		_, err := Resolve("node", cli, nil, nil)
+		_, err := Resolve("node", &cli, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duration cannot be negative")
 	})
@@ -225,7 +225,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 			CderunTTY:    false,
 			CderunTTYSet: true,
 		}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.False(t, res.TTY)
 	})
@@ -240,7 +240,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 			TTY:      true,
 			TTYSet:   true,
 		}
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)
 	})
@@ -255,7 +255,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 				TTY:   ptr(false),
 			},
 		}
-		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{}, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)
 	})
@@ -272,7 +272,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 				TTY: ptr(false),
 			},
 		}
-		res, err := Resolve("node", CLIOptions{}, tools, global)
+		res, err := Resolve("node", &CLIOptions{}, tools, global)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)
 	})
@@ -287,7 +287,7 @@ func TestUnit_Resolver_AutoDetection(t *testing.T) {
 			SocketPath:    "/run/podman/podman.sock",
 			SocketPathSet: true,
 		}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
 	})
@@ -299,7 +299,7 @@ func TestUnit_Resolver_AutoDetection(t *testing.T) {
 			Runtime:    "docker",
 			RuntimeSet: true,
 		}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 	})
@@ -311,7 +311,7 @@ func TestUnit_Resolver_Mounts_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{
 			Env: map[string]string{"CDERUN_MOUNT": "source=/a,target=/b ; source=/c,target=/d,readonly"},
 		}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 2)
 		assert.Equal(t, "/a", res.Mounts[0].Source)
@@ -334,7 +334,7 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 				Env: []string{"TOOL_VAR=tool-val"},
 			},
 		}
-		res, err := ResolveWithFS("node", CLIOptions{}, tools, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{}, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "ENV_VAR=env-val")
 		assert.Contains(t, res.Env, "HOST_VAR=host-val")
@@ -346,7 +346,7 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 			Env: []string{"NONEXISTENT"},
 			StrictEnv: true, StrictEnvSet: true,
 		}
-		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 	})
 }
@@ -371,7 +371,7 @@ func TestUnit_Resolver_Devices_Advanced(t *testing.T) {
 				}},
 			},
 		}
-		res, err := Resolve("node", CLIOptions{}, tools, global)
+		res, err := Resolve("node", &CLIOptions{}, tools, global)
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/tool", res.Devices[0].PathOnHost)
@@ -387,7 +387,7 @@ func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
 			HangTimeout:    "5s",
 			HangTimeoutSet: true,
 		}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 5*time.Second, res.HangTimeout)
 	})
@@ -399,7 +399,7 @@ func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
 			Memory:    "512MiB",
 			MemorySet: true,
 		}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, int64(512*1024*1024), res.Memory)
 	})
@@ -415,7 +415,7 @@ func TestUnit_Resolver_Expressions_Exhaustive(t *testing.T) {
 	}
 	t.Run("Expression in environment variable override", func(t *testing.T) {
 		mfs.Env = map[string]string{"CDERUN_IMAGE": "node:{{file:.version}}"}
-		res, err := ResolveWithFS("node", CLIOptions{}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "node:1.0", res.Image)
 	})
@@ -425,28 +425,28 @@ func TestUnit_Resolver_Exhaustive_Additional(t *testing.T) {
 	t.Parallel()
 	t.Run("Diagnosis mode bypasses image check", func(t *testing.T) {
 		cli := CLIOptions{Diagnosis: true, DiagnosisSet: true}
-		res, err := Resolve("unknown", cli, nil, nil)
+		res, err := Resolve("unknown", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.True(t, res.Diagnosis)
 	})
 
 	t.Run("Transitive auto-enablement cderun to socket", func(t *testing.T) {
 		cli := CLIOptions{Image: "alpine", ImageSet: true, MountCderun: true, MountCderunSet: true}
-		res, err := Resolve("sh", cli, nil, nil)
+		res, err := Resolve("sh", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.True(t, res.MountSocket)
 	})
 
 	t.Run("Float64 resolution", func(t *testing.T) {
 		cli := CLIOptions{Image: "alpine", ImageSet: true, CPUs: 1.5, CPUsSet: true}
-		res, err := Resolve("node", cli, nil, nil)
+		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.InDelta(t, 1.5, res.CPUs, 0.0001)
 	})
 
 	t.Run("String slice with comma resolution", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DNS": "8.8.8.8,1.1.1.1"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, res.DNS)
 	})
@@ -456,21 +456,21 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	t.Parallel()
 	t.Run("MountTools resolution", func(t *testing.T) {
 		cli := CLIOptions{Image: "alpine", ImageSet: true, MountTools: "tool1,tool2", MountToolsSet: true}
-		res, err := Resolve("sh", cli, nil, nil)
+		res, err := Resolve("sh", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"tool1", "tool2"}, res.MountTools)
 	})
 
 	t.Run("Log settings resolution", func(t *testing.T) {
 		cli := CLIOptions{Image: "alpine", ImageSet: true, LogLevel: "debug", LogLevelSet: true}
-		res, err := Resolve("sh", cli, nil, nil)
+		res, err := Resolve("sh", &cli, nil, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "debug", res.LogLevel)
 	})
 
 	t.Run("resolveDevices from environment", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/b:rw"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/a", res.Devices[0].PathOnHost)
@@ -478,13 +478,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 	t.Run("resolveDevices invalid format in CDERUN_DEVICE", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_DEVICE": ":"}}
-		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveMounts from environment", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "source=/a,target=/b"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/a", res.Mounts[0].Source)
@@ -492,13 +492,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 	t.Run("resolveMounts invalid format in CDERUN_MOUNT", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT": "invalid"}}
-		_, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath from CDERUN_SOCKET_PATH", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_SOCKET_PATH": "/run/my.sock"}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/run/my.sock", res.SocketPath)
 	})
@@ -507,7 +507,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		global := &CDERunConfig{
 			SocketPath: ConfigPath{Raw: "/global.sock"},
 		}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "/global.sock", res.SocketPath)
 	})
@@ -518,7 +518,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			Dirs: map[string]bool{"/var/run": true},
 			Files: map[string][]byte{"/var/run/docker.sock": []byte("")},
 		}
-		res, err := ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
@@ -528,26 +528,26 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			Dirs: map[string]bool{"/run/podman": true},
 			Files: map[string][]byte{"/run/podman/podman.sock": []byte("")},
 		}
-		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 		// specified podman but no socket, should use default podman socket
-		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Runtime: "podman", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Runtime: "podman", RuntimeSet: true}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 		// specified docker but no socket
-		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Runtime: "docker", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Runtime: "docker", RuntimeSet: true}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
 		// specified unknown runtime (e.g. from global)
 		global := &CDERunConfig{Runtime: "containerd"}
-		res, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath) // Fallback to docker socket
@@ -585,30 +585,30 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 	t.Run("Resolve errors", func(t *testing.T) {
 		// no image
-		_, err := ResolveWithFS("sh", CLIOptions{}, nil, nil, &MockFileSystem{})
+		_, err := ResolveWithFS("sh", &CLIOptions{}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no image mapping found")
 
 		// resolveDevices invalid format in CLI
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
-		_, err = ResolveWithFS("sh", cliDev, nil, nil, &MockFileSystem{})
+		_, err = ResolveWithFS("sh", &cliDev, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
 
 		// resolveMounts invalid format in CLI
 		cliMnt := CLIOptions{Image: "alpine", ImageSet: true, Mounts: []string{"invalid"}}
-		_, err = ResolveWithFS("sh", cliMnt, nil, nil, &MockFileSystem{})
+		_, err = ResolveWithFS("sh", &cliMnt, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config")
 
 		// invalid memory
-		_, err = ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
+		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid memory value")
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
-		resError, err := ResolveWithFS("sh", CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
+		resError, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
 		require.NoError(t, err)
 		assert.NotNil(t, resError)
 
@@ -619,68 +619,28 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// Expression error
 		mfsExpr := &MockFileSystem{WD: "/app"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}}
-		_, err = ResolveWithFS("sh", cli, nil, nil, mfsExpr)
+		_, err = ResolveWithFS("sh", &cli, nil, nil, mfsExpr)
 		require.Error(t, err)
 
 		// Test resolveEnv with Tool getter
 		tools := ToolsConfig{"node": ToolConfig{Env: []string{"TOOL=1"}}}
-		res, err := ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "TOOL=1")
 
 		// Test resolveDevices with Tool getter
 		tools = ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/t"}}}}}
-		res, err = ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/t", res.Devices[0].PathOnHost)
 
 		// Test resolveMounts with Tool getter
 		tools = ToolsConfig{"node": ToolConfig{Mounts: []MountConfig{{Source: ConfigPath{Raw: "/s"}, Target: ConfigPath{Raw: "/t"}}}}}
-		res, err = ResolveWithFS("node", CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/s", res.Mounts[0].Source)
-	})
-
-	t.Run("MaskSensitiveEnv", func(t *testing.T) {
-		env := []string{
-			"MY_PASSWORD=secret123",
-			"API_TOKEN=abc-123",
-			"SAFE_VAR=hello",
-			"MONKEY=banana", // Should not match
-			"DB_SECRET_KEY=highly-confidential",
-			"AUTH_CALLBACK=http://localhost",
-			"SIG_STORE=/tmp",
-			"no-equal",
-		}
-		expected := []string{
-			"MY_PASSWORD=[REDACTED]",
-			"API_TOKEN=[REDACTED]",
-			"SAFE_VAR=hello",
-			"MONKEY=banana",
-			"DB_SECRET_KEY=[REDACTED]",
-			"AUTH_CALLBACK=[REDACTED]",
-			"SIG_STORE=[REDACTED]",
-			"no-equal",
-		}
-		actual := MaskSensitiveEnv(env)
-		assert.Equal(t, expected, actual)
-	})
-
-	t.Run("MaskSensitiveEnv CamelCase", func(t *testing.T) {
-		env := []string{
-			"dbPassword=secret",
-			"apiToken=abc",
-			"secretKey=123",
-		}
-		expected := []string{
-			"dbPassword=[REDACTED]",
-			"apiToken=[REDACTED]",
-			"secretKey=[REDACTED]",
-		}
-		actual := MaskSensitiveEnv(env)
-		assert.Equal(t, expected, actual)
 	})
 
 	t.Run("PullMaxRetries and PullBackoffBase errors", func(t *testing.T) {
@@ -690,7 +650,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// PullMaxRetries <= 0
 		cli.CderunPullMaxRetries = 0
 		cli.CderunPullMaxRetriesSet = true
-		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be greater than 0")
 
@@ -698,13 +658,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullMaxRetries = 3
 		cli.CderunPullBackoffBase = "invalid"
 		cli.CderunPullBackoffBaseSet = true
-		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"
-		_, err = ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be positive")
 	})
@@ -716,14 +676,14 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// Invalid memory format
 		cli.CderunMemory = "invalid"
 		cli.CderunMemorySet = true
-		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid memory value")
 
 		// Expression error already present
 		mfsExpr := &MockFileSystem{WD: "/app"}
 		cliExpr := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}, Memory: "1G", MemorySet: true}
-		_, err = ResolveWithFS("node", cliExpr, nil, nil, mfsExpr)
+		_, err = ResolveWithFS("node", &cliExpr, nil, nil, mfsExpr)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
 	})
@@ -744,7 +704,7 @@ func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
 			ImageSet: true,
 			Mounts:   []string{"source=/app/missing,target=/data,optional"},
 		}
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res.Mounts)
 	})
@@ -755,7 +715,7 @@ func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
 			ImageSet: true,
 			Mounts:   []string{"source=/app/exists,target=/data,optional"},
 		}
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/app/exists", res.Mounts[0].Source)
@@ -768,7 +728,7 @@ func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
 			ImageSet: true,
 			Mounts:   []string{"source=/app/missing,target=/data"},
 		}
-		res, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/app/missing", res.Mounts[0].Source)
