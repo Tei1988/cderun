@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidatePathChars(t *testing.T) {
@@ -23,7 +24,7 @@ func TestValidatePathChars(t *testing.T) {
 	for _, tt := range tests {
 		err := validatePathChars(tt.input)
 		if tt.wantErr {
-			assert.Error(t, err, "input: %q", tt.input)
+			require.Error(t, err, "input: %q", tt.input)
 		} else {
 			assert.NoError(t, err, "input: %q", tt.input)
 		}
@@ -48,7 +49,7 @@ func TestValidateToolName(t *testing.T) {
 	for _, tt := range tests {
 		err := ValidateToolName(tt.input)
 		if tt.wantErr {
-			assert.Error(t, err, "input: %q", tt.input)
+			require.Error(t, err, "input: %q", tt.input)
 		} else {
 			assert.NoError(t, err, "input: %q", tt.input)
 		}

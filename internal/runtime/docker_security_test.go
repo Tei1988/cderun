@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockDockerClientForSignal struct {
@@ -38,7 +39,7 @@ func TestSignalValidation(t *testing.T) {
 	for _, tt := range tests {
 		err := d.SignalContainer(context.Background(), "test-id", tt.sig)
 		if tt.wantErr {
-			assert.Error(t, err, "sig: %q", tt.sig)
+			require.Error(t, err, "sig: %q", tt.sig)
 			assert.Contains(t, err.Error(), "invalid signal")
 		} else {
 			assert.NoError(t, err, "sig: %q", tt.sig)
