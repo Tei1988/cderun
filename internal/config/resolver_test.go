@@ -125,6 +125,15 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Equal(t, 60, res)
 	})
 
+	t.Run("resolveEnvValues contains plaintext", func(t *testing.T) {
+		mfs := &MockFileSystem{Env: map[string]string{"PASS": "secret"}}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		res, err := resolveEnvValues([]string{"PASS"}, false, r, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"PASS=secret"}, res)
+	})
+
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		r, err := NewExpressionResolver(nil)
 		require.NoError(t, err)

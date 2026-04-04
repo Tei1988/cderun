@@ -995,11 +995,10 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			val = v
 		}
 
-		masked := MaskSensitiveEnv(key, val)
 		// Apply masking for debug logs
-		logging.Debug("Resolved Env: %s=%s", key, masked)
+		logging.Debug("Resolved Env: %s=%s", key, MaskSensitiveEnv(key, val))
 
-		res = append(res, fmt.Sprintf("%s=%s", key, masked))
+		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
 	return res, nil
 }
@@ -1135,4 +1134,20 @@ func MaskSensitiveEnv(key, value string) string {
 	// Let's stick to strict segment match for the core keywords to avoid false positives.
 
 	return value
+}
+
+// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
+func MaskSensitiveEnvList(env []string) []string {
+	if env == nil {
+		return nil
+	}
+	res := make([]string, len(env))
+	for i, e := range env {
+		if k, v, found := strings.Cut(e, "="); found {
+			res[i] = fmt.Sprintf("%s=%s", k, MaskSensitiveEnv(k, v))
+		} else {
+			res[i] = e
+		}
+	}
+	return res
 }

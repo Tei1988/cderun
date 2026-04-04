@@ -1,6 +1,8 @@
 package command
 
 import (
+	"strconv"
+	"github.com/docker/go-units"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +22,6 @@ import (
 	"cderun/internal/runtime"
 	"cderun/internal/version"
 
-	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -614,36 +615,38 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	o.ensureHooks()
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, containerConfig, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Image: %s\n", containerConfig.Image)
-		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(containerConfig.Command, " "))
-		_, _ = fmt.Fprintf(w, "TTY: %v\n", containerConfig.TTY)
-		_, _ = fmt.Fprintf(w, "Interactive: %v\n", containerConfig.Interactive)
-		_, _ = fmt.Fprintf(w, "Network: %s\n", containerConfig.Network)
-		_, _ = fmt.Fprintf(w, "Remove: %v\n", containerConfig.Remove)
+
+	// Mask sensitive environment variables in dry-run output
+	maskedContainerConfig := *containerConfig
+	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env)
+
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
+		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)
+		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(maskedContainerConfig.Command, " "))
+		_, _ = fmt.Fprintf(w, "TTY: %v\n", maskedContainerConfig.TTY)
+		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
+		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
+		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
 		var mounts []string
-		for _, m := range containerConfig.Mounts {
+		for _, m := range maskedContainerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(containerConfig.Env, ", "))
-		_, _ = fmt.Fprintf(w, "Workdir: %s\n", containerConfig.Workdir)
-		_, _ = fmt.Fprintf(w, "User: %s\n", containerConfig.User)
-		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(containerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(w, "PublishAll: %v\n", containerConfig.PublishAll)
-		_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(containerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(w, "Hostname: %s\n", containerConfig.Hostname)
-		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(containerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(containerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(w, "Privileged: %v\n", containerConfig.Privileged)
-		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(containerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(containerConfig.CapDrop, ", "))
-		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(containerConfig.Entrypoint, ", "))
-		_, _ = fmt.Fprintf(w, "Pull: %s\n", containerConfig.Pull)
-		_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(containerConfig.Memory)))
-		_, _ = fmt.Fprintf(w, "CPUs: %g\n", containerConfig.CPUs)
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedContainerConfig.Env, ", "))
+		_, _ = fmt.Fprintf(w, "Workdir: %s\n", maskedContainerConfig.Workdir)
+		_, _ = fmt.Fprintf(w, "User: %s\n", maskedContainerConfig.User)
+		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(maskedContainerConfig.Ports, ", "))
+		_, _ = fmt.Fprintf(w, "PublishAll: %v\n", maskedContainerConfig.PublishAll)
+		_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(maskedContainerConfig.Expose, ", "))
+		_, _ = fmt.Fprintf(w, "Hostname: %s\n", maskedContainerConfig.Hostname)
+		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(maskedContainerConfig.DNS, ", "))
+		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(maskedContainerConfig.AddHosts, ", "))
+		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
+		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
+		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
+
 		var devices []string
-		for _, d := range containerConfig.Devices {
+		for _, d := range maskedContainerConfig.Devices {
 			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
 				devices = append(devices, d.PathOnHost)
 			} else {
@@ -651,6 +654,16 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 			}
 		}
 		_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
+
+		if maskedContainerConfig.Memory > 0 {
+			_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(maskedContainerConfig.Memory)))
+		}
+		if maskedContainerConfig.CPUs > 0 {
+			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))
+		}
+		if len(maskedContainerConfig.Entrypoint) > 0 {
+			_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(maskedContainerConfig.Entrypoint, " "))
+		}
 	})
 }
 

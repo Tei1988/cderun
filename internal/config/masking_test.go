@@ -30,6 +30,7 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Lowercase password", "my_password", "secret", "[REDACTED]"},
 		{"Letter-digit boundary password", "PASSWORD2", "secret", "[REDACTED]"},
 		{"Digit-letter boundary key", "1KEY", "secret", "[REDACTED]"},
+		{"Letter-digit camel boundary", "dbPassword2", "secret", "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
@@ -38,4 +39,12 @@ func TestMaskSensitiveEnv(t *testing.T) {
 			assert.Equal(t, tt.expected, got, "key: %s", tt.key)
 		})
 	}
+}
+
+func TestMaskSensitiveEnvList(t *testing.T) {
+	env := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
+	expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
+
+	got := MaskSensitiveEnvList(env)
+	assert.Equal(t, expected, got)
 }

@@ -34,7 +34,7 @@ node:
   tty: true
   network: host
   env:
-    - MYVAR=VALUE
+    - KEY=VALUE
   mounts:
     - type: bind
       source: /host
@@ -52,7 +52,7 @@ node:
 	assert.Equal(t, []string{"app.js"}, mockRuntime.CreatedConfig.Command)
 	assert.True(t, mockRuntime.CreatedConfig.TTY)
 	assert.Equal(t, "host", mockRuntime.CreatedConfig.Network)
-	assert.Contains(t, mockRuntime.CreatedConfig.Env, "MYVAR=VALUE")
+	assert.Contains(t, mockRuntime.CreatedConfig.Env, "KEY=VALUE")
 	assert.Len(t, mockRuntime.CreatedConfig.Mounts, 1)
 	assert.Equal(t, "bind", mockRuntime.CreatedConfig.Mounts[0].Type)
 	assert.Equal(t, "/host", mockRuntime.CreatedConfig.Mounts[0].Source)
