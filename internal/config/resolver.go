@@ -15,7 +15,6 @@ import (
 	"github.com/docker/go-units"
 )
 
-
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
 	HostContext     *HostContext
@@ -47,22 +46,22 @@ type ResolvedConfig struct {
 	HangTimeout     time.Duration
 
 	// Docker-compatible flags
-	Ports      []string
-	PublishAll bool
-	Expose     []string
-	Hostname   string
-	DNS        []string
-	AddHosts   []string
-	Privileged bool
-	CapAdd     []string
-	CapDrop    []string
-	Entrypoint []string
-	Pull       string
+	Ports           []string
+	PublishAll      bool
+	Expose          []string
+	Hostname        string
+	DNS             []string
+	AddHosts        []string
+	Privileged      bool
+	CapAdd          []string
+	CapDrop         []string
+	Entrypoint      []string
+	Pull            string
 	PullMaxRetries  int
 	PullBackoffBase time.Duration
-	Memory     int64
-	CPUs       float64
-	Devices    []container.DeviceMapping
+	Memory          int64
+	CPUs            float64
+	Devices         []container.DeviceMapping
 }
 
 // CLIOptions represents values from CLI flags.
@@ -165,68 +164,63 @@ type CLIOptions struct {
 	CderunHangTimeoutSet     bool
 
 	// Docker-compatible flags
-	Ports               []string
-	CderunPorts         []string
-	PublishAll          bool
-	PublishAllSet       bool
-	CderunPublishAll    bool
-	CderunPublishAllSet bool
-	Expose              []string
-	CderunExpose        []string
-	Hostname            string
-	HostnameSet         bool
-	CderunHostname      string
-	CderunHostnameSet   bool
-	DNS                 []string
-	CderunDNS           []string
-	AddHosts            []string
-	CderunAddHosts      []string
-	User                string
-	UserSet             bool
-	CderunUser          string
-	CderunUserSet       bool
-	Privileged          bool
-	PrivilegedSet       bool
-	CderunPrivileged    bool
-	CderunPrivilegedSet bool
-	CapAdd              []string
-	CderunCapAdd        []string
-	CapDrop             []string
-	CderunCapDrop       []string
-	Entrypoint          []string
-	CderunEntrypoint    []string
-	Pull                string
-	PullSet             bool
-	CderunPull          string
-	CderunPullSet       bool
-	PullMaxRetries      int
-	PullMaxRetriesSet   bool
-	CderunPullMaxRetries int
-	CderunPullMaxRetriesSet bool
-	PullBackoffBase     string
-	PullBackoffBaseSet  bool
-	CderunPullBackoffBase string
+	Ports                    []string
+	CderunPorts              []string
+	PublishAll               bool
+	PublishAllSet            bool
+	CderunPublishAll         bool
+	CderunPublishAllSet      bool
+	Expose                   []string
+	CderunExpose             []string
+	Hostname                 string
+	HostnameSet              bool
+	CderunHostname           string
+	CderunHostnameSet        bool
+	DNS                      []string
+	CderunDNS                []string
+	AddHosts                 []string
+	CderunAddHosts           []string
+	User                     string
+	UserSet                  bool
+	CderunUser               string
+	CderunUserSet            bool
+	Privileged               bool
+	PrivilegedSet            bool
+	CderunPrivileged         bool
+	CderunPrivilegedSet      bool
+	CapAdd                   []string
+	CderunCapAdd             []string
+	CapDrop                  []string
+	CderunCapDrop            []string
+	Entrypoint               []string
+	CderunEntrypoint         []string
+	Pull                     string
+	PullSet                  bool
+	CderunPull               string
+	CderunPullSet            bool
+	PullMaxRetries           int
+	PullMaxRetriesSet        bool
+	CderunPullMaxRetries     int
+	CderunPullMaxRetriesSet  bool
+	PullBackoffBase          string
+	PullBackoffBaseSet       bool
+	CderunPullBackoffBase    string
 	CderunPullBackoffBaseSet bool
-	Memory              string
-	MemorySet           bool
-	CderunMemory        string
-	CderunMemorySet     bool
-	CPUs                float64
-	CPUsSet             bool
-	CderunCPUs          float64
-	CderunCPUsSet       bool
-	Devices             []string
-	CderunDevices       []string
+	Memory                   string
+	MemorySet                bool
+	CderunMemory             string
+	CderunMemorySet          bool
+	CPUs                     float64
+	CPUsSet                  bool
+	CderunCPUs               float64
+	CderunCPUsSet            bool
+	Devices                  []string
+	CderunDevices            []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
 func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
-}
-
-// ResolveWithFS combines CLI flags, environment variables, tool-specific config, and global defaults using the provided filesystem.
-func ptr[T any](v T) *T {
-	return &v
 }
 
 var (
@@ -309,11 +303,11 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
 	info, ok := fieldInfo[key]
 	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Option: key, Reason: fmt.Sprintf("info for option %q not found", key)}
 	}
 
 	if info.p1ValIdx == nil || info.p2ValIdx == nil {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Option: key, Reason: fmt.Sprintf("CLI reflection fields for option %q missing in CLIOptions", key)}
 	}
 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -321,13 +315,18 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 	return info, p1Set, p1Val, p2Set, p2Val, nil
 }
 
+// ptr returns a pointer to the given value.
+func ptr[T any](v T) *T {
+	return &v
+}
+
 func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	if cli == nil {
 		cli = &CLIOptions{}
 	}
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
-	res := &ResolvedConfig{}
-	var err error
+
+	fieldOnce.Do(initFieldInfo)
 
 	var hostCtx *HostContext
 	if global != nil {
@@ -339,16 +338,74 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
 	}
 
-	fieldOnce.Do(initFieldInfo)
+	resolver := &resolver{
+		subcommand: subcommand,
+		cli:        cli,
+		cliVal:     reflect.ValueOf(cli).Elem(),
+		tools:      tools,
+		global:     global,
+		fs:         fs,
+		expr:       r,
+		res:        &ResolvedConfig{HostContext: hostCtx},
+	}
+	resolver.resVal = reflect.ValueOf(resolver.res).Elem()
 
-	cliVal := reflect.ValueOf(cli).Elem()
-	resVal := reflect.ValueOf(res).Elem()
+	if err := resolver.resolveEarly(); err != nil {
+		return nil, err
+	}
 
+	if err := resolver.resolveStandardOptions(); err != nil {
+		return nil, err
+	}
+
+	if resolver.res.Image == "" && subcommand != "" && !resolver.res.Diagnosis {
+		return nil, &ImageNotFoundError{Tool: subcommand}
+	}
+	if resolver.res.Image != "" {
+		logging.Debug("Resolved Image: %s", resolver.res.Image)
+	}
+
+	if err := resolver.resolveComplexOptions(); err != nil {
+		return nil, err
+	}
+
+	if err := resolver.resolveRuntimeAndSocket(); err != nil {
+		return nil, err
+	}
+
+	if err := resolver.resolveTransitiveOptions(); err != nil {
+		return nil, err
+	}
+
+	if err := resolver.resolveCustomParsing(); err != nil {
+		return nil, err
+	}
+
+	if err := r.Error(); err != nil {
+		return nil, err
+	}
+
+	return resolver.res, nil
+}
+
+type resolver struct {
+	subcommand string
+	cli        *CLIOptions
+	cliVal     reflect.Value
+	tools      ToolsConfig
+	global     *CDERunConfig
+	fs         FileSystem
+	expr       *ExpressionResolver
+	res        *ResolvedConfig
+	resVal     reflect.Value
+}
+
+func (r *resolver) resolveEarly() error {
 	// Phase 1: Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: early boolean option %q not found", name)
+			return &RegistryMismatchError{Option: name, Reason: fmt.Sprintf("early boolean option %q not found", name)}
 		}
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -356,25 +413,27 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
-		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), r.subcommand, r.tools, r.global, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
+	return nil
+}
 
-	// Phase 2: Registry-based options (String & Bool)
-
+func (r *resolver) resolveStandardOptions() error {
+	// Phase 2: Registry-based options (String)
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		def := OptionDef[string]{
@@ -384,15 +443,8 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     opt.Default,
 		}
 
-		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
-		resVal.FieldByIndex(info.targetIdx).SetString(resolved)
-	}
-
-	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
-	}
-	if res.Image != "" {
-		logging.Debug("Resolved Image: %s", res.Image)
+		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), r.subcommand, r.tools, r.global, r.expr, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -406,9 +458,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		def := OptionDef[*bool]{
@@ -417,232 +469,15 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
-		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), r.subcommand, r.tools, r.global, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
-	// Phase 4: Complex types (Mounts, Env)
-	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r, fs)
-	if err != nil {
-		return nil, err
-	}
-
-	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r, fs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Phase 5: Path resolution & Auto-detection (Socket)
-	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		res.SocketPath, err = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_SOCKET_PATH",
-			"", nil, nil,
-			global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
-			"",
-			r,
-			"path",
-			fs,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if res.Runtime == "" {
-		if res.SocketPath != "" {
-			if strings.Contains(res.SocketPath, "podman") {
-				res.Runtime = "podman"
-			} else {
-				res.Runtime = "docker"
-			}
-		} else {
-			if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
-				res.Runtime = "docker"
-				res.SocketPath = "/var/run/docker.sock"
-			} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
-				res.Runtime = "podman"
-				res.SocketPath = "/run/podman/podman.sock"
-			} else {
-				res.Runtime = "docker"
-				res.SocketPath = "/var/run/docker.sock"
-			}
-		}
-	}
-
-	if res.SocketPath == "" {
-		if res.Runtime == "podman" {
-			res.SocketPath = "/run/podman/podman.sock"
-		} else {
-			res.SocketPath = "/var/run/docker.sock"
-		}
-	}
-	res.SocketPath = strings.TrimPrefix(res.SocketPath, "unix://")
-
-	// Phase 6: Transitive options (MountTools -> MountCderun -> MountSocket)
-	res.MountTools = resolveStringSliceCommaOpt(
-		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
-			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
-			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
-		cli.CderunMountToolsSet, cli.CderunMountTools,
-		cli.MountToolsSet, cli.MountTools,
-		subcommand, tools, global, r, fs,
-	)
-
-	// Resolve mount-all-tools (transitive trigger)
-	{
-		opt, _ := GetBoolOption("mount-all-tools")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", cliVal)
-		if err != nil {
-			return nil, err
-		}
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
-	}
-
-	var mountCderunSpecified bool
-	{
-		opt, _ := GetBoolOption("mount-cderun")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", cliVal)
-		if err != nil {
-			return nil, err
-		}
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
-	}
-	if !mountCderunSpecified {
-		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
-	}
-
-	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		res.MountCderunPath, err = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_CDERUN_PATH",
-			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-			"",
-			r,
-			"path",
-			fs,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var mountSocketSpecified bool
-	{
-		opt, _ := GetBoolOption("mount-socket")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", cliVal)
-		if err != nil {
-			return nil, err
-		}
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
-	}
-	if !mountSocketSpecified {
-		res.MountSocket = res.MountCderun
-	}
-
-	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		res.MountSocketPath, err = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_SOCKET_PATH",
-			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-			res.SocketPath,
-			r,
-			"path",
-			fs,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Phase 7: Duration and Slice options
-	// Resolve hang-timeout via registry entry (skipped in Phase 2)
-	var hangTimeoutStr string
-	if opt, ok := GetStringOption("hang-timeout"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
-	}
-	if hangTimeoutStr != "" {
-		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
-			if d < 0 {
-				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
-			}
-			res.HangTimeout = d
-		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
-		}
-	}
-
-	for _, opt := range StringSliceOptions {
-		if opt.SkipResolution {
-			continue
-		}
-
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		var p1v, p2v []string
-		if p1Set {
-			if v, ok := p1Val.Interface().([]string); ok {
-				p1v = v
-			}
-		}
-		if p2Set {
-			if v, ok := p2Val.Interface().([]string); ok {
-				p2v = v
-			}
-		}
-
-		def := OptionDef[[]string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-		}
-
-		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, subcommand, tools, global, r, fs)
-		resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
-	}
-
-	// Phase 8: Integer & Float options
+	// Phase 7/8: Integer & Float options
 	for _, opt := range IntOptions {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		p1Int := 0
@@ -672,78 +507,14 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, subcommand, tools, global, fs)
-		resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
-	}
-
-	if res.PullMaxRetries <= 0 {
-		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
-	}
-
-	// Resolve pull-backoff-base via registry
-	var pullBackoffBaseStr string
-	if opt, ok := GetStringOption("pull-backoff-base"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
-	}
-
-	if pullBackoffBaseStr != "" {
-		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
-			if d <= 0 {
-				return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
-			}
-			res.PullBackoffBase = d
-		} else {
-			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
-		}
-	}
-
-	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r, fs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Resolve memory via registry
-	var memStr string
-	if opt, ok := GetStringOption("memory"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", cliVal)
-		if err != nil {
-			return nil, err
-		}
-
-		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
-	}
-	if memStr != "" {
-		bytes, err := units.RAMInBytes(memStr)
-		if err != nil {
-			if exprErr := r.Error(); exprErr != nil {
-				return nil, exprErr
-			}
-			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
-		}
-		res.Memory = bytes
+		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, r.subcommand, r.tools, r.global, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 
 	for _, opt := range Float64Options {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		p1Float := 0.0
@@ -773,17 +544,300 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, subcommand, tools, global, fs)
-		resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
+		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, r.subcommand, r.tools, r.global, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
-	res.HostContext = hostCtx
+	for _, opt := range StringSliceOptions {
+		if opt.SkipResolution {
+			continue
+		}
 
-	if err := r.Error(); err != nil {
-		return nil, err
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		var p1v, p2v []string
+		if p1Set {
+			if v, ok := p1Val.Interface().([]string); ok {
+				p1v = v
+			}
+		}
+		if p2Set {
+			if v, ok := p2Val.Interface().([]string); ok {
+				p2v = v
+			}
+		}
+
+		def := OptionDef[[]string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+		}
+
+		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, r.subcommand, r.tools, r.global, r.expr, r.fs)
+		r.resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
 	}
 
-	return res, nil
+	return nil
+}
+
+func (r *resolver) resolveComplexOptions() error {
+	var err error
+	// Phase 4: Complex types (Mounts, Env)
+	r.res.Mounts, err = resolveMounts(r.cli.CderunMounts, r.cli.Mounts, r.subcommand, r.tools, r.global, r.expr, r.fs)
+	if err != nil {
+		return err
+	}
+
+	r.res.Env, err = resolveEnv(r.cli.CderunEnv, r.cli.Env, "CDERUN_ENV", r.subcommand, r.tools, r.global, r.res.StrictEnv, r.expr, r.fs)
+	if err != nil {
+		return err
+	}
+
+	r.res.Devices, err = resolveDevices(r.cli.CderunDevices, r.cli.Devices, r.subcommand, r.tools, r.global, r.expr, r.fs)
+	return err
+}
+
+func (r *resolver) resolveRuntimeAndSocket() error {
+	// Phase 5: Path resolution & Auto-detection (Socket)
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", r.cliVal)
+	if err != nil {
+		return err
+	}
+
+	r.res.SocketPath, err = resolveConfigPath(
+		p1Set, p1Val.String(),
+		p2Set, p2Val.String(),
+		"CDERUN_SOCKET_PATH",
+		"", nil, nil,
+		r.global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
+		"",
+		r.expr,
+		"path",
+		r.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	if r.res.Runtime == "" {
+		if r.res.SocketPath != "" {
+			if strings.Contains(r.res.SocketPath, "podman") {
+				r.res.Runtime = "podman"
+			} else {
+				r.res.Runtime = "docker"
+			}
+		} else {
+			if _, err := r.fs.Stat("/var/run/docker.sock"); err == nil {
+				r.res.Runtime = "docker"
+				r.res.SocketPath = "/var/run/docker.sock"
+			} else if _, err := r.fs.Stat("/run/podman/podman.sock"); err == nil {
+				r.res.Runtime = "podman"
+				r.res.SocketPath = "/run/podman/podman.sock"
+			} else {
+				r.res.Runtime = "docker"
+				r.res.SocketPath = "/var/run/docker.sock"
+			}
+		}
+	}
+
+	if r.res.SocketPath == "" {
+		if r.res.Runtime == "podman" {
+			r.res.SocketPath = "/run/podman/podman.sock"
+		} else {
+			r.res.SocketPath = "/var/run/docker.sock"
+		}
+	}
+	r.res.SocketPath = strings.TrimPrefix(r.res.SocketPath, "unix://")
+	return nil
+}
+
+func (r *resolver) resolveTransitiveOptions() error {
+	// Phase 6: Transitive options (MountTools -> MountCderun -> MountSocket)
+	r.res.MountTools = resolveStringSliceCommaOpt(
+		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
+			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
+			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
+		r.cli.CderunMountToolsSet, r.cli.CderunMountTools,
+		r.cli.MountToolsSet, r.cli.MountTools,
+		r.subcommand, r.tools, r.global, r.expr, r.fs,
+	)
+
+	// Resolve mount-all-tools (transitive trigger)
+	{
+		opt, _ := GetBoolOption("mount-all-tools")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", r.cliVal)
+		if err != nil {
+			return err
+		}
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		r.res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), r.subcommand, r.tools, r.global, r.fs)
+	}
+
+	var mountCderunSpecified bool
+	{
+		opt, _ := GetBoolOption("mount-cderun")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", r.cliVal)
+		if err != nil {
+			return err
+		}
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		r.res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), r.subcommand, r.tools, r.global, r.fs)
+	}
+	if !mountCderunSpecified {
+		r.res.MountCderun = len(r.res.MountTools) > 0 || r.res.MountAllTools
+	}
+
+	{
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		r.res.MountCderunPath, err = resolveConfigPath(
+			p1Set, p1Val.String(),
+			p2Set, p2Val.String(),
+			"CDERUN_MOUNT_CDERUN_PATH",
+			r.subcommand, r.tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+			r.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			"",
+			r.expr,
+			"path",
+			r.fs,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	var mountSocketSpecified bool
+	{
+		opt, _ := GetBoolOption("mount-socket")
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", r.cliVal)
+		if err != nil {
+			return err
+		}
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		r.res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), r.subcommand, r.tools, r.global, r.fs)
+	}
+	if !mountSocketSpecified {
+		r.res.MountSocket = r.res.MountCderun
+	}
+
+	{
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		r.res.MountSocketPath, err = resolveConfigPath(
+			p1Set, p1Val.String(),
+			p2Set, p2Val.String(),
+			"CDERUN_MOUNT_SOCKET_PATH",
+			r.subcommand, r.tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+			r.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			r.res.SocketPath,
+			r.expr,
+			"path",
+			r.fs,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *resolver) resolveCustomParsing() error {
+	// Phase 7/8: Duration, memory and other custom parsing
+	// Resolve hang-timeout
+	var hangTimeoutStr string
+	if opt, ok := GetStringOption("hang-timeout"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), r.subcommand, r.tools, r.global, r.expr, r.fs)
+	}
+	if hangTimeoutStr != "" {
+		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
+			if d < 0 {
+				return &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
+			}
+			r.res.HangTimeout = d
+		} else {
+			return &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: err}
+		}
+	}
+
+	if r.res.PullMaxRetries <= 0 {
+		return fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", r.res.PullMaxRetries)
+	}
+
+	// Resolve pull-backoff-base
+	var pullBackoffBaseStr string
+	if opt, ok := GetStringOption("pull-backoff-base"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), r.subcommand, r.tools, r.global, r.expr, r.fs)
+	}
+
+	if pullBackoffBaseStr != "" {
+		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
+			if d <= 0 {
+				return fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
+			}
+			r.res.PullBackoffBase = d
+		} else {
+			return fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
+		}
+	}
+
+	// Resolve memory
+	var memStr string
+	if opt, ok := GetStringOption("memory"); ok {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
+		}
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", r.cliVal)
+		if err != nil {
+			return err
+		}
+
+		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), r.subcommand, r.tools, r.global, r.expr, r.fs)
+	}
+	if memStr != "" {
+		bytes, err := units.RAMInBytes(memStr)
+		if err != nil {
+			if exprErr := r.expr.Error(); exprErr != nil {
+				return exprErr
+			}
+			return fmt.Errorf("invalid memory value %q: %w", memStr, err)
+		}
+		r.res.Memory = bytes
+	}
+	return nil
 }
 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
@@ -910,7 +964,6 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	}
 
 	// Deduplicate within the winning source (last-one-wins for the same key)
-	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
 	merged := mergeEnv(nil, nil, envs)
 
 	return resolveEnvValues(merged, strict, r, fs)
