@@ -147,7 +147,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	StringOptions = append(originalOptions, StringOption{Name: "hc", FieldName: "HostContext"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields")
+	assert.Contains(t, err.Error(), "registry mismatch: info for option \"hc\" not found")
 
 	// Reset StringOptions before Phase 1 test to avoid triggering same error again
 	StringOptions = originalOptions
@@ -162,7 +162,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: info for bool option \"bad-bool\" not found")
+	assert.Contains(t, err.Error(), "registry mismatch: info for option \"bad-bool\" not found")
 }
 
 func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
@@ -817,7 +817,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatchErrors(t *testing.
 	cli := CLIOptions{Image: "a", ImageSet: true}
 	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: 'mount-all-tools' not found")
+	assert.Contains(t, err.Error(), "registry mismatch: early boolean option \"diagnosis\" not found")
 }
 
 func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {

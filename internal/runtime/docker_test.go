@@ -388,7 +388,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 				{Type: "bind", Source: "/src", Target: "/dst"},
 				{Type: "volume", Source: "myvol", Target: "/data"},
 				{Type: "tmpfs", Target: "/cache"},
-				{Type: "", Source: "/ext", Target: "/ext"},
+				{Type: "unknown", Source: "/ext", Target: "/ext"},
 			},
 			Devices: []container.DeviceMapping{
 				{PathOnHost: "/dev/fuse", PathInContainer: "/dev/fuse", CgroupPermissions: "rmw"},

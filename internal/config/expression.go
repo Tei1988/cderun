@@ -10,6 +10,8 @@ import (
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
+const MaxDirectiveFileSize = 1024 * 1024 // 1MB
+
 type fileCacheEntry struct {
 	content string
 	err     error
@@ -71,6 +73,22 @@ func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 		shared:      r.shared,
 		err:         r.err,
 	}
+}
+
+func (r *ExpressionResolver) ensureFileCache() {
+	r.shared.cacheOnce.Do(func() {
+		if r.shared.fileCache == nil {
+			r.shared.fileCache = make(map[string]fileCacheEntry)
+		}
+	})
+}
+
+func (r *ExpressionResolver) ensureLoader() {
+	r.shared.loaderOnce.Do(func() {
+		if r.shared.loader == nil {
+			r.shared.loader = NewConfigLoaderWithFS(r.fs)
+		}
+	})
 }
 
 func (r *ExpressionResolver) setError(err error) {
@@ -155,22 +173,6 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	return resolved
 }
 
-func (r *ExpressionResolver) ensureLoader() {
-	r.shared.loaderOnce.Do(func() {
-		if r.shared.loader == nil {
-			r.shared.loader = NewConfigLoaderWithFS(r.fs)
-		}
-	})
-}
-
-func (r *ExpressionResolver) ensureCache() {
-	r.shared.cacheOnce.Do(func() {
-		if r.shared.fileCache == nil {
-			r.shared.fileCache = make(map[string]fileCacheEntry)
-		}
-	})
-}
-
 func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 	// 1. Magic Words
 	switch content {
@@ -211,17 +213,28 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	r.ensureCache()
-
+	r.ensureFileCache()
 	if cached, ok := r.shared.fileCache[filename]; ok {
 		return cached.content, cached.err
 	}
 
 	r.ensureLoader()
-
 	paths := r.shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
+	}
+
+	info, err := r.fs.Stat(paths[0])
+	if err != nil {
+		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
+		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		return "", wrappedErr
+	}
+
+	if info.Size() > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
@@ -231,6 +244,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
 		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
+	}
+
+	if int64(len(data)) > MaxDirectiveFileSize {
+		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		return "", err
 	}
 
 	result := strings.TrimSpace(string(data))
@@ -244,7 +263,6 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	}
 
 	r.ensureLoader()
-
 	paths := r.shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
 		return "", fmt.Errorf("item not found for find_dir: %s", name)

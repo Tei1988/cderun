@@ -88,7 +88,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	for _, m := range config.Mounts {
 		var mType mount.Type
 		switch m.Type {
-		case "bind", "":
+		case "bind":
 			mType = mount.TypeBind
 		case "volume":
 			mType = mount.TypeVolume
