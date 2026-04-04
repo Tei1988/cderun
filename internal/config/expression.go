@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -16,14 +17,20 @@ type fileCacheEntry struct {
 	err     error
 }
 
+// resolverSharedState holds lazily-initialized shared state for ExpressionResolver.
+type resolverSharedState struct {
+	fileCache map[string]fileCacheEntry
+	loader    *ConfigLoader
+	once      sync.Once
+}
+
 // ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
 	Home        string
 	Pwd         string
 	HostContext *HostContext
-	fileCache   map[string]fileCacheEntry
-	loader      *ConfigLoader
+	shared      *resolverSharedState
 	err         error
 }
 
@@ -45,8 +52,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		fileCache:   make(map[string]fileCacheEntry),
-		loader:      NewConfigLoaderWithFS(fs),
+		shared:      &resolverSharedState{},
 	}, nil
 }
 
@@ -186,39 +192,44 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
 	}
 
-	if cached, ok := r.fileCache[filename]; ok {
+	r.shared.once.Do(func() {
+		r.shared.fileCache = make(map[string]fileCacheEntry)
+		r.shared.loader = NewConfigLoaderWithFS(r.fs)
+	})
+
+	if cached, ok := r.shared.fileCache[filename]; ok {
 		return cached.content, cached.err
 	}
 
-	paths := r.loader.FindConfigs(filename)
+	paths := r.shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %s", filename)
-		r.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	info, err := r.fs.Stat(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
-		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
 	if info.Size() > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
-		r.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
-		r.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
 	result := strings.TrimSpace(string(data))
-	r.fileCache[filename] = fileCacheEntry{content: result}
+	r.shared.fileCache[filename] = fileCacheEntry{content: result}
 	return result, nil
 }
 
@@ -227,7 +238,12 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
 	}
 
-	paths := r.loader.FindConfigs(name)
+	r.shared.once.Do(func() {
+		r.shared.fileCache = make(map[string]fileCacheEntry)
+		r.shared.loader = NewConfigLoaderWithFS(r.fs)
+	})
+
+	paths := r.shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
 		return "", fmt.Errorf("item not found for find_dir: %s", name)
 	}

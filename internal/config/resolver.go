@@ -818,7 +818,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	var dcs []DeviceConfig
 
 	if p1 != nil {
-		dcs = []DeviceConfig{}
+		dcs = make([]DeviceConfig, 0, len(p1))
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -828,7 +828,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			dcs = append(dcs, parsed)
 		}
 	} else if p2 != nil {
-		dcs = []DeviceConfig{}
+		dcs = make([]DeviceConfig, 0, len(p2))
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
@@ -861,7 +861,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		dcs = global.Defaults.Devices
 	}
 
-	var res []container.DeviceMapping
+	res := make([]container.DeviceMapping, 0, len(dcs))
 	for _, dc := range dcs {
 		resolved, err := dc.Resolve(r)
 		if err != nil {
@@ -906,8 +906,13 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
-	m := make(map[string]string)
-	var keys []string
+	if len(base) == 0 && len(p2) == 0 && len(p1) == 0 {
+		return nil
+	}
+
+	total := len(base) + len(p2) + len(p1)
+	m := make(map[string]string, total)
+	keys := make([]string, 0, total)
 
 	add := func(env []string) {
 		for _, e := range env {
@@ -923,7 +928,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 	add(p2)
 	add(p1)
 
-	var res []string
+	res := make([]string, 0, len(keys))
 	for _, k := range keys {
 		res = append(res, m[k])
 	}
@@ -931,15 +936,17 @@ func mergeEnv(base, p2, p1 []string) []string {
 }
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var res []string
+	res := make([]string, 0, len(env))
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
 			return nil, err
 		}
 		if strings.Contains(resolvedE, "=") {
-			masked := MaskSensitiveEnv([]string{resolvedE})
-			logging.Debug("Environment variable: %s", masked[0])
+			if logging.GetGlobalLogger().GetLevel() >= logging.DebugLevel {
+				masked := MaskSensitiveEnv([]string{resolvedE})
+				logging.Debug("Environment variable: %s", masked[0])
+			}
 			res = append(res, resolvedE)
 		} else {
 			val, found := fs.LookupEnv(resolvedE)
@@ -998,7 +1005,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	var mcs []MountConfig
 
 	if p1 != nil {
-		mcs = []MountConfig{}
+		mcs = make([]MountConfig, 0, len(p1))
 		for _, m := range p1 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
@@ -1008,7 +1015,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			mcs = append(mcs, parsed)
 		}
 	} else if p2 != nil {
-		mcs = []MountConfig{}
+		mcs = make([]MountConfig, 0, len(p2))
 		for _, m := range p2 {
 			parsed, err := ParseMountFlag(m)
 			if err != nil {
@@ -1041,7 +1048,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		mcs = global.Defaults.Mounts
 	}
 
-	var res []container.Mount
+	res := make([]container.Mount, 0, len(mcs))
 	for _, mc := range mcs {
 		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
 			hostPath, err := mc.Source.Resolve(r)
