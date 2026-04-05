@@ -344,6 +344,13 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	cliVal := reflect.ValueOf(cli).Elem()
 	resVal := reflect.ValueOf(res).Elem()
 
+	var tool *ToolConfig
+	if tools != nil && subcommand != "" {
+		if t, ok := tools[subcommand]; ok {
+			tool = &t
+		}
+	}
+
 	// Phase 1: Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
@@ -361,7 +368,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), tool, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
@@ -384,7 +391,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     opt.Default,
 		}
 
-		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
+		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), tool, global, r, fs)
 		resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	}
 
@@ -417,17 +424,17 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), tool, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 
 	// Phase 4: Complex types (Mounts, Env)
-	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, subcommand, tools, global, r, fs)
+	res.Mounts, err = resolveMounts(cli.CderunMounts, cli.Mounts, tool, global, r, fs)
 	if err != nil {
 		return nil, err
 	}
 
-	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", subcommand, tools, global, res.StrictEnv, r, fs)
+	res.Env, err = resolveEnv(cli.CderunEnv, cli.Env, "CDERUN_ENV", tool, global, res.StrictEnv, r, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -443,8 +450,8 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			p1Set, p1Val.String(),
 			p2Set, p2Val.String(),
 			"CDERUN_SOCKET_PATH",
-			"", nil, nil,
-			global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			nil, nil,
+			global, func(g *CDERunConfig) ConfigPath { return g.SocketPath },
 			"",
 			r,
 			"path",
@@ -488,11 +495,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	// Phase 6: Transitive options (MountTools -> MountCderun -> MountSocket)
 	res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
-			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
-			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
+			ToolGetter:   func(t *ToolConfig) []string { return t.MountTools },
+			GlobalGetter: func(g *CDERunConfig) []string { return g.Defaults.MountTools }},
 		cli.CderunMountToolsSet, cli.CderunMountTools,
 		cli.MountToolsSet, cli.MountTools,
-		subcommand, tools, global, r, fs,
+		tool, global, r, fs,
 	)
 
 	// Resolve mount-all-tools (transitive trigger)
@@ -503,7 +510,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), tool, global, fs)
 	}
 
 	var mountCderunSpecified bool
@@ -514,7 +521,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), tool, global, fs)
 	}
 	if !mountCderunSpecified {
 		res.MountCderun = len(res.MountTools) > 0 || res.MountAllTools
@@ -530,8 +537,8 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			p1Set, p1Val.String(),
 			p2Set, p2Val.String(),
 			"CDERUN_MOUNT_CDERUN_PATH",
-			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			tool, func(t *ToolConfig) ConfigPath { return t.MountCderunPath },
+			global, func(g *CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
 			"",
 			r,
 			"path",
@@ -550,7 +557,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), subcommand, tools, global, fs)
+		res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), tool, global, fs)
 	}
 	if !mountSocketSpecified {
 		res.MountSocket = res.MountCderun
@@ -566,8 +573,8 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			p1Set, p1Val.String(),
 			p2Set, p2Val.String(),
 			"CDERUN_MOUNT_SOCKET_PATH",
-			subcommand, tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			tool, func(t *ToolConfig) ConfigPath { return t.MountSocketPath },
+			global, func(g *CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
 			res.SocketPath,
 			r,
 			"path",
@@ -593,7 +600,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 
-		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
+		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), tool, global, r, fs)
 	}
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
@@ -634,7 +641,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, subcommand, tools, global, r, fs)
+		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, tool, global, r, fs)
 		resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
 	}
 
@@ -672,7 +679,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, subcommand, tools, global, fs)
+		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, tool, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 
@@ -694,7 +701,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 
-		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
+		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), tool, global, r, fs)
 	}
 
 	if pullBackoffBaseStr != "" {
@@ -708,7 +715,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		}
 	}
 
-	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, subcommand, tools, global, r, fs)
+	res.Devices, err = resolveDevices(cli.CderunDevices, cli.Devices, tool, global, r, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -727,7 +734,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 
-		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
+		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), tool, global, r, fs)
 	}
 	if memStr != "" {
 		bytes, err := units.RAMInBytes(memStr)
@@ -773,7 +780,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			Fallback:     &opt.Default,
 		}
 
-		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, subcommand, tools, global, fs)
+		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, tool, global, fs)
 		resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
@@ -786,7 +793,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	return res, nil
 }
 
-func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
+func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, tool *ToolConfig, toolGetter func(*ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(*CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
 	if p1Set {
 		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
@@ -796,16 +803,14 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
 	} else {
 		found := false
-		if tools != nil {
-			if tool, ok := tools[subcommand]; ok {
-				if t := toolGetter(tool); !t.IsEmpty() {
-					cp = t
-					found = true
-				}
+		if tool != nil {
+			if t := toolGetter(tool); !t.IsEmpty() {
+				cp = t
+				found = true
 			}
 		}
 		if !found && global != nil {
-			if g := globalGetter(*global); !g.IsEmpty() {
+			if g := globalGetter(global); !g.IsEmpty() {
 				cp = g
 				found = true
 			}
@@ -825,7 +830,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	}
 }
 
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
+func resolveDevices(p1 []string, p2 []string, tool *ToolConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	var dcs []DeviceConfig
 
 	if p1 != nil {
@@ -862,10 +867,8 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
 		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
-			dcs = tool.Devices
-		}
+	} else if tool != nil && tool.Devices != nil {
+		dcs = tool.Devices
 	}
 
 	if dcs == nil && global != nil {
@@ -883,7 +886,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
-func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
+func resolveEnv(p1 []string, p2 []string, envKey string, tool *ToolConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var envs []string
 
 	if p1 != nil {
@@ -899,10 +902,8 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 			}
 			envs = append(envs, e)
 		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
-			envs = tool.Env
-		}
+	} else if tool != nil && tool.Env != nil {
+		envs = tool.Env
 	}
 
 	if envs == nil && global != nil {
@@ -961,7 +962,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 	return res, nil
 }
 
-func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
+func resolveMounts(p1 []string, p2 []string, tool *ToolConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	var mcs []MountConfig
 
 	if p1 != nil {
@@ -998,10 +999,8 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			parsed.SetBaseDir(r.Pwd)
 			mcs = append(mcs, parsed)
 		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
-			mcs = tool.Mounts
-		}
+	} else if tool != nil && tool.Mounts != nil {
+		mcs = tool.Mounts
 	}
 
 	if mcs == nil && global != nil {

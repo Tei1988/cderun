@@ -12,9 +12,9 @@ type OptionDef[T any] struct {
 	// P3 environment variable key
 	EnvKey string
 	// P4: getter from tool-specific config
-	ToolGetter func(ToolConfig) T
+	ToolGetter func(*ToolConfig) T
 	// P5: getter from global defaults
-	GlobalGetter func(CDERunConfig) T
+	GlobalGetter func(*CDERunConfig) T
 	// P6: hardcoded fallback
 	Fallback T
 }
@@ -24,7 +24,7 @@ func resolveStringOpt(
 	def OptionDef[string],
 	p1Set bool, p1Val string,
 	p2Set bool, p2Val string,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) string {
 	if p1Set {
@@ -38,15 +38,13 @@ func resolveStringOpt(
 			return r.resolveString(env)
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			if s := def.ToolGetter(tool); s != "" {
-				return r.resolveString(s)
-			}
+	if def.ToolGetter != nil && tool != nil {
+		if s := def.ToolGetter(tool); s != "" {
+			return r.resolveString(s)
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if s := def.GlobalGetter(*global); s != "" {
+		if s := def.GlobalGetter(global); s != "" {
 			return r.resolveString(s)
 		}
 	}
@@ -60,10 +58,10 @@ func resolveBoolOpt(
 	fallback bool,
 	p1Set bool, p1Val bool,
 	p2Set bool, p2Val bool,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	fs FileSystem,
 ) bool {
-	val, specified := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+	val, specified := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, tool, global, fs)
 	if specified {
 		return val
 	}
@@ -75,7 +73,7 @@ func resolveBoolOptInfo(
 	def OptionDef[*bool],
 	p1Set bool, p1Val bool,
 	p2Set bool, p2Val bool,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	fs FileSystem,
 ) (bool, bool) {
 	if p1Set {
@@ -91,15 +89,13 @@ func resolveBoolOptInfo(
 			}
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			if b := def.ToolGetter(tool); b != nil {
-				return *b, true
-			}
+	if def.ToolGetter != nil && tool != nil {
+		if b := def.ToolGetter(tool); b != nil {
+			return *b, true
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if b := def.GlobalGetter(*global); b != nil {
+		if b := def.GlobalGetter(global); b != nil {
 			return *b, true
 		}
 	}
@@ -113,7 +109,7 @@ func resolveStringSliceOpt(
 	def OptionDef[[]string],
 	envSep string,
 	p1 []string, p2 []string,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
 	var vals []string
@@ -133,13 +129,11 @@ func resolveStringSliceOpt(
 			}
 		}
 	}
-	if vals == nil && def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			vals = def.ToolGetter(tool)
-		}
+	if vals == nil && def.ToolGetter != nil && tool != nil {
+		vals = def.ToolGetter(tool)
 	}
 	if vals == nil && def.GlobalGetter != nil && global != nil {
-		vals = def.GlobalGetter(*global)
+		vals = def.GlobalGetter(global)
 	}
 	var res []string
 	if vals != nil {
@@ -157,7 +151,7 @@ func resolveStringSliceCommaOpt(
 	def OptionDef[[]string],
 	p1Set bool, p1Val string,
 	p2Set bool, p2Val string,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
 	var vals []string
@@ -170,13 +164,11 @@ func resolveStringSliceCommaOpt(
 			vals = strings.Split(env, ",")
 		}
 	}
-	if vals == nil && def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			vals = def.ToolGetter(tool)
-		}
+	if vals == nil && def.ToolGetter != nil && tool != nil {
+		vals = def.ToolGetter(tool)
 	}
 	if vals == nil && def.GlobalGetter != nil && global != nil {
-		vals = def.GlobalGetter(*global)
+		vals = def.GlobalGetter(global)
 	}
 	var res []string
 	if vals != nil {
@@ -196,7 +188,7 @@ func resolveFloat64Opt(
 	def OptionDef[*float64],
 	p1Set bool, p1Val float64,
 	p2Set bool, p2Val float64,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	fs FileSystem,
 ) float64 {
 	if p1Set {
@@ -212,15 +204,13 @@ func resolveFloat64Opt(
 			}
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			if f := def.ToolGetter(tool); f != nil {
-				return *f
-			}
+	if def.ToolGetter != nil && tool != nil {
+		if f := def.ToolGetter(tool); f != nil {
+			return *f
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if f := def.GlobalGetter(*global); f != nil {
+		if f := def.GlobalGetter(global); f != nil {
 			return *f
 		}
 	}
@@ -235,7 +225,7 @@ func resolveIntOpt(
 	def OptionDef[*int],
 	p1Set bool, p1Val int,
 	p2Set bool, p2Val int,
-	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	tool *ToolConfig, global *CDERunConfig,
 	fs FileSystem,
 ) int {
 	if p1Set {
@@ -251,15 +241,13 @@ func resolveIntOpt(
 			}
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			if i := def.ToolGetter(tool); i != nil {
-				return *i
-			}
+	if def.ToolGetter != nil && tool != nil {
+		if i := def.ToolGetter(tool); i != nil {
+			return *i
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if i := def.GlobalGetter(*global); i != nil {
+		if i := def.GlobalGetter(global); i != nil {
 			return *i
 		}
 	}

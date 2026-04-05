@@ -420,7 +420,7 @@ func TestUnit_Config_Resolver_Devices_More(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		res, err := resolveDevices(nil, nil, "", nil, nil, r, mfs)
+		res, err := resolveDevices(nil, nil, nil, nil, r, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res)
 	})
@@ -433,7 +433,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		_, err = resolveDevices([]string{":"}, nil, "", nil, nil, r, mfs)
+		_, err = resolveDevices([]string{":"}, nil, nil, nil, r, mfs)
 		require.Error(t, err)
 	})
 
@@ -441,7 +441,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		_, err = resolveMounts([]string{"invalid"}, nil, "", nil, nil, r, mfs)
+		_, err = resolveMounts([]string{"invalid"}, nil, nil, nil, r, mfs)
 		require.Error(t, err)
 	})
 
@@ -460,7 +460,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 
 	t.Run("resolveFloat64Opt invalid", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "invalid"}}
-		val := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, "", nil, nil, mfs)
+		val := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, nil, nil, mfs)
 		assert.InDelta(t, 0.0, val, 1e-9)
 	})
 
@@ -468,7 +468,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"VOL": "/host:/cont:ro"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "VOL", "", nil, nil, nil, nil, "", r, "volume", mfs)
+		val, err := resolveConfigPath(false, "", false, "", "VOL", nil, nil, nil, nil, "", r, "volume", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/host:/cont:ro", val)
 	})
@@ -477,7 +477,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"DEV": "/dev/a:/dev/b:rw"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "DEV", "", nil, nil, nil, nil, "", r, "device", mfs)
+		val, err := resolveConfigPath(false, "", false, "", "DEV", nil, nil, nil, nil, "", r, "device", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/a:/dev/b:rw", val)
 	})
@@ -491,7 +491,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		p1 := []string{"source={{env:SRC}},target=/cont/path"}
-		res, err := resolveMounts(p1, nil, "", nil, nil, r, mfs)
+		res, err := resolveMounts(p1, nil, nil, nil, r, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, "/host/path", res[0].Source)
@@ -501,7 +501,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/fallback:ro", r, "volume", mfs)
+		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", nil, nil, nil, nil, "/fallback:ro", r, "volume", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/fallback:ro", val)
 	})
@@ -510,7 +510,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/dev/null:/dev/null:rw", r, "device", mfs)
+		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", nil, nil, nil, nil, "/dev/null:/dev/null:rw", r, "device", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/null:/dev/null:rw", val)
 	})

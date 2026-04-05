@@ -13,27 +13,27 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		def := OptionDef[[]string]{
 			EnvKey: "TEST_SLICE",
-			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
+			GlobalGetter: func(c *CDERunConfig) []string { return []string{"global"} },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
 		r, err := NewExpressionResolver(nil)
 		require.NoError(t, err)
 
 		// Env priority
-		res := resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
+		res := resolveStringSliceCommaOpt(def, false, "", false, "", nil, nil, r, mfs)
 		assert.Equal(t, []string{"env1", "env2"}, res)
 
 		// P2 priority
-		res = resolveStringSliceCommaOpt(def, false, "", true, "cli1,cli2", "sub", nil, nil, r, mfs)
+		res = resolveStringSliceCommaOpt(def, false, "", true, "cli1,cli2", nil, nil, r, mfs)
 		assert.Equal(t, []string{"cli1", "cli2"}, res)
 
 		// P1 priority
-		res = resolveStringSliceCommaOpt(def, true, "p1a,p1b", false, "", "sub", nil, nil, r, mfs)
+		res = resolveStringSliceCommaOpt(def, true, "p1a,p1b", false, "", nil, nil, r, mfs)
 		assert.Equal(t, []string{"p1a", "p1b"}, res)
 
 		// Fallback to global
 		mfs.Env = nil
-		res = resolveStringSliceCommaOpt(def, false, "", false, "", "sub", nil, &CDERunConfig{Defaults: ConfigDefaults{}}, r, mfs)
+		res = resolveStringSliceCommaOpt(def, false, "", false, "", nil, &CDERunConfig{Defaults: ConfigDefaults{}}, r, mfs)
 		assert.Equal(t, []string{"global"}, res)
 	})
 
@@ -45,39 +45,39 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
 
 		// Env
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := resolveFloat64Opt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.InDelta(t, 2.5, res, 1e-9)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveFloat64Opt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveFloat64Opt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Tool getter
 		mfs.Env = nil
 		f2 := 2.0
-		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		def.ToolGetter = func(tc *ToolConfig) *float64 { return &f2 }
+		res = resolveFloat64Opt(def, false, 0, false, 0, &ToolConfig{}, nil, mfs)
 		assert.InDelta(t, 2.0, res, 1e-9)
 
 		// Global getter
 		def.ToolGetter = nil
 		f3 := 3.0
-		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		def.GlobalGetter = func(c *CDERunConfig) *float64 { return &f3 }
+		res = resolveFloat64Opt(def, false, 0, false, 0, nil, &CDERunConfig{}, mfs)
 		assert.InDelta(t, 3.0, res, 1e-9)
 
 		// P2 CLI
-		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		res = resolveFloat64Opt(def, false, 0, true, 4.0, nil, nil, mfs)
 		assert.InDelta(t, 4.0, res, 1e-9)
 
 		// P1 Override
-		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		res = resolveFloat64Opt(def, true, 5.0, false, 0, nil, nil, mfs)
 		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
@@ -89,39 +89,39 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
 
 		// Env
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := resolveIntOpt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.Equal(t, 20, res)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveIntOpt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.Equal(t, 10, res)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_INT": "invalid"}
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveIntOpt(def, false, 0, false, 0, nil, nil, mfs)
 		assert.Equal(t, 10, res)
 
 		// Tool getter
 		mfs.Env = nil
 		i2 := 30
-		def.ToolGetter = func(tc ToolConfig) *int { return &i2 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		def.ToolGetter = func(tc *ToolConfig) *int { return &i2 }
+		res = resolveIntOpt(def, false, 0, false, 0, &ToolConfig{}, nil, mfs)
 		assert.Equal(t, 30, res)
 
 		// Global getter
 		def.ToolGetter = nil
 		i3 := 40
-		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		def.GlobalGetter = func(c *CDERunConfig) *int { return &i3 }
+		res = resolveIntOpt(def, false, 0, false, 0, nil, &CDERunConfig{}, mfs)
 		assert.Equal(t, 40, res)
 
 		// P2 CLI
-		res = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		res = resolveIntOpt(def, false, 0, true, 50, nil, nil, mfs)
 		assert.Equal(t, 50, res)
 
 		// P1 Override
-		res = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		res = resolveIntOpt(def, true, 60, false, 0, nil, nil, mfs)
 		assert.Equal(t, 60, res)
 	})
 
@@ -154,7 +154,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		res, err := resolveConfigPath(false, "", false, "", "UNSET", "sub", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
+		res, err := resolveConfigPath(false, "", false, "", "UNSET", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/home/user/sock", res)
 	})
@@ -166,19 +166,19 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		require.NoError(t, err)
 
 		// Env
-		res := resolveStringOpt(def, false, "", false, "", "sub", nil, nil, r, mfs)
+		res := resolveStringOpt(def, false, "", false, "", nil, nil, r, mfs)
 		assert.Equal(t, "env", res)
 
 		// Tool
 		mfs.Env = nil
-		def.ToolGetter = func(tc ToolConfig) string { return "tool" }
-		res = resolveStringOpt(def, false, "", false, "", "node", ToolsConfig{"node": ToolConfig{}}, nil, r, mfs)
+		def.ToolGetter = func(tc *ToolConfig) string { return "tool" }
+		res = resolveStringOpt(def, false, "", false, "", &ToolConfig{}, nil, r, mfs)
 		assert.Equal(t, "tool", res)
 
 		// Global
 		def.ToolGetter = nil
-		def.GlobalGetter = func(c CDERunConfig) string { return "global" }
-		res = resolveStringOpt(def, false, "", false, "", "node", nil, &CDERunConfig{}, r, mfs)
+		def.GlobalGetter = func(c *CDERunConfig) string { return "global" }
+		res = resolveStringOpt(def, false, "", false, "", nil, &CDERunConfig{}, r, mfs)
 		assert.Equal(t, "global", res)
 	})
 
@@ -189,27 +189,27 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		require.NoError(t, err)
 
 		// Env
-		res := resolveStringSliceOpt(def, ":", nil, nil, "sub", nil, nil, r, mfs)
+		res := resolveStringSliceOpt(def, ":", nil, nil, nil, nil, r, mfs)
 		assert.Equal(t, []string{"a", "b"}, res)
 
 		// Tool
 		mfs.Env = nil
-		def.ToolGetter = func(tc ToolConfig) []string { return []string{"tool"} }
-		res = resolveStringSliceOpt(def, ":", nil, nil, "node", ToolsConfig{"node": ToolConfig{}}, nil, r, mfs)
+		def.ToolGetter = func(tc *ToolConfig) []string { return []string{"tool"} }
+		res = resolveStringSliceOpt(def, ":", nil, nil, &ToolConfig{}, nil, r, mfs)
 		assert.Equal(t, []string{"tool"}, res)
 
 		// Global
 		def.ToolGetter = nil
-		def.GlobalGetter = func(c CDERunConfig) []string { return []string{"global"} }
-		res = resolveStringSliceOpt(def, ":", nil, nil, "node", nil, &CDERunConfig{}, r, mfs)
+		def.GlobalGetter = func(c *CDERunConfig) []string { return []string{"global"} }
+		res = resolveStringSliceOpt(def, ":", nil, nil, nil, &CDERunConfig{}, r, mfs)
 		assert.Equal(t, []string{"global"}, res)
 
 		// P2 CLI
-		res = resolveStringSliceOpt(def, ":", nil, []string{"cli"}, "sub", nil, nil, r, mfs)
+		res = resolveStringSliceOpt(def, ":", nil, []string{"cli"}, nil, nil, r, mfs)
 		assert.Equal(t, []string{"cli"}, res)
 
 		// P1 Override
-		res = resolveStringSliceOpt(def, ":", []string{"p1"}, nil, "sub", nil, nil, r, mfs)
+		res = resolveStringSliceOpt(def, ":", []string{"p1"}, nil, nil, nil, r, mfs)
 		assert.Equal(t, []string{"p1"}, res)
 	})
 }
@@ -559,26 +559,26 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.NoError(t, err)
 
 		// resolveDevices P2
-		resDevices, err := resolveDevices(nil, []string{"/dev/p2:/dev/p2"}, "", nil, nil, r, mfs)
+		resDevices, err := resolveDevices(nil, []string{"/dev/p2:/dev/p2"}, nil, nil, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/p2", resDevices[0].PathOnHost)
 
 		// resolveMounts P2 and Global
-		resMounts, err := resolveMounts(nil, []string{"source=/p2,target=/p2"}, "", nil, nil, r, mfs)
+		resMounts, err := resolveMounts(nil, []string{"source=/p2,target=/p2"}, nil, nil, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/p2", resMounts[0].Source)
 
 		global := &CDERunConfig{Defaults: ConfigDefaults{Mounts: []MountConfig{{Source: ConfigPath{Raw: "/global"}, Target: ConfigPath{Raw: "/global"}}}}}
-		resMounts, err = resolveMounts(nil, nil, "", nil, global, r, mfs)
+		resMounts, err = resolveMounts(nil, nil, nil, global, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/global", resMounts[0].Source)
 
 		// resolveConfigPath P1 and CLI
-		resPath, err := resolveConfigPath(true, "/p1", false, "", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		resPath, err := resolveConfigPath(true, "/p1", false, "", "", nil, nil, nil, nil, "", r, "path", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/p1", resPath)
 
-		resPath, err = resolveConfigPath(false, "", true, "/cli", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		resPath, err = resolveConfigPath(false, "", true, "/cli", "", nil, nil, nil, nil, "", r, "path", mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/cli", resPath)
 	})
@@ -763,7 +763,7 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 			},
 		}
 		// Resolve the mounts. /config/foo should resolve to /host/config/foo via HostContext.
-		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
+		res, err := resolveMounts(nil, nil, nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, "/host/config/foo", res[0].Source)
@@ -778,7 +778,7 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 				Optional: true,
 			},
 		}
-		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
+		res, err := resolveMounts(nil, nil, nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
 		require.NoError(t, err)
 		assert.Empty(t, res)
 	})
@@ -799,7 +799,7 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 		rError, err := NewExpressionResolverWithFS(nil, mfsError)
 		require.NoError(t, err)
 
-		_, err = resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, rError, mfsError)
+		_, err = resolveMounts(nil, nil, nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, rError, mfsError)
 		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})

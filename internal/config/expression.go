@@ -141,19 +141,39 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	// 1. Resolve {{...}} expressions
 	resolved := s
 	if hasExpr {
-		resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
-			if r.err != nil {
-				return match
+		var builder strings.Builder
+		start := 0
+		for {
+			openIdx := strings.Index(s[start:], "{{")
+			if openIdx == -1 {
+				builder.WriteString(s[start:])
+				break
 			}
-			content := strings.TrimSpace(match[2 : len(match)-2])
+			openIdx += start
+			builder.WriteString(s[start:openIdx])
 
+			closeIdx := strings.Index(s[openIdx+2:], "}}")
+			if closeIdx == -1 {
+				builder.WriteString(s[openIdx:])
+				break
+			}
+			// Important: closeIdx is relative to s[openIdx+2:]
+			// Absolute closeIdx is openIdx + 2 + closeIdx
+			absCloseIdx := openIdx + 2 + closeIdx
+
+			content := strings.TrimSpace(s[openIdx+2 : absCloseIdx])
 			res, err := r.resolveDirective(content)
 			if err != nil {
 				r.setError(err)
-				return match
+				// If error occurs, we stop resolving but return what we have so far
+				// concatenated with the rest of the string as is.
+				builder.WriteString(s[openIdx:])
+				break
 			}
-			return res
-		})
+			builder.WriteString(res)
+			start = absCloseIdx + 2
+		}
+		resolved = builder.String()
 	}
 
 	if r.err != nil {
