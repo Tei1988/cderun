@@ -482,7 +482,7 @@ func ValidateToolName(name string) error {
 	// Since '/' and '\' are already rejected by the whitelist above,
 	// we only need to check if the entire name is "..".
 	if name == ".." || name == "." {
-		return fmt.Errorf("parent directory reference not allowed for tool name: %s", name)
+		return fmt.Errorf("current or parent directory reference not allowed for tool name: %s", name)
 	}
 
 	return nil
