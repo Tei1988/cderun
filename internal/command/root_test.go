@@ -308,7 +308,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "- echo")
 		assert.Contains(t, output, "- hello")
 		assert.Contains(t, output, "env:")
-		assert.Contains(t, output, "- K=V")
+		assert.Contains(t, output, "\"K\"=\"V\"")
 		assert.Contains(t, output, "mounts:")
 		assert.Contains(t, output, "target: /t")
 
@@ -323,7 +323,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: echo hello")
-		assert.Contains(t, output, "Env: K=V")
+		assert.Contains(t, output, "Env: \"K\"=\"V\"")
 		assert.Contains(t, output, "Mounts: type=bind,source=/s,target=/t,readonly=false")
 		assert.Contains(t, output, "Devices: /dev/fuse, /dev/snd:/dev/snd:rw")
 		assert.Contains(t, output, "Memory: 512MiB") // go-units formatting

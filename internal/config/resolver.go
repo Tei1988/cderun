@@ -999,10 +999,10 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			val = v
 		}
 
-		// Apply masking for debug logs
-		logging.Debug("Resolved Env: %s=%s", key, MaskSensitiveEnv(key, val))
+		// Apply masking for debug logs and quoting for safety
+		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 
-		res = append(res, fmt.Sprintf("%s=%s", key, val))
+		res = append(res, fmt.Sprintf("%q=%q", key, val))
 	}
 	return res, nil
 }
@@ -1090,14 +1090,15 @@ func MaskSensitiveEnv(key, value string) string {
 	var segments []string
 	var current strings.Builder
 	var lastRune rune
-	for i, r := range key {
+	runes := []rune(key)
+	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
 			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
 			isAcronym := false
-			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) && i+1 < len(key) {
-				nextRune := rune(key[i+1])
+			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) && i+1 < len(runes) {
+				nextRune := runes[i+1]
 				if unicode.IsLower(nextRune) {
 					isAcronym = true
 				}

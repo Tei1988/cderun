@@ -301,7 +301,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_Strict(t *testing.T) {
 	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
 	require.NoError(t, err)
 	assert.Len(t, res, 3)
-	assert.Contains(t, res, "B=2")
+	assert.Contains(t, res, "\"B\"=\"2\"")
 }
 
 func TestUnit_Coverage_Resolver_ResolveMounts_Optional_Exists(t *testing.T) {
@@ -327,7 +327,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
 	r, _ := NewExpressionResolver(nil)
 	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, false, r, mfs)
 	require.NoError(t, err)
-	assert.Contains(t, res, "B=2")
+	assert.Contains(t, res, "\"B\"=\"2\"")
 }
 
 func TestUnit_Coverage_Path_ResolvePath_NoResolver(t *testing.T) {

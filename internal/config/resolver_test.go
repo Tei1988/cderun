@@ -133,7 +133,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		res, err := resolveEnvValues([]string{"MY_PASSWORD"}, false, r, mfs)
 		require.NoError(t, err)
 		// Verification: ensure the resolver returns plaintext for container execution
-		assert.Equal(t, []string{"MY_PASSWORD=secret"}, res)
+		assert.Equal(t, []string{"\"MY_PASSWORD\"=\"secret\""}, res)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
@@ -347,8 +347,8 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 		}
 		res, err := ResolveWithFS("node", &CLIOptions{}, tools, nil, mfs)
 		require.NoError(t, err)
-		assert.Contains(t, res.Env, "ENV_VAR=env-val")
-		assert.Contains(t, res.Env, "HOST_VAR=host-val")
+		assert.Contains(t, res.Env, "\"ENV_VAR\"=\"env-val\"")
+		assert.Contains(t, res.Env, "\"HOST_VAR\"=\"host-val\"")
 	})
 
 	t.Run("Strict mode env validation", func(t *testing.T) {
@@ -637,7 +637,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		tools := ToolsConfig{"node": ToolConfig{Env: []string{"TOOL=1"}}}
 		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Contains(t, res.Env, "TOOL=1")
+		assert.Contains(t, res.Env, "\"TOOL\"=\"1\"")
 
 		// Test resolveDevices with Tool getter
 		tools = ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/t"}}}}}

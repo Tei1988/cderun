@@ -88,7 +88,7 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "host", res.Network)
 		assert.True(t, res.Remove)
-		assert.Equal(t, []string{"TOOL=1"}, res.Env)
+		assert.Equal(t, []string{"\"TOOL\"=\"1\""}, res.Env)
 	})
 }
 
