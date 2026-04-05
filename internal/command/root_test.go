@@ -308,7 +308,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "- echo")
 		assert.Contains(t, output, "- hello")
 		assert.Contains(t, output, "env:")
-		assert.Contains(t, output, "\"K\"=\"V\"")
+		assert.Contains(t, output, "- K=V")
 		assert.Contains(t, output, "mounts:")
 		assert.Contains(t, output, "target: /t")
 

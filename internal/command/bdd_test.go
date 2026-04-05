@@ -57,7 +57,7 @@ node:
 		assert.Equal(t, "custom-net", cfg.Network)
 
 		// Slices are not merged across layers, TOOL_VAR should be present, GLOBAL_VAR should not
-		assert.Contains(t, cfg.Env, "\"TOOL_VAR\"=\"1\"")
+		assert.Contains(t, cfg.Env, "TOOL_VAR=1")
 		assert.NotContains(t, cfg.Env, "GLOBAL_VAR=1")
 	})
 }

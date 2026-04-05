@@ -1002,7 +1002,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		// Apply masking for debug logs and quoting for safety
 		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 
-		res = append(res, fmt.Sprintf("%q=%q", key, val))
+		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
 	return res, nil
 }

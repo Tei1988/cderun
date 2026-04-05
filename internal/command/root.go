@@ -632,7 +632,15 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(maskedContainerConfig.Env, ", "))
+		var quotedEnvs []string
+		for _, e := range maskedContainerConfig.Env {
+			if k, v, found := strings.Cut(e, "="); found {
+				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
+			} else {
+				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
+			}
+		}
+		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
 		_, _ = fmt.Fprintf(w, "Workdir: %s\n", maskedContainerConfig.Workdir)
 		_, _ = fmt.Fprintf(w, "User: %s\n", maskedContainerConfig.User)
 		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(maskedContainerConfig.Ports, ", "))
