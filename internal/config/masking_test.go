@@ -46,8 +46,11 @@ func TestMaskSensitiveEnv(t *testing.T) {
 
 func TestMaskSensitiveEnvList(t *testing.T) {
 	env := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
+	orig := append([]string(nil), env...)
 	expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
 
 	got := MaskSensitiveEnvList(env)
 	assert.Equal(t, expected, got)
+	// Verify non-destructive behavior
+	assert.Equal(t, orig, env, "original slice should not be modified")
 }

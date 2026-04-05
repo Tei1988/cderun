@@ -326,12 +326,12 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if cli == nil {
 		cli = &CLIOptions{}
 	}
-	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	if subcommand != "" {
 		if err := ValidateToolName(subcommand); err != nil {
 			return nil, err
 		}
 	}
+	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
 
