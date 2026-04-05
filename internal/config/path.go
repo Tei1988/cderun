@@ -470,7 +470,7 @@ func ValidateToolName(name string) error {
 		return fmt.Errorf("tool name cannot be empty")
 	}
 	if filepath.IsAbs(name) {
-		return fmt.Errorf("absolute path not allowed for tool name: %s", name)
+		return fmt.Errorf("absolute path not allowed for tool name: %q", name)
 	}
 	// Use a strict whitelist for tool names: alphanumerics, dots, underscores, and hyphens.
 	for i, r := range name {
