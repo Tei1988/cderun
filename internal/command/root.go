@@ -622,7 +622,11 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 
 	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
 		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)
-		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(maskedContainerConfig.Command, " "))
+		var quotedCmd []string
+		for _, arg := range maskedContainerConfig.Command {
+			quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
+		}
+		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
 		_, _ = fmt.Fprintf(w, "TTY: %v\n", maskedContainerConfig.TTY)
 		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
 		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
@@ -670,7 +674,11 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))
 		}
 		if len(maskedContainerConfig.Entrypoint) > 0 {
-			_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(maskedContainerConfig.Entrypoint, " "))
+			var quotedEntry []string
+			for _, arg := range maskedContainerConfig.Entrypoint {
+				quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
+			}
+			_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
 		}
 	})
 }

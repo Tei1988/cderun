@@ -159,6 +159,9 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	if err != nil {
 		return container.Mount{}, err
 	}
+	if target != "" && !filepath.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %s", target)
+	}
 
 	return container.Mount{
 		Type:     mc.Type,
@@ -461,7 +464,7 @@ func validatePathChars(s string) error {
 
 // ValidateToolName ensures the tool name is a safe identifier.
 // It rejects empty strings, absolute paths, parent directory references, directory separators,
-// and control characters.
+// control characters, whitespace, and colons.
 func ValidateToolName(name string) error {
 	if name == "" {
 		return fmt.Errorf("tool name cannot be empty")
@@ -469,20 +472,19 @@ func ValidateToolName(name string) error {
 	if filepath.IsAbs(name) {
 		return fmt.Errorf("absolute path not allowed for tool name: %s", name)
 	}
-	if err := validatePathChars(name); err != nil {
-		return fmt.Errorf("invalid tool name %q: %w", name, err)
+	// Use a strict whitelist for tool names: alphanumerics, dots, underscores, and hyphens.
+	for i, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-') {
+			return fmt.Errorf("invalid character in tool name %q: %q (position %d)", name, r, i)
+		}
 	}
-	// Check for path traversal segments
+	// Additional segment-based traversal check
 	splitter := func(r rune) bool {
 		return r == '/' || r == '\\'
 	}
 	segments := strings.FieldsFunc(name, splitter)
 	if slices.Contains(segments, "..") {
 		return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
-	}
-	// Re-check for any separators that might have been missed or are leading/trailing
-	if strings.ContainsAny(name, "/\\") {
-		return fmt.Errorf("directory separators not allowed in tool name: %s", name)
 	}
 	return nil
 }

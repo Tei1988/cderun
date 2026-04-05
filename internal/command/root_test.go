@@ -20,6 +20,7 @@ import (
 
 	"cderun/internal/config"
 	"cderun/internal/logging"
+	"cderun/internal/container"
 	"cderun/internal/runtime"
 )
 
@@ -322,7 +323,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		output, err = executeCommand("--dry-run", "-f", "simple", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "--device", "/dev/fuse", "--device", "/dev/snd:/dev/snd:rw", "--memory", "512MiB", "--cpus", "2", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
-		assert.Contains(t, output, "Command: echo hello")
+		assert.Contains(t, output, "Command: \"echo\" \"hello\"")
 		assert.Contains(t, output, "Env: \"K\"=\"V\"")
 		assert.Contains(t, output, "Mounts: type=bind,source=/s,target=/t,readonly=false")
 		assert.Contains(t, output, "Devices: /dev/fuse, /dev/snd:/dev/snd:rw")
@@ -346,7 +347,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 			"--cap-drop", "KILL",
 			"sh", "echo", "hello")
 		require.NoError(t, err)
-		assert.Contains(t, output, "Entrypoint: /bin/sh")
+		assert.Contains(t, output, "Entrypoint: \"/bin/sh\"")
 		assert.Contains(t, output, "User: 1000:1000")
 		assert.Contains(t, output, "Hostname: myhost")
 		assert.Contains(t, output, "Network: bridge")
@@ -1931,5 +1932,55 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to marshal YAML: yaml dry-run error")
+	})
+}
+
+func TestUnit_Root_DryRun_Safety(t *testing.T) {
+	t.Parallel()
+	t.Run("Quotes command and environment", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{
+			DryRun:       true,
+			DryRunFormat: "simple",
+		}
+		containerConfig := &container.ContainerConfig{
+			Image: "alpine",
+			Command: []string{"sh", "-c", "echo 'hello world'"},
+			Env: []string{"SECRET_TOKEN=top-secret", "PLAIN_VAR=value", "VAR_WITH_SPACE=val with space"},
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDryRun(cmd, containerConfig, resolved)
+		require.NoError(t, err)
+		output := out.String()
+
+		// Verify Command quoting
+		assert.Contains(t, output, "Command: \"sh\" \"-c\" \"echo 'hello world'\"")
+
+		// Verify Env masking and quoting
+		assert.Contains(t, output, "Env: \"SECRET_TOKEN\"=\"[REDACTED]\", \"PLAIN_VAR\"=\"value\", \"VAR_WITH_SPACE\"=\"val with space\"")
+	})
+
+	t.Run("Handles Entrypoint quoting", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		opts := &rootOptions{}
+		resolved := &config.ResolvedConfig{
+			DryRun:       true,
+			DryRunFormat: "simple",
+		}
+		containerConfig := &container.ContainerConfig{
+			Image: "alpine",
+			Entrypoint: []string{"/usr/bin/env", "bash"},
+		}
+		cmd := &cobra.Command{}
+		cmd.SetOut(out)
+
+		err := opts.handleDryRun(cmd, containerConfig, resolved)
+		require.NoError(t, err)
+		output := out.String()
+
+		assert.Contains(t, output, "Entrypoint: \"/usr/bin/env\" \"bash\"")
 	})
 }

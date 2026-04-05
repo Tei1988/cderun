@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,4 +62,31 @@ func TestValidateToolName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
+	t.Parallel()
+	r := &ExpressionResolver{Pwd: "/host"}
+
+	t.Run("absolute target is accepted", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/src"},
+			Target: ConfigPath{Raw: "/tgt"},
+		}
+		m, err := mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "/tgt", m.Target)
+	})
+
+	t.Run("relative target is rejected", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/src"},
+			Target: ConfigPath{Raw: "relative/path"},
+		}
+		_, err := mc.Resolve(r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target must be an absolute path")
+	})
 }
