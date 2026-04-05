@@ -8,8 +8,6 @@ import (
 	"sync"
 )
 
-var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
-
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
 
 type fileCacheEntry struct {
