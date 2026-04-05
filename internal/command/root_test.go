@@ -1139,7 +1139,10 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 		o.isTerminal = func(fd int) bool { return true }
 	})
 	require.Error(t, err)
-	require.ErrorContains(t, err, "invalid pull policy \"invalid\"")
+	require.ErrorContains(t, err, "invalid pull policy value \"invalid\"")
+	var invalidConfigErr *config.InvalidConfigError
+	require.ErrorAs(t, err, &invalidConfigErr)
+	assert.Equal(t, "pull policy", invalidConfigErr.Field)
 }
 
 func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {

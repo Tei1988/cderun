@@ -731,7 +731,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Initialize Runtime
 	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to initialize runtime: %w", err)
+		return nil, "", nil, &runtime.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 	}
 
 	o.logger.Trace("Creating container...")
@@ -1041,7 +1041,7 @@ intended for the subcommand.`,
 			case "always", "missing", "never":
 				// Valid
 			default:
-				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
+				return &config.InvalidConfigError{Field: "pull policy", Value: resolved.Pull, Err: errors.New("allowed values are \"always\", \"missing\", or \"never\"")}
 			}
 
 			if resolved.Diagnosis {
