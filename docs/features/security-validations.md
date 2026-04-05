@@ -4,7 +4,7 @@ cderun implements several validation layers to prevent command injection, path t
 
 ## Character Validation
 
-The `validatePathChars` function (referred to as `ValidateSafeString` in some contexts) ensures that critical configuration strings do not contain ASCII control characters (ASCII < 32 or 127) or null bytes.
+The `validatePathChars` function ensures that critical configuration strings do not contain ASCII control characters (ASCII < 32 or 127).
 
 This validation is applied to:
 

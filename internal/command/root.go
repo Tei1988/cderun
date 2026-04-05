@@ -1,8 +1,6 @@
 package command
 
 import (
-	"strconv"
-	"github.com/docker/go-units"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,18 +11,20 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/docker/go-units"
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
+	"gopkg.in/yaml.v3"
 
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
 	"cderun/internal/version"
-
-	"github.com/spf13/cobra"
-	"golang.org/x/term"
-	"gopkg.in/yaml.v3"
 )
 
 type rootOptions struct {
@@ -633,7 +633,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
 		var mounts []string
 		for _, m := range maskedContainerConfig.Mounts {
-			mounts = append(mounts, fmt.Sprintf("type=%s,source=%s,target=%s,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
+			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 		}
 		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
 		var quotedEnvs []string

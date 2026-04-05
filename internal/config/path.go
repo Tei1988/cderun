@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"slices"
 
 	"cderun/internal/container"
 
@@ -478,13 +477,12 @@ func ValidateToolName(name string) error {
 			return fmt.Errorf("invalid character in tool name %q: %q (position %d)", name, r, i)
 		}
 	}
-	// Additional segment-based traversal check
-	splitter := func(r rune) bool {
-		return r == '/' || r == '\\'
+	// Additional check for parent directory reference.
+	// Since '/' and '\' are already rejected by the whitelist above,
+	// we only need to check if the entire name is "..".
+	if name == ".." {
+		return fmt.Errorf("parent directory reference not allowed for tool name: %s", name)
 	}
-	segments := strings.FieldsFunc(name, splitter)
-	if slices.Contains(segments, "..") {
-		return fmt.Errorf("parent directory reference not allowed in tool name: %s", name)
-	}
+
 	return nil
 }
