@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -1016,10 +1017,8 @@ func MaskSensitiveEnv(key, value string) string {
 
 	for _, seg := range segments {
 		s := strings.ToUpper(seg)
-		for _, kw := range sensitiveKeywords {
-			if s == kw {
-				return "********"
-			}
+		if slices.Contains(sensitiveKeywords, s) {
+			return "********"
 		}
 	}
 
@@ -1031,7 +1030,7 @@ func splitKeySegments(k string) []string {
 	var current strings.Builder
 
 	runes := []rune(k)
-	for i := 0; i < len(runes); i++ {
+	for i := range runes {
 		r := runes[i]
 		isUpper := r >= 'A' && r <= 'Z'
 		isLower := r >= 'a' && r <= 'z'
