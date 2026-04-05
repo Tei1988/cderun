@@ -23,7 +23,7 @@ func NewPodmanRuntime(socket string) (ContainerRuntime, error) {
 		},
 	}
 
-	return NewDockerRuntimeWithOptions(
+	rt, err := NewDockerRuntimeWithOptions(
 		socket,
 		"podman",
 		client.WithHTTPClient(httpClient),
@@ -31,4 +31,8 @@ func NewPodmanRuntime(socket string) (ContainerRuntime, error) {
 		// Explicitly using 1.41 (compatible with Podman 4.0+) is more stable.
 		client.WithVersion("1.41"),
 	)
+	if err != nil {
+		return nil, err // NewDockerRuntimeWithOptions already wraps it in RuntimeInitError
+	}
+	return rt, nil
 }

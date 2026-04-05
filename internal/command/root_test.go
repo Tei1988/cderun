@@ -280,7 +280,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("returns error for unsupported runtime", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
+		require.ErrorContains(t, err, "failed to initialize runtime \"invalid\": unsupported runtime")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -1316,7 +1316,7 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 		rt, err := o.runtimeFactory("invalid", "")
 		require.Error(t, err)
 		assert.Nil(t, rt)
-		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
+		require.ErrorContains(t, err, "failed to initialize runtime \"invalid\": unsupported runtime")
 	})
 }
 

@@ -660,7 +660,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"invalid\"")
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"

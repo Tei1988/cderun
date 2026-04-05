@@ -66,7 +66,7 @@ func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt)
 
 	cli, err := client.NewClientWithOpts(allOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %w", err)
+		return nil, &RuntimeInitError{Runtime: name, Err: fmt.Errorf("failed to create docker client: %w", err)}
 	}
 
 	return &DockerRuntime{

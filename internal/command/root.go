@@ -181,7 +181,7 @@ func defaultOptions() rootOptions {
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
 			default:
-				return nil, fmt.Errorf("unsupported runtime %q", name)
+				return nil, &runtime.RuntimeInitError{Runtime: name, Err: errors.New("unsupported runtime")}
 			}
 		},
 		jsonMarshalIndent: json.MarshalIndent,
