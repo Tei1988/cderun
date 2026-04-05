@@ -2,7 +2,9 @@
 
 ## Code Improvement
 
-### P-6: Typed Error Handling
+### P-6: Typed Error Handling (Discrepancy with Memory)
+
+Note: Memory indicates this is already implemented, but code shows otherwise.
 
 All errors are currently `fmt.Errorf` strings, making programmatic error inspection difficult.
 Introduce typed errors incrementally, starting with the most common patterns:
@@ -98,5 +100,23 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 ## Terminal / TTY
 - macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソルがターミナルの右端に到達するとターミナル自体が強制終了される。TTY ハンドリングまたはリサイズシグナル周りの問題の可能性あり。
 
+
+## Security & Hardening (Discrepancies identified during documentation update)
+
+### S-1: Environment Variable Masking
+- Memory suggests `MaskSensitiveEnv` and `MaskSensitiveEnvList` should be implemented in `internal/config/resolver.go` to redact secrets in dry-run/debug output.
+- Currently not found in the codebase.
+
+### S-2: Path Character Validation
+- Memory suggests `validatePathChars` should be implemented in `internal/config/path.go` to reject control characters and null bytes in resolved paths (Image, User, Network, etc.).
+- Currently not found in the codebase.
+
+### S-3: Signal Injection Protection
+- Memory suggests `SignalContainer` in `internal/runtime/` should validate signal names against a regex `^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`.
+- Currently missing in `docker.go` and `mock.go`.
+
+### S-4: Optimization of Expression Resolution
+- Memory suggests `resolveString` in `internal/config/expression.go` should use manual scanning instead of `regexp.ReplaceAllStringFunc` for performance.
+- Current implementation still uses `regexp`.
 
 ## Testing & Maintenance
