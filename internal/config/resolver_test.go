@@ -126,12 +126,14 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveEnvValues contains plaintext", func(t *testing.T) {
-		mfs := &MockFileSystem{Env: map[string]string{"PASS": "secret"}}
+		// Use a key that MaskSensitiveEnv would normally target (e.g. MY_PASSWORD)
+		mfs := &MockFileSystem{Env: map[string]string{"MY_PASSWORD": "secret"}}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		res, err := resolveEnvValues([]string{"PASS"}, false, r, mfs)
+		res, err := resolveEnvValues([]string{"MY_PASSWORD"}, false, r, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, []string{"PASS=secret"}, res)
+		// Verification: ensure the resolver returns plaintext for container execution
+		assert.Equal(t, []string{"MY_PASSWORD=secret"}, res)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {

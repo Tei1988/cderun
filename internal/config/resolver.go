@@ -398,6 +398,10 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
 	}
 	if res.Image != "" {
+		// Security validation before any further use (including logging)
+		if err := validatePathChars(res.Image); err != nil {
+			return nil, fmt.Errorf("security validation failed for image: %w", err)
+		}
 		logging.Debug("Resolved Image: %s", res.Image)
 	}
 
@@ -1091,7 +1095,15 @@ func MaskSensitiveEnv(key, value string) string {
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
 			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
-			if isCamel || isLetterDigit {
+			isAcronym := false
+			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) && i+1 < len(key) {
+				nextRune := rune(key[i+1])
+				if unicode.IsLower(nextRune) {
+					isAcronym = true
+				}
+			}
+
+			if isCamel || isLetterDigit || isAcronym {
 				if current.Len() > 0 {
 					segments = append(segments, strings.ToUpper(current.String()))
 					current.Reset()
