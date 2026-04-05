@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -158,8 +159,8 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	if err != nil {
 		return container.Mount{}, err
 	}
-	if target != "" && !filepath.IsAbs(target) {
-		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %s", target)
+	if target != "" && !path.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
 	}
 
 	return container.Mount{
