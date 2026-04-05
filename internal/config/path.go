@@ -474,7 +474,7 @@ func ValidateToolName(name string) error {
 	}
 	// Use a strict whitelist for tool names: alphanumerics, dots, underscores, and hyphens.
 	for i, r := range name {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '.' && r != '_' && r != '-' {
 			return fmt.Errorf("invalid character in tool name %q: %q (position %d)", name, r, i)
 		}
 	}

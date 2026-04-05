@@ -8,6 +8,7 @@ All signals sent via the `SignalContainer` method (available in both Docker and 
 `^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`
 
 This regex pattern ensures that:
+
 - Standard signal names (e.g., `TERM`, `KILL`, `HUP`) are accepted.
 - Signal names with the `SIG` prefix (e.g., `SIGTERM`, `SIGINT`) are accepted.
 - Numeric signal values (e.g., `9`, `15`) are accepted.
