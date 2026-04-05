@@ -19,7 +19,7 @@ func TestIntegration_Execution_AlpineEcho(t *testing.T) {
 		stdout, _, exitCode, err := runCderun("--image", "public.ecr.aws/docker/library/alpine:latest", "--mount-socket", "--mount-cderun", "--mount-cderun-path", customPath, "--dry-run", "--dry-run-format", "simple", "echo", "hello")
 		require.NoError(t, err)
 		assert.Equal(t, 0, exitCode)
-		assert.Contains(t, stdout, "source="+customPath+",target=/usr/local/bin/cderun")
+		assert.Contains(t, stdout, "source=""+customPath+"",target="/usr/local/bin/cderun"")
 	})
 }
 
