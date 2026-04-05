@@ -309,11 +309,11 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
 	info, ok := fieldInfo[key]
 	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Option: key, Err: fmt.Errorf("info not found")}
 	}
 
 	if info.p1ValIdx == nil || info.p2ValIdx == nil {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Option: key, Err: fmt.Errorf("CLI reflection fields missing in CLIOptions")}
 	}
 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -322,6 +322,12 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 }
 
 func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
+	if subcommand != "" {
+		if err := ValidateToolName(subcommand); err != nil {
+			return nil, &InvalidConfigError{Field: "subcommand", Value: subcommand, Err: err}
+		}
+	}
+
 	if cli == nil {
 		cli = &CLIOptions{}
 	}
@@ -389,9 +395,12 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
+		return nil, &ImageNotFoundError{Tool: subcommand}
 	}
 	if res.Image != "" {
+		if err := validatePathChars(res.Image); err != nil {
+			return nil, &InvalidConfigError{Field: "image", Value: res.Image, Err: err}
+		}
 		logging.Debug("Resolved Image: %s", res.Image)
 	}
 
@@ -783,6 +792,29 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, err
 	}
 
+	// Final security validation for other critical fields
+	for _, f := range []struct {
+		name string
+		val  string
+	}{
+		{"user", res.User},
+		{"network", res.Network},
+		{"hostname", res.Hostname},
+		{"workdir", res.Workdir},
+	} {
+		if f.val != "" {
+			if err := validatePathChars(f.val); err != nil {
+				return nil, &InvalidConfigError{Field: f.name, Value: f.val, Err: err}
+			}
+		}
+	}
+
+	for _, ep := range res.Entrypoint {
+		if err := validatePathChars(ep); err != nil {
+			return nil, &InvalidConfigError{Field: "entrypoint", Value: ep, Err: err}
+		}
+	}
+
 	return res, nil
 }
 
@@ -948,17 +980,109 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		if err := r.Error(); err != nil {
 			return nil, err
 		}
+		var key, val string
+		var found bool
 		if strings.Contains(resolvedE, "=") {
-			res = append(res, resolvedE)
+			key, val, _ = strings.Cut(resolvedE, "=")
 		} else {
-			val, found := fs.LookupEnv(resolvedE)
+			key = resolvedE
+			val, found = fs.LookupEnv(key)
 			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %s", resolvedE)
+				return nil, fmt.Errorf("required environment variable not found: %s", key)
 			}
-			res = append(res, fmt.Sprintf("%s=%s", resolvedE, val))
+		}
+
+		entry := fmt.Sprintf("%s=%s", key, val)
+		res = append(res, entry)
+
+		if logging.GetLogLevel() <= logging.DebugLevel {
+			masked := MaskSensitiveEnv(key, val)
+			logging.Debug("Resolved Env: %q=%q", key, masked)
 		}
 	}
 	return res, nil
+}
+
+// MaskSensitiveEnv masks the value of environment variables that likely contain secrets.
+func MaskSensitiveEnv(key, value string) string {
+	if value == "" {
+		return ""
+	}
+
+	sensitiveKeywords := []string{"KEY", "SECRET", "TOKEN", "PASSWORD", "PASS", "AUTH", "CREDENTIAL", "PRIVATE", "CERT", "SIGNATURE", "API"}
+
+	// segments splits by non-alphanumeric, camelCase transitions, letter-digit boundaries.
+	segments := splitKeySegments(key)
+
+	for _, seg := range segments {
+		s := strings.ToUpper(seg)
+		for _, kw := range sensitiveKeywords {
+			if s == kw {
+				return "********"
+			}
+		}
+	}
+
+	return value
+}
+
+func splitKeySegments(k string) []string {
+	var segments []string
+	var current strings.Builder
+
+	runes := []rune(k)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		isUpper := r >= 'A' && r <= 'Z'
+		isLower := r >= 'a' && r <= 'z'
+		isDigit := r >= '0' && r <= '9'
+
+		if !isUpper && !isLower && !isDigit {
+			if current.Len() > 0 {
+				segments = append(segments, current.String())
+				current.Reset()
+			}
+			continue
+		}
+
+		// camelCase transition or letter-digit boundary
+		if current.Len() > 0 {
+			prev := runes[i-1]
+			prevUpper := prev >= 'A' && prev <= 'Z'
+			prevDigit := prev >= '0' && prev <= '9'
+
+			if (isUpper && !prevUpper) || (isDigit && !prevDigit) || (!isDigit && prevDigit) {
+				segments = append(segments, current.String())
+				current.Reset()
+			} else if isUpper && prevUpper && i+1 < len(runes) {
+				// Acronym boundary: e.g. APIKey -> API, Key
+				next := runes[i+1]
+				if next >= 'a' && next <= 'z' {
+					segments = append(segments, current.String())
+					current.Reset()
+				}
+			}
+		}
+		current.WriteRune(r)
+	}
+	if current.Len() > 0 {
+		segments = append(segments, current.String())
+	}
+	return segments
+}
+
+// MaskSensitiveEnvList returns a masked copy of an environment variable list.
+func MaskSensitiveEnvList(env []string) []string {
+	res := make([]string, len(env))
+	for i, e := range env {
+		if strings.Contains(e, "=") {
+			key, val, _ := strings.Cut(e, "=")
+			res[i] = fmt.Sprintf("%s=%s", key, MaskSensitiveEnv(key, val))
+		} else {
+			res[i] = e
+		}
+	}
+	return res
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {

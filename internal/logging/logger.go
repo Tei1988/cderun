@@ -188,6 +188,10 @@ func Info(msg string, args ...any)  { globalLogger.Info(msg, args...) }
 func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
 func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
 
+func GetLogLevel() Level {
+	return globalLogger.GetLevel()
+}
+
 // GetGlobalLogger returns the global logger instance.
 // Callers should use Init() and SetOutput() methods to configure it,
 // as they are thread-safe and properly handle internal state.

@@ -147,7 +147,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	StringOptions = append(originalOptions, StringOption{Name: "hc", FieldName: "HostContext"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: info for option \"hc\" not found")
+	assert.Contains(t, err.Error(), "registry mismatch: info not found (option: \"hc\")")
 
 	// Reset StringOptions before Phase 1 test to avoid triggering same error again
 	StringOptions = originalOptions
@@ -162,7 +162,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry mismatch: info for option \"bad-bool\" not found")
+	assert.Contains(t, err.Error(), "registry mismatch: info not found (option: \"bad-bool\")")
 }
 
 func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
@@ -689,8 +689,9 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 
 	// No image mapping
 	_, err := ResolveWithFS("missing", &CLIOptions{}, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no image mapping found for tool: missing")
+	var imageNotFoundErr *ImageNotFoundError
+	require.ErrorAs(t, err, &imageNotFoundErr)
+	assert.Equal(t, "missing", imageNotFoundErr.Tool)
 
 	// Negative hang-timeout
 	cli := CLIOptions{Image: "a", ImageSet: true, HangTimeout: "-1s", HangTimeoutSet: true}

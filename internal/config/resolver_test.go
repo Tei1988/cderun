@@ -145,7 +145,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
-		_, err := Resolve("node", &cli, nil, nil)
+		_, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duration cannot be negative")
 	})
@@ -586,8 +586,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	t.Run("Resolve errors", func(t *testing.T) {
 		// no image
 		_, err := ResolveWithFS("sh", &CLIOptions{}, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found")
+		var imageNotFoundErr *ImageNotFoundError
+		require.ErrorAs(t, err, &imageNotFoundErr)
+		assert.Equal(t, "sh", imageNotFoundErr.Tool)
 
 		// resolveDevices invalid format in CLI
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}

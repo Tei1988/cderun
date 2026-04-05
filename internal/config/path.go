@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -157,6 +159,10 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.Mount{}, err
+	}
+
+	if !path.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %s", target)
 	}
 
 	return container.Mount{
@@ -427,6 +433,34 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 		return "", err
 	}
 	return resolvedHost + ":" + remainder, nil
+}
+
+// validatePathChars rejects ASCII control characters (bytes <= 31 and 127).
+func validatePathChars(s string) error {
+	for i, r := range s {
+		if r <= 31 || r == 127 {
+			return fmt.Errorf("invalid character at position %d: %#U", i, r)
+		}
+	}
+	return nil
+}
+
+// ValidateToolName checks for control characters and path traversal.
+func ValidateToolName(name string) error {
+	if err := validatePathChars(name); err != nil {
+		return err
+	}
+
+	// Reject path traversal via segments
+	segments := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+
+	if slices.Contains(segments, "..") {
+		return fmt.Errorf("tool name contains path traversal: %s", name)
+	}
+
+	return nil
 }
 
 func SplitHostRemainder(s string) (string, string, bool) {
