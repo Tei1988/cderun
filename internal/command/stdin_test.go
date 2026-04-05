@@ -283,6 +283,7 @@ func TestUnit_Stdin_AttachSynchronization(t *testing.T) {
 type fakeFdReader struct {
 	io.Reader
 }
+
 func (f fakeFdReader) Fd() uintptr { return 0 }
 
 func TestUnit_Stdin_QuickExitWithPipedInput(t *testing.T) {

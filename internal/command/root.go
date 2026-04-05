@@ -84,39 +84,39 @@ type rootOptions struct {
 	cderunHangTimeout     string
 
 	// Docker-compatible flags
-	ports            []string
-	publishAll       bool
-	expose           []string
-	hostname         string
-	dns              []string
-	addHosts         []string
-	user             string
-	privileged       bool
-	capAdd           []string
-	capDrop          []string
-	entrypoint       []string
-	pull             string
-	memory           string
-	cpus             float64
-	devices          []string
-	cderunPorts      []string
-	cderunPublishAll bool
-	cderunExpose     []string
-	cderunHostname   string
-	cderunDNS        []string
-	cderunAddHosts   []string
-	cderunUser       string
-	cderunPrivileged bool
-	cderunCapAdd     []string
-	cderunCapDrop    []string
-	cderunEntrypoint []string
-	cderunPull       string
-	cderunMemory     string
-	cderunCPUs       float64
-	cderunDevices    []string
-	pullMaxRetries       int
-	cderunPullMaxRetries int
-	pullBackoffBase      string
+	ports                 []string
+	publishAll            bool
+	expose                []string
+	hostname              string
+	dns                   []string
+	addHosts              []string
+	user                  string
+	privileged            bool
+	capAdd                []string
+	capDrop               []string
+	entrypoint            []string
+	pull                  string
+	memory                string
+	cpus                  float64
+	devices               []string
+	cderunPorts           []string
+	cderunPublishAll      bool
+	cderunExpose          []string
+	cderunHostname        string
+	cderunDNS             []string
+	cderunAddHosts        []string
+	cderunUser            string
+	cderunPrivileged      bool
+	cderunCapAdd          []string
+	cderunCapDrop         []string
+	cderunEntrypoint      []string
+	cderunPull            string
+	cderunMemory          string
+	cderunCPUs            float64
+	cderunDevices         []string
+	pullMaxRetries        int
+	cderunPullMaxRetries  int
+	pullBackoffBase       string
 	cderunPullBackoffBase string
 
 	// Dependencies
@@ -125,8 +125,8 @@ type rootOptions struct {
 	logger       *logging.Logger
 
 	// Testing hooks
-	exitFunc       func(int)
-	isTerminal     func(int) bool
+	exitFunc           func(int)
+	isTerminal         func(int) bool
 	termGetSize        func(int) (int, int, error)
 	makeRaw            func(int) (*term.State, error)
 	restore            func(int, *term.State) error
@@ -360,58 +360,58 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunHangTimeoutSet:     cmd.Flags().Changed("cderun-hang-timeout"),
 
 		// Docker-compatible flags
-		Ports:               o.ports,
-		CderunPorts:         o.cderunPorts,
-		PublishAll:          o.publishAll,
-		PublishAllSet:       cmd.Flags().Changed("publish-all"),
-		CderunPublishAll:    o.cderunPublishAll,
-		CderunPublishAllSet: cmd.Flags().Changed("cderun-publish-all"),
-		Expose:              o.expose,
-		CderunExpose:        o.cderunExpose,
-		Hostname:            o.hostname,
-		HostnameSet:         cmd.Flags().Changed("hostname"),
-		CderunHostname:      o.cderunHostname,
-		CderunHostnameSet:   cmd.Flags().Changed("cderun-hostname"),
-		DNS:                 o.dns,
-		CderunDNS:           o.cderunDNS,
-		AddHosts:            o.addHosts,
-		CderunAddHosts:      o.cderunAddHosts,
-		User:                o.user,
-		UserSet:             cmd.Flags().Changed("user"),
-		CderunUser:          o.cderunUser,
-		CderunUserSet:       cmd.Flags().Changed("cderun-user"),
-		Privileged:          o.privileged,
-		PrivilegedSet:       cmd.Flags().Changed("privileged"),
-		CderunPrivileged:    o.cderunPrivileged,
-		CderunPrivilegedSet: cmd.Flags().Changed("cderun-privileged"),
-		CapAdd:              o.capAdd,
-		CderunCapAdd:        o.cderunCapAdd,
-		CapDrop:             o.capDrop,
-		CderunCapDrop:       o.cderunCapDrop,
-		Entrypoint:          o.entrypoint,
-		CderunEntrypoint:    o.cderunEntrypoint,
-		Pull:                o.pull,
-		PullSet:             cmd.Flags().Changed("pull"),
-		CderunPull:          o.cderunPull,
-		CderunPullSet:       cmd.Flags().Changed("cderun-pull"),
+		Ports:                    o.ports,
+		CderunPorts:              o.cderunPorts,
+		PublishAll:               o.publishAll,
+		PublishAllSet:            cmd.Flags().Changed("publish-all"),
+		CderunPublishAll:         o.cderunPublishAll,
+		CderunPublishAllSet:      cmd.Flags().Changed("cderun-publish-all"),
+		Expose:                   o.expose,
+		CderunExpose:             o.cderunExpose,
+		Hostname:                 o.hostname,
+		HostnameSet:              cmd.Flags().Changed("hostname"),
+		CderunHostname:           o.cderunHostname,
+		CderunHostnameSet:        cmd.Flags().Changed("cderun-hostname"),
+		DNS:                      o.dns,
+		CderunDNS:                o.cderunDNS,
+		AddHosts:                 o.addHosts,
+		CderunAddHosts:           o.cderunAddHosts,
+		User:                     o.user,
+		UserSet:                  cmd.Flags().Changed("user"),
+		CderunUser:               o.cderunUser,
+		CderunUserSet:            cmd.Flags().Changed("cderun-user"),
+		Privileged:               o.privileged,
+		PrivilegedSet:            cmd.Flags().Changed("privileged"),
+		CderunPrivileged:         o.cderunPrivileged,
+		CderunPrivilegedSet:      cmd.Flags().Changed("cderun-privileged"),
+		CapAdd:                   o.capAdd,
+		CderunCapAdd:             o.cderunCapAdd,
+		CapDrop:                  o.capDrop,
+		CderunCapDrop:            o.cderunCapDrop,
+		Entrypoint:               o.entrypoint,
+		CderunEntrypoint:         o.cderunEntrypoint,
+		Pull:                     o.pull,
+		PullSet:                  cmd.Flags().Changed("pull"),
+		CderunPull:               o.cderunPull,
+		CderunPullSet:            cmd.Flags().Changed("cderun-pull"),
 		PullMaxRetries:           o.pullMaxRetries,
 		PullMaxRetriesSet:        cmd.Flags().Changed("pull-max-retries"),
-		CderunPullMaxRetries:    o.cderunPullMaxRetries,
-		CderunPullMaxRetriesSet: cmd.Flags().Changed("cderun-pull-max-retries"),
-		PullBackoffBase:         o.pullBackoffBase,
-		PullBackoffBaseSet:      cmd.Flags().Changed("pull-backoff-base"),
+		CderunPullMaxRetries:     o.cderunPullMaxRetries,
+		CderunPullMaxRetriesSet:  cmd.Flags().Changed("cderun-pull-max-retries"),
+		PullBackoffBase:          o.pullBackoffBase,
+		PullBackoffBaseSet:       cmd.Flags().Changed("pull-backoff-base"),
 		CderunPullBackoffBase:    o.cderunPullBackoffBase,
 		CderunPullBackoffBaseSet: cmd.Flags().Changed("cderun-pull-backoff-base"),
-		Memory:              o.memory,
-		MemorySet:           cmd.Flags().Changed("memory"),
-		CderunMemory:        o.cderunMemory,
-		CderunMemorySet:     cmd.Flags().Changed("cderun-memory"),
-		CPUs:                o.cpus,
-		CPUsSet:             cmd.Flags().Changed("cpus"),
-		CderunCPUs:          o.cderunCPUs,
-		CderunCPUsSet:       cmd.Flags().Changed("cderun-cpus"),
-		Devices:             o.devices,
-		CderunDevices:       o.cderunDevices,
+		Memory:                   o.memory,
+		MemorySet:                cmd.Flags().Changed("memory"),
+		CderunMemory:             o.cderunMemory,
+		CderunMemorySet:          cmd.Flags().Changed("cderun-memory"),
+		CPUs:                     o.cpus,
+		CPUsSet:                  cmd.Flags().Changed("cpus"),
+		CderunCPUs:               o.cderunCPUs,
+		CderunCPUsSet:            cmd.Flags().Changed("cderun-cpus"),
+		Devices:                  o.devices,
+		CderunDevices:            o.cderunDevices,
 	}
 
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
@@ -1045,118 +1045,118 @@ intended for the subcommand.`,
 		}
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-			// Early logger initialization with CLI and Environment settings before config loading.
-			// This allows loadConfigs() to use the correct log level.
-			initialLevel := "warn"
-			if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
-				initialLevel = env
-			}
-			if o.logLevel != "" {
-				initialLevel = o.logLevel
-			}
-			if o.cderunLogLevel != "" {
-				initialLevel = o.cderunLogLevel
-			}
-			_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
+		// Early logger initialization with CLI and Environment settings before config loading.
+		// This allows loadConfigs() to use the correct log level.
+		initialLevel := "warn"
+		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+			initialLevel = env
+		}
+		if o.logLevel != "" {
+			initialLevel = o.logLevel
+		}
+		if o.cderunLogLevel != "" {
+			initialLevel = o.cderunLogLevel
+		}
+		_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
 
-			// Load configurations
-			toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
-			if err != nil {
-				return err
-			}
-
-			subcommand := ""
-			passthroughArgs := []string{}
-			if len(args) > 0 {
-				subcommand = args[0]
-				passthroughArgs = args[1:]
-			}
-
-			// Resolve settings using priority logic (CLI > Env > Config > Default)
-			resolved, err := o.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
-			if err != nil {
-				return fmt.Errorf("configuration error: %w", err)
-			}
-
-			// Validate pull policy
-			switch resolved.Pull {
-			case "always", "missing", "never":
-				// Valid
-			default:
-				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
-			}
-
-			if resolved.Diagnosis {
-				return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
-			}
-
-			if len(args) == 0 {
-				if resolved.DryRun {
-					return fmt.Errorf("--dry-run requires a subcommand")
-				}
-				return cmd.Help()
-			}
-
-			// Re-initialize logger with fully resolved settings including those from config files.
-			if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
-				return fmt.Errorf("failed to initialize logger: %w", err)
-			}
-			// Redirect logging to the command's stderr stream.
-			o.logger.SetOutput(cmd.ErrOrStderr())
-			o.logger.Debug("Logger initialized with level: %s", resolved.LogLevel)
-
-			// Build ContainerConfig
-			var containerConfig *container.ContainerConfig
-			if subcommand != "" {
-				containerConfig, err = o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
-				if err != nil {
-					return fmt.Errorf("container configuration error: %w", err)
-				}
-			}
-
-			if resolved.DryRun {
-				return o.handleDryRun(cmd, containerConfig, resolved)
-			}
-
-			// Create snapshot if nested execution support is requested or already active
-			var snapshotDir string
-			if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
-				o.logger.Debug("Creating execution snapshot for nested support...")
-				// Ensure globalCfg is initialized for snapshot if it was nil
-				if globalCfg == nil {
-					globalCfg = &config.CDERunConfig{}
-				}
-				sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
-				if err != nil {
-					o.logger.Warn("failed to create snapshot: %v", err)
-				} else {
-					snapshotDir = sDir
-					defer func() {
-						o.logger.Trace("Cleaning up snapshot: %s", snapshotDir)
-						if err := cleanupSnapshot(o.fs, snapshotDir); err != nil {
-							o.logger.Warn("failed to cleanup snapshot: %v", err)
-						}
-					}()
-					// Mount the snapshot directory using the host path as source
-					containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-						Type:     "bind",
-						Source:   hostDir,
-						Target:   "/run/cderun",
-						ReadOnly: true,
-					})
-				}
-			}
-
-			// Execute Container
-			exitCode, err := o.execute(cmd, resolved, containerConfig)
-			if err != nil {
-				return err
-			}
-			o.exitFunc(exitCode)
-			return nil
+		// Load configurations
+		toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)
+		if err != nil {
+			return err
 		}
 
-registerFlags(cmd, o)
+		subcommand := ""
+		passthroughArgs := []string{}
+		if len(args) > 0 {
+			subcommand = args[0]
+			passthroughArgs = args[1:]
+		}
+
+		// Resolve settings using priority logic (CLI > Env > Config > Default)
+		resolved, err := o.resolveSettings(cmd, subcommand, toolsCfg, globalCfg)
+		if err != nil {
+			return fmt.Errorf("configuration error: %w", err)
+		}
+
+		// Validate pull policy
+		switch resolved.Pull {
+		case "always", "missing", "never":
+			// Valid
+		default:
+			return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", resolved.Pull)
+		}
+
+		if resolved.Diagnosis {
+			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
+		}
+
+		if len(args) == 0 {
+			if resolved.DryRun {
+				return fmt.Errorf("--dry-run requires a subcommand")
+			}
+			return cmd.Help()
+		}
+
+		// Re-initialize logger with fully resolved settings including those from config files.
+		if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
+		// Redirect logging to the command's stderr stream.
+		o.logger.SetOutput(cmd.ErrOrStderr())
+		o.logger.Debug("Logger initialized with level: %s", resolved.LogLevel)
+
+		// Build ContainerConfig
+		var containerConfig *container.ContainerConfig
+		if subcommand != "" {
+			containerConfig, err = o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
+			if err != nil {
+				return fmt.Errorf("container configuration error: %w", err)
+			}
+		}
+
+		if resolved.DryRun {
+			return o.handleDryRun(cmd, containerConfig, resolved)
+		}
+
+		// Create snapshot if nested execution support is requested or already active
+		var snapshotDir string
+		if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
+			o.logger.Debug("Creating execution snapshot for nested support...")
+			// Ensure globalCfg is initialized for snapshot if it was nil
+			if globalCfg == nil {
+				globalCfg = &config.CDERunConfig{}
+			}
+			sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+			if err != nil {
+				o.logger.Warn("failed to create snapshot: %v", err)
+			} else {
+				snapshotDir = sDir
+				defer func() {
+					o.logger.Trace("Cleaning up snapshot: %s", snapshotDir)
+					if err := cleanupSnapshot(o.fs, snapshotDir); err != nil {
+						o.logger.Warn("failed to cleanup snapshot: %v", err)
+					}
+				}()
+				// Mount the snapshot directory using the host path as source
+				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+					Type:     "bind",
+					Source:   hostDir,
+					Target:   "/run/cderun",
+					ReadOnly: true,
+				})
+			}
+		}
+
+		// Execute Container
+		exitCode, err := o.execute(cmd, resolved, containerConfig)
+		if err != nil {
+			return err
+		}
+		o.exitFunc(exitCode)
+		return nil
+	}
+
+	registerFlags(cmd, o)
 
 	cmd.Flags().SetInterspersed(false)
 	return cmd

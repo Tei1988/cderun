@@ -16,7 +16,6 @@ import (
 	"github.com/docker/go-units"
 )
 
-
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
 	HostContext     *HostContext
@@ -48,22 +47,22 @@ type ResolvedConfig struct {
 	HangTimeout     time.Duration
 
 	// Docker-compatible flags
-	Ports      []string
-	PublishAll bool
-	Expose     []string
-	Hostname   string
-	DNS        []string
-	AddHosts   []string
-	Privileged bool
-	CapAdd     []string
-	CapDrop    []string
-	Entrypoint []string
-	Pull       string
+	Ports           []string
+	PublishAll      bool
+	Expose          []string
+	Hostname        string
+	DNS             []string
+	AddHosts        []string
+	Privileged      bool
+	CapAdd          []string
+	CapDrop         []string
+	Entrypoint      []string
+	Pull            string
 	PullMaxRetries  int
 	PullBackoffBase time.Duration
-	Memory     int64
-	CPUs       float64
-	Devices    []container.DeviceMapping
+	Memory          int64
+	CPUs            float64
+	Devices         []container.DeviceMapping
 }
 
 // CLIOptions represents values from CLI flags.
@@ -166,58 +165,58 @@ type CLIOptions struct {
 	CderunHangTimeoutSet     bool
 
 	// Docker-compatible flags
-	Ports               []string
-	CderunPorts         []string
-	PublishAll          bool
-	PublishAllSet       bool
-	CderunPublishAll    bool
-	CderunPublishAllSet bool
-	Expose              []string
-	CderunExpose        []string
-	Hostname            string
-	HostnameSet         bool
-	CderunHostname      string
-	CderunHostnameSet   bool
-	DNS                 []string
-	CderunDNS           []string
-	AddHosts            []string
-	CderunAddHosts      []string
-	User                string
-	UserSet             bool
-	CderunUser          string
-	CderunUserSet       bool
-	Privileged          bool
-	PrivilegedSet       bool
-	CderunPrivileged    bool
-	CderunPrivilegedSet bool
-	CapAdd              []string
-	CderunCapAdd        []string
-	CapDrop             []string
-	CderunCapDrop       []string
-	Entrypoint          []string
-	CderunEntrypoint    []string
-	Pull                string
-	PullSet             bool
-	CderunPull          string
-	CderunPullSet       bool
-	PullMaxRetries      int
-	PullMaxRetriesSet   bool
-	CderunPullMaxRetries int
-	CderunPullMaxRetriesSet bool
-	PullBackoffBase     string
-	PullBackoffBaseSet  bool
-	CderunPullBackoffBase string
+	Ports                    []string
+	CderunPorts              []string
+	PublishAll               bool
+	PublishAllSet            bool
+	CderunPublishAll         bool
+	CderunPublishAllSet      bool
+	Expose                   []string
+	CderunExpose             []string
+	Hostname                 string
+	HostnameSet              bool
+	CderunHostname           string
+	CderunHostnameSet        bool
+	DNS                      []string
+	CderunDNS                []string
+	AddHosts                 []string
+	CderunAddHosts           []string
+	User                     string
+	UserSet                  bool
+	CderunUser               string
+	CderunUserSet            bool
+	Privileged               bool
+	PrivilegedSet            bool
+	CderunPrivileged         bool
+	CderunPrivilegedSet      bool
+	CapAdd                   []string
+	CderunCapAdd             []string
+	CapDrop                  []string
+	CderunCapDrop            []string
+	Entrypoint               []string
+	CderunEntrypoint         []string
+	Pull                     string
+	PullSet                  bool
+	CderunPull               string
+	CderunPullSet            bool
+	PullMaxRetries           int
+	PullMaxRetriesSet        bool
+	CderunPullMaxRetries     int
+	CderunPullMaxRetriesSet  bool
+	PullBackoffBase          string
+	PullBackoffBaseSet       bool
+	CderunPullBackoffBase    string
 	CderunPullBackoffBaseSet bool
-	Memory              string
-	MemorySet           bool
-	CderunMemory        string
-	CderunMemorySet     bool
-	CPUs                float64
-	CPUsSet             bool
-	CderunCPUs          float64
-	CderunCPUsSet       bool
-	Devices             []string
-	CderunDevices       []string
+	Memory                   string
+	MemorySet                bool
+	CderunMemory             string
+	CderunMemorySet          bool
+	CPUs                     float64
+	CPUsSet                  bool
+	CderunCPUs               float64
+	CderunCPUsSet            bool
+	Devices                  []string
+	CderunDevices            []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -20,7 +19,7 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 				"/home/user/project/.go-version": []byte("1.25"),
 			},
 			Env: map[string]string{
-				"PROJECT_ENV": "production",
+				"PROJECT_ENV":  "production",
 				"CDERUN_IMAGE": "node:{{file:.go-version}}-{{env:PROJECT_ENV}}",
 			},
 		}
@@ -346,15 +345,15 @@ func TestIntegration_Config_RealFS_Exhaustive(t *testing.T) {
 		err = fs.WriteFile(tmpDir+"/f", []byte("data"), 0o644)
 		require.NoError(t, err)
 
-		data, err := fs.ReadFile(tmpDir+"/f")
+		data, err := fs.ReadFile(tmpDir + "/f")
 		require.NoError(t, err)
 		assert.Equal(t, "data", string(data))
 
-		info, err := fs.Stat(tmpDir+"/f")
+		info, err := fs.Stat(tmpDir + "/f")
 		require.NoError(t, err)
 		assert.False(t, info.IsDir())
 
-		err = fs.RemoveAll(tmpDir+"/a")
+		err = fs.RemoveAll(tmpDir + "/a")
 		require.NoError(t, err)
 
 		abs, err := fs.Abs(".")

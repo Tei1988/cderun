@@ -2,10 +2,10 @@ package runtime
 
 import (
 	"context"
-	"time"
-	"io"
 	"fmt"
+	"io"
 	"sync"
+	"time"
 
 	"cderun/internal/container"
 )
@@ -43,8 +43,8 @@ type MockRuntime struct {
 	SignalErr           error
 
 	// Custom behavior hooks
-	WaitFunc   func(ctx context.Context, containerID string) (int, error)
-	AttachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	WaitFunc    func(ctx context.Context, containerID string) (int, error)
+	AttachFunc  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
 }
 

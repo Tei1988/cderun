@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/term"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/term"
 
 	"cderun/internal/config"
-	"cderun/internal/logging"
 	"cderun/internal/container"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -665,17 +665,17 @@ func TestUnit_Root_SyncReader(t *testing.T) {
 	}
 
 	// Test before ready
-		type result struct {
-			n   int
-			err error
-			p   []byte
-		}
-		resCh := make(chan result)
-		go func() {
-			buf := make([]byte, 5)
-			n, err := sr.Read(buf)
-			resCh <- result{n: n, err: err, p: buf}
-		}()
+	type result struct {
+		n   int
+		err error
+		p   []byte
+	}
+	resCh := make(chan result)
+	go func() {
+		buf := make([]byte, 5)
+		n, err := sr.Read(buf)
+		resCh <- result{n: n, err: err, p: buf}
+	}()
 
 	// Ensure Read has reached the select block but is waiting for ready
 	select {
@@ -1003,7 +1003,7 @@ func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
-			o.exitFunc = func(code int) { }
+			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 			cmd.SetErr(&errBuf)
 		})
@@ -1377,28 +1377,28 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "PullImage fails",
-			setup: func(m *runtime.MockRuntime) { m.PullErr = errors.New("pull failed") },
+			name:     "PullImage fails",
+			setup:    func(m *runtime.MockRuntime) { m.PullErr = errors.New("pull failed") },
 			expected: "failed to pull image: pull failed",
 		},
 		{
-			name: "StartContainer fails",
-			setup: func(m *runtime.MockRuntime) { m.StartErr = errors.New("start failed") },
+			name:     "StartContainer fails",
+			setup:    func(m *runtime.MockRuntime) { m.StartErr = errors.New("start failed") },
 			expected: "failed to start container: start failed",
 		},
 		{
-			name: "WaitContainer fails",
-			setup: func(m *runtime.MockRuntime) { m.WaitErr = errors.New("wait failed") },
+			name:     "WaitContainer fails",
+			setup:    func(m *runtime.MockRuntime) { m.WaitErr = errors.New("wait failed") },
 			expected: "failed to wait for container: wait failed",
 		},
 		{
-			name: "CreateContainer fails",
-			setup: func(m *runtime.MockRuntime) { m.CreateErr = errors.New("create failed") },
+			name:     "CreateContainer fails",
+			setup:    func(m *runtime.MockRuntime) { m.CreateErr = errors.New("create failed") },
 			expected: "failed to create container: create failed",
 		},
 		{
-			name: "AttachContainer fails",
-			setup: func(m *runtime.MockRuntime) { m.AttachErr = errors.New("attach failed") },
+			name:     "AttachContainer fails",
+			setup:    func(m *runtime.MockRuntime) { m.AttachErr = errors.New("attach failed") },
 			expected: "failed to attach to container: attach failed",
 		},
 	}
@@ -1410,7 +1410,7 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return false }
-				o.exitFunc = func(code int) { }
+				o.exitFunc = func(code int) {}
 			})
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tt.expected)
@@ -1945,9 +1945,9 @@ func TestUnit_Root_DryRun_Safety(t *testing.T) {
 			DryRunFormat: "simple",
 		}
 		containerConfig := &container.ContainerConfig{
-			Image: "alpine",
+			Image:   "alpine",
 			Command: []string{"sh", "-c", "echo 'hello world'"},
-			Env: []string{"SECRET_TOKEN=top-secret", "PLAIN_VAR=value", "VAR_WITH_SPACE=val with space"},
+			Env:     []string{"SECRET_TOKEN=top-secret", "PLAIN_VAR=value", "VAR_WITH_SPACE=val with space"},
 		}
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
@@ -1971,7 +1971,7 @@ func TestUnit_Root_DryRun_Safety(t *testing.T) {
 			DryRunFormat: "simple",
 		}
 		containerConfig := &container.ContainerConfig{
-			Image: "alpine",
+			Image:      "alpine",
 			Entrypoint: []string{"/usr/bin/env", "bash"},
 		}
 		cmd := &cobra.Command{}

@@ -26,7 +26,6 @@ const (
 	attachCloseWriteGrace = 1 * time.Second
 )
 
-
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)

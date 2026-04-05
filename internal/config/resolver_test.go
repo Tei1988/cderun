@@ -8,11 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		def := OptionDef[[]string]{
-			EnvKey: "TEST_SLICE",
+			EnvKey:       "TEST_SLICE",
 			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
@@ -39,7 +38,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
 		def := OptionDef[*float64]{
-			EnvKey: "TEST_FLOAT",
+			EnvKey:   "TEST_FLOAT",
 			Fallback: ptr(1.0),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
@@ -334,7 +333,7 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{
 		Env: map[string]string{
-			"HOST_VAR": "host-val",
+			"HOST_VAR":   "host-val",
 			"CDERUN_ENV": "ENV_VAR=env-val; HOST_VAR",
 		},
 	}
@@ -342,7 +341,7 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node",
-				Env: []string{"TOOL_VAR=tool-val"},
+				Env:   []string{"TOOL_VAR=tool-val"},
 			},
 		}
 		res, err := ResolveWithFS("node", &CLIOptions{}, tools, nil, mfs)
@@ -354,7 +353,7 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 	t.Run("Strict mode env validation", func(t *testing.T) {
 		cli := CLIOptions{
 			Image: "alpine", ImageSet: true,
-			Env: []string{"NONEXISTENT"},
+			Env:       []string{"NONEXISTENT"},
 			StrictEnv: true, StrictEnvSet: true,
 		}
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
@@ -368,7 +367,7 @@ func TestUnit_Resolver_Devices_Advanced(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
 				Devices: []DeviceConfig{{
-					Source: ConfigPath{Raw: "/dev/global"},
+					Source:      ConfigPath{Raw: "/dev/global"},
 					Destination: ConfigPath{Raw: "/dev/global"},
 				}},
 			},
@@ -377,7 +376,7 @@ func TestUnit_Resolver_Devices_Advanced(t *testing.T) {
 			"node": ToolConfig{
 				Image: "node",
 				Devices: []DeviceConfig{{
-					Source: ConfigPath{Raw: "/dev/tool"},
+					Source:      ConfigPath{Raw: "/dev/tool"},
 					Destination: ConfigPath{Raw: "/dev/tool"},
 				}},
 			},
@@ -526,7 +525,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	t.Run("Auto-detection exhaustive", func(t *testing.T) {
 		// docker.sock exists
 		mfs := &MockFileSystem{
-			Dirs: map[string]bool{"/var/run": true},
+			Dirs:  map[string]bool{"/var/run": true},
 			Files: map[string][]byte{"/var/run/docker.sock": []byte("")},
 		}
 		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
@@ -536,7 +535,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// podman.sock exists
 		mfs = &MockFileSystem{
-			Dirs: map[string]bool{"/run/podman": true},
+			Dirs:  map[string]bool{"/run/podman": true},
 			Files: map[string][]byte{"/run/podman/podman.sock": []byte("")},
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)

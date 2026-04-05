@@ -1,9 +1,9 @@
 package command
 
 import (
-	"testing"
 	"cderun/internal/container"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func assertMountSourceEquals(t *testing.T, mounts []container.Mount, target, expectedSource string) {
