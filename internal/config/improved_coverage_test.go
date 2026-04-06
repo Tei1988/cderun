@@ -9,10 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// exprMockFS and other helpers are in expression_test.go or coverage_test.go.
-// Since we are running as a package test, we should be fine if we run 'go test ./internal/config'
-
-func TestUnit_ImprovedCoverage_Expression_FileLimits(t *testing.T) {
+func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *testing.T) {
 	hostCtx := &HostContext{}
 
 	t.Run("resolveFile exactly MaxDirectiveFileSize", func(t *testing.T) {
@@ -46,12 +43,10 @@ func TestUnit_ImprovedCoverage_Expression_FileLimits(t *testing.T) {
 	})
 
 	t.Run("resolveFile exceeding MaxDirectiveFileSize in ReadFile", func(t *testing.T) {
-		// Mock Stat to return small size, but ReadFile to return large data
 		fs := &MockFileSystem{
 			Files: map[string][]byte{"/project/race.txt": make([]byte, MaxDirectiveFileSize+1)},
 			WD:    "/project",
 		}
-		// We need to override Stat for this specific file
 		cfs := &customStatFS{
 			MockFileSystem: *fs,
 			statSize:       10,
@@ -78,9 +73,8 @@ func TestUnit_ImprovedCoverage_Expression_FileLimits(t *testing.T) {
 		_, err = r.resolveFile("err.txt")
 		require.Error(t, err)
 
-		// Second call should hit cache and return SAME error
 		_, err2 := r.resolveFile("err.txt")
-		assert.Equal(t, err, err2)
+		assert.Same(t, err, err2)
 	})
 }
 
@@ -104,7 +98,7 @@ type customStatInfo struct {
 
 func (i *customStatInfo) Size() int64 { return i.size }
 
-func TestUnit_ImprovedCoverage_Registry_Getters(t *testing.T) {
+func TestUnit_OptionRegistry_Getters(t *testing.T) {
 	t.Run("GetIntOption", func(t *testing.T) {
 		opt, ok := GetIntOption("pull-max-retries")
 		assert.True(t, ok)
@@ -133,7 +127,7 @@ func TestUnit_ImprovedCoverage_Registry_Getters(t *testing.T) {
 	})
 }
 
-func TestUnit_ImprovedCoverage_Config_SetBaseDir(t *testing.T) {
+func TestUnit_Config_SetBaseDirBehavior(t *testing.T) {
 	t.Run("CDERunConfig.SetBaseDir with HostContext Mounts", func(t *testing.T) {
 		cfg := &CDERunConfig{
 			HostContext: &HostContext{
@@ -158,7 +152,7 @@ func TestUnit_ImprovedCoverage_Config_SetBaseDir(t *testing.T) {
 	})
 }
 
-func TestUnit_ImprovedCoverage_Resolver_Internal(t *testing.T) {
+func TestUnit_Resolver_InternalHelpers(t *testing.T) {
 	t.Run("ptr helper", func(t *testing.T) {
 		v := 123
 		p := ptr(v)
@@ -170,7 +164,8 @@ func TestUnit_ImprovedCoverage_Resolver_Internal(t *testing.T) {
 		cliVal := reflect.ValueOf(cli).Elem()
 
 		fieldOnce.Do(initFieldInfo)
-		info := fieldInfo["tty"]
+		info, ok := fieldInfo["tty"]
+		assert.True(t, ok, "fieldInfo['tty'] must exist")
 
 		set, val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 		assert.True(t, set)
@@ -178,7 +173,8 @@ func TestUnit_ImprovedCoverage_Resolver_Internal(t *testing.T) {
 	})
 }
 
-func TestUnit_ImprovedCoverage_Expression_ResolveString_Empty(t *testing.T) {
-	r, _ := NewExpressionResolver(nil)
+func TestUnit_ExpressionResolver_ResolveString_Empty(t *testing.T) {
+	r, err := NewExpressionResolver(nil)
+	require.NoError(t, err)
 	assert.Empty(t, r.resolveString(""))
 }
