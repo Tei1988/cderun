@@ -20,8 +20,14 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	t.Run("missing reflection fields", func(t *testing.T) {
 		// Mock fieldInfo by adding an entry with missing ValIdx
 		fieldOnce.Do(initFieldInfo)
-		orig := fieldInfo["image"]
-		defer func() { fieldInfo["image"] = orig }()
+		orig, ok := fieldInfo["image"]
+		defer func() {
+			if ok {
+				fieldInfo["image"] = orig
+			} else {
+				delete(fieldInfo, "image")
+			}
+		}()
 
 		fieldInfo["image"] = optionFields{p1ValIdx: nil}
 		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal)

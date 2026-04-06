@@ -23,14 +23,13 @@ func (m *mockFileInfoLarge) Sys() any           { return nil }
 
 type largeFileMockFS struct {
 	MockFileSystem
-	statFileInfo os.FileInfo
-	statErr      error
-	statCallCount int
+	statFileInfo  os.FileInfo
+	statErr       error
+	failStatPath  string
 }
 
 func (m *largeFileMockFS) Stat(name string) (os.FileInfo, error) {
-	m.statCallCount++
-	if m.statCallCount > 1 && m.statErr != nil {
+	if m.failStatPath != "" && name == m.failStatPath {
 		return nil, m.statErr
 	}
 	if m.statFileInfo != nil {
@@ -60,10 +59,13 @@ func TestUnit_ExpressionResolver_ResolveFile_LargeFile(t *testing.T) {
 func TestUnit_ExpressionResolver_ResolveFile_LargeData(t *testing.T) {
 	// Size is OK in Stat, but actual data is too large
 	data := make([]byte, MaxDirectiveFileSize+1)
-	fs := &MockFileSystem{
-		WD:    "/work",
-		Files: map[string][]byte{"/work/large_data.txt": data},
-		Dirs:  map[string]bool{"/work": true},
+	fs := &largeFileMockFS{
+		MockFileSystem: MockFileSystem{
+			WD:    "/work",
+			Files: map[string][]byte{"/work/large_data.txt": data},
+			Dirs:  map[string]bool{"/work": true},
+		},
+		statFileInfo: &mockFileInfoLarge{name: "large_data.txt", size: 100},
 	}
 
 	r, err := NewExpressionResolverWithFS(nil, fs)
@@ -86,6 +88,14 @@ func TestUnit_ExpressionResolver_ResolveFile_StatError(t *testing.T) {
 
 	r, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
+	r.ensureLoader()
+
+	// Ensure FindConfigs works by temporarily disabling the error
+	fs.failStatPath = ""
+	_ = r.shared.loader.FindConfigs("err.txt")
+
+	// Now enable the error for direct Stat call in resolveFile
+	fs.failStatPath = "/work/err.txt"
 
 	_, err = r.ResolveString("{{ file:err.txt }}")
 	require.Error(t, err)
