@@ -670,13 +670,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"invalid\"")
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be positive")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"0s\": must be positive")
 	})
 
 	t.Run("Memory and Expression errors", func(t *testing.T) {

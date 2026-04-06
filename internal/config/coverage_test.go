@@ -142,11 +142,14 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	cli := CLIOptions{CderunImage: "alpine", CderunImageSet: true}
 	_, err := ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
+	var regErr *RegistryMismatchError
+	assert.ErrorAs(t, err, &regErr)
 	assert.Contains(t, err.Error(), "registry mismatch:")
 
 	StringOptions = append(originalOptions, StringOption{Name: "hc", FieldName: "HostContext"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &regErr)
 	assert.Contains(t, err.Error(), "registry mismatch: info for option \"hc\" not found")
 
 	// Reset StringOptions before Phase 1 test to avoid triggering same error again
@@ -162,6 +165,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &regErr)
 	assert.Contains(t, err.Error(), "registry mismatch: info for option \"bad-bool\" not found")
 }
 
@@ -170,18 +174,27 @@ func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
 	cli := CLIOptions{Image: "alpine", ImageSet: true, HangTimeout: "invalid", HangTimeoutSet: true}
 	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	var invErr *InvalidConfigError
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "hang-timeout", invErr.Field)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "pull-backoff-base", invErr.Field)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "memory", invErr.Field)
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "pull-max-retries", invErr.Field)
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_ExpressionError(t *testing.T) {
@@ -690,31 +703,42 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 	// No image mapping
 	_, err := ResolveWithFS("missing", &CLIOptions{}, nil, nil, mfs)
 	require.Error(t, err)
+	var imgErr *ImageNotFoundError
+	assert.ErrorAs(t, err, &imgErr)
+	assert.Equal(t, "missing", imgErr.Tool)
 	assert.Contains(t, err.Error(), "no image mapping found for tool: \"missing\"")
 
 	// Negative hang-timeout
 	cli := CLIOptions{Image: "a", ImageSet: true, HangTimeout: "-1s", HangTimeoutSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	var invErr *InvalidConfigError
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "hang-timeout", invErr.Field)
 	assert.Contains(t, err.Error(), "duration cannot be negative")
 
 	// Non-positive pull-max-retries
 	cli = CLIOptions{Image: "a", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "pull-max-retries", invErr.Field)
 	assert.Contains(t, err.Error(), "must be greater than 0")
 
 	// Non-positive pull-backoff-base
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "pull-backoff-base", invErr.Field)
 	assert.Contains(t, err.Error(), "must be positive")
 
 	// Invalid pull-backoff-base format
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "invalid", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+	assert.ErrorAs(t, err, &invErr)
+	assert.Equal(t, "pull-backoff-base", invErr.Field)
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_TransitiveLogic(t *testing.T) {
@@ -817,6 +841,8 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatchErrors(t *testing.
 	cli := CLIOptions{Image: "a", ImageSet: true}
 	_, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	var regErr *RegistryMismatchError
+	assert.ErrorAs(t, err, &regErr)
 	assert.Contains(t, err.Error(), "registry mismatch: early boolean option \"diagnosis\" not found")
 }
 

@@ -766,7 +766,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Initialize Runtime
 	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to initialize runtime: %w", err)
+		return nil, "", nil, &runtime.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 	}
 
 	o.logger.Trace("Creating container...")
