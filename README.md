@@ -94,7 +94,7 @@ cderun --cderun-image node:20-alpine node app.js
 
 Hoisting is a preprocessing step that scans the argument list to separate `cderun`'s internal overrides from the arguments intended for the wrapped tool.
 
-1. **Detection**: `cderun` identifies the **subcommand** (the first non-flag argument that isn't a known P2 flag's value).
+1. **Detection**: `cderun` identifies the **subcommand** (the first non-flag argument that is not a value associated with a flag registered in `cderun`'s dynamic `FlagSet`).
 2. **Extraction**: It gathers all flags prefixed with `--cderun-` (and their values) that appear *after* the subcommand.
 3. **Hoisting**: These gathered flags are internally moved before the subcommand. This ensures they are correctly parsed as `cderun` overrides (P1) and prevents them from being passed to the containerized tool.
 

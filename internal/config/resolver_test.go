@@ -814,3 +814,95 @@ func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
 		assert.Equal(t, assert.AnError, err)
 	})
 }
+
+func TestUnit_Resolver_ValidateImageRegistryMatch(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		cliImage    string
+		configImage string
+		wantErr     bool
+	}{
+		{"exact match", "node:20", "node:18", false},
+		{"with registry match", "docker.io/library/node:20", "node:18", false},
+		{"implicit library match", "node:20", "library/node:18", false},
+		{"explicit host library match", "docker.io/node:20", "node:18", false},
+		{"explicit host match", "docker.io/library/node:20", "docker.io/node:18", false},
+		{"mismatch host", "my-reg.com/node:20", "node:18", true},
+		{"mismatch repo", "library/python:3", "library/node:18", true},
+		{"custom registry match", "my-reg.com/my-tool:v1", "my-reg.com/my-tool:latest", false},
+		{"custom registry mismatch", "other-reg.com/my-tool:v1", "my-reg.com/my-tool:latest", true},
+		{"ghcr match", "ghcr.io/user/repo:v1", "ghcr.io/user/repo:latest", false},
+		{"localhost match", "localhost:5000/my-tool:v1", "localhost:5000/my-tool:latest", false},
+		{"nested repo match", "my-reg.com/org/team/tool:v1", "my-reg.com/org/team/tool:latest", false},
+		{"one side empty", "node:20", "", false},
+		{"other side empty", "", "node:18", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateImageRegistryMatch(tt.cliImage, tt.configImage)
+			if tt.wantErr {
+				require.Error(t, err)
+				var regErr *RegistryMismatchError
+				require.ErrorAs(t, err, &regErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnit_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{}
+	tools := ToolsConfig{
+		"node": ToolConfig{Image: "node:18-alpine"},
+	}
+
+	t.Run("mismatch from CLI", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image: "my-reg.com/node:20", ImageSet: true,
+		}
+		_, err := ResolveWithFS("node", cli, tools, nil, mfs)
+		require.Error(t, err)
+		var regErr *RegistryMismatchError
+		require.ErrorAs(t, err, &regErr)
+		assert.Equal(t, "docker.io/library/node", regErr.ExpectedRegistry)
+		assert.Equal(t, "my-reg.com/node", regErr.ActualRegistry)
+	})
+
+	t.Run("mismatch from Env", func(t *testing.T) {
+		mfsEnv := &MockFileSystem{
+			Env: map[string]string{"CDERUN_IMAGE": "other.io/node:latest"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, mfsEnv)
+		require.Error(t, err)
+		var regErr *RegistryMismatchError
+		assert.ErrorAs(t, err, &regErr)
+	})
+
+	t.Run("match from CLI", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image: "docker.io/library/node:20", ImageSet: true,
+		}
+		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "docker.io/library/node:20", res.Image)
+	})
+
+	t.Run("templated config match", func(t *testing.T) {
+		mfsEnv := &MockFileSystem{
+			Env: map[string]string{"REG": "my-reg.com"},
+		}
+		toolsTemplated := ToolsConfig{
+			"node": ToolConfig{Image: "{{env:REG}}/node:18-alpine"},
+		}
+		cli := &CLIOptions{
+			Image: "my-reg.com/node:20", ImageSet: true,
+		}
+		res, err := ResolveWithFS("node", cli, toolsTemplated, nil, mfsEnv)
+		require.NoError(t, err)
+		assert.Equal(t, "my-reg.com/node:20", res.Image)
+	})
+}
