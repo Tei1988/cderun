@@ -158,7 +158,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		_, err := ResolveWithFS("unknown-tool", &cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		var imageErr *ImageNotFoundError
-		assert.ErrorAs(t, err, &imageErr)
+		require.ErrorAs(t, err, &imageErr)
 		assert.Equal(t, "unknown-tool", imageErr.Tool)
 	})
 
@@ -167,7 +167,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		_, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		var invalidErr *InvalidConfigError
-		assert.ErrorAs(t, err, &invalidErr)
+		require.ErrorAs(t, err, &invalidErr)
 		assert.Equal(t, "hang-timeout", invalidErr.Field)
 		assert.Equal(t, "-5s", invalidErr.Value)
 	})
