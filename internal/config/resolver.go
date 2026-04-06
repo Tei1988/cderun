@@ -979,6 +979,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	var res []string
+	isDebug := logging.GetGlobalLogger().GetLevel() >= logging.DebugLevel
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
@@ -999,7 +1000,9 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		if isDebug {
+			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		}
 
 		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
@@ -1078,11 +1081,49 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	return res, nil
 }
 
+var sensitiveKeywords = []string{
+	"PASSWORD",
+	"SECRET",
+	"TOKEN",
+	"KEY",
+	"AUTH",
+	"SIG",
+	"CERT",
+	"PEM",
+	"PRIVATE",
+	"CREDENTIALS",
+	"PASSPHRASE",
+}
+
+var sensitiveKeywordsMap map[string]struct{}
+var sensitiveOnce sync.Once
+
+func initSensitiveKeywords() {
+	sensitiveKeywordsMap = make(map[string]struct{}, len(sensitiveKeywords))
+	for _, kw := range sensitiveKeywords {
+		sensitiveKeywordsMap[kw] = struct{}{}
+	}
+}
+
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
 	if value == "" {
 		return ""
 	}
+
+	upperKey := strings.ToUpper(key)
+	found := false
+	for _, kw := range sensitiveKeywords {
+		if strings.Contains(upperKey, kw) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return value
+	}
+
+	sensitiveOnce.Do(initSensitiveKeywords)
 
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
@@ -1125,25 +1166,11 @@ func MaskSensitiveEnv(key, value string) string {
 		segments = append(segments, strings.ToUpper(current.String()))
 	}
 
-	sensitiveKeywords := map[string]struct{}{
-		"PASSWORD": {},
-		"SECRET":   {},
-		"TOKEN":    {},
-		"KEY":      {},
-		"AUTH":     {},
-		"SIG":      {},
-	}
-
 	for _, segment := range segments {
-		if _, ok := sensitiveKeywords[segment]; ok {
+		if _, ok := sensitiveKeywordsMap[segment]; ok {
 			return "[REDACTED]"
 		}
 	}
-
-	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
-	// if they were split but should be treated as one sensitive keyword.
-	// However, 'PASS' and 'WORD' individually might be too generic.
-	// Let's stick to strict segment match for the core keywords to avoid false positives.
 
 	return value
 }
