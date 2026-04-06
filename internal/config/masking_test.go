@@ -34,6 +34,11 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Letter-digit boundary password", "PASSWORD2", "secret", "[REDACTED]"},
 		{"Digit-letter boundary key", "1KEY", "secret", "[REDACTED]"},
 		{"Letter-digit camel boundary", "dbPassword2", "secret", "[REDACTED]"},
+		{"CERT keyword", "MY_CERT", "value", "[REDACTED]"},
+		{"PEM keyword", "PRIVATE_PEM", "value", "[REDACTED]"},
+		{"PRIVATE keyword", "PRIVATE_DATA", "value", "[REDACTED]"},
+		{"CREDENTIALS keyword", "AWS_CREDENTIALS", "value", "[REDACTED]"},
+		{"PASSPHRASE keyword", "SSH_PASSPHRASE", "value", "[REDACTED]"},
 	}
 
 	for _, tt := range tests {

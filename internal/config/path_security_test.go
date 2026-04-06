@@ -117,3 +117,53 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 		assert.Contains(t, err.Error(), "device destination must be an absolute path")
 	})
 }
+
+func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
+	fs := &MockFileSystem{
+		HomeDir: "/home/user",
+		WD:      "/work",
+	}
+
+	tests := []struct {
+		name    string
+		cli     *CLIOptions
+		wantErr string
+	}{
+		{
+			name: "Invalid control char in LogFormat",
+			cli: &CLIOptions{
+				Image:        "alpine",
+				ImageSet:     true,
+				LogFormat:    "text\t",
+				LogFormatSet: true,
+			},
+			wantErr: "security validation failed for \"log-format\"",
+		},
+		{
+			name: "Invalid control char in Env element",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      []string{"SAFE=VALUE", "UNSAFE=\n"},
+			},
+			wantErr: "security validation failed for env[1]",
+		},
+		{
+			name: "Invalid control char in Ports element",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"8080:80\r"},
+			},
+			wantErr: "security validation failed for ports[0]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ResolveWithFS("tool", tt.cli, nil, nil, fs)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
