@@ -153,6 +153,25 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("ImageNotFoundError inspection", func(t *testing.T) {
+		cli := CLIOptions{}
+		_, err := ResolveWithFS("unknown-tool", &cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		var imageErr *ImageNotFoundError
+		assert.ErrorAs(t, err, &imageErr)
+		assert.Equal(t, "unknown-tool", imageErr.Tool)
+	})
+
+	t.Run("InvalidConfigError inspection", func(t *testing.T) {
+		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		var invalidErr *InvalidConfigError
+		assert.ErrorAs(t, err, &invalidErr)
+		assert.Equal(t, "hang-timeout", invalidErr.Field)
+		assert.Equal(t, "-5s", invalidErr.Value)
+	})
+
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
 		_, err := Resolve("node", &cli, nil, nil)

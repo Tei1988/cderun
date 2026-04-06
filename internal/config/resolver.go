@@ -309,11 +309,11 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
 	info, ok := fieldInfo[key]
 	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Message: fmt.Sprintf("info for option %q not found", key)}
 	}
 
 	if info.p1ValIdx == nil || info.p2ValIdx == nil {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Message: fmt.Sprintf("CLI reflection fields for option %q missing in CLIOptions", key)}
 	}
 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -353,7 +353,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
 		if !ok {
-			return nil, fmt.Errorf("registry mismatch: early boolean option %q not found", name)
+			return nil, &RegistryMismatchError{Message: fmt.Sprintf("early boolean option %q not found", name)}
 		}
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -394,7 +394,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %q", subcommand)
+		return nil, &ImageNotFoundError{Tool: subcommand}
 	}
 	if res.Image != "" {
 		// Security validation before any further use (including logging)
@@ -612,11 +612,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
 			if d < 0 {
-				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
+				return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
 			}
 			res.HangTimeout = d
 		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+			return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: err}
 		}
 	}
 
@@ -749,7 +749,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			if exprErr := r.Error(); exprErr != nil {
 				return nil, exprErr
 			}
-			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
+			return nil, &InvalidConfigError{Field: "memory", Value: memStr, Err: err}
 		}
 		res.Memory = bytes
 	}
