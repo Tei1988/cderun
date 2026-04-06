@@ -1170,7 +1170,6 @@ func MaskSensitiveEnv(key, value string) string {
 	return value
 }
 
-// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
 func getRegistry(img string) string {
 	// Simple registry detection: if first part contains dot or colon (before first slash), it's a registry.
 	// docker.io/library/alpine -> docker.io
@@ -1185,6 +1184,7 @@ func getRegistry(img string) string {
 	return ""
 }
 
+// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
 func MaskSensitiveEnvList(env []string) []string {
 	if env == nil {
 		return nil

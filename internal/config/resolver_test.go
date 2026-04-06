@@ -172,7 +172,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Equal(t, "-5s", invalidErr.Value)
 	})
 
-	t.Run("RegistryMismatchError inspection (image registry)", func(t *testing.T) {
+	t.Run("RegistryMismatchError inspection (image registry mismatch)", func(t *testing.T) {
 		cli := CLIOptions{Image: "other-registry.io/node:latest", ImageSet: true}
 		tools := ToolsConfig{
 			"node": ToolConfig{Image: "my-registry.com/node:latest"},
@@ -184,6 +184,36 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Equal(t, "my-registry.com", registryErr.ExpectedRegistry)
 		assert.Equal(t, "other-registry.io", registryErr.ActualRegistry)
 		assert.Contains(t, err.Error(), "registry mismatch: expected \"my-registry.com\", got \"other-registry.io\"")
+	})
+
+	t.Run("RegistryMismatchError inspection (short-form image mismatch)", func(t *testing.T) {
+		// Tool config has registry, CLI has short-form (no registry)
+		cli := CLIOptions{Image: "node:latest", ImageSet: true}
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "docker.io/node:latest"},
+		}
+		_, err := ResolveWithFS("node", &cli, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		var registryErr *RegistryMismatchError
+		require.ErrorAs(t, err, &registryErr)
+		assert.Equal(t, "docker.io", registryErr.ExpectedRegistry)
+		assert.Equal(t, "", registryErr.ActualRegistry)
+		assert.Contains(t, err.Error(), "registry mismatch: expected \"docker.io\", got \"\"")
+	})
+
+	t.Run("RegistryMismatchError inspection (internal metadata mismatch)", func(t *testing.T) {
+		// Simulate corrupted fieldInfo by injecting mismatch
+		fieldOnce.Do(initFieldInfo)
+		orig := fieldInfo["image"]
+		delete(fieldInfo, "image")
+		defer func() { fieldInfo["image"] = orig }()
+
+		cli := CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		var registryErr *RegistryMismatchError
+		require.ErrorAs(t, err, &registryErr)
+		assert.Contains(t, registryErr.Message, "info for option \"image\" not found")
 	})
 
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
