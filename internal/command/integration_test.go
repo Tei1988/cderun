@@ -66,14 +66,14 @@ func TestIntegration_Priority_EnvOverTools(t *testing.T) {
 			"/project/.tools.yaml": []byte("node:\n  image: node:20-alpine"),
 		},
 		Env: map[string]string{
-			"CDERUN_IMAGE": "env-image:latest",
+			"CDERUN_IMAGE": "node:latest",
 		},
 	}
 
 	mockRuntime := &runtime.MockRuntime{}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "node", "app.js"}, withMockRuntime(mockRuntime, withMockFS(mfs)))
 	require.NoError(t, err)
-	assert.Equal(t, "env-image:latest", mockRuntime.CreatedConfig.Image)
+	assert.Equal(t, "node:latest", mockRuntime.CreatedConfig.Image)
 }
 
 func TestIntegration_Polyglot_ToolSymlink(t *testing.T) {
