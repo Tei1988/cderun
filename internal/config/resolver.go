@@ -306,14 +306,14 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value)
 	return !v.IsZero(), v
 }
 
-func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
-	info, ok := fieldInfo[key]
+func fetchFieldAndParams(key string, cliVal reflect.Value, fields map[string]optionFields) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
+	info, ok := fields[key]
 	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Message: fmt.Sprintf("info for option %q not found", key)}
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("info for option %q not found", key)
 	}
 
 	if info.p1ValIdx == nil || info.p2ValIdx == nil {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, &RegistryMismatchError{Message: fmt.Sprintf("CLI reflection fields for option %q missing in CLIOptions", key)}
+		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("CLI reflection fields for option %q missing in CLIOptions", key)
 	}
 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
@@ -353,7 +353,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
 		if !ok {
-			return nil, &RegistryMismatchError{Message: fmt.Sprintf("early boolean option %q not found", name)}
+			return nil, fmt.Errorf("early boolean option %q not found", name)
 		}
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
@@ -361,7 +361,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -377,7 +377,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -404,7 +404,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			var expectedRegistry string
 			if tools != nil {
 				if t, ok := tools[subcommand]; ok && t.Image != "" {
-					expectedRegistry = getRegistry(t.Image)
+					resolvedToolImage := r.resolveString(t.Image)
+					if err := r.Error(); err != nil {
+						return nil, err
+					}
+					expectedRegistry = getRegistry(resolvedToolImage)
 				}
 			}
 
@@ -437,7 +441,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -465,7 +469,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 	// Phase 5: Path resolution & Auto-detection (Socket)
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -534,7 +538,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	// Resolve mount-all-tools (transitive trigger)
 	{
 		opt, _ := GetBoolOption("mount-all-tools")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -545,7 +549,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	var mountCderunSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-cderun")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -557,7 +561,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -581,7 +585,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	var mountSocketSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-socket")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -593,7 +597,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -624,7 +628,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -632,6 +636,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), subcommand, tools, global, r, fs)
 	}
 	if hangTimeoutStr != "" {
+		if err := r.Error(); err != nil {
+			return nil, err
+		}
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
 			if d < 0 {
 				return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
@@ -647,7 +654,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -676,7 +683,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 	// Phase 8: Integer & Float options
 	for _, opt := range IntOptions {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -725,7 +732,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -734,6 +741,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if pullBackoffBaseStr != "" {
+		if err := r.Error(); err != nil {
+			return nil, err
+		}
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
 			if d <= 0 {
 				return nil, &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: errors.New("must be positive")}
@@ -758,7 +768,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", cliVal)
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -777,7 +787,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	for _, opt := range Float64Options {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal)
+		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, cliVal, fieldInfo)
 		if err != nil {
 			return nil, err
 		}

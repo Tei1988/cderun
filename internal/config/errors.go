@@ -31,17 +31,12 @@ func (e *InvalidConfigError) Unwrap() error {
 	return e.Err
 }
 
-// RegistryMismatchError is returned when there is an inconsistency in the internal configuration registry
-// or a mismatch between expected and actual container image registries.
+// RegistryMismatchError is returned when there is a mismatch between expected and actual container image registries.
 type RegistryMismatchError struct {
-	Message          string
 	ExpectedRegistry string
 	ActualRegistry   string
 }
 
 func (e *RegistryMismatchError) Error() string {
-	if e.ExpectedRegistry != "" || e.ActualRegistry != "" {
-		return fmt.Sprintf("registry mismatch: expected %q, got %q", e.ExpectedRegistry, e.ActualRegistry)
-	}
-	return "registry mismatch: " + e.Message
+	return fmt.Sprintf("registry mismatch: expected %q, got %q", e.ExpectedRegistry, e.ActualRegistry)
 }

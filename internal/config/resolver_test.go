@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -201,19 +202,32 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Contains(t, err.Error(), "registry mismatch: expected \"docker.io\", got \"\"")
 	})
 
-	t.Run("RegistryMismatchError inspection (internal metadata mismatch)", func(t *testing.T) {
-		// Simulate corrupted fieldInfo by injecting mismatch
-		fieldOnce.Do(initFieldInfo)
-		orig := fieldInfo["image"]
-		delete(fieldInfo, "image")
-		defer func() { fieldInfo["image"] = orig }()
-
-		cli := CLIOptions{Image: "alpine", ImageSet: true}
-		_, err := ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
+	t.Run("RegistryMismatchError inspection (resolved expression mismatch)", func(t *testing.T) {
+		// Tool config has expression in image, CLI has mismatching registry
+		cli := CLIOptions{Image: "other.io/node:latest", ImageSet: true}
+		mfs := &MockFileSystem{Env: map[string]string{"REG": "my.io"}}
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "{{env:REG}}/node:latest"},
+		}
+		_, err := ResolveWithFS("node", &cli, tools, nil, mfs)
 		require.Error(t, err)
 		var registryErr *RegistryMismatchError
 		require.ErrorAs(t, err, &registryErr)
-		assert.Contains(t, registryErr.Message, "info for option \"image\" not found")
+		assert.Equal(t, "my.io", registryErr.ExpectedRegistry)
+		assert.Equal(t, "other.io", registryErr.ActualRegistry)
+	})
+
+	t.Run("Internal metadata mismatch (safe test)", func(t *testing.T) {
+		// Test fetchFieldAndParams directly with a custom map to avoid global mutation
+		cli := CLIOptions{Image: "alpine"}
+		cliVal := reflect.ValueOf(&cli).Elem()
+		customFields := make(map[string]optionFields)
+		// Leave it empty to trigger "info for option ... not found"
+
+		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal, customFields)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "info for option \"image\" not found")
+		assert.NotContains(t, err.Error(), "registry mismatch")
 	})
 
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
