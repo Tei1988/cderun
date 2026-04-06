@@ -429,7 +429,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Run("fails when no image mapping found for tool", func(t *testing.T) {
 		_, err := executeCommand("unknown-tool", "--version")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "no image mapping found for tool: unknown-tool")
+		require.ErrorContains(t, err, "no image mapping found for tool: \"unknown-tool\"")
 	})
 
 	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
@@ -608,7 +608,7 @@ func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		})
 		require.Error(t, err)
-		require.ErrorContains(t, err, "required environment variable not found: NONEXISTENT")
+		require.ErrorContains(t, err, "required environment variable not found: \"NONEXISTENT\"")
 	})
 }
 
@@ -1114,7 +1114,7 @@ func TestUnit_RunCderunCore_ExecuteFailure(t *testing.T) {
 	t.Parallel()
 	stdout, _, exitCode, err := runCderunCore(nil, "sh")
 	require.Error(t, err)
-	require.ErrorContains(t, err, "no image mapping found for tool: sh")
+	require.ErrorContains(t, err, "no image mapping found for tool: \"sh\"")
 	assert.Empty(t, stdout)
 	assert.Equal(t, 0, exitCode)
 }

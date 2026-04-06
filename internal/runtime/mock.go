@@ -206,7 +206,7 @@ func (m *MockRuntime) GetExitCode() int {
 
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	if sig != "" && !signalRegex.MatchString(sig) {
-		return fmt.Errorf("invalid signal: %s", sig)
+		return fmt.Errorf("invalid signal: %q", sig)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -394,7 +394,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
+		return nil, fmt.Errorf("no image mapping found for tool: %q", subcommand)
 	}
 	if res.Image != "" {
 		// Security validation before any further use (including logging)
@@ -810,7 +810,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 	for _, f := range criticalFields {
 		if err := validatePathChars(f.value); err != nil {
-			return nil, fmt.Errorf("security validation failed for %s: %w", f.name, err)
+			return nil, fmt.Errorf("security validation failed for %q: %w", f.name, err)
 		}
 	}
 	for i, e := range res.Entrypoint {
@@ -869,7 +869,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %s", d)
+				return nil, fmt.Errorf("invalid device config (override): %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -879,7 +879,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config: %s", d)
+				return nil, fmt.Errorf("invalid device config: %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -893,7 +893,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
+				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -992,7 +992,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		} else {
 			v, found := fs.LookupEnv(resolvedE)
 			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %s", resolvedE)
+				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
 			}
 			key = resolvedE
 			val = v

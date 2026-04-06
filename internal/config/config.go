@@ -515,20 +515,20 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		baseDir := filepath.Dir(path)
 		data, err := l.fs.ReadFile(path)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to read config file %q: %w", path, err)
 		}
 
 		var layer CDERunConfig
 		if err := unmarshalStrict(data, &layer); err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to unmarshal config file %q: %w", path, err)
 		}
 
 		if err := layer.SetBaseDir(baseDir); err != nil {
-			return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to set base directory for %q: %w", path, err)
 		}
 
 		if err := mergo.Merge(&merged, &layer, mergo.WithOverride); err != nil {
-			return nil, nil, fmt.Errorf("failed to merge config from %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to merge config from %q: %w", path, err)
 		}
 
 		loadedPaths = append(loadedPaths, path)
@@ -560,12 +560,12 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		baseDir := filepath.Dir(path)
 		data, err := l.fs.ReadFile(path)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read tools file %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to read tools file %q: %w", path, err)
 		}
 
 		var layer ToolsConfig
 		if err := unmarshalStrict(data, &layer); err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", path, err)
+			return nil, nil, fmt.Errorf("failed to unmarshal tools file %q: %w", path, err)
 		}
 
 		for k, v := range layer {
@@ -573,7 +573,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 			if existing, ok := merged[k]; ok {
 				if err := mergo.Merge(&existing, &v, mergo.WithOverride); err != nil {
-					return nil, nil, fmt.Errorf("failed to merge tool config for %s from %s: %w", k, path, err)
+					return nil, nil, fmt.Errorf("failed to merge tool config for %q from %q: %w", k, path, err)
 				}
 				merged[k] = existing
 			} else {
@@ -599,22 +599,22 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 	path = expanded
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
 	}
 
 	data, err := l.fs.ReadFile(absPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read config file %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to read config file %q: %w", absPath, err)
 	}
 
 	var cfg CDERunConfig
 	if err := unmarshalStrict(data, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal config file %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to unmarshal config file %q: %w", absPath, err)
 	}
 
 	baseDir := filepath.Dir(absPath)
 	if err := cfg.SetBaseDir(baseDir); err != nil {
-		return nil, nil, fmt.Errorf("failed to set base directory for %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to set base directory for %q: %w", absPath, err)
 	}
 
 	return &cfg, []string{absPath}, nil
@@ -629,17 +629,17 @@ func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []stri
 	path = expanded
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
 	}
 
 	data, err := l.fs.ReadFile(absPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read tools file %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to read tools file %q: %w", absPath, err)
 	}
 
 	cfg := make(ToolsConfig)
 	if err := unmarshalStrict(data, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal tools file %s: %w", absPath, err)
+		return nil, nil, fmt.Errorf("failed to unmarshal tools file %q: %w", absPath, err)
 	}
 
 	baseDir := filepath.Dir(absPath)

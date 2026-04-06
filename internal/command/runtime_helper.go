@@ -82,7 +82,7 @@ func findCderunBinary() (string, error) {
 		curr = parent
 	}
 
-	return "", fmt.Errorf("cderun binary not found in %s or its ancestors", wd)
+	return "", fmt.Errorf("cderun binary not found in %q or its ancestors", wd)
 }
 
 func runCderunWithStdin(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {

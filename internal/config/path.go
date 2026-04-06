@@ -190,7 +190,7 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	}
 	parsed, ok := ParseDeviceConfig(s)
 	if !ok {
-		return fmt.Errorf("invalid device config: %s", s)
+		return fmt.Errorf("invalid device config: %q", s)
 	}
 	*dc = parsed
 	return nil
@@ -230,6 +230,9 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
+	if containerPath != "" && !path.IsAbs(containerPath) {
+		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
+	}
 	return container.DeviceMapping{
 		PathOnHost:        host,
 		PathInContainer:   containerPath,
@@ -254,7 +257,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 				res.Optional = true
 				continue
 			}
-			return MountConfig{}, fmt.Errorf("invalid mount format: %s", s)
+			return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
 		}
 
 		key := kv[0]
@@ -270,13 +273,13 @@ func ParseMountFlag(s string) (MountConfig, error) {
 		case "readonly":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid readonly value: %s", val)
+				return MountConfig{}, fmt.Errorf("invalid readonly value: %q", val)
 			}
 			res.ReadOnly = b
 		case "optional":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid optional value: %s", val)
+				return MountConfig{}, fmt.Errorf("invalid optional value: %q", val)
 			}
 			res.Optional = b
 		default:
@@ -284,7 +287,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 	}
 
 	if res.Target.IsEmpty() {
-		return MountConfig{}, fmt.Errorf("mount target is required: %s", s)
+		return MountConfig{}, fmt.Errorf("mount target is required: %q", s)
 	}
 
 	return res, nil
@@ -375,7 +378,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		if !filepath.IsAbs(abs) {
 			a, err := fs.Abs(abs)
 			if err != nil {
-				return "", fmt.Errorf("failed to get absolute path for %s: %w", abs, err)
+				return "", fmt.Errorf("failed to get absolute path for %q: %w", abs, err)
 			}
 			abs = a
 		}

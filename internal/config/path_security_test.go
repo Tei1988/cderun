@@ -90,3 +90,30 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 		assert.Contains(t, err.Error(), "mount target must be an absolute path")
 	})
 }
+
+func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
+	t.Parallel()
+	r := &ExpressionResolver{Pwd: "/host"}
+
+	t.Run("absolute destination is accepted", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/sda"},
+			Destination: ConfigPath{Raw: "/dev/sda"},
+			Permissions: "rwm",
+		}
+		d, err := dc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "/dev/sda", d.PathInContainer)
+	})
+
+	t.Run("relative destination is rejected", func(t *testing.T) {
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/sda"},
+			Destination: ConfigPath{Raw: "dev/sda"},
+			Permissions: "rwm",
+		}
+		_, err := dc.Resolve(r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device destination must be an absolute path")
+	})
+}
