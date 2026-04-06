@@ -682,3 +682,31 @@ func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 		assert.False(t, ok)
 	})
 }
+
+func TestUnit_Path_ValidatePathChars(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		err := validatePathChars("valid/path")
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid character at start", func(t *testing.T) {
+		err := validatePathChars("\x01path")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "(position 0)")
+	})
+
+	t.Run("invalid character after multi-byte characters", func(t *testing.T) {
+		// "こんにちは" is 5 characters, but 15 bytes in UTF-8.
+		s := "こんにちは\x01"
+		err := validatePathChars(s)
+		require.Error(t, err)
+		// It should report position 5 (the character index of \x01), not position 15 (the byte index).
+		assert.Contains(t, err.Error(), "(position 5)")
+	})
+
+	t.Run("invalid character 127 (DEL)", func(t *testing.T) {
+		err := validatePathChars("path\x7f")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "(position 4)")
+	})
+}

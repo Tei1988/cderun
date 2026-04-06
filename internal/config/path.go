@@ -4,6 +4,7 @@ import (
 	"path"
 	"fmt"
 	"path/filepath"
+	"unicode/utf8"
 	"regexp"
 	"strconv"
 	"strings"
@@ -458,7 +459,8 @@ func validatePathChars(s string) error {
 	for i := 0; i < len(s); i++ {
 		b := s[i]
 		if b <= 31 || b == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", b, i)
+			runeIdx := utf8.RuneCountInString(s[:i])
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", b, runeIdx)
 		}
 	}
 	return nil
