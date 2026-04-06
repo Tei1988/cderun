@@ -174,6 +174,7 @@ func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid pull-backoff-base value")
 
 	cli = CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
@@ -182,6 +183,7 @@ func TestUnit_Coverage_Resolver_Errors_DurationMemory(t *testing.T) {
 	cli = CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid pull-max-retries value")
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_ExpressionError(t *testing.T) {
@@ -702,19 +704,19 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 	cli = CLIOptions{Image: "a", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be greater than 0")
+	assert.Contains(t, err.Error(), "invalid pull-max-retries value \"0\": must be greater than 0")
 
 	// Non-positive pull-backoff-base
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be positive")
+	assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"0s\": must be positive")
 
 	// Invalid pull-backoff-base format
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "invalid", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+	assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"invalid\"")
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_TransitiveLogic(t *testing.T) {

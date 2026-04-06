@@ -172,6 +172,20 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Equal(t, "-5s", invalidErr.Value)
 	})
 
+	t.Run("RegistryMismatchError inspection (image registry)", func(t *testing.T) {
+		cli := CLIOptions{Image: "other-registry.io/node:latest", ImageSet: true}
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "my-registry.com/node:latest"},
+		}
+		_, err := ResolveWithFS("node", &cli, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		var registryErr *RegistryMismatchError
+		require.ErrorAs(t, err, &registryErr)
+		assert.Equal(t, "my-registry.com", registryErr.ExpectedRegistry)
+		assert.Equal(t, "other-registry.io", registryErr.ActualRegistry)
+		assert.Contains(t, err.Error(), "registry mismatch: expected \"my-registry.com\", got \"other-registry.io\"")
+	})
+
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
 		_, err := Resolve("node", &cli, nil, nil)
@@ -681,7 +695,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullMaxRetriesSet = true
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be greater than 0")
+		assert.Contains(t, err.Error(), "invalid pull-max-retries value \"0\": must be greater than 0")
 
 		// PullBackoffBase invalid
 		cli.CderunPullMaxRetries = 3
@@ -689,13 +703,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"invalid\"")
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be positive")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value \"0s\": must be positive")
 	})
 
 	t.Run("Memory and Expression errors", func(t *testing.T) {

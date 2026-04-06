@@ -396,7 +396,29 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
 		return nil, &ImageNotFoundError{Tool: subcommand}
 	}
+
 	if res.Image != "" {
+		// Image Registry Validation
+		// If image was provided via CLI, ensure its registry matches the one in tool config if defined.
+		if cli.ImageSet || cli.CderunImageSet {
+			var expectedRegistry string
+			if tools != nil {
+				if t, ok := tools[subcommand]; ok && t.Image != "" {
+					expectedRegistry = getRegistry(t.Image)
+				}
+			}
+
+			if expectedRegistry != "" {
+				actualRegistry := getRegistry(res.Image)
+				if actualRegistry != expectedRegistry {
+					return nil, &RegistryMismatchError{
+						ExpectedRegistry: expectedRegistry,
+						ActualRegistry:   actualRegistry,
+					}
+				}
+			}
+		}
+
 		// Security validation before any further use (including logging)
 		if err := validatePathChars(res.Image); err != nil {
 			return nil, fmt.Errorf("security validation failed for image: %w", err)
@@ -691,7 +713,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.PullMaxRetries <= 0 {
-		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
+		return nil, &InvalidConfigError{Field: "pull-max-retries", Value: fmt.Sprint(res.PullMaxRetries), Err: errors.New("must be greater than 0")}
 	}
 
 	// Resolve pull-backoff-base via registry
@@ -714,11 +736,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if pullBackoffBaseStr != "" {
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
 			if d <= 0 {
-				return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
+				return nil, &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: errors.New("must be positive")}
 			}
 			res.PullBackoffBase = d
 		} else {
-			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
+			return nil, &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: err}
 		}
 	}
 
@@ -1149,6 +1171,20 @@ func MaskSensitiveEnv(key, value string) string {
 }
 
 // MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
+func getRegistry(img string) string {
+	// Simple registry detection: if first part contains dot or colon (before first slash), it's a registry.
+	// docker.io/library/alpine -> docker.io
+	// localhost:5000/alpine -> localhost:5000
+	// alpine -> "" (default docker.io)
+	parts := strings.Split(img, "/")
+	if len(parts) > 1 {
+		if strings.ContainsAny(parts[0], ".:") || parts[0] == "localhost" {
+			return parts[0]
+		}
+	}
+	return ""
+}
+
 func MaskSensitiveEnvList(env []string) []string {
 	if env == nil {
 		return nil
