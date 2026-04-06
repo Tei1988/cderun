@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestValidatePathChars(t *testing.T) {
+func TestUnit_Config_ValidatePathChars(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -34,7 +34,7 @@ func TestValidatePathChars(t *testing.T) {
 	}
 }
 
-func TestValidateToolName(t *testing.T) {
+func TestUnit_Config_ValidateToolName(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
