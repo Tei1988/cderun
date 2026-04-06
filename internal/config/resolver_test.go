@@ -197,7 +197,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		var registryErr *RegistryMismatchError
 		require.ErrorAs(t, err, &registryErr)
 		assert.Equal(t, "docker.io", registryErr.ExpectedRegistry)
-		assert.Equal(t, "", registryErr.ActualRegistry)
+		assert.Empty(t, registryErr.ActualRegistry)
 		assert.Contains(t, err.Error(), "registry mismatch: expected \"docker.io\", got \"\"")
 	})
 
