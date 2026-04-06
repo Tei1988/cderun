@@ -119,6 +119,7 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 }
 
 func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
+	t.Parallel()
 	fs := &MockFileSystem{
 		HomeDir: "/home/user",
 		WD:      "/work",
@@ -170,6 +171,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, err := ResolveWithFS("tool", tt.cli, nil, nil, fs)
 			if tt.wantErr != "" {
 				require.Error(t, err)
