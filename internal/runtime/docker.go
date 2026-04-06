@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
@@ -25,7 +26,6 @@ const (
 	attachCloseWriteGrace = 1 * time.Second
 )
 
-
 type dockerClient interface {
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
@@ -38,6 +38,8 @@ type dockerClient interface {
 	ContainerKill(ctx context.Context, containerID string, signal string) error
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
 }
+
+var signalRegex = regexp.MustCompile(`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`)
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
@@ -202,6 +204,9 @@ func (d *DockerRuntime) ResizeContainerTTY(ctx context.Context, containerID stri
 
 // SignalContainer sends a signal to a container.
 func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if sig != "" && !signalRegex.MatchString(sig) {
+		return fmt.Errorf("invalid signal: %q", sig)
+	}
 	err := d.client.ContainerKill(ctx, containerID, sig)
 	if err != nil {
 		// Suppress errors if the container is already gone or not running.

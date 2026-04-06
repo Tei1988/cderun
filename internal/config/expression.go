@@ -210,7 +210,7 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) {
-		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %s", filename)
+		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %q", filename)
 	}
 
 	r.ensureFileCache()
@@ -221,33 +221,33 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	r.ensureLoader()
 	paths := r.shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
-		err := fmt.Errorf("file not found: %s", filename)
+		err := fmt.Errorf("file not found: %q", filename)
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	info, err := r.fs.Stat(paths[0])
 	if err != nil {
-		wrappedErr := fmt.Errorf("failed to stat file %s: %w", paths[0], err)
+		wrappedErr := fmt.Errorf("failed to stat file %q: %w", paths[0], err)
 		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
 	if info.Size() > MaxDirectiveFileSize {
-		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
+		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
-		wrappedErr := fmt.Errorf("failed to read file %s: %w", paths[0], err)
+		wrappedErr := fmt.Errorf("failed to read file %q: %w", paths[0], err)
 		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		return "", wrappedErr
 	}
 
 	if int64(len(data)) > MaxDirectiveFileSize {
-		err := fmt.Errorf("file %s is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
 		return "", err
 	}
@@ -259,20 +259,20 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	if filepath.IsAbs(name) || !filepath.IsLocal(name) {
-		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %s", name)
+		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %q", name)
 	}
 
 	r.ensureLoader()
 	paths := r.shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
-		return "", fmt.Errorf("item not found for find_dir: %s", name)
+		return "", fmt.Errorf("item not found for find_dir: %q", name)
 	}
 
 	dir := filepath.Dir(paths[0])
 
 	rel, err := filepath.Rel(r.Pwd, dir)
 	if err != nil {
-		return "", fmt.Errorf("failed to calculate relative path for %s: %w", dir, err)
+		return "", fmt.Errorf("failed to calculate relative path for %q: %w", dir, err)
 	}
 
 	return rel, nil

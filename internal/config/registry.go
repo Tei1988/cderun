@@ -379,9 +379,9 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
-		Name:   "diagnosis-format",
-		EnvKey: "CDERUN_DIAGNOSIS_FORMAT",
-		Usage:  "Diagnosis output format (yaml, json, simple)",
+		Name:    "diagnosis-format",
+		EnvKey:  "CDERUN_DIAGNOSIS_FORMAT",
+		Usage:   "Diagnosis output format (yaml, json, simple)",
 		Default: "yaml",
 		ToolGetter: func(t ToolConfig) string {
 			return t.DiagnosisFormat

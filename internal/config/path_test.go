@@ -256,7 +256,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 2,
 			Mounts: []MountMapping{
-				{Source: "/tmp", Target: "/tmp", Level: 1}, // Broad but specific
+				{Source: "/tmp", Target: "/tmp", Level: 1},                      // Broad but specific
 				{Source: "/var/lib/docker/overlay/diff", Target: "/", Level: 2}, // Higher level but root
 			},
 		}
@@ -524,9 +524,9 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-			r, err := NewExpressionResolverWithFS(nil, mfs)
-			require.NoError(t, err)
-			_, err = ResolvePath("~/foo", "/base", r)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = ResolvePath("~/foo", "/base", r)
 		require.Error(t, err)
 	})
 

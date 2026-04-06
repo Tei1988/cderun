@@ -2,13 +2,13 @@ package runtime
 
 import (
 	"bufio"
-	"sync/atomic"
 	"bytes"
 	"context"
 	"errors"
 	"io"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +26,6 @@ import (
 )
 
 var noopSleepFunc = func(ctx context.Context, d time.Duration) error { return nil }
-
 
 func TestUnit_Docker_New(t *testing.T) {
 	// This should succeed even without docker daemon as it just creates the client
@@ -90,13 +89,13 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 }
 
 type mockDockerClient struct {
-	imageInspectErr error
+	imageInspectErr  error
 	imageInspectFunc func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
-	inspectCount    int
-	imagePullErr    error
-	imagePullFunc   func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
-	pullCount       int
-	pullReader      io.ReadCloser
+	inspectCount     int
+	imagePullErr     error
+	imagePullFunc    func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
+	pullCount        int
+	pullReader       io.ReadCloser
 
 	createConfig     *dockercontainer.Config
 	createHostConfig *dockercontainer.HostConfig
@@ -121,10 +120,10 @@ type mockDockerClient struct {
 	killSignal string
 	killErr    error
 
-	attachID   string
-	attachOpts dockercontainer.AttachOptions
-	attachResp types.HijackedResponse
-	attachErr  error
+	attachID    string
+	attachOpts  dockercontainer.AttachOptions
+	attachResp  types.HijackedResponse
+	attachErr   error
 	inspectResp dockercontainer.InspectResponse
 	inspectErr  error
 }
@@ -284,7 +283,6 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		assert.Equal(t, 2, count)
 		assert.Equal(t, 1, mock.pullCount)
 	})
-
 
 	t.Run("non-retryable pull error", func(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
@@ -717,9 +715,11 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 }
 
 type errNotFound struct{ error }
+
 func (e errNotFound) NotFound() {}
 
 type errConflict struct{ error }
+
 func (e errConflict) Conflict() {}
 
 func TestUnit_Docker_InspectContainer(t *testing.T) {

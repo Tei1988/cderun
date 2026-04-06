@@ -2,9 +2,10 @@ package runtime
 
 import (
 	"context"
-	"time"
+	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"cderun/internal/container"
 )
@@ -42,8 +43,8 @@ type MockRuntime struct {
 	SignalErr           error
 
 	// Custom behavior hooks
-	WaitFunc   func(ctx context.Context, containerID string) (int, error)
-	AttachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	WaitFunc    func(ctx context.Context, containerID string) (int, error)
+	AttachFunc  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
 }
 
@@ -204,6 +205,9 @@ func (m *MockRuntime) GetExitCode() int {
 }
 
 func (m *MockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if sig != "" && !signalRegex.MatchString(sig) {
+		return fmt.Errorf("invalid signal: %q", sig)
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.SignaledContainerID = containerID

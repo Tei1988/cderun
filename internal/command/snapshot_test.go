@@ -179,7 +179,7 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 }
 
 type errorFS struct {
-	wfFunc   func(path string, data []byte, perm os.FileMode) error
+	wfFunc func(path string, data []byte, perm os.FileMode) error
 	*config.MockFileSystem
 	mkdirErr error
 	writeErr error

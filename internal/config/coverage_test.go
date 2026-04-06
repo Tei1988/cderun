@@ -294,7 +294,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_Strict(t *testing.T) {
 	// B is missing from host environment
 	_, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "required environment variable not found: B")
+	assert.Contains(t, err.Error(), "required environment variable not found: \"B\"")
 
 	// B exists on host
 	mfs.Env["B"] = "2"
@@ -690,7 +690,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 	// No image mapping
 	_, err := ResolveWithFS("missing", &CLIOptions{}, nil, nil, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no image mapping found for tool: missing")
+	assert.Contains(t, err.Error(), "no image mapping found for tool: \"missing\"")
 
 	// Negative hang-timeout
 	cli := CLIOptions{Image: "a", ImageSet: true, HangTimeout: "-1s", HangTimeoutSet: true}

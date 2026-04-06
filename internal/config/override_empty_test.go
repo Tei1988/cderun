@@ -33,8 +33,8 @@ func TestUnit_Resolver_EmptyListOverride(t *testing.T) {
 	tools := ToolsConfig{
 		"empty-tool": ToolConfig{
 			Image:   "alpine",
-			Env:     []string{},      // Explicit empty list
-			Mounts:  []MountConfig{}, // Explicit empty list
+			Env:     []string{},       // Explicit empty list
+			Mounts:  []MountConfig{},  // Explicit empty list
 			Devices: []DeviceConfig{}, // Explicit empty list
 		},
 	}

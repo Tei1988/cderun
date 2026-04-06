@@ -8,13 +8,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
 
 	"github.com/docker/go-units"
 )
-
 
 // ResolvedConfig contains the final values after resolution.
 type ResolvedConfig struct {
@@ -47,22 +47,22 @@ type ResolvedConfig struct {
 	HangTimeout     time.Duration
 
 	// Docker-compatible flags
-	Ports      []string
-	PublishAll bool
-	Expose     []string
-	Hostname   string
-	DNS        []string
-	AddHosts   []string
-	Privileged bool
-	CapAdd     []string
-	CapDrop    []string
-	Entrypoint []string
-	Pull       string
+	Ports           []string
+	PublishAll      bool
+	Expose          []string
+	Hostname        string
+	DNS             []string
+	AddHosts        []string
+	Privileged      bool
+	CapAdd          []string
+	CapDrop         []string
+	Entrypoint      []string
+	Pull            string
 	PullMaxRetries  int
 	PullBackoffBase time.Duration
-	Memory     int64
-	CPUs       float64
-	Devices    []container.DeviceMapping
+	Memory          int64
+	CPUs            float64
+	Devices         []container.DeviceMapping
 }
 
 // CLIOptions represents values from CLI flags.
@@ -165,58 +165,58 @@ type CLIOptions struct {
 	CderunHangTimeoutSet     bool
 
 	// Docker-compatible flags
-	Ports               []string
-	CderunPorts         []string
-	PublishAll          bool
-	PublishAllSet       bool
-	CderunPublishAll    bool
-	CderunPublishAllSet bool
-	Expose              []string
-	CderunExpose        []string
-	Hostname            string
-	HostnameSet         bool
-	CderunHostname      string
-	CderunHostnameSet   bool
-	DNS                 []string
-	CderunDNS           []string
-	AddHosts            []string
-	CderunAddHosts      []string
-	User                string
-	UserSet             bool
-	CderunUser          string
-	CderunUserSet       bool
-	Privileged          bool
-	PrivilegedSet       bool
-	CderunPrivileged    bool
-	CderunPrivilegedSet bool
-	CapAdd              []string
-	CderunCapAdd        []string
-	CapDrop             []string
-	CderunCapDrop       []string
-	Entrypoint          []string
-	CderunEntrypoint    []string
-	Pull                string
-	PullSet             bool
-	CderunPull          string
-	CderunPullSet       bool
-	PullMaxRetries      int
-	PullMaxRetriesSet   bool
-	CderunPullMaxRetries int
-	CderunPullMaxRetriesSet bool
-	PullBackoffBase     string
-	PullBackoffBaseSet  bool
-	CderunPullBackoffBase string
+	Ports                    []string
+	CderunPorts              []string
+	PublishAll               bool
+	PublishAllSet            bool
+	CderunPublishAll         bool
+	CderunPublishAllSet      bool
+	Expose                   []string
+	CderunExpose             []string
+	Hostname                 string
+	HostnameSet              bool
+	CderunHostname           string
+	CderunHostnameSet        bool
+	DNS                      []string
+	CderunDNS                []string
+	AddHosts                 []string
+	CderunAddHosts           []string
+	User                     string
+	UserSet                  bool
+	CderunUser               string
+	CderunUserSet            bool
+	Privileged               bool
+	PrivilegedSet            bool
+	CderunPrivileged         bool
+	CderunPrivilegedSet      bool
+	CapAdd                   []string
+	CderunCapAdd             []string
+	CapDrop                  []string
+	CderunCapDrop            []string
+	Entrypoint               []string
+	CderunEntrypoint         []string
+	Pull                     string
+	PullSet                  bool
+	CderunPull               string
+	CderunPullSet            bool
+	PullMaxRetries           int
+	PullMaxRetriesSet        bool
+	CderunPullMaxRetries     int
+	CderunPullMaxRetriesSet  bool
+	PullBackoffBase          string
+	PullBackoffBaseSet       bool
+	CderunPullBackoffBase    string
 	CderunPullBackoffBaseSet bool
-	Memory              string
-	MemorySet           bool
-	CderunMemory        string
-	CderunMemorySet     bool
-	CPUs                float64
-	CPUsSet             bool
-	CderunCPUs          float64
-	CderunCPUsSet       bool
-	Devices             []string
-	CderunDevices       []string
+	Memory                   string
+	MemorySet                bool
+	CderunMemory             string
+	CderunMemorySet          bool
+	CPUs                     float64
+	CPUsSet                  bool
+	CderunCPUs               float64
+	CderunCPUsSet            bool
+	Devices                  []string
+	CderunDevices            []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -325,6 +325,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if cli == nil {
 		cli = &CLIOptions{}
 	}
+	if subcommand != "" {
+		if err := ValidateToolName(subcommand); err != nil {
+			return nil, err
+		}
+	}
 	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
@@ -389,9 +394,13 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %s", subcommand)
+		return nil, fmt.Errorf("no image mapping found for tool: %q", subcommand)
 	}
 	if res.Image != "" {
+		// Security validation before any further use (including logging)
+		if err := validatePathChars(res.Image); err != nil {
+			return nil, fmt.Errorf("security validation failed for image: %w", err)
+		}
 		logging.Debug("Resolved Image: %s", res.Image)
 	}
 
@@ -494,6 +503,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		cli.MountToolsSet, cli.MountTools,
 		subcommand, tools, global, r, fs,
 	)
+	for _, tool := range res.MountTools {
+		if err := ValidateToolName(tool); err != nil {
+			return nil, fmt.Errorf("invalid tool name in mount-tools: %w", err)
+		}
+	}
 
 	// Resolve mount-all-tools (transitive trigger)
 	{
@@ -783,6 +797,28 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, err
 	}
 
+	// Security: validate resolved configuration for injection characters.
+	criticalFields := []struct {
+		name  string
+		value string
+	}{
+		{"image", res.Image},
+		{"user", res.User},
+		{"network", res.Network},
+		{"hostname", res.Hostname},
+		{"workdir", res.Workdir},
+	}
+	for _, f := range criticalFields {
+		if err := validatePathChars(f.value); err != nil {
+			return nil, fmt.Errorf("security validation failed for %q: %w", f.name, err)
+		}
+	}
+	for i, e := range res.Entrypoint {
+		if err := validatePathChars(e); err != nil {
+			return nil, fmt.Errorf("security validation failed for entrypoint[%d]: %w", i, err)
+		}
+	}
+
 	return res, nil
 }
 
@@ -833,7 +869,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p1 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %s", d)
+				return nil, fmt.Errorf("invalid device config (override): %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -843,7 +879,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		for _, d := range p2 {
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config: %s", d)
+				return nil, fmt.Errorf("invalid device config: %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -857,7 +893,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 			parsed, ok := ParseDeviceConfig(d)
 			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %s", d)
+				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", d)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			dcs = append(dcs, parsed)
@@ -948,15 +984,24 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		if err := r.Error(); err != nil {
 			return nil, err
 		}
-		if strings.Contains(resolvedE, "=") {
-			res = append(res, resolvedE)
+
+		var key, val string
+		if k, v, found := strings.Cut(resolvedE, "="); found {
+			key = k
+			val = v
 		} else {
-			val, found := fs.LookupEnv(resolvedE)
+			v, found := fs.LookupEnv(resolvedE)
 			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %s", resolvedE)
+				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
 			}
-			res = append(res, fmt.Sprintf("%s=%s", resolvedE, val))
+			key = resolvedE
+			val = v
 		}
+
+		// Apply masking for debug logs and quoting for safety
+		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+
+		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
 	return res, nil
 }
@@ -1031,4 +1076,90 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		res = append(res, resolved)
 	}
 	return res, nil
+}
+
+// MaskSensitiveEnv redacts sensitive environment variables based on key names.
+func MaskSensitiveEnv(key, value string) string {
+	if value == "" {
+		return ""
+	}
+
+	// Split by non-alphanumeric characters and also split camelCase.
+	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
+	var segments []string
+	var current strings.Builder
+	var lastRune rune
+	runes := []rune(key)
+	for i, r := range runes {
+		// Boundary split logic
+		if i > 0 {
+			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
+			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
+			isAcronym := false
+			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) && i+1 < len(runes) {
+				nextRune := runes[i+1]
+				if unicode.IsLower(nextRune) {
+					isAcronym = true
+				}
+			}
+
+			if isCamel || isLetterDigit || isAcronym {
+				if current.Len() > 0 {
+					segments = append(segments, strings.ToUpper(current.String()))
+					current.Reset()
+				}
+			}
+		}
+
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			current.WriteRune(r)
+		} else {
+			if current.Len() > 0 {
+				segments = append(segments, strings.ToUpper(current.String()))
+				current.Reset()
+			}
+		}
+		lastRune = r
+	}
+	if current.Len() > 0 {
+		segments = append(segments, strings.ToUpper(current.String()))
+	}
+
+	sensitiveKeywords := map[string]struct{}{
+		"PASSWORD": {},
+		"SECRET":   {},
+		"TOKEN":    {},
+		"KEY":      {},
+		"AUTH":     {},
+		"SIG":      {},
+	}
+
+	for _, segment := range segments {
+		if _, ok := sensitiveKeywords[segment]; ok {
+			return "[REDACTED]"
+		}
+	}
+
+	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
+	// if they were split but should be treated as one sensitive keyword.
+	// However, 'PASS' and 'WORD' individually might be too generic.
+	// Let's stick to strict segment match for the core keywords to avoid false positives.
+
+	return value
+}
+
+// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
+func MaskSensitiveEnvList(env []string) []string {
+	if env == nil {
+		return nil
+	}
+	res := make([]string, len(env))
+	for i, e := range env {
+		if k, v, found := strings.Cut(e, "="); found {
+			res[i] = fmt.Sprintf("%s=%s", k, MaskSensitiveEnv(k, v))
+		} else {
+			res[i] = e
+		}
+	}
+	return res
 }

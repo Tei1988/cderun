@@ -124,7 +124,7 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		require.NoError(t, err)
 		r2.resolveString("{{ find_dir:nonexistent }}")
 		require.Error(t, r2.Error())
-		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: nonexistent")
+		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: \"nonexistent\"")
 	})
 
 	t.Run("filepath.Rel failure in resolveFindDir", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestUnit_Expression_FileError(t *testing.T) {
 		require.NoError(t, err)
 		r2.resolveString("{{ file:missing }}")
 		require.Error(t, r2.Error())
-		assert.Contains(t, r2.Error().Error(), "file not found: missing")
+		assert.Contains(t, r2.Error().Error(), "file not found: \"missing\"")
 	})
 
 	t.Run("ReadFile failure in resolveFile", func(t *testing.T) {

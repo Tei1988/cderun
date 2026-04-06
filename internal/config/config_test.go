@@ -133,7 +133,7 @@ defaults:
 			Files: map[string][]byte{
 				"/a/b/c/.cderun.yaml": []byte(""),
 				"/a/.cderun.yaml":     []byte(""),
-				"/.cderun.yaml":        []byte(""),
+				"/.cderun.yaml":       []byte(""),
 			},
 			WD: "/a/b/c",
 		}

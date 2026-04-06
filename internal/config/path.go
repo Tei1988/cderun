@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -158,6 +159,9 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	if err != nil {
 		return container.Mount{}, err
 	}
+	if target != "" && !path.IsAbs(target) {
+		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
+	}
 
 	return container.Mount{
 		Type:     mc.Type,
@@ -186,7 +190,7 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	}
 	parsed, ok := ParseDeviceConfig(s)
 	if !ok {
-		return fmt.Errorf("invalid device config: %s", s)
+		return fmt.Errorf("invalid device config: %q", s)
 	}
 	*dc = parsed
 	return nil
@@ -226,6 +230,9 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
+	if containerPath != "" && !path.IsAbs(containerPath) {
+		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
+	}
 	return container.DeviceMapping{
 		PathOnHost:        host,
 		PathInContainer:   containerPath,
@@ -250,7 +257,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 				res.Optional = true
 				continue
 			}
-			return MountConfig{}, fmt.Errorf("invalid mount format: %s", s)
+			return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
 		}
 
 		key := kv[0]
@@ -266,13 +273,13 @@ func ParseMountFlag(s string) (MountConfig, error) {
 		case "readonly":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid readonly value: %s", val)
+				return MountConfig{}, fmt.Errorf("invalid readonly value: %q", val)
 			}
 			res.ReadOnly = b
 		case "optional":
 			b, err := strconv.ParseBool(val)
 			if err != nil {
-				return MountConfig{}, fmt.Errorf("invalid optional value: %s", val)
+				return MountConfig{}, fmt.Errorf("invalid optional value: %q", val)
 			}
 			res.Optional = b
 		default:
@@ -280,7 +287,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 	}
 
 	if res.Target.IsEmpty() {
-		return MountConfig{}, fmt.Errorf("mount target is required: %s", s)
+		return MountConfig{}, fmt.Errorf("mount target is required: %q", s)
 	}
 
 	return res, nil
@@ -371,7 +378,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		if !filepath.IsAbs(abs) {
 			a, err := fs.Abs(abs)
 			if err != nil {
-				return "", fmt.Errorf("failed to get absolute path for %s: %w", abs, err)
+				return "", fmt.Errorf("failed to get absolute path for %q: %w", abs, err)
 			}
 			abs = a
 		}
@@ -444,4 +451,42 @@ func SplitHostRemainder(s string) (string, string, bool) {
 	}
 
 	return s[:sepIdx], s[sepIdx+1:], true
+}
+
+// validatePathChars ensures the string does not contain ASCII control characters.
+func validatePathChars(s string) error {
+	runeIdx := 0
+	for _, r := range s {
+		if r <= 31 || r == 127 {
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, runeIdx)
+		}
+		runeIdx++
+	}
+	return nil
+}
+
+// ValidateToolName ensures the tool name is a safe identifier.
+// It rejects empty strings, absolute paths, parent directory references, directory separators,
+// control characters, whitespace, and colons.
+func ValidateToolName(name string) error {
+	if name == "" {
+		return fmt.Errorf("tool name cannot be empty")
+	}
+	if filepath.IsAbs(name) {
+		return fmt.Errorf("absolute path not allowed for tool name: %q", name)
+	}
+	// Use a strict whitelist for tool names: alphanumerics, dots, underscores, and hyphens.
+	for i, r := range name {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '.' && r != '_' && r != '-' {
+			return fmt.Errorf("invalid character in tool name %q: %q (position %d)", name, r, i)
+		}
+	}
+	// Additional check for parent directory reference.
+	// Since '/' and '\' are already rejected by the whitelist above,
+	// we only need to check if the entire name is "..".
+	if name == ".." || name == "." {
+		return fmt.Errorf("current or parent directory reference not allowed for tool name: %q", name)
+	}
+
+	return nil
 }
