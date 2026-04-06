@@ -827,7 +827,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		slice []string
 	}{
 		{"entrypoint", res.Entrypoint},
-		{"env", res.Env},
 		{"ports", res.Ports},
 		{"expose", res.Expose},
 		{"dns", res.DNS},
@@ -840,6 +839,13 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			if err := validatePathChars(e); err != nil {
 				return nil, fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
 			}
+		}
+	}
+
+	for i, e := range res.Env {
+		key, _, _ := strings.Cut(e, "=")
+		if err := validatePathChars(key); err != nil {
+			return nil, fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
 

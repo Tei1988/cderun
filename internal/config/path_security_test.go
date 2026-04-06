@@ -140,13 +140,22 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			wantErr: "security validation failed for \"log-format\"",
 		},
 		{
-			name: "Invalid control char in Env element",
+			name: "Invalid control char in Env key",
 			cli: &CLIOptions{
 				Image:    "alpine",
 				ImageSet: true,
-				Env:      []string{"SAFE=VALUE", "UNSAFE=\n"},
+				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
 			},
-			wantErr: "security validation failed for env[1]",
+			wantErr: "security validation failed for env[1] (key)",
+		},
+		{
+			name: "Multiline Env value (PEM) is allowed",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
+			},
+			wantErr: "", // No error expected
 		},
 		{
 			name: "Invalid control char in Ports element",
@@ -162,8 +171,12 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ResolveWithFS("tool", tt.cli, nil, nil, fs)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
