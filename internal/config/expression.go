@@ -97,6 +97,11 @@ func (r *ExpressionResolver) setError(err error) {
 	}
 }
 
+// ClearError resets the internal sticky error to nil.
+func (r *ExpressionResolver) ClearError() {
+	r.err = nil
+}
+
 // Resolve processes a value (string, slice, or map) and resolves any expressions or tilde expansion found.
 func (r *ExpressionResolver) Resolve(v any) any {
 	if r.err != nil {

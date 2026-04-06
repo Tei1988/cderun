@@ -404,11 +404,15 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			var expectedRegistry string
 			if tools != nil {
 				if t, ok := tools[subcommand]; ok && t.Image != "" {
+					// Best-effort: try to resolve the tool's image to compare its registry.
+					// If resolution fails (e.g. template error), we skip the registry check
+					// because the user provided an explicit CLI override which should take precedence.
 					resolvedToolImage := r.resolveString(t.Image)
-					if err := r.Error(); err != nil {
-						return nil, err
+					if r.Error() != nil {
+						r.ClearError()
+					} else {
+						expectedRegistry = getRegistry(resolvedToolImage)
 					}
-					expectedRegistry = getRegistry(resolvedToolImage)
 				}
 			}
 
