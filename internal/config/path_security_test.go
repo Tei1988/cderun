@@ -117,3 +117,68 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 		assert.Contains(t, err.Error(), "device destination must be an absolute path")
 	})
 }
+
+func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
+	t.Parallel()
+	fs := &MockFileSystem{
+		HomeDir: "/home/user",
+		WD:      "/work",
+	}
+
+	tests := []struct {
+		name    string
+		cli     *CLIOptions
+		wantErr string
+	}{
+		{
+			name: "Invalid control char in LogFormat",
+			cli: &CLIOptions{
+				Image:        "alpine",
+				ImageSet:     true,
+				LogFormat:    "text\t",
+				LogFormatSet: true,
+			},
+			wantErr: "security validation failed for \"log-format\"",
+		},
+		{
+			name: "Invalid control char in Env key",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
+			},
+			wantErr: "security validation failed for env[1] (key)",
+		},
+		{
+			name: "Multiline Env value (PEM) is allowed",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
+			},
+			wantErr: "", // No error expected
+		},
+		{
+			name: "Invalid control char in Ports element",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"8080:80\r"},
+			},
+			wantErr: "security validation failed for ports[0]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := ResolveWithFS("tool", tt.cli, nil, nil, fs)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
