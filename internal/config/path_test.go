@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -684,29 +685,46 @@ func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 }
 
 func TestUnit_Path_ValidatePathChars(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		err := validatePathChars("valid/path")
-		assert.NoError(t, err)
-	})
+	tests := []struct {
+		name             string
+		input            string
+		expectedErr      bool
+		expectedPosition int
+	}{
+		{
+			name:        "success",
+			input:       "valid/path",
+			expectedErr: false,
+		},
+		{
+			name:             "invalid character at start",
+			input:            "\x01path",
+			expectedErr:      true,
+			expectedPosition: 0,
+		},
+		{
+			name:             "invalid character after multi-byte characters",
+			input:            "こんにちは\x01",
+			expectedErr:      true,
+			expectedPosition: 5,
+		},
+		{
+			name:             "invalid character 127 (DEL)",
+			input:            "path\x7f",
+			expectedErr:      true,
+			expectedPosition: 4,
+		},
+	}
 
-	t.Run("invalid character at start", func(t *testing.T) {
-		err := validatePathChars("\x01path")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "(position 0)")
-	})
-
-	t.Run("invalid character after multi-byte characters", func(t *testing.T) {
-		// "こんにちは" is 5 characters, but 15 bytes in UTF-8.
-		s := "こんにちは\x01"
-		err := validatePathChars(s)
-		require.Error(t, err)
-		// It should report position 5 (the character index of \x01), not position 15 (the byte index).
-		assert.Contains(t, err.Error(), "(position 5)")
-	})
-
-	t.Run("invalid character 127 (DEL)", func(t *testing.T) {
-		err := validatePathChars("path\x7f")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "(position 4)")
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePathChars(tt.input)
+			if tt.expectedErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), fmt.Sprintf("(position %d)", tt.expectedPosition))
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
