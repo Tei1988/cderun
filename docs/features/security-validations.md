@@ -40,6 +40,16 @@ This allows:
 
 Invalid signals are rejected to prevent command injection into the underlying runtime.
 
+## Registry Mismatch Validation
+
+To prevent accidental use of incorrect or unauthorized registries, `cderun` validates that the container image registry provided via CLI (or environment variables) matches the registry specified in the tool's configuration (`.tools.yaml`).
+
+If a mismatch is detected (e.g., CLI specifies `private-reg.com/node` while configuration expects `docker.io/library/node`), `cderun` returns a `RegistryMismatchError`. This error includes both the expected and actual registries to assist in troubleshooting.
+
 ## Absolute Mount Targets
 
 All mount configurations must specify an absolute path for the `Target` (container-side path). Relative paths in mount targets are ambiguous and potentially dangerous, so they are rejected during resolution.
+
+## Environment Variable Validation
+
+When validating environment variables, `cderun` applies character checks strictly to the **key** portion (the part before the first `=`). This prevents the use of control characters in variable names while allowing legitimate multiline values or complex strings (such as PEM certificates) in the values themselves.

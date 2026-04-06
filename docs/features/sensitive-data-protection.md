@@ -16,16 +16,22 @@ The following segments (case-insensitive) trigger masking:
 - `KEY`
 - `AUTH`
 - `SIG`
+- `CERT`
+- `PEM`
+- `PRIVATE`
+- `CREDENTIALS`
+- `PASSPHRASE`
 
 ### Intelligent Segmentation
 
-The system splits keys into segments based on:
+The system splits keys into segments to accurately identify sensitive information while minimizing false positives. Segmentation occurs at:
 
-- Non-alphanumeric characters (e.g., `DB_PASSWORD`)
-- CamelCase transitions (e.g., `apiToken`)
-- Letter-to-digit boundaries (e.g., `accessKey2`)
+- **Non-alphanumeric characters**: e.g., `DB_PASSWORD` → `["DB", "PASSWORD"]`
+- **CamelCase transitions**: e.g., `apiToken` → `["API", "TOKEN"]`
+- **Letter-to-digit boundaries**: e.g., `accessKey2` → `["ACCESS", "KEY", "2"]`
+- **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `["JSON", "TOKEN"]`
 
-A key like `MONKEY` is correctly identified as non-sensitive, while `AWS_ACCESS_KEY_ID` or `dbPassword2` will be masked.
+A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
 
 ## Presentation Layer Safety
 
