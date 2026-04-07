@@ -54,3 +54,97 @@ func TestUnit_Config_Path_ResolvePath_AbsError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get absolute path")
 }
+
+func TestUnit_Config_Path_ResolvePath_HostContext_Coverage(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{
+		WD: "/work",
+	}
+	// Case where multiple mounts match, should pick the longest target or deepest level
+	hostCtx := &HostContext{
+		Level: 1,
+		Mounts: []MountMapping{
+			{Source: "/host/a", Target: "/work", Level: 1},
+			{Source: "/host/b", Target: "/work/subdir", Level: 1},
+			{Source: "/host/c", Target: "/work/subdir", Level: 2},
+		},
+	}
+
+	t.Run("pick deepest level for same target length", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(hostCtx, mfs)
+		res, err := ResolvePath("/work/subdir/file", "/work", r)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/c/file", res)
+	})
+
+	t.Run("pick longest target match", func(t *testing.T) {
+		hostCtx2 := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/a", Target: "/work", Level: 1},
+				{Source: "/host/b", Target: "/work/subdir", Level: 1},
+			},
+		}
+		r, _ := NewExpressionResolverWithFS(hostCtx2, mfs)
+		res, err := ResolvePath("/work/subdir/file", "/work", r)
+		require.NoError(t, err)
+		assert.Equal(t, "/host/b/file", res)
+	})
+}
+
+func TestUnit_Config_Path_SplitHostRemainder_Windows(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input     string
+		wantHost  string
+		wantRem   string
+		wantFound bool
+	}{
+		{"C:\\path:rem", "C:\\path", "rem", true},
+		{"D:/path:rem", "D:/path", "rem", true},
+		{"C:\\path", "", "", false},
+		{"E:/path", "", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			host, rem, ok := SplitHostRemainder(tt.input)
+			assert.Equal(t, tt.wantFound, ok)
+			assert.Equal(t, tt.wantHost, host)
+			assert.Equal(t, tt.wantRem, rem)
+		})
+	}
+}
+
+func TestUnit_Config_Path_ParseDeviceConfig_Exhaustive(t *testing.T) {
+	t.Parallel()
+	t.Run("valid with perms", func(t *testing.T) {
+		dc, ok := ParseDeviceConfig("/dev/host:/dev/cont:rw")
+		assert.True(t, ok)
+		assert.Equal(t, "/dev/host", dc.Source.Raw)
+		assert.Equal(t, "/dev/cont", dc.Destination.Raw)
+		assert.Equal(t, "rw", dc.Permissions)
+	})
+
+	t.Run("valid without perms", func(t *testing.T) {
+		dc, ok := ParseDeviceConfig("/dev/host:/dev/cont")
+		assert.True(t, ok)
+		assert.Equal(t, "/dev/host", dc.Source.Raw)
+		assert.Equal(t, "/dev/cont", dc.Destination.Raw)
+		assert.Equal(t, "rwm", dc.Permissions)
+	})
+
+	t.Run("invalid no colon", func(t *testing.T) {
+		dc, ok := ParseDeviceConfig("/dev/host")
+		assert.True(t, ok) // Actually it defaults to same path
+		assert.Equal(t, "/dev/host", dc.Source.Raw)
+		assert.Equal(t, "/dev/host", dc.Destination.Raw)
+	})
+
+	t.Run("empty segments", func(t *testing.T) {
+		_, ok := ParseDeviceConfig(":/dev/cont")
+		assert.False(t, ok)
+		_, ok = ParseDeviceConfig("/dev/host:")
+		assert.False(t, ok)
+	})
+}

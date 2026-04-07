@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -92,5 +93,282 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	t.Run("Map nil", func(t *testing.T) {
 		set, _ := getFieldInfo(valNil, nil, []int{2})
 		assert.False(t, set)
+	})
+}
+
+func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
+	// Not Parallel because it mutates global fieldInfo
+
+	t.Run("registry mismatch for early boolean option", func(t *testing.T) {
+		fieldOnce.Do(initFieldInfo)
+		orig, ok := fieldInfo["diagnosis"]
+		defer func() {
+			if ok {
+				fieldInfo["diagnosis"] = orig
+			} else {
+				delete(fieldInfo, "diagnosis")
+			}
+		}()
+		delete(fieldInfo, "diagnosis")
+
+		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"diagnosis\" not found")
+	})
+
+	t.Run("registry mismatch for string option in phase 2", func(t *testing.T) {
+		fieldOnce.Do(initFieldInfo)
+		orig, ok := fieldInfo["image"]
+		defer func() {
+			if ok {
+				fieldInfo["image"] = orig
+			} else {
+				delete(fieldInfo, "image")
+			}
+		}()
+		delete(fieldInfo, "image")
+
+		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"image\" not found")
+	})
+
+	t.Run("registry mismatch validation with expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_IMAGE": "my-reg.com/node:{{env:UNKNOWN}}"},
+		}
+		tools := ToolsConfig{
+			// The registry check logic uses ResolveString which sets the sticky error if it fails.
+			// However, ResolveWithFS calls validateImageRegistryMatch which uses r.ResolveString.
+			// If r.ResolveString fails, it returns the error, BUT validateImageRegistryMatch
+			// only fails if both errCLI and errCfg are nil.
+			"node": ToolConfig{Image: "my-reg.com/node:18"},
+		}
+		res, err := ResolveWithFS("node", nil, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Contains(t, res.Image, "my-reg.com/node:")
+	})
+
+	t.Run("registry mismatch validation with config expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "my-reg.com/node:{{env:UNKNOWN}}"},
+		}
+		cli := &CLIOptions{Image: "my-reg.com/node:20", ImageSet: true}
+		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "my-reg.com/node:20", res.Image)
+	})
+
+	t.Run("negative duration in tool config", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "alpine", HangTimeout: "-1s"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duration cannot be negative")
+	})
+
+	t.Run("invalid duration in tool config", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "alpine", HangTimeout: "invalid"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid hang-timeout value")
+	})
+
+	t.Run("pull-backoff-base invalid in tool config", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "alpine", PullBackoffBase: "invalid"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+	})
+
+	t.Run("pull-backoff-base zero in tool config", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "alpine", PullBackoffBase: "0s"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be positive")
+	})
+
+	t.Run("memory invalid in tool config", func(t *testing.T) {
+		tools := ToolsConfig{
+			"node": ToolConfig{Image: "alpine", Memory: "invalid"},
+		}
+		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value")
+	})
+
+	t.Run("security validation failure for user", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, User: "user\nname", UserSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for \"user\"")
+	})
+
+	t.Run("security validation failure for env key", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"BAD\nKEY=val"}}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
+	})
+
+	t.Run("resolveDevices fallback to global", func(t *testing.T) {
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/global"}, Destination: ConfigPath{Raw: "/dev/global"}}},
+			},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		require.Len(t, res.Devices, 1)
+		assert.Equal(t, "/dev/global", res.Devices[0].PathOnHost)
+	})
+
+	t.Run("resolveEnv fallback to global", func(t *testing.T) {
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Env: []string{"GLOBAL=1"},
+			},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "GLOBAL=1")
+	})
+
+	t.Run("resolveDevices with empty segments in environment", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/a , , /dev/b:/dev/b"},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Devices, 2)
+	})
+
+	t.Run("resolveEnv with empty segments in environment", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_ENV": "A=1 ; ; B=2"},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "A=1")
+		assert.Contains(t, res.Env, "B=2")
+		assert.Len(t, res.Env, 2)
+	})
+
+	t.Run("resolveMounts fallback to global", func(t *testing.T) {
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				Mounts: []MountConfig{{Source: ConfigPath{Raw: "/src"}, Target: ConfigPath{Raw: "/dst"}}},
+			},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "/src", res.Mounts[0].Source)
+	})
+
+	t.Run("transitive options: mount-all-tools", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountAllTools: true, MountAllToolsSet: true}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.True(t, res.MountAllTools)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("transitive options: mount-tools", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountTools: "git", MountToolsSet: true}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"git"}, res.MountTools)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("RAMInBytes error with sticky expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Env:       []string{"FOO={{file:missing}}"},
+			Memory:    "invalid",
+			MemorySet: true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
+	})
+
+	t.Run("registry mismatch for missing CLI reflection fields", func(t *testing.T) {
+		fieldOnce.Do(initFieldInfo)
+		orig, ok := fieldInfo["image"]
+		defer func() {
+			if ok {
+				fieldInfo["image"] = orig
+			} else {
+				delete(fieldInfo, "image")
+			}
+		}()
+		fieldInfo["image"] = optionFields{p1ValIdx: nil, p2ValIdx: []int{1}}
+
+		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields for option \"image\" missing")
+	})
+
+	t.Run("security validation failure for various fields", func(t *testing.T) {
+		fields := []struct {
+			name string
+			cli  CLIOptions
+		}{
+			{"network", CLIOptions{Network: "net\r", NetworkSet: true}},
+			{"hostname", CLIOptions{Hostname: "host\t", HostnameSet: true}},
+			{"workdir", CLIOptions{Workdir: "dir\v", WorkdirSet: true}},
+			{"runtime", CLIOptions{Runtime: "run\f", RuntimeSet: true}},
+			{"dry-run-format", CLIOptions{DryRunFormat: "fmt\n", DryRunFormatSet: true}},
+			{"log-level", CLIOptions{LogLevel: "level\r", LogLevelSet: true}},
+		}
+
+		for _, f := range fields {
+			t.Run(f.name, func(t *testing.T) {
+				f.cli.Image = "alpine"
+				f.cli.ImageSet = true
+				_, err := ResolveWithFS("node", &f.cli, nil, nil, &MockFileSystem{})
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), fmt.Sprintf("security validation failed for %q", f.name))
+			})
+		}
+	})
+
+	t.Run("security validation failure for slice elements", func(t *testing.T) {
+		slices := []struct {
+			name string
+			cli  CLIOptions
+		}{
+			{"entrypoint", CLIOptions{Entrypoint: []string{"ep\n"}}},
+			{"ports", CLIOptions{Ports: []string{"80\r"}}},
+			{"expose", CLIOptions{Expose: []string{"80\t"}}},
+			{"dns", CLIOptions{DNS: []string{"8.8.8.8\v"}}},
+			{"add-hosts", CLIOptions{AddHosts: []string{"host:ip\f"}}},
+			{"cap-add", CLIOptions{CapAdd: []string{"SYS_ADMIN\n"}}},
+			{"cap-drop", CLIOptions{CapDrop: []string{"ALL\r"}}},
+		}
+
+		for _, s := range slices {
+			t.Run(s.name, func(t *testing.T) {
+				s.cli.Image = "alpine"
+				s.cli.ImageSet = true
+				_, err := ResolveWithFS("node", &s.cli, nil, nil, &MockFileSystem{})
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), fmt.Sprintf("security validation failed for %s[0]", s.name))
+			})
+		}
 	})
 }
