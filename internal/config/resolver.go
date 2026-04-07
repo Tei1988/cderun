@@ -1140,7 +1140,7 @@ func MaskSensitiveEnv(key, value string) string {
 	var lastRune rune
 	start := -1
 	runes := []rune(key)
-	for i := 0; i < len(runes); i++ {
+	for i := range runes {
 		r := runes[i]
 		isBoundary := false
 		if i > 0 {
