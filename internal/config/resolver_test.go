@@ -597,7 +597,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// no image
 		_, err := ResolveWithFS("sh", &CLIOptions{}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found")
+		var imageNotFoundErr *ImageNotFoundError
+		require.ErrorAs(t, err, &imageNotFoundErr)
+		assert.Equal(t, "sh", imageNotFoundErr.Tool)
 
 		// resolveDevices invalid format in CLI
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
@@ -614,7 +616,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		// invalid memory
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value")
+		var invalidConfigErr *InvalidConfigError
+		require.ErrorAs(t, err, &invalidConfigErr)
+		assert.Equal(t, "memory", invalidConfigErr.Field)
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
@@ -662,6 +666,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullMaxRetriesSet = true
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
+		var invalidConfigErr *InvalidConfigError
+		require.ErrorAs(t, err, &invalidConfigErr)
+		assert.Equal(t, "pull-max-retries", invalidConfigErr.Field)
 		assert.Contains(t, err.Error(), "must be greater than 0")
 
 		// PullBackoffBase invalid
@@ -670,12 +677,15 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		require.ErrorAs(t, err, &invalidConfigErr)
+		assert.Equal(t, "pull-backoff-base", invalidConfigErr.Field)
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
+		require.ErrorAs(t, err, &invalidConfigErr)
+		assert.Equal(t, "pull-backoff-base", invalidConfigErr.Field)
 		assert.Contains(t, err.Error(), "must be positive")
 	})
 

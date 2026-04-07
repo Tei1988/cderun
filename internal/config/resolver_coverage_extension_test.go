@@ -10,29 +10,25 @@ import (
 
 func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	cliVal := reflect.ValueOf(&CLIOptions{}).Elem()
+	fieldOnce.Do(initFieldInfo)
 
 	t.Run("missing registry info", func(t *testing.T) {
-		_, _, _, _, _, err := fetchFieldAndParams("nonexistent", cliVal)
+		_, _, _, _, _, err := fetchFieldAndParams("nonexistent", fieldInfo, cliVal)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
+		assert.Contains(t, err.Error(), "info for option \"nonexistent\" not found")
 	})
 
 	t.Run("missing reflection fields", func(t *testing.T) {
-		// Mock fieldInfo by adding an entry with missing ValIdx
-		fieldOnce.Do(initFieldInfo)
-		orig, ok := fieldInfo["image"]
-		defer func() {
-			if ok {
-				fieldInfo["image"] = orig
-			} else {
-				delete(fieldInfo, "image")
-			}
-		}()
+		// Mock fields by creating a local map instead of mutating global state
+		mockFields := make(map[string]optionFields)
+		for k, v := range fieldInfo {
+			mockFields[k] = v
+		}
+		mockFields["image"] = optionFields{p1ValIdx: nil}
 
-		fieldInfo["image"] = optionFields{p1ValIdx: nil}
-		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal)
+		_, _, _, _, _, err := fetchFieldAndParams("image", mockFields, cliVal)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields for option \"image\" missing")
+		assert.Contains(t, err.Error(), "CLI reflection fields for option \"image\" missing")
 	})
 }
 

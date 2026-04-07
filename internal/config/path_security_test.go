@@ -138,7 +138,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				LogFormat:    "text\t",
 				LogFormatSet: true,
 			},
-			wantErr: "security validation failed for \"log-format\"",
+			wantErr: "log-format",
 		},
 		{
 			name: "Invalid control char in Env key",
@@ -147,7 +147,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
 			},
-			wantErr: "security validation failed for env[1] (key)",
+			wantErr: "env[1] (key)",
 		},
 		{
 			name: "Multiline Env value (PEM) is allowed",
@@ -165,7 +165,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				Ports:    []string{"8080:80\r"},
 			},
-			wantErr: "security validation failed for ports[0]",
+			wantErr: "ports[0]",
 		},
 	}
 
@@ -175,7 +175,9 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			_, err := ResolveWithFS("tool", tt.cli, nil, nil, fs)
 			if tt.wantErr != "" {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
+				var invalidConfigErr *InvalidConfigError
+				require.ErrorAs(t, err, &invalidConfigErr)
+				assert.Equal(t, tt.wantErr, invalidConfigErr.Field)
 			} else {
 				require.NoError(t, err)
 			}
