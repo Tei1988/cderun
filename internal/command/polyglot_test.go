@@ -58,8 +58,9 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		}
 
 		// It should fail because no image mapping for 'node' exists, and --image was not hoisted.
-		require.Error(t, execErr)
-		assert.Contains(t, execErr.Error(), "no image mapping found for tool: \"node\"")
+		var imgErr *config.ImageNotFoundError
+		require.ErrorAs(t, execErr, &imgErr)
+		assert.Equal(t, "node", imgErr.Tool)
 
 		requireConfig := mock.GetCreatedConfig()
 		assert.Nil(t, requireConfig)

@@ -394,7 +394,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.Image == "" && subcommand != "" && !res.Diagnosis {
-		return nil, fmt.Errorf("no image mapping found for tool: %q", subcommand)
+		return nil, &ImageNotFoundError{Tool: subcommand}
 	}
 	if res.Image != "" {
 		// Security validation before any further use (including logging)
@@ -637,11 +637,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if hangTimeoutStr != "" {
 		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
 			if d < 0 {
-				return nil, fmt.Errorf("invalid hang-timeout value %q: duration cannot be negative", hangTimeoutStr)
+				return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
 			}
 			res.HangTimeout = d
 		} else {
-			return nil, fmt.Errorf("invalid hang-timeout value %q: %w", hangTimeoutStr, err)
+			return nil, &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: err}
 		}
 	}
 
@@ -716,7 +716,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	if res.PullMaxRetries <= 0 {
-		return nil, fmt.Errorf("invalid PullMaxRetries (%d): must be greater than 0", res.PullMaxRetries)
+		return nil, &InvalidConfigError{Field: "pull-max-retries", Value: fmt.Sprintf("%d", res.PullMaxRetries), Err: errors.New("must be greater than 0")}
 	}
 
 	// Resolve pull-backoff-base via registry
@@ -739,11 +739,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	if pullBackoffBaseStr != "" {
 		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
 			if d <= 0 {
-				return nil, fmt.Errorf("invalid PullBackoffBase duration %q: must be positive", pullBackoffBaseStr)
+				return nil, &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: errors.New("must be positive")}
 			}
 			res.PullBackoffBase = d
 		} else {
-			return nil, fmt.Errorf("failed to parse PullBackoffBase from %q: %w", pullBackoffBaseStr, err)
+			return nil, &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: err}
 		}
 	}
 
@@ -774,7 +774,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			if exprErr := r.Error(); exprErr != nil {
 				return nil, exprErr
 			}
-			return nil, fmt.Errorf("invalid memory value %q: %w", memStr, err)
+			return nil, &InvalidConfigError{Field: "memory", Value: memStr, Err: err}
 		}
 		res.Memory = bytes
 	}
