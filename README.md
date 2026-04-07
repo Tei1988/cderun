@@ -176,6 +176,7 @@ Key variables include:
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
+- `CDERUN_PULL`: Image pull policy (`always`, `missing`, `never`).
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
 - `CDERUN_DRY_RUN_FORMAT`: Output format for dry-run (yaml, json, simple).
 - `CDERUN_DIAGNOSIS`: If set to `true`, enables diagnosis mode.

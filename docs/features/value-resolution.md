@@ -47,9 +47,9 @@ cderunが特別な意味を持つと定義しているキーワードです。
 
 - **絶対パスの禁止**: `/etc/passwd` や `C:\windows\system32\...` のような絶対パスは指定できません。
 - **親ディレクトリ参照の禁止**: `..` セグメントを含むパス（例: `../../secret`）は指定できません。
-- **ファイルサイズの制限**: `{{file:...}}` で読み込めるファイルは **1MB** (`MaxDirectiveFileSize`) 以下に制限されています。
+- **ファイルサイズの制限**: `{{file:...}}` で読み込めるファイルは **1MB** (`MaxDirectiveFileSize`: 1,048,576 bytes) 以下に制限されています。
 
-これらの制約は、`filepath.IsLocal` によるパスの妥当性検証、`fs.Stat` による `info.Size` の `MaxDirectiveFileSize` に対する事前チェックを経てから `fs.ReadFile` を実行するという順序で厳密に適用されます。
+これらの制約は、`filepath.IsLocal` によるパスの妥当性検証、`fs.Stat` による `info.Size` の `MaxDirectiveFileSize` に対する事前チェックを経てから `fs.ReadFile` を実行するという順序で厳密に適用されます。読み取られたデータ自体のサイズも、最終的に再度チェックされます。
 
 #### スティッキーエラー (Sticky Error) パターン
 

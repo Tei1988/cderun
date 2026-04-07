@@ -8,12 +8,21 @@ The `validatePathChars` function ensures that critical configuration strings do 
 
 This validation is applied to:
 
-- Image names
-- User names
-- Network modes
-- Hostnames
-- Working directories
-- Entrypoint elements
+- **Image**
+- **User**
+- **Network**
+- **Hostname**
+- **Workdir**
+- **Runtime**
+- **Socket Path**
+- **Mount Socket Path**
+- **Mount Cderun Path**
+- **Dry Run Format**
+- **Diagnosis Format**
+- **Log Level**
+- **Log Format**
+- **Slice Elements**: `Entrypoint`, `Ports`, `Expose`, `DNS`, `AddHosts`, `CapAdd`, `CapDrop`
+- **Environment Variables**: キーの部分（値は対象外）
 
 Any string containing unsafe characters will cause an immediate resolution failure.
 

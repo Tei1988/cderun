@@ -16,6 +16,14 @@ The following segments (case-insensitive) trigger masking:
 - `KEY`
 - `AUTH`
 - `SIG`
+- `CERT`
+- `PEM`
+- `PRIVATE`
+- `CREDENTIALS`
+- `CREDENTIAL` (substring of keywords)
+- `PASSPHRASE`
+- `APIKEY` (substring of keywords)
+- `SESSION`
 
 ### Intelligent Segmentation
 
