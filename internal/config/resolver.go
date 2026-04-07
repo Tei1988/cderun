@@ -401,6 +401,31 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		if err := validatePathChars(res.Image); err != nil {
 			return nil, fmt.Errorf("security validation failed for image: %w", err)
 		}
+
+		// Registry mismatch validation: if image is provided via CLI/Env, ensure it matches tool config registry
+		if tools != nil {
+			if tool, ok := tools[subcommand]; ok && tool.Image != "" {
+				cliImage := ""
+				if cli.CderunImageSet {
+					cliImage = cli.CderunImage
+				} else if cli.ImageSet {
+					cliImage = cli.Image
+				} else if env := fs.Getenv("CDERUN_IMAGE"); env != "" {
+					cliImage = env
+				}
+
+				if cliImage != "" {
+					resolvedCLIImage, errCLI := r.ResolveString(cliImage)
+					resolvedCfgImage, errCfg := r.ResolveString(tool.Image)
+					if errCLI == nil && errCfg == nil {
+						if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+
 		logging.Debug("Resolved Image: %s", res.Image)
 	}
 
@@ -1005,6 +1030,54 @@ func mergeEnv(base, p2, p1 []string) []string {
 		res = append(res, m[k])
 	}
 	return res
+}
+
+func validateImageRegistryMatch(cliImage, configImage string) error {
+	if cliImage == "" || configImage == "" {
+		return nil
+	}
+
+	normalize := func(img string) (string, string) {
+		parts := strings.Split(img, "/")
+		var host, repo string
+		if len(parts) == 1 {
+			host = "docker.io"
+			repo = "library/" + parts[0]
+		} else if len(parts) == 2 {
+			if strings.ContainsAny(parts[0], ".:") || parts[0] == "localhost" {
+				host = parts[0]
+				repo = parts[1]
+			} else {
+				host = "docker.io"
+				repo = parts[0] + "/" + parts[1]
+			}
+		} else {
+			host = parts[0]
+			repo = strings.Join(parts[1:], "/")
+		}
+
+		if host == "docker.io" && !strings.Contains(repo, "/") {
+			repo = "library/" + repo
+		}
+
+		// Strip tags or digests from repo
+		if idx := strings.IndexAny(repo, ":@"); idx != -1 {
+			repo = repo[:idx]
+		}
+		return host, repo
+	}
+
+	cliHost, cliRepo := normalize(cliImage)
+	cfgHost, cfgRepo := normalize(configImage)
+
+	if cliHost != cfgHost || cliRepo != cfgRepo {
+		return &RegistryMismatchError{
+			ExpectedRegistry: fmt.Sprintf("%s/%s", cfgHost, cfgRepo),
+			ActualRegistry:   fmt.Sprintf("%s/%s", cliHost, cliRepo),
+		}
+	}
+
+	return nil
 }
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {

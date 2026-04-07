@@ -84,8 +84,8 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		done := make(chan struct{})
 		var execErr error
 		go func() {
-			// Simulating "node --cderun-interactive=true --cderun-image=alpine cat"
-			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--cderun-interactive=true", "--cderun-image=alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
+			// Simulating "node --cderun-interactive=true --cderun-image=node:alpine cat"
+			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--cderun-interactive=true", "--cderun-image=node:alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -109,7 +109,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		requireConfig := mock.GetCreatedConfig()
 		assert.NotNil(t, requireConfig)
 		assert.True(t, requireConfig.Interactive)
-		assert.Equal(t, "alpine", requireConfig.Image)
+		assert.Equal(t, "node:alpine", requireConfig.Image)
 	})
 }
 

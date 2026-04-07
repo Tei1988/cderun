@@ -6,10 +6,10 @@ cderunをネストして実行する場合、以下のように呼び分ける�
 
 ### 基底ホスト (Base Host)
 
-最初にcderunを実行した物理マシンまたはVM。
+最初に `cderun` を実行した物理マシンまたはVM。コンテナランタイム（Docker/Podman）が実際に動作している場所です。Nested レベル 0 に相当します。
 
 ```bash
-# 基底ホスト
+# 基底ホスト (Level 0)
 cderun --mount-cderun gemini-cli
 ```
 
