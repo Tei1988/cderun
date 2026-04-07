@@ -843,15 +843,45 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		{"network", res.Network},
 		{"hostname", res.Hostname},
 		{"workdir", res.Workdir},
+		{"runtime", res.Runtime},
+		{"socket-path", res.SocketPath},
+		{"mount-socket-path", res.MountSocketPath},
+		{"mount-cderun-path", res.MountCderunPath},
+		{"dry-run-format", res.DryRunFormat},
+		{"diagnosis-format", res.DiagnosisFormat},
+		{"log-level", res.LogLevel},
+		{"log-format", res.LogFormat},
 	}
 	for _, f := range criticalFields {
 		if err := validatePathChars(f.value); err != nil {
 			return nil, fmt.Errorf("security validation failed for %q: %w", f.name, err)
 		}
 	}
-	for i, e := range res.Entrypoint {
-		if err := validatePathChars(e); err != nil {
-			return nil, fmt.Errorf("security validation failed for entrypoint[%d]: %w", i, err)
+
+	criticalSlices := []struct {
+		name  string
+		slice []string
+	}{
+		{"entrypoint", res.Entrypoint},
+		{"ports", res.Ports},
+		{"expose", res.Expose},
+		{"dns", res.DNS},
+		{"add-hosts", res.AddHosts},
+		{"cap-add", res.CapAdd},
+		{"cap-drop", res.CapDrop},
+	}
+	for _, s := range criticalSlices {
+		for i, e := range s.slice {
+			if err := validatePathChars(e); err != nil {
+				return nil, fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
+			}
+		}
+	}
+
+	for i, e := range res.Env {
+		key, _, _ := strings.Cut(e, "=")
+		if err := validatePathChars(key); err != nil {
+			return nil, fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
 
@@ -1162,12 +1192,17 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	sensitiveKeywords := map[string]struct{}{
-		"PASSWORD": {},
-		"SECRET":   {},
-		"TOKEN":    {},
-		"KEY":      {},
-		"AUTH":     {},
-		"SIG":      {},
+		"PASSWORD":    {},
+		"SECRET":      {},
+		"TOKEN":       {},
+		"KEY":         {},
+		"AUTH":        {},
+		"SIG":         {},
+		"CERT":        {},
+		"PEM":         {},
+		"PRIVATE":     {},
+		"CREDENTIALS": {},
+		"PASSPHRASE":  {},
 	}
 
 	for _, segment := range segments {
