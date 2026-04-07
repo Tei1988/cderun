@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"reflect"
 	"testing"
 
@@ -21,9 +22,7 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	t.Run("missing reflection fields", func(t *testing.T) {
 		// Mock fields by creating a local map instead of mutating global state
 		mockFields := make(map[string]optionFields)
-		for k, v := range fieldInfo {
-			mockFields[k] = v
-		}
+		maps.Copy(mockFields, fieldInfo)
 		mockFields["image"] = optionFields{p1ValIdx: nil}
 
 		_, _, _, _, _, err := fetchFieldAndParams("image", mockFields, cliVal)
