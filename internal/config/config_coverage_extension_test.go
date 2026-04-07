@@ -23,6 +23,7 @@ func TestUnit_Config_LoadCDERunConfig_FromPath_Hierarchical(t *testing.T) {
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
+		require.NotNil(t, cfg)
 		assert.Equal(t, "podman", cfg.Runtime)
 		assert.Equal(t, "info", cfg.Logging.Level)
 		assert.Len(t, paths, 2)
@@ -45,7 +46,10 @@ func TestUnit_Config_LoadToolsConfig_FromPath_Merging(t *testing.T) {
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, _, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
-		node := cfg["node"]
+		require.NotNil(t, cfg)
+		node, ok := cfg["node"]
+		require.True(t, ok)
+		require.NotNil(t, node.TTY)
 		assert.Equal(t, "node:20", node.Image)
 		assert.True(t, *node.TTY)
 	})

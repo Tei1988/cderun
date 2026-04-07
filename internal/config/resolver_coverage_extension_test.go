@@ -9,6 +9,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// withPatchedFieldInfo mutates fieldInfo for testing and restores it after the test.
+func withPatchedFieldInfo(t *testing.T, key string, mutation func()) {
+	t.Helper()
+	fieldOnce.Do(initFieldInfo)
+	orig, exists := fieldInfo[key]
+	t.Cleanup(func() {
+		if exists {
+			fieldInfo[key] = orig
+		} else {
+			delete(fieldInfo, key)
+		}
+	})
+	mutation()
+}
+
 func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	cliVal := reflect.ValueOf(&CLIOptions{}).Elem()
 
@@ -19,18 +34,11 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	})
 
 	t.Run("missing reflection fields", func(t *testing.T) {
-		// Mock fieldInfo by adding an entry with missing ValIdx
-		fieldOnce.Do(initFieldInfo)
-		orig, ok := fieldInfo["image"]
-		defer func() {
-			if ok {
-				fieldInfo["image"] = orig
-			} else {
-				delete(fieldInfo, "image")
-			}
-		}()
-
-		fieldInfo["image"] = optionFields{p1ValIdx: nil}
+		withPatchedFieldInfo(t, "image", func() {
+			info := fieldInfo["image"]
+			info.p1ValIdx = nil
+			fieldInfo["image"] = info
+		})
 		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields for option \"image\" missing")
@@ -100,16 +108,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	// Not Parallel because it mutates global fieldInfo
 
 	t.Run("registry mismatch for early boolean option", func(t *testing.T) {
-		fieldOnce.Do(initFieldInfo)
-		orig, ok := fieldInfo["diagnosis"]
-		defer func() {
-			if ok {
-				fieldInfo["diagnosis"] = orig
-			} else {
-				delete(fieldInfo, "diagnosis")
-			}
-		}()
-		delete(fieldInfo, "diagnosis")
+		withPatchedFieldInfo(t, "diagnosis", func() {
+			delete(fieldInfo, "diagnosis")
+		})
 
 		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
@@ -117,16 +118,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("registry mismatch for string option in phase 2", func(t *testing.T) {
-		fieldOnce.Do(initFieldInfo)
-		orig, ok := fieldInfo["image"]
-		defer func() {
-			if ok {
-				fieldInfo["image"] = orig
-			} else {
-				delete(fieldInfo, "image")
-			}
-		}()
-		delete(fieldInfo, "image")
+		withPatchedFieldInfo(t, "image", func() {
+			delete(fieldInfo, "image")
+		})
 
 		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
@@ -307,16 +301,12 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("registry mismatch for missing CLI reflection fields", func(t *testing.T) {
-		fieldOnce.Do(initFieldInfo)
-		orig, ok := fieldInfo["image"]
-		defer func() {
-			if ok {
-				fieldInfo["image"] = orig
-			} else {
-				delete(fieldInfo, "image")
-			}
-		}()
-		fieldInfo["image"] = optionFields{p1ValIdx: nil, p2ValIdx: []int{1}}
+		withPatchedFieldInfo(t, "image", func() {
+			info := fieldInfo["image"]
+			info.p1ValIdx = nil
+			info.p2ValIdx = []int{1}
+			fieldInfo["image"] = info
+		})
 
 		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
 		require.Error(t, err)

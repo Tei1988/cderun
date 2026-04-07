@@ -71,7 +71,8 @@ func TestUnit_Config_Path_ResolvePath_HostContext_Coverage(t *testing.T) {
 	}
 
 	t.Run("pick deepest level for same target length", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(hostCtx, mfs)
+		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+		require.NoError(t, err)
 		res, err := ResolvePath("/work/subdir/file", "/work", r)
 		require.NoError(t, err)
 		assert.Equal(t, "/host/c/file", res)
@@ -85,7 +86,8 @@ func TestUnit_Config_Path_ResolvePath_HostContext_Coverage(t *testing.T) {
 				{Source: "/host/b", Target: "/work/subdir", Level: 1},
 			},
 		}
-		r, _ := NewExpressionResolverWithFS(hostCtx2, mfs)
+		r, err := NewExpressionResolverWithFS(hostCtx2, mfs)
+		require.NoError(t, err)
 		res, err := ResolvePath("/work/subdir/file", "/work", r)
 		require.NoError(t, err)
 		assert.Equal(t, "/host/b/file", res)
@@ -134,9 +136,9 @@ func TestUnit_Config_Path_ParseDeviceConfig_Exhaustive(t *testing.T) {
 		assert.Equal(t, "rwm", dc.Permissions)
 	})
 
-	t.Run("invalid no colon", func(t *testing.T) {
+	t.Run("no colon defaults to same path", func(t *testing.T) {
 		dc, ok := ParseDeviceConfig("/dev/host")
-		assert.True(t, ok) // Actually it defaults to same path
+		assert.True(t, ok)
 		assert.Equal(t, "/dev/host", dc.Source.Raw)
 		assert.Equal(t, "/dev/host", dc.Destination.Raw)
 	})
