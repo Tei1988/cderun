@@ -874,6 +874,10 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		}
 	}
 
+	if res.Privileged {
+		logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+	}
+
 	return res, nil
 }
 
@@ -1240,6 +1244,8 @@ func MaskSensitiveEnv(key, value string) string {
 		"PRIVATE":     {},
 		"CREDENTIALS": {},
 		"PASSPHRASE":  {},
+		"APIKEY":      {},
+		"SESSION":     {},
 	}
 
 	for _, segment := range segments {
