@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Config_Errors_Coverage(t *testing.T) {
@@ -32,13 +33,13 @@ func TestUnit_Config_Errors_Coverage(t *testing.T) {
 			Err:     baseErr,
 		}
 		assert.Equal(t, "failed to initialize runtime \"docker\": base error", err.Error())
-		assert.Equal(t, baseErr, err.Unwrap())
+		require.Equal(t, baseErr, err.Unwrap())
 
 		errNoBase := &RuntimeInitError{
 			Runtime: "podman",
 		}
 		assert.Equal(t, "failed to initialize runtime \"podman\"", errNoBase.Error())
-		assert.Nil(t, errNoBase.Unwrap())
+		require.NoError(t, errNoBase.Unwrap())
 	})
 
 	t.Run("InvalidConfigError", func(t *testing.T) {
@@ -50,6 +51,6 @@ func TestUnit_Config_Errors_Coverage(t *testing.T) {
 		}
 		// Error() already covered but let's be sure
 		assert.Equal(t, "invalid memory value \"invalid\": invalid format", err.Error())
-		assert.Equal(t, baseErr, err.Unwrap())
+		require.Equal(t, baseErr, err.Unwrap())
 	})
 }
