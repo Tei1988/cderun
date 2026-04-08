@@ -689,32 +689,37 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_ValidationExhaustive(t *testing.T)
 
 	// No image mapping
 	_, err := ResolveWithFS("missing", &CLIOptions{}, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no image mapping found for tool: \"missing\"")
+	var imgErr *ImageNotFoundError
+	require.ErrorAs(t, err, &imgErr)
+	assert.Equal(t, "missing", imgErr.Tool)
 
 	// Negative hang-timeout
 	cli := CLIOptions{Image: "a", ImageSet: true, HangTimeout: "-1s", HangTimeoutSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duration cannot be negative")
+	var cfgErr *InvalidConfigError
+	require.ErrorAs(t, err, &cfgErr)
+	assert.Equal(t, "hang-timeout", cfgErr.Field)
+	assert.Contains(t, cfgErr.Error(), "duration cannot be negative")
 
 	// Non-positive pull-max-retries
 	cli = CLIOptions{Image: "a", ImageSet: true, PullMaxRetries: 0, PullMaxRetriesSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be greater than 0")
+	require.ErrorAs(t, err, &cfgErr)
+	assert.Equal(t, "pull-max-retries", cfgErr.Field)
+	assert.Contains(t, cfgErr.Error(), "must be greater than 0")
 
 	// Non-positive pull-backoff-base
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "0s", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be positive")
+	require.ErrorAs(t, err, &cfgErr)
+	assert.Equal(t, "pull-backoff-base", cfgErr.Field)
+	assert.Contains(t, cfgErr.Error(), "must be positive")
 
 	// Invalid pull-backoff-base format
 	cli = CLIOptions{Image: "a", ImageSet: true, PullBackoffBase: "invalid", PullBackoffBaseSet: true}
 	_, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+	require.ErrorAs(t, err, &cfgErr)
+	assert.Equal(t, "pull-backoff-base", cfgErr.Field)
 }
 
 func TestUnit_Coverage_Resolver_ResolveWithFS_TransitiveLogic(t *testing.T) {
@@ -982,8 +987,9 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_NilCLI(t *testing.T) {
 	mfs := &MockFileSystem{}
 	// Should not panic and should return error due to missing image
 	res, err := ResolveWithFS("node", nil, nil, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no image mapping found")
+	var imgErr *ImageNotFoundError
+	require.ErrorAs(t, err, &imgErr)
+	assert.Equal(t, "node", imgErr.Tool)
 	assert.Nil(t, res)
 
 	// Should work if diagnosis is requested via env

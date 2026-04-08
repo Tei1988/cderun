@@ -156,8 +156,10 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("negative hang-timeout duration", func(t *testing.T) {
 		cli := CLIOptions{HangTimeout: "-5s", HangTimeoutSet: true, Image: "alpine", ImageSet: true}
 		_, err := Resolve("node", &cli, nil, nil)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "duration cannot be negative")
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "hang-timeout", cfgErr.Field)
+		assert.Contains(t, cfgErr.Error(), "duration cannot be negative")
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
@@ -596,8 +598,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	t.Run("Resolve errors", func(t *testing.T) {
 		// no image
 		_, err := ResolveWithFS("sh", &CLIOptions{}, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no image mapping found")
+		var imgErr *ImageNotFoundError
+		require.ErrorAs(t, err, &imgErr)
+		assert.Equal(t, "sh", imgErr.Tool)
 
 		// resolveDevices invalid format in CLI
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
@@ -613,8 +616,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// invalid memory
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value")
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "memory", cfgErr.Field)
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
@@ -661,22 +665,25 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunPullMaxRetries = 0
 		cli.CderunPullMaxRetriesSet = true
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be greater than 0")
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "pull-max-retries", cfgErr.Field)
+		assert.Contains(t, cfgErr.Error(), "must be greater than 0")
 
 		// PullBackoffBase invalid
 		cli.CderunPullMaxRetries = 3
 		cli.CderunPullBackoffBase = "invalid"
 		cli.CderunPullBackoffBaseSet = true
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "pull-backoff-base", cfgErr.Field)
 
 		// PullBackoffBase non-positive
 		cli.CderunPullBackoffBase = "0s"
 		_, err = ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must be positive")
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "pull-backoff-base", cfgErr.Field)
+		assert.Contains(t, cfgErr.Error(), "must be positive")
 	})
 
 	t.Run("Memory and Expression errors", func(t *testing.T) {
@@ -687,8 +694,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cli.CderunMemory = "invalid"
 		cli.CderunMemorySet = true
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value")
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "memory", cfgErr.Field)
 
 		// Expression error already present
 		mfsExpr := &MockFileSystem{WD: "/app"}
