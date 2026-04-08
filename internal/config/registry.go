@@ -263,7 +263,7 @@ var StringOptions = []StringOption{
 	{
 		Name:   "runtime",
 		EnvKey: "CDERUN_RUNTIME",
-		Usage:  "Container runtime to use (docker/podman)",
+		Usage:  "Container runtime to use (docker/podman/containerd)",
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Runtime
 		},

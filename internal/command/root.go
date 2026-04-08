@@ -181,6 +181,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewDockerRuntime(socket)
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
+			case "containerd":
+				return runtime.NewContainerdRuntime(socket)
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}

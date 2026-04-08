@@ -520,6 +520,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
 				res.Runtime = "docker"
 				res.SocketPath = "/var/run/docker.sock"
+			} else if _, err := fs.Stat("/run/containerd/containerd.sock"); err == nil {
+				res.Runtime = "containerd"
+				res.SocketPath = "/run/containerd/containerd.sock"
 			} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
 				res.Runtime = "podman"
 				res.SocketPath = "/run/podman/podman.sock"
