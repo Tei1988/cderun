@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_ContainerdRuntime_Name(t *testing.T) {
@@ -33,9 +34,9 @@ func TestUnit_ParseSignal(t *testing.T) {
 		t.Run(tt.sig, func(t *testing.T) {
 			got, err := parseSignal(tt.sig)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, int(got))
 			}
 		})

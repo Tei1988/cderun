@@ -270,7 +270,7 @@ jobs:
 
     services:
       containerd:
-        image: ghcr.io/containerd/containerd:v2.0.2
+        image: ghcr.io/containerd/containerd/v2:v2.0.2
         options: >-
           --privileged
           -v /run/containerd:/run/containerd

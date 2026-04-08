@@ -290,7 +290,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return fmt.Errorf("failed to load task: %w", err)
 	}
 
-	return task.Resize(ctx, uint32(cols), uint32(rows))
+	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
 }
 
 // SignalContainer sends a signal to a container.
