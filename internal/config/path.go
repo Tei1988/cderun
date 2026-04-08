@@ -486,13 +486,13 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		} else {
 			home, err := fs.UserHomeDir()
 			if err != nil {
-				return nil
+				return fmt.Errorf("failed to get anchor home directory: %w", err)
 			}
 			anchorPath = home
 		}
 	} else {
 		if r == nil {
-			return nil
+			return fmt.Errorf("expression resolver required for anchor validation")
 		}
 		word := matches[2]
 		switch word {
@@ -516,14 +516,14 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 
 	if anchorPath == "" {
-		return nil
+		return fmt.Errorf("anchor path is empty for %q", original)
 	}
 
 	absResolved := resolved
 	if !filepath.IsAbs(absResolved) {
 		a, err := fs.Abs(resolved)
 		if err != nil {
-			return nil
+			return fmt.Errorf("failed to get absolute path for resolved path %q: %w", resolved, err)
 		}
 		absResolved = a
 	}
@@ -531,16 +531,16 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 
 	absAnchor, err := fs.Abs(anchorPath)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
 	}
 	absAnchor = filepath.Clean(absAnchor)
 
 	rel, err := filepath.Rel(absAnchor, absResolved)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to calculate relative path between %q and %q: %w", absAnchor, absResolved, err)
 	}
 
-	if strings.HasPrefix(rel, "..") {
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
 	}
 
