@@ -6,7 +6,7 @@ import (
 
 func BenchmarkResolveWithFS(b *testing.B) {
 	cli := CLIOptions{
-		Image:    "node:20",
+		Image:    "alpine",
 		ImageSet: true,
 		TTY:      true,
 		TTYSet:   true,

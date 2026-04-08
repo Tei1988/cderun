@@ -524,9 +524,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-		r, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-		_, err = ResolvePath("~/foo", "/base", r)
+		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -563,9 +561,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-		r, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-		_, err = resolveVolumePath("~/host:/container", "/base", r)
+		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -573,9 +569,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
-		r, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-		_, err = resolveDevicePath("~/dev:/dev", "/base", r)
+		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
 }

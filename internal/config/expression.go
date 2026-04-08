@@ -41,11 +41,11 @@ func NewExpressionResolver(hostCtx *HostContext) (*ExpressionResolver, error) {
 func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*ExpressionResolver, error) {
 	home, err := fs.UserHomeDir()
 	if err != nil {
-		home = ""
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
 	pwd, err := fs.Getwd()
 	if err != nil {
-		pwd = ""
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 	return &ExpressionResolver{
 		fs:          fs,

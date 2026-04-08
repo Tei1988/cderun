@@ -234,22 +234,6 @@ var (
 	resType   = reflect.TypeFor[ResolvedConfig]()
 	fieldInfo map[string]optionFields
 	fieldOnce sync.Once
-
-	sensitiveKeywords = map[string]struct{}{
-		"PASSWORD":    {},
-		"SECRET":      {},
-		"TOKEN":       {},
-		"KEY":         {},
-		"AUTH":        {},
-		"SIG":         {},
-		"CERT":        {},
-		"PEM":         {},
-		"PRIVATE":     {},
-		"CREDENTIALS": {},
-		"PASSPHRASE":  {},
-		"APIKEY":      {},
-		"SESSION":     {},
-	}
 )
 
 type optionFields struct {
@@ -346,9 +330,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 	}
-	if logging.TraceEnabled() {
-		logging.Trace("Resolving configurations for tool: %s", subcommand)
-	}
+	logging.Trace("Resolving configurations for tool: %s", subcommand)
 	res := &ResolvedConfig{}
 	var err error
 
@@ -444,9 +426,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			}
 		}
 
-		if logging.DebugEnabled() {
-			logging.Debug("Resolved Image: %s", res.Image)
-		}
+		logging.Debug("Resolved Image: %s", res.Image)
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -894,6 +874,10 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		}
 	}
 
+	if res.Privileged {
+		logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+	}
+
 	return res, nil
 }
 
@@ -1122,9 +1106,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		if logging.DebugEnabled() {
-			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
-		}
+		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 
 		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
@@ -1211,20 +1193,10 @@ func MaskSensitiveEnv(key, value string) string {
 
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
+	var segments []string
 	var current strings.Builder
 	var lastRune rune
 	runes := []rune(key)
-
-	check := func() bool {
-		if current.Len() > 0 {
-			if _, ok := sensitiveKeywords[strings.ToUpper(current.String())]; ok {
-				return true
-			}
-			current.Reset()
-		}
-		return false
-	}
-
 	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
@@ -1239,8 +1211,9 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 
 			if isCamel || isLetterDigit || isAcronym {
-				if check() {
-					return "[REDACTED]"
+				if current.Len() > 0 {
+					segments = append(segments, strings.ToUpper(current.String()))
+					current.Reset()
 				}
 			}
 		}
@@ -1248,15 +1221,43 @@ func MaskSensitiveEnv(key, value string) string {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			current.WriteRune(r)
 		} else {
-			if check() {
-				return "[REDACTED]"
+			if current.Len() > 0 {
+				segments = append(segments, strings.ToUpper(current.String()))
+				current.Reset()
 			}
 		}
 		lastRune = r
 	}
-	if check() {
-		return "[REDACTED]"
+	if current.Len() > 0 {
+		segments = append(segments, strings.ToUpper(current.String()))
 	}
+
+	sensitiveKeywords := map[string]struct{}{
+		"PASSWORD":    {},
+		"SECRET":      {},
+		"TOKEN":       {},
+		"KEY":         {},
+		"AUTH":        {},
+		"SIG":         {},
+		"CERT":        {},
+		"PEM":         {},
+		"PRIVATE":     {},
+		"CREDENTIALS": {},
+		"PASSPHRASE":  {},
+		"APIKEY":      {},
+		"SESSION":     {},
+	}
+
+	for _, segment := range segments {
+		if _, ok := sensitiveKeywords[segment]; ok {
+			return "[REDACTED]"
+		}
+	}
+
+	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
+	// if they were split but should be treated as one sensitive keyword.
+	// However, 'PASS' and 'WORD' individually might be too generic.
+	// Let's stick to strict segment match for the core keywords to avoid false positives.
 
 	return value
 }
