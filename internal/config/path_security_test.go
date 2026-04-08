@@ -57,6 +57,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true},
 		{"Traversal escaping tilde", "~/../../etc/passwd", true},
 		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
+		{"Anchor not at start", "/{{HOME}}/../../etc/passwd", true},
 		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
 		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
 	}

@@ -330,7 +330,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
 	assert.Contains(t, res, "B=2")
 }
 
-func TestUnit_Coverage_Path_ResolvePath_NoResolver(t *testing.T) {
+func TestUnit_Coverage_Path_ResolvePath_WithResolver(t *testing.T) {
 	mfs := &MockFileSystem{HomeDir: "/home", WD: "/base"}
 	r, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)

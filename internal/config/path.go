@@ -337,7 +337,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`^(\{\{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*\}\}|~)`)
+	magicWordPreRegex = regexp.MustCompile(`^(/?)({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -478,7 +478,7 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 
 	var anchorPath string
-	anchor := matches[1]
+	anchor := matches[2]
 
 	if anchor == "~" {
 		if r != nil {
@@ -494,7 +494,7 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		if r == nil {
 			return fmt.Errorf("expression resolver required for anchor validation")
 		}
-		word := matches[2]
+		word := matches[3]
 		switch word {
 		case "HOME":
 			anchorPath = r.Home
