@@ -70,9 +70,8 @@ func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
 				WD: "/wd",
 			},
 		}
-		r, err := NewExpressionResolverWithFS(nil, fsErr)
-		require.NoError(t, err)
-		assert.Empty(t, r.Home)
+		_, err := NewExpressionResolverWithFS(nil, fsErr)
+		require.Error(t, err)
 	})
 
 	t.Run("NewExpressionResolverWithFS - Getwd failure", func(t *testing.T) {
@@ -82,9 +81,8 @@ func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
 				HomeDir: "/home",
 			},
 		}
-		r, err := NewExpressionResolverWithFS(nil, fsErr)
-		require.NoError(t, err)
-		assert.Empty(t, r.Pwd)
+		_, err := NewExpressionResolverWithFS(nil, fsErr)
+		require.Error(t, err)
 	})
 }
 

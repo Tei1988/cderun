@@ -330,10 +330,13 @@ func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
 	assert.Contains(t, res, "B=2")
 }
 
-func TestUnit_Coverage_Path_ResolvePath_NoResolver(t *testing.T) {
-	mfs := &MockFileSystem{HomeDir: "/home"}
+func TestUnit_Coverage_Path_ResolvePath_WithResolver(t *testing.T) {
+	mfs := &MockFileSystem{HomeDir: "/home", WD: "/base"}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	require.NoError(t, err)
+
 	// Test ResolvePath with a minimal ExpressionResolver to verify home (~) expansion using MockFileSystem
-	res, err := ResolvePath("~/foo", "/base", &ExpressionResolver{fs: mfs})
+	res, err := ResolvePath("~/foo", "/base", r)
 	require.NoError(t, err)
 	// On Linux mock filesystem it should use /home
 	assert.Equal(t, "/home/foo", res)
@@ -439,8 +442,12 @@ func TestUnit_Coverage_Path_ResolvePath_Nested(t *testing.T) {
 
 func TestUnit_Coverage_Expression_ResolveString_Errors(t *testing.T) {
 	mfs := &CoverageErrorFS{MockFileSystem: &MockFileSystem{}, HomeErr: errors.New("no home")}
-	r, _ := NewExpressionResolverWithFS(nil, mfs)
-	assert.Equal(t, "~/foo", r.resolveString("~/foo"))
+	_, err := NewExpressionResolverWithFS(nil, mfs)
+	require.Error(t, err)
+
+	mfs = &CoverageErrorFS{MockFileSystem: &MockFileSystem{}}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	require.NoError(t, err)
 
 	r.setError(nil)
 	s := "{{file:missing}} {{HOME}}"

@@ -34,6 +34,47 @@ func TestUnit_Config_ValidatePathChars(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
+	t.Parallel()
+	home := "/home/user"
+	pwd := "/work"
+	mfs := &MockFileSystem{
+		WD:      pwd,
+		HomeDir: home,
+	}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Safe home path", "{{HOME}}/file", false},
+		{"Safe tilde path", "~/file", false},
+		{"Safe pwd path", "{{PWD}}/file", false},
+		{"Traversal within home", "{{HOME}}/subdir/../file", false},
+		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true},
+		{"Traversal escaping tilde", "~/../../etc/passwd", true},
+		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
+		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
+		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
+		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ResolvePath(tt.input, pwd, r)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+				assert.Contains(t, err.Error(), "path traversal detected")
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidateToolName(t *testing.T) {
 	tests := []struct {
 		name    string

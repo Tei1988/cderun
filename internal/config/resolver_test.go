@@ -622,13 +622,9 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
-		resError, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
-		require.NoError(t, err)
-		assert.NotNil(t, resError)
+		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
+		require.Error(t, err)
 
-		// Expression resolver error is recorded but doesn't immediately stop ResolveWithFS until the end or specific points.
-		// Actually NewExpressionResolverWithFS swallows homeDirErr and sets home to "".
-		// Let's try to trigger an error in ResolveWithFS.
 
 		// Expression error
 		mfsExpr := &MockFileSystem{WD: "/app"}

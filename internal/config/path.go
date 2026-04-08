@@ -335,8 +335,9 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 }
 
 var (
-	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
-	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
+	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
+	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
+	magicWordPreRegex = regexp.MustCompile(`(^|/)({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -346,7 +347,8 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 	}
 
 	prefix := schemeRegex.FindString(p)
-	p = strings.TrimPrefix(p, prefix)
+	raw := strings.TrimPrefix(p, prefix)
+	p = raw
 
 	var fs FileSystem = RealFileSystem{}
 	if r != nil && r.fs != nil {
@@ -372,6 +374,10 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 	}
 
 	absPath := filepath.Clean(p)
+
+	if err := validateAnchorBoundaries(raw, absPath, r, fs); err != nil {
+		return "", err
+	}
 
 	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
 		abs := absPath
@@ -462,6 +468,82 @@ func validatePathChars(s string) error {
 		}
 		runeIdx++
 	}
+	return nil
+}
+
+func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
+	matches := magicWordPreRegex.FindStringSubmatch(original)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	var anchorPath string
+	anchor := matches[2]
+
+	if anchor == "~" {
+		if r != nil {
+			anchorPath = r.Home
+		} else {
+			home, err := fs.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get anchor home directory: %w", err)
+			}
+			anchorPath = home
+		}
+	} else {
+		if r == nil {
+			return fmt.Errorf("expression resolver required for anchor validation")
+		}
+		word := matches[3]
+		switch word {
+		case "HOME":
+			anchorPath = r.Home
+		case "PWD":
+			anchorPath = r.Pwd
+		case "BASE_HOME":
+			if r.HostContext != nil && r.HostContext.HomeDir != "" {
+				anchorPath = r.HostContext.HomeDir
+			} else {
+				anchorPath = r.Home
+			}
+		case "BASE_PWD":
+			if r.HostContext != nil && r.HostContext.WorkingDir != "" {
+				anchorPath = r.HostContext.WorkingDir
+			} else {
+				anchorPath = r.Pwd
+			}
+		}
+	}
+
+	if anchorPath == "" {
+		return fmt.Errorf("anchor path is empty for %q", original)
+	}
+
+	absResolved := resolved
+	if !filepath.IsAbs(absResolved) {
+		a, err := fs.Abs(resolved)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for resolved path %q: %w", resolved, err)
+		}
+		absResolved = a
+	}
+	absResolved = filepath.Clean(absResolved)
+
+	absAnchor, err := fs.Abs(anchorPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
+	}
+	absAnchor = filepath.Clean(absAnchor)
+
+	rel, err := filepath.Rel(absAnchor, absResolved)
+	if err != nil {
+		return fmt.Errorf("failed to calculate relative path between %q and %q: %w", absAnchor, absResolved, err)
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
+	}
+
 	return nil
 }
 
