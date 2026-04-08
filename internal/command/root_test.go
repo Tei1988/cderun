@@ -953,6 +953,7 @@ func TestUnit_Root_BuildContainerConfig_Nested_Additions(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			ExecPath: "/app/{{HOME}}/cderun",
 			HomeDir:  "myhome",
+			WD:       "/app",
 		}
 		o := &rootOptions{
 			fs:     mfs,

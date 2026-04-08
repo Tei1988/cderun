@@ -337,7 +337,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`^(/?)({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
+	magicWordPreRegex = regexp.MustCompile(`(^|/)({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
