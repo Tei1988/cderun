@@ -13,7 +13,15 @@ This validation is applied to:
 - Network modes
 - Hostnames
 - Working directories
+- Runtime
+- Socket paths (`--socket-path`, `--mount-socket-path`)
+- cderun binary mount path (`--mount-cderun-path`)
+- Output formats (`--dry-run-format`, `--diagnosis-format`)
+- Logging settings (`--log-level`, `--log-format`)
 - Entrypoint elements
+- Port mappings and exposed ports (`--publish`, `--expose`)
+- DNS servers and host mappings (`--dns`, `--add-host`)
+- Linux capabilities (`--cap-add`, `--cap-drop`)
 
 Any string containing unsafe characters will cause an immediate resolution failure.
 

@@ -44,7 +44,7 @@ flowchart TD
     B --> C[現在のマウント情報を HostContext に追記]
     C --> D[OverlayFS upperdir を検出し HostContext に追記]
     D --> E[実行ホスト内パスにディレクトリ作成]
-    E --> F{ネストレベル >= 1?}
+    E --> F{現在の実行環境は\nコンテナ内か？}
     F -- Yes --> G[HostContext のマウントマッピングを使って\n実行ホスト内パス → 基底ホストパスに逆解決]
     F -- No --> H[基底ホストパス = 実行ホスト内パス]
     G --> I[HostContext.SnapshotDir に基底ホストパスをセット]
