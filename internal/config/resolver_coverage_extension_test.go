@@ -178,7 +178,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse PullBackoffBase")
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value")
 	})
 
 	t.Run("pull-backoff-base zero in tool config", func(t *testing.T) {
