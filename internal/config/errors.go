@@ -29,7 +29,10 @@ type RuntimeInitError struct {
 }
 
 func (e *RuntimeInitError) Error() string {
-	return "failed to initialize runtime: " + e.Err.Error()
+	if e.Err != nil {
+		return fmt.Sprintf("failed to initialize runtime %q: %v", e.Runtime, e.Err)
+	}
+	return fmt.Sprintf("failed to initialize runtime %q", e.Runtime)
 }
 
 func (e *RuntimeInitError) Unwrap() error {
