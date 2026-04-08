@@ -75,3 +75,4 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 
 ## Testing & Maintenance
+- `internal/command/snapshot.go` のインラインコメントとコードの不整合修正。コメントでは `level >= 1` で逆パス解決を行うとしているが、コード（`if hostCtx.Level > 1`）ではレベル2以上（コンテナ内からのコンテナ起動）のみが対象。他パッケージ（`path.go`, `root.go`）では `Level > 0` が使われており、セマンティクスを統一する必要がある。
