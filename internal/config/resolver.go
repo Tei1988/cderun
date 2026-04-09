@@ -848,21 +848,27 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	}
 
 	criticalSlices := []struct {
-		name  string
-		slice []string
+		name     string
+		slice    []string
+		validate func(string) error
 	}{
-		{"entrypoint", res.Entrypoint},
-		{"ports", res.Ports},
-		{"expose", res.Expose},
-		{"dns", res.DNS},
-		{"add-hosts", res.AddHosts},
-		{"cap-add", res.CapAdd},
-		{"cap-drop", res.CapDrop},
+		{"entrypoint", res.Entrypoint, nil},
+		{"ports", res.Ports, validatePortBinding},
+		{"expose", res.Expose, validateExpose},
+		{"dns", res.DNS, validateDNS},
+		{"add-hosts", res.AddHosts, validateAddHost},
+		{"cap-add", res.CapAdd, nil},
+		{"cap-drop", res.CapDrop, nil},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {
 			if err := validatePathChars(e); err != nil {
 				return nil, fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
+			}
+			if s.validate != nil {
+				if err := s.validate(e); err != nil {
+					return nil, &InvalidConfigError{Field: fmt.Sprintf("%s[%d]", s.name, i), Value: e, Err: err}
+				}
 			}
 		}
 	}

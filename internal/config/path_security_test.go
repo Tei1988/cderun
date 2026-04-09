@@ -208,6 +208,69 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			},
 			wantErr: "security validation failed for ports[0]",
 		},
+		{
+			name: "Invalid format in Ports (space)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"8080 :80"},
+			},
+			wantErr: "invalid ports[0] value \"8080 :80\": port binding cannot contain spaces",
+		},
+		{
+			name: "Invalid format in Expose (port number)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Expose:   []string{"70000"},
+			},
+			wantErr: "invalid expose[0] value \"70000\": invalid port in expose: \"70000\"",
+		},
+		{
+			name: "Invalid format in Expose (protocol)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Expose:   []string{"80/http"},
+			},
+			wantErr: "invalid expose[0] value \"80/http\": invalid protocol in expose: \"http\"",
+		},
+		{
+			name: "Invalid format in Expose (range)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Expose:   []string{"80-70"},
+			},
+			wantErr: "invalid expose[0] value \"80-70\": invalid port range in expose: \"80-70\"",
+		},
+		{
+			name: "Invalid DNS (not an IP)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				DNS:      []string{"localhost"},
+			},
+			wantErr: "invalid dns[0] value \"localhost\": invalid DNS IP address: \"localhost\"",
+		},
+		{
+			name: "Invalid AddHosts (missing colon)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				AddHosts: []string{"host1.2.3.4"},
+			},
+			wantErr: "invalid add-hosts[0] value \"host1.2.3.4\": invalid add-host format, expected host:IP: \"host1.2.3.4\"",
+		},
+		{
+			name: "Invalid AddHosts (invalid IP)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				AddHosts: []string{"host:999.999.999.999"},
+			},
+			wantErr: "invalid add-hosts[0] value \"host:999.999.999.999\": invalid IP address in add-host: \"999.999.999.999\"",
+		},
 	}
 
 	for _, tt := range tests {
