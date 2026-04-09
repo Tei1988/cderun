@@ -109,7 +109,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	opts := []oci.SpecOpts{
 		oci.WithImageConfig(image),
-		oci.WithProcessArgs(config.Command...),
+	}
+
+	if len(config.Entrypoint) > 0 || len(config.Command) > 0 {
+		var args []string
+		if len(config.Entrypoint) > 0 {
+			args = append([]string{}, config.Entrypoint...)
+			args = append(args, config.Command...)
+		} else {
+			args = config.Command
+		}
+		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 
 	if config.TTY {
@@ -124,8 +134,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithProcessCwd(config.Workdir))
 	}
 
-	for _, e := range config.Env {
-		opts = append(opts, oci.WithEnv([]string{e}))
+	if len(config.Env) > 0 {
+		opts = append(opts, oci.WithEnv(config.Env))
 	}
 
 	for _, m := range config.Mounts {
@@ -152,13 +162,6 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	if len(config.CapAdd) > 0 {
 		opts = append(opts, oci.WithCapabilities(config.CapAdd))
-	}
-
-	if len(config.Entrypoint) > 0 {
-		opts = append(opts, oci.WithProcessArgs(config.Entrypoint...))
-		if len(config.Command) > 0 {
-			opts = append(opts, oci.WithProcessArgs(append(config.Entrypoint, config.Command...)...))
-		}
 	}
 
 	if config.Memory > 0 {

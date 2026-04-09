@@ -263,18 +263,10 @@ jobs:
           fail_ci_if_error: true
 
   runtime-test-containerd:
-    name: Runtime Tests (containerd v2.0.2)
+    name: Runtime Tests (containerd host)
     needs: [filter, build]
     if: needs.filter.outputs.go == 'true'
     runs-on: ubuntu-latest
-
-    services:
-      containerd:
-        image: ghcr.io/containerd/containerd/v2:v2.0.2
-        options: >-
-          --privileged
-          -v /run/containerd:/run/containerd
-          -v /var/lib/containerd:/var/lib/containerd
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -292,6 +284,11 @@ jobs:
 
       - name: Make binary executable
         run: chmod +x cderun
+
+      - name: Check containerd
+        run: |
+          containerd --version
+          sudo chmod 666 /run/containerd/containerd.sock
 
       - name: Runtime Tests
         env:
