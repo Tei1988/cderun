@@ -27,6 +27,7 @@ const (
 )
 
 type dockerClient interface {
+	io.Closer
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
@@ -355,6 +356,11 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
+}
+
+// Close closes the underlying docker client.
+func (d *DockerRuntime) Close() error {
+	return d.client.Close()
 }
 
 func isRetryablePullError(err error) bool {

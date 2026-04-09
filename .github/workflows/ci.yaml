@@ -261,3 +261,54 @@ jobs:
           files: ./coverage-podman.out
           flags: podman
           fail_ci_if_error: true
+
+  runtime-test-containerd:
+    name: Runtime Tests (containerd v2.2.2)
+    needs: [filter, build]
+    if: needs.filter.outputs.go == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Download Binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cderun-binary
+
+      - name: Make binary executable
+        run: chmod +x cderun
+
+      - name: Setup containerd
+        run: |
+          # Use containerd from the host, but ensure it's running and accessible
+          sudo apt-get update && sudo apt-get install -y containerd
+          sudo mkdir -p /etc/containerd
+          containerd config default | sudo tee /etc/containerd/config.toml
+          sudo systemctl restart containerd
+          sudo chmod 666 /run/containerd/containerd.sock
+          ctr version
+
+      - name: Runtime Tests
+        env:
+          CDERUN_RUNTIME: containerd
+          CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
+          TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-runtime-containerd
+          CDERUN_HANG_TIMEOUT: 10s
+        run: |
+          mkdir -p $TEST_HOST_TMP_DIR
+          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-containerd.out
+          flags: containerd
+          fail_ci_if_error: true
