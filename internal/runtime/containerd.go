@@ -2,8 +2,10 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"syscall"
 	"time"
@@ -107,18 +109,19 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	containerID := uuid.New().String()
 
+	var args []string
+	if len(config.Entrypoint) > 0 {
+		args = append([]string{}, config.Entrypoint...)
+		args = append(args, config.Command...)
+	} else {
+		args = config.Command
+	}
+
 	opts := []oci.SpecOpts{
 		oci.WithImageConfig(image),
 	}
 
-	if len(config.Entrypoint) > 0 || len(config.Command) > 0 {
-		var args []string
-		if len(config.Entrypoint) > 0 {
-			args = append([]string{}, config.Entrypoint...)
-			args = append(args, config.Command...)
-		} else {
-			args = config.Command
-		}
+	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 
@@ -181,8 +184,9 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	_, err = r.client.NewContainer(
 		ctx,
 		containerID,
-		client.WithNewSpec(opts...),
 		client.WithImage(image),
+		client.WithNewSnapshot(containerID, image),
+		client.WithNewSpec(opts...),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create containerd container: %w", err)
@@ -254,7 +258,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 		}
 	}
 
-	if err := container.Delete(ctx); err != nil {
+	if err := container.Delete(ctx, client.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to delete container: %w", err)
 		}
@@ -283,6 +287,10 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 
 // ResizeContainerTTY resizes the terminal of a container.
 func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	if rows > math.MaxUint32 || cols > math.MaxUint32 {
+		return errors.New("terminal size overflow")
+	}
+
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
@@ -293,7 +301,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return fmt.Errorf("failed to load task: %w", err)
 	}
 
-	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
+	return task.Resize(ctx, uint32(cols), uint32(rows))
 }
 
 // SignalContainer sends a signal to a container.

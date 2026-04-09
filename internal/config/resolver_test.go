@@ -535,6 +535,16 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
+		// containerd.sock exists
+		mfs = &MockFileSystem{
+			Dirs:  map[string]bool{"/run/containerd": true},
+			Files: map[string][]byte{"/run/containerd/containerd.sock": []byte("")},
+		}
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
+
 		// podman.sock exists
 		mfs = &MockFileSystem{
 			Dirs:  map[string]bool{"/run/podman": true},
@@ -558,11 +568,17 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
 		// specified unknown runtime (e.g. from global)
-		global := &CDERunConfig{Runtime: "containerd"}
+		global := &CDERunConfig{Runtime: "other"}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "other", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath) // Fallback to docker socket
+
+		// specified containerd but no socket, should use default containerd socket
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Runtime: "containerd", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {

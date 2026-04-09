@@ -32,6 +32,7 @@ func TestUnit_ParseSignal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.sig, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseSignal(tt.sig)
 			if tt.wantErr {
 				require.Error(t, err)

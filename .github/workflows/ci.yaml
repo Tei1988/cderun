@@ -301,6 +301,18 @@ jobs:
           ./cderun --version
           go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
 
+      - name: Diagnostic on Failure
+        if: failure()
+        env:
+          CDERUN_RUNTIME: containerd
+          CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
+        run: |
+          echo "--- containerd Status ---"
+          sudo containerd --version || true
+          sudo ls -l /run/containerd/containerd.sock || true
+          echo "--- cderun Diagnosis ---"
+          ./cderun --diagnosis || true
+
       - name: Upload to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
