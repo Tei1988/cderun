@@ -72,7 +72,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
 			time.Sleep(time.Duration(1<<uint(i)) * backoffBase)
@@ -98,7 +98,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	id := uuid.New().String()
 
 	var opts []oci.SpecOpts
-	opts = append(opts, oci.WithImageConfig(img))
+	opts = append(opts, oci.WithDefaultSpec(), oci.WithImageConfig(img))
 
 	if len(config.Command) > 0 {
 		opts = append(opts, oci.WithProcessArgs(config.Command...))
@@ -197,7 +197,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	task, err := container.Task(ctx, nil)
 	if err == nil {
-		_, _ = task.Delete(ctx, client.WithProcessKill)
+		_, _ = task.Delete(ctx, client.WithProcessKill) //nolint:errcheck
 	}
 
 	if err := container.Delete(ctx, client.WithSnapshotCleanup); err != nil {
@@ -247,7 +247,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return err
 	}
 
-	return task.Resize(ctx, uint32(cols), uint32(rows))
+	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
 }
 
 // SignalContainer sends a signal to a container's task.
