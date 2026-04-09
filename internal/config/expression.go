@@ -131,6 +131,18 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
+	// Fast-path for exact magic word matches
+	if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") && !strings.Contains(s[2:len(s)-2], "{{") {
+		content := strings.TrimSpace(s[2 : len(s)-2])
+		// Check if it's a simple magic word (no directives)
+		if !strings.Contains(content, ":") {
+			res, err := r.resolveDirective(content)
+			if err == nil && res != s { // res != s means it was resolved
+				return res
+			}
+		}
+	}
+
 	hasExpr := strings.Contains(s, "{{")
 
 	// Fast-path: no expressions and no tilde expansion
