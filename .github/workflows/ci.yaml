@@ -287,8 +287,13 @@ jobs:
 
       - name: Check containerd
         run: |
-          containerd --version
-          sudo chmod 666 /run/containerd/containerd.sock
+          # Wait for containerd to be ready (it should be pre-installed and running)
+          timeout 30s sh -c 'while ! sudo containerd --version >/dev/null 2>&1; do sleep 1; done'
+          sudo containerd --version
+
+          # Grant access to the runner user using ACLs (least privilege)
+          sudo apt-get update && sudo apt-get install -y acl
+          sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
 
       - name: Runtime Tests
         env:
@@ -299,7 +304,8 @@ jobs:
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           ./cderun --version
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          # Run both unit and runtime tests for better coverage
+          go test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out ./internal/command/... ./internal/runtime/...
 
       - name: Diagnostic on Failure
         if: failure()

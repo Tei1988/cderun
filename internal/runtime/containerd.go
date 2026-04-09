@@ -111,7 +111,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	var args []string
 	if len(config.Entrypoint) > 0 {
-		args = append([]string{}, config.Entrypoint...)
+		args = make([]string, 0, len(config.Entrypoint)+len(config.Command))
+		args = append(args, config.Entrypoint...)
 		args = append(args, config.Command...)
 	} else {
 		args = config.Command
@@ -250,7 +251,11 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	}
 
 	task, err := container.Task(ctx, nil)
-	if err == nil {
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			logging.Debug("failed to get task for container %s: %v", containerID, err)
+		}
+	} else {
 		if _, err := task.Delete(ctx, client.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to delete task: %w", err)
