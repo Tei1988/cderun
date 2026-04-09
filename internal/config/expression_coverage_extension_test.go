@@ -150,6 +150,6 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 
 		assert.Equal(t, "val", r.resolveString("{{env:EXISTING:-default}}"))
 		assert.Equal(t, "default", r.resolveString("{{env:MISSING:-default}}"))
-		assert.Equal(t, "", r.resolveString("{{env:MISSING}}"))
+		assert.Empty(t, r.resolveString("{{env:MISSING}}"))
 	})
 }
