@@ -220,10 +220,9 @@ func validateAddHost(s string) error {
 
 func validateExpose(s string) error {
 	// Format: port[/proto] or port-port[/proto]
-	portPart := s
-	if idx := strings.Index(s, "/"); idx != -1 {
-		portPart = s[:idx]
-		proto := strings.ToLower(s[idx+1:])
+	portPart, protoPart, hasProto := strings.Cut(s, "/")
+	if hasProto {
+		proto := strings.ToLower(protoPart)
 		if proto != "tcp" && proto != "udp" && proto != "sctp" {
 			return fmt.Errorf("invalid protocol in expose: %q", proto)
 		}
