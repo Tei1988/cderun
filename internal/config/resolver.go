@@ -1224,8 +1224,7 @@ func MaskSensitiveEnv(key, value string) string {
 	var lastRune rune
 	runes := []rune(key)
 	start := 0
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
+	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
@@ -1249,7 +1248,7 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 		}
 
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r)) {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
 			if i > start {
 				segment := strings.ToUpper(string(runes[start:i]))
 				if _, ok := sensitiveKeywords[segment]; ok {
