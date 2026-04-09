@@ -733,6 +733,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		return 0, err
 	}
 	defer cleanup()
+	defer rt.Close()
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())

@@ -49,6 +49,14 @@ func (r *ContainerdRuntime) Name() string {
 	return "containerd"
 }
 
+// Close closes the containerd client connection.
+func (r *ContainerdRuntime) Close() error {
+	if r.client == nil {
+		return nil
+	}
+	return r.client.Close()
+}
+
 // PullImage pulls the specified image.
 func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
@@ -148,7 +156,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			mountOptions = append(mountOptions, "ro")
 		}
 		if m.Type == "bind" || m.Type == "" {
-			mountOptions = append(mountOptions, "bind", "rbind")
+			// rbind is preferred for cderun to ensure nested mounts are included
+			mountOptions = append(mountOptions, "rbind")
 		}
 		opts = append(opts, oci.WithMounts([]specs.Mount{
 			{
@@ -168,7 +177,10 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithCapabilities(config.CapAdd))
 	}
 
-	if config.Memory > 0 {
+	if config.Memory != 0 {
+		if config.Memory < 0 {
+			return "", fmt.Errorf("invalid memory limit: %d", config.Memory)
+		}
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
 	}
 

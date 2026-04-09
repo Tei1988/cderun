@@ -356,3 +356,15 @@ func (d *DockerRuntime) Name() string {
 	return d.name
 }
 
+// Close closes the Docker client connection.
+func (d *DockerRuntime) Close() error {
+	if d.client == nil {
+		return nil
+	}
+	// Note: docker client version in use here doesn't have a Close method in the interface we defined,
+	// but the real client.Client has one. We'll use a type assertion to call it if it exists.
+	if closer, ok := d.client.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}

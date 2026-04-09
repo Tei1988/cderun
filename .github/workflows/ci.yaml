@@ -263,7 +263,7 @@ jobs:
           fail_ci_if_error: true
 
   runtime-test-containerd:
-    name: Runtime Tests (containerd host)
+    name: Runtime Tests (containerd v2.2.x)
     needs: [filter, build]
     if: needs.filter.outputs.go == 'true'
     runs-on: ubuntu-latest
@@ -288,7 +288,8 @@ jobs:
       - name: Check containerd
         run: |
           # Wait for containerd to be ready (it should be pre-installed and running)
-          timeout 30s sh -c 'while ! sudo containerd --version >/dev/null 2>&1; do sleep 1; done'
+          # Use probe that verifies the socket is accepting RPCs
+          timeout 30s sh -c 'while ! sudo ctr -a /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
           sudo containerd --version
 
           # Grant access to the runner user using ACLs (least privilege)
