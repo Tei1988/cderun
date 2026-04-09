@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cderun/internal/logging"
 	"fmt"
 	"reflect"
 	"testing"
@@ -105,7 +106,7 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 }
 
 func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
-	// Not Parallel because it mutates global fieldInfo
+	// Not Parallel because it mutates global fieldInfo or global logger level
 
 	t.Run("registry mismatch for early boolean option", func(t *testing.T) {
 		withPatchedFieldInfo(t, "diagnosis", func() {
@@ -360,5 +361,67 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 				assert.Contains(t, err.Error(), fmt.Sprintf("security validation failed for %s[0]", s.name))
 			})
 		}
+	})
+
+	t.Run("invalid tool name in mount-tools", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:         "alpine",
+			ImageSet:      true,
+			MountTools:    "../bad",
+			MountToolsSet: true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid tool name in mount-tools")
+	})
+
+	t.Run("pull-max-retries non-positive", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:                "alpine",
+			ImageSet:             true,
+			PullMaxRetries:       0,
+			PullMaxRetriesSet:    true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pull-max-retries value \"0\"")
+	})
+
+	t.Run("trace logging", func(t *testing.T) {
+		origLevel := logging.GetGlobalLogger().GetLevel()
+		logging.GetGlobalLogger().SetLevel(logging.TraceLevel)
+		defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+	})
+
+	t.Run("security validation failure for image", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine\n", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for image")
+	})
+
+	t.Run("hang-timeout invalid duration", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, HangTimeout: "invalid", HangTimeoutSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid hang-timeout value")
+	})
+
+	t.Run("pull-backoff-base invalid duration", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullBackoffBase: "invalid", CderunPullBackoffBaseSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pull-backoff-base value")
+	})
+
+	t.Run("pull-backoff-base non-positive", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullBackoffBase: "0s", CderunPullBackoffBaseSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be positive")
 	})
 }
