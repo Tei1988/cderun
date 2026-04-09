@@ -202,18 +202,18 @@ func validateDNS(s string) error {
 		return fmt.Errorf("DNS address cannot be empty")
 	}
 	if net.ParseIP(s) == nil {
-		return fmt.Errorf("invalid DNS IP address: %q", s)
+		return fmt.Errorf("invalid IP address: %q", s)
 	}
 	return nil
 }
 
 func validateAddHost(s string) error {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("invalid add-host format, expected host:IP: %q", s)
+	host, ip, ok := strings.Cut(s, ":")
+	if !ok || host == "" || ip == "" {
+		return fmt.Errorf("invalid format, expected host:IP: %q", s)
 	}
-	if net.ParseIP(parts[1]) == nil {
-		return fmt.Errorf("invalid IP address in add-host: %q", parts[1])
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("invalid IP address: %q", ip)
 	}
 	return nil
 }
@@ -233,13 +233,12 @@ func validateExpose(s string) error {
 		rangeParts := strings.SplitN(portPart, "-", 2)
 		start, err1 := strconv.Atoi(rangeParts[0])
 		end, err2 := strconv.Atoi(rangeParts[1])
-		if err1 != nil || err2 != nil || start < 0 || end < 0 || start > 65535 || end > 65535 || start > end {
+		if err1 != nil || err2 != nil || start < 1 || end < 1 || start > 65535 || end > 65535 || start > end {
 			return fmt.Errorf("invalid port range in expose: %q", portPart)
 		}
 	} else {
-		port, err := strconv.Atoi(portPart)
-		if err != nil || port < 0 || port > 65535 {
-			return fmt.Errorf("invalid port in expose: %q", portPart)
+		if err := validatePortRange(portPart); err != nil {
+			return fmt.Errorf("invalid port in expose: %w", err)
 		}
 	}
 	return nil
@@ -247,7 +246,89 @@ func validateExpose(s string) error {
 
 func validatePortBinding(s string) error {
 	if strings.Contains(s, " ") {
-		return fmt.Errorf("port binding cannot contain spaces: %q", s)
+		return fmt.Errorf("port binding cannot contain spaces")
+	}
+
+	binding, protoPart, hasProto := strings.Cut(s, "/")
+	if hasProto {
+		proto := strings.ToLower(protoPart)
+		if proto != "tcp" && proto != "udp" && proto != "sctp" {
+			return fmt.Errorf("invalid protocol: %q", proto)
+		}
+	}
+
+	if binding == "" {
+		return fmt.Errorf("empty port binding")
+	}
+
+	var parts []string
+	if strings.HasPrefix(binding, "[") {
+		end := strings.Index(binding, "]")
+		if end == -1 {
+			return fmt.Errorf("invalid IPv6 format")
+		}
+		ip := binding[1:end]
+		if net.ParseIP(ip) == nil {
+			return fmt.Errorf("invalid host IP: %q", ip)
+		}
+		remainder := binding[end+1:]
+		parts = []string{ip}
+		if remainder != "" {
+			if !strings.HasPrefix(remainder, ":") {
+				return fmt.Errorf("invalid format after IPv6")
+			}
+			parts = append(parts, strings.Split(remainder[1:], ":")...)
+		}
+	} else {
+		parts = strings.Split(binding, ":")
+	}
+
+	if len(parts) > 3 {
+		return fmt.Errorf("too many segments")
+	}
+
+	if len(parts) == 1 {
+		return validatePortRange(parts[0])
+	}
+
+	if len(parts) == 2 {
+		if parts[0] == "" { // e.g. :80
+			return validatePortRange(parts[1])
+		}
+		if net.ParseIP(parts[0]) != nil {
+			return validatePortRange(parts[1])
+		}
+		if err := validatePortRange(parts[0]); err != nil {
+			return fmt.Errorf("invalid host port or IP: %w", err)
+		}
+		return validatePortRange(parts[1])
+	}
+
+	if len(parts) == 3 {
+		if net.ParseIP(parts[0]) == nil {
+			return fmt.Errorf("invalid host IP: %q", parts[0])
+		}
+		if parts[1] != "" {
+			if err := validatePortRange(parts[1]); err != nil {
+				return fmt.Errorf("invalid host port: %w", err)
+			}
+		}
+		return validatePortRange(parts[2])
+	}
+
+	return nil
+}
+
+func validatePortRange(s string) error {
+	if s == "" {
+		return fmt.Errorf("port cannot be empty")
+	}
+	port, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("port must be numeric: %q", s)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("port out of range (1-65535): %d", port)
 	}
 	return nil
 }
@@ -393,7 +474,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
+	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}})|(?:^|/)~`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -534,9 +615,11 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 
 	var anchorPath string
-	anchor := matches[1]
+	// matches[1] is {{...}}, matches[2] is the word inside {{...}}
+	// matches[0] will contain ~ if it matched the second branch (possibly with a leading slash)
+	exprMatch := matches[1]
 
-	if anchor == "~" {
+	if exprMatch == "" { // Must be the tilde match
 		if r != nil {
 			anchorPath = r.Home
 		} else {

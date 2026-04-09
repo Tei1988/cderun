@@ -60,6 +60,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
 		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
 		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{"Literal tilde in filename", "cache~old/file", false},
 	}
 
 	for _, tt := range tests {
@@ -218,13 +219,40 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			wantErr: "invalid ports[0] value \"8080 :80\": port binding cannot contain spaces",
 		},
 		{
+			name: "Implicit host port is allowed",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{":80"},
+			},
+			wantErr: "",
+		},
+		{
+			name: "Invalid format in Ports (too many colons)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"1:2:3:4"},
+			},
+			wantErr: "invalid ports[0] value \"1:2:3:4\": too many segments",
+		},
+		{
+			name: "Invalid format in Ports (non-numeric)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"8080:abc"},
+			},
+			wantErr: "invalid ports[0] value \"8080:abc\": port must be numeric: \"abc\"",
+		},
+		{
 			name: "Invalid format in Expose (port number)",
 			cli: &CLIOptions{
 				Image:    "alpine",
 				ImageSet: true,
 				Expose:   []string{"70000"},
 			},
-			wantErr: "invalid expose[0] value \"70000\": invalid port in expose: \"70000\"",
+			wantErr: "invalid expose[0] value \"70000\": invalid port in expose: port out of range (1-65535): 70000",
 		},
 		{
 			name: "Invalid format in Expose (protocol)",
@@ -251,7 +279,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				DNS:      []string{"localhost"},
 			},
-			wantErr: "invalid dns[0] value \"localhost\": invalid DNS IP address: \"localhost\"",
+			wantErr: "invalid dns[0] value \"localhost\": invalid IP address: \"localhost\"",
 		},
 		{
 			name: "Invalid AddHosts (missing colon)",
@@ -260,7 +288,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				AddHosts: []string{"host1.2.3.4"},
 			},
-			wantErr: "invalid add-hosts[0] value \"host1.2.3.4\": invalid add-host format, expected host:IP: \"host1.2.3.4\"",
+			wantErr: "invalid add-hosts[0] value \"host1.2.3.4\": invalid format, expected host:IP: \"host1.2.3.4\"",
 		},
 		{
 			name: "Invalid AddHosts (invalid IP)",
@@ -269,7 +297,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				AddHosts: []string{"host:999.999.999.999"},
 			},
-			wantErr: "invalid add-hosts[0] value \"host:999.999.999.999\": invalid IP address in add-host: \"999.999.999.999\"",
+			wantErr: "invalid add-hosts[0] value \"host:999.999.999.999\": invalid IP address: \"999.999.999.999\"",
 		},
 	}
 
