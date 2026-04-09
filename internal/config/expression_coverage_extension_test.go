@@ -101,3 +101,55 @@ func TestUnit_ExpressionResolver_ResolveFile_StatError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to stat file")
 }
+
+func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
+	t.Run("sticky error", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{})
+		r.err = assert.AnError
+		assert.Equal(t, "some-string", r.resolveString("some-string"))
+		assert.Equal(t, "{{HOME}}", r.resolveString("{{HOME}}"))
+	})
+
+	t.Run("expandHome error", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			HomeDir: "/home/user",
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		mfs.HomeDirErr = assert.AnError
+		res := r.resolveString("~/path")
+		assert.Equal(t, "~/path", res)
+		assert.Error(t, r.err)
+	})
+
+	t.Run("magic words exhaustive", func(t *testing.T) {
+		hostCtx := &HostContext{
+			HomeDir:    "/base/home",
+			WorkingDir: "/base/pwd",
+		}
+		r, _ := NewExpressionResolverWithFS(hostCtx, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
+
+		assert.Equal(t, "/home", r.resolveString("{{HOME}}"))
+		assert.Equal(t, "/pwd", r.resolveString("{{PWD}}"))
+		assert.Equal(t, "/base/home", r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, "/base/pwd", r.resolveString("{{BASE_PWD}}"))
+	})
+
+	t.Run("magic words fallback exhaustive", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
+
+		assert.Equal(t, "/home", r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, "/pwd", r.resolveString("{{BASE_PWD}}"))
+	})
+
+	t.Run("env with default", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{
+			Env: map[string]string{"EXISTING": "val"},
+		})
+
+		assert.Equal(t, "val", r.resolveString("{{env:EXISTING:-default}}"))
+		assert.Equal(t, "default", r.resolveString("{{env:MISSING:-default}}"))
+		assert.Equal(t, "", r.resolveString("{{env:MISSING}}"))
+	})
+}

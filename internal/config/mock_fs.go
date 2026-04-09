@@ -23,6 +23,7 @@ type MockFileSystem struct {
 	WriteFileErr error
 	RemoveAllErr error
 	AbsErr       error
+	HomeDirErr   error
 	TempDirValue string
 	Perms        map[string]os.FileMode
 }
@@ -69,6 +70,9 @@ func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
 }
 
 func (m *MockFileSystem) UserHomeDir() (string, error) {
+	if m.HomeDirErr != nil {
+		return "", m.HomeDirErr
+	}
 	return m.HomeDir, nil
 }
 
