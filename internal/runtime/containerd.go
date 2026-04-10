@@ -145,8 +145,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	container, err := r.client.NewContainer(
 		ctx,
 		id,
-		client.WithNewSpec(opts...),
 		client.WithNewSnapshot(id, img),
+		client.WithNewSpec(opts...),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create container: %w", err)
