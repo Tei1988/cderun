@@ -246,7 +246,6 @@ jobs:
           CONTAINER_HOST=unix:///run/podman/podman.sock podman version
           DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
 
-      - name: Diagnostic on Failure
         if: failure()
         run: |
           echo "--- Podman Service Log ---"
@@ -292,8 +291,19 @@ jobs:
           sudo mkdir -p /etc/containerd
           containerd config default | sudo tee /etc/containerd/config.toml
           sudo systemctl restart containerd
-          sudo chmod 666 /run/containerd/containerd.sock
+
           ctr version
+      - name: Check containerd
+        run: |
+          # Wait for containerd to be ready (it should be pre-installed and running)
+          timeout 30s sh -c 'while ! sudo ctr --address /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
+          sudo containerd --version
+
+          # Grant access to the runner user using ACLs (least privilege)
+          if ! command -v setfacl >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y acl
+          fi
+          sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
 
       - name: Runtime Tests
         env:
@@ -303,8 +313,15 @@ jobs:
           CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
-          sudo -E $(which go) test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          sudo -E $(which go) test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out ./internal/...
           sudo chown runner:docker coverage-containerd.out
+      - name: Diagnostic on Failure
+        if: failure()
+        run: |
+          echo "--- Containerd Info ---"
+          ./cderun --diagnosis || true
+          echo "--- Socket Check ---"
+          ls -la /run/containerd/ || true
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2

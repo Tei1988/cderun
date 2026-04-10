@@ -2,8 +2,13 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"math"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"cderun/internal/container"
@@ -12,38 +17,31 @@ import (
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/google/uuid"
-	"github.com/moby/sys/signal"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
-	defaultContainerdNamespace = "cderun"
+	containerdNamespace = "cderun"
 )
 
 // ContainerdRuntime implements ContainerRuntime using containerd client.
 type ContainerdRuntime struct {
 	client    *client.Client
 	socket    string
-	namespace string
+	ioCreator cio.Creator
 }
 
 // NewContainerdRuntime creates a new ContainerdRuntime instance.
 func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
-	return NewContainerdRuntimeWithNamespace(socket, defaultContainerdNamespace)
-}
-
-// NewContainerdRuntimeWithNamespace creates a new ContainerdRuntime instance with a specific namespace.
-func NewContainerdRuntimeWithNamespace(socket string, namespace string) (*ContainerdRuntime, error) {
-	c, err := client.New(socket, client.WithDefaultNamespace(namespace))
+	c, err := client.New(socket, client.WithDefaultNamespace(containerdNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
-
 	return &ContainerdRuntime{
-		client:    c,
-		socket:    socket,
-		namespace: namespace,
+		client: c,
+		socket: socket,
 	}, nil
 }
 
@@ -52,8 +50,11 @@ func (r *ContainerdRuntime) Name() string {
 	return "containerd"
 }
 
-// Close closes the underlying containerd client.
+// Close closes the containerd client connection.
 func (r *ContainerdRuntime) Close() error {
+	if r.client == nil {
+		return nil
+	}
 	return r.client.Close()
 }
 
@@ -63,229 +64,340 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		return nil
 	}
 
-	if pullPolicy == "missing" {
-		imageService := r.client.ImageService()
-		_, err := imageService.Get(ctx, img)
-		if err == nil {
-			return nil // Image exists
-		}
-	}
-
 	var lastErr error
 	for i := range maxRetries {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
-			time.Sleep(time.Duration(1<<uint(i)) * backoffBase)
+			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
 		}
 
-		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
-		if err == nil {
-			return nil
+		if pullPolicy == "missing" {
+			_, err := r.client.GetImage(ctx, img)
+			if err == nil {
+				return nil // Image exists locally
+			}
+			if !errdefs.IsNotFound(err) {
+				lastErr = err
+				if isRetryablePullError(err) {
+					continue
+				}
+				return fmt.Errorf("failed to get image: %w", err)
+			}
 		}
-		lastErr = err
+
+		// Policy is "always" or "missing" (and not found locally)
+		logging.Info("Pulling image %s...", img)
+		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
+		if err != nil {
+			lastErr = err
+			if isRetryablePullError(err) {
+				continue
+			}
+			return fmt.Errorf("failed to pull image: %w", err)
+		}
+
+		return nil // Success
 	}
 
 	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 }
 
+
 // CreateContainer creates a new container.
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	img, err := r.client.GetImage(ctx, config.Image)
+	// TODO: Implement missing ContainerConfig features for parity with Docker:
+	// - CapDrop: config.CapDrop
+	// - Network: config.Network
+	// - Hostname: config.Hostname
+	// - DNS: config.DNS
+	// - AddHosts: config.AddHosts
+	// - Ports/Expose/PublishAll: config.Ports, config.Expose, config.PublishAll
+
+	image, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
-		return "", fmt.Errorf("failed to get image %q: %w", config.Image, err)
+		return "", fmt.Errorf("failed to get image: %w", err)
 	}
 
-	id := uuid.New().String()
+	containerID := uuid.New().String()
 
-	var opts []oci.SpecOpts
-	opts = append(opts, oci.WithDefaultSpec(), oci.WithImageConfig(img))
-
-	if len(config.Command) > 0 {
-		opts = append(opts, oci.WithProcessArgs(config.Command...))
-	}
-	if config.Workdir != "" {
-		opts = append(opts, oci.WithProcessCwd(config.Workdir))
-	}
-	if len(config.Env) > 0 {
-		opts = append(opts, oci.WithEnv(config.Env))
-	}
-	if config.User != "" {
-		opts = append(opts, oci.WithUser(config.User))
+	var args []string
+	if len(config.Entrypoint) > 0 {
+		args = make([]string, 0, len(config.Entrypoint)+len(config.Command))
+		args = append(args, config.Entrypoint...)
+		args = append(args, config.Command...)
+	} else {
+		args = config.Command
 	}
 
-	// TTY
+	opts := []oci.SpecOpts{
+		oci.WithDefaultSpec(),
+		oci.WithImageConfig(image),
+	}
+
+	if len(args) > 0 {
+		opts = append(opts, oci.WithProcessArgs(args...))
+	}
+
 	if config.TTY {
 		opts = append(opts, oci.WithTTY)
 	}
 
-	// Mounts
-	for _, m := range config.Mounts {
-		if m.Type == "bind" || m.Type == "" {
-			opts = append(opts, oci.WithMounts([]specs.Mount{
-				{
-					Type:        "bind",
-					Source:      m.Source,
-					Destination: m.Target,
-					Options:     []string{"bind", "rbind"},
-				},
-			}))
-		}
+	if config.User != "" {
+		opts = append(opts, oci.WithUser(config.User))
 	}
 
-	// Privileged
+	if config.Workdir != "" {
+		opts = append(opts, oci.WithProcessCwd(config.Workdir))
+	}
+
+	if len(config.Env) > 0 {
+		opts = append(opts, oci.WithEnv(config.Env))
+	}
+
+	for _, m := range config.Mounts {
+		var mountOptions []string
+		if m.ReadOnly {
+			mountOptions = append(mountOptions, "ro")
+		}
+		if m.Type == "bind" || m.Type == "" {
+			// rbind is preferred for cderun to ensure nested mounts are included
+			mountOptions = append(mountOptions, "rbind")
+		}
+		opts = append(opts, oci.WithMounts([]specs.Mount{
+			{
+				Type:        m.Type,
+				Source:      m.Source,
+				Destination: m.Target,
+				Options:     mountOptions,
+			},
+		}))
+	}
+
 	if config.Privileged {
 		opts = append(opts, oci.WithPrivileged)
 	}
 
-	// Caps
 	if len(config.CapAdd) > 0 {
 		opts = append(opts, oci.WithCapabilities(config.CapAdd))
 	}
 
-	container, err := r.client.NewContainer(
+	if config.Memory != 0 {
+		if config.Memory < 0 {
+			return "", fmt.Errorf("invalid memory limit: %d", config.Memory)
+		}
+		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
+	}
+
+	if config.CPUs > 0 {
+		period := uint64(100000)
+		quota := int64(config.CPUs * float64(period))
+		opts = append(opts, oci.WithCPUCFS(quota, period))
+	}
+
+	for _, d := range config.Devices {
+		opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+	}
+
+	_, err = r.client.NewContainer(
 		ctx,
-		id,
-		client.WithImage(img),
-		client.WithNewSnapshot(id, img),
+		containerID,
+		client.WithImage(image),
+		client.WithNewSnapshot(containerID, image),
 		client.WithNewSpec(opts...),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create container: %w", err)
+		return "", fmt.Errorf("failed to create containerd container: %w", err)
 	}
 
-	return container.ID(), nil
+	return containerID, nil
 }
 
-// StartContainer starts a container by creating a task.
+// StartContainer starts a created container.
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
-	// In containerd, "starting" means creating a task.
-	// However, we usually create the task in AttachContainer or separately.
-	// For the cderun model, we'll assume the task is created during Start if not already.
-	// But WaitContainer and AttachContainer also need access to the task.
+	container, err := r.client.LoadContainer(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("failed to load container: %w", err)
+	}
+
+	creator := r.ioCreator
+	if creator == nil {
+		creator = cio.NewCreator(cio.WithStdio)
+	}
+
+	task, err := container.NewTask(ctx, creator)
+	if err != nil {
+		return fmt.Errorf("failed to create task: %w", err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start task: %w", err)
+	}
+
 	return nil
 }
 
-// WaitContainer waits for a container's task to exit.
+// WaitContainer waits for a container to exit and returns its exit code.
 func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to load container: %w", err)
 	}
 
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to load task: %w", err)
 	}
 
 	exitStatusC, err := task.Wait(ctx)
 	if err != nil {
 		return 0, err
 	}
-	select {
-	case status := <-exitStatusC:
-		return int(status.ExitCode()), status.Error()
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	}
+	status := <-exitStatusC
+	return int(status.ExitCode()), status.Error()
 }
 
-// RemoveContainer removes a container and its snapshot.
+// RemoveContainer removes a container.
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
-		return err
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to load container: %w", err)
 	}
 
 	task, err := container.Task(ctx, nil)
-	if err == nil {
-		_, _ = task.Delete(ctx, client.WithProcessKill) //nolint:errcheck
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			logging.Debug("failed to get task for container %s: %v", containerID, err)
+		}
+	} else {
+		if _, err := task.Delete(ctx, client.WithProcessKill); err != nil { //nolint:errcheck
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to delete task: %w", err)
+			}
+		}
 	}
 
 	if err := container.Delete(ctx, client.WithSnapshotCleanup); err != nil {
-		return err
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to delete container: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// AttachContainer attaches to a container's IO by creating a task.
+// AttachContainer attaches to a container's IO streams.
+// Note: Unlike Docker's implementation, containerd uses a cio.Creator pattern.
+// The I/O streams are actually connected when NewTask is called in StartContainer,
+// so AttachContainer MUST be called before StartContainer.
 func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil {
-		return err
+	ioOpts := []cio.Opt{
+		cio.WithStreams(stdin, stdout, stderr),
 	}
-
-	var cioOpts cio.Opt
 	if tty {
-		cioOpts = cio.WithTerminal
+		ioOpts = append(ioOpts, cio.WithTerminal)
 	}
 
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStreams(stdin, stdout, stderr), cioOpts))
-	if err != nil {
-		return err
-	}
+	r.ioCreator = cio.NewCreator(ioOpts...)
 
 	if ready != nil {
 		close(ready)
 	}
 
-	if err := task.Start(ctx); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-// ResizeContainerTTY resizes the terminal of a container's task.
+// ResizeContainerTTY resizes the terminal of a container.
 func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	if rows > math.MaxUint32 || cols > math.MaxUint32 {
+		return errors.New("terminal size overflow")
+	}
+
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load container: %w", err)
 	}
 
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load task: %w", err)
 	}
 
 	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
 }
 
-// SignalContainer sends a signal to a container's task.
+// SignalContainer sends a signal to a container.
 func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load container: %w", err)
 	}
 
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return err
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to load task: %w", err)
 	}
 
-	s, err := signal.ParseSignal(sig)
+	s, err := parseSignal(sig)
 	if err != nil {
-		return fmt.Errorf("invalid signal %q: %w", sig, err)
+		return err
 	}
 
 	return task.Kill(ctx, s)
 }
 
-// InspectContainer inspects the container status.
+func parseSignal(sig string) (syscall.Signal, error) {
+	if sig == "" {
+		return syscall.SIGTERM, nil
+	}
+	if n, err := strconv.Atoi(sig); err == nil {
+		return syscall.Signal(n), nil
+	}
+	switch strings.ToUpper(sig) {
+	case "SIGTERM", "TERM":
+		return syscall.SIGTERM, nil
+	case "SIGKILL", "KILL":
+		return syscall.SIGKILL, nil
+	case "SIGINT", "INT":
+		return syscall.SIGINT, nil
+	case "SIGHUP", "HUP":
+		return syscall.SIGHUP, nil
+	case "SIGQUIT", "QUIT":
+		return syscall.SIGQUIT, nil
+	default:
+		return 0, fmt.Errorf("unsupported signal: %s", sig)
+	}
+}
+
+// InspectContainer inspects the container to get its status and exit code.
 func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
-		return false, 0, err
+		return false, 0, fmt.Errorf("failed to load container: %w", err)
 	}
 
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		return false, 0, err
+		if errdefs.IsNotFound(err) {
+			return false, 0, nil
+		}
+		return false, 0, fmt.Errorf("failed to load task: %w", err)
 	}
 
 	status, err := task.Status(ctx)
 	if err != nil {
-		return false, 0, err
+		return false, 0, fmt.Errorf("failed to get task status: %w", err)
 	}
 
 	isRunning := status.Status == client.Running

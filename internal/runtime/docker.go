@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"strings"
 	"time"
 
 	"cderun/internal/container"
@@ -361,34 +360,4 @@ func (d *DockerRuntime) Name() string {
 // Close closes the underlying docker client.
 func (d *DockerRuntime) Close() error {
 	return d.client.Close()
-}
-
-func isRetryablePullError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-
-	// List of keywords indicating transient registry or connection issues.
-	retryableKeywords := []string{
-		"toomanyrequests", "rate exceeded", "rate limit", "data limit exceeded",
-		"i/o timeout", "connection refused", "connection reset", "eof",
-	}
-
-	for _, kw := range retryableKeywords {
-		if strings.Contains(msg, kw) {
-			return true
-		}
-	}
-
-	return isTemporaryAuthError(err)
-}
-
-func isTemporaryAuthError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	// Catch temporary token issues or specific hints for re-authentication
-	return strings.Contains(msg, "token expired")
 }
