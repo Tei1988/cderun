@@ -556,6 +556,8 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		if rv.res.SocketPath != "" {
 			if strings.Contains(rv.res.SocketPath, "podman") {
 				rv.res.Runtime = "podman"
+			} else if strings.Contains(rv.res.SocketPath, "containerd") {
+				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"
 			}

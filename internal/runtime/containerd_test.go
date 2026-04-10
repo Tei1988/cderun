@@ -14,7 +14,7 @@ func TestUnit_ContainerdRuntime_Name(t *testing.T) {
 	assert.Equal(t, "containerd", rt.Name())
 }
 
-func TestUnit_ParseSignal(t *testing.T) {
+func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		sig      string
@@ -44,7 +44,7 @@ func TestUnit_ParseSignal(t *testing.T) {
 	}
 }
 
-func TestUnit_IsRetryablePullError(t *testing.T) {
+func TestUnit_Runtime_IsRetryablePullError(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		err      error

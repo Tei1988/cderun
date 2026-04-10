@@ -111,13 +111,26 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 // CreateContainer creates a new container.
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	// TODO: Implement missing ContainerConfig features for parity with Docker:
-	// - CapDrop: config.CapDrop
-	// - Network: config.Network
-	// - Hostname: config.Hostname
-	// - DNS: config.DNS
-	// - AddHosts: config.AddHosts
-	// - Ports/Expose/PublishAll: config.Ports, config.Expose, config.PublishAll
+
+	if len(config.CapDrop) > 0 {
+		return "", errors.New("containerd runtime: CapDrop is not supported yet")
+	}
+	if config.Network != "" && config.Network != "bridge" {
+		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
+	}
+	if config.Hostname != "" {
+		return "", errors.New("containerd runtime: Hostname is not supported yet")
+	}
+	if len(config.DNS) > 0 {
+		return "", errors.New("containerd runtime: DNS is not supported yet")
+	}
+	if len(config.AddHosts) > 0 {
+		return "", errors.New("containerd runtime: AddHosts is not supported yet")
+	}
+	if len(config.Ports) > 0 || len(config.Expose) > 0 || config.PublishAll {
+		return "", errors.New("containerd runtime: Port mapping is not supported yet")
+	}
+
 
 	image, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {

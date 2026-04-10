@@ -293,6 +293,10 @@ jobs:
           sudo systemctl restart containerd
 
           ctr version
+          if ! ctr version | grep -q "2.2"; then
+            echo "Error: containerd version 2.2.x is required"
+            exit 1
+          fi
       - name: Check containerd
         run: |
           # Wait for containerd to be ready (it should be pre-installed and running)

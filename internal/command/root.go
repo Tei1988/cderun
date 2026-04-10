@@ -772,8 +772,16 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		return nil, "", nil, &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 	}
 
+	// Ensure runtime is closed on early error paths
+	closed := false
+	defer func() {
+		if !closed && err != nil {
+			_ = rt.Close()
+		}
+	}()
+
 	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
+	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
 		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
 	}
 
@@ -781,6 +789,9 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
 	}
+
+	// Success path, caller will own rt
+	closed = true
 
 	cleanup := func() {}
 	if cc.Remove {
