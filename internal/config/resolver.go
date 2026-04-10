@@ -352,7 +352,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	if err != nil {
 		return err
 	}
-	info, _ := fieldInfo[opt.Name]
+	info := fieldInfo[opt.Name]
 	rv.resVal.FieldByIndex(info.targetIdx).SetString(val)
 	return nil
 }
@@ -375,7 +375,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	if err != nil {
 		return err
 	}
-	info, _ := fieldInfo[opt.Name]
+	info := fieldInfo[opt.Name]
 	rv.resVal.FieldByIndex(info.targetIdx).SetBool(val)
 	return nil
 }
