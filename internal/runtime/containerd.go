@@ -145,6 +145,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	container, err := r.client.NewContainer(
 		ctx,
 		id,
+		client.WithImage(img),
 		client.WithNewSnapshot(id, img),
 		client.WithNewSpec(opts...),
 	)

@@ -303,7 +303,8 @@ jobs:
           CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          sudo -E $(which go) test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          sudo chown runner:docker coverage-containerd.out
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
