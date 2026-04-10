@@ -3,6 +3,7 @@ package config
 import (
 	"cderun/internal/logging"
 	"fmt"
+	"time"
 	"reflect"
 	"testing"
 
@@ -278,6 +279,32 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.True(t, res.MountSocket)
 	})
 
+	t.Run("transitive options: explicit mount-cderun overrides mount-tools trigger", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:             "alpine",
+			ImageSet:          true,
+			MountTools:        "git",
+			MountToolsSet:     true,
+			MountCderun:       false,
+			MountCderunSet:    true,
+			MountSocket:       true, // explicitly set for clarity
+			MountSocketSet:    true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"git"}, res.MountTools)
+		assert.False(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("transitive options: mount-cderun triggers mount-socket", func(t *testing.T) {
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountCderun: true, MountCderunSet: true}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
 	t.Run("transitive options: mount-tools", func(t *testing.T) {
 		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountTools: "git", MountToolsSet: true}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
@@ -423,5 +450,85 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be positive")
+	})
+
+	t.Run("resolution of hang-timeout, pull-backoff-base, memory from various levels", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_HANG_TIMEOUT":     "20s",
+				"CDERUN_PULL_BACKOFF_BASE": "2s",
+				"CDERUN_MEMORY":            "1g",
+			},
+		}
+		tools := ToolsConfig{
+			"node": ToolConfig{
+				Image:           "node:20",
+				HangTimeout:     "30s",
+				PullBackoffBase: "3s",
+				Memory:          "2g",
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				HangTimeout:     "10s",
+				PullBackoffBase: "1s",
+				Memory:          "512m",
+			},
+		}
+
+		// Env level (no CLI)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, 20*time.Second, res.HangTimeout)
+		assert.Equal(t, 2*time.Second, res.PullBackoffBase)
+		assert.Equal(t, int64(1024*1024*1024), res.Memory)
+
+		// Tool Config level (no CLI, no Env)
+		res, err = ResolveWithFS("node", nil, tools, global, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, 30*time.Second, res.HangTimeout)
+		assert.Equal(t, 3*time.Second, res.PullBackoffBase)
+		assert.Equal(t, int64(2*1024*1024*1024), res.Memory)
+
+		// Global Config level (no CLI, no Env, no Tool)
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, 10*time.Second, res.HangTimeout)
+		assert.Equal(t, 1*time.Second, res.PullBackoffBase)
+		assert.Equal(t, int64(512*1024*1024), res.Memory)
+
+		// CLI level (P2)
+		cli := &CLIOptions{
+			Image:              "alpine",
+			ImageSet:           true,
+			HangTimeout:        "5s",
+			HangTimeoutSet:     true,
+			PullBackoffBase:    "500ms",
+			PullBackoffBaseSet: true,
+			Memory:             "256m",
+			MemorySet:          true,
+		}
+		res, err = ResolveWithFS("sh", cli, tools, global, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, 5*time.Second, res.HangTimeout)
+		assert.Equal(t, 500*time.Millisecond, res.PullBackoffBase)
+		assert.Equal(t, int64(256*1024*1024), res.Memory)
+
+		// CLI level (P1)
+		cliP1 := &CLIOptions{
+			Image:                    "alpine",
+			ImageSet:                 true,
+			CderunHangTimeout:        "2s",
+			CderunHangTimeoutSet:     true,
+			CderunPullBackoffBase:    "200ms",
+			CderunPullBackoffBaseSet: true,
+			CderunMemory:             "128m",
+			CderunMemorySet:          true,
+		}
+		res, err = ResolveWithFS("sh", cliP1, tools, global, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, 2*time.Second, res.HangTimeout)
+		assert.Equal(t, 200*time.Millisecond, res.PullBackoffBase)
+		assert.Equal(t, int64(128*1024*1024), res.Memory)
 	})
 }
