@@ -953,6 +953,24 @@ func (rv *resolver) validateSecurity() error {
 		}
 	}
 
+	for i, m := range rv.res.Mounts {
+		if err := validatePathChars(m.Source); err != nil {
+			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
+		}
+		if err := validatePathChars(m.Target); err != nil {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
+		}
+	}
+
+	for i, d := range rv.res.Devices {
+		if err := validatePathChars(d.PathOnHost); err != nil {
+			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
+		}
+		if err := validatePathChars(d.PathInContainer); err != nil {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
+		}
+	}
+
 	if rv.res.Privileged {
 		logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 	}
