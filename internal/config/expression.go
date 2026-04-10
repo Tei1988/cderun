@@ -141,19 +141,33 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	// 1. Resolve {{...}} expressions
 	resolved := s
 	if hasExpr {
-		resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
-			if r.err != nil {
-				return match
+		// Optimization: handle exact magic word matches (e.g. "{{HOME}}")
+		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") && strings.Count(s, "{{") == 1 {
+			content := strings.TrimSpace(s[2 : len(s)-2])
+			if !strings.ContainsAny(content, "{}:") { // Avoid complex directives in fast-path
+				res, err := r.resolveDirective(content)
+				if err == nil && !strings.HasPrefix(res, "{{") {
+					resolved = res
+					hasExpr = false // Resolved
+				}
 			}
-			content := strings.TrimSpace(match[2 : len(match)-2])
+		}
 
-			res, err := r.resolveDirective(content)
-			if err != nil {
-				r.setError(err)
-				return match
-			}
-			return res
-		})
+		if hasExpr {
+			resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
+				if r.err != nil {
+					return match
+				}
+				content := strings.TrimSpace(match[2 : len(match)-2])
+
+				res, err := r.resolveDirective(content)
+				if err != nil {
+					r.setError(err)
+					return match
+				}
+				return res
+			})
+		}
 	}
 
 	if r.err != nil {

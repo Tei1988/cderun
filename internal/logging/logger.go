@@ -101,6 +101,21 @@ func (l *Logger) GetWriter() io.Writer {
 	return l.writer
 }
 
+// Enabled returns true if the given level is enabled.
+func (l *Logger) Enabled(level Level) bool {
+	return level <= l.GetLevel()
+}
+
+// DebugEnabled returns true if debug level is enabled.
+func (l *Logger) DebugEnabled() bool {
+	return l.Enabled(DebugLevel)
+}
+
+// TraceEnabled returns true if trace level is enabled.
+func (l *Logger) TraceEnabled() bool {
+	return l.Enabled(TraceLevel)
+}
+
 func newDefaultLogger() *Logger {
 	l := &Logger{
 		writer:    os.Stderr,
@@ -187,6 +202,21 @@ func Warn(msg string, args ...any)  { globalLogger.Warn(msg, args...) }
 func Info(msg string, args ...any)  { globalLogger.Info(msg, args...) }
 func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
 func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
+
+// Enabled returns true if the given level is enabled on the global logger.
+func Enabled(level Level) bool {
+	return globalLogger.Enabled(level)
+}
+
+// DebugEnabled returns true if debug level is enabled on the global logger.
+func DebugEnabled() bool {
+	return globalLogger.DebugEnabled()
+}
+
+// TraceEnabled returns true if trace level is enabled on the global logger.
+func TraceEnabled() bool {
+	return globalLogger.TraceEnabled()
+}
 
 // GetGlobalLogger returns the global logger instance.
 // Callers should use Init() and SetOutput() methods to configure it,
