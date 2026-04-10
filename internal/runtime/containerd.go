@@ -31,6 +31,7 @@ type ContainerdRuntime struct {
 	client    *client.Client
 	socket    string
 	ioCreator cio.Creator
+	ioWait    chan error
 }
 
 // NewContainerdRuntime creates a new ContainerdRuntime instance.
@@ -41,6 +42,7 @@ func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
 	}
 	return &ContainerdRuntime{
 		client: c,
+		ioWait: make(chan error, 1),
 		socket: socket,
 	}, nil
 }
@@ -65,7 +67,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
-	for i := range maxRetries {
+	for i := 0; i <= maxRetries; i++ {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
 			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
@@ -178,13 +180,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		if m.ReadOnly {
 			mountOptions = append(mountOptions, "ro")
 		}
-		if m.Type == "bind" || m.Type == "" {
+		resolvedType := m.Type
+		if resolvedType == "" {
+			resolvedType = "bind"
+		}
+		if resolvedType == "bind" {
 			// rbind is preferred for cderun to ensure nested mounts are included
 			mountOptions = append(mountOptions, "rbind")
 		}
 		opts = append(opts, oci.WithMounts([]specs.Mount{
 			{
-				Type:        m.Type,
+				Type:        resolvedType,
 				Source:      m.Source,
 				Destination: m.Target,
 				Options:     mountOptions,
@@ -272,6 +278,7 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 		return 0, err
 	}
 	status := <-exitStatusC
+	r.ioWait <- status.Error()
 	return int(status.ExitCode()), status.Error()
 }
 
@@ -325,7 +332,13 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		close(ready)
 	}
 
-	return nil
+	// Wait for the task to finish (signaled by StartContainer/WaitContainer)
+	select {
+	case err := <-r.ioWait:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // ResizeContainerTTY resizes the terminal of a container.

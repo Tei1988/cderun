@@ -317,10 +317,12 @@ jobs:
           CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
-          sudo -E $(which go) test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out ./internal/...
-          sudo chown runner:docker coverage-containerd.out
+          go test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out ./internal/...
       - name: Diagnostic on Failure
         if: failure()
+        env:
+          CDERUN_RUNTIME: containerd
+          CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
         run: |
           echo "--- Containerd Info ---"
           ./cderun --diagnosis || true
