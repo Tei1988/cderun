@@ -75,3 +75,6 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 
 ## Testing & Maintenance
+
+## Documentation Gap Analysis
+- [ ] Discrepancy: Memory suggests containerd (v2.2.2) is integrated into CI, but `go.mod` and `ci.yaml` do not reflect this. Native containerd support is still under development (P-9).

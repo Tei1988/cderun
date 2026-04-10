@@ -100,7 +100,7 @@ Hoisting is a preprocessing step that scans the argument list to separate `cderu
 
 In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
 
-**Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
+**Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere. In Wrapper Mode, placing a P1 flag before the subcommand will result in an error to prevent ambiguity.
 
 ### Available Flags
 

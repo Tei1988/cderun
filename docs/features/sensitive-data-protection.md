@@ -21,6 +21,8 @@ The following segments (case-insensitive) trigger masking:
 - `PRIVATE`
 - `CREDENTIALS`
 - `PASSPHRASE`
+- `APIKEY`
+- `SESSION`
 
 ### Intelligent Segmentation
 
