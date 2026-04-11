@@ -266,7 +266,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 			// Use background context for cleanup to ensure it runs even if original ctx was cancelled
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_, _ = task.Delete(cleanupCtx, client.WithProcessKill) //nolint:errcheck
+			_, _ = task.Delete(cleanupCtx, client.WithProcessKill)
 		}
 	}()
 
