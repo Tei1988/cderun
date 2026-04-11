@@ -775,10 +775,12 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Ensure runtime is closed on early error paths
 	closed := false
 	defer func() {
-		if !closed && err != nil {
-			_ = rt.Close()
-		}
-	}()
+			if !closed && err != nil {
+				if closeErr := rt.Close(); closeErr != nil { //nolint:errcheck
+					o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
+				}
+			}
+		}()
 
 	o.logger.Trace("Creating container...")
 	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {

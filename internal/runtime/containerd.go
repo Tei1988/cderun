@@ -72,8 +72,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	var lastErr error
 	for i := 0; i <= maxRetries; i++ {
 		if i > 0 {
-			attempts := maxRetries + 1
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries+1, img, lastErr)
 			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
 			select {
 			case <-ctx.Done():
@@ -266,7 +265,9 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 			// Use background context for cleanup to ensure it runs even if original ctx was cancelled
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_, _ = task.Delete(cleanupCtx, client.WithProcessKill)
+			if _, delErr := task.Delete(cleanupCtx, client.WithProcessKill); delErr != nil { //nolint:errcheck
+				logging.Debug("failed to delete task on start failure: %v", delErr)
+			}
 		}
 	}()
 
@@ -326,7 +327,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	task, err := container.Task(cleanupCtx, nil)
 	if err == nil {
-		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil {
+		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil { //nolint:errcheck
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to delete task: %w", err)
 			}

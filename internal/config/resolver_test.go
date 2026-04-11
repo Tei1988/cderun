@@ -237,7 +237,7 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 			CderunTTY:    false,
 			CderunTTYSet: true,
 		}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.False(t, res.TTY)
 	})
@@ -399,7 +399,7 @@ func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
 			HangTimeout:    "5s",
 			HangTimeoutSet: true,
 		}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, 5*time.Second, res.HangTimeout)
 	})
@@ -411,7 +411,7 @@ func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
 			Memory:    "512MiB",
 			MemorySet: true,
 		}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, int64(512*1024*1024), res.Memory)
 	})
@@ -451,7 +451,7 @@ func TestUnit_Resolver_Exhaustive_Additional(t *testing.T) {
 
 	t.Run("Float64 resolution", func(t *testing.T) {
 		cli := CLIOptions{Image: "alpine", ImageSet: true, CPUs: 1.5, CPUsSet: true}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.InDelta(t, 1.5, res.CPUs, 0.0001)
 	})
@@ -557,7 +557,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
-		// specified unknown runtime (e.g. from global)
+		// specified runtime from global (known runtime: containerd)
 		global := &CDERunConfig{Runtime: "containerd"}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
