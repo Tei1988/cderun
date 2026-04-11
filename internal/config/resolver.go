@@ -407,19 +407,9 @@ func (rv *resolver) resolveEarly() error {
 		if !ok {
 			return fmt.Errorf("registry mismatch: early boolean option %q not found", name)
 		}
-		def := OptionDef[*bool]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-		}
-
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyBoolOption(opt); err != nil {
 			return err
 		}
-
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 	return nil
 }
@@ -432,20 +422,9 @@ func (rv *resolver) resolveStandardOptions() error {
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyStringOption(opt); err != nil {
 			return err
 		}
-
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-
-		resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	}
 
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
@@ -495,19 +474,9 @@ func (rv *resolver) resolveStandardOptions() error {
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyBoolOption(opt); err != nil {
 			return err
 		}
-
-		def := OptionDef[*bool]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-		}
-
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
 	}
 	return nil
 }
@@ -690,29 +659,9 @@ func (rv *resolver) resolveTransitiveOptions() error {
 func (rv *resolver) resolveCustomParsing() error {
 	// Phase 7: Duration and Slice options
 	// Resolve hang-timeout via registry entry (skipped in Phase 2)
-	var hangTimeoutStr string
 	if opt, ok := GetStringOption("hang-timeout"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("hang-timeout", rv.cliVal)
-		if err != nil {
+		if err := rv.applyDurationOption(opt, &rv.res.HangTimeout, false); err != nil {
 			return err
-		}
-
-		hangTimeoutStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	}
-	if hangTimeoutStr != "" {
-		if d, err := time.ParseDuration(hangTimeoutStr); err == nil {
-			if d < 0 {
-				return &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: errors.New("duration cannot be negative")}
-			}
-			rv.res.HangTimeout = d
-		} else {
-			return &InvalidConfigError{Field: "hang-timeout", Value: hangTimeoutStr, Err: err}
 		}
 	}
 
@@ -721,69 +670,16 @@ func (rv *resolver) resolveCustomParsing() error {
 			continue
 		}
 
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyStringSliceOption(opt); err != nil {
 			return err
 		}
-
-		var p1v, p2v []string
-		if p1Set {
-			if v, ok := p1Val.Interface().([]string); ok {
-				p1v = v
-			}
-		}
-		if p2Set {
-			if v, ok := p2Val.Interface().([]string); ok {
-				p2v = v
-			}
-		}
-
-		def := OptionDef[[]string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-		}
-
-		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
 	}
 
 	// Phase 8: Integer & Float options
 	for _, opt := range IntOptions {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyIntOption(opt); err != nil {
 			return err
 		}
-
-		p1Int := 0
-		if p1Set && p1Val.IsValid() {
-			k := p1Val.Kind()
-			if k >= reflect.Int && k <= reflect.Int64 {
-				p1Int = int(p1Val.Int())
-			} else {
-				p1Set = false
-			}
-		}
-
-		p2Int := 0
-		if p2Set && p2Val.IsValid() {
-			k := p2Val.Kind()
-			if k >= reflect.Int && k <= reflect.Int64 {
-				p2Int = int(p2Val.Int())
-			} else {
-				p2Set = false
-			}
-		}
-
-		def := OptionDef[*int]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     &opt.Default,
-		}
-
-		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
 	}
 
 	if rv.res.PullMaxRetries <= 0 {
@@ -791,30 +687,9 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 
 	// Resolve pull-backoff-base via registry
-	var pullBackoffBaseStr string
 	if opt, ok := GetStringOption("pull-backoff-base"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("pull-backoff-base", rv.cliVal)
-		if err != nil {
+		if err := rv.applyDurationOption(opt, &rv.res.PullBackoffBase, true); err != nil {
 			return err
-		}
-
-		pullBackoffBaseStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	}
-
-	if pullBackoffBaseStr != "" {
-		if d, err := time.ParseDuration(pullBackoffBaseStr); err == nil {
-			if d <= 0 {
-				return &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: errors.New("must be positive")}
-			}
-			rv.res.PullBackoffBase = d
-		} else {
-			return &InvalidConfigError{Field: "pull-backoff-base", Value: pullBackoffBaseStr, Err: err}
 		}
 	}
 
@@ -825,67 +700,16 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 
 	// Resolve memory via registry
-	var memStr string
 	if opt, ok := GetStringOption("memory"); ok {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("memory", rv.cliVal)
-		if err != nil {
+		if err := rv.applyMemoryOption(opt, &rv.res.Memory); err != nil {
 			return err
 		}
-
-		memStr = resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	}
-	if memStr != "" {
-		bytes, err := units.RAMInBytes(memStr)
-		if err != nil {
-			if exprErr := rv.r.Error(); exprErr != nil {
-				return exprErr
-			}
-			return &InvalidConfigError{Field: "memory", Value: memStr, Err: err}
-		}
-		rv.res.Memory = bytes
 	}
 
 	for _, opt := range Float64Options {
-		info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
+		if err := rv.applyFloat64Option(opt); err != nil {
 			return err
 		}
-
-		p1Float := 0.0
-		if p1Set && p1Val.IsValid() {
-			k := p1Val.Kind()
-			if k == reflect.Float32 || k == reflect.Float64 {
-				p1Float = p1Val.Float()
-			} else {
-				p1Set = false
-			}
-		}
-
-		p2Float := 0.0
-		if p2Set && p2Val.IsValid() {
-			k := p2Val.Kind()
-			if k == reflect.Float32 || k == reflect.Float64 {
-				p2Float = p2Val.Float()
-			} else {
-				p2Set = false
-			}
-		}
-
-		def := OptionDef[*float64]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     &opt.Default,
-		}
-
-		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-		rv.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
 	}
 
 	var hostCtx *HostContext
@@ -959,6 +783,200 @@ func (rv *resolver) validateSecurity() error {
 	return nil
 }
 
+func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	var p1v, p2v []string
+	if p1Set {
+		if v, ok := p1Val.Interface().([]string); ok {
+			p1v = v
+		}
+	}
+	if p2Set {
+		if v, ok := p2Val.Interface().([]string); ok {
+			p2v = v
+		}
+	}
+
+	def := OptionDef[[]string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+	}
+
+	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
+	return nil
+}
+
+func (rv *resolver) applyStringOption(opt StringOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+
+	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetString(resolved)
+	return nil
+}
+
+func (rv *resolver) applyBoolOption(opt BoolOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	def := OptionDef[*bool]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+	}
+
+	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
+	return nil
+}
+
+func (rv *resolver) applyIntOption(opt IntOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	p1Int := 0
+	if p1Set && p1Val.IsValid() {
+		k := p1Val.Kind()
+		if k >= reflect.Int && k <= reflect.Int64 {
+			p1Int = int(p1Val.Int())
+		} else {
+			p1Set = false
+		}
+	}
+
+	p2Int := 0
+	if p2Set && p2Val.IsValid() {
+		k := p2Val.Kind()
+		if k >= reflect.Int && k <= reflect.Int64 {
+			p2Int = int(p2Val.Int())
+		} else {
+			p2Set = false
+		}
+	}
+
+	def := OptionDef[*int]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     &opt.Default,
+	}
+
+	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
+	return nil
+}
+
+func (rv *resolver) applyFloat64Option(opt Float64Option) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	p1Float := 0.0
+	if p1Set && p1Val.IsValid() {
+		k := p1Val.Kind()
+		if k == reflect.Float32 || k == reflect.Float64 {
+			p1Float = p1Val.Float()
+		} else {
+			p1Set = false
+		}
+	}
+
+	p2Float := 0.0
+	if p2Set && p2Val.IsValid() {
+		k := p2Val.Kind()
+		if k == reflect.Float32 || k == reflect.Float64 {
+			p2Float = p2Val.Float()
+		} else {
+			p2Set = false
+		}
+	}
+
+	def := OptionDef[*float64]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     &opt.Default,
+	}
+
+	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
+	return nil
+}
+
+func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration, positive bool) error {
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if valStr != "" {
+		d, err := time.ParseDuration(valStr)
+		if err != nil {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
+		}
+		if positive && d <= 0 {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("must be positive")}
+		}
+		if !positive && d < 0 {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("duration cannot be negative")}
+		}
+		*target = d
+	}
+	return nil
+}
+
+func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if valStr != "" {
+		bytes, err := units.RAMInBytes(valStr)
+		if err != nil {
+			if exprErr := rv.r.Error(); exprErr != nil {
+				return exprErr
+			}
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
+		}
+		*target = bytes
+	}
+	return nil
+}
 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
