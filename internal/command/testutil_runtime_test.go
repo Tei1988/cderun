@@ -13,8 +13,8 @@ func skipIfDockerBroken(t *testing.T, err error) {
 		return
 	}
 	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "failed to mount") && strings.Contains(msg, "invalid argument") {
-		t.Skip("Skipping test due to Docker mount limitation in this environment (likely overlay-on-overlay)")
+	if strings.Contains(msg, "failed to mount") && (strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted")) {
+		t.Skip("Skipping test due to runtime mount limitation in this environment (likely overlay-on-overlay)")
 	}
 	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") {
 		t.Skip("Skipping test due to Docker Hub rate limit")

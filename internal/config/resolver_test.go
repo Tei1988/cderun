@@ -563,6 +563,19 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Runtime)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
+
+		// priority: containerd > podman when docker is missing
+		mfs = &MockFileSystem{
+			Dirs: map[string]bool{"/run/containerd": true, "/run/podman": true},
+			Files: map[string][]byte{
+				"/run/containerd/containerd.sock": []byte(""),
+				"/run/podman/podman.sock":         []byte(""),
+			},
+		}
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {

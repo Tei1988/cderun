@@ -322,13 +322,14 @@ jobs:
         env:
           CDERUN_RUNTIME: containerd
           CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
-          TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-runtime-containerd
+          TEST_HOST_TMP_DIR: /tmp/tmp-runtime-containerd
           CDERUN_HANG_TIMEOUT: 10s
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           # Note: containerd runs with a wider scope (./internal/...) to include its unit tests
           # in internal/runtime, but still uses the runtime tag for E2E scenarios.
-          go test -v -tags=runtime -timeout 15m -coverpkg=./internal/... -coverprofile=coverage-containerd.out ./internal/...
+          # Use sudo to allow overlay mounts, and explicitly pass PATH to find 'go'.
+          sudo -E PATH=$PATH $(which go) test -v -tags=runtime -timeout 15m -coverpkg=./internal/... -coverprofile=coverage-containerd.out ./internal/...
       - name: Diagnostic on Failure
         if: failure()
         env:
