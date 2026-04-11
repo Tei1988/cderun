@@ -239,3 +239,28 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get anchor home directory")
 	})
 }
+
+func TestUnit_Config_Path_ResolveVolume_ResolveDevice_Errors(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{HomeDirErr: assert.AnError}
+	// Note: NewExpressionResolverWithFS returns error if fs.UserHomeDir fails
+	_, err := NewExpressionResolverWithFS(nil, mfs)
+	require.Error(t, err)
+
+	// Since we can't get a resolver with erroring FS easily for ResolvePath,
+	// let's use a resolver with valid FS but make the resolution fail if possible.
+	r, _ := NewExpressionResolver(nil)
+
+	t.Run("resolveVolumePath ResolvePath error", func(t *testing.T) {
+		// ResolvePath errors if anchor boundary is escaped
+		_, err := resolveVolumePath("~/../../etc/passwd:/data", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "path traversal detected")
+	})
+
+	t.Run("resolveDevicePath ResolvePath error", func(t *testing.T) {
+		_, err := resolveDevicePath("~/../../etc/passwd:/dev/a", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "path traversal detected")
+	})
+}
