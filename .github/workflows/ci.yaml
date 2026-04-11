@@ -246,6 +246,7 @@ jobs:
           CONTAINER_HOST=unix:///run/podman/podman.sock podman version
           DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
 
+      - name: Diagnostic on Failure
         if: failure()
         run: |
           echo "--- Podman Service Log ---"
@@ -306,8 +307,8 @@ jobs:
           # Wait for containerd to be ready
           timeout 30s sh -c 'while ! ctr --address /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
 
-          # Verify version
-          if ! sudo ctr version | grep -q "2.2.2"; then
+          # Verify version (Server version)
+          if ! sudo ctr version | sed -n '/Server:/,/UUID:/p' | grep -q "2.2.2"; then
             echo "Error: containerd version 2.2.2 is required"
             exit 1
           fi
