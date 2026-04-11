@@ -287,18 +287,16 @@ jobs:
       - name: Setup containerd
         run: |
           # Install containerd v2.2.2
-          wget https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+          wget -q https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+          echo "2c08c99cbde73b3388c6d5da68e0bcaebc70c9174f2b14d785695e4401b3ede0  containerd-2.2.2-linux-amd64.tar.gz" | sha256sum -c -
           sudo tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
           sudo systemctl restart containerd
 
           # Install CNI plugins
-          wget https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
+          wget -q https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
+          echo "b8e811578fb66023f90d2e238d80cec3bdfca4b44049af74c374d4fae0f9c090  cni-plugins-linux-amd64-v1.6.2.tgz" | sha256sum -c -
           sudo mkdir -p /opt/cni/bin
           sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.6.2.tgz
-          if ! ctr version | grep -q "2.2"; then
-            echo "Error: containerd version 2.2.x is required"
-            exit 1
-          fi
       - name: Check containerd
         run: |
           # Grant access to the runner user using ACLs (least privilege)
@@ -309,8 +307,7 @@ jobs:
           timeout 30s sh -c 'while ! ctr --address /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
 
           # Verify version
-          ctr version
-          if ! ctr version | grep -q "2.2.2"; then
+          if ! sudo ctr version | grep -q "2.2.2"; then
             echo "Error: containerd version 2.2.2 is required"
             exit 1
           fi

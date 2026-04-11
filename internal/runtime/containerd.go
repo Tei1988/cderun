@@ -70,7 +70,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	for i := 0; i <= maxRetries; i++ {
 		if i > 0 {
 			attempts := maxRetries + 1
-		logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
 			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
 			select {
 			case <-ctx.Done():
@@ -258,7 +258,10 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 	started := false
 	defer func() {
 		if !started {
-			_, _ = task.Delete(ctx, client.WithProcessKill)
+			// Use background context for cleanup to ensure it runs even if original ctx was cancelled
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, _ = task.Delete(cleanupCtx, client.WithProcessKill)
 		}
 	}()
 
@@ -286,9 +289,13 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 	if err != nil {
 		return 0, err
 	}
-	status := <-exitStatusC
-	r.ioWait <- status.Error()
-	return int(status.ExitCode()), status.Error()
+	select {
+	case status := <-exitStatusC:
+		r.ioWait <- status.Error()
+		return int(status.ExitCode()), status.Error()
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
 
 // RemoveContainer removes a container.
@@ -408,7 +415,6 @@ var signalMap = map[string]syscall.Signal{
 	"PIPE":   syscall.SIGPIPE,
 	"ALRM":   syscall.SIGALRM,
 	"TERM":   syscall.SIGTERM,
-	"STKFLT": syscall.Signal(16),
 	"CHLD":   syscall.SIGCHLD,
 	"CONT":   syscall.SIGCONT,
 	"STOP":   syscall.SIGSTOP,
