@@ -424,4 +424,56 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be positive")
 	})
+
+	t.Run("transitive options: mount-cderun and mount-socket specified", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:               "alpine",
+			ImageSet:            true,
+			MountCderun:         false,
+			MountCderunSet:      true,
+			MountSocket:         false,
+			MountSocketSet:      true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.False(t, res.MountCderun)
+		assert.False(t, res.MountSocket)
+	})
+
+	t.Run("transitive options: mount-cderun overrides mount-tools", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:               "alpine",
+			ImageSet:            true,
+			MountTools:          "git",
+			MountToolsSet:       true,
+			MountCderun:         false,
+			MountCderunSet:      true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.False(t, res.MountCderun)
+		// socket is transitive from cderun, so it should also be false if not specified
+		assert.False(t, res.MountSocket)
+	})
+
+	t.Run("registry mismatch: only CLI image provided", func(t *testing.T) {
+		cli := &CLIOptions{CderunImage: "my-reg.com/node:20", CderunImageSet: true}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "my-reg.com/node:20", res.Image)
+	})
+
+
+	t.Run("memory expression error", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/app"}
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "{{file:missing}}",
+			MemorySet: true,
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file not found")
+	})
 }
