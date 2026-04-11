@@ -189,7 +189,7 @@ jobs:
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           docker version
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-runtime.out ./internal/command/...
+          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverpkg=./internal/... -coverprofile=coverage-runtime.out ./internal/command/...
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
@@ -244,7 +244,7 @@ jobs:
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           CONTAINER_HOST=unix:///run/podman/podman.sock podman version
-          DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
+          DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverpkg=./internal/... -coverprofile=coverage-podman.out ./internal/command/...
 
       - name: Diagnostic on Failure
         if: failure()
@@ -327,7 +327,7 @@ jobs:
           mkdir -p $TEST_HOST_TMP_DIR
           # Note: containerd runs with a wider scope (./internal/...) to include its unit tests
           # in internal/runtime, but still uses the runtime tag for E2E scenarios.
-          go test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out ./internal/...
+          go test -v -tags=runtime -timeout 15m -coverpkg=./internal/... -coverprofile=coverage-containerd.out ./internal/...
       - name: Diagnostic on Failure
         if: failure()
         env:
