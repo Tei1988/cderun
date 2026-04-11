@@ -182,11 +182,35 @@ func (l *Logger) Info(msg string, args ...any)  { l.log(InfoLevel, msg, args...)
 func (l *Logger) Debug(msg string, args ...any) { l.log(DebugLevel, msg, args...) }
 func (l *Logger) Trace(msg string, args ...any) { l.log(TraceLevel, msg, args...) }
 
+func (l *Logger) Enabled(level Level) bool {
+	return level <= l.GetLevel()
+}
+
+func (l *Logger) DebugEnabled() bool {
+	return l.Enabled(DebugLevel)
+}
+
+func (l *Logger) TraceEnabled() bool {
+	return l.Enabled(TraceLevel)
+}
+
 func Error(msg string, args ...any) { globalLogger.Error(msg, args...) }
 func Warn(msg string, args ...any)  { globalLogger.Warn(msg, args...) }
 func Info(msg string, args ...any)  { globalLogger.Info(msg, args...) }
 func Debug(msg string, args ...any) { globalLogger.Debug(msg, args...) }
 func Trace(msg string, args ...any) { globalLogger.Trace(msg, args...) }
+
+func Enabled(level Level) bool {
+	return globalLogger.Enabled(level)
+}
+
+func DebugEnabled() bool {
+	return globalLogger.DebugEnabled()
+}
+
+func TraceEnabled() bool {
+	return globalLogger.TraceEnabled()
+}
 
 // GetGlobalLogger returns the global logger instance.
 // Callers should use Init() and SetOutput() methods to configure it,

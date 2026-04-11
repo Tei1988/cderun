@@ -1185,7 +1185,9 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		if logging.DebugEnabled() {
+			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		}
 
 		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
@@ -1264,19 +1266,52 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	return res, nil
 }
 
+var sensitiveKeywords = map[string]struct{}{
+	"PASSWORD":    {},
+	"SECRET":      {},
+	"TOKEN":       {},
+	"KEY":         {},
+	"AUTH":        {},
+	"SIG":         {},
+	"CERT":        {},
+	"PEM":         {},
+	"PRIVATE":     {},
+	"CREDENTIALS": {},
+	"PASSPHRASE":  {},
+	"APIKEY":      {},
+	"SESSION":     {},
+}
+
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
 	if value == "" {
 		return ""
 	}
 
+	// Fast path: exact match
+	upperKey := strings.ToUpper(key)
+	if _, ok := sensitiveKeywords[upperKey]; ok {
+		return "[REDACTED]"
+	}
+
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
-	var segments []string
-	var current strings.Builder
 	var lastRune rune
 	runes := []rune(key)
-	for i, r := range runes {
+	start := 0
+
+	checkSegment := func(s string) bool {
+		if s == "" {
+			return false
+		}
+		if _, ok := sensitiveKeywords[strings.ToUpper(s)]; ok {
+			return true
+		}
+		return false
+	}
+
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
 		// Boundary split logic
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
@@ -1290,53 +1325,30 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 
 			if isCamel || isLetterDigit || isAcronym {
-				if current.Len() > 0 {
-					segments = append(segments, strings.ToUpper(current.String()))
-					current.Reset()
+				if i > start {
+					if checkSegment(string(runes[start:i])) {
+						return "[REDACTED]"
+					}
 				}
+				start = i
 			}
 		}
 
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
-		} else {
-			if current.Len() > 0 {
-				segments = append(segments, strings.ToUpper(current.String()))
-				current.Reset()
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			if i > start {
+				if checkSegment(string(runes[start:i])) {
+					return "[REDACTED]"
+				}
 			}
+			start = i + 1
 		}
 		lastRune = r
 	}
-	if current.Len() > 0 {
-		segments = append(segments, strings.ToUpper(current.String()))
-	}
-
-	sensitiveKeywords := map[string]struct{}{
-		"PASSWORD":    {},
-		"SECRET":      {},
-		"TOKEN":       {},
-		"KEY":         {},
-		"AUTH":        {},
-		"SIG":         {},
-		"CERT":        {},
-		"PEM":         {},
-		"PRIVATE":     {},
-		"CREDENTIALS": {},
-		"PASSPHRASE":  {},
-		"APIKEY":      {},
-		"SESSION":     {},
-	}
-
-	for _, segment := range segments {
-		if _, ok := sensitiveKeywords[segment]; ok {
+	if len(runes) > start {
+		if checkSegment(string(runes[start:])) {
 			return "[REDACTED]"
 		}
 	}
-
-	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
-	// if they were split but should be treated as one sensitive keyword.
-	// However, 'PASS' and 'WORD' individually might be too generic.
-	// Let's stick to strict segment match for the core keywords to avoid false positives.
 
 	return value
 }
