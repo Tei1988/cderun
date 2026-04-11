@@ -587,7 +587,7 @@ func validatePort(s string) error {
 	// For simplicity and since we are mainly concerned about injection/sanity,
 	// we check for allowed characters: digits, dots, colons, slashes, hyphens, and alphabets (for tcp/udp).
 	for i, r := range s {
-		if !((r >= '0' && r <= '9') || r == '.' || r == ':' || r == '/' || r == '-' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+		if (r < '0' || r > '9') && r != '.' && r != ':' && r != '/' && r != '-' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') {
 			return fmt.Errorf("invalid character in port mapping %q: %q (position %d)", s, r, i)
 		}
 	}
@@ -604,7 +604,7 @@ func validateExpose(s string) error {
 	}
 	// Format: port[/protocol] or port-port[/protocol]
 	for i, r := range s {
-		if !((r >= '0' && r <= '9') || r == '/' || r == '-' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+		if (r < '0' || r > '9') && r != '/' && r != '-' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') {
 			return fmt.Errorf("invalid character in expose %q: %q (position %d)", s, r, i)
 		}
 	}
@@ -621,7 +621,7 @@ func validateIP(s string) error {
 	}
 	// We allow digits, dots, colons (for IPv6), and alphabets (for IPv6 hex).
 	for i, r := range s {
-		if !((r >= '0' && r <= '9') || r == '.' || r == ':' || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+		if (r < '0' || r > '9') && r != '.' && r != ':' && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
 			return fmt.Errorf("invalid character in IP address %q: %q (position %d)", s, r, i)
 		}
 	}
@@ -647,7 +647,7 @@ func validateHostIP(s string) error {
 	ip := parts[1]
 
 	for i, r := range host {
-		if !((r >= '0' && r <= '9') || r == '.' || r == '-' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) {
+		if (r < '0' || r > '9') && r != '.' && r != '-' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') {
 			return fmt.Errorf("invalid character in host name %q: %q (position %d)", host, r, i)
 		}
 	}
