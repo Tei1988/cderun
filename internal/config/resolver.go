@@ -927,20 +927,21 @@ func (rv *resolver) validateSecurity() error {
 	}
 
 	criticalSlices := []struct {
-		name  string
-		slice []string
+		name      string
+		slice     []string
+		validator func(string) error
 	}{
-		{"entrypoint", rv.res.Entrypoint},
-		{"ports", rv.res.Ports},
-		{"expose", rv.res.Expose},
-		{"dns", rv.res.DNS},
-		{"add-hosts", rv.res.AddHosts},
-		{"cap-add", rv.res.CapAdd},
-		{"cap-drop", rv.res.CapDrop},
+		{"entrypoint", rv.res.Entrypoint, validatePathChars},
+		{"ports", rv.res.Ports, validatePort},
+		{"expose", rv.res.Expose, validateExpose},
+		{"dns", rv.res.DNS, validateIP},
+		{"add-hosts", rv.res.AddHosts, validateHostIP},
+		{"cap-add", rv.res.CapAdd, validatePathChars},
+		{"cap-drop", rv.res.CapDrop, validatePathChars},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {
-			if err := validatePathChars(e); err != nil {
+			if err := s.validator(e); err != nil {
 				return fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
 			}
 		}

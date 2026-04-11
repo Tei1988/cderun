@@ -49,22 +49,31 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		name    string
 		input   string
 		wantErr bool
+		home    string
+		pwd     string
 	}{
-		{"Safe home path", "{{HOME}}/file", false},
-		{"Safe tilde path", "~/file", false},
-		{"Safe pwd path", "{{PWD}}/file", false},
-		{"Traversal within home", "{{HOME}}/subdir/../file", false},
-		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true},
-		{"Traversal escaping tilde", "~/../../etc/passwd", true},
-		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
-		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
-		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
-		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{"Safe home path", "{{HOME}}/file", false, home, pwd},
+		{"Safe tilde path", "~/file", false, home, pwd},
+		{"Safe pwd path", "{{PWD}}/file", false, home, pwd},
+		{"Traversal within home", "{{HOME}}/subdir/../file", false, home, pwd},
+		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true, home, pwd},
+		{"Traversal escaping tilde", "~/../../etc/passwd", true, home, pwd},
+		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true, home, pwd},
+		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true, home, pwd},
+		{"False positive traversal prefix", "{{HOME}}/..config/file", false, home, pwd},
+		{"No anchor no traversal check", "../../etc/passwd", false, home, pwd}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{"Multiple anchors safe", "{{HOME}}{{PWD}}/file", false, "/", "/work"},
+		{"Multiple anchors unsafe second", "{{HOME}}/{{PWD}}/../../etc/passwd", true, home, pwd},
+		{"Multiple anchors bypass first", "{{HOME}}{{PWD}}/../etc/passwd", true, "/", "/work"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ResolvePath(tt.input, pwd, r)
+			mfs.HomeDir = tt.home
+			mfs.WD = tt.pwd
+			r.Home = tt.home
+			r.Pwd = tt.pwd
+			_, err := ResolvePath(tt.input, tt.pwd, r)
 			if tt.wantErr {
 				require.Error(t, err, "input: %q", tt.input)
 				assert.Contains(t, err.Error(), "path traversal detected")
@@ -207,6 +216,33 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				Ports:    []string{"8080:80\r"},
 			},
 			wantErr: "security validation failed for ports[0]",
+		},
+		{
+			name: "Space in Ports element",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Ports:    []string{"8080 :80"},
+			},
+			wantErr: "security validation failed for ports[0]",
+		},
+		{
+			name: "Space in DNS element",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				DNS:      []string{"8.8.8.8 "},
+			},
+			wantErr: "security validation failed for dns[0]",
+		},
+		{
+			name: "Invalid char in AddHosts",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				AddHosts: []string{"host:1.2.3.4;"},
+			},
+			wantErr: "security validation failed for add-hosts[0]",
 		},
 	}
 
