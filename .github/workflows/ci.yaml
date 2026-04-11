@@ -294,7 +294,7 @@ jobs:
           sudo tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
           # Ubuntu systemd unit might point to /usr/bin/containerd
           if [ -f /usr/bin/containerd ]; then
-            sudo cp -f /usr/local/bin/containerd /usr/bin/containerd
+            sudo install -m 755 /usr/local/bin/containerd /usr/bin/containerd
           fi
           sudo systemctl restart containerd
 
@@ -328,7 +328,7 @@ jobs:
           mkdir -p $TEST_HOST_TMP_DIR
           # Note: containerd runs with a wider scope (./internal/...) to include its unit tests
           # in internal/runtime, but still uses the runtime tag for E2E scenarios.
-          sudo -E /usr/local/go/bin/go test -v -tags=runtime -timeout 15m -coverpkg=./internal/... -coverprofile=coverage-containerd.out ./internal/...
+          go test -v -tags=runtime -timeout 15m -coverpkg=./internal/... -coverprofile=coverage-containerd.out ./internal/...
       - name: Diagnostic on Failure
         if: failure()
         env:

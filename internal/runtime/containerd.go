@@ -265,7 +265,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 			// Use background context for cleanup to ensure it runs even if original ctx was cancelled
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			if _, delErr := task.Delete(cleanupCtx, client.WithProcessKill); delErr != nil { //nolint:errcheck
+			if _, delErr := task.Delete(cleanupCtx, client.WithProcessKill); delErr != nil {
 				logging.Debug("failed to delete task on start failure: %v", delErr)
 			}
 		}
@@ -327,7 +327,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	task, err := container.Task(cleanupCtx, nil)
 	if err == nil {
-		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil { //nolint:errcheck
+		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to delete task: %w", err)
 			}
