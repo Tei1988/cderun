@@ -108,7 +108,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries+1, lastErr)
 }
 
 
