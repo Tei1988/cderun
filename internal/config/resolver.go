@@ -333,125 +333,6 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
-func (rv *resolver) resolveString(opt StringOption) (string, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return "", err
-	}
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-	return resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs), nil
-}
-
-func (rv *resolver) applyStringOption(opt StringOption) error {
-	val, err := rv.resolveString(opt)
-	if err != nil {
-		return err
-	}
-	info := fieldInfo[opt.Name]
-	rv.resVal.FieldByIndex(info.targetIdx).SetString(val)
-	return nil
-}
-
-func (rv *resolver) resolveBool(opt BoolOption) (bool, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return false, err
-	}
-	def := OptionDef[*bool]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-	}
-	return resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs), nil
-}
-
-func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	val, err := rv.resolveBool(opt)
-	if err != nil {
-		return err
-	}
-	info := fieldInfo[opt.Name]
-	rv.resVal.FieldByIndex(info.targetIdx).SetBool(val)
-	return nil
-}
-
-func (rv *resolver) applyIntOption(opt IntOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
-	}
-
-	p1Int := 0
-	if p1Set && p1Val.IsValid() {
-		if k := p1Val.Kind(); k >= reflect.Int && k <= reflect.Int64 {
-			p1Int = int(p1Val.Int())
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Int := 0
-	if p2Set && p2Val.IsValid() {
-		if k := p2Val.Kind(); k >= reflect.Int && k <= reflect.Int64 {
-			p2Int = int(p2Val.Int())
-		} else {
-			p2Set = false
-		}
-	}
-
-	def := OptionDef[*int]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
-	return nil
-}
-
-func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
-	}
-
-	p1Float := 0.0
-	if p1Set && p1Val.IsValid() {
-		if k := p1Val.Kind(); k == reflect.Float32 || k == reflect.Float64 {
-			p1Float = p1Val.Float()
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Float := 0.0
-	if p2Set && p2Val.IsValid() {
-		if k := p2Val.Kind(); k == reflect.Float32 || k == reflect.Float64 {
-			p2Float = p2Val.Float()
-		} else {
-			p2Set = false
-		}
-	}
-
-	def := OptionDef[*float64]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
-	return nil
-}
-
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
@@ -481,51 +362,169 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	return nil
 }
 
-func (rv *resolver) applyDurationOption(name string, target *time.Duration, validator func(time.Duration) error) error {
-	opt, ok := GetStringOption(name)
-	if !ok {
-		return fmt.Errorf("registry mismatch: string option %q not found", name)
-	}
-	val, err := rv.resolveString(opt)
+func (rv *resolver) applyStringOption(opt StringOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
-	if val == "" {
-		return nil
+
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
 	}
-	d, err := time.ParseDuration(val)
-	if err != nil {
-		return &InvalidConfigError{Field: name, Value: val, Err: err}
-	}
-	if validator != nil {
-		if err := validator(d); err != nil {
-			return &InvalidConfigError{Field: name, Value: val, Err: err}
-		}
-	}
-	*target = d
+
+	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetString(resolved)
 	return nil
 }
 
-func (rv *resolver) applyMemoryOption(name string, target *int64) error {
-	opt, ok := GetStringOption(name)
-	if !ok {
-		return fmt.Errorf("registry mismatch: string option %q not found", name)
-	}
-	val, err := rv.resolveString(opt)
+func (rv *resolver) applyBoolOption(opt BoolOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
-	if val == "" {
-		return nil
+
+	def := OptionDef[*bool]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
 	}
-	bytes, err := units.RAMInBytes(val)
+
+	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
+	return nil
+}
+
+func (rv *resolver) applyIntOption(opt IntOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
-		if exprErr := rv.r.Error(); exprErr != nil {
-			return exprErr
-		}
-		return &InvalidConfigError{Field: name, Value: val, Err: err}
+		return err
 	}
-	*target = bytes
+
+	p1Int := 0
+	if p1Set && p1Val.IsValid() {
+		k := p1Val.Kind()
+		if k >= reflect.Int && k <= reflect.Int64 {
+			p1Int = int(p1Val.Int())
+		} else {
+			p1Set = false
+		}
+	}
+
+	p2Int := 0
+	if p2Set && p2Val.IsValid() {
+		k := p2Val.Kind()
+		if k >= reflect.Int && k <= reflect.Int64 {
+			p2Int = int(p2Val.Int())
+		} else {
+			p2Set = false
+		}
+	}
+
+	def := OptionDef[*int]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     &opt.Default,
+	}
+
+	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
+	return nil
+}
+
+func (rv *resolver) applyFloat64Option(opt Float64Option) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	p1Float := 0.0
+	if p1Set && p1Val.IsValid() {
+		k := p1Val.Kind()
+		if k == reflect.Float32 || k == reflect.Float64 {
+			p1Float = p1Val.Float()
+		} else {
+			p1Set = false
+		}
+	}
+
+	p2Float := 0.0
+	if p2Set && p2Val.IsValid() {
+		k := p2Val.Kind()
+		if k == reflect.Float32 || k == reflect.Float64 {
+			p2Float = p2Val.Float()
+		} else {
+			p2Set = false
+		}
+	}
+
+	def := OptionDef[*float64]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     &opt.Default,
+	}
+
+	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
+	return nil
+}
+
+func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration, positive bool) error {
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if valStr != "" {
+		d, err := time.ParseDuration(valStr)
+		if err != nil {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
+		}
+		if positive && d <= 0 {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("must be positive")}
+		}
+		if !positive && d < 0 {
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("duration cannot be negative")}
+		}
+		*target = d
+	}
+	return nil
+}
+
+func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	if err != nil {
+		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if valStr != "" {
+		bytes, err := units.RAMInBytes(valStr)
+		if err != nil {
+			if exprErr := rv.r.Error(); exprErr != nil {
+				return exprErr
+			}
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
+		}
+		*target = bytes
+	}
 	return nil
 }
 
@@ -538,9 +537,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 	}
-	if logging.TraceEnabled() {
-		logging.Trace("Resolving configurations for tool: %s", subcommand)
-	}
+	logging.Trace("Resolving configurations for tool: %s", subcommand)
 
 	var hostCtx *HostContext
 	if global != nil {
@@ -658,9 +655,7 @@ func (rv *resolver) resolveStandardOptions() error {
 			}
 		}
 
-		if logging.DebugEnabled() {
-			logging.Debug("Resolved Image: %s", rv.res.Image)
-		}
+		logging.Debug("Resolved Image: %s", rv.res.Image)
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -859,13 +854,10 @@ func (rv *resolver) resolveTransitiveOptions() error {
 func (rv *resolver) resolveCustomParsing() error {
 	// Phase 7: Duration and Slice options
 	// Resolve hang-timeout via registry entry (skipped in Phase 2)
-	if err := rv.applyDurationOption("hang-timeout", &rv.res.HangTimeout, func(d time.Duration) error {
-		if d < 0 {
-			return errors.New("duration cannot be negative")
+	if opt, ok := GetStringOption("hang-timeout"); ok {
+		if err := rv.applyDurationOption(opt, &rv.res.HangTimeout, false); err != nil {
+			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
 
 	for _, opt := range StringSliceOptions {
@@ -890,13 +882,10 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 
 	// Resolve pull-backoff-base via registry
-	if err := rv.applyDurationOption("pull-backoff-base", &rv.res.PullBackoffBase, func(d time.Duration) error {
-		if d <= 0 {
-			return errors.New("must be positive")
+	if opt, ok := GetStringOption("pull-backoff-base"); ok {
+		if err := rv.applyDurationOption(opt, &rv.res.PullBackoffBase, true); err != nil {
+			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
 
 	var errDevices error
@@ -906,8 +895,10 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 
 	// Resolve memory via registry
-	if err := rv.applyMemoryOption("memory", &rv.res.Memory); err != nil {
-		return err
+	if opt, ok := GetStringOption("memory"); ok {
+		if err := rv.applyMemoryOption(opt, &rv.res.Memory); err != nil {
+			return err
+		}
 	}
 
 	for _, opt := range Float64Options {
@@ -1231,9 +1222,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		if logging.DebugEnabled() {
-			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
-		}
+		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 
 		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
@@ -1335,21 +1324,11 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	// Split by non-alphanumeric characters and also split camelCase.
-	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
+	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
+	var segments []string
 	var current strings.Builder
 	var lastRune rune
 	runes := []rune(key)
-
-	checkSegment := func() bool {
-		if current.Len() > 0 {
-			if _, ok := sensitiveKeywords[strings.ToUpper(current.String())]; ok {
-				return true
-			}
-			current.Reset()
-		}
-		return false
-	}
-
 	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
@@ -1364,8 +1343,9 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 
 			if isCamel || isLetterDigit || isAcronym {
-				if checkSegment() {
-					return "[REDACTED]"
+				if current.Len() > 0 {
+					segments = append(segments, strings.ToUpper(current.String()))
+					current.Reset()
 				}
 			}
 		}
@@ -1373,14 +1353,21 @@ func MaskSensitiveEnv(key, value string) string {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			current.WriteRune(r)
 		} else {
-			if checkSegment() {
-				return "[REDACTED]"
+			if current.Len() > 0 {
+				segments = append(segments, strings.ToUpper(current.String()))
+				current.Reset()
 			}
 		}
 		lastRune = r
 	}
-	if checkSegment() {
-		return "[REDACTED]"
+	if current.Len() > 0 {
+		segments = append(segments, strings.ToUpper(current.String()))
+	}
+
+	for _, segment := range segments {
+		if _, ok := sensitiveKeywords[segment]; ok {
+			return "[REDACTED]"
+		}
 	}
 
 	return value
