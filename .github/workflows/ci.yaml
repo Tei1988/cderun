@@ -286,28 +286,34 @@ jobs:
 
       - name: Setup containerd
         run: |
-          # Use containerd from the host, but ensure it's running and accessible
-          sudo apt-get update && sudo apt-get install -y containerd
-          sudo mkdir -p /etc/containerd
-          containerd config default | sudo tee /etc/containerd/config.toml
+          # Install containerd v2.2.2
+          wget https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+          sudo tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
           sudo systemctl restart containerd
 
-          ctr version
+          # Install CNI plugins
+          wget https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
+          sudo mkdir -p /opt/cni/bin
+          sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.6.2.tgz
           if ! ctr version | grep -q "2.2"; then
             echo "Error: containerd version 2.2.x is required"
             exit 1
           fi
       - name: Check containerd
         run: |
-          # Wait for containerd to be ready (it should be pre-installed and running)
-          timeout 30s sh -c 'while ! sudo ctr --address /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
-          sudo containerd --version
-
           # Grant access to the runner user using ACLs (least privilege)
-          if ! command -v setfacl >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y acl
-          fi
+          sudo apt-get update && sudo apt-get install -y acl
           sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+
+          # Wait for containerd to be ready
+          timeout 30s sh -c 'while ! ctr --address /run/containerd/containerd.sock version >/dev/null 2>&1; do sleep 1; done'
+
+          # Verify version
+          ctr version
+          if ! ctr version | grep -q "2.2.2"; then
+            echo "Error: containerd version 2.2.2 is required"
+            exit 1
+          fi
 
       - name: Runtime Tests
         env:

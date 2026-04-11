@@ -69,7 +69,8 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	var lastErr error
 	for i := 0; i <= maxRetries; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
+			attempts := maxRetries + 1
+		logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
 			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
 			select {
 			case <-ctx.Done():
@@ -254,9 +255,17 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 		return fmt.Errorf("failed to create task: %w", err)
 	}
 
+	started := false
+	defer func() {
+		if !started {
+			_, _ = task.Delete(ctx, client.WithProcessKill)
+		}
+	}()
+
 	if err := task.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start task: %w", err)
 	}
+	started = true
 
 	return nil
 }
@@ -383,6 +392,40 @@ func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID str
 	return task.Kill(ctx, s)
 }
 
+var signalMap = map[string]syscall.Signal{
+	"HUP":    syscall.SIGHUP,
+	"INT":    syscall.SIGINT,
+	"QUIT":   syscall.SIGQUIT,
+	"ILL":    syscall.SIGILL,
+	"TRAP":   syscall.SIGTRAP,
+	"ABRT":   syscall.SIGABRT,
+	"BUS":    syscall.SIGBUS,
+	"FPE":    syscall.SIGFPE,
+	"KILL":   syscall.SIGKILL,
+	"USR1":   syscall.SIGUSR1,
+	"SEGV":   syscall.SIGSEGV,
+	"USR2":   syscall.SIGUSR2,
+	"PIPE":   syscall.SIGPIPE,
+	"ALRM":   syscall.SIGALRM,
+	"TERM":   syscall.SIGTERM,
+	"STKFLT": syscall.Signal(16),
+	"CHLD":   syscall.SIGCHLD,
+	"CONT":   syscall.SIGCONT,
+	"STOP":   syscall.SIGSTOP,
+	"TSTP":   syscall.SIGTSTP,
+	"TTIN":   syscall.SIGTTIN,
+	"TTOU":   syscall.SIGTTOU,
+	"URG":    syscall.SIGURG,
+	"XCPU":   syscall.SIGXCPU,
+	"XFSZ":   syscall.SIGXFSZ,
+	"VTALRM": syscall.SIGVTALRM,
+	"PROF":   syscall.SIGPROF,
+	"WINCH":  syscall.SIGWINCH,
+	"IO":     syscall.SIGIO,
+	"PWR":    syscall.SIGPWR,
+	"SYS":    syscall.SIGSYS,
+}
+
 func parseSignal(sig string) (syscall.Signal, error) {
 	if sig == "" {
 		return syscall.SIGTERM, nil
@@ -390,20 +433,11 @@ func parseSignal(sig string) (syscall.Signal, error) {
 	if n, err := strconv.Atoi(sig); err == nil {
 		return syscall.Signal(n), nil
 	}
-	switch strings.ToUpper(sig) {
-	case "SIGTERM", "TERM":
-		return syscall.SIGTERM, nil
-	case "SIGKILL", "KILL":
-		return syscall.SIGKILL, nil
-	case "SIGINT", "INT":
-		return syscall.SIGINT, nil
-	case "SIGHUP", "HUP":
-		return syscall.SIGHUP, nil
-	case "SIGQUIT", "QUIT":
-		return syscall.SIGQUIT, nil
-	default:
-		return 0, fmt.Errorf("unsupported signal: %s", sig)
+	name := strings.TrimPrefix(strings.ToUpper(sig), "SIG")
+	if s, ok := signalMap[name]; ok {
+		return s, nil
 	}
+	return 0, fmt.Errorf("unsupported signal: %s", sig)
 }
 
 // InspectContainer inspects the container to get its status and exit code.
