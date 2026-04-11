@@ -290,10 +290,11 @@ jobs:
           # Install containerd v2.2.2
           wget -q https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
           echo "2c08c99cbde73b3388c6d5da68e0bcaebc70c9174f2b14d785695e4401b3ede0  containerd-2.2.2-linux-amd64.tar.gz" | sha256sum -c -
+          sudo systemctl stop containerd || true
           sudo tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
           # Ubuntu systemd unit might point to /usr/bin/containerd
           if [ -f /usr/bin/containerd ]; then
-            sudo cp /usr/local/bin/containerd /usr/bin/containerd
+            sudo cp -f /usr/local/bin/containerd /usr/bin/containerd
           fi
           sudo systemctl restart containerd
 
