@@ -299,7 +299,7 @@ func TestUnit_Resolver_AutoDetection(t *testing.T) {
 			SocketPath:    "/run/podman/podman.sock",
 			SocketPathSet: true,
 		}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Runtime)
 	})
@@ -311,7 +311,7 @@ func TestUnit_Resolver_AutoDetection(t *testing.T) {
 			Runtime:    "docker",
 			RuntimeSet: true,
 		}
-		res, err := Resolve("node", &cli, nil, nil)
+		res, err := ResolveWithFS("node", &cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 	})

@@ -579,11 +579,12 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 	}
 
 	if rv.res.SocketPath == "" {
-		if rv.res.Runtime == "podman" {
+		switch rv.res.Runtime {
+		case "podman":
 			rv.res.SocketPath = "/run/podman/podman.sock"
-		} else if rv.res.Runtime == "containerd" {
+		case "containerd":
 			rv.res.SocketPath = "/run/containerd/containerd.sock"
-		} else {
+		default:
 			rv.res.SocketPath = "/var/run/docker.sock"
 		}
 	}

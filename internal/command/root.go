@@ -776,7 +776,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	closed := false
 	defer func() {
 		if !closed && err != nil {
-			_ = rt.Close()
+			_ = rt.Close() //nolint:errcheck
 		}
 	}()
 
