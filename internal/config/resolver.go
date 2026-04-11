@@ -342,7 +342,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 	}
-	logging.Trace("Resolving configurations for tool: %s", subcommand)
+	if logging.TraceEnabled() {
+		logging.Trace("Resolving configurations for tool: %s", subcommand)
+	}
 
 	var hostCtx *HostContext
 	if global != nil {
@@ -481,7 +483,9 @@ func (rv *resolver) resolveStandardOptions() error {
 			}
 		}
 
-		logging.Debug("Resolved Image: %s", rv.res.Image)
+		if logging.DebugEnabled() {
+			logging.Debug("Resolved Image: %s", rv.res.Image)
+		}
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -1203,7 +1207,9 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		if logging.DebugEnabled() {
+			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		}
 
 		res = append(res, fmt.Sprintf("%s=%s", key, val))
 	}
@@ -1282,6 +1288,22 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	return res, nil
 }
 
+var sensitiveKeywords = map[string]struct{}{
+	"PASSWORD":    {},
+	"SECRET":      {},
+	"TOKEN":       {},
+	"KEY":         {},
+	"AUTH":        {},
+	"SIG":         {},
+	"CERT":        {},
+	"PEM":         {},
+	"PRIVATE":     {},
+	"CREDENTIALS": {},
+	"PASSPHRASE":  {},
+	"APIKEY":      {},
+	"SESSION":     {},
+}
+
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
 	if value == "" {
@@ -1290,10 +1312,20 @@ func MaskSensitiveEnv(key, value string) string {
 
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like 'dbPassword' are correctly identified as ['db', 'Password'].
-	var segments []string
 	var current strings.Builder
 	var lastRune rune
 	runes := []rune(key)
+
+	checkSegment := func() bool {
+		if current.Len() > 0 {
+			if _, ok := sensitiveKeywords[strings.ToUpper(current.String())]; ok {
+				return true
+			}
+			current.Reset()
+		}
+		return false
+	}
+
 	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
@@ -1308,9 +1340,8 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 
 			if isCamel || isLetterDigit || isAcronym {
-				if current.Len() > 0 {
-					segments = append(segments, strings.ToUpper(current.String()))
-					current.Reset()
+				if checkSegment() {
+					return "[REDACTED]"
 				}
 			}
 		}
@@ -1318,43 +1349,15 @@ func MaskSensitiveEnv(key, value string) string {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			current.WriteRune(r)
 		} else {
-			if current.Len() > 0 {
-				segments = append(segments, strings.ToUpper(current.String()))
-				current.Reset()
+			if checkSegment() {
+				return "[REDACTED]"
 			}
 		}
 		lastRune = r
 	}
-	if current.Len() > 0 {
-		segments = append(segments, strings.ToUpper(current.String()))
+	if checkSegment() {
+		return "[REDACTED]"
 	}
-
-	sensitiveKeywords := map[string]struct{}{
-		"PASSWORD":    {},
-		"SECRET":      {},
-		"TOKEN":       {},
-		"KEY":         {},
-		"AUTH":        {},
-		"SIG":         {},
-		"CERT":        {},
-		"PEM":         {},
-		"PRIVATE":     {},
-		"CREDENTIALS": {},
-		"PASSPHRASE":  {},
-		"APIKEY":      {},
-		"SESSION":     {},
-	}
-
-	for _, segment := range segments {
-		if _, ok := sensitiveKeywords[segment]; ok {
-			return "[REDACTED]"
-		}
-	}
-
-	// Handle special combined cases that might be common like 'PASS-WORD' or 'SEC-RET'
-	// if they were split but should be treated as one sensitive keyword.
-	// However, 'PASS' and 'WORD' individually might be too generic.
-	// Let's stick to strict segment match for the core keywords to avoid false positives.
 
 	return value
 }

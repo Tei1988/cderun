@@ -51,6 +51,33 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 	}
 }
 
+func BenchmarkExpressionResolver_ResolveString_MagicOnly(b *testing.B) {
+	mfs := &MockFileSystem{
+		HomeDir: "/home/user",
+		WD:      "/app",
+	}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	if err != nil {
+		b.Fatalf("NewExpressionResolverWithFS failed: %v", err)
+	}
+	input := "{{HOME}}"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = r.ResolveString(input)
+	}
+}
+
+func BenchmarkMaskSensitiveEnv(b *testing.B) {
+	key := "DB_PASSWORD_SECRET_TOKEN"
+	val := "my-secret-password"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = MaskSensitiveEnv(key, val)
+	}
+}
+
 func BenchmarkExpressionResolver_ResolveString_NoExpr(b *testing.B) {
 	mfs := &MockFileSystem{
 		HomeDir: "/home/user",
