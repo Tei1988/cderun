@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"sync"
 	"strings"
 	"syscall"
 	"time"
@@ -30,8 +31,9 @@ const (
 type ContainerdRuntime struct {
 	client    *client.Client
 	socket    string
-	ioCreator cio.Creator
-	ioWait    chan error
+	mu        sync.RWMutex
+	creators  map[string]cio.Creator
+	waiters   map[string]chan error
 }
 
 // NewContainerdRuntime creates a new ContainerdRuntime instance.
@@ -42,7 +44,8 @@ func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
 	}
 	return &ContainerdRuntime{
 		client: c,
-		ioWait: make(chan error, 1),
+		creators: make(map[string]cio.Creator),
+		waiters:  make(map[string]chan error),
 		socket: socket,
 	}, nil
 }
@@ -245,8 +248,10 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 		return fmt.Errorf("failed to load container: %w", err)
 	}
 
-	creator := r.ioCreator
-	if creator == nil {
+	r.mu.RLock()
+	creator, ok := r.creators[containerID]
+	r.mu.RUnlock()
+	if !ok {
 		creator = cio.NewCreator(cio.WithStdio)
 	}
 
@@ -289,9 +294,16 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 	if err != nil {
 		return 0, err
 	}
+
+	r.mu.RLock()
+	waiter := r.waiters[containerID]
+	r.mu.RUnlock()
+
 	select {
 	case status := <-exitStatusC:
-		r.ioWait <- status.Error()
+		if waiter != nil {
+			waiter <- status.Error()
+		}
 		return int(status.ExitCode()), status.Error()
 	case <-ctx.Done():
 		return 0, ctx.Err()
@@ -300,7 +312,11 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 
 // RemoveContainer removes a container.
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
-	container, err := r.client.LoadContainer(ctx, containerID)
+	// Use background context for cleanup to ensure it completes even if original ctx is canceled
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	container, err := r.client.LoadContainer(cleanupCtx, containerID)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			return nil
@@ -308,24 +324,25 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 		return fmt.Errorf("failed to load container: %w", err)
 	}
 
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			logging.Debug("failed to get task for container %s: %v", containerID, err)
-		}
-	} else {
-		if _, err := task.Delete(ctx, client.WithProcessKill); err != nil { //nolint:errcheck
+	task, err := container.Task(cleanupCtx, nil)
+	if err == nil {
+		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to delete task: %w", err)
 			}
 		}
 	}
 
-	if err := container.Delete(ctx, client.WithSnapshotCleanup); err != nil {
+	if err := container.Delete(cleanupCtx, client.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("failed to delete container: %w", err)
 		}
 	}
+
+	r.mu.Lock()
+	delete(r.creators, containerID)
+	delete(r.waiters, containerID)
+	r.mu.Unlock()
 
 	return nil
 }
@@ -342,15 +359,21 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		ioOpts = append(ioOpts, cio.WithTerminal)
 	}
 
-	r.ioCreator = cio.NewCreator(ioOpts...)
+	creator := cio.NewCreator(ioOpts...)
+	waiter := make(chan error, 1)
+
+	r.mu.Lock()
+	r.creators[containerID] = creator
+	r.waiters[containerID] = waiter
+	r.mu.Unlock()
 
 	if ready != nil {
 		close(ready)
 	}
 
-	// Wait for the task to finish (signaled by StartContainer/WaitContainer)
+	// Wait for the task to finish (signaled by WaitContainer)
 	select {
-	case err := <-r.ioWait:
+	case err := <-waiter:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
