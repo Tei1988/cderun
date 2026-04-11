@@ -337,7 +337,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`(^|/)({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
+	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -472,51 +472,9 @@ func validatePathChars(s string) error {
 }
 
 func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
-	matches := magicWordPreRegex.FindStringSubmatch(original)
-	if len(matches) == 0 {
+	allMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
+	if len(allMatches) == 0 {
 		return nil
-	}
-
-	var anchorPath string
-	anchor := matches[2]
-
-	if anchor == "~" {
-		if r != nil {
-			anchorPath = r.Home
-		} else {
-			home, err := fs.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get anchor home directory: %w", err)
-			}
-			anchorPath = home
-		}
-	} else {
-		if r == nil {
-			return fmt.Errorf("expression resolver required for anchor validation")
-		}
-		word := matches[3]
-		switch word {
-		case "HOME":
-			anchorPath = r.Home
-		case "PWD":
-			anchorPath = r.Pwd
-		case "BASE_HOME":
-			if r.HostContext != nil && r.HostContext.HomeDir != "" {
-				anchorPath = r.HostContext.HomeDir
-			} else {
-				anchorPath = r.Home
-			}
-		case "BASE_PWD":
-			if r.HostContext != nil && r.HostContext.WorkingDir != "" {
-				anchorPath = r.HostContext.WorkingDir
-			} else {
-				anchorPath = r.Pwd
-			}
-		}
-	}
-
-	if anchorPath == "" {
-		return fmt.Errorf("anchor path is empty for %q", original)
 	}
 
 	absResolved := resolved
@@ -529,19 +487,63 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 	absResolved = filepath.Clean(absResolved)
 
-	absAnchor, err := fs.Abs(anchorPath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
-	}
-	absAnchor = filepath.Clean(absAnchor)
+	for _, matches := range allMatches {
+		var anchorPath string
+		anchor := matches[1]
 
-	rel, err := filepath.Rel(absAnchor, absResolved)
-	if err != nil {
-		return fmt.Errorf("failed to calculate relative path between %q and %q: %w", absAnchor, absResolved, err)
-	}
+		if anchor == "~" {
+			if r != nil {
+				anchorPath = r.Home
+			} else {
+				home, err := fs.UserHomeDir()
+				if err != nil {
+					return fmt.Errorf("failed to get anchor home directory: %w", err)
+				}
+				anchorPath = home
+			}
+		} else {
+			if r == nil {
+				return fmt.Errorf("expression resolver required for anchor validation")
+			}
+			word := matches[2]
+			switch word {
+			case "HOME":
+				anchorPath = r.Home
+			case "PWD":
+				anchorPath = r.Pwd
+			case "BASE_HOME":
+				if r.HostContext != nil && r.HostContext.HomeDir != "" {
+					anchorPath = r.HostContext.HomeDir
+				} else {
+					anchorPath = r.Home
+				}
+			case "BASE_PWD":
+				if r.HostContext != nil && r.HostContext.WorkingDir != "" {
+					anchorPath = r.HostContext.WorkingDir
+				} else {
+					anchorPath = r.Pwd
+				}
+			}
+		}
 
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
+		if anchorPath == "" {
+			return fmt.Errorf("anchor path is empty for %q", original)
+		}
+
+		absAnchor, err := fs.Abs(anchorPath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
+		}
+		absAnchor = filepath.Clean(absAnchor)
+
+		rel, err := filepath.Rel(absAnchor, absResolved)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path between %q and %q: %w", absAnchor, absResolved, err)
+		}
+
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
+		}
 	}
 
 	return nil
