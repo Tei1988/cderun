@@ -1310,8 +1310,7 @@ func MaskSensitiveEnv(key, value string) string {
 		return false
 	}
 
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
+	for i, r := range runes {
 		// Boundary split logic
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
