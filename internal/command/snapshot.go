@@ -55,10 +55,10 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		return "", "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
-	// When running inside a container (level >= 1), snapshotDir is a container-local path.
+	// When running inside a container (level > 0), snapshotDir is a container-local path.
 	// Resolve it to a host path for SnapshotDir, which is used as a mount source.
 	hostSnapshotDir := snapshotDir
-	if hostCtx.Level > 1 {
+	if globalCfg.HostContext != nil && globalCfg.HostContext.Level > 0 {
 		r, err := config.NewExpressionResolverWithFS(&hostCtx, fs)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to create expression resolver: %w", err)
