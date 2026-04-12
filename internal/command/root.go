@@ -823,7 +823,11 @@ func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *c
 		if err != nil {
 			o.logger.Warn("failed to set terminal to raw mode: %v", err)
 		} else {
-			return func() { _ = o.restore(stdinFd, state) }
+			return func() {
+				if err := o.restore(stdinFd, state); err != nil {
+					o.logger.Warn("failed to restore terminal: %v", err)
+				}
+			}
 		}
 	}
 	return func() {}
@@ -1070,7 +1074,9 @@ intended for the subcommand.`,
 		if o.cderunLogLevel != "" {
 			initialLevel = o.cderunLogLevel
 		}
-		_ = o.logger.Init(initialLevel, "text", true)
+		if err := o.logger.Init(initialLevel, "text", true); err != nil {
+			return fmt.Errorf("failed to initialize early logger: %w", err)
+		}
 
 		// Load configurations
 		toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)

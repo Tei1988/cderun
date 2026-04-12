@@ -206,7 +206,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 
 	if len(config.CapAdd) > 0 {
-		opts = append(opts, oci.WithCapabilities(config.CapAdd))
+		opts = append(opts, oci.WithAddedCapabilities(config.CapAdd))
 	}
 
 	if config.Memory != 0 {
