@@ -249,7 +249,9 @@ func TestUnit_Config_Path_ResolveVolume_ResolveDevice_Errors(t *testing.T) {
 
 	// Since we can't get a resolver with erroring FS easily for ResolvePath,
 	// let's use a resolver with valid FS but make the resolution fail if possible.
-	r, _ := NewExpressionResolver(nil)
+	r, err := NewExpressionResolver(nil)
+	require.NoError(t, err)
+	require.NotNil(t, r)
 
 	t.Run("resolveVolumePath ResolvePath error", func(t *testing.T) {
 		// ResolvePath errors if anchor boundary is escaped

@@ -626,15 +626,6 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"tty\" not found")
 	})
 
-	t.Run("resolveStandardOptions registry mismatch on transitive skipped bool", func(t *testing.T) {
-		// transitive options are mount-socket, mount-cderun, mount-all-tools.
-		// phase 3 skips them.
-		// If they were NOT skipped, they'd be handled in phase 3.
-		// Let's force one to not be skipped.
-		// Actually, resolveStandardOptions has:
-		// if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" { continue }
-		// This is hardcoded, so we can't easily trigger a mismatch for them in Phase 3.
-	})
 }
 
 func partOfCLIOptionsImage() int {
