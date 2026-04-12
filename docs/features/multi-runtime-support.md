@@ -129,6 +129,3 @@ import (
     "github.com/docker/docker/client"
 )
 ```
-
----
-*2026年4月12日時点の仕様である。*

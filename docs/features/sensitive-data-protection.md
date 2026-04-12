@@ -53,6 +53,3 @@ All error messages referencing paths, tool identifiers, or user-provided input u
 ### Secure Logging
 
 Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure.
-
----
-*2026年4月12日時点の仕様である。*
