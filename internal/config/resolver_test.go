@@ -329,6 +329,17 @@ func TestUnit_Resolver_Mounts_Exhaustive(t *testing.T) {
 		assert.Equal(t, "/a", res.Mounts[0].Source)
 		assert.True(t, res.Mounts[1].ReadOnly)
 	})
+
+	t.Run("Mounts from environment with empty segments and extra spaces", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_MOUNT": "  source=/a,target=/b  ; ;   source=/c,target=/d   "},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 2)
+		assert.Equal(t, "/a", res.Mounts[0].Source)
+		assert.Equal(t, "/c", res.Mounts[1].Source)
+	})
 }
 
 func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
@@ -360,6 +371,17 @@ func TestUnit_Resolver_Env_Exhaustive(t *testing.T) {
 		}
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
+	})
+
+	t.Run("Env from environment with empty segments and extra spaces", func(t *testing.T) {
+		mfs2 := &MockFileSystem{
+			Env: map[string]string{"CDERUN_ENV": "  A=1  ; ;   B=2   "},
+		}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs2)
+		require.NoError(t, err)
+		assert.Contains(t, res.Env, "A=1")
+		assert.Contains(t, res.Env, "B=2")
+		assert.Len(t, res.Env, 2)
 	})
 }
 
