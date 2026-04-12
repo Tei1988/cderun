@@ -21,7 +21,8 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 ### 将来的な拡張
 
-- nerdctl（containerdのCLI、Dockerの代替）
+- **containerd**: ネイティブの containerd API (gRPC) を使用したサポート (Planned / 開発中)。
+- **nerdctl**: containerd の CLI をラップした実行の検討。
 
 ## アーキテクチャ
 

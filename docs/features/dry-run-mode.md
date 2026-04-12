@@ -225,6 +225,3 @@ mounts:
     source: /home/user/project
     target: /workspace
 ```
-
----
-*2026年3月17日時点の仕様である。*

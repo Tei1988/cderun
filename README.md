@@ -263,6 +263,15 @@ the available runtime by checking for common Unix socket paths.
 - **Reverse Path Resolution**: Translates container-local paths back to host paths for nested mounts, ensuring the host-side Docker/Podman daemon can resolve volume sources.
 - **OverlayFS Detection**: Automatically detects the root filesystem's `upperdir` to map container files back to the host.
 
+### Sensitive Data Masking
+
+`cderun` protects your secrets. Environment variables containing sensitive keywords (like `PASSWORD`, `SECRET`, `TOKEN`, `JWT`) are automatically masked (`[REDACTED]`) in:
+
+- Dry-run output (`--dry-run`)
+- Debug logs (`--log-level debug`)
+
+The masking logic is intelligent and handles CamelCase (e.g., `dbPassword`) and different separators (e.g., `API_KEY`).
+
 ### Unified Value Resolution
 
 - **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
@@ -271,6 +280,26 @@ the available runtime by checking for common Unix socket paths.
 - **Relative Path Handling**: Intelligent absolute path resolution based on the
   origin of the setting (config file location vs. current directory).
 - See [Value Resolution](docs/features/value-resolution.md) for details.
+
+## Best Practices
+
+### Consistent Development Environments
+
+Use `{{file:.go-version}}` or `{{file:.nvmrc}}` in your tool configuration to ensure the container image tag matches your project's version file:
+
+```yaml
+# .tools.yaml
+go:
+  image: "golang:{{file:.go-version}}"
+```
+
+### Context-Aware Pathing
+
+Use `{{find_dir:.git}}` to reference the project root regardless of your current working directory:
+
+```bash
+cderun --mount type=bind,source="{{find_dir:.git}}/logs",target=/logs my-tool
+```
 
 ## Development & Testing
 

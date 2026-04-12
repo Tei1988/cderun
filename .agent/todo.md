@@ -75,3 +75,6 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 
 ## Testing & Maintenance
+
+### Inconsistency in containerd Support
+The security validator in `internal/config/resolver.go` allows `containerd` as a valid runtime, but the `runtimeFactory` in `internal/command/root.go` does not yet support it. This should be addressed when implementing native containerd support.

@@ -23,6 +23,9 @@ The following segments (case-insensitive) trigger masking:
 - `PASSPHRASE`
 - `APIKEY`
 - `SESSION`
+- `ACCESS`
+- `JWT`
+- `SALT`
 
 ### Intelligent Segmentation
 

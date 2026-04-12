@@ -59,6 +59,3 @@
 
 - [標準入力の同期](./stdin-synchronization.md)
 - [コマンドラインオプション](./command-line-options.md)
-
----
-*2026年3月14日時点の仕様である。*
