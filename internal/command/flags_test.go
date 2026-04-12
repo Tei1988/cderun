@@ -16,7 +16,7 @@ import (
 func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 	t.Run("basic and complex Docker flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
+		args := []string{"cderun",
 			"--publish", "8080:80",
 			"--publish-all",
 			"--expose", "80",
@@ -34,28 +34,15 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--mount", "type=tmpfs,target=/tmp",
 			"--device", "/dev/fuse",
 			"--image", "alpine",
-			"alpine", "ls", "-l"}, func(o *rootOptions, cmd *cobra.Command) {
+			"alpine", "ls", "-l"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err, "raw args: %v", []string{"cderun", "--publish", "8080:80",
-			"--user", "initialUser",
-			"--privileged",
-			"--pull", "never",
-			"--memory", "1g",
-			"--cpus", "1.0",
-			"--image", "alpine",
-			"alpine",
-			"--cderun-publish", "9090:90",
-			"--cderun-user", "override-user",
-			"--cderun-privileged=false",
-			"--cderun-pull", "always",
-			"--cderun-memory", "2g",
-			"--cderun-cpus", "2.0",
-			"ls", "-l"})
+		require.NoError(t, err, "raw args: %v", args)
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
@@ -83,7 +70,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 
 	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
+		args := []string{"cderun",
 			"--publish", "8080:80",
 			"--user", "initialUser",
 			"--privileged=true",
@@ -98,14 +85,15 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--cderun-pull", "always",
 			"--cderun-memory", "2g",
 			"--cderun-cpus", "2.0",
-			"ls", "-l"}, func(o *rootOptions, cmd *cobra.Command) {
+			"ls", "-l"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err)
+		require.NoError(t, err, "raw args: %v", args)
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
