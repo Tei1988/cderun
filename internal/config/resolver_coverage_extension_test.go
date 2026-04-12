@@ -629,6 +629,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 }
 
 func partOfCLIOptionsImage() int {
-	f, _ := reflect.TypeFor[CLIOptions]().FieldByName("Image")
+	f, ok := reflect.TypeFor[CLIOptions]().FieldByName("Image")
+	if !ok || len(f.Index) == 0 {
+		panic("Field 'Image' not found in CLIOptions")
+	}
 	return f.Index[0]
 }
