@@ -26,11 +26,8 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 		[]string{"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
 	)
 
-	// Handle environment-specific Docker issues
-	skipIfDockerBroken(t, err)
-
-	require.NoError(t, err, "stderr: %s", stderr)
-	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
+	require.NoError(t, err)
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
@@ -74,9 +71,7 @@ func TestScenario_Stdin_PipedInput(t *testing.T) {
 		[]string{"cat"},
 	)
 
-	skipIfDockerBroken(t, err)
-
-	require.NoError(t, err, "stderr: %s", stderr)
-	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
+	require.NoError(t, err)
 	assert.Equal(t, stdinData, stdout)
 }
