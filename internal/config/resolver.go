@@ -237,11 +237,11 @@ var (
 )
 
 type optionFields struct {
-	targetIdx []int
-	p1SetIdx  []int
-	p1ValIdx  []int
-	p2SetIdx  []int
-	p2ValIdx  []int
+	targetIdx int
+	p1SetIdx  int
+	p1ValIdx  int
+	p2SetIdx  int
+	p2ValIdx  int
 }
 
 func initFieldInfo() {
@@ -257,22 +257,28 @@ func initFieldInfo() {
 			return
 		}
 
-		info := optionFields{targetIdx: targetField.Index}
+		info := optionFields{
+			targetIdx: targetField.Index[0],
+			p1SetIdx:  -1,
+			p1ValIdx:  -1,
+			p2SetIdx:  -1,
+			p2ValIdx:  -1,
+		}
 
 		if f, ok := cliType.FieldByName("Cderun" + fieldName + "Set"); ok {
-			info.p1SetIdx = f.Index
+			info.p1SetIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName("Cderun" + fieldName); ok {
-			info.p1ValIdx = f.Index
+			info.p1ValIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(fieldName + "Set"); ok {
-			info.p2SetIdx = f.Index
+			info.p2SetIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(fieldName); ok {
-			info.p2ValIdx = f.Index
+			info.p2ValIdx = f.Index[0]
 		}
 
-		if info.p1ValIdx != nil && info.p2ValIdx != nil {
+		if info.p1ValIdx != -1 && info.p2ValIdx != -1 {
 			fieldInfo[name] = info
 		}
 	}
@@ -294,12 +300,12 @@ func initFieldInfo() {
 	}
 }
 
-func getFieldInfo(val reflect.Value, setIdx, valIdx []int) (bool, reflect.Value) {
-	if len(setIdx) > 0 {
-		return val.FieldByIndex(setIdx).Bool(), val.FieldByIndex(valIdx)
+func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
+	if setIdx != -1 {
+		return val.Field(setIdx).Bool(), val.Field(valIdx)
 	}
 	// For slices and other types without a explicit Set flag
-	v := val.FieldByIndex(valIdx)
+	v := val.Field(valIdx)
 	if v.Kind() == reflect.Slice || v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface || v.Kind() == reflect.Map {
 		return !v.IsNil(), v
 	}
@@ -312,7 +318,7 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
 	}
 
-	if info.p1ValIdx == nil || info.p2ValIdx == nil {
+	if info.p1ValIdx == -1 || info.p2ValIdx == -1 {
 		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
 	}
 
@@ -358,7 +364,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	}
 
 	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).Set(reflect.ValueOf(resolved))
+	rv.resVal.Field(info.targetIdx).Set(reflect.ValueOf(resolved))
 	return nil
 }
 
@@ -376,7 +382,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	}
 
 	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetString(resolved)
+	rv.resVal.Field(info.targetIdx).SetString(resolved)
 	return nil
 }
 
@@ -393,7 +399,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	}
 
 	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetBool(resolved)
+	rv.resVal.Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
 
@@ -431,7 +437,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	}
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetInt(int64(resolved))
+	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
 
@@ -469,7 +475,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	}
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.FieldByIndex(info.targetIdx).SetFloat(resolved)
+	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
 
@@ -537,7 +543,9 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 			return nil, err
 		}
 	}
-	logging.Trace("Resolving configurations for tool: %s", subcommand)
+	if logging.TraceEnabled() {
+		logging.Trace("Resolving configurations for tool: %s", subcommand)
+	}
 
 	var hostCtx *HostContext
 	if global != nil {
@@ -655,7 +663,9 @@ func (rv *resolver) resolveStandardOptions() error {
 			}
 		}
 
-		logging.Debug("Resolved Image: %s", rv.res.Image)
+		if logging.DebugEnabled() {
+			logging.Debug("Resolved Image: %s", rv.res.Image)
+		}
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -1031,7 +1041,9 @@ func (rv *resolver) validateSecurity() error {
 	}
 
 	if rv.res.Privileged {
-		logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		}
 	}
 	return nil
 }
@@ -1168,8 +1180,12 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
-	m := make(map[string]string)
-	var keys []string
+	total := len(base) + len(p2) + len(p1)
+	if total == 0 {
+		return nil
+	}
+	m := make(map[string]string, total)
+	keys := make([]string, 0, total)
 
 	add := func(env []string) {
 		for _, e := range env {
@@ -1185,7 +1201,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 	add(p2)
 	add(p1)
 
-	var res []string
+	res := make([]string, 0, len(keys))
 	for _, k := range keys {
 		res = append(res, m[k])
 	}
@@ -1262,9 +1278,11 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		// Apply masking for debug logs and quoting for safety
-		logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		if logging.DebugEnabled() {
+			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+		}
 
-		res = append(res, fmt.Sprintf("%s=%s", key, val))
+		res = append(res, key+"="+val)
 	}
 	return res, nil
 }
@@ -1366,22 +1384,42 @@ func MaskSensitiveEnv(key, value string) string {
 		return ""
 	}
 
+	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
+	// We check for any of the sensitive keyword prefixes or exact matches in a case-insensitive manner.
+	hasSensitive := false
+	for kw := range sensitiveKeywords {
+		// Keyword is always uppercase in sensitiveKeywords map.
+		// Check for uppercase, lowercase, and Titlecase/camelCase variants.
+		if strings.Contains(key, kw) ||
+			strings.Contains(key, strings.ToLower(kw)) ||
+			strings.Contains(key, strings.ToUpper(kw[:1])+strings.ToLower(kw[1:])) {
+			hasSensitive = true
+			break
+		}
+	}
+	if !hasSensitive {
+		return value
+	}
+
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
 	var segments []string
 	var current strings.Builder
 	var lastRune rune
-	runes := []rune(key)
-	for i, r := range runes {
+	for i, r := range key {
 		// Boundary split logic
 		if i > 0 {
 			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
 			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
 			isAcronym := false
-			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) && i+1 < len(runes) {
-				nextRune := runes[i+1]
-				if unicode.IsLower(nextRune) {
-					isAcronym = true
+			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
+				// To check for acronym boundary (e.g. APIKey -> API, Key), we need to look ahead
+				// We can do this safely by checking the rest of the string
+				for _, nextRune := range key[i+len(string(r)):] {
+					if unicode.IsLower(nextRune) {
+						isAcronym = true
+					}
+					break
 				}
 			}
 
