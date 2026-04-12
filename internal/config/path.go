@@ -337,7 +337,12 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}}|~)`)
+	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}})|(^~|[/\\]~)`)
+
+	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
+	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+	userPartRegex = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
+	portRegex     = regexp.MustCompile(`^(\d+)(/tcp|/udp)?$`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -487,9 +492,10 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 
 	for _, matches := range allMatches {
 		var anchorPath string
-		anchor := matches[1]
+		exprMatch := matches[1]
+		tildeMatch := matches[3]
 
-		if anchor == "~" {
+		if tildeMatch != "" {
 			if r != nil {
 				anchorPath = r.Home
 			} else {
@@ -525,7 +531,10 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		}
 
 		if anchorPath == "" {
-			return fmt.Errorf("anchor path is empty for %q", original)
+			if exprMatch != "" {
+				return fmt.Errorf("anchor path is empty for %q", exprMatch)
+			}
+			return fmt.Errorf("anchor path is empty for %q", tildeMatch)
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)
@@ -542,6 +551,98 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
 		}
+	}
+
+	return nil
+}
+
+// ValidateHostname ensures the hostname follows standard DNS label rules.
+func ValidateHostname(s string) error {
+	if s == "" {
+		return nil
+	}
+	if len(s) > 253 {
+		return fmt.Errorf("hostname too long: %d characters (max 253)", len(s))
+	}
+	if !hostnameRegex.MatchString(s) {
+		return fmt.Errorf("invalid hostname: %q", s)
+	}
+	return nil
+}
+
+// ValidateNetworkName ensures the network name follows Docker-compatible rules.
+func ValidateNetworkName(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !networkRegex.MatchString(s) {
+		return fmt.Errorf("invalid network name: %q", s)
+	}
+	return nil
+}
+
+// ValidateUserName ensures the user name (or user:group) is valid.
+func ValidateUserName(s string) error {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ":")
+	if len(parts) > 2 {
+		return fmt.Errorf("invalid user format: %q", s)
+	}
+	for _, p := range parts {
+		if !userPartRegex.MatchString(p) {
+			return fmt.Errorf("invalid user or group identifier: %q", p)
+		}
+	}
+	return nil
+}
+
+// ValidatePort ensures the port mapping (host:container/proto) is valid.
+func ValidatePort(s string) error {
+	if s == "" {
+		return nil
+	}
+	// Format: [hostPort:]containerPort[/protocol]
+	remainder := s
+	if parts := strings.Split(remainder, ":"); len(parts) == 2 {
+		hostPort := parts[0]
+		if !portRegex.MatchString(hostPort) {
+			return fmt.Errorf("invalid host port: %q", hostPort)
+		}
+		remainder = parts[1]
+	}
+
+	if !portRegex.MatchString(remainder) {
+		return fmt.Errorf("invalid port mapping: %q", remainder)
+	}
+	return nil
+}
+
+// ValidateExposePort ensures the exposed port (port[-port]/proto) is valid.
+func ValidateExposePort(s string) error {
+	if s == "" {
+		return nil
+	}
+	// Format: port[-port][/protocol]
+	proto := ""
+	remainder := s
+	if parts := strings.Split(s, "/"); len(parts) == 2 {
+		remainder = parts[0]
+		proto = parts[1]
+		if proto != "tcp" && proto != "udp" {
+			return fmt.Errorf("invalid protocol: %q", proto)
+		}
+	}
+
+	if parts := strings.Split(remainder, "-"); len(parts) == 2 {
+		for _, p := range parts {
+			if _, err := strconv.Atoi(p); err != nil {
+				return fmt.Errorf("invalid port range: %q", remainder)
+			}
+		}
+	} else if _, err := strconv.Atoi(remainder); err != nil {
+		return fmt.Errorf("invalid port: %q", remainder)
 	}
 
 	return nil

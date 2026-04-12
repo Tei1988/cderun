@@ -41,7 +41,21 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err)
+		require.NoError(t, err, "raw args: %v", []string{"cderun", "--publish", "8080:80",
+			"--user", "initialUser",
+			"--privileged",
+			"--pull", "never",
+			"--memory", "1g",
+			"--cpus", "1.0",
+			"--image", "alpine",
+			"alpine",
+			"--cderun-publish", "9090:90",
+			"--cderun-user", "override-user",
+			"--cderun-privileged=false",
+			"--cderun-pull", "always",
+			"--cderun-memory", "2g",
+			"--cderun-cpus", "2.0",
+			"ls", "-l"})
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
@@ -79,7 +93,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--image", "alpine",
 			"alpine",
 			"--cderun-publish", "9090:90",
-			"--cderun-user", "overrideUser",
+			"--cderun-user", "override-user",
 			"--cderun-privileged=false",
 			"--cderun-pull", "always",
 			"--cderun-memory", "2g",
@@ -97,7 +111,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 		require.NotNil(t, cfg)
 		assert.Equal(t, []string{"ls", "-l"}, cfg.Command)
 		assert.Equal(t, []string{"9090:90"}, cfg.Ports)
-		assert.Equal(t, "overrideUser", cfg.User)
+		assert.Equal(t, "override-user", cfg.User)
 		assert.False(t, cfg.Privileged)
 		assert.Equal(t, "always", cfg.Pull)
 		assert.Equal(t, int64(2*1024*1024*1024), cfg.Memory)

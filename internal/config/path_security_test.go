@@ -59,7 +59,9 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
 		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
 		{"Bypass attempt anywhere in string", "foo{{HOME}}/../../etc/passwd", true},
-		{"Bypass attempt anywhere in string with tilde", "a~", true},
+		{"Bypass attempt anywhere in string with tilde", "a~", false}, // No longer a bypass as ~ only matches at boundaries
+		{"Tilde at boundary", "foo/~", true},
+		{"Tilde at start", "~/file", false},
 		{"Multiple anchors", "{{HOME}}/subdir/{{HOME}}/file", false},
 		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
 		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
