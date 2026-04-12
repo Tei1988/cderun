@@ -732,7 +732,11 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
-	defer rt.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := rt.Close(); closeErr != nil {
+			o.logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}()
 	defer cleanup()
 
 	// Detect if host stdin is a terminal once
@@ -775,12 +779,12 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Ensure runtime is closed on early error paths
 	closed := false
 	defer func() {
-			if !closed && err != nil {
-				if closeErr := rt.Close(); closeErr != nil { //nolint:errcheck
-					o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
-				}
+		if !closed && err != nil {
+			if closeErr := rt.Close(); closeErr != nil {
+				o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
 			}
-		}()
+		}
+	}()
 
 	o.logger.Trace("Creating container...")
 	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {

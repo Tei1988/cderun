@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"testing"
 )
 
 var (
@@ -97,5 +98,6 @@ func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err e
 	if exitCode != 0 {
 		// If the command failed but it might be due to environmental mount issues reported in stderr
 		skipIfDockerBroken(t, fmt.Errorf("exit code %d: %s", exitCode, stderr))
+		t.Fatalf("command failed with exit code %d: %s", exitCode, stderr)
 	}
 }

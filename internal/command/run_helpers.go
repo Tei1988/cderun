@@ -19,7 +19,7 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 
 	timeout := 60 * time.Second
 	if val, ok := os.LookupEnv("CDERUN_TEST_TIMEOUT"); ok {
-		if d, err := time.ParseDuration(val); err == nil {
+		if d, err := time.ParseDuration(val); err == nil && d > 0 {
 			timeout = d
 		}
 	}
