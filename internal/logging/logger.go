@@ -165,7 +165,7 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 		if l.timestamp {
 			entry["time"] = now.Format(time.RFC3339)
 		}
-		data, _ := json.Marshal(entry) //nolint:errcheck
+		data, _ := json.Marshal(entry)
 		_, _ = fmt.Fprintln(l.writer, string(data))
 	} else {
 		ts := ""

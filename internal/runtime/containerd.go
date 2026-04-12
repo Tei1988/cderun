@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strconv"
-	"sync"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,11 +30,11 @@ const (
 
 // ContainerdRuntime implements ContainerRuntime using containerd client.
 type ContainerdRuntime struct {
-	client    *client.Client
-	socket    string
-	mu        sync.RWMutex
-	creators  map[string]cio.Creator
-	waiters   map[string]chan error
+	client   *client.Client
+	socket   string
+	mu       sync.RWMutex
+	creators map[string]cio.Creator
+	waiters  map[string]chan error
 }
 
 // NewContainerdRuntime creates a new ContainerdRuntime instance.
@@ -43,10 +44,10 @@ func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 	return &ContainerdRuntime{
-		client: c,
+		client:   c,
 		creators: make(map[string]cio.Creator),
 		waiters:  make(map[string]chan error),
-		socket: socket,
+		socket:   socket,
 	}, nil
 }
 
@@ -70,10 +71,11 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
+	// The requirement is "up to PullMaxRetries retries", so total attempts = 1 + maxRetries.
 	for i := 0; i <= maxRetries; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries+1, img, lastErr)
-			timer := time.NewTimer(time.Duration(1<<i) * backoffBase)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
+			timer := time.NewTimer(time.Duration(1<<(i-1)) * backoffBase)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
@@ -110,9 +112,8 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries+1, lastErr)
+	return fmt.Errorf("failed to pull image after %d retries: %w", maxRetries, lastErr)
 }
-
 
 // CreateContainer creates a new container.
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
@@ -135,7 +136,6 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if len(config.Ports) > 0 || len(config.Expose) > 0 || config.PublishAll {
 		return "", errors.New("containerd runtime: Port mapping is not supported yet")
 	}
-
 
 	image, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
@@ -226,10 +226,16 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 	}
 
+	snapshotter := os.Getenv("CDERUN_CONTAINERD_SNAPSHOTTER")
+	if snapshotter == "" {
+		snapshotter = "overlayfs"
+	}
+
 	_, err = r.client.NewContainer(
 		ctx,
 		containerID,
 		client.WithImage(image),
+		client.WithSnapshotter(snapshotter),
 		client.WithNewSnapshot(containerID, image),
 		client.WithNewSpec(opts...),
 	)
@@ -397,7 +403,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return fmt.Errorf("failed to load task: %w", err)
 	}
 
-	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
+	return task.Resize(ctx, uint32(cols), uint32(rows))
 }
 
 // SignalContainer sends a signal to a container.

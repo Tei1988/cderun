@@ -130,7 +130,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 		// Wait for pull to complete and check for errors in the stream
 		err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
-		_ = reader.Close() //nolint:errcheck
+		_ = reader.Close()
 		if err != nil {
 			lastErr = err
 			if isRetryablePullError(err) {
