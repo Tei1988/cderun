@@ -737,6 +737,12 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 			if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
 				rv.res.Runtime = "docker"
 				rv.res.SocketPath = "/var/run/docker.sock"
+			} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+				rv.res.Runtime = "containerd"
+				rv.res.SocketPath = "/run/containerd/containerd.sock"
+			} else if _, err := rv.fs.Stat("/var/run/containerd/containerd.sock"); err == nil {
+				rv.res.Runtime = "containerd"
+				rv.res.SocketPath = "/var/run/containerd/containerd.sock"
 			} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
 				rv.res.Runtime = "podman"
 				rv.res.SocketPath = "/run/podman/podman.sock"
