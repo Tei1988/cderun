@@ -944,9 +944,9 @@ func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
 
 		// Point CLI value lookups to 'Image' (string) instead of 'PullMaxRetries' (int)
 		imgField, _ := cliType.FieldByName("CderunImage")
-		info.p1ValIdx = imgField.Index
+		info.p1ValIdx = imgField.Index[0]
 		imgField2, _ := cliType.FieldByName("Image")
-		info.p2ValIdx = imgField2.Index
+		info.p2ValIdx = imgField2.Index[0]
 		fieldInfo["pull-max-retries"] = info
 
 		defer func() {
@@ -974,7 +974,7 @@ func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
 		origP1ValIdx := info.p1ValIdx
 
 		imgField, _ := cliType.FieldByName("CderunImage")
-		info.p1ValIdx = imgField.Index
+		info.p1ValIdx = imgField.Index[0]
 		fieldInfo["cpus"] = info
 
 		defer func() {

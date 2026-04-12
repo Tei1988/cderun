@@ -37,7 +37,7 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	t.Run("missing reflection fields", func(t *testing.T) {
 		withPatchedFieldInfo(t, "image", func() {
 			info := fieldInfo["image"]
-			info.p1ValIdx = nil
+			info.p1ValIdx = -1
 			fieldInfo["image"] = info
 		})
 		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal)
@@ -63,22 +63,22 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	val := reflect.ValueOf(ts)
 
 	t.Run("Ptr set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, nil, []int{0})
+		set, _ := getFieldInfo(val, -1, 0)
 		assert.True(t, set)
 	})
 
 	t.Run("Interface set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, nil, []int{1})
+		set, _ := getFieldInfo(val, -1, 1)
 		assert.True(t, set)
 	})
 
 	t.Run("Map set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, nil, []int{2})
+		set, _ := getFieldInfo(val, -1, 2)
 		assert.True(t, set)
 	})
 
 	t.Run("Zero not set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, nil, []int{3})
+		set, _ := getFieldInfo(val, -1, 3)
 		assert.False(t, set)
 	})
 
@@ -90,17 +90,17 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	valNil := reflect.ValueOf(tsNil)
 
 	t.Run("Ptr nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, nil, []int{0})
+		set, _ := getFieldInfo(valNil, -1, 0)
 		assert.False(t, set)
 	})
 
 	t.Run("Interface nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, nil, []int{1})
+		set, _ := getFieldInfo(valNil, -1, 1)
 		assert.False(t, set)
 	})
 
 	t.Run("Map nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, nil, []int{2})
+		set, _ := getFieldInfo(valNil, -1, 2)
 		assert.False(t, set)
 	})
 }
@@ -344,8 +344,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("registry mismatch for missing CLI reflection fields", func(t *testing.T) {
 		withPatchedFieldInfo(t, "image", func() {
 			info := fieldInfo["image"]
-			info.p1ValIdx = nil
-			info.p2ValIdx = []int{1}
+			info.p1ValIdx = -1
+			info.p2ValIdx = 1
 			fieldInfo["image"] = info
 		})
 
@@ -536,7 +536,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		withPatchedFieldInfo(t, "pull-max-retries", func() {
 			info := fieldInfo["pull-max-retries"]
 			// Point p1ValIdx to a string field (Image)
-			info.p1ValIdx = []int{0}
+			info.p1ValIdx = 0
 			fieldInfo["pull-max-retries"] = info
 		})
 
@@ -551,7 +551,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		withPatchedFieldInfo(t, "cpus", func() {
 			info := fieldInfo["cpus"]
 			// Point p1ValIdx to a string field (Image)
-			info.p1ValIdx = []int{0}
+			info.p1ValIdx = 0
 			fieldInfo["cpus"] = info
 		})
 
@@ -565,7 +565,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("applyIntOption p2 non-int", func(t *testing.T) {
 		withPatchedFieldInfo(t, "pull-max-retries", func() {
 			info := fieldInfo["pull-max-retries"]
-			info.p2ValIdx = []int{0}
+			info.p2ValIdx = 0
 			fieldInfo["pull-max-retries"] = info
 		})
 
@@ -578,7 +578,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("applyFloat64Option p2 non-float", func(t *testing.T) {
 		withPatchedFieldInfo(t, "cpus", func() {
 			info := fieldInfo["cpus"]
-			info.p2ValIdx = []int{partOfCLIOptionsImage()}
+			info.p2ValIdx = partOfCLIOptionsImage()
 			fieldInfo["cpus"] = info
 		})
 
@@ -592,7 +592,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		withPatchedFieldInfo(t, "dns", func() {
 			info := fieldInfo["dns"]
 			// Point p1ValIdx to a string field (Image)
-			info.p1ValIdx = []int{partOfCLIOptionsImage()}
+			info.p1ValIdx = partOfCLIOptionsImage()
 			fieldInfo["dns"] = info
 		})
 
@@ -605,7 +605,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("applyStringSliceOption p2 non-slice", func(t *testing.T) {
 		withPatchedFieldInfo(t, "dns", func() {
 			info := fieldInfo["dns"]
-			info.p2ValIdx = []int{partOfCLIOptionsImage()}
+			info.p2ValIdx = partOfCLIOptionsImage()
 			fieldInfo["dns"] = info
 		})
 
