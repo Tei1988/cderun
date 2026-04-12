@@ -214,6 +214,46 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
 	})
 
+	t.Run("security validation failure for mounts", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"source=/bad\n,target=/good"},
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for mounts[0] (source)")
+
+		cli = &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Mounts:   []string{"source=/good,target=/bad\r"},
+		}
+		_, err = ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for mounts[0] (target)")
+	})
+
+	t.Run("security validation failure for devices", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Devices:  []string{"/bad\n:/good"},
+		}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for devices[0] (path-on-host)")
+
+		cli = &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			Devices:  []string{"/good:/bad\r"},
+		}
+		_, err = ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for devices[0] (path-in-container)")
+	})
+
 	t.Run("resolveDevices fallback to global", func(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
@@ -456,6 +496,21 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.False(t, res.MountSocket)
 	})
 
+	t.Run("transitive options: mount-socket false explicitly with mount-cderun true", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:          "alpine",
+			ImageSet:       true,
+			MountCderun:    true,
+			MountCderunSet: true,
+			MountSocket:    false,
+			MountSocketSet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.True(t, res.MountCderun)
+		assert.False(t, res.MountSocket)
+	})
+
 	t.Run("registry mismatch: only CLI image provided", func(t *testing.T) {
 		cli := &CLIOptions{CderunImage: "my-reg.com/node:20", CderunImageSet: true}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
@@ -476,4 +531,107 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
 	})
+
+	t.Run("applyIntOption with non-int field", func(t *testing.T) {
+		withPatchedFieldInfo(t, "pull-max-retries", func() {
+			info := fieldInfo["pull-max-retries"]
+			// Point p1ValIdx to a string field (Image)
+			info.p1ValIdx = []int{0}
+			fieldInfo["pull-max-retries"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullMaxRetriesSet: true}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		// Should fallback to default (3) because k is not int
+		assert.Equal(t, 3, res.PullMaxRetries)
+	})
+
+	t.Run("applyFloat64Option with non-float field", func(t *testing.T) {
+		withPatchedFieldInfo(t, "cpus", func() {
+			info := fieldInfo["cpus"]
+			// Point p1ValIdx to a string field (Image)
+			info.p1ValIdx = []int{0}
+			fieldInfo["cpus"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunCPUsSet: true}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		// Should be 0.0 because k is not float
+		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
+	})
+
+	t.Run("applyIntOption p2 non-int", func(t *testing.T) {
+		withPatchedFieldInfo(t, "pull-max-retries", func() {
+			info := fieldInfo["pull-max-retries"]
+			info.p2ValIdx = []int{0}
+			fieldInfo["pull-max-retries"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetriesSet: true}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, 3, res.PullMaxRetries)
+	})
+
+	t.Run("applyFloat64Option p2 non-float", func(t *testing.T) {
+		withPatchedFieldInfo(t, "cpus", func() {
+			info := fieldInfo["cpus"]
+			info.p2ValIdx = []int{partOfCLIOptionsImage()}
+			fieldInfo["cpus"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CPUsSet: true}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
+	})
+
+	t.Run("applyStringSliceOption with non-slice field", func(t *testing.T) {
+		withPatchedFieldInfo(t, "dns", func() {
+			info := fieldInfo["dns"]
+			// Point p1ValIdx to a string field (Image)
+			info.p1ValIdx = []int{partOfCLIOptionsImage()}
+			fieldInfo["dns"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunDNS: []string{"8.8.8.8"}} // This will not be used because reflection will see String
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Empty(t, res.DNS)
+	})
+
+	t.Run("applyStringSliceOption p2 non-slice", func(t *testing.T) {
+		withPatchedFieldInfo(t, "dns", func() {
+			info := fieldInfo["dns"]
+			info.p2ValIdx = []int{partOfCLIOptionsImage()}
+			fieldInfo["dns"] = info
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, DNS: []string{"8.8.8.8"}}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Empty(t, res.DNS)
+	})
+
+	t.Run("resolveStandardOptions registry mismatch on bool option", func(t *testing.T) {
+		withPatchedFieldInfo(t, "tty", func() {
+			delete(fieldInfo, "tty")
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"tty\" not found")
+	})
+
+}
+
+func partOfCLIOptionsImage() int {
+	f, ok := reflect.TypeFor[CLIOptions]().FieldByName("Image")
+	if !ok || len(f.Index) == 0 {
+		panic("Field 'Image' not found in CLIOptions")
+	}
+	return f.Index[0]
 }
