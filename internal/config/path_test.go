@@ -676,3 +676,139 @@ func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 		assert.False(t, ok)
 	})
 }
+
+
+func TestUnit_Config_ValidateHostname(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Basic hostname", "localhost", false},
+		{"Hostname with dots", "example.com", false},
+		{"Hostname with hyphen", "my-host", false},
+		{"Empty hostname", "", false},
+		{"Too long hostname", string(make([]byte, 254)), true},
+		{"Invalid characters", "host!", true},
+		{"Starts with hyphen", "-host", true},
+		{"Ends with hyphen", "host-", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateHostname(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateNetworkName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Basic network", "bridge", false},
+		{"Network with dots", "my.net", false},
+		{"Network with underscore", "my_net", false},
+		{"Empty network", "", false},
+		{"Invalid characters", "net!", true},
+		{"Starts with hyphen", "-net", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateNetworkName(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateUserName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Basic user", "root", false},
+		{"User and group", "user:group", false},
+		{"UID and GID", "1000:1000", false},
+		{"User with dollar", "user$", false},
+		{"Empty user", "", false},
+		{"Invalid characters", "user!", true},
+		{"Too many colons", "user:group:extra", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateUserName(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidatePort(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Port", "80", false},
+		{"Port mapping", "8080:80", false},
+		{"Port with proto", "80/tcp", false},
+		{"Mapping with proto", "8080:80/udp", false},
+		{"Empty port", "", false},
+		{"Invalid characters", "80!", true},
+		{"Invalid mapping", "8080:80:extra", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePort(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateExposePort(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Port", "80", false},
+		{"Port range", "80-90", false},
+		{"Port with proto", "80/tcp", false},
+		{"Range with proto", "80-90/udp", false},
+		{"Empty port", "", false},
+		{"Invalid protocol", "80/http", true},
+		{"Invalid range", "80-extra", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateExposePort(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}

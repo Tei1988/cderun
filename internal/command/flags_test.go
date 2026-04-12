@@ -16,7 +16,7 @@ import (
 func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 	t.Run("basic and complex Docker flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
+		args := []string{"cderun",
 			"--publish", "8080:80",
 			"--publish-all",
 			"--expose", "80",
@@ -34,14 +34,15 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--mount", "type=tmpfs,target=/tmp",
 			"--device", "/dev/fuse",
 			"--image", "alpine",
-			"alpine", "ls", "-l"}, func(o *rootOptions, cmd *cobra.Command) {
+			"alpine", "ls", "-l"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err)
+		require.NoError(t, err, "raw args: %v", args)
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
@@ -69,7 +70,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 
 	t.Run("P1 flags override P2 for Docker-compatible features", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun",
+		args := []string{"cderun",
 			"--publish", "8080:80",
 			"--user", "initialUser",
 			"--privileged=true",
@@ -79,25 +80,26 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--image", "alpine",
 			"alpine",
 			"--cderun-publish", "9090:90",
-			"--cderun-user", "overrideUser",
+			"--cderun-user", "override-user",
 			"--cderun-privileged=false",
 			"--cderun-pull", "always",
 			"--cderun-memory", "2g",
 			"--cderun-cpus", "2.0",
-			"ls", "-l"}, func(o *rootOptions, cmd *cobra.Command) {
+			"ls", "-l"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err)
+		require.NoError(t, err, "raw args: %v", args)
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
 		assert.Equal(t, []string{"ls", "-l"}, cfg.Command)
 		assert.Equal(t, []string{"9090:90"}, cfg.Ports)
-		assert.Equal(t, "overrideUser", cfg.User)
+		assert.Equal(t, "override-user", cfg.User)
 		assert.False(t, cfg.Privileged)
 		assert.Equal(t, "always", cfg.Pull)
 		assert.Equal(t, int64(2*1024*1024*1024), cfg.Memory)
