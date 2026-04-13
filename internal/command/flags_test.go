@@ -138,14 +138,8 @@ func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Expected: cderun --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL node app.js
-		assert.Equal(t, "cderun", processed[0])
-		assert.Contains(t, processed, "--cderun-image")
-		assert.Contains(t, processed, "node:20-alpine")
-		assert.Contains(t, processed, "--cderun-tty")
-		assert.Contains(t, processed, "--cderun-env")
-		assert.Contains(t, processed, "KEY=VAL")
-		assert.Equal(t, "node", processed[6])
-		assert.Equal(t, "app.js", processed[7])
+		expected := []string{"cderun", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL", "node", "app.js"}
+		assert.Equal(t, expected, processed)
 	})
 
 	t.Run("P1 flag with equals sign (no skip next)", func(t *testing.T) {

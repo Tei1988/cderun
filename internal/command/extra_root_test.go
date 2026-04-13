@@ -138,12 +138,15 @@ func TestUnit_Command_WriteFormatted_Exhaustive(t *testing.T) {
 	}{Foo: "bar"}
 
 	t.Run("unsupported format", func(t *testing.T) {
-		err := o.writeFormatted(os.Stdout, "xml", data, nil)
+		// Use copy to avoid side effects
+		o2 := o
+		err := o2.writeFormatted(os.Stdout, "xml", data, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported output format: \"xml\"")
 	})
 
 	t.Run("json marshal error", func(t *testing.T) {
+		// Explicit copy to isolate hooks in subtest
 		o2 := o
 		o2.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 			return nil, assert.AnError
@@ -154,6 +157,7 @@ func TestUnit_Command_WriteFormatted_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("yaml marshal error", func(t *testing.T) {
+		// Explicit copy to isolate hooks in subtest
 		o2 := o
 		o2.yamlMarshal = func(v any) ([]byte, error) {
 			return nil, assert.AnError
