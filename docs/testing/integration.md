@@ -2,7 +2,7 @@
 
 ## 概要
 
-MockRuntime やファイルシステムとの連携を検証する。実際のコンテナランタイムが必要なテストでは `skipIfDockerBroken` でスキップする。
+MockRuntime やファイルシステムとの連携を検証する。実際のコンテナランタイムが必要なテストでは `skipIfRuntimeBroken` でスキップする。
 
 ## テストの基本構造
 
@@ -19,7 +19,7 @@ MockRuntime やファイルシステムとの連携を検証する。実際の�
 
 - `runCderun(args ...string) (stdout, stderr string, exitCode int, err error)`
 - `setupTestDir(t *testing.T) string`
-- `skipIfDockerBroken(t *testing.T, err error)`
+- `skipIfRuntimeBroken(t *testing.T, err error)`
 
 ## 主なテストシナリオ
 

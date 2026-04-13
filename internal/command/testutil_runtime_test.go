@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func skipIfDockerBroken(t *testing.T, err error) {
+func skipIfRuntimeBroken(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
 		return

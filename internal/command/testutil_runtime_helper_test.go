@@ -41,13 +41,13 @@ func setupTestDir(t *testing.T) string {
 }
 
 // checkRuntimeResult is a helper to standardize result checking in E2E tests.
-// It uses skipIfDockerBroken to handle environmental limitations reported via error or stderr.
+// It uses skipIfRuntimeBroken to handle environmental limitations reported via error or stderr.
 func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err error) {
 	t.Helper()
-	skipIfDockerBroken(t, err)
+	skipIfRuntimeBroken(t, err)
 	if exitCode != 0 {
 		// If the command failed but it might be due to environmental mount issues reported in stderr
-		skipIfDockerBroken(t, fmt.Errorf("exit code %d: %s", exitCode, stderr))
+		skipIfRuntimeBroken(t, fmt.Errorf("exit code %d: %s", exitCode, stderr))
 		t.Fatalf("command failed with exit code %d: %s", exitCode, stderr)
 	}
 }
