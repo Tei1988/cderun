@@ -25,6 +25,10 @@ This validation is applied to:
 
 Any string containing unsafe characters will cause an immediate resolution failure.
 
+## Anchor Boundary Validation (アンカー境界検証)
+
+マジックワード（`{{HOME}}`, `{{PWD}}` 等）やチルダ（`~`）を起点としたパス解決において、解決後のパスが起点ディレクトリの境界を越えて親ディレクトリへ遡っていないかを検証します。これにより、ユーザー入力による意図しないパスへのアクセスやディレクトリトラバーサル攻撃を防止します。詳細は [値の解決](./value-resolution.md#アンカー境界検証-anchor-boundary-validation) を参照してください。
+
 ## Tool Name Safety
 
 The `ValidateToolName` function enforces strict naming conventions for tool identifiers. Tool names are restricted to a whitelist of safe characters:
@@ -50,9 +54,9 @@ Invalid signals are rejected to prevent command injection into the underlying ru
 
 ## Registry Mismatch Validation
 
-To prevent accidental use of incorrect or unauthorized registries, `cderun` validates that the container image registry provided via CLI (or environment variables) matches the registry specified in the tool's configuration (`.tools.yaml`).
+誤ったレジストリや許可されていないレジストリの使用を防止するため、CLIや環境変数で指定されたイメージが、ツールの設定（`.tools.yaml`）で定義されたレジストリと一致するかを検証します。
 
-If a mismatch is detected (e.g., CLI specifies `private-reg.com/node` while configuration expects `docker.io/library/node`), `cderun` returns a `RegistryMismatchError`. This error includes both the expected and actual registries to assist in troubleshooting.
+一致の判定は、ホスト名とリポジトリ名（例: `docker.io/library/node`）に基づいて行われ、タグやダイジェストの違いは許容されます。不一致（例: 設定では `docker.io` を期待しているが CLI で `private-reg.com` が指定された場合）が検出されると、`RegistryMismatchError` を返し、実行を中断します。
 
 ## Absolute Mount Targets
 
