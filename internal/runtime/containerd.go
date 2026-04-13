@@ -121,7 +121,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if len(config.CapDrop) > 0 {
 		return "", errors.New("containerd runtime: CapDrop is not supported yet")
 	}
-	if config.Network != "" && config.Network != "bridge" {
+	if config.Network != "" {
 		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
 	}
 	if config.Hostname != "" {
