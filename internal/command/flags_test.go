@@ -118,3 +118,45 @@ func TestUnit_Flags_GetStringPointers_Coverage(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("P1 flag before subcommand is an error", func(t *testing.T) {
+		args := []string{"cderun", "--cderun-tty", "node", "--version"}
+		cmd := newRootCmd(&rootOptions{})
+		_, err := preprocessArgs(cmd, args)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand")
+	})
+
+	t.Run("Hoisting complex P1 flags with values", func(t *testing.T) {
+		// cderun node app.js --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL
+		args := []string{"cderun", "node", "app.js", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+
+		// Expected: cderun --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL node app.js
+		expected := []string{"cderun", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL", "node", "app.js"}
+		assert.Equal(t, expected, processed)
+	})
+
+	t.Run("P1 flag with equals sign (no skip next)", func(t *testing.T) {
+		args := []string{"cderun", "node", "--cderun-image=alpine", "ls"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"cderun", "--cderun-image=alpine", "node", "ls"}, processed)
+	})
+
+	t.Run("shorthand group with value", func(t *testing.T) {
+		// actually -p 80:80 node. 'p' takes arg.
+		args := []string{"cderun", "-p", "80:80", "node", "ls"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cderun", "-p", "80:80", "node", "ls"}, processed)
+	})
+}
