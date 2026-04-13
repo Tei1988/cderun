@@ -21,8 +21,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, stdout, "", exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "hello-cderun")
 	})
@@ -38,8 +37,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		require.NoError(t, err)
 
 		stdout, stderr, exitCode, err := runCderun("--mount", "type=bind,source="+hostFile+",target=/hello.txt", "cat", "/hello.txt")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode, "stderr: %s", stderr)
 		assert.Contains(t, stdout, "hello-from-host")
 	})
@@ -52,8 +50,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 
 		t.Setenv("HOST_VAR", "host-value")
 		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, stdout, "", exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "EXPLICIT_VAR=explicit-value")
 		assert.Contains(t, stdout, "HOST_VAR=host-value")
@@ -61,8 +58,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 
 	t.Run("port mapping", func(t *testing.T) {
 		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, "", "", exitCode, err)
 		assert.Equal(t, 0, exitCode)
 	})
 
@@ -73,8 +69,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "env")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, stdout, "", exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "MY_PWD="+tmpDir)
 	})
@@ -90,8 +85,7 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		require.NoError(t, err)
 
 		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
-		skipIfDockerBroken(t, err)
-		require.NoError(t, err)
+		checkRuntimeResult(t, stdout, "", exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "/mnt")
 	})

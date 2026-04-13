@@ -40,7 +40,7 @@ make test-runtime
 
 - `runCderun(args ...string)`: `cderun` をインプロセスで実行する（`runtime_inprocess_test.go` 用）
 - `runCderunE2E`: サブコマンドの指定を強制するヘルパー（`scenario_test.go` 用）
-- `skipIfDockerBroken(t, err)`: ランタイム環境が利用できない場合にスキップする
+- `skipIfRuntimeBroken(t, err)`: ランタイム環境が利用できない場合にスキップする
 - `findCderunBinary`: プロジェクトルートのビルド済みバイナリを動的に解決する（シナリオテスト用）
 
 ### サブコマンドの必須指定

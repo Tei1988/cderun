@@ -16,12 +16,7 @@ import (
 func TestScenario_Runtime_VersionCheck(t *testing.T) {
 	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
 	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
-	skipIfDockerBroken(t, err)
-	if err != nil || exitCode != 0 {
-		t.Logf("STDOUT: %s", stdout)
-		t.Logf("STDERR: %s", stderr)
-	}
-	require.NoError(t, err, "stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 
 	// Log docker version for visibility in CI matrix
@@ -35,12 +30,7 @@ func TestScenario_Execution_AlpineSh(t *testing.T) {
 		"alpine",
 		[]string{"echo", "hello-cderun-e2e"},
 	)
-	skipIfDockerBroken(t, err)
-	if err != nil || exitCode != 0 {
-		t.Logf("STDOUT: %s", stdout)
-		t.Logf("STDERR: %s", stderr)
-	}
-	require.NoError(t, err, "stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "hello-cderun-e2e")
 }
@@ -73,12 +63,7 @@ func TestScenario_Execution_VolumeMounting(t *testing.T) {
 		"alpine",
 		[]string{"cat", "/mnt/test/test.txt"},
 	)
-	skipIfDockerBroken(t, err)
-	if err != nil || exitCode != 0 {
-		t.Logf("STDOUT: %s", stdout)
-		t.Logf("STDERR: %s", stderr)
-	}
-	require.NoError(t, err, "stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, content, strings.TrimSpace(stdout))
 }
@@ -126,12 +111,7 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	}
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)
-	skipIfDockerBroken(t, err)
-	if err != nil || exitCode != 0 {
-		t.Logf("STDOUT: %s", stdout)
-		t.Logf("STDERR: %s", stderr)
-	}
-	require.NoError(t, err, "stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "nested-success")
 }
@@ -142,12 +122,7 @@ func TestScenario_DryRun_FormatsAndOutput(t *testing.T) {
 		"alpine",
 		[]string{"echo", "dry-run-test"},
 	)
-	skipIfDockerBroken(t, err)
-	if err != nil || exitCode != 0 {
-		t.Logf("STDOUT: %s", stdout)
-		t.Logf("STDERR: %s", stderr)
-	}
-	require.NoError(t, err, "stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "\"image\": \"public.ecr.aws/docker/library/alpine:latest\"")
 	assert.Contains(t, stdout, "dry-run-test")

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestScenario_DeviceMount_NullDevice(t *testing.T) {
@@ -25,12 +24,7 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 		"alpine",
 		[]string{"sh", "-c", "ls -l /dev/null2 && echo 'test' > /dev/null2"},
 	)
-
-	// Handle environment-specific Docker issues
-	skipIfDockerBroken(t, err)
-
-	require.NoError(t, err, "stderr: %s", stderr)
-	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
@@ -73,10 +67,6 @@ func TestScenario_Stdin_PipedInput(t *testing.T) {
 		"alpine",
 		[]string{"cat"},
 	)
-
-	skipIfDockerBroken(t, err)
-
-	require.NoError(t, err, "stderr: %s", stderr)
-	assert.Equal(t, 0, exitCode, "command failed, stderr: %s", stderr)
+	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, stdinData, stdout)
 }
