@@ -6,6 +6,70 @@ import (
 	"testing"
 )
 
+func TestUnit_Config_ValidateImageName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Basic image", "alpine", false},
+		{"Image with tag", "alpine:latest", false},
+		{"Image with registry", "docker.io/library/alpine:latest", false},
+		{"Image with port", "localhost:5000/my-image", false},
+		{"Image with digest", "alpine@sha256:abcdef123456", false},
+		{"Complex image", "my.registry.com:5000/user/repo:tag@sha256:digest", false},
+		{"Image with underscore", "my_image", false},
+		{"Image with dot", "my.image", false},
+		{"Empty image", "", false}, // Allowed (handled in resolver)
+		{"Invalid character (space)", "my image", true},
+		{"Invalid character (control)", "alpine\n", true},
+		{"Invalid character (semicolon)", "alpine;rm -rf /", true},
+		{"Invalid character (shell)", "alpine|ls", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateImageName(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateEnvKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Standard key", "MY_VAR", false},
+		{"Key with numbers", "VAR123", false},
+		{"Key starting with underscore", "_HIDDEN", false},
+		{"Key with lowercase", "myVar", false},
+		{"Empty key", "", true},
+		{"Key starting with number", "123VAR", true},
+		{"Key with hyphen", "MY-VAR", true},
+		{"Key with space", "MY VAR", true},
+		{"Key with dot", "MY.VAR", true},
+		{"Key with control char", "MY\nVAR", true},
+		{"Key with shell char", "MY;VAR", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateEnvKey(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidatePathChars(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -193,7 +257,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				ImageSet: true,
 				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
 			},
-			wantErr: "security validation failed for env[1] (key)",
+			wantErr: "invalid environment variable key",
 		},
 		{
 			name: "Multiline Env value (PEM) is allowed",
@@ -212,6 +276,23 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				Ports:    []string{"8080:80\r"},
 			},
 			wantErr: "security validation failed for ports[0]",
+		},
+		{
+			name: "Invalid ImageName in ResolveWithFS",
+			cli: &CLIOptions{
+				Image:    "alpine;rm -rf /",
+				ImageSet: true,
+			},
+			wantErr: "security validation failed for \"image\"",
+		},
+		{
+			name: "Invalid EnvKey in ResolveWithFS (CLI)",
+			cli: &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      []string{"INVALID-KEY=VALUE"},
+			},
+			wantErr: "invalid environment variable key",
 		},
 	}
 
