@@ -18,8 +18,8 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool,
 		return resolved.HangTimeout
 	}
 
-	// Fallback to default hangTimeout (e.g. 10s)
-	return hangTimeout
+	// Fallback to default HangTimeout (e.g. 10s)
+	return HangTimeout
 }
 
 func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {

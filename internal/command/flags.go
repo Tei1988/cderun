@@ -2,303 +2,107 @@ package command
 
 import (
 	"fmt"
+	"reflect"
 
 	"cderun/internal/config"
 
 	"github.com/spf13/cobra"
 )
 
-type boolFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     bool
-	p2Usage        string
-	p2Field        *bool
-	p1Field        *bool
-}
-
-type stringFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     string
-	p2Usage        string
-	p2Field        *string
-	p1Field        *string
-}
-
-type stringSliceFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	p2Usage        string
-	p2Field        *[]string
-	p1Field        *[]string
-}
-
-type intFlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     int
-	p2Usage        string
-	p2Field        *int
-	p1Field        *int
-}
-
-type float64FlagDef struct {
-	p2Name, p1Name string
-	p2Short        string
-	defaultVal     float64
-	p2Usage        string
-	p2Field        *float64
-	p1Field        *float64
-}
-
 func registerFlags(cmd *cobra.Command, o *rootOptions) {
-	boolDefs := make([]boolFlagDef, 0, len(config.BoolOptions))
-	for _, opt := range config.BoolOptions {
-		p2Field, p1Field := getBoolPointers(o, opt.Name)
-		if p2Field == nil || p1Field == nil {
-			panic(fmt.Sprintf("could not find fields for bool option %q", opt.Name))
-		}
-		boolDefs = append(boolDefs, boolFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	stringDefs := make([]stringFlagDef, 0, len(config.StringOptions))
-	for _, opt := range config.StringOptions {
-		p2Field, p1Field := getStringPointers(o, opt.Name)
-		if p2Field == nil || p1Field == nil {
-			panic(fmt.Sprintf("could not find fields for string option %q", opt.Name))
-		}
-		stringDefs = append(stringDefs, stringFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	intDefs := make([]intFlagDef, 0, len(config.IntOptions))
-	for _, opt := range config.IntOptions {
-		p2Field, p1Field := getIntPointers(o, opt.Name)
-		if p2Field == nil || p1Field == nil {
-			panic(fmt.Sprintf("could not find fields for int option %q", opt.Name))
-		}
-		intDefs = append(intDefs, intFlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	float64Defs := make([]float64FlagDef, 0, len(config.Float64Options))
-	for _, opt := range config.Float64Options {
-		p2Field, p1Field := getFloat64Pointers(o, opt.Name)
-		if p2Field == nil || p1Field == nil {
-			panic(fmt.Sprintf("could not find fields for float64 option %q", opt.Name))
-		}
-		float64Defs = append(float64Defs, float64FlagDef{
-			p2Name:     opt.Name,
-			p1Name:     "cderun-" + opt.Name,
-			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
-			p2Usage:    opt.Usage,
-			p2Field:    p2Field,
-			p1Field:    p1Field,
-		})
-	}
-
-	stringSliceDefs := make([]stringSliceFlagDef, 0, len(config.StringSliceOptions))
-	for _, opt := range config.StringSliceOptions {
-		p2Field, p1Field := getStringSlicePointers(o, opt.Name)
-		if p2Field == nil || p1Field == nil {
-			panic(fmt.Sprintf("could not find fields for string slice option %q", opt.Name))
-		}
-		stringSliceDefs = append(stringSliceDefs, stringSliceFlagDef{
-			p2Name:  opt.Name,
-			p1Name:  "cderun-" + opt.Name,
-			p2Short: opt.Shorthand,
-			p2Usage: opt.Usage,
-			p2Field: p2Field,
-			p1Field: p1Field,
-		})
-	}
-
 	f := cmd.PersistentFlags()
-	for _, d := range boolDefs {
-		if d.p2Short != "" {
-			f.BoolVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
-		} else {
-			f.BoolVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+
+	process := func(name, fieldName, shorthand, usage string, defVal any) {
+		if fieldName == "" {
+			fieldName = config.PascalCase(name)
 		}
-		f.BoolVar(d.p1Field, d.p1Name, d.defaultVal, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range stringDefs {
-		if d.p2Short != "" {
-			f.StringVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
-		} else {
-			f.StringVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+
+		v := reflect.ValueOf(o).Elem()
+		p2Field := v.FieldByName(fieldName)
+		if !p2Field.IsValid() {
+			panic(fmt.Sprintf("could not find field %q for option %q", fieldName, name))
 		}
-		f.StringVar(d.p1Field, d.p1Name, "", "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range intDefs {
-		if d.p2Short != "" {
-			f.IntVarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
-		} else {
-			f.IntVar(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+
+		p1FieldName := "Cderun" + fieldName
+		p1Field := v.FieldByName(p1FieldName)
+		if !p1Field.IsValid() {
+			panic(fmt.Sprintf("could not find field %q for option %q", p1FieldName, name))
 		}
-		f.IntVar(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
-	for _, d := range float64Defs {
-		if d.p2Short != "" {
-			f.Float64VarP(d.p2Field, d.p2Name, d.p2Short, d.defaultVal, d.p2Usage)
-		} else {
-			f.Float64Var(d.p2Field, d.p2Name, d.defaultVal, d.p2Usage)
+
+		switch dv := defVal.(type) {
+		case bool:
+			p2 := p2Field.Addr().Interface().(*bool)
+			p1 := p1Field.Addr().Interface().(*bool)
+			if shorthand != "" {
+				f.BoolVarP(p2, name, shorthand, dv, usage)
+			} else {
+				f.BoolVar(p2, name, dv, usage)
+			}
+			f.BoolVar(p1, "cderun-"+name, dv, "Override "+name+" setting (highest priority, can be used after subcommand)")
+		case string:
+			p2 := p2Field.Addr().Interface().(*string)
+			p1 := p1Field.Addr().Interface().(*string)
+			if shorthand != "" {
+				f.StringVarP(p2, name, shorthand, dv, usage)
+			} else {
+				f.StringVar(p2, name, dv, usage)
+			}
+			f.StringVar(p1, "cderun-"+name, "", "Override "+name+" setting (highest priority, can be used after subcommand)")
+		case int:
+			p2 := p2Field.Addr().Interface().(*int)
+			p1 := p1Field.Addr().Interface().(*int)
+			if shorthand != "" {
+				f.IntVarP(p2, name, shorthand, dv, usage)
+			} else {
+				f.IntVar(p2, name, dv, usage)
+			}
+			f.IntVar(p1, "cderun-"+name, 0, "Override "+name+" setting (highest priority, can be used after subcommand)")
+		case float64:
+			p2 := p2Field.Addr().Interface().(*float64)
+			p1 := p1Field.Addr().Interface().(*float64)
+			if shorthand != "" {
+				f.Float64VarP(p2, name, shorthand, dv, usage)
+			} else {
+				f.Float64Var(p2, name, dv, usage)
+			}
+			f.Float64Var(p1, "cderun-"+name, 0, "Override "+name+" setting (highest priority, can be used after subcommand)")
+		case []string:
+			p2 := p2Field.Addr().Interface().(*[]string)
+			p1 := p1Field.Addr().Interface().(*[]string)
+			if shorthand != "" {
+				f.StringArrayVarP(p2, name, shorthand, nil, usage)
+			} else {
+				f.StringArrayVar(p2, name, nil, usage)
+			}
+			f.StringArrayVar(p1, "cderun-"+name, nil, "Override "+name+" setting (highest priority, can be used after subcommand)")
 		}
-		f.Float64Var(d.p1Field, d.p1Name, 0, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
 	}
-	for _, d := range stringSliceDefs {
-		if d.p2Short != "" {
-			f.StringArrayVarP(d.p2Field, d.p2Name, d.p2Short, nil, d.p2Usage)
-		} else {
-			f.StringArrayVar(d.p2Field, d.p2Name, nil, d.p2Usage)
-		}
-		f.StringArrayVar(d.p1Field, d.p1Name, nil, "Override "+d.p2Name+" setting (highest priority, can be used after subcommand)")
-	}
+
+	for _, opt := range config.BoolOptions { process(opt.Name, opt.FieldName, opt.Shorthand, opt.Usage, opt.Default) }
+	for _, opt := range config.StringOptions { process(opt.Name, opt.FieldName, opt.Shorthand, opt.Usage, opt.Default) }
+	for _, opt := range config.IntOptions { process(opt.Name, opt.FieldName, opt.Shorthand, opt.Usage, opt.Default) }
+	for _, opt := range config.Float64Options { process(opt.Name, opt.FieldName, opt.Shorthand, opt.Usage, opt.Default) }
+	for _, opt := range config.StringSliceOptions { process(opt.Name, opt.FieldName, opt.Shorthand, opt.Usage, []string(nil)) }
 }
 
-func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
-	switch name {
-	case "tty":
-		return &o.tty, &o.cderunTTY
-	case "interactive":
-		return &o.interactive, &o.cderunInteractive
-	case "mount-socket":
-		return &o.mountSocket, &o.cderunMountSocket
-	case "mount-cderun":
-		return &o.mountCderun, &o.cderunMountCderun
-	case "mount-all-tools":
-		return &o.mountAllTools, &o.cderunMountAllTools
-	case "remove":
-		return &o.remove, &o.cderunRemove
-	case "publish-all":
-		return &o.publishAll, &o.cderunPublishAll
-	case "privileged":
-		return &o.privileged, &o.cderunPrivileged
-	case "strict-env":
-		return &o.strictEnv, &o.cderunStrictEnv
-	case "dry-run":
-		return &o.dryRun, &o.cderunDryRun
-	case "diagnosis":
-		return &o.diagnosis, &o.cderunDiagnosis
-	case "log-timestamp":
-		return &o.logTimestamp, &o.cderunLogTimestamp
-	default:
-		return nil, nil
+func getFlagPointers[T any](o *rootOptions, name, fieldName string) (p2, p1 *T) {
+	v := reflect.ValueOf(o).Elem()
+	if fieldName == "" {
+		fieldName = config.PascalCase(name)
 	}
-}
 
-func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
-	switch name {
-	case "pull-max-retries":
-		return &o.pullMaxRetries, &o.cderunPullMaxRetries
-	default:
-		return nil, nil
+	p2Field := v.FieldByName(fieldName)
+	if !p2Field.IsValid() {
+		panic(fmt.Sprintf("could not find field %q for option %q", fieldName, name))
 	}
-}
+	p2 = p2Field.Addr().Interface().(*T)
 
-func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
-	switch name {
-	case "cpus":
-		return &o.cpus, &o.cderunCPUs
-	default:
-		return nil, nil
+	p1FieldName := "Cderun" + fieldName
+	p1Field := v.FieldByName(p1FieldName)
+	if !p1Field.IsValid() {
+		panic(fmt.Sprintf("could not find field %q for option %q", p1FieldName, name))
 	}
-}
+	p1 = p1Field.Addr().Interface().(*T)
 
-func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
-	switch name {
-	case "env":
-		return &o.env, &o.cderunEnv
-	case "mount":
-		return &o.mounts, &o.cderunMounts
-	case "publish":
-		return &o.ports, &o.cderunPorts
-	case "expose":
-		return &o.expose, &o.cderunExpose
-	case "dns":
-		return &o.dns, &o.cderunDNS
-	case "add-host":
-		return &o.addHosts, &o.cderunAddHosts
-	case "cap-add":
-		return &o.capAdd, &o.cderunCapAdd
-	case "cap-drop":
-		return &o.capDrop, &o.cderunCapDrop
-	case "entrypoint":
-		return &o.entrypoint, &o.cderunEntrypoint
-	case "device":
-		return &o.devices, &o.cderunDevices
-	default:
-		return nil, nil
-	}
-}
-
-func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
-	switch name {
-	case "network":
-		return &o.network, &o.cderunNetwork
-	case "socket-path":
-		return &o.socketPath, &o.cderunSocketPath
-	case "mount-socket-path":
-		return &o.mountSocketPath, &o.cderunMountSocketPath
-	case "mount-cderun-path":
-		return &o.mountCderunPath, &o.cderunMountCderunPath
-	case "image":
-		return &o.image, &o.cderunImage
-	case "runtime":
-		return &o.runtimeName, &o.cderunRuntime
-	case "workdir":
-		return &o.workdir, &o.cderunWorkdir
-	case "mount-tools":
-		return &o.mountTools, &o.cderunMountTools
-	case "config":
-		return &o.configPath, &o.cderunConfigPath
-	case "tool-config":
-		return &o.toolConfigPath, &o.cderunToolConfigPath
-	case "hostname":
-		return &o.hostname, &o.cderunHostname
-	case "user":
-		return &o.user, &o.cderunUser
-	case "pull":
-		return &o.pull, &o.cderunPull
-	case "pull-backoff-base":
-		return &o.pullBackoffBase, &o.cderunPullBackoffBase
-	case "memory":
-		return &o.memory, &o.cderunMemory
-	case "dry-run-format":
-		return &o.dryRunFormat, &o.cderunDryRunFormat
-	case "diagnosis-format":
-		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
-	case "log-level":
-		return &o.logLevel, &o.cderunLogLevel
-	case "log-format":
-		return &o.logFormat, &o.cderunLogFormat
-	case "hang-timeout":
-		return &o.hangTimeout, &o.cderunHangTimeout
-	default:
-		return nil, nil
-	}
+	return p2, p1
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"unicode"
 	"strings"
 )
 
@@ -673,4 +674,34 @@ func PascalCase(s string) string {
 		builder.WriteString(part[1:])
 	}
 	return builder.String()
+}
+
+// KebabCase converts PascalCase (e.g. "DryRunFormat") to kebab-case (e.g. "dry-run-format").
+// It respects known initialisms (e.g. "TTY" -> "tty").
+func KebabCase(s string) string {
+	var builder strings.Builder
+	for i, r := range s {
+		if i > 0 && unicode.IsUpper(r) {
+			// Check if we're in the middle of an initialism
+			if !unicode.IsUpper(rune(s[i-1])) || (i+1 < len(s) && unicode.IsLower(rune(s[i+1]))) {
+				builder.WriteRune('-')
+			}
+		}
+		builder.WriteRune(unicode.ToLower(r))
+	}
+	res := builder.String()
+
+	// Handle initialisms that might be misinterpreted by the generic logic
+	// e.g. "CPUs" -> "cp-us" (generic) vs "cpus" (intended)
+	for _, v := range initialisms {
+		splitKebab := ""
+		for j, r := range v {
+			if j > 0 { splitKebab += "-" }
+			splitKebab += string(unicode.ToLower(r))
+		}
+		if splitKebab != "" && strings.Contains(res, splitKebab) {
+			res = strings.ReplaceAll(res, splitKebab, strings.ToLower(v))
+		}
+	}
+	return res
 }
