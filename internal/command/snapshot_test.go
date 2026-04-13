@@ -265,6 +265,20 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
 	})
 
+	// skipped ResolvePath returns empty string
+}
+
+func TestUnit_Snapshot_ReadMountInfo_Error(t *testing.T) {
+	oldReader := defaultMountInfoReader
+	t.Cleanup(func() { defaultMountInfoReader = oldReader })
+
+	mfs := &config.MockFileSystem{}
+	sentinel := errors.New("read mountinfo failed")
+	defaultMountInfoReader = &mockMountInfoReader{Err: sentinel}
+
+	upperdir, err := discoverOverlayUpperDir(mfs)
+	require.ErrorIs(t, err, sentinel)
+	assert.Empty(t, upperdir)
 }
 
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {
