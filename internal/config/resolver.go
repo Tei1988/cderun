@@ -1385,14 +1385,10 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	// We check for any of the sensitive keyword prefixes or exact matches in a case-insensitive manner.
+	upperKey := strings.ToUpper(key)
 	hasSensitive := false
 	for kw := range sensitiveKeywords {
-		// Keyword is always uppercase in sensitiveKeywords map.
-		// Check for uppercase, lowercase, and Titlecase/camelCase variants.
-		if strings.Contains(key, kw) ||
-			strings.Contains(key, strings.ToLower(kw)) ||
-			strings.Contains(key, strings.ToUpper(kw[:1])+strings.ToLower(kw[1:])) {
+		if strings.Contains(upperKey, kw) {
 			hasSensitive = true
 			break
 		}
@@ -1403,49 +1399,69 @@ func MaskSensitiveEnv(key, value string) string {
 
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
-	var segments []string
-	var current strings.Builder
+	// We perform a single pass and check segments against sensitiveKeywords without extra allocations.
+	useUpperDirectly := len(upperKey) == len(key)
+	start := -1
 	var lastRune rune
+
 	for i, r := range key {
-		// Boundary split logic
-		if i > 0 {
-			isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
-			isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
-			isAcronym := false
-			if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
-				// To check for acronym boundary (e.g. APIKey -> API, Key), we need to look ahead
-				// We can do this safely by checking the rest of the string
-				for _, nextRune := range key[i+len(string(r)):] {
-					if unicode.IsLower(nextRune) {
-						isAcronym = true
+		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || (r > 127 && (unicode.IsLetter(r) || unicode.IsDigit(r)))
+
+		if isAlphaNum {
+			if start == -1 {
+				start = i
+			} else {
+				// Boundary split logic (camelCase, letter/digit transition, acronyms)
+				isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
+				isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
+				isAcronym := false
+				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
+					// Check for acronym boundary (e.g. APIKey -> API, Key)
+					for _, nextRune := range key[i+len(string(r)):] {
+						if unicode.IsLower(nextRune) {
+							isAcronym = true
+						}
+						break
 					}
-					break
+				}
+
+				if isCamel || isLetterDigit || isAcronym {
+					var segment string
+					if useUpperDirectly {
+						segment = upperKey[start:i]
+					} else {
+						segment = strings.ToUpper(key[start:i])
+					}
+					if _, ok := sensitiveKeywords[segment]; ok {
+						return "[REDACTED]"
+					}
+					start = i
 				}
 			}
-
-			if isCamel || isLetterDigit || isAcronym {
-				if current.Len() > 0 {
-					segments = append(segments, strings.ToUpper(current.String()))
-					current.Reset()
-				}
-			}
-		}
-
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
 		} else {
-			if current.Len() > 0 {
-				segments = append(segments, strings.ToUpper(current.String()))
-				current.Reset()
+			if start != -1 {
+				var segment string
+				if useUpperDirectly {
+					segment = upperKey[start:i]
+				} else {
+					segment = strings.ToUpper(key[start:i])
+				}
+				if _, ok := sensitiveKeywords[segment]; ok {
+					return "[REDACTED]"
+				}
+				start = -1
 			}
 		}
 		lastRune = r
 	}
-	if current.Len() > 0 {
-		segments = append(segments, strings.ToUpper(current.String()))
-	}
 
-	for _, segment := range segments {
+	if start != -1 {
+		var segment string
+		if useUpperDirectly {
+			segment = upperKey[start:]
+		} else {
+			segment = strings.ToUpper(key[start:])
+		}
 		if _, ok := sensitiveKeywords[segment]; ok {
 			return "[REDACTED]"
 		}

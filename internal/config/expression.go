@@ -131,7 +131,8 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
-	hasExpr := strings.Contains(s, "{{")
+	startIdx := strings.Index(s, "{{")
+	hasExpr := startIdx != -1
 
 	// Fast-path: no expressions and no tilde expansion
 	if !hasExpr && !strings.HasPrefix(s, "~") {
@@ -154,19 +155,40 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		if hasExpr {
-			resolved = exprRegex.ReplaceAllStringFunc(s, func(match string) string {
-				if r.err != nil {
-					return match
+			var sb strings.Builder
+			last := 0
+			curr := s
+			for {
+				start := strings.Index(curr[last:], "{{")
+				if start == -1 {
+					sb.WriteString(curr[last:])
+					break
 				}
-				content := strings.TrimSpace(match[2 : len(match)-2])
+				start += last
+				sb.WriteString(curr[last:start])
 
-				res, err := r.resolveDirective(content)
-				if err != nil {
-					r.setError(err)
-					return match
+				end := strings.Index(curr[start:], "}}")
+				if end == -1 {
+					sb.WriteString(curr[start:])
+					break
 				}
-				return res
-			})
+				end += start
+
+				if r.err != nil {
+					sb.WriteString(curr[start : end+2])
+				} else {
+					content := strings.TrimSpace(curr[start+2 : end])
+					res, err := r.resolveDirective(content)
+					if err != nil {
+						r.setError(err)
+						sb.WriteString(curr[start : end+2])
+					} else {
+						sb.WriteString(res)
+					}
+				}
+				last = end + 2
+			}
+			resolved = sb.String()
 		}
 	}
 
