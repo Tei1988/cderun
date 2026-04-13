@@ -756,16 +756,17 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 	}
 
 	if rv.res.SocketPath == "" {
-		if rv.res.Runtime == "containerd" {
+		switch rv.res.Runtime {
+		case "containerd":
 			// Try common containerd paths
 			if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
 				rv.res.SocketPath = "/run/containerd/containerd.sock"
 			} else {
 				rv.res.SocketPath = "/var/run/containerd/containerd.sock"
 			}
-		} else if rv.res.Runtime == "podman" {
+		case "podman":
 			rv.res.SocketPath = "/run/podman/podman.sock"
-		} else {
+		default:
 			rv.res.SocketPath = "/var/run/docker.sock"
 		}
 	}
