@@ -303,7 +303,6 @@ func (o *rootOptions) populateCLIOptions(cmd *cobra.Command) config.CLIOptions {
 
 	return cli
 }
-
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.

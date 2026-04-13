@@ -21,8 +21,11 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 
 		switch dv := defVal.(type) {
 		case bool:
-			p2b, _ := p2.(*bool)
-			p1b, _ := p1.(*bool)
+			p2b, ok2 := p2.(*bool)
+			p1b, ok1 := p1.(*bool)
+			if !ok2 || !ok1 {
+				panic(fmt.Sprintf("internal error: field %s is not *bool", fieldName))
+			}
 			if shorthand != "" {
 				f.BoolVarP(p2b, name, shorthand, dv, usage)
 			} else {
@@ -30,8 +33,11 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 			}
 			f.BoolVar(p1b, "cderun-"+name, dv, "Override "+name+" setting (highest priority, can be used after subcommand)")
 		case string:
-			p2s, _ := p2.(*string)
-			p1s, _ := p1.(*string)
+			p2s, ok2 := p2.(*string)
+			p1s, ok1 := p1.(*string)
+			if !ok2 || !ok1 {
+				panic(fmt.Sprintf("internal error: field %s is not *string", fieldName))
+			}
 			if shorthand != "" {
 				f.StringVarP(p2s, name, shorthand, dv, usage)
 			} else {
@@ -39,8 +45,11 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 			}
 			f.StringVar(p1s, "cderun-"+name, "", "Override "+name+" setting (highest priority, can be used after subcommand)")
 		case int:
-			p2i, _ := p2.(*int)
-			p1i, _ := p1.(*int)
+			p2i, ok2 := p2.(*int)
+			p1i, ok1 := p1.(*int)
+			if !ok2 || !ok1 {
+				panic(fmt.Sprintf("internal error: field %s is not *int", fieldName))
+			}
 			if shorthand != "" {
 				f.IntVarP(p2i, name, shorthand, dv, usage)
 			} else {
@@ -48,8 +57,11 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 			}
 			f.IntVar(p1i, "cderun-"+name, 0, "Override "+name+" setting (highest priority, can be used after subcommand)")
 		case float64:
-			p2f, _ := p2.(*float64)
-			p1f, _ := p1.(*float64)
+			p2f, ok2 := p2.(*float64)
+			p1f, ok1 := p1.(*float64)
+			if !ok2 || !ok1 {
+				panic(fmt.Sprintf("internal error: field %s is not *float64", fieldName))
+			}
 			if shorthand != "" {
 				f.Float64VarP(p2f, name, shorthand, dv, usage)
 			} else {
@@ -57,8 +69,11 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 			}
 			f.Float64Var(p1f, "cderun-"+name, 0, "Override "+name+" setting (highest priority, can be used after subcommand)")
 		case []string:
-			p2ss, _ := p2.(*[]string)
-			p1ss, _ := p1.(*[]string)
+			p2ss, ok2 := p2.(*[]string)
+			p1ss, ok1 := p1.(*[]string)
+			if !ok2 || !ok1 {
+				panic(fmt.Sprintf("internal error: field %s is not *[]string", fieldName))
+			}
 			if shorthand != "" {
 				f.StringArrayVarP(p2ss, name, shorthand, nil, usage)
 			} else {
@@ -109,7 +124,10 @@ func getFlagPointersAny(o *rootOptions, name, fieldName string) (any, any) {
 
 func getFlagPointers[T any](o *rootOptions, name, fieldName string) (*T, *T) {
 	p2, p1 := getFlagPointersAny(o, name, fieldName)
-	p2t, _ := p2.(*T)
-	p1t, _ := p1.(*T)
+	p2t, ok2 := p2.(*T)
+	p1t, ok1 := p1.(*T)
+	if !ok2 || !ok1 {
+		panic(fmt.Sprintf("internal error: type mismatch for option %q", name))
+	}
 	return p2t, p1t
 }
