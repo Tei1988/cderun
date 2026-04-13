@@ -3,12 +3,9 @@ package config
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 )
-
-var exprRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
 
@@ -131,8 +128,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
-	startIdx := strings.Index(s, "{{")
-	hasExpr := startIdx != -1
+	hasExpr := strings.Contains(s, "{{")
 
 	// Fast-path: no expressions and no tilde expansion
 	if !hasExpr && !strings.HasPrefix(s, "~") {
