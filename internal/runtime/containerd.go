@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"crypto/rand"
+	"encoding/hex"
 	"math"
 	"os"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -67,11 +70,21 @@ func (r *ContainerdRuntime) Close() error {
 	return r.client.Close()
 }
 
+func (r *ContainerdRuntime) withNamespace(ctx context.Context) context.Context {
+	namespace := os.Getenv("CDERUN_CONTAINERD_NAMESPACE")
+	if namespace == "" {
+		namespace = "default"
+	}
+	return namespaces.WithNamespace(ctx, namespace)
+}
+
 // PullImage pulls the specified image.
 func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
 		return nil
 	}
+
+	ctx = r.withNamespace(ctx)
 
 	var lastErr error
 	for i := range maxRetries {
@@ -113,6 +126,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 // CreateContainer creates a new container.
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	ctx = r.withNamespace(ctx)
 	image, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
 		return "", fmt.Errorf("failed to get image: %w", err)
@@ -121,8 +135,16 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	containerID := strings.ReplaceAll("cderun-"+config.Image, ":", "-")
 	containerID = strings.ReplaceAll(containerID, "/", "-")
 	containerID = strings.ReplaceAll(containerID, ".", "-")
-	// Use a more unique ID to avoid collisions
-	containerID = fmt.Sprintf("%s-%d", containerID, time.Now().UnixNano())
+
+	// Use a cryptographically random suffix to avoid collisions.
+	randomSuffix := make([]byte, 8)
+	if _, err := rand.Read(randomSuffix); err != nil {
+		logging.Debug("failed to generate random suffix for container ID: %v", err)
+		// Fallback to timestamp if random generation fails
+		containerID = fmt.Sprintf("%s-%d", containerID, time.Now().UnixNano())
+	} else {
+		containerID = fmt.Sprintf("%s-%s", containerID, hex.EncodeToString(randomSuffix))
+	}
 
 	var args []string
 	if len(config.Entrypoint) > 0 {
@@ -231,6 +253,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 // StartContainer starts a created container.
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
+	ctx = r.withNamespace(ctx)
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
@@ -269,6 +292,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 
 // WaitContainer waits for a container to exit and returns its exit code.
 func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	ctx = r.withNamespace(ctx)
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to load container: %w", err)
@@ -303,6 +327,7 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	cleanupCtx = r.withNamespace(cleanupCtx)
 
 	container, err := r.client.LoadContainer(cleanupCtx, containerID)
 	if err != nil {
@@ -313,7 +338,11 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	}
 
 	task, err := container.Task(cleanupCtx, nil)
-	if err == nil {
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to get task: %w", err)
+		}
+	} else {
 		if _, err := task.Delete(cleanupCtx, client.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to delete task: %w", err)
@@ -370,6 +399,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return errors.New("terminal size overflow")
 	}
 
+	ctx = r.withNamespace(ctx)
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
@@ -385,6 +415,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 
 // SignalContainer sends a signal to a container.
 func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	ctx = r.withNamespace(ctx)
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("failed to load container: %w", err)
@@ -455,6 +486,7 @@ func parseSignal(sig string) (syscall.Signal, error) {
 
 // InspectContainer inspects the container.
 func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
+	ctx = r.withNamespace(ctx)
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return false, 0, fmt.Errorf("failed to load container: %w", err)

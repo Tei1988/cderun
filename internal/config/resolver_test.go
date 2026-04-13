@@ -562,7 +562,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Runtime)
-		assert.Equal(t, "/var/run/docker.sock", res.SocketPath) // Fallback to docker socket
+		assert.Equal(t, "/var/run/containerd/containerd.sock", res.SocketPath) // Should use default containerd socket
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {

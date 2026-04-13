@@ -732,12 +732,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
-	defer cleanup()
 	defer func() {
 		if err := rt.Close(); err != nil {
 			o.logger.Debug("failed to close runtime: %v", err)
 		}
 	}()
+	defer cleanup()
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
