@@ -936,7 +936,7 @@ func (rv *resolver) validateSecurity() error {
 		value     string
 		validator func(string) error
 	}{
-		{"image", rv.res.Image, nil},
+		{"image", rv.res.Image, ValidateImageName},
 		{"user", rv.res.User, ValidateUserName},
 		{"network", rv.res.Network, ValidateNetworkName},
 		{"hostname", rv.res.Hostname, ValidateHostname},
@@ -1018,6 +1018,9 @@ func (rv *resolver) validateSecurity() error {
 	for i, e := range rv.res.Env {
 		key, _, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
+			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
@@ -1268,6 +1271,9 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		if k, v, found := strings.Cut(resolvedE, "="); found {
 			key = k
 			val = v
+			if err := ValidateEnvKey(key); err != nil {
+				return nil, err
+			}
 		} else {
 			v, found := fs.LookupEnv(resolvedE)
 			if !found && strict {

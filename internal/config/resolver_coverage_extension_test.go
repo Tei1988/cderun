@@ -211,7 +211,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		cli := &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"BAD\nKEY=val"}}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
+		assert.Contains(t, err.Error(), "invalid environment variable key")
 	})
 
 	t.Run("security validation failure for mounts", func(t *testing.T) {

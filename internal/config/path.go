@@ -343,6 +343,8 @@ var (
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 	userPartRegex = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
 	portRegex     = regexp.MustCompile(`^(\d+)(/tcp|/udp)?$`)
+	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
+	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -553,6 +555,28 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		}
 	}
 
+	return nil
+}
+
+// ValidateEnvKey ensures the environment variable key follows a safe and standard format.
+func ValidateEnvKey(s string) error {
+	if s == "" {
+		return fmt.Errorf("environment variable key cannot be empty")
+	}
+	if !envKeyRegex.MatchString(s) {
+		return fmt.Errorf("invalid environment variable key: %q", s)
+	}
+	return nil
+}
+
+// ValidateImageName ensures the image name follows a safe and standard format.
+func ValidateImageName(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !imageRegex.MatchString(s) {
+		return fmt.Errorf("invalid image name: %q", s)
+	}
 	return nil
 }
 
