@@ -115,9 +115,11 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 			attachGracePeriod: 1 * time.Second,
 		}
 		waitStarted := make(chan struct{})
+		exitNotified := make(chan struct{})
 		mockRuntime := &runtime.MockRuntime{
 			WaitFunc: func(ctx context.Context, id string) (int, error) {
 				close(waitStarted)
+				close(exitNotified)
 				return 42, nil
 			},
 		}
@@ -128,9 +130,7 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 		}
 
 		go func() {
-			<-waitStarted
-			// Ensure WaitContainer has priority in select by giving it a tiny head start
-			time.Sleep(10 * time.Millisecond)
+			<-exitNotified
 			att.attachDone <- errors.New("attach failure after exit")
 		}()
 
