@@ -1,9 +1,11 @@
 package config
 
 import (
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestUnit_Config_ValidateImageName(t *testing.T) {
@@ -144,6 +146,36 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ResolvePath_FindDir_PWD_Anchor(t *testing.T) {
+	t.Parallel()
+	pwd := "/home/user/project/subdir"
+	projectRoot := "/home/user/project"
+	mfs := &MockFileSystem{
+		WD:      pwd,
+		HomeDir: "/home/user",
+		Dirs: map[string]bool{
+			projectRoot:                         true,
+			filepath.Join(projectRoot, ".git"):  true,
+			pwd:                                true,
+		},
+	}
+
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	require.NoError(t, err)
+
+	t.Run("find_dir alone is safe", func(t *testing.T) {
+		resolved, err := ResolvePath("{{find_dir:.git}}", pwd, r)
+		require.NoError(t, err)
+		assert.Equal(t, projectRoot, resolved)
+	})
+
+	t.Run("PWD with find_dir traversal is rejected", func(t *testing.T) {
+		_, err := ResolvePath("{{PWD}}/{{find_dir:.git}}", pwd, r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "path traversal detected")
+	})
+}
+
 func TestUnit_Config_ValidateToolName(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -158,7 +190,7 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 		{"Absolute path tool name", "/abs/path", true},
 		{"Parent directory traversal", "../parent", true},
 		{"Subdirectory tool name (Linux)", "subdir/tool", true},
-		{"Subdirectory tool name (Windows)", "subdir\\tool", true},
+		{"Subdirectory tool name (Windows)", "subdir\tool", true},
 		{"Control character in tool name", "tool\tname", true},
 	}
 
