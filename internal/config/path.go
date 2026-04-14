@@ -1,8 +1,9 @@
 package config
 
 import (
-	"path"
 	"fmt"
+	"net"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -345,6 +346,7 @@ var (
 	portRegex     = regexp.MustCompile(`^(\d+)(/tcp|/udp)?$`)
 	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
 	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	capRegex      = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -622,23 +624,113 @@ func ValidateUserName(s string) error {
 	return nil
 }
 
-// ValidatePort ensures the port mapping (host:container/proto) is valid.
+// ValidatePort ensures the port mapping is valid.
+// Supports formats: [ip:][hostPort:]containerPort[/protocol]
 func ValidatePort(s string) error {
 	if s == "" {
 		return nil
 	}
-	// Format: [hostPort:]containerPort[/protocol]
+
+	proto := ""
 	remainder := s
-	if parts := strings.Split(remainder, ":"); len(parts) == 2 {
-		hostPort := parts[0]
-		if !portRegex.MatchString(hostPort) {
-			return fmt.Errorf("invalid host port: %q", hostPort)
+	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
+		remainder = parts[0]
+		proto = parts[1]
+		if proto != "tcp" && proto != "udp" {
+			return fmt.Errorf("invalid protocol: %q", proto)
 		}
-		remainder = parts[1]
 	}
 
-	if !portRegex.MatchString(remainder) {
-		return fmt.Errorf("invalid port mapping: %q", remainder)
+	parts := strings.Split(remainder, ":")
+	switch len(parts) {
+	case 1:
+		// containerPort
+		if _, err := strconv.Atoi(parts[0]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[0])
+		}
+	case 2:
+		// hostPort:containerPort OR ip:containerPort
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[1])
+		}
+		// If parts[0] is not a number, it must be an IP
+		if _, err := strconv.Atoi(parts[0]); err != nil {
+			if net.ParseIP(parts[0]) == nil {
+				return fmt.Errorf("invalid host port or IP: %q", parts[0])
+			}
+		}
+	case 3:
+		// ip:hostPort:containerPort
+		if _, err := strconv.Atoi(parts[2]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[2])
+		}
+		if parts[1] != "" {
+			if _, err := strconv.Atoi(parts[1]); err != nil {
+				return fmt.Errorf("invalid host port: %q", parts[1])
+			}
+		}
+		if net.ParseIP(parts[0]) == nil {
+			return fmt.Errorf("invalid IP: %q", parts[0])
+		}
+	default:
+		return fmt.Errorf("invalid port format: %q", s)
+	}
+
+	return nil
+}
+
+// ValidateDNS ensures the DNS setting is a valid IP address.
+func ValidateDNS(s string) error {
+	if s == "" {
+		return nil
+	}
+	if net.ParseIP(s) == nil {
+		return fmt.Errorf("invalid DNS IP: %q", s)
+	}
+	return nil
+}
+
+// ValidateAddHost ensures the custom host-to-IP mapping (host:ip) is valid.
+func ValidateAddHost(s string) error {
+	if s == "" {
+		return nil
+	}
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid add-host format: %q (expected host:ip)", s)
+	}
+	if err := ValidateHostname(parts[0]); err != nil {
+		return fmt.Errorf("invalid host in add-host: %w", err)
+	}
+	if parts[1] != "host-gateway" && net.ParseIP(parts[1]) == nil {
+		return fmt.Errorf("invalid IP in add-host: %q", parts[1])
+	}
+	return nil
+}
+
+// ValidateCapability ensures the Linux capability follows a safe format.
+func ValidateCapability(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !capRegex.MatchString(s) {
+		return fmt.Errorf("invalid Linux capability: %q", s)
+	}
+	return nil
+}
+
+var workdirRegex = regexp.MustCompile(`^/[a-zA-Z0-9._\-/]*$`)
+
+// ValidateWorkdir ensures the working directory is a valid absolute path.
+func ValidateWorkdir(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !path.IsAbs(s) {
+		return fmt.Errorf("working directory must be an absolute path: %q", s)
+	}
+	if !workdirRegex.MatchString(s) {
+		return fmt.Errorf("invalid characters in working directory: %q", s)
 	}
 	return nil
 }

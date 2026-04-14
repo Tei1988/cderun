@@ -156,7 +156,7 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 				ImageSet: true,
 				Ports:    []string{"80:80/tcp!"},
 			},
-			wantErr: "security validation failed for ports[0]: invalid port mapping",
+			wantErr: "security validation failed for ports[0]: invalid protocol",
 		},
 		{
 			name: "invalid expose port (invalid protocol)",
