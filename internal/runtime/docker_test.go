@@ -825,6 +825,7 @@ func TestUnit_Docker_New_Error(t *testing.T) {
 	// client.WithHost("invalid") should fail during client.NewClientWithOpts
 	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create docker client")
 	assert.Contains(t, err.Error(), "unable to parse docker host")
 }
 

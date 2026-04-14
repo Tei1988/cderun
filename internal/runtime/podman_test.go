@@ -27,7 +27,7 @@ func TestUnit_Podman_New_Error(t *testing.T) {
 	// "unix://" is invalid and should fail.
 	_, err := NewPodmanRuntime("")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create docker client")
+	assert.Contains(t, err.Error(), "creating docker client")
 }
 
 func TestUnit_Podman_DialContext(t *testing.T) {

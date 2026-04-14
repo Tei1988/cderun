@@ -31,7 +31,9 @@ func TestSignalValidation(t *testing.T) {
 		{"Lowercase sigterm", "sigterm", false},
 		{"Empty signal", "", false},
 		{"Custom signal SIGUSR1", "SIGUSR1", false},
-		{"Invalid signal string", "SIGINVALID", false}, // signalRegex handles it but SignalContainer just passes it if it matches regex. Wait.
+		// "SIGINVALID" matches the regex ^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$,
+		// so SignalContainer accepts it and propagates it to the daemon.
+		{"Invalid signal string", "SIGINVALID", false},
 		{"Injection attempt ; rm -rf", "SIGTERM; rm -rf /", true},
 		{"Injection attempt \n", "SIGTERM\n", true},
 	}

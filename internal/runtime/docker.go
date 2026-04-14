@@ -64,16 +64,13 @@ func NewDockerRuntimeWithName(socket string, name string) (ContainerRuntime, err
 // NewDockerRuntimeWithOptions creates a new Docker runtime instance with specific client options.
 func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (ContainerRuntime, error) {
 	if socket == "" {
-		return nil, fmt.Errorf("failed to create docker client: empty socket path")
+		return nil, fmt.Errorf("creating docker client: empty socket path")
 	}
-	if socket != "" {
-		opts = append(opts, client.WithHost("unix://"+socket))
-	}
-	opts = append(opts, client.WithAPIVersionNegotiation())
+	opts = append(opts, client.WithHost("unix://"+socket))
 
 	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
 
 	return &DockerRuntime{
