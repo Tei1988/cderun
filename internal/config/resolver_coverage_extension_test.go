@@ -626,6 +626,89 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"tty\" not found")
 	})
 
+	t.Run("applyIntOption registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "pull-max-retries", func() {
+			delete(fieldInfo, "pull-max-retries")
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"pull-max-retries\" not found")
+	})
+
+	t.Run("applyFloat64Option registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "cpus", func() {
+			delete(fieldInfo, "cpus")
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"cpus\" not found")
+	})
+
+	t.Run("applyStringSliceOption registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "dns", func() {
+			delete(fieldInfo, "dns")
+		})
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"dns\" not found")
+	})
+
+	t.Run("validateSecurity exhaustive critical fields", func(t *testing.T) {
+		// Valid "warning" alias for log-level
+		cli := &CLIOptions{
+			Image:       "alpine",
+			ImageSet:    true,
+			LogLevel:    "warning",
+			LogLevelSet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "warning", res.LogLevel)
+
+		// Invalid log-level
+		cli.LogLevel = "invalid"
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log level: \"invalid\"")
+
+		// Invalid runtime
+		cli.LogLevel = "warn"
+		cli.Runtime = "rkt"
+		cli.RuntimeSet = true
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported runtime: \"rkt\"")
+
+		// Invalid dry-run-format
+		cli.Runtime = "docker"
+		cli.DryRunFormat = "xml"
+		cli.DryRunFormatSet = true
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported dry-run format: \"xml\"")
+
+		// Invalid diagnosis-format
+		cli.DryRunFormat = "yaml"
+		cli.DiagnosisFormat = "xml"
+		cli.DiagnosisFormatSet = true
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported diagnosis format: \"xml\"")
+
+		// Invalid log-format
+		cli.DiagnosisFormat = "yaml"
+		cli.LogFormat = "xml"
+		cli.LogFormatSet = true
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log format: \"xml\"")
+	})
 }
 
 func partOfCLIOptionsImage() int {

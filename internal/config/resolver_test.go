@@ -932,3 +932,47 @@ func TestUnit_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 		assert.Equal(t, "my-reg.com/node:20", res.Image)
 	})
 }
+
+func TestUnit_Resolver_Transitive_Env(t *testing.T) {
+	t.Parallel()
+	t.Run("mount-tools from env transitively enables mount-cderun and mount-socket", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_MOUNT_TOOLS": "git,node",
+			},
+		}
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"git", "node"}, res.MountTools)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("mount-all-tools from env transitively enables mount-cderun and mount-socket", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_MOUNT_ALL_TOOLS": "true",
+			},
+		}
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.MountAllTools)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+}
+
+func TestUnit_Resolver_Env_Strict_Missing(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{}
+	cli := &CLIOptions{
+		Image:    "alpine",
+		ImageSet: true,
+		Env:      []string{"MISSING_HOST_VAR"},
+		StrictEnv: true,
+		StrictEnvSet: true,
+	}
+	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required environment variable not found: \"MISSING_HOST_VAR\"")
+}
