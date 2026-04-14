@@ -167,12 +167,18 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 
 	for _, m := range config.Mounts {
+		mOpts := []string{"bind"}
+		if m.ReadOnly {
+			mOpts = append(mOpts, "ro")
+		} else {
+			mOpts = append(mOpts, "rw")
+		}
 		opts = append(opts, oci.WithMounts([]specs.Mount{
 			{
 				Type:        m.Type,
 				Source:      m.Source,
 				Destination: m.Target,
-				Options:     []string{"bind", "rw"}, // Defaulting to rw for now
+				Options:     mOpts,
 			},
 		}))
 	}
@@ -191,6 +197,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		ctx,
 		id,
 		client.WithImage(img),
+		client.WithNewSnapshot(id, img),
 		client.WithNewSpec(opts...),
 	)
 	if err != nil {
@@ -256,7 +263,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 		return err
 	}
 
-	return container.Delete(ctx)
+	return container.Delete(ctx, client.WithSnapshotCleanup)
 }
 
 // AttachContainer attaches to a container's IO streams by creating a task.
