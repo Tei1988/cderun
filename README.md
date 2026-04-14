@@ -78,9 +78,9 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority (P1 > P2 CLI Flags > P3 Env Vars > P4 Tool Config > P5 Global Config > P6 Hardcoded Defaults).
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy (**P1** > **P2** CLI Flags > **P3** Env Vars > **P4** Tool Config > **P5** Global Config > **P6** Hardcoded Defaults).
 
-In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the subcommand as passthrough arguments. Placing a P1 flag before the subcommand in Wrapper Mode will result in an error.
+In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the container.
 
 ```bash
 # Standard Wrapper Mode: P1 flags go AFTER the subcommand
@@ -92,13 +92,13 @@ cderun --cderun-image node:20-alpine node app.js
 
 #### Hoisting Mechanics
 
-Hoisting is a preprocessing step that scans the argument list to separate `cderun`'s internal overrides from the arguments intended for the wrapped tool.
+Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
 
-1. **Detection**: `cderun` identifies the **subcommand** (the first non-flag argument that is not a value associated with a flag registered in `cderun`'s dynamic `FlagSet`).
-2. **Extraction**: It gathers all flags prefixed with `--cderun-` (and their values) that appear *after* the subcommand.
-3. **Hoisting**: These gathered flags are internally moved before the subcommand. This ensures they are correctly parsed as `cderun` overrides (P1) and prevents them from being passed to the containerized tool.
+1. **Detection**: `cderun` scans for the **subcommand** boundary.
+2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
+3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
 
-In **Symlink Mode (Polyglot Entry Point)**, only `--cderun-` prefixed flags are hoisted. This prevents collisions between `cderun`'s internal settings and the flags of the wrapped tool (e.g., `node --tty` passes `--tty` to `node`, while `node --cderun-tty` enables `cderun`'s TTY allocation).
+This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
 **Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
 

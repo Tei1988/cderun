@@ -101,6 +101,8 @@
 
 1. **[診断モード (完了)](./diagnosis-mode.md)**
 
+  - システム診断情報と利用可能なツールの表示
+
 ### セキュリティ機能
 
 1. **[セキュリティバリデーション (完了)](./security-validations.md)**
@@ -115,20 +117,18 @@
 
   - コンテナへのシグナル送信時における厳密なシグナル名検証メカニズムについて解説します。
 
-  - システム診断情報と利用可能なツールの表示
-
 ## テストドキュメント
 
 テストに関するドキュメントは [`docs/testing/`](../testing/) を参照すること。
 
-- [ランタイムテスト](../testing/runtime-tests.md)
-- [統合テスト](../testing/integration.md)
-- [テスト構成・網羅性計画](../testing/organization.md)
-- [テストカバレッジ計測](../testing/coverage.md)
+  - [ランタイムテスト](../testing/runtime-tests.md)
+  - [統合テスト](../testing/integration.md)
+  - [テスト構成・網羅性計画](../testing/organization.md)
+  - [テストカバレッジ計測](../testing/coverage.md)
 
 ## 技術リファレンス
 
-- **[/proc/self/mountinfo 仕様](../references/proc-self-mountinfo.md)**
+  - **[/proc/self/mountinfo 仕様](../references/proc-self-mountinfo.md)**
 
 ## 機能間の関係
 
