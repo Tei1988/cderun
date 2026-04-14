@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/google/uuid"
+	"github.com/moby/sys/signal"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -99,7 +100,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries-1, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
@@ -136,8 +137,8 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 // CreateContainer creates a new container based on the provided config.
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	if config.Network != "" && config.Network != "none" {
-		return "", fmt.Errorf("network configuration is not supported yet in containerd runtime")
+	if config.Network != "" && config.Network != "none" && config.Network != "bridge" {
+		return "", fmt.Errorf("network configuration %q is not supported yet in containerd runtime", config.Network)
 	}
 
 	img, err := r.client.GetImage(ctx, config.Image)
@@ -244,10 +245,10 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	r.mu.Unlock()
 
 	if hasTask {
-		_, _ = task.Delete(ctx)
+		_, _ = task.Delete(ctx) //nolint:errcheck
 	}
 	if io != nil {
-		_ = io.Close()
+		_ = io.Close() //nolint:errcheck
 	}
 
 	container, err := r.client.LoadContainer(ctx, containerID)
@@ -319,7 +320,7 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return fmt.Errorf("task not found for container %s", containerID)
 	}
 
-	return task.Resize(ctx, uint32(cols), uint32(rows))
+	return task.Resize(ctx, uint32(cols), uint32(rows)) //nolint:gosec
 }
 
 // SignalContainer sends a signal to a container task.
@@ -332,12 +333,14 @@ func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID str
 		return fmt.Errorf("task not found for container %s", containerID)
 	}
 
-	// Simple signal parsing (containerd expects syscall.Signal)
-	// For simplicity, we only handle common names or numbers if we wanted to be robust,
-	// but here we might just pass it to task.Kill which expects a syscall.Signal.
-	// However, our interface takes a string.
-	// We'll use a best-effort approach or just SIGTERM for now as a placeholder for robustness.
-	// In reality, we'd need a string-to-signal mapper.
+	if sig == "" {
+		sig = "SIGTERM"
+	}
 
-	return task.Kill(ctx, 15) // 15 = SIGTERM as default
+	s, err := signal.ParseSignal(sig)
+	if err != nil {
+		return fmt.Errorf("invalid signal %q: %w", sig, err)
+	}
+
+	return task.Kill(ctx, s)
 }
