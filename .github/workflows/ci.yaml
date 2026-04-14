@@ -297,10 +297,23 @@ jobs:
           CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
           TEST_HOST_TMP_DIR: /tmp/tmp-runtime-containerd
           CDERUN_HANG_TIMEOUT: 10s
+          XDG_RUNTIME_DIR: /tmp
+          TMPDIR: /tmp
         run: |
           mkdir -p $TEST_HOST_TMP_DIR
           containerd --version
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          sudo -E env "PATH=$PATH" "XDG_RUNTIME_DIR=/tmp" "TMPDIR=/tmp" go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-containerd.out ./internal/command/...
+          sudo chown $(id -u):$(id -g) coverage-containerd.out
+
+      - name: Diagnostic on Failure
+        if: failure()
+        run: |
+          echo "--- Containerd Status ---"
+          sudo service containerd status || true
+          echo "--- Mount Info ---"
+          mount | grep containerd || true
+          echo "--- Env ---"
+          env
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2

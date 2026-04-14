@@ -149,7 +149,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	id := uuid.New().String()
 
 	var opts []oci.SpecOpts
-	opts = append(opts, oci.WithImageConfig(img))
+	opts = append(opts, oci.WithDefaultSpec(), oci.WithImageConfig(img))
 	if config.Workdir != "" {
 		opts = append(opts, oci.WithProcessCwd(config.Workdir))
 	}
@@ -251,19 +251,21 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	delete(r.ioWait, containerID)
 	r.mu.Unlock()
 
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	if hasTask {
-		_, _ = task.Delete(ctx) //nolint:errcheck
+		_, _ = task.Delete(cleanupCtx) //nolint:errcheck
 	}
 	if io != nil {
 		_ = io.Close() //nolint:errcheck
 	}
 
-	container, err := r.client.LoadContainer(ctx, containerID)
+	container, err := r.client.LoadContainer(cleanupCtx, containerID)
 	if err != nil {
 		return err
 	}
 
-	return container.Delete(ctx, client.WithSnapshotCleanup)
+	return container.Delete(cleanupCtx, client.WithSnapshotCleanup)
 }
 
 // AttachContainer attaches to a container's IO streams by creating a task.
