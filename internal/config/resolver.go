@@ -639,7 +639,7 @@ func (rv *resolver) resolveEarly() error {
 }
 
 func (rv *resolver) resolveStandardOptions() error {
-	// Phase 2: Registry-based options (String & Bool)
+	// Phase 2: Registry-based options (String)
 
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
