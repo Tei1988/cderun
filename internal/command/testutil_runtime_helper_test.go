@@ -45,6 +45,9 @@ func setupTestDir(t *testing.T) string {
 func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err error) {
 	t.Helper()
 	skipIfRuntimeBroken(t, err)
+	if err != nil {
+		t.Fatalf("command returned error: %v", err)
+	}
 	if exitCode != 0 {
 		// If the command failed but it might be due to environmental mount issues reported in stderr
 		skipIfRuntimeBroken(t, fmt.Errorf("exit code %d: %s", exitCode, stderr))

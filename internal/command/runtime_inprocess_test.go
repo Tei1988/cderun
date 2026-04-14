@@ -20,8 +20,8 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		err := os.WriteFile(".tools.yaml", []byte("echo:\n  image: "+testImage+"\n  entrypoint: [\"echo\"]"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("echo", "hello-cderun")
-		checkRuntimeResult(t, stdout, "", exitCode, err)
+		stdout, stderr, exitCode, err := runCderun("echo", "hello-cderun")
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "hello-cderun")
 	})
@@ -49,16 +49,16 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Setenv("HOST_VAR", "host-value")
-		stdout, _, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
-		checkRuntimeResult(t, stdout, "", exitCode, err)
+		stdout, stderr, exitCode, err := runCderun("-e", "EXPLICIT_VAR=explicit-value", "-e", "HOST_VAR", "env")
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "EXPLICIT_VAR=explicit-value")
 		assert.Contains(t, stdout, "HOST_VAR=host-value")
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
-		_, _, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
-		checkRuntimeResult(t, "", "", exitCode, err)
+		stdout, stderr, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
 	})
 
@@ -68,8 +68,8 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		err := os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  env:\n    - MY_PWD={{PWD}}"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "env")
-		checkRuntimeResult(t, stdout, "", exitCode, err)
+		stdout, stderr, exitCode, err := runCderun("mytool", "env")
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "MY_PWD="+tmpDir)
 	})
@@ -84,8 +84,8 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 		err = os.WriteFile(".tools.yaml", []byte("mytool:\n  image: "+testImage+"\n  mounts:\n    - type: bind\n      source: ./subdir\n      target: /mnt"), 0o644)
 		require.NoError(t, err)
 
-		stdout, _, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
-		checkRuntimeResult(t, stdout, "", exitCode, err)
+		stdout, stderr, exitCode, err := runCderun("mytool", "ls", "-d", "/mnt")
+		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
 		assert.Contains(t, stdout, "/mnt")
 	})

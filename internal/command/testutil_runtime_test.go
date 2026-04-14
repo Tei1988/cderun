@@ -30,7 +30,7 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 		t.Skip("Skipping test due to Docker SIGKILL timeout (likely environment resource constraint)")
 	}
 	// Detect containerd/gRPC stream cancellation or deadline exceeded
-	if strings.Contains(msg, "deadlineexceeded") || strings.Contains(msg, "rst_stream") {
+	if strings.Contains(msg, "deadlineexceeded") || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "rst_stream") {
 		t.Skipf("Skipping test due to gRPC stream/deadline issue: %v", err)
 	}
 }
