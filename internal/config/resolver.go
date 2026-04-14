@@ -339,23 +339,23 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
+func extractStringSliceValue(v reflect.Value, set bool) ([]string, bool) {
+	if set && v.IsValid() {
+		if val, ok := v.Interface().([]string); ok {
+			return val, true
+		}
+	}
+	return nil, false
+}
+
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
-	var p1v, p2v []string
-	if p1Set {
-		if v, ok := p1Val.Interface().([]string); ok {
-			p1v = v
-		}
-	}
-	if p2Set {
-		if v, ok := p2Val.Interface().([]string); ok {
-			p2v = v
-		}
-	}
+	p1v, p1Set := extractStringSliceValue(p1Val, p1Set)
+	p2v, p2Set := extractStringSliceValue(p2Val, p2Set)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -368,10 +368,10 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	return nil
 }
 
-func (rv *resolver) applyStringOption(opt StringOption) error {
+func (rv *resolver) resolveStringValue(opt StringOption) (string, int, error) {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
-		return err
+		return "", -1, err
 	}
 
 	def := OptionDef[string]{
@@ -382,7 +382,15 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	}
 
 	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetString(resolved)
+	return resolved, info.targetIdx, nil
+}
+
+func (rv *resolver) applyStringOption(opt StringOption) error {
+	resolved, targetIdx, err := rv.resolveStringValue(opt)
+	if err != nil {
+		return err
+	}
+	rv.resVal.Field(targetIdx).SetString(resolved)
 	return nil
 }
 
@@ -403,31 +411,24 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	return nil
 }
 
+func extractIntValue(v reflect.Value, set bool) (int, bool) {
+	if set && v.IsValid() {
+		k := v.Kind()
+		if k >= reflect.Int && k <= reflect.Int64 {
+			return int(v.Int()), true
+		}
+	}
+	return 0, false
+}
+
 func (rv *resolver) applyIntOption(opt IntOption) error {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
-	p1Int := 0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p1Int = int(p1Val.Int())
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Int := 0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p2Int = int(p2Val.Int())
-		} else {
-			p2Set = false
-		}
-	}
+	p1Int, p1Set := extractIntValue(p1Val, p1Set)
+	p2Int, p2Set := extractIntValue(p2Val, p2Set)
 
 	def := OptionDef[*int]{
 		EnvKey:       opt.EnvKey,
@@ -441,31 +442,24 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	return nil
 }
 
+func extractFloatValue(v reflect.Value, set bool) (float64, bool) {
+	if set && v.IsValid() {
+		k := v.Kind()
+		if k == reflect.Float32 || k == reflect.Float64 {
+			return v.Float(), true
+		}
+	}
+	return 0.0, false
+}
+
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
-	p1Float := 0.0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p1Float = p1Val.Float()
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Float := 0.0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p2Float = p2Val.Float()
-		} else {
-			p2Set = false
-		}
-	}
+	p1Float, p1Set := extractFloatValue(p1Val, p1Set)
+	p2Float, p2Set := extractFloatValue(p2Val, p2Set)
 
 	def := OptionDef[*float64]{
 		EnvKey:       opt.EnvKey,
@@ -480,18 +474,11 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 }
 
 func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration, positive bool) error {
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	valStr, _, err := rv.resolveStringValue(opt)
 	if err != nil {
 		return err
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
@@ -509,18 +496,11 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 }
 
 func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	valStr, _, err := rv.resolveStringValue(opt)
 	if err != nil {
 		return err
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if valStr != "" {
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
@@ -603,33 +583,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	return rv.res, nil
 }
 
-func (rv *resolver) resolveEarly() error {
-	// Phase 1: Early resolution (Diagnosis & StrictEnv)
-	for _, name := range []string{"diagnosis", "strict-env"} {
-		opt, ok := GetBoolOption(name)
-		if !ok {
-			return fmt.Errorf("registry mismatch: early boolean option %q not found", name)
-		}
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (rv *resolver) resolveStandardOptions() error {
-	// Phase 2: Registry-based options (String & Bool)
-
-	for _, opt := range StringOptions {
-		if opt.SkipResolution {
-			continue
-		}
-
-		if err := rv.applyStringOption(opt); err != nil {
-			return err
-		}
-	}
-
+func (rv *resolver) resolveImage() error {
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
 		return &ImageNotFoundError{Tool: rv.subcommand}
 	}
@@ -666,6 +620,39 @@ func (rv *resolver) resolveStandardOptions() error {
 		if logging.DebugEnabled() {
 			logging.Debug("Resolved Image: %s", rv.res.Image)
 		}
+	}
+	return nil
+}
+
+func (rv *resolver) resolveEarly() error {
+	// Phase 1: Early resolution (Diagnosis & StrictEnv)
+	for _, name := range []string{"diagnosis", "strict-env"} {
+		opt, ok := GetBoolOption(name)
+		if !ok {
+			return fmt.Errorf("registry mismatch: early boolean option %q not found", name)
+		}
+		if err := rv.applyBoolOption(opt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) resolveStandardOptions() error {
+	// Phase 2: Registry-based options (String & Bool)
+
+	for _, opt := range StringOptions {
+		if opt.SkipResolution {
+			continue
+		}
+
+		if err := rv.applyStringOption(opt); err != nil {
+			return err
+		}
+	}
+
+	if err := rv.resolveImage(); err != nil {
+		return err
 	}
 
 	// Phase 3: Remaining Boolean options
@@ -930,7 +917,31 @@ func (rv *resolver) resolveCustomParsing() error {
 }
 
 func (rv *resolver) validateSecurity() error {
-	// Security: validate resolved configuration for injection characters and identifier formats.
+	if err := rv.validateCriticalFields(); err != nil {
+		return err
+	}
+	if err := rv.validateCriticalSlices(); err != nil {
+		return err
+	}
+	if err := rv.validateEnvSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateMountSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateDeviceSecurity(); err != nil {
+		return err
+	}
+
+	if rv.res.Privileged {
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) validateCriticalFields() error {
 	criticalFields := []struct {
 		name      string
 		value     string
@@ -988,7 +999,10 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateCriticalSlices() error {
 	criticalSlices := []struct {
 		name      string
 		slice     []string
@@ -1014,7 +1028,10 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
 		key, _, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
@@ -1024,7 +1041,10 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateMountSecurity() error {
 	for i, m := range rv.res.Mounts {
 		if err := validatePathChars(m.Source); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
@@ -1033,19 +1053,16 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateDeviceSecurity() error {
 	for i, d := range rv.res.Devices {
 		if err := validatePathChars(d.PathOnHost); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
-		}
-	}
-
-	if rv.res.Privileged {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 		}
 	}
 	return nil
