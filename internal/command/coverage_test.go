@@ -108,6 +108,132 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 		assert.Contains(t, err.Error(), "early attach error")
 		assert.Equal(t, 0, exitCode)
 	})
+
+	t.Run("AttachContainer fails after container exit within grace period", func(t *testing.T) {
+		o := &rootOptions{
+			logger:            logging.NewLogger(),
+			attachGracePeriod: 1 * time.Second,
+		}
+		waitStarted := make(chan struct{})
+		exitNotified := make(chan struct{})
+		mockRuntime := &runtime.MockRuntime{
+			WaitFunc: func(ctx context.Context, id string) (int, error) {
+				close(waitStarted)
+				close(exitNotified)
+				return 42, nil
+			},
+		}
+		cmd := &cobra.Command{}
+		att := &attachResult{
+			attachDone:   make(chan error, 1),
+			cancelAttach: func() {},
+		}
+
+		go func() {
+			<-exitNotified
+			att.attachDone <- errors.New("attach failure after exit")
+		}()
+
+		exitCode, err := o.waitForCompletion(context.Background(), cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{}, false, att)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "attach failure after exit")
+		assert.Equal(t, 42, exitCode)
+	})
+}
+
+func TestUnit_Root_LoadConfigs_Coverage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CDERUN_CONFIG environment variable", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_CONFIG": "/env/cderun.yaml",
+			},
+			Files: map[string][]byte{
+				"/env/cderun.yaml": []byte("runtime: podman"),
+			},
+		}
+		o := defaultOptions()
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd := newRootCmd(&o)
+
+		_, globalCfg, _, _, err := o.loadConfigs(cmd)
+		require.NoError(t, err)
+		assert.Equal(t, "podman", globalCfg.Runtime)
+	})
+
+	t.Run("CDERUN_TOOL_CONFIG environment variable", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_TOOL_CONFIG": "/env/tools.yaml",
+			},
+			Files: map[string][]byte{
+				"/env/tools.yaml": []byte("node: { image: node:env }"),
+			},
+		}
+		o := defaultOptions()
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd := newRootCmd(&o)
+
+		toolsCfg, _, _, _, err := o.loadConfigs(cmd)
+		require.NoError(t, err)
+		assert.Equal(t, "node:env", toolsCfg["node"].Image)
+	})
+}
+
+type mockLargeFd struct{}
+
+func (m mockLargeFd) Fd() uintptr {
+	// Return a value that is definitely larger than math.MaxInt64 on any platform
+	// but uintptr can hold it. Since math.MaxInt is what we check in getFd.
+	return ^uintptr(0)
+}
+
+func TestUnit_Root_GetFd_LargeValue(t *testing.T) {
+	t.Parallel()
+	fd, ok := getFd(mockLargeFd{})
+	assert.False(t, ok)
+	assert.Equal(t, -1, fd)
+}
+
+func TestUnit_Root_AttachContainer_Timeout(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AttachContainer returns nil but does not signal ready", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		o := &rootOptions{logger: logging.NewLogger()}
+		mockRuntime := &runtime.MockRuntime{
+			AttachFunc: func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+				// Success but no ready signal
+				<-ctx.Done()
+				return nil
+			},
+		}
+		cmd := &cobra.Command{}
+
+		att, err := o.attachContainer(ctx, cmd, mockRuntime, "test-container", &container.ContainerConfig{})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Nil(t, att)
+	})
+
+	t.Run("AttachContainer returns error before ready", func(t *testing.T) {
+		o := &rootOptions{logger: logging.NewLogger()}
+		mockRuntime := &runtime.MockRuntime{
+			AttachFunc: func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+				return errors.New("immediate attach error")
+			},
+		}
+		cmd := &cobra.Command{}
+
+		att, err := o.attachContainer(context.Background(), cmd, mockRuntime, "test-container", &container.ContainerConfig{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "immediate attach error")
+		assert.Nil(t, att)
+	})
 }
 
 func TestUnit_Root_WriteFormatted(t *testing.T) {
