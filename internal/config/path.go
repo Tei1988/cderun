@@ -343,7 +343,6 @@ var (
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 	userPartRegex = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
-	portRegex     = regexp.MustCompile(`^(\d+)(/tcp|/udp)?$`)
 	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
 	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 	capRegex      = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
@@ -743,7 +742,7 @@ func ValidateExposePort(s string) error {
 	// Format: port[-port][/protocol]
 	proto := ""
 	remainder := s
-	if parts := strings.Split(s, "/"); len(parts) == 2 {
+	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
 		remainder = parts[0]
 		proto = parts[1]
 		if proto != "tcp" && proto != "udp" {
@@ -751,7 +750,7 @@ func ValidateExposePort(s string) error {
 		}
 	}
 
-	if parts := strings.Split(remainder, "-"); len(parts) == 2 {
+	if parts := strings.SplitN(remainder, "-", 2); len(parts) == 2 {
 		for _, p := range parts {
 			if _, err := strconv.Atoi(p); err != nil {
 				return fmt.Errorf("invalid port range: %q", remainder)
