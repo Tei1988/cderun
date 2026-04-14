@@ -27,4 +27,7 @@ type ContainerRuntime interface {
 	// Information
 	Name() string
 	InspectContainer(ctx context.Context, containerID string) (isRunning bool, exitCode int, err error)
+
+	// Cleanup
+	Close() error
 }

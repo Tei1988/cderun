@@ -27,6 +27,7 @@ const (
 )
 
 type dockerClient interface {
+	Close() error
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
@@ -49,26 +50,30 @@ type DockerRuntime struct {
 	sleepFunc func(context.Context, time.Duration) error
 }
 
-// NewDockerRuntime creates a new DockerRuntime instance with name "docker".
-func NewDockerRuntime(socket string) (*DockerRuntime, error) {
+// NewDockerRuntime creates a new Docker runtime instance with name "docker".
+func NewDockerRuntime(socket string) (ContainerRuntime, error) {
 	return NewDockerRuntimeWithOptions(socket, "docker", client.WithAPIVersionNegotiation())
 }
 
-// NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
+// NewDockerRuntimeWithName creates a new Docker runtime instance with a specific name.
 // It uses default API version negotiation.
-func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
+func NewDockerRuntimeWithName(socket string, name string) (ContainerRuntime, error) {
 	return NewDockerRuntimeWithOptions(socket, name, client.WithAPIVersionNegotiation())
 }
 
-// NewDockerRuntimeWithOptions creates a new DockerRuntime instance with specific client options.
-func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (*DockerRuntime, error) {
-	allOpts := append([]client.Opt{
-		client.WithHost("unix://" + socket),
-	}, opts...)
+// NewDockerRuntimeWithOptions creates a new Docker runtime instance with specific client options.
+func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (ContainerRuntime, error) {
+	if socket == "" {
+		return nil, fmt.Errorf("failed to create docker client: empty socket path")
+	}
+	if socket != "" {
+		opts = append(opts, client.WithHost("unix://"+socket))
+	}
+	opts = append(opts, client.WithAPIVersionNegotiation())
 
-	cli, err := client.NewClientWithOpts(allOpts...)
+	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %w", err)
+		return nil, err
 	}
 
 	return &DockerRuntime{
@@ -355,6 +360,11 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
+}
+
+// Close closes the underlying docker client.
+func (d *DockerRuntime) Close() error {
+	return d.client.Close()
 }
 
 func isRetryablePullError(err error) bool {

@@ -89,6 +89,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 }
 
 type mockDockerClient struct {
+	closeErr         error
 	imageInspectErr  error
 	imageInspectFunc func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
 	inspectCount     int
@@ -126,6 +127,10 @@ type mockDockerClient struct {
 	attachErr   error
 	inspectResp dockercontainer.InspectResponse
 	inspectErr  error
+}
+
+func (m *mockDockerClient) Close() error {
+	return m.closeErr
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -804,14 +809,14 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 	t.Run("sleep completes", func(t *testing.T) {
 		ctx := context.Background()
-		err := runtime.sleepFunc(ctx, 1*time.Millisecond)
+		err := runtime.(*DockerRuntime).sleepFunc(ctx, 1*time.Millisecond)
 		require.NoError(t, err)
 	})
 
 	t.Run("sleep cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := runtime.sleepFunc(ctx, 1*time.Second)
+		err := runtime.(*DockerRuntime).sleepFunc(ctx, 1*time.Second)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
@@ -820,7 +825,7 @@ func TestUnit_Docker_New_Error(t *testing.T) {
 	// client.WithHost("invalid") should fail during client.NewClientWithOpts
 	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create docker client")
+	assert.Contains(t, err.Error(), "unable to parse docker host")
 }
 
 type syncFailingReader struct {

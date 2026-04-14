@@ -730,6 +730,11 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
+	defer func() {
+		if closeErr := rt.Close(); closeErr != nil {
+			o.logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}()
 	defer cleanup()
 
 	// Detect if host stdin is a terminal once
@@ -769,15 +774,29 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		return nil, "", nil, &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 	}
 
+	// Ensure runtime is closed on early error paths
+	closed := false
+	defer func() {
+		if !closed && err != nil {
+			if closeErr := rt.Close(); closeErr != nil {
+				o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
+			}
+		}
+	}()
+
 	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
+	var containerID string
+	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
 		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
 	}
 
-	containerID, err := rt.CreateContainer(ctx, cc)
+	containerID, err = rt.CreateContainer(ctx, cc)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
 	}
+
+	// Success path, caller will own rt
+	closed = true
 
 	cleanup := func() {}
 	if cc.Remove {
