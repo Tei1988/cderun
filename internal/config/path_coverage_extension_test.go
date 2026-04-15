@@ -154,16 +154,16 @@ func TestUnit_Config_Path_ParseDeviceConfig_Exhaustive(t *testing.T) {
 func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 	t.Run("r is nil with tilde", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
-		err := validateAnchorBoundaries("~", "/home/user/file", nil, mfs)
+		err := validateAnchorBoundaries("~", "/home/user/file", "/work", nil, mfs)
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("~", "/etc/passwd", nil, mfs)
+		err = validateAnchorBoundaries("~", "/etc/passwd", "/work", nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "path traversal detected")
 	})
 
 	t.Run("r is nil with non-tilde anchor", func(t *testing.T) {
-		err := validateAnchorBoundaries("{{HOME}}", "/home/user/file", nil, &MockFileSystem{})
+		err := validateAnchorBoundaries("{{HOME}}", "/home/user/file", "/work", nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "expression resolver required")
 	})
@@ -176,10 +176,10 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("{{BASE_HOME}}/file", "/base/home/file", r, r.fs)
+		err = validateAnchorBoundaries("{{BASE_HOME}}/file", "/base/home/file", "/work", r, r.fs)
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("{{BASE_PWD}}/file", "/base/pwd/file", r, r.fs)
+		err = validateAnchorBoundaries("{{BASE_PWD}}/file", "/base/pwd/file", "/work", r, r.fs)
 		require.NoError(t, err)
 	})
 
@@ -188,22 +188,24 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("{{BASE_HOME}}/file", "/home/file", r, r.fs)
+		err = validateAnchorBoundaries("{{BASE_HOME}}/file", "/home/file", "/work", r, r.fs)
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("{{BASE_PWD}}/file", "/pwd/file", r, r.fs)
+		err = validateAnchorBoundaries("{{BASE_PWD}}/file", "/pwd/file", "/work", r, r.fs)
 		require.NoError(t, err)
 	})
 
 	t.Run("fs.Abs failure for anchorPath", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			HomeDir: "/home",
-			AbsErr:  assert.AnError,
+			HomeDir: "home", // relative path to trigger fs.Abs
 		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		err = validateAnchorBoundaries("~", "/home/file", r, mfs)
+		// Make fs.Abs fail
+		mfs.AbsErr = assert.AnError
+
+		err = validateAnchorBoundaries("~", "/home/file", "/work", r, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get absolute path for anchor")
 	})
@@ -218,14 +220,14 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 		// Make fs.Abs fail for a specific path
 		mfs.AbsErr = assert.AnError
 		// validateAnchorBoundaries calls fs.Abs(resolved) if resolved is not absolute.
-		err = validateAnchorBoundaries("~", "relative/path", r, mfs)
+		err = validateAnchorBoundaries("~", "relative/path", "/work", r, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get absolute path for resolved path")
 	})
 
 	t.Run("anchorPath is empty", func(t *testing.T) {
 		r := &ExpressionResolver{Home: ""}
-		err := validateAnchorBoundaries("~", "/file", r, &MockFileSystem{})
+		err := validateAnchorBoundaries("~", "/file", "/work", r, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "anchor path is empty")
 	})
@@ -234,7 +236,7 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{
 			HomeDirErr: assert.AnError,
 		}
-		err := validateAnchorBoundaries("~", "/file", nil, mfs)
+		err := validateAnchorBoundaries("~", "/file", "/work", nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get anchor home directory")
 	})

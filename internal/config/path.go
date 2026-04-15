@@ -335,9 +335,8 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 }
 
 var (
-	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
-	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{(.+?)}})|(^~|[/\\]~)`)
+	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
+	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
@@ -346,6 +345,58 @@ var (
 	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
 	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 )
+
+type anchorInfo struct {
+	raw      string
+	isTilde  bool
+	exprName string
+}
+
+func findAnchors(s string) []anchorInfo {
+	var res []anchorInfo
+	n := len(s)
+
+	// Check for tilde at start
+	if strings.HasPrefix(s, "~") {
+		res = append(res, anchorInfo{raw: "~", isTilde: true})
+	}
+
+	for i := 0; i < n; i++ {
+		// Check for tilde at boundary (after / or \)
+		if i > 0 && (s[i-1] == '/' || s[i-1] == '\\') && s[i] == '~' {
+			res = append(res, anchorInfo{raw: "~", isTilde: true})
+			continue
+		}
+
+		// Check for {{ ... }} with nesting support
+		if i+1 < n && s[i] == '{' && s[i+1] == '{' {
+			start := i
+			depth := 0
+			foundEnd := false
+			for j := i; j+1 < n; j++ {
+				if s[j] == '{' && s[j+1] == '{' {
+					depth++
+					j++
+				} else if s[j] == '}' && s[j+1] == '}' {
+					depth--
+					j++
+					if depth == 0 {
+						raw := s[start : j+1]
+						content := strings.TrimSpace(s[start+2 : j-1])
+						res = append(res, anchorInfo{raw: raw, exprName: content})
+						i = j
+						foundEnd = true
+						break
+					}
+				}
+			}
+			if !foundEnd {
+				// Unbalanced, skip this start
+			}
+		}
+	}
+	return res
+}
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
@@ -382,7 +433,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 
 	absPath := filepath.Clean(p)
 
-	if err := validateAnchorBoundaries(raw, absPath, r, fs); err != nil {
+	if err := validateAnchorBoundaries(raw, absPath, baseDir, r, fs); err != nil {
 		return "", err
 	}
 
@@ -476,9 +527,9 @@ func validatePathChars(s string) error {
 	return nil
 }
 
-func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
-	allMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
-	if len(allMatches) == 0 {
+func validateAnchorBoundaries(original, resolved string, baseDir string, r *ExpressionResolver, fs FileSystem) error {
+	anchors := findAnchors(original)
+	if len(anchors) == 0 {
 		return nil
 	}
 
@@ -492,12 +543,10 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 	absResolved = filepath.Clean(absResolved)
 
-	for _, matches := range allMatches {
+	for _, anchor := range anchors {
 		var anchorPath string
-		exprMatch := matches[1]
-		tildeMatch := matches[3]
 
-		if tildeMatch != "" {
+		if anchor.isTilde {
 			if r != nil {
 				anchorPath = r.Home
 			} else {
@@ -511,20 +560,29 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 			if r == nil {
 				return fmt.Errorf("expression resolver required for anchor validation")
 			}
-			resolvedAnchor, err := r.ResolveString(exprMatch)
+			resolvedAnchor, err := r.ResolveString(anchor.raw)
 			if err != nil {
-				return fmt.Errorf("failed to resolve anchor expression %q: %w", exprMatch, err)
+				return fmt.Errorf("failed to resolve anchor expression %q: %w", anchor.raw, err)
 			}
 			anchorPath = resolvedAnchor
 		}
 
 		if anchorPath == "" {
-			return fmt.Errorf("anchor path is empty for %q", matches[0])
+			return fmt.Errorf("anchor path is empty for %q", anchor.raw)
 		}
 
-		absAnchor, err := fs.Abs(anchorPath)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
+		// Normalize anchorPath the same way as the main path
+		if !filepath.IsAbs(anchorPath) && (strings.HasPrefix(anchorPath, "."+string(filepath.Separator)) || strings.HasPrefix(anchorPath, ".."+string(filepath.Separator)) || anchorPath == "." || anchorPath == "..") {
+			anchorPath = filepath.Join(baseDir, anchorPath)
+		}
+
+		absAnchor := anchorPath
+		if !filepath.IsAbs(absAnchor) {
+			a, err := fs.Abs(anchorPath)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for anchor %q: %w", anchorPath, err)
+			}
+			absAnchor = a
 		}
 		absAnchor = filepath.Clean(absAnchor)
 
