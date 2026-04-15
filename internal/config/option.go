@@ -193,7 +193,10 @@ func resolveStringSliceCommaOpt(
 
 // resolveFloat64Opt resolves a float64 option through P1-P6.
 func resolveFloat64Opt(
-	def OptionDef[*float64],
+	envKey string,
+	toolGetter func(ToolConfig) *float64,
+	globalGetter func(CDERunConfig) *float64,
+	fallback float64,
 	p1Set bool, p1Val float64,
 	p2Set bool, p2Val float64,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
@@ -205,34 +208,34 @@ func resolveFloat64Opt(
 	if p2Set {
 		return p2Val
 	}
-	if def.EnvKey != "" {
-		if env := fs.Getenv(def.EnvKey); env != "" {
+	if envKey != "" {
+		if env := fs.Getenv(envKey); env != "" {
 			if f, err := strconv.ParseFloat(env, 64); err == nil {
 				return f
 			}
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if toolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			if f := def.ToolGetter(tool); f != nil {
+			if f := toolGetter(tool); f != nil {
 				return *f
 			}
 		}
 	}
-	if def.GlobalGetter != nil && global != nil {
-		if f := def.GlobalGetter(*global); f != nil {
+	if globalGetter != nil && global != nil {
+		if f := globalGetter(*global); f != nil {
 			return *f
 		}
 	}
-	if def.Fallback != nil {
-		return *def.Fallback
-	}
-	return 0
+	return fallback
 }
 
 // resolveIntOpt resolves an int option through P1-P6.
 func resolveIntOpt(
-	def OptionDef[*int],
+	envKey string,
+	toolGetter func(ToolConfig) *int,
+	globalGetter func(CDERunConfig) *int,
+	fallback int,
 	p1Set bool, p1Val int,
 	p2Set bool, p2Val int,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
@@ -244,27 +247,24 @@ func resolveIntOpt(
 	if p2Set {
 		return p2Val
 	}
-	if def.EnvKey != "" {
-		if env := fs.Getenv(def.EnvKey); env != "" {
+	if envKey != "" {
+		if env := fs.Getenv(envKey); env != "" {
 			if i, err := strconv.Atoi(env); err == nil {
 				return i
 			}
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if toolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			if i := def.ToolGetter(tool); i != nil {
+			if i := toolGetter(tool); i != nil {
 				return *i
 			}
 		}
 	}
-	if def.GlobalGetter != nil && global != nil {
-		if i := def.GlobalGetter(*global); i != nil {
+	if globalGetter != nil && global != nil {
+		if i := globalGetter(*global); i != nil {
 			return *i
 		}
 	}
-	if def.Fallback != nil {
-		return *def.Fallback
-	}
-	return 0
+	return fallback
 }

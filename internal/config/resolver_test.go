@@ -37,90 +37,80 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
-		def := OptionDef[*float64]{
-			EnvKey:   "TEST_FLOAT",
-			Fallback: ptr(1.0),
-		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
 
 		// Env
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := resolveFloat64Opt("TEST_FLOAT", nil, nil, 1.0, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.InDelta(t, 2.5, res, 1e-9)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveFloat64Opt("TEST_FLOAT", nil, nil, 1.0, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveFloat64Opt("TEST_FLOAT", nil, nil, 1.0, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Tool getter
 		mfs.Env = nil
 		f2 := 2.0
-		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		toolGetter := func(tc ToolConfig) *float64 { return &f2 }
+		res = resolveFloat64Opt("TEST_FLOAT", toolGetter, nil, 1.0, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
 		assert.InDelta(t, 2.0, res, 1e-9)
 
 		// Global getter
-		def.ToolGetter = nil
 		f3 := 3.0
-		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		globalGetter := func(c CDERunConfig) *float64 { return &f3 }
+		res = resolveFloat64Opt("TEST_FLOAT", nil, globalGetter, 1.0, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
 		assert.InDelta(t, 3.0, res, 1e-9)
 
 		// P2 CLI
-		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		res = resolveFloat64Opt("TEST_FLOAT", nil, nil, 1.0, false, 0, true, 4.0, "node", nil, nil, mfs)
 		assert.InDelta(t, 4.0, res, 1e-9)
 
 		// P1 Override
-		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		res = resolveFloat64Opt("TEST_FLOAT", nil, nil, 1.0, true, 5.0, false, 0, "node", nil, nil, mfs)
 		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
 	t.Run("resolveIntOpt", func(t *testing.T) {
-		def := OptionDef[*int]{
-			EnvKey:   "TEST_INT",
-			Fallback: ptr(10),
-		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
 
 		// Env
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := resolveIntOpt("TEST_INT", nil, nil, 10, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.Equal(t, 20, res)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveIntOpt("TEST_INT", nil, nil, 10, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.Equal(t, 10, res)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_INT": "invalid"}
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = resolveIntOpt("TEST_INT", nil, nil, 10, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.Equal(t, 10, res)
 
 		// Tool getter
 		mfs.Env = nil
 		i2 := 30
-		def.ToolGetter = func(tc ToolConfig) *int { return &i2 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		toolGetter := func(tc ToolConfig) *int { return &i2 }
+		res = resolveIntOpt("TEST_INT", toolGetter, nil, 10, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
 		assert.Equal(t, 30, res)
 
 		// Global getter
-		def.ToolGetter = nil
 		i3 := 40
-		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		globalGetter := func(c CDERunConfig) *int { return &i3 }
+		res = resolveIntOpt("TEST_INT", nil, globalGetter, 10, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
 		assert.Equal(t, 40, res)
 
 		// P2 CLI
-		res = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		res = resolveIntOpt("TEST_INT", nil, nil, 10, false, 0, true, 50, "node", nil, nil, mfs)
 		assert.Equal(t, 50, res)
 
 		// P1 Override
-		res = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		res = resolveIntOpt("TEST_INT", nil, nil, 10, true, 60, false, 0, "node", nil, nil, mfs)
 		assert.Equal(t, 60, res)
 	})
 
@@ -646,7 +636,6 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
 		require.Error(t, err)
-
 
 		// Expression error
 		mfsExpr := &MockFileSystem{WD: "/app"}

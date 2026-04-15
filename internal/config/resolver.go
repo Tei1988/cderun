@@ -429,14 +429,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		}
 	}
 
-	def := OptionDef[*int]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved := resolveIntOpt(opt.EnvKey, opt.ToolGetter, opt.GlobalGetter, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
@@ -467,14 +460,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		}
 	}
 
-	def := OptionDef[*float64]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved := resolveFloat64Opt(opt.EnvKey, opt.ToolGetter, opt.GlobalGetter, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
@@ -1051,7 +1037,6 @@ func (rv *resolver) validateSecurity() error {
 	return nil
 }
 
-
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
 	if p1Set {
@@ -1138,7 +1123,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		dcs = global.Defaults.Devices
 	}
 
-	var res []container.DeviceMapping
+	res := make([]container.DeviceMapping, 0, len(dcs))
 	for _, dc := range dcs {
 		resolved, err := dc.Resolve(r)
 		if err != nil {
@@ -1260,7 +1245,7 @@ func validateImageRegistryMatch(cliImage, configImage string) error {
 }
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var res []string
+	res := make([]string, 0, len(env))
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
@@ -1340,7 +1325,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		mcs = global.Defaults.Mounts
 	}
 
-	var res []container.Mount
+	res := make([]container.Mount, 0, len(mcs))
 	for _, mc := range mcs {
 		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
 			hostPath, err := mc.Source.Resolve(r)
@@ -1391,10 +1376,28 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	upperKey := strings.ToUpper(key)
 	hasSensitive := false
 	for kw := range sensitiveKeywords {
-		if strings.Contains(upperKey, kw) {
+		// Non-allocating case-insensitive check
+		found := false
+		for i := 0; i <= len(key)-len(kw); i++ {
+			match := true
+			for j := 0; j < len(kw); j++ {
+				c := key[i+j]
+				if c >= 'a' && c <= 'z' {
+					c -= 'a' - 'A'
+				}
+				if c != kw[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				found = true
+				break
+			}
+		}
+		if found {
 			hasSensitive = true
 			break
 		}
@@ -1402,6 +1405,8 @@ func MaskSensitiveEnv(key, value string) string {
 	if !hasSensitive {
 		return value
 	}
+
+	upperKey := strings.ToUpper(key)
 
 	// Split by non-alphanumeric characters and also split camelCase.
 	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
