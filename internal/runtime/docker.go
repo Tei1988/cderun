@@ -357,6 +357,14 @@ func (d *DockerRuntime) Name() string {
 	return d.name
 }
 
+// Close closes the underlying docker client.
+func (d *DockerRuntime) Close() error {
+	if c, ok := d.client.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
+}
+
 func isRetryablePullError(err error) bool {
 	if err == nil {
 		return false

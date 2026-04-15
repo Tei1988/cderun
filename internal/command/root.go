@@ -181,6 +181,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewDockerRuntime(socket)
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
+			case "containerd":
+				return runtime.NewContainerdRuntime(socket)
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -769,24 +771,37 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		return nil, "", nil, &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 	}
 
+	closed := false
+	cleanup := func() {
+		if !closed {
+			if err := rt.Close(); err != nil {
+				o.logger.Debug("failed to close runtime: %v", err)
+			}
+			closed = true
+		}
+	}
+
 	o.logger.Trace("Creating container...")
 	if err := rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
+		cleanup()
 		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
 	}
 
 	containerID, err := rt.CreateContainer(ctx, cc)
 	if err != nil {
+		cleanup()
 		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
 	}
 
-	cleanup := func() {}
 	if cc.Remove {
+		oldCleanup := cleanup
 		cleanupCtx := context.WithoutCancel(ctx)
 		cleanup = func() {
 			o.logger.Trace("Removing container: %s", containerID)
 			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
 				o.logger.Warn("failed to remove container (defer): %v", err)
 			}
+			oldCleanup()
 		}
 	}
 
