@@ -265,8 +265,13 @@ cderun --remove=false node app.js  # コンテナを残す
 
 - **型**: stringArray
 - **環境変数**: `CDERUN_PUBLISH`
-- **説明**: ポートマッピング（ホストポート:コンテナポート）
-- **用途**: コンテナのポートをホストに公開
+- **説明**: ポートマッピングを設定します
+- **フォーマット**:
+  - `containerPort` (例: `80`)
+  - `hostPort:containerPort` (例: `8080:80`)
+  - `ip:hostPort:containerPort` (例: `127.0.0.1:8080:80`)
+  - `ip::containerPort` (例: `127.0.0.1::80`)
+- **プロトコル指定**: ポートの末尾に `/tcp` または `/udp` を付与可能（デフォルトは `tcp`）
 - **補足**:
   - CLIフラグ（P1/P2）では、複数のポートを指定する場合、フラグを繰り返す必要があります。
   - 環境変数 `CDERUN_PUBLISH` (P3) では、カンマ (`,`) をセパレータとして使用します。
@@ -274,6 +279,7 @@ cderun --remove=false node app.js  # コンテナを残す
 
 ```bash
 cderun -p 8080:80 nginx
+cderun -p 127.0.0.1:53:53/udp alpine
 ```
 
 ### `--publish-all`, `-P`
@@ -287,14 +293,18 @@ cderun -p 8080:80 nginx
 
 - **型**: stringArray
 - **環境変数**: `CDERUN_EXPOSE`
-- **説明**: 特定のポートまたはポート範囲を公開
+- **説明**: コンテナのポートを公開（外部へのマッピングなし）
+- **フォーマット**:
+  - `port` (例: `80`)
+  - `port-port` (例: `8000-8010`)
+- **プロトコル指定**: 末尾に `/tcp` または `/udp` を付与可能
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
   - 環境変数 `CDERUN_EXPOSE` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --expose 80 node app.js
-cderun --expose 80/udp node app.js
+cderun --expose 8000-8100/tcp node app.js
 ```
 
 ### `--hostname`
@@ -428,12 +438,15 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: stringArray
 - **環境変数**: `CDERUN_DEVICE`
 - **説明**: ホストデバイスをコンテナに追加
+- **フォーマット**: `hostPath:containerPath[:permissions]`
+  - `permissions` は `r`, `w`, `m` の組み合わせ（デフォルト: `rwm`）
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
   - 環境変数 `CDERUN_DEVICE` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ```bash
 cderun --device /dev/fuse alpine ls /dev/fuse
+cderun --device /dev/snd:/dev/snd:rw alpine
 ```
 
 ### `--config`
@@ -529,7 +542,7 @@ cderun --hang-timeout 5s node script.js
 - **デフォルト**: `warn`
 - **環境変数**: `CDERUN_LOG_LEVEL`
 - **説明**: ログレベルを直接指定
-- **値**: `error`, `warn`, `info`, `debug`, `trace`
+- **値**: `error`, `warn` (alias: `warning`), `info`, `debug`, `trace`
 - **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
 
 ```bash

@@ -154,12 +154,12 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--runtime`: Container runtime to use (`docker`/`podman`).
+- `--runtime`: Container runtime to use (`docker`, `podman`, or `containerd` [planned]).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
 - `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
-- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Default: `warn`)
+- `--log-level`: Set log level (`error`, `warn` [alias: `warning`], `info`, `debug`, `trace`). (Default: `warn`)
 - `--log-format`: Set log format (`text`, `json`).
 - `--log-timestamp`: Include timestamp in logs. (Default: `true`)
 
