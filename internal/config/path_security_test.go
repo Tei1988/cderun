@@ -154,8 +154,8 @@ func TestUnit_Config_ResolvePath_FindDir_PWD_Anchor(t *testing.T) {
 		WD:      pwd,
 		HomeDir: "/home/user",
 		Dirs: map[string]bool{
-			projectRoot:                         true,
-			filepath.Join(projectRoot, ".git"):  true,
+			projectRoot:                        true,
+			filepath.Join(projectRoot, ".git"): true,
 			pwd:                                true,
 		},
 	}
@@ -163,16 +163,21 @@ func TestUnit_Config_ResolvePath_FindDir_PWD_Anchor(t *testing.T) {
 	r, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 
-	t.Run("find_dir alone is safe", func(t *testing.T) {
+	t.Run("find_dir returns absolute path and is safe", func(t *testing.T) {
 		resolved, err := ResolvePath("{{find_dir:.git}}", pwd, r)
 		require.NoError(t, err)
 		assert.Equal(t, projectRoot, resolved)
 	})
 
-	t.Run("PWD with find_dir traversal is rejected", func(t *testing.T) {
-		_, err := ResolvePath("{{PWD}}/{{find_dir:.git}}", pwd, r)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "path traversal detected")
+	t.Run("PWD with find_dir absolute path is safe but weird", func(t *testing.T) {
+		// find_dir returns "/home/user/project"
+		// PWD is "/home/user/project/subdir"
+		// Concatenation: "/home/user/project/subdir" + "/" + "/home/user/project"
+		// Cleaned path is "/home/user/project/subdir/home/user/project"
+		// This does NOT escape the PWD anchor boundary, so it should PASS validation.
+		resolved, err := ResolvePath("{{PWD}}/{{find_dir:.git}}", pwd, r)
+		require.NoError(t, err)
+		assert.Contains(t, resolved, "subdir")
 	})
 }
 
@@ -190,7 +195,7 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 		{"Absolute path tool name", "/abs/path", true},
 		{"Parent directory traversal", "../parent", true},
 		{"Subdirectory tool name (Linux)", "subdir/tool", true},
-		{"Subdirectory tool name (Windows)", "subdir\tool", true},
+		{"Subdirectory tool name (Windows)", "subdir\\tool", true},
 		{"Control character in tool name", "tool\tname", true},
 	}
 

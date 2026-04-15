@@ -301,13 +301,7 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	}
 
 	dir := filepath.Dir(paths[0])
-
-	rel, err := filepath.Rel(r.Pwd, dir)
-	if err != nil {
-		return "", fmt.Errorf("failed to calculate relative path for %q: %w", dir, err)
-	}
-
-	return rel, nil
+	return dir, nil
 }
 
 // resolveEnv returns the value of an environment variable.

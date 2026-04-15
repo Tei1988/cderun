@@ -108,13 +108,13 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	t.Run("find_dir existing directory", func(t *testing.T) {
 		val := r.resolveString("{{ find_dir:modules }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "../..", val)
+		assert.Equal(t, "/project", val)
 	})
 
 	t.Run("find_dir existing file", func(t *testing.T) {
 		val := r.resolveString("{{ find_dir:modules/foo }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "../../modules", val)
+		assert.Equal(t, "/project/modules", val)
 	})
 
 	t.Run("find_dir not found", func(t *testing.T) {
@@ -125,25 +125,6 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: \"nonexistent\"")
 	})
 
-	t.Run("filepath.Rel failure in resolveFindDir", func(t *testing.T) {
-		// On Unix, filepath.Rel("rel", "/abs") fails.
-		fs := &MockFileSystem{
-			Files: map[string][]byte{"/abs/foo": []byte("bar")},
-			Dirs:  map[string]bool{"/abs": true},
-			WD:    "/abs",
-		}
-		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-
-		// Force find_dir to use a search result that will fail Rel against r2.Pwd
-		// resolveFindDir calls FindConfigs, which returns absolute paths from MockFileSystem.Abs
-		// Then it calls filepath.Rel(r.Pwd, dir)
-		r2.Pwd = "relative" // rel
-		// FindConfigs will find /abs/foo
-		r2.resolveString("{{ find_dir:foo }}")
-		require.Error(t, r2.Error())
-		assert.Contains(t, r2.Error().Error(), "failed to calculate relative path")
-	})
 }
 
 func TestUnit_Expression_FileError(t *testing.T) {
