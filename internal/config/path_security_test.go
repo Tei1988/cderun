@@ -144,6 +144,143 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ValidatePort(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Standard port", "8080:80", false},
+		{"Port with protocol", "80:80/tcp", false},
+		{"Single port", "80", false},
+		{"Empty port", "", false},
+		{"IP and port", "127.0.0.1:80:80", false},
+		{"IP and container port", "127.0.0.1:80", false},
+		{"Invalid host port", "abc:80", true},
+		{"Invalid container port", "80:abc", true},
+		{"Invalid protocol", "80:80/http", true},
+		{"Port with control char", "80\n", true},
+		{"Too many colons", "127.0.0.1:80:80:80", true},
+		{"Invalid IP", "999.999.999.999:80:80", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePort(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateDNS(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"IPv4", "8.8.8.8", false},
+		{"IPv6", "2001:4860:4860::8888", false},
+		{"Empty", "", false},
+		{"Invalid IP", "8.8.8.256", true},
+		{"Hostname", "google.com", true},
+		{"Injection attempt", "8.8.8.8; rm -rf /", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDNS(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateAddHost(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Standard", "myhost:127.0.0.1", false},
+		{"Host gateway", "myhost:host-gateway", false},
+		{"Empty", "", false},
+		{"Missing colon", "myhost127.0.0.1", true},
+		{"Invalid IP", "myhost:999.999.999.999", true},
+		{"Invalid Hostname", "my_host:127.0.0.1", true},
+		{"Injection attempt", "myhost:127.0.0.1; rm -rf /", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAddHost(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateCapability(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Standard", "SYS_ADMIN", false},
+		{"NET_RAW", "NET_RAW", false},
+		{"Empty", "", false},
+		{"Lowercase", "sys_admin", true},
+		{"Injection attempt", "SYS_ADMIN; rm -rf /", true},
+		{"Space", "SYS ADMIN", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateCapability(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateWorkdir(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Absolute", "/app", false},
+		{"Root", "/", false},
+		{"Empty", "", false},
+		{"Relative", "app", true},
+		{"Home tilde", "~/app", true},
+		{"Injection attempt", "/app; rm -rf /", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWorkdir(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidateToolName(t *testing.T) {
 	tests := []struct {
 		name    string

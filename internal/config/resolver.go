@@ -940,7 +940,7 @@ func (rv *resolver) validateSecurity() error {
 		{"user", rv.res.User, ValidateUserName},
 		{"network", rv.res.Network, ValidateNetworkName},
 		{"hostname", rv.res.Hostname, ValidateHostname},
-		{"workdir", rv.res.Workdir, nil},
+		{"workdir", rv.res.Workdir, ValidateWorkdir},
 		{"runtime", rv.res.Runtime, func(s string) error {
 			if s != "docker" && s != "podman" && s != "containerd" {
 				return fmt.Errorf("unsupported runtime: %q", s)
@@ -997,10 +997,10 @@ func (rv *resolver) validateSecurity() error {
 		{"entrypoint", rv.res.Entrypoint, nil},
 		{"ports", rv.res.Ports, ValidatePort},
 		{"expose", rv.res.Expose, ValidateExposePort},
-		{"dns", rv.res.DNS, nil},
-		{"add-hosts", rv.res.AddHosts, nil},
-		{"cap-add", rv.res.CapAdd, nil},
-		{"cap-drop", rv.res.CapDrop, nil},
+		{"dns", rv.res.DNS, ValidateDNS},
+		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
+		{"cap-add", rv.res.CapAdd, ValidateCapability},
+		{"cap-drop", rv.res.CapDrop, ValidateCapability},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {
