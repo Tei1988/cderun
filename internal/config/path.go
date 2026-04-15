@@ -337,7 +337,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}})|(^~|[/\\]~)`)
+	magicWordPreRegex = regexp.MustCompile(`({{(.+?)}})|(^~|[/\\]~)`)
 
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
@@ -511,32 +511,15 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 			if r == nil {
 				return fmt.Errorf("expression resolver required for anchor validation")
 			}
-			word := matches[2]
-			switch word {
-			case "HOME":
-				anchorPath = r.Home
-			case "PWD":
-				anchorPath = r.Pwd
-			case "BASE_HOME":
-				if r.HostContext != nil && r.HostContext.HomeDir != "" {
-					anchorPath = r.HostContext.HomeDir
-				} else {
-					anchorPath = r.Home
-				}
-			case "BASE_PWD":
-				if r.HostContext != nil && r.HostContext.WorkingDir != "" {
-					anchorPath = r.HostContext.WorkingDir
-				} else {
-					anchorPath = r.Pwd
-				}
+			resolvedAnchor, err := r.ResolveString(exprMatch)
+			if err != nil {
+				return fmt.Errorf("failed to resolve anchor expression %q: %w", exprMatch, err)
 			}
+			anchorPath = resolvedAnchor
 		}
 
 		if anchorPath == "" {
-			if exprMatch != "" {
-				return fmt.Errorf("anchor path is empty for %q", exprMatch)
-			}
-			return fmt.Errorf("anchor path is empty for %q", tildeMatch)
+			return fmt.Errorf("anchor path is empty for %q", matches[0])
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)

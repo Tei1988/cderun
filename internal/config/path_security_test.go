@@ -129,7 +129,14 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Multiple anchors", "{{HOME}}/subdir/{{HOME}}/file", false},
 		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
 		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{"Env traversal", "{{env:MY_ROOT}}/../../etc/passwd", true},
+		{"Nested expression traversal", "{{env:DIR:-{{HOME}}}}/../../etc/passwd", true},
+		{"FindDir traversal", "{{find_dir:.git}}/../../etc/passwd", true},
 	}
+
+	mfs.Files = map[string][]byte{"/work/.git/config": []byte("foo")}
+	mfs.Dirs = map[string]bool{"/work/.git": true}
+	mfs.Env = map[string]string{"MY_ROOT": "/work/root"}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
