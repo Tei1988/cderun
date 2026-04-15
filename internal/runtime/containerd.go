@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"cderun/internal/logging"
 
 	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
@@ -28,6 +30,7 @@ type ContainerdRuntime struct {
 	ioMap   map[string]cio.Creator
 	taskMap map[string]client.Task
 	exitMap map[string]chan uint32
+	codeMap map[string]uint32
 }
 
 func NewContainerdRuntime(socket string) (ContainerRuntime, error) {
@@ -41,6 +44,7 @@ func NewContainerdRuntime(socket string) (ContainerRuntime, error) {
 		ioMap:   make(map[string]cio.Creator),
 		taskMap: make(map[string]client.Task),
 		exitMap: make(map[string]chan uint32),
+		codeMap: make(map[string]uint32),
 	}, nil
 }
 
@@ -57,8 +61,10 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		return nil
 	}
 
+	normalized := normalizeImageName(img)
+
 	if pullPolicy == "missing" {
-		_, err := r.client.GetImage(ctx, img)
+		_, err := r.client.GetImage(ctx, normalized)
 		if err == nil {
 			return nil
 		}
@@ -67,10 +73,12 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		}
 	}
 
+	resolver := docker.NewResolver(docker.ResolverOptions{})
+
 	var lastErr error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i, maxRetries-1, normalized, lastErr)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -78,8 +86,11 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 			}
 		}
 
-		logging.Info("Pulling image %s...", img)
-		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
+		logging.Info("Pulling image %s...", normalized)
+		_, err := r.client.Pull(ctx, normalized,
+			client.WithPullUnpack,
+			client.WithResolver(resolver),
+		)
 		if err == nil {
 			return nil
 		}
@@ -88,8 +99,32 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 }
 
+func normalizeImageName(img string) string {
+	res := img
+	if !strings.Contains(img, "/") {
+		res = "docker.io/library/" + img
+	} else {
+		parts := strings.Split(img, "/")
+		if !strings.ContainsAny(parts[0], ".:") && parts[0] != "localhost" {
+			res = "docker.io/" + img
+		}
+	}
+
+	lastSlash := strings.LastIndex(res, "/")
+	remainder := res
+	if lastSlash != -1 {
+		remainder = res[lastSlash+1:]
+	}
+
+	if !strings.ContainsAny(remainder, ":@") {
+		res += ":latest"
+	}
+	return res
+}
+
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	img, err := r.client.GetImage(ctx, config.Image)
+	normalized := normalizeImageName(config.Image)
+	img, err := r.client.GetImage(ctx, normalized)
 	if err != nil {
 		return "", fmt.Errorf("failed to get image: %w", err)
 	}
@@ -194,14 +229,22 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 		delete(r.taskMap, containerID)
 		delete(r.exitMap, containerID)
 		r.mu.Unlock()
-		task.Delete(ctx)
+		_, _ = task.Delete(ctx)
 		return fmt.Errorf("failed to wait for task: %w", err)
 	}
 
 	go func() {
+		defer close(exitChan)
 		select {
 		case status := <-exitStatusC:
-			exitChan <- status.ExitCode()
+			code := status.ExitCode()
+			r.mu.Lock()
+			r.codeMap[containerID] = code
+			r.mu.Unlock()
+			select {
+			case exitChan <- code:
+			default:
+			}
 		case <-ctx.Done():
 		}
 	}()
@@ -215,6 +258,10 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 
 func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	r.mu.Lock()
+	if code, ok := r.codeMap[containerID]; ok {
+		r.mu.Unlock()
+		return int(code), nil
+	}
 	exitChan, ok := r.exitMap[containerID]
 	r.mu.Unlock()
 
@@ -223,7 +270,13 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 	}
 
 	select {
-	case code := <-exitChan:
+	case code, ok := <-exitChan:
+		if !ok {
+			// Channel closed, get from codeMap
+			r.mu.Lock()
+			code = r.codeMap[containerID]
+			r.mu.Unlock()
+		}
 		return int(code), nil
 	case <-ctx.Done():
 		return 0, ctx.Err()
@@ -259,6 +312,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	delete(r.ioMap, containerID)
 	delete(r.taskMap, containerID)
 	delete(r.exitMap, containerID)
+	delete(r.codeMap, containerID)
 	r.mu.Unlock()
 
 	return nil
@@ -291,6 +345,11 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 
 	if !ok {
 		return fmt.Errorf("task not found for container %s", containerID)
+	}
+
+	if rows > 0xffff || cols > 0xffff {
+		// Basic overflow protection for gosec G115
+		return fmt.Errorf("invalid terminal size: %dx%d", cols, rows)
 	}
 
 	return task.Resize(ctx, uint32(cols), uint32(rows))

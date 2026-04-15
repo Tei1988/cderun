@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainerdRuntime_Name(t *testing.T) {
@@ -19,14 +20,14 @@ func TestContainerdRuntime_Name(t *testing.T) {
 func TestContainerdRuntime_PullImage_Never(t *testing.T) {
 	rt := &ContainerdRuntime{}
 	err := rt.PullImage(context.Background(), "alpine", "never", 3, time.Second)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestContainerdRuntime_NewContainerdRuntime_ValidSocket(t *testing.T) {
 	// client.New() doesn't immediately dial if it's a unix socket,
 	// it just sets up the client structure.
 	rt, err := NewContainerdRuntime("/tmp/containerd.sock")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, rt)
 }
 
@@ -56,9 +57,9 @@ func TestParseSignal(t *testing.T) {
 		t.Run(tt.sig, func(t *testing.T) {
 			got, err := parseSignal(tt.sig)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, int(got))
 			}
 		})
