@@ -229,7 +229,9 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 		delete(r.taskMap, containerID)
 		delete(r.exitMap, containerID)
 		r.mu.Unlock()
-		_, _ = task.Delete(ctx)
+		if _, delErr := task.Delete(ctx); delErr != nil {
+			logging.Debug("failed to delete task after wait failure: %v", delErr)
+		}
 		return fmt.Errorf("failed to wait for task: %w", err)
 	}
 
@@ -298,7 +300,9 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	if hasTask {
 		// Try to delete task first
-		_, _ = task.Delete(ctx, client.WithProcessKill)
+		if _, delErr := task.Delete(ctx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
+			logging.Debug("failed to delete task during removal: %v", delErr)
+		}
 	}
 
 	err = c.Delete(ctx, client.WithSnapshotCleanup)
