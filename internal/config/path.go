@@ -347,9 +347,8 @@ var (
 )
 
 type anchorInfo struct {
-	raw      string
-	isTilde  bool
-	exprName string
+	raw     string
+	isTilde bool
 }
 
 func findAnchors(s string) []anchorInfo {
@@ -372,7 +371,6 @@ func findAnchors(s string) []anchorInfo {
 		if i+1 < n && s[i] == '{' && s[i+1] == '{' {
 			start := i
 			depth := 0
-			foundEnd := false
 			for j := i; j+1 < n; j++ {
 				if s[j] == '{' && s[j+1] == '{' {
 					depth++
@@ -382,16 +380,11 @@ func findAnchors(s string) []anchorInfo {
 					j++
 					if depth == 0 {
 						raw := s[start : j+1]
-						content := strings.TrimSpace(s[start+2 : j-1])
-						res = append(res, anchorInfo{raw: raw, exprName: content})
+						res = append(res, anchorInfo{raw: raw})
 						i = j
-						foundEnd = true
 						break
 					}
 				}
-			}
-			if !foundEnd {
-				// Unbalanced, skip this start
 			}
 		}
 	}
@@ -572,7 +565,7 @@ func validateAnchorBoundaries(original, resolved string, baseDir string, r *Expr
 		}
 
 		// Normalize anchorPath the same way as the main path
-		if !filepath.IsAbs(anchorPath) && (strings.HasPrefix(anchorPath, "."+string(filepath.Separator)) || strings.HasPrefix(anchorPath, ".."+string(filepath.Separator)) || anchorPath == "." || anchorPath == "..") {
+		if !filepath.IsAbs(anchorPath) && (strings.HasPrefix(anchorPath, "./") || strings.HasPrefix(anchorPath, "../") || anchorPath == "." || anchorPath == "..") {
 			anchorPath = filepath.Join(baseDir, anchorPath)
 		}
 
