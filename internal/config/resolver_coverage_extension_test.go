@@ -660,54 +660,81 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("validateSecurity exhaustive critical fields", func(t *testing.T) {
-		// Valid "warning" alias for log-level
-		cli := &CLIOptions{
-			Image:       "alpine",
-			ImageSet:    true,
-			LogLevel:    "warning",
-			LogLevelSet: true,
+		testCases := []struct {
+			name        string
+			cli         CLIOptions
+			wantErr     bool
+			errContains string
+		}{
+			{
+				name: "Valid warning alias for log-level",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					LogLevel: "warning", LogLevelSet: true,
+				},
+				wantErr: false,
+			},
+			{
+				name: "Invalid log-level",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					LogLevel: "invalid", LogLevelSet: true,
+				},
+				wantErr:     true,
+				errContains: "unsupported log level: \"invalid\"",
+			},
+			{
+				name: "Invalid runtime",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					Runtime: "rkt", RuntimeSet: true,
+				},
+				wantErr:     true,
+				errContains: "unsupported runtime: \"rkt\"",
+			},
+			{
+				name: "Invalid dry-run-format",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					DryRunFormat: "xml", DryRunFormatSet: true,
+				},
+				wantErr:     true,
+				errContains: "unsupported dry-run format: \"xml\"",
+			},
+			{
+				name: "Invalid diagnosis-format",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					DiagnosisFormat: "xml", DiagnosisFormatSet: true,
+				},
+				wantErr:     true,
+				errContains: "unsupported diagnosis format: \"xml\"",
+			},
+			{
+				name: "Invalid log-format",
+				cli: CLIOptions{
+					Image: "alpine", ImageSet: true,
+					LogFormat: "xml", LogFormatSet: true,
+				},
+				wantErr:     true,
+				errContains: "unsupported log format: \"xml\"",
+			},
 		}
-		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.NoError(t, err)
-		assert.Equal(t, "warning", res.LogLevel)
 
-		// Invalid log-level
-		cli.LogLevel = "invalid"
-		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported log level: \"invalid\"")
-
-		// Invalid runtime
-		cli.LogLevel = "warn"
-		cli.Runtime = "rkt"
-		cli.RuntimeSet = true
-		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported runtime: \"rkt\"")
-
-		// Invalid dry-run-format
-		cli.Runtime = "docker"
-		cli.DryRunFormat = "xml"
-		cli.DryRunFormatSet = true
-		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported dry-run format: \"xml\"")
-
-		// Invalid diagnosis-format
-		cli.DryRunFormat = "yaml"
-		cli.DiagnosisFormat = "xml"
-		cli.DiagnosisFormatSet = true
-		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported diagnosis format: \"xml\"")
-
-		// Invalid log-format
-		cli.DiagnosisFormat = "yaml"
-		cli.LogFormat = "xml"
-		cli.LogFormatSet = true
-		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported log format: \"xml\"")
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				res, err := ResolveWithFS("sh", &tc.cli, nil, nil, &MockFileSystem{})
+				if tc.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), tc.errContains)
+				} else {
+					require.NoError(t, err)
+					if tc.name == "Valid warning alias for log-level" {
+						assert.Equal(t, "warning", res.LogLevel)
+					}
+				}
+			})
+		}
 	})
 }
 
