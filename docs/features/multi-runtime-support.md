@@ -38,7 +38,7 @@ cderun独自の`ContainerRuntime`インターフェースを定義し、各ラ�
 cderun ContainerRuntimeインターフェース
         │
         ├── DockerRuntime     → Docker Engine API (HTTP over Unix socket) [Implemented]
-        ├── PodmanRuntime     → Supported via Docker API compatibility (uses DockerRuntime)
+        ├── PodmanRuntime     → Supported via Docker API compatibility (uses DockerRuntime) [Implemented]
         └── ContainerdRuntime → containerd API (gRPC) [Planned / In-progress]
 ```
 
