@@ -143,4 +143,42 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 		assert.False(t, res.MountCderun)
 		assert.False(t, res.MountSocket)
 	})
+
+	t.Run("complex override: P4 Tool enables mount-tools, but P2 CLI disables mount-cderun", func(t *testing.T) {
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				MountTools: []string{"node"},
+			},
+		}
+		cli := &CLIOptions{
+			Image:          "alpine",
+			ImageSet:       true,
+			MountCderun:    false,
+			MountCderunSet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, tools, nil, fs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"node"}, res.MountTools)
+		assert.False(t, res.MountCderun)
+		// MountSocket should also be false because it inherits from MountCderun if not specified
+		assert.False(t, res.MountSocket)
+	})
+
+	t.Run("complex override: P3 Env enables mount-all-tools, but P5 Global disables mount-socket", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{"CDERUN_MOUNT_ALL_TOOLS": "true"},
+			WD:  "/work",
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				MountSocket: ptr(false),
+			},
+		}
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.MountAllTools)
+		assert.True(t, res.MountCderun)
+		// Global Config (P5) should override the transitive trigger from mount-all-tools
+		assert.False(t, res.MountSocket)
+	})
 }
