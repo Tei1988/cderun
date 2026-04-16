@@ -345,17 +345,8 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		return err
 	}
 
-	var p1v, p2v []string
-	if p1Set {
-		if v, ok := p1Val.Interface().([]string); ok {
-			p1v = v
-		}
-	}
-	if p2Set {
-		if v, ok := p2Val.Interface().([]string); ok {
-			p2v = v
-		}
-	}
+	p1v, p1Set := extractStringSliceValue(p1Val, p1Set)
+	p2v, p2Set := extractStringSliceValue(p2Val, p2Set)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -368,10 +359,10 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	return nil
 }
 
-func (rv *resolver) applyStringOption(opt StringOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+func (rv *resolver) resolveStringValue(opt StringOption) (string, error) {
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	def := OptionDef[string]{
@@ -381,15 +372,28 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		Fallback:     opt.Default,
 	}
 
-	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	return resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs), nil
+}
+
+func (rv *resolver) applyStringOption(opt StringOption) error {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	resolved, err := rv.resolveStringValue(opt)
+	if err != nil {
+		return err
+	}
+
 	rv.resVal.Field(info.targetIdx).SetString(resolved)
 	return nil
 }
 
-func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+func (rv *resolver) resolveBoolValue(opt BoolOption) (bool, error) {
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	def := OptionDef[*bool]{
@@ -398,7 +402,20 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+	return resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs), nil
+}
+
+func (rv *resolver) applyBoolOption(opt BoolOption) error {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	resolved, err := rv.resolveBoolValue(opt)
+	if err != nil {
+		return err
+	}
+
 	rv.resVal.Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
@@ -409,25 +426,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		return err
 	}
 
-	p1Int := 0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p1Int = int(p1Val.Int())
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Int := 0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p2Int = int(p2Val.Int())
-		} else {
-			p2Set = false
-		}
-	}
+	p1Int, p1Set := extractIntValue(p1Val, p1Set)
+	p2Int, p2Set := extractIntValue(p2Val, p2Set)
 
 	def := OptionDef[*int]{
 		EnvKey:       opt.EnvKey,
@@ -447,25 +447,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		return err
 	}
 
-	p1Float := 0.0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p1Float = p1Val.Float()
-		} else {
-			p1Set = false
-		}
-	}
-
-	p2Float := 0.0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p2Float = p2Val.Float()
-		} else {
-			p2Set = false
-		}
-	}
+	p1Float, p1Set := extractFloatValue(p1Val, p1Set)
+	p2Float, p2Set := extractFloatValue(p2Val, p2Set)
 
 	def := OptionDef[*float64]{
 		EnvKey:       opt.EnvKey,
@@ -480,18 +463,11 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 }
 
 func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration, positive bool) error {
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	valStr, err := rv.resolveStringValue(opt)
 	if err != nil {
 		return err
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
@@ -509,18 +485,11 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 }
 
 func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	valStr, err := rv.resolveStringValue(opt)
 	if err != nil {
 		return err
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if valStr != "" {
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
@@ -630,6 +599,63 @@ func (rv *resolver) resolveStandardOptions() error {
 		}
 	}
 
+	if err := rv.resolveImage(); err != nil {
+		return err
+	}
+
+	// Phase 3: Remaining Boolean options
+	for _, opt := range BoolOptions {
+		// Skip early options already resolved in Phase 1
+		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
+			continue
+		}
+		// Skip transitive options handled in Phase 6
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+			continue
+		}
+
+		if err := rv.applyBoolOption(opt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) resolveComplexOptions() error {
+	var err error
+	// Phase 4: Complex types (Mounts, Env)
+	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if err != nil {
+		return err
+	}
+
+	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.StrictEnv, rv.r, rv.fs)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (rv *resolver) resolvePathValue(name, envKey string, toolGetter func(ToolConfig) ConfigPath, globalGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.cliVal)
+	if err != nil {
+		return "", err
+	}
+
+	return resolveConfigPath(
+		p1Set, p1Val.String(),
+		p2Set, p2Val.String(),
+		envKey,
+		rv.subcommand, rv.tools, toolGetter,
+		rv.global, globalGetter,
+		fallback,
+		rv.r,
+		"path",
+		rv.fs,
+	)
+}
+
+func (rv *resolver) resolveImage() error {
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
 		return &ImageNotFoundError{Tool: rv.subcommand}
 	}
@@ -667,62 +693,22 @@ func (rv *resolver) resolveStandardOptions() error {
 			logging.Debug("Resolved Image: %s", rv.res.Image)
 		}
 	}
-
-	// Phase 3: Remaining Boolean options
-	for _, opt := range BoolOptions {
-		// Skip early options already resolved in Phase 1
-		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
-			continue
-		}
-		// Skip transitive options handled in Phase 6
-		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
-			continue
-		}
-
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (rv *resolver) resolveComplexOptions() error {
-	var err error
-	// Phase 4: Complex types (Mounts, Env)
-	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if err != nil {
-		return err
-	}
-
-	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.StrictEnv, rv.r, rv.fs)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func (rv *resolver) resolveRuntimeAndSocket() error {
 	// Phase 5: Path resolution & Auto-detection (Socket)
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", rv.cliVal)
+		var err error
+		rv.res.SocketPath, err = rv.resolvePathValue(
+			"socket-path",
+			"CDERUN_SOCKET_PATH",
+			nil,
+			func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			"",
+		)
 		if err != nil {
 			return err
-		}
-
-		var errPath error
-		rv.res.SocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_SOCKET_PATH",
-			"", nil, nil,
-			rv.global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
-			"",
-			rv.r,
-			"path",
-			rv.fs,
-		)
-		if errPath != nil {
-			return errPath
 		}
 	}
 
@@ -800,25 +786,16 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", rv.cliVal)
+		var err error
+		rv.res.MountCderunPath, err = rv.resolvePathValue(
+			"mount-cderun-path",
+			"CDERUN_MOUNT_CDERUN_PATH",
+			func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+			func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			"",
+		)
 		if err != nil {
 			return err
-		}
-
-		var errPath error
-		rv.res.MountCderunPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_CDERUN_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-			"",
-			rv.r,
-			"path",
-			rv.fs,
-		)
-		if errPath != nil {
-			return errPath
 		}
 	}
 
@@ -837,25 +814,16 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", rv.cliVal)
+		var err error
+		rv.res.MountSocketPath, err = rv.resolvePathValue(
+			"mount-socket-path",
+			"CDERUN_MOUNT_SOCKET_PATH",
+			func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+			func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			rv.res.SocketPath,
+		)
 		if err != nil {
 			return err
-		}
-
-		var errPath error
-		rv.res.MountSocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_SOCKET_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-			rv.res.SocketPath,
-			rv.r,
-			"path",
-			rv.fs,
-		)
-		if errPath != nil {
-			return errPath
 		}
 	}
 	return nil
@@ -930,8 +898,32 @@ func (rv *resolver) resolveCustomParsing() error {
 }
 
 func (rv *resolver) validateSecurity() error {
-	// Security: validate resolved configuration for injection characters and identifier formats.
-	criticalFields := []struct {
+	if err := rv.validateCriticalFields(); err != nil {
+		return err
+	}
+	if err := rv.validateSlices(); err != nil {
+		return err
+	}
+	if err := rv.validateEnvSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateMountSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateDeviceSecurity(); err != nil {
+		return err
+	}
+
+	if rv.res.Privileged {
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) validateCriticalFields() error {
+	fields := []struct {
 		name      string
 		value     string
 		validator func(string) error
@@ -978,7 +970,8 @@ func (rv *resolver) validateSecurity() error {
 			return nil
 		}},
 	}
-	for _, f := range criticalFields {
+
+	for _, f := range fields {
 		if err := validatePathChars(f.value); err != nil {
 			return fmt.Errorf("security validation failed for %q: %w", f.name, err)
 		}
@@ -988,8 +981,11 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
-	criticalSlices := []struct {
+func (rv *resolver) validateSlices() error {
+	slices := []struct {
 		name      string
 		slice     []string
 		validator func(string) error
@@ -1002,7 +998,8 @@ func (rv *resolver) validateSecurity() error {
 		{"cap-add", rv.res.CapAdd, ValidateCapability},
 		{"cap-drop", rv.res.CapDrop, ValidateCapability},
 	}
-	for _, s := range criticalSlices {
+
+	for _, s := range slices {
 		for i, e := range s.slice {
 			if err := validatePathChars(e); err != nil {
 				return fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
@@ -1014,7 +1011,10 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
 		key, _, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
@@ -1024,7 +1024,10 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateMountSecurity() error {
 	for i, m := range rv.res.Mounts {
 		if err := validatePathChars(m.Source); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
@@ -1033,19 +1036,48 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func extractIntValue(val reflect.Value, set bool) (int, bool) {
+	if !set || !val.IsValid() {
+		return 0, false
+	}
+	k := val.Kind()
+	if k >= reflect.Int && k <= reflect.Int64 {
+		return int(val.Int()), true
+	}
+	return 0, false
+}
+
+func extractFloatValue(val reflect.Value, set bool) (float64, bool) {
+	if !set || !val.IsValid() {
+		return 0.0, false
+	}
+	k := val.Kind()
+	if k == reflect.Float32 || k == reflect.Float64 {
+		return val.Float(), true
+	}
+	return 0.0, false
+}
+
+func extractStringSliceValue(val reflect.Value, set bool) ([]string, bool) {
+	if !set || !val.IsValid() {
+		return nil, false
+	}
+	if v, ok := val.Interface().([]string); ok {
+		return v, true
+	}
+	return nil, false
+}
+
+func (rv *resolver) validateDeviceSecurity() error {
 	for i, d := range rv.res.Devices {
 		if err := validatePathChars(d.PathOnHost); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
-		}
-	}
-
-	if rv.res.Privileged {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 		}
 	}
 	return nil
@@ -1062,7 +1094,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
 	} else {
 		found := false
-		if tools != nil {
+		if tools != nil && toolGetter != nil {
 			if tool, ok := tools[subcommand]; ok {
 				if t := toolGetter(tool); !t.IsEmpty() {
 					cp = t
@@ -1070,7 +1102,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 				}
 			}
 		}
-		if !found && global != nil {
+		if !found && global != nil && globalGetter != nil {
 			if g := globalGetter(*global); !g.IsEmpty() {
 				cp = g
 				found = true
