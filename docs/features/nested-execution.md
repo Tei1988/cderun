@@ -51,6 +51,7 @@ flowchart TD
     H --> I
     I --> J[設定ファイルを実行ホスト内パスに書き込み]
     J --> K[実行ホスト内パスと基底ホストパスを返却]
+
 ```
 
 **ポイント**:
@@ -92,6 +93,7 @@ hostContext:
     - source: "/home/user/project"
       target: "/app"
       level: 1
+
 ```
 
 ## ホストパス追跡 (逆パス解決)

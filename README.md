@@ -17,12 +17,14 @@ Explicitly call `cderun` followed by the subcommand you want to run.
 
 ```bash
 cderun [cderun-flags] <subcommand> [passthrough-args]
+
 ```
 
 Example:
 
 ```bash
 cderun --tty node --version
+
 ```
 
 ### 2. Symlink Mode (Polyglot Entry Point)
@@ -33,6 +35,7 @@ Create a symlink to `cderun` with the name of the tool you want to wrap.
 ```bash
 ln -s cderun node
 ./node --version  # Effectively runs 'cderun node --version'
+
 ```
 
 ### 3. Ad-hoc Mode
@@ -44,6 +47,7 @@ if you want to execute a command that is not the default entrypoint of the image
 
 ```bash
 cderun --image=alpine --entrypoint=ls ls -l
+
 ```
 
 ### 4. Diagnosis Mode
@@ -53,6 +57,7 @@ and available tools. This mode does not require a subcommand.
 
 ```bash
 cderun --diagnosis
+
 ```
 
 ## Argument Parsing & Flags
@@ -74,6 +79,7 @@ cderun --tty docker --tty
   |      |     +--------- Subcommand
   |      +--------------- cderun flag (TTY: true)
   +---------------------- cderun command
+
 ```
 
 ### P1 Internal Overrides
@@ -89,6 +95,7 @@ cderun node app.js --cderun-image node:20-alpine
 
 # Incorrect (will result in an error):
 cderun --cderun-image node:20-alpine node app.js
+
 ```
 
 #### Why Hoisting?
@@ -96,9 +103,11 @@ cderun --cderun-image node:20-alpine node app.js
 Hoisting prevents configuration conflicts. If you wrap a tool that also uses `--tty` or `--env`, placing the `cderun` version *after* the subcommand with the `--cderun-` prefix ensures it is handled by `cderun` and not passed to the wrapped tool.
 
 This is essential in **Symlink Mode**:
+
 ```bash
 # node is a symlink to cderun
 node app.js --cderun-tty  # --cderun-tty is hoisted and used by cderun
+
 ```
 
 **Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
@@ -216,6 +225,7 @@ defaults:
 logging:
   level: warn
   format: text
+
 ```
 
 ### `.tools.yaml` (Tool Mappings)
@@ -232,6 +242,7 @@ node:
   workdir: /app
 python:
   image: python:3.11-slim
+
 ```
 
 ## Features
@@ -296,6 +307,7 @@ go:
   image: "golang:{{file:.go-version}}"
 node:
   image: "node:{{file:.nvmrc}}-alpine"
+
 ```
 
 ### Project-Root Relative Mounting
@@ -305,6 +317,7 @@ Use `{{find_dir:...}}` to locate your project root (e.g., where `.git` or `packa
 ```bash
 # Mount the node_modules from the project root
 cderun --mount type=bind,source="{{find_dir:package.json}}/node_modules",target=/app/node_modules node app.js
+
 ```
 
 ### Dynamic Image Selection
@@ -314,6 +327,7 @@ Use environment variables with default fallbacks to allow CI/CD pipelines to ove
 ```bash
 # Defaults to 20-alpine if CDERUN_NODE_VERSION is not set
 cderun --image "node:{{env:CDERUN_NODE_VERSION:-20-alpine}}" node --version
+
 ```
 
 ## Development & Testing
@@ -326,12 +340,14 @@ To run the unit tests:
 make test
 # or
 go test ./...
+
 ```
 
 To run the End-to-End (E2E) tests which require a running Docker or Podman environment:
 
 ```bash
 go test -tags=runtime ./...
+
 ```
 
 ### Generating Coverage Report
@@ -340,6 +356,7 @@ To generate a test coverage report:
 
 ```bash
 make coverage
+
 ```
 
 ---

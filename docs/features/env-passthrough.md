@@ -27,6 +27,7 @@ node:
     - NODE_ENV=production      # 明示的な値
     - NPM_TOKEN                 # 実行ホストから取得
     - HOME                      # 実行ホストから取得
+
 ```
 
 ### コマンドライン
@@ -40,6 +41,7 @@ cderun --env NPM_TOKEN --env HOME node app.js
 
 # 混在
 cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
+
 ```
 
 ### 環境変数 (P3)
@@ -49,6 +51,7 @@ cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 ```bash
 export CDERUN_ENV="NODE_ENV=production;NPM_TOKEN;HOME"
 cderun node app.js
+
 ```
 
 ## 優先順位
@@ -61,12 +64,14 @@ node:
   env:
     - NODE_ENV=development
     - PORT=3000
+
 ```
 
 ```bash
 cderun --env NODE_ENV=production node app.js
 # → NODE_ENV=production のみがコンテナに渡されます。
 # 設定ファイル内の PORT=3000 は無視されます。
+
 ```
 
 ### 同じソース内でキーが複数回指定された場合
@@ -77,6 +82,7 @@ node:
   env:
     - NODE_ENV=development
     - NODE_ENV=production  # この値が使われる
+
 ```
 
 ## 実行例
@@ -89,11 +95,13 @@ node:
   env:
     - NODE_ENV=production
     - PORT=3000
+
 ```
 
 ```bash
 cderun node app.js
 # ContainerConfig.Env = ["NODE_ENV=production", "PORT=3000"]
+
 ```
 
 ### 例2: 実行ホストから取得
@@ -104,6 +112,7 @@ node:
   env:
     - NPM_TOKEN  # 実行ホストから取得
     - HOME       # 実行ホストから取得
+
 ```
 
 ```bash
@@ -112,6 +121,7 @@ export HOME=/home/alice
 cderun node app.js
 # 実行時に解決:
 # ContainerConfig.Env = ["NPM_TOKEN=secret123", "HOME=/home/alice"]
+
 ```
 
 ### 例3: 混在
@@ -123,6 +133,7 @@ node:
     - NODE_ENV=production  # 明示的
     - NPM_TOKEN            # 実行ホストから
     - PORT=3000            # 明示的
+
 ```
 
 ```bash
@@ -133,6 +144,7 @@ cderun node app.js
 #   "NPM_TOKEN=secret123",
 #   "PORT=3000"
 # ]
+
 ```
 
 ## 環境変数が存在しない場合
@@ -145,6 +157,7 @@ cderun node app.js
 cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # ContainerConfig.Env = ["NONEXISTENT="]
 # 出力: "" (空文字列)
+
 ```
 
 ### 厳密モード (Strict Mode)
@@ -159,18 +172,21 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # .cderun.yaml
 defaults:
   strictEnv: true
+
 ```
 
 またはコマンドラインフラグで指定：
 
 ```bash
 cderun --strict-env node app.js
+
 ```
 
 または環境変数で指定：
 
 ```bash
 export CDERUN_STRICT_ENV=true
+
 ```
 
 #### 挙動
@@ -178,6 +194,7 @@ export CDERUN_STRICT_ENV=true
 ```bash
 cderun node app.js
 Error: required environment variable not found: NPM_TOKEN
+
 ```
 
 ## 環境変数の解決ロジック
@@ -215,4 +232,5 @@ env:
   - NODE_ENV=production
   - NPM_TOKEN=secret123
   - HOME=/home/alice
+
 ```

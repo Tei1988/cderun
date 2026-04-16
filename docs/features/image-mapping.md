@@ -16,6 +16,7 @@ python:
   image: "python:3.11-slim"
 custom-tool:
   image: "my-registry/custom:latest"
+
 ```
 
 ### エラーハンドリング

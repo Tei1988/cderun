@@ -118,6 +118,7 @@ cderun --image="node:{{env:CDERUN_NODE_VERSION:-20-alpine}}" node --version
 # コンテナ内 (Nested) でのみ有効な環境変数との組み合わせ
 # BASE_HOME が物理ホスト、HOME が現在のコンテナ内を指すことを利用した設定
 cderun --env "HOST_PROJECT_ROOT={{BASE_PWD}}" --env "LOG_DIR={{env:CONTAINER_LOG_PATH:-/var/log/app}}" my-tool
+
 ```
 
 #### 1. プロジェクト間でのバージョン同期 (`{{file:...}}`)
@@ -130,6 +131,7 @@ cderun --image="golang:{{file:.go-version}}" go version
 
 # .nvmrc の内容を node イメージのタグに使用
 cderun --image="node:{{file:.nvmrc}}-alpine" node --version
+
 ```
 
 #### 2. プロジェクトルートを基準としたパス指定 (`{{find_dir:...}}`)
@@ -150,6 +152,7 @@ my-tool:
     - type: bind
       source: "{{find_dir:package.json}}/logs"
       target: "/var/log/app"
+
 ```
 
 #### 3. 環境に応じたフォールバック (`{{env:...}}`)
@@ -159,6 +162,7 @@ my-tool:
 ```bash
 # CI環境等で IMAGE_TAG があればそれを使用し、なければ latest を使用する
 cderun --image="my-app:{{env:IMAGE_TAG:-latest}}" my-app
+
 ```
 
 #### その他の使用例
@@ -168,6 +172,7 @@ cderun --workdir="{{PWD}}/src" node app.js
 cderun --image="node:{{env:NODE_VERSION}}" node --version
 # 環境変数が未設定または空の場合のデフォルト値を指定する例
 cderun --image="node:{{env:NODE_VERSION:-20-alpine}}" node --version
+
 ```
 
 ```yaml
@@ -186,6 +191,7 @@ clasp:
     - type: bind
       source: "{{BASE_HOME}}/.config/gcloud"
       target: /root/.config/gcloud
+
 ```
 
 ## チルダ展開 (Tilde Expansion)
@@ -214,6 +220,7 @@ mounts:
   - type: bind
     source: ./src
     target: /app
+
 ```
 
 は、`source: /home/user/project/src` として解決されます。

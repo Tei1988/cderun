@@ -28,6 +28,7 @@ cderun --log-level debug node app.js
 
 # 最も詳細 (TRACE)
 cderun --log-level trace node app.js
+
 ```
 
 #### 設定ファイル
@@ -38,6 +39,7 @@ logging:
   level: warn  # error | warn | info | debug | trace
   format: text  # text | json
   timestamp: true
+
 ```
 
 #### 環境変数
@@ -45,6 +47,7 @@ logging:
 ```bash
 export CDERUN_LOG_LEVEL=debug
 export CDERUN_LOG_TIMESTAMP=true
+
 ```
 
 ## P1 Internal Overrides
@@ -63,6 +66,7 @@ export CDERUN_LOG_TIMESTAMP=true
 ```bash
 cderun node app.js
 Hello, World!
+
 ```
 
 > **Note**: デフォルトでは `INFO` レベルの "Running: ..." 等のメッセージは表示されず、コマンドの出力のみが表示されます。
@@ -73,6 +77,7 @@ Hello, World!
 cderun --log-level info node app.js
 2026-02-28 10:30:45 [INFO] Running: node app.js
 Hello, World!
+
 ```
 
 ### DEBUG レベル
@@ -87,6 +92,7 @@ cderun --log-level debug node app.js
 2026-02-28 10:30:45 [DEBUG] Socket: /var/run/docker.sock
 Hello, World!
 2026-02-28 10:30:46 [DEBUG] Container exited with code: 0
+
 ```
 
 ### TRACE レベル
@@ -103,6 +109,7 @@ cderun --log-level trace node app.js
 2026-02-28 10:30:45 [TRACE] Starting container: <ID>
 2026-02-28 10:30:45 [TRACE] Waiting for container: <ID>
 ...
+
 ```
 
 ## フォーマット
@@ -111,6 +118,7 @@ cderun --log-level trace node app.js
 
 ```text
 2026-02-28 10:30:45 [INFO] Running: node app.js
+
 ```
 
 ### JSON形式
@@ -118,6 +126,7 @@ cderun --log-level trace node app.js
 ```bash
 cderun --log-format json --log-level info node app.js
 {"level":"info","msg":"Running: node app.js","time":"2026-02-28T10:30:45Z"}
+
 ```
 
 ## デバッグ機能
@@ -128,6 +137,7 @@ cderun --log-format json --log-level info node app.js
 
 ```bash
 cderun --dry-run node app.js
+
 ```
 
 ## 内部実装の注意点

@@ -21,6 +21,7 @@
 
 ```bash
 cderun --diagnosis
+
 ```
 
 ### サブコマンドとの併用
@@ -29,6 +30,7 @@ cderun --diagnosis
 
 ```bash
 cderun --diagnosis node --version
+
 ```
 
 ## 出力フォーマット
@@ -51,6 +53,7 @@ available_tools:
   - git
   - node
   - python
+
 ```
 
 ※実際の出力項目は、実装の変更に伴い多少異なる場合があります。
@@ -80,6 +83,7 @@ available_tools:
     "python"
   ]
 }
+
 ```
 
 ### 簡易形式
@@ -92,6 +96,7 @@ Runtime Status: accessible
 Global Config: /home/user/.cderun.yaml
 Tools Config: /home/user/project/.tools.yaml
 Available Tools: git, node, python
+
 ```
 
 ## P1 Internal Overrides
@@ -102,6 +107,7 @@ Available Tools: git, node, python
 cderun --cderun-diagnosis
 # または
 cderun --diagnosis --cderun-diagnosis-format json
+
 ```
 
 ## 環境変数
@@ -111,6 +117,7 @@ cderun --diagnosis --cderun-diagnosis-format json
 ```bash
 export CDERUN_DIAGNOSIS=true
 cderun
+
 ```
 
 ### 出力フォーマットの環境変数
@@ -120,6 +127,7 @@ cderun
 ```bash
 export CDERUN_DIAGNOSIS_FORMAT=json
 cderun --diagnosis
+
 ```
 
 `CDERUN_DIAGNOSIS=true` と組み合わせることで、フラグなしで特定のフォーマットの診断出力を得ることができます。
@@ -128,6 +136,7 @@ cderun --diagnosis
 export CDERUN_DIAGNOSIS=true
 export CDERUN_DIAGNOSIS_FORMAT=json
 cderun
+
 ```
 
 利用可能な値は `yaml`（デフォルト）、`json`、`simple` です。

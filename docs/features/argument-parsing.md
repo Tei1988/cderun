@@ -8,6 +8,7 @@
 
 ```text
 cderun [cderun-flags] <subcommand> [passthrough-args]
+
 ```
 
 - **[cderun-flags]**: `cderun` 自体の動作を制御するフラグ。サブコマンドの**前**に置く標準フラグ（P2）と、`--cderun-` で始まる内部オーバーライドフラグ（P1）に分けられる。
@@ -42,6 +43,7 @@ cderun --image=golang:1.22 --entrypoint=go go --version
 # イメージが特定できない場合
 cderun go --version
 # → エラー
+
 ```
 
 ## P1 内部オーバーライドのホイスト
@@ -67,6 +69,7 @@ flowchart TD
     ExampleOutput["cderun --cderun-image node:20 node app.js"]
     ExampleInput -.-> ExampleOutput
     end
+
 ```
 
 #### 解析ロジックの詳細
@@ -82,6 +85,7 @@ cderun node app.js --cderun-tty --cderun-image node:20-alpine
 
 # 内部的なホイスト後の引数
 cderun --cderun-tty --cderun-image node:20-alpine node app.js
+
 ```
 
 このメカニズムにより、コンテナ内で実行されるコマンドが自身のフラグ（例: `node --version`）を持っていても、`cderun` の設定と曖昧さなく区別することが可能になります。
@@ -95,6 +99,7 @@ cderun --cderun-tty --cderun-image node:20-alpine node app.js
 ```bash
 # node が cderun へのシンボリックリンクの場合
 node --env DEBUG=app app.js --cderun-env NODE_ENV=production
+
 ```
 
 この例では：
@@ -115,4 +120,5 @@ node --env DEBUG=app app.js --cderun-env NODE_ENV=production
 ```bash
 cderun --tty docker --tty
 # 最初の --tty は cderun フラグ、後の --tty は docker へのパススルー引数
+
 ```

@@ -8,6 +8,7 @@
 
 ```bash
 cderun [cderun-flags] <subcommand> [passthrough-args]
+
 ```
 
 - **[cderun-flags]**: `cderun` の動作を制御するフラグ。
@@ -28,6 +29,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 ```bash
 cderun --tty bash
 cderun -t node
+
 ```
 
 ### `--interactive`, `-i`
@@ -41,6 +43,7 @@ cderun -t node
 ```bash
 cderun --interactive python
 cderun -i bash
+
 ```
 
 **組み合わせ例**:
@@ -48,6 +51,7 @@ cderun -i bash
 ```bash
 cderun --tty --interactive bash
 cderun -ti bash  # 短縮形
+
 ```
 
 ### `--network`
@@ -62,6 +66,7 @@ cderun -ti bash  # 短縮形
 cderun --network host node server.js
 cderun --network none python script.py
 cderun --network my-network node app.js
+
 ```
 
 ### `--socket-path`
@@ -75,6 +80,7 @@ cderun --network my-network node app.js
 ```bash
 cderun --socket-path /var/run/docker.sock docker ps
 cderun podman images --cderun-socket-path /run/podman/podman.sock
+
 ```
 
 ### `--mount-socket`
@@ -87,6 +93,7 @@ cderun podman images --cderun-socket-path /run/podman/podman.sock
 
 ```bash
 cderun --mount-socket docker ps
+
 ```
 
 ### `--mount-socket-path`
@@ -99,6 +106,7 @@ cderun --mount-socket docker ps
 
 ```bash
 cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
+
 ```
 
 ### `--mount-cderun`
@@ -115,6 +123,7 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 
 ```bash
 cderun --mount-cderun alpine sh
+
 ```
 
 ### `--mount-cderun-path`
@@ -126,6 +135,7 @@ cderun --mount-cderun alpine sh
 
 ```bash
 cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
+
 ```
 
 ### `--mount-tools`
@@ -139,6 +149,7 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 
 ```bash
 cderun --mount-tools node,python alpine sh
+
 ```
 
 ### `--mount-all-tools`
@@ -152,6 +163,7 @@ cderun --mount-tools node,python alpine sh
 
 ```bash
 cderun --mount-all-tools alpine sh
+
 ```
 
 ### `--image`
@@ -166,6 +178,7 @@ cderun --mount-all-tools alpine sh
 ```bash
 cderun --image node:18-alpine node --version
 cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
+
 ```
 
 ### `--env`, `-e`
@@ -183,6 +196,7 @@ cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 cderun --env NODE_ENV=production node app.js
 cderun --env NPM_TOKEN node app.js  # ホストから取得
 cderun --env "PROJECT_DIR={{PWD}}" node app.js
+
 ```
 
 ### `--cderun-env`
@@ -194,6 +208,7 @@ cderun --env "PROJECT_DIR={{PWD}}" node app.js
 ```bash
 # サブコマンドの後ろで指定
 cderun node app.js --cderun-env=NODE_ENV=production
+
 ```
 
 ### `--mount`
@@ -214,6 +229,7 @@ cderun --mount type=bind,source=~/.ssh,target=/root/.ssh,readonly git clone ...
 cderun --mount type=bind,source=./config,target=/config,optional node app.js
 cderun --mount type=tmpfs,target=/tmp alpine
 cderun --mount "type=bind,source={{HOME}}/.npmrc,target=/root/.npmrc" node app.js
+
 ```
 
 ### `--workdir`, `-w`
@@ -226,6 +242,7 @@ cderun --mount "type=bind,source={{HOME}}/.npmrc,target=/root/.npmrc" node app.j
 ```bash
 cderun --workdir /app node server.js
 cderun --workdir "{{PWD}}/src" node app.js
+
 ```
 
 ### `--strict-env`
@@ -237,6 +254,7 @@ cderun --workdir "{{PWD}}/src" node app.js
 
 ```bash
 cderun --strict-env --env NPM_TOKEN node app.js
+
 ```
 
 ### `--runtime`
@@ -248,6 +266,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 
 ```bash
 cderun --runtime podman node app.js
+
 ```
 
 ### `--remove`
@@ -259,6 +278,7 @@ cderun --runtime podman node app.js
 
 ```bash
 cderun --remove=false node app.js  # コンテナを残す
+
 ```
 
 ### `--publish`, `-p`
@@ -274,6 +294,7 @@ cderun --remove=false node app.js  # コンテナを残す
 
 ```bash
 cderun -p 8080:80 nginx
+
 ```
 
 ### `--publish-all`, `-P`
@@ -295,6 +316,7 @@ cderun -p 8080:80 nginx
 ```bash
 cderun --expose 80 node app.js
 cderun --expose 80/udp node app.js
+
 ```
 
 ### `--hostname`
@@ -305,6 +327,7 @@ cderun --expose 80/udp node app.js
 
 ```bash
 cderun --hostname my-container alpine hostname
+
 ```
 
 ### `--dns`
@@ -318,6 +341,7 @@ cderun --hostname my-container alpine hostname
 
 ```bash
 cderun --dns 8.8.8.8 alpine ping google.com
+
 ```
 
 ### `--add-host`
@@ -331,6 +355,7 @@ cderun --dns 8.8.8.8 alpine ping google.com
 
 ```bash
 cderun --add-host my-server:192.168.1.10 alpine ping my-server
+
 ```
 
 ### `--user`, `-u`
@@ -341,6 +366,7 @@ cderun --add-host my-server:192.168.1.10 alpine ping my-server
 
 ```bash
 cderun -u 1000:1000 alpine whoami
+
 ```
 
 ### `--privileged`
@@ -352,6 +378,7 @@ cderun -u 1000:1000 alpine whoami
 
 ```bash
 cderun --privileged alpine ls /dev
+
 ```
 
 ### `--cap-add`
@@ -365,6 +392,7 @@ cderun --privileged alpine ls /dev
 
 ```bash
 cderun --cap-add SYS_ADMIN alpine mount ...
+
 ```
 
 ### `--cap-drop`
@@ -387,6 +415,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 
 ```bash
 cderun --entrypoint /bin/sh node -c "ls"
+
 ```
 
 ### `--pull`
@@ -423,12 +452,6 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **環境変数**: `CDERUN_MEMORY`
 - **説明**: メモリ制限 (例: `512m`, `1g`)
 
-### `--cpus`
-
-- **型**: float64
-- **環境変数**: `CDERUN_CPUS`
-- **説明**: CPU数制限
-
 ### `--device`
 
 - **型**: stringArray
@@ -440,6 +463,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 
 ```bash
 cderun --device /dev/fuse alpine ls /dev/fuse
+
 ```
 
 ### `--config`
@@ -452,6 +476,7 @@ cderun --device /dev/fuse alpine ls /dev/fuse
 ```bash
 cderun --config my-cderun.yaml node app.js
 cderun --config ~/.config/cderun/custom.yaml node app.js
+
 ```
 
 ### `--tool-config`
@@ -464,6 +489,7 @@ cderun --config ~/.config/cderun/custom.yaml node app.js
 ```bash
 cderun --tool-config my-tools.yaml node app.js
 cderun --tool-config ~/tools-config.yaml node app.js
+
 ```
 
 ### `--dry-run`
@@ -475,6 +501,7 @@ cderun --tool-config ~/tools-config.yaml node app.js
 
 ```bash
 cderun --dry-run node --version
+
 ```
 
 ### `--dry-run-format`, `-f`
@@ -488,6 +515,7 @@ cderun --dry-run node --version
 ```bash
 cderun --dry-run --dry-run-format json node --version
 cderun --dry-run -f simple node --version
+
 ```
 
 ### `--diagnosis`
@@ -499,6 +527,7 @@ cderun --dry-run -f simple node --version
 
 ```bash
 cderun --diagnosis
+
 ```
 
 ### `--diagnosis-format`
@@ -511,6 +540,7 @@ cderun --diagnosis
 
 ```bash
 cderun --diagnosis --diagnosis-format json
+
 ```
 
 ### `--hang-timeout`
@@ -527,6 +557,7 @@ cderun --diagnosis --diagnosis-format json
 
 ```bash
 cderun --hang-timeout 5s node script.js
+
 ```
 
 ### `--log-level`
@@ -540,6 +571,7 @@ cderun --hang-timeout 5s node script.js
 
 ```bash
 cderun --log-level info node app.js
+
 ```
 
 ### `--log-format`
@@ -551,6 +583,7 @@ cderun --log-level info node app.js
 
 ```bash
 cderun --log-format json --log-level info node app.js
+
 ```
 
 ### `--log-timestamp`
@@ -562,6 +595,7 @@ cderun --log-format json --log-level info node app.js
 
 ```bash
 cderun --log-timestamp=false node app.js
+
 ```
 
 ### `--cderun-*` (内部オーバーライドフラグ)
@@ -628,6 +662,7 @@ cderun --tty bash
 
 # インタラクティブ
 cderun -ti python
+
 ```
 
 ### ネットワーク設定
@@ -638,6 +673,7 @@ cderun --network host node server.js
 
 # ネットワーク分離
 cderun --network none python script.py
+
 ```
 
 ### Docker-in-Docker
@@ -652,12 +688,14 @@ cderun --mount-cderun alpine sh
 # Mac等でホストとコンテナのマウントパスを変える場合
 cderun --socket-path ~/.rd/docker.sock --mount-socket \
   --mount-socket-path /var/run/docker.sock docker ps
+
 ```
 
 ### 複数オプションの組み合わせ
 
 ```bash
 cderun --tty --interactive --network host --mount-socket docker sh
+
 ```
 
 ## 注意事項
@@ -672,6 +710,7 @@ cderun --tty node --version
 
 # 間違い（--ttyがnodeに渡される）
 cderun node --tty --version
+
 ```
 
 ---
@@ -688,6 +727,7 @@ cderun --cderun-tty node --version
 # 正しい（Diagnosis Mode）
 cderun --diagnosis --cderun-log-level=debug
 cderun --cderun-log-level=debug --diagnosis
+
 ```
 
 ### 短縮形
@@ -708,6 +748,7 @@ cderun --cderun-log-level=debug --diagnosis
 
 ```bash
 cderun --help
+
 ```
 
 ## トラブルシューティング
@@ -717,16 +758,19 @@ cderun --help
 ```bash
 cderun node --tty
 # --ttyがnodeに渡される
+
 ```
 
 **解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
 
 ```bash
 cderun --tty node
+
 ```
 
 ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
 
 ```bash
 cderun node --version --cderun-tty
+
 ```

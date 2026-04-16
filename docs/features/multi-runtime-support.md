@@ -40,6 +40,7 @@ cderun ContainerRuntimeインターフェース
         ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
         ├── PodmanRuntime → Podman API (HTTP over Unix socket)
         └── NerdctlRuntime → containerd API (gRPC)
+
 ```
 
 ### 共通インターフェースの役割
@@ -78,6 +79,7 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 
 ```yaml
 runtime: podman
+
 ```
 
 #### 環境変数
@@ -86,12 +88,14 @@ runtime: podman
 export CDERUN_RUNTIME=podman
 export CDERUN_SOCKET_PATH=/run/podman/podman.sock
 cderun node app.js
+
 ```
 
 #### コマンドライン
 
 ```bash
 cderun --runtime podman node app.js
+
 ```
 
 ## ランタイム固有の実装ポイント
@@ -108,12 +112,14 @@ cderun --runtime podman node app.js
 
 ```bash
 cderun --diagnosis
+
 ```
 
 診断情報の出力フォーマットは `--diagnosis-format` で指定可能です（`yaml`, `json`, `simple`）。
 
 ```bash
 cderun --diagnosis --diagnosis-format simple
+
 ```
 
 ## 拡張性
@@ -132,4 +138,5 @@ cderun --diagnosis --diagnosis-format simple
 import (
     "github.com/docker/docker/client"
 )
+
 ```

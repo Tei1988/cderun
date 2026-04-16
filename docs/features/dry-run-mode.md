@@ -21,6 +21,7 @@
 
 ```bash
 cderun --dry-run node --version
+
 ```
 
 ## 出力フォーマット
@@ -69,6 +70,7 @@ devices:
   - path_on_host: /dev/fuse
     path_in_container: /dev/fuse
     cgroup_permissions: rwm
+
 ```
 
 ### JSON形式
@@ -114,6 +116,7 @@ devices:
     }
   ]
 }
+
 ```
 
 ### 簡易形式
@@ -145,6 +148,7 @@ Pull: missing
 Memory: 512MiB
 CPUs: 1.5
 Devices:
+
 ```
 
 > **Note**: `Memory` は `512MiB` や `1GiB` のようなバイナリ単位（MiB/GiB）を用いた人間が読みやすい形式で表示され、`CPUs` は浮動小数点数（例: `1.5`）として表示されます。
@@ -157,6 +161,7 @@ Devices:
 
 ```bash
 cderun --dry-run python script.py
+
 ```
 
 ### 2. 設定の検証
@@ -171,12 +176,14 @@ else
   echo "Unexpected image: $image"
   false
 fi
+
 ```
 
 ### 3. 設定ファイルのドキュメント化
 
 ```bash
 cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
+
 ```
 
 ## 他のフラグとの組み合わせ
@@ -192,6 +199,7 @@ cderun --dry-run --log-level info node app.js
 [INFO] Generated ContainerConfig:
 image: node:20-alpine
 ...
+
 ```
 
 ## 実装上の注意
@@ -211,6 +219,7 @@ export API_KEY=secret123
 cderun --dry-run --env API_KEY node app.js
 env:
   - API_KEY=secret123
+
 ```
 
 ### パスの解決
@@ -224,4 +233,5 @@ mounts:
   - type: bind
     source: /home/user/project
     target: /workspace
+
 ```

@@ -43,6 +43,7 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 		return s.inner.Read(p)
 	}
 }
+
 ```
 
 ### 3. StdinOnce による確実な EOF 伝達

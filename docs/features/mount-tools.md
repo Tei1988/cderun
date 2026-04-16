@@ -23,6 +23,7 @@ cderunバイナリを複数のツール名でマウントし、ポリグロッ�
 
 ```bash
 cderun --mount-all-tools sh
+
 ```
 
 **動作**:
@@ -36,6 +37,7 @@ docker run --rm \
   --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
   --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/gemini-cli,readonly \
   alpine:latest
+
 ```
 
 **コンテナ内での使用**:
@@ -45,6 +47,7 @@ docker run --rm \
 node --version    # cderunがnodeとして実行される
 python script.py  # cderunがpythonとして実行される
 gemini-cli ask    # cderunがgemini-cliとして実行される
+
 ```
 
 ### `--mount-tools`
@@ -57,6 +60,7 @@ gemini-cli ask    # cderunがgemini-cliとして実行される
 
 ```bash
 cderun --mount-tools python,node sh
+
 ```
 
 **動作イメージ(実際はランタイムAPIで実現)**:
@@ -68,6 +72,7 @@ docker run --rm \
   --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
   --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/node,readonly \
   alpine:latest
+
 ```
 
 **コンテナ内での使用**:
@@ -77,6 +82,7 @@ docker run --rm \
 python --version  # OK
 node --version    # OK
 gemini-cli ask    # エラー: マウントされていない
+
 ```
 
 ## 実装詳細
@@ -91,6 +97,7 @@ gemini-cli ask    # エラー: マウントされていない
 ├── node         -> <ホスト側cderunのパス>
 ├── python       -> <ホスト側cderunのパス>
 └── gemini-cli   -> <ホスト側cderunのパス>
+
 ```
 
 ### ポリグロットエントリーポイントの活用
@@ -103,6 +110,7 @@ node --version
 
 # cderunが実際に実行するコマンド
 cderun node --version
+
 ```
 
 ### ツールの検証
@@ -113,6 +121,7 @@ cderun node --version
 cderun --mount-tools unknown-tool alpine sh
 Error: tool "unknown-tool" not found in .tools.yaml
 available tools: node, python, gemini-cli
+
 ```
 
 ## 使用例
@@ -132,6 +141,7 @@ cderun --mount-all-tools \
 node --version
 python --version
 gemini-cli --version
+
 ```
 
 ### 特定ツールのみマウント
@@ -139,6 +149,7 @@ gemini-cli --version
 ```bash
 # .tools.yamlにshが定義されている場合
 cderun --mount-tools python,node sh
+
 ```
 
 ### CI/CDパイプライン
@@ -154,6 +165,7 @@ cderun --mount-tools node,docker \
     docker build -t myapp .
     docker push myapp
   '
+
 ```
 
 **注意**: `npm`や`npx`などのコマンドを使う場合は、`.tools.yaml`に別途定義する必要があります：
@@ -168,6 +180,7 @@ npm:
 
 npx:
   image: node:20-alpine
+
 ```
 
 そうすれば以下のように使用できます：
@@ -179,6 +192,7 @@ cderun --mount-tools node,npm,npx \
     npm install
     npx eslint .
   '
+
 ```
 
 ## 制限事項

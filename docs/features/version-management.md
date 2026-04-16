@@ -29,6 +29,7 @@
 
 ```text
 cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
+
 ```
 
 ## 実装の仕組み
@@ -49,6 +50,7 @@ LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
            -X cderun/internal/version.BuildDate=$(BUILD_DATE)
 
 go build -ldflags "$(LDFLAGS)" -o cderun main.go
+
 ```
 
 ### 3. GoReleaser との統合
@@ -61,6 +63,7 @@ builds:
       - -X cderun/internal/version.Version={{.Version}}
       - -X cderun/internal/version.Revision={{.FullCommit}}
       - -X cderun/internal/version.BuildDate={{.Date}}
+
 ```
 
 ## 関連ドキュメント
