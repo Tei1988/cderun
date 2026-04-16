@@ -230,6 +230,44 @@ func resolveFloat64Opt(
 	return 0
 }
 
+func resolveFloat64OptVal(
+	envKey string,
+	toolGetter func(ToolConfig) *float64,
+	globalGetter func(CDERunConfig) *float64,
+	fallback float64,
+	p1Set bool, p1Val float64,
+	p2Set bool, p2Val float64,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	fs FileSystem,
+) float64 {
+	if p1Set {
+		return p1Val
+	}
+	if p2Set {
+		return p2Val
+	}
+	if envKey != "" {
+		if env := fs.Getenv(envKey); env != "" {
+			if f, err := strconv.ParseFloat(env, 64); err == nil {
+				return f
+			}
+		}
+	}
+	if toolGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if f := toolGetter(tool); f != nil {
+				return *f
+			}
+		}
+	}
+	if globalGetter != nil && global != nil {
+		if f := globalGetter(*global); f != nil {
+			return *f
+		}
+	}
+	return fallback
+}
+
 // resolveIntOpt resolves an int option through P1-P6.
 func resolveIntOpt(
 	def OptionDef[*int],
@@ -267,4 +305,42 @@ func resolveIntOpt(
 		return *def.Fallback
 	}
 	return 0
+}
+
+func resolveIntOptVal(
+	envKey string,
+	toolGetter func(ToolConfig) *int,
+	globalGetter func(CDERunConfig) *int,
+	fallback int,
+	p1Set bool, p1Val int,
+	p2Set bool, p2Val int,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	fs FileSystem,
+) int {
+	if p1Set {
+		return p1Val
+	}
+	if p2Set {
+		return p2Val
+	}
+	if envKey != "" {
+		if env := fs.Getenv(envKey); env != "" {
+			if i, err := strconv.Atoi(env); err == nil {
+				return i
+			}
+		}
+	}
+	if toolGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if i := toolGetter(tool); i != nil {
+				return *i
+			}
+		}
+	}
+	if globalGetter != nil && global != nil {
+		if i := globalGetter(*global); i != nil {
+			return *i
+		}
+	}
+	return fallback
 }

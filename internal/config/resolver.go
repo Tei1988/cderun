@@ -429,14 +429,12 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		}
 	}
 
-	def := OptionDef[*int]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved := resolveIntOptVal(
+		opt.EnvKey,
+		opt.ToolGetter,
+		opt.GlobalGetter,
+		opt.Default,
+		p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
@@ -467,14 +465,12 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		}
 	}
 
-	def := OptionDef[*float64]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
-	}
-
-	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved := resolveFloat64OptVal(
+		opt.EnvKey,
+		opt.ToolGetter,
+		opt.GlobalGetter,
+		opt.Default,
+		p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
@@ -1391,13 +1387,26 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	upperKey := strings.ToUpper(key)
 	hasSensitive := false
+	upperKey := ""
 	for kw := range sensitiveKeywords {
-		if strings.Contains(upperKey, kw) {
+		if strings.Contains(key, kw) { // Try exact match first
 			hasSensitive = true
 			break
 		}
+	}
+	if !hasSensitive {
+		// Fallback to case-insensitive check if exact match fails
+		for kw := range sensitiveKeywords {
+			if containsIgnoreCase(key, kw) {
+				hasSensitive = true
+				break
+			}
+		}
+	}
+
+	if hasSensitive {
+		upperKey = strings.ToUpper(key)
 	}
 	if !hasSensitive {
 		return value
@@ -1477,6 +1486,21 @@ func MaskSensitiveEnv(key, value string) string {
 }
 
 // MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
+func containsIgnoreCase(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(substr) > len(s) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if strings.EqualFold(s[i:i+len(substr)], substr) {
+			return true
+		}
+	}
+	return false
+}
+
 func MaskSensitiveEnvList(env []string) []string {
 	if env == nil {
 		return nil

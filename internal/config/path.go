@@ -469,7 +469,7 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i, r := range []rune(s) {
+	for i, r := range s {
 		if r <= 31 || r == 127 {
 			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
 		}
@@ -478,6 +478,9 @@ func validatePathChars(s string) error {
 }
 
 func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
+	if !strings.Contains(original, "{{") && !strings.Contains(original, "~") {
+		return nil
+	}
 	allMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
 	if len(allMatches) == 0 {
 		return nil
