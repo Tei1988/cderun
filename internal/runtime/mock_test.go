@@ -255,3 +255,21 @@ func TestUnit_Mock_WaitContainer_AlreadySignaled_WithDelay(t *testing.T) {
 	code, _ := mock.WaitContainer(context.Background(), "c")
 	assert.Equal(t, 7, code)
 }
+
+func TestUnit_Mock_Close(t *testing.T) {
+	t.Run("Close sets CloseCalled and returns nil by default", func(t *testing.T) {
+		mock := NewMockRuntime()
+		err := mock.Close()
+		require.NoError(t, err)
+		assert.True(t, mock.CloseCalled)
+	})
+
+	t.Run("Close returns CloseErr", func(t *testing.T) {
+		mock := NewMockRuntime()
+		expectedErr := errors.New("close error")
+		mock.CloseErr = expectedErr
+		err := mock.Close()
+		require.ErrorIs(t, err, expectedErr)
+		assert.True(t, mock.CloseCalled)
+	})
+}
