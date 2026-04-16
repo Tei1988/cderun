@@ -345,8 +345,8 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		return err
 	}
 
-	p1v, p1Set := extractStringSliceValue(p1Val, p1Set)
-	p2v, p2Set := extractStringSliceValue(p2Val, p2Set)
+	p1v, _ := extractStringSliceValue(p1Val, p1Set)
+	p2v, _ := extractStringSliceValue(p2Val, p2Set)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -376,24 +376,27 @@ func (rv *resolver) resolveStringValue(opt StringOption) (string, error) {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
-	resolved, err := rv.resolveStringValue(opt)
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+
+	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetString(resolved)
 	return nil
 }
 
-func (rv *resolver) resolveBoolValue(opt BoolOption) (bool, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+func (rv *resolver) applyBoolOption(opt BoolOption) error {
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	def := OptionDef[*bool]{
@@ -402,20 +405,7 @@ func (rv *resolver) resolveBoolValue(opt BoolOption) (bool, error) {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	return resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs), nil
-}
-
-func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
-	resolved, err := rv.resolveBoolValue(opt)
-	if err != nil {
-		return err
-	}
-
+	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
