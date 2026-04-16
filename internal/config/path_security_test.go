@@ -102,12 +102,6 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	t.Parallel()
 	home := "/home/user"
 	pwd := "/work"
-	mfs := &MockFileSystem{
-		WD:      pwd,
-		HomeDir: home,
-	}
-	r, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name    string
@@ -129,11 +123,31 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Multiple anchors", "{{HOME}}/subdir/{{HOME}}/file", false},
 		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
 		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{"Safe env anchor", "{{env:MY_PATH}}/file", false},
+		{"Traversal escaping env anchor", "{{env:MY_PATH}}/../../etc/passwd", true},
+		{"Safe find_dir anchor", "{{find_dir:.git}}/file", false},
+		{"Traversal escaping find_dir anchor", "{{find_dir:.git}}/../../etc/passwd", true},
+		{"Safe nested anchor", "{{env:DIR:-{{HOME}}}}/file", false},
+		{"Traversal escaping nested anchor", "{{env:DIR:-{{HOME}}}}/../../etc/passwd", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ResolvePath(tt.input, pwd, r)
+			mfs := &MockFileSystem{
+				WD:      pwd,
+				HomeDir: home,
+				Env: map[string]string{
+					"MY_PATH": "/work/safe",
+					"DIR":     "",
+				},
+				Dirs: map[string]bool{
+					"/work/.git": true,
+				},
+			}
+			r, err := NewExpressionResolverWithFS(nil, mfs)
+			require.NoError(t, err)
+
+			_, err = ResolvePath(tt.input, pwd, r)
 			if tt.wantErr {
 				require.Error(t, err, "input: %q", tt.input)
 				assert.Contains(t, err.Error(), "path traversal detected")

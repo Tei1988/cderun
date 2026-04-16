@@ -153,37 +153,51 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		if hasExpr {
 			var sb strings.Builder
 			last := 0
-			curr := s
-			for {
-				start := strings.Index(curr[last:], "{{")
-				if start == -1 {
-					sb.WriteString(curr[last:])
-					break
-				}
-				start += last
-				sb.WriteString(curr[last:start])
+			for i := 0; i < len(s)-1; i++ {
+				if s[i] == '{' && s[i+1] == '{' {
+					sb.WriteString(s[last:i])
+					// Found start of expression, find matching }}
+					start := i
+					depth := 1
+					i += 2
+					for ; i < len(s)-1; i++ {
+						if s[i] == '{' && s[i+1] == '{' {
+							depth++
+							i++
+						} else if s[i] == '}' && s[i+1] == '}' {
+							depth--
+							if depth == 0 {
+								break
+							}
+							i++
+						}
+					}
 
-				end := strings.Index(curr[start:], "}}")
-				if end == -1 {
-					sb.WriteString(curr[start:])
-					break
-				}
-				end += start
-
-				if r.err != nil {
-					sb.WriteString(curr[start : end+2])
-				} else {
-					content := strings.TrimSpace(curr[start+2 : end])
-					res, err := r.resolveDirective(content)
-					if err != nil {
-						r.setError(err)
-						sb.WriteString(curr[start : end+2])
+					if depth == 0 {
+						// Found matching }}
+						if r.err != nil {
+							sb.WriteString(s[start : i+2])
+						} else {
+							content := strings.TrimSpace(s[start+2 : i])
+							res, err := r.resolveDirective(content)
+							if err != nil {
+								r.setError(err)
+								sb.WriteString(s[start : i+2])
+							} else {
+								sb.WriteString(res)
+							}
+						}
+						last = i + 2
+						i++ // skip second }
 					} else {
-						sb.WriteString(res)
+						// No matching }}, treat as literal
+						sb.WriteString(s[start : start+2])
+						last = start + 2
+						i = start + 1
 					}
 				}
-				last = end + 2
 			}
+			sb.WriteString(s[last:])
 			resolved = sb.String()
 		}
 	}

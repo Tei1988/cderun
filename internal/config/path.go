@@ -338,7 +338,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}})|(^~|[/\\]~)`)
+	magicWordPreRegex = regexp.MustCompile(`(^~|[/\\]~)`)
 
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
@@ -467,9 +467,35 @@ func SplitHostRemainder(s string) (string, string, bool) {
 	return s[:sepIdx], s[sepIdx+1:], true
 }
 
+// findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
+func findAnchors(s string) []string {
+	var res []string
+	start := -1
+	depth := 0
+	for i := 0; i < len(s)-1; i++ {
+		if s[i] == '{' && s[i+1] == '{' {
+			if depth == 0 {
+				start = i
+			}
+			depth++
+			i++ // skip second {
+		} else if s[i] == '}' && s[i+1] == '}' {
+			if depth > 0 {
+				depth--
+				if depth == 0 {
+					res = append(res, s[start:i+2])
+					start = -1
+				}
+			}
+			i++ // skip second }
+		}
+	}
+	return res
+}
+
 // validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i, r := range []rune(s) {
+	for i, r := range s {
 		if r <= 31 || r == 127 {
 			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
 		}
@@ -478,8 +504,10 @@ func validatePathChars(s string) error {
 }
 
 func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
-	allMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
-	if len(allMatches) == 0 {
+	tildeMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
+	exprAnchors := findAnchors(original)
+
+	if len(tildeMatches) == 0 && len(exprAnchors) == 0 {
 		return nil
 	}
 
@@ -493,51 +521,9 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 	absResolved = filepath.Clean(absResolved)
 
-	for _, matches := range allMatches {
-		var anchorPath string
-		exprMatch := matches[1]
-		tildeMatch := matches[3]
-
-		if tildeMatch != "" {
-			if r != nil {
-				anchorPath = r.Home
-			} else {
-				home, err := fs.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("failed to get anchor home directory: %w", err)
-				}
-				anchorPath = home
-			}
-		} else {
-			if r == nil {
-				return fmt.Errorf("expression resolver required for anchor validation")
-			}
-			word := matches[2]
-			switch word {
-			case "HOME":
-				anchorPath = r.Home
-			case "PWD":
-				anchorPath = r.Pwd
-			case "BASE_HOME":
-				if r.HostContext != nil && r.HostContext.HomeDir != "" {
-					anchorPath = r.HostContext.HomeDir
-				} else {
-					anchorPath = r.Home
-				}
-			case "BASE_PWD":
-				if r.HostContext != nil && r.HostContext.WorkingDir != "" {
-					anchorPath = r.HostContext.WorkingDir
-				} else {
-					anchorPath = r.Pwd
-				}
-			}
-		}
-
+	processBoundary := func(anchorRaw, anchorPath string) error {
 		if anchorPath == "" {
-			if exprMatch != "" {
-				return fmt.Errorf("anchor path is empty for %q", exprMatch)
-			}
-			return fmt.Errorf("anchor path is empty for %q", tildeMatch)
+			return fmt.Errorf("anchor path is empty for %q", anchorRaw)
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)
@@ -553,6 +539,37 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
+		}
+		return nil
+	}
+
+	for _, matches := range tildeMatches {
+		tildeMatch := matches[1]
+		var anchorPath string
+		if r != nil {
+			anchorPath = r.Home
+		} else {
+			home, err := fs.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get anchor home directory: %w", err)
+			}
+			anchorPath = home
+		}
+		if err := processBoundary(tildeMatch, anchorPath); err != nil {
+			return err
+		}
+	}
+
+	for _, anchor := range exprAnchors {
+		if r == nil {
+			return fmt.Errorf("expression resolver required for anchor validation")
+		}
+		anchorPath, err := r.ResolveString(anchor)
+		if err != nil {
+			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
+		}
+		if err := processBoundary(anchor, anchorPath); err != nil {
+			return err
 		}
 	}
 
