@@ -47,6 +47,7 @@ type MockRuntime struct {
 	AttachFunc  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
 	CloseCalled bool
+	CloseErr    error
 }
 
 // WithLockedMock executes the provided function while holding the mock's mutex.
@@ -240,7 +241,7 @@ func (m *MockRuntime) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.CloseCalled = true
-	return nil
+	return m.CloseErr
 }
 
 // ResetCreatedConfig resets the created config to nil.

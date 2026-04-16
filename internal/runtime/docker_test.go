@@ -809,14 +809,18 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 	t.Run("sleep completes", func(t *testing.T) {
 		ctx := context.Background()
-		err := runtime.(*DockerRuntime).sleepFunc(ctx, 1*time.Millisecond)
+		rt, ok := runtime.(*DockerRuntime)
+		require.True(t, ok)
+		err := rt.sleepFunc(ctx, 1*time.Millisecond)
 		require.NoError(t, err)
 	})
 
 	t.Run("sleep cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		err := runtime.(*DockerRuntime).sleepFunc(ctx, 1*time.Second)
+		rt, ok := runtime.(*DockerRuntime)
+		require.True(t, ok)
+		err := rt.sleepFunc(ctx, 1*time.Second)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
