@@ -181,6 +181,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewDockerRuntime(socket)
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
+			case "containerd":
+				return runtime.NewContainerdRuntime(socket)
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -730,6 +732,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
+	defer rt.Close()
 	defer cleanup()
 
 	// Detect if host stdin is a terminal once

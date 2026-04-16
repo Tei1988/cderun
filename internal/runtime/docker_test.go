@@ -200,6 +200,10 @@ func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID str
 	return m.inspectResp, m.inspectErr
 }
 
+func (m *mockDockerClient) Close() error {
+	return nil
+}
+
 func TestUnit_Docker_RetryablePullError(t *testing.T) {
 	assert.False(t, isRetryablePullError(nil))
 	assert.True(t, isRetryablePullError(errors.New("toomanyrequests")))

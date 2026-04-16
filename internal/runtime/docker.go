@@ -37,6 +37,7 @@ type dockerClient interface {
 	ContainerInspect(ctx context.Context, containerID string) (dockercontainer.InspectResponse, error)
 	ContainerKill(ctx context.Context, containerID string, signal string) error
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
+	Close() error
 }
 
 var signalRegex = regexp.MustCompile(`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`)
@@ -355,6 +356,14 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
+}
+
+// Close closes the underlying Docker client.
+func (d *DockerRuntime) Close() error {
+	if d.client == nil {
+		return nil
+	}
+	return d.client.Close()
 }
 
 func isRetryablePullError(err error) bool {

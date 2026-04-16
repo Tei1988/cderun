@@ -235,6 +235,10 @@ func (m *MockRuntime) Name() string {
 	return "mock"
 }
 
+func (m *MockRuntime) Close() error {
+	return nil
+}
+
 // ResetCreatedConfig resets the created config to nil.
 func (m *MockRuntime) ResetCreatedConfig() {
 	m.mu.Lock()
