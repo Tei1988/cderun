@@ -35,6 +35,7 @@ func TestSignalValidation(t *testing.T) {
 		// so SignalContainer accepts it and propagates it to the daemon.
 		// This confirms that we allow validly formatted but non-existent signal names.
 		{"Invalid signal string", "SIGINVALID", false},
+		{"Negative numeric signal", "-9", true},
 		{"Injection attempt ; rm -rf", "SIGTERM; rm -rf /", true},
 		{"Injection attempt \n", "SIGTERM\n", true},
 	}
