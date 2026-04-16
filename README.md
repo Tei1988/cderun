@@ -78,27 +78,28 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy (**P1** > **P2** CLI Flags > **P3** Env Vars > **P4** Tool Config > **P5** Global Config > **P6** Hardcoded Defaults).
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy:
+**P1** (Overrides) > **P2** (CLI Flags) > **P3** (Env Vars) > **P4** (Tool Config) > **P5** (Global Config) > **P6** (Defaults).
 
-In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the container.
+In **Wrapper Mode**, P1 flags **must** be placed **after** the subcommand. `cderun` automatically "hoists" these flags during preprocessing, treating them as internal settings while passing all other arguments to the container.
 
 ```bash
-# Standard Wrapper Mode: P1 flags go AFTER the subcommand
+# Correct: P1 flags go AFTER the subcommand
 cderun node app.js --cderun-image node:20-alpine
 
-# WRONG (will result in an error):
+# Incorrect (will result in an error):
 cderun --cderun-image node:20-alpine node app.js
 ```
 
-#### Hoisting Mechanics
+#### Why Hoisting?
 
-Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
+Hoisting prevents configuration conflicts. If you wrap a tool that also uses `--tty` or `--env`, placing the `cderun` version *after* the subcommand with the `--cderun-` prefix ensures it is handled by `cderun` and not passed to the wrapped tool.
 
-1. **Detection**: `cderun` scans for the **subcommand** boundary.
-2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
-3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
-
-This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
+This is essential in **Symlink Mode**:
+```bash
+# node is a symlink to cderun
+node app.js --cderun-tty  # --cderun-tty is hoisted and used by cderun
+```
 
 **Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
 
@@ -187,6 +188,8 @@ Key variables include:
 - `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
+- `CDERUN_MEMORY`: Memory limit (e.g., `512m`, `1g`).
+- `CDERUN_CPUS`: Number of CPUs (float).
 
 **Note on List-type Options:**
 
@@ -283,22 +286,34 @@ The masking logic is intelligent and handles CamelCase (e.g., `dbPassword`) and 
 
 ## Best Practices
 
-### Consistent Development Environments
+### Version Pinning with `{{file:...}}`
 
-Use `{{file:.go-version}}` or `{{file:.nvmrc}}` in your tool configuration to ensure the container image tag matches your project's version file:
+Keep your container environments in sync with your project's version files (like `.go-version`, `.nvmrc`, or `.python-version`).
 
 ```yaml
 # .tools.yaml
 go:
   image: "golang:{{file:.go-version}}"
+node:
+  image: "node:{{file:.nvmrc}}-alpine"
 ```
 
-### Context-Aware Pathing
+### Project-Root Relative Mounting
 
-Use `{{find_dir:.git}}` to reference the project root regardless of your current working directory:
+Use `{{find_dir:...}}` to locate your project root (e.g., where `.git` or `package.json` resides) and mount paths relative to it, no matter where you are in the directory tree.
 
 ```bash
-cderun --mount type=bind,source="{{find_dir:.git}}/logs",target=/logs my-tool
+# Mount the node_modules from the project root
+cderun --mount type=bind,source="{{find_dir:package.json}}/node_modules",target=/app/node_modules node app.js
+```
+
+### Dynamic Image Selection
+
+Use environment variables with default fallbacks to allow CI/CD pipelines to override images easily.
+
+```bash
+# Defaults to 20-alpine if CDERUN_NODE_VERSION is not set
+cderun --image "node:{{env:CDERUN_NODE_VERSION:-20-alpine}}" node --version
 ```
 
 ## Development & Testing

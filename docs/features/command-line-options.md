@@ -13,7 +13,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 - **[cderun-flags]**: `cderun` の動作を制御するフラグ。
   - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
 - **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
-- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグは `cderun` の優先設定（P1オーバーライド）としてパースされ、それ以外の全ての引数はサブコマンドにそのまま渡されます。
+- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグは `cderun` の優先設定（P1オーバーライド）としてパース（ホイスト）され、それ以外の全ての引数はサブコマンドにそのまま渡されます。
 
 ## グローバルオプション
 
@@ -410,6 +410,12 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **デフォルト**: `1s`
 - **環境変数**: `CDERUN_PULL_BACKOFF_BASE`
 - **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）。
+
+### `--cpus`
+
+- **型**: float64
+- **環境変数**: `CDERUN_CPUS`
+- **説明**: CPU数制限
 
 ### `--memory`, `-m`
 

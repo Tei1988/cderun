@@ -23,7 +23,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 - **containerd (Planned / In-progress)**:
   ネイティブの containerd API (gRPC) を直接利用したサポートを計画しています。
-  - **開発ステータス**: 内部的な設定バリデータ（`resolver.go`）では将来の対応を見越して `containerd` を有効な値として受け入れますが、**現時点ではランタイムの実装が完了していないため、指定しても実行時にエラーとなります。**
+  - **開発ステータス**: 内部的な設定バリデータ（`resolver.go`）では将来の対応を見越して `containerd` を有効な値として受け入れますが、**ランタイムエンジン本体（`internal/runtime`）の実装が完了していないため、指定しても実行時に「unsupported runtime」エラーとなります。**
   - **目的**: Docker/Podman デーモンを経由しない、より軽量なコンテナ実行の実現。
 - **nerdctl (Backlog)**:
   containerd の CLI である `nerdctl` をラップして実行する方式の検討。

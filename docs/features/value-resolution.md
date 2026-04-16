@@ -107,6 +107,19 @@ cderunの式解決には、セキュリティ上の理由から以下の厳格�
 
 ### 使用例 (Practical Examples)
 
+#### 0. 環境変数のフォールバック (`{{env:KEY:-default}}`)
+
+ホスト環境の変数が未設定の場合に安全なデフォルト値を採用できます。これは特にCI環境や、複数の開発者が異なるセットアップを持つ場合に有効です。
+
+```bash
+# CDERUN_NODE_VERSION がなければ 20-alpine を使用
+cderun --image="node:{{env:CDERUN_NODE_VERSION:-20-alpine}}" node --version
+
+# コンテナ内 (Nested) でのみ有効な環境変数との組み合わせ
+# BASE_HOME が物理ホスト、HOME が現在のコンテナ内を指すことを利用した設定
+cderun --env "HOST_PROJECT_ROOT={{BASE_PWD}}" --env "LOG_DIR={{env:CONTAINER_LOG_PATH:-/var/log/app}}" my-tool
+```
+
 #### 1. プロジェクト間でのバージョン同期 (`{{file:...}}`)
 
 プロジェクトごとに `.go-version` や `.nvmrc` を用意している場合、それらのファイル内容をコンテナイメージのタグに直接埋め込むことができます。これにより、開発環境（ホスト）と実行環境（コンテナ）のバージョンを完璧に一致させることが可能です。
@@ -126,6 +139,9 @@ cderun --image="node:{{file:.nvmrc}}-alpine" node --version
 ```bash
 # リポジトリルートの node_modules を /node_modules にマウントする例
 cderun --mount type=bind,source="{{find_dir:.git}}/node_modules",target=/node_modules node app.js
+
+# モノレポ構成で、特定のパッケージのルートを探す
+cderun --mount type=bind,source="{{find_dir:go.mod}}/vendor",target=/vendor my-go-tool
 
 # 設定ファイル (.tools.yaml) 内での記述例
 # 常にプロジェクトルートの logs ディレクトリをマウントする

@@ -78,3 +78,9 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 ### Inconsistency in containerd Support
 The security validator in `internal/config/resolver.go` allows `containerd` as a valid runtime, but the `runtimeFactory` in `internal/command/root.go` does not yet support it. This should be addressed when implementing native containerd support.
+
+### Missing Implementation of Advanced Features (Memory Audit)
+The following features or components mentioned in documentation or project "Memory" appear to be missing or named differently in the current codebase:
+- `findAnchors` brace-counting parser (appears to be manual/regex-based currently in `path.go`)
+- `extractIntValue`, `extractFloatValue` reflection helpers in `resolver.go`
+- Native `containerd` runtime implementation (planned but not yet in `internal/runtime/`)
