@@ -10,36 +10,55 @@ import (
 	"cderun/internal/logging"
 )
 
-func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
+type configPathOptions struct {
+	p1Set        bool
+	p1Val        string
+	cliSet       bool
+	cliVal       string
+	envKey       string
+	subcommand   string
+	tools        ToolsConfig
+	toolGetter   func(ToolConfig) ConfigPath
+	global       *CDERunConfig
+	globalGetter func(CDERunConfig) ConfigPath
+	fallback     string
+	pathType     string
+}
+
+func resolveConfigPath(opts configPathOptions, r *ExpressionResolver, fs FileSystem) (string, error) {
 	var cp ConfigPath
-	if p1Set {
-		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
-	} else if cliSet {
-		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
-	} else if env := fs.Getenv(envKey); env != "" {
+	if opts.p1Set {
+		cp = ConfigPath{Raw: opts.p1Val, BaseDir: r.Pwd}
+	} else if opts.cliSet {
+		cp = ConfigPath{Raw: opts.cliVal, BaseDir: r.Pwd}
+	} else if env := fs.Getenv(opts.envKey); env != "" {
 		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
 	} else {
 		found := false
-		if tools != nil {
-			if tool, ok := tools[subcommand]; ok {
-				if t := toolGetter(tool); !t.IsEmpty() {
-					cp = t
+		if opts.tools != nil {
+			if tool, ok := opts.tools[opts.subcommand]; ok {
+				if opts.toolGetter != nil {
+					if t := opts.toolGetter(tool); !t.IsEmpty() {
+						cp = t
+						found = true
+					}
+				}
+			}
+		}
+		if !found && opts.global != nil {
+			if opts.globalGetter != nil {
+				if g := opts.globalGetter(*opts.global); !g.IsEmpty() {
+					cp = g
 					found = true
 				}
 			}
 		}
-		if !found && global != nil {
-			if g := globalGetter(*global); !g.IsEmpty() {
-				cp = g
-				found = true
-			}
-		}
 		if !found {
-			cp = ConfigPath{Raw: fallback, BaseDir: r.Pwd}
+			cp = ConfigPath{Raw: opts.fallback, BaseDir: r.Pwd}
 		}
 	}
 
-	switch pathType {
+	switch opts.pathType {
 	case "volume":
 		return cp.ResolveVolume(r)
 	case "device":
@@ -49,62 +68,105 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	}
 }
 
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
-	var dcs []DeviceConfig
+func resolveMultiSource[T any, R any](
+	p1 []string,
+	p2 []string,
+	envKey string,
+	subcommand string,
+	tools ToolsConfig,
+	global *CDERunConfig,
+	r *ExpressionResolver,
+	fs FileSystem,
+	envSep string,
+	parser func(string) (T, error),
+	setBaseDir func(*T, string),
+	toolGetter func(ToolConfig) []T,
+	globalGetter func(CDERunConfig) []T,
+	resolver func(T) (R, error),
+	skipPredicate func(T, R) (bool, error),
+) ([]R, error) {
+	var configs []T
 
 	if p1 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p1 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %q", d)
+		configs = make([]T, 0, len(p1))
+		for _, s := range p1 {
+			parsed, err := parser(s)
+			if err != nil {
+				return nil, fmt.Errorf("invalid config (override): %w", err)
 			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
+			setBaseDir(&parsed, r.Pwd)
+			configs = append(configs, parsed)
 		}
 	} else if p2 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p2 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config: %q", d)
+		configs = make([]T, 0, len(p2))
+		for _, s := range p2 {
+			parsed, err := parser(s)
+			if err != nil {
+				return nil, fmt.Errorf("invalid config: %w", err)
 			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
+			setBaseDir(&parsed, r.Pwd)
+			configs = append(configs, parsed)
 		}
-	} else if env, ok := fs.LookupEnv("CDERUN_DEVICE"); ok {
-		dcs = []DeviceConfig{}
-		for d := range strings.SplitSeq(env, ",") {
-			d = strings.TrimSpace(d)
-			if d == "" {
+	} else if env, ok := fs.LookupEnv(envKey); ok {
+		configs = []T{}
+		for s := range strings.SplitSeq(env, envSep) {
+			s = strings.TrimSpace(s)
+			if s == "" {
 				continue
 			}
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", d)
+			parsed, err := parser(s)
+			if err != nil {
+				return nil, fmt.Errorf("invalid config in %s: %w", envKey, err)
 			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
+			setBaseDir(&parsed, r.Pwd)
+			configs = append(configs, parsed)
 		}
 	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
-			dcs = tool.Devices
+		if tool, ok := tools[subcommand]; ok {
+			configs = toolGetter(tool)
 		}
 	}
 
-	if dcs == nil && global != nil {
-		dcs = global.Defaults.Devices
+	if configs == nil && global != nil {
+		configs = globalGetter(*global)
 	}
 
-	var res []container.DeviceMapping
-	for _, dc := range dcs {
-		resolved, err := dc.Resolve(r)
+	var res []R
+	for _, cfg := range configs {
+		resolved, err := resolver(cfg)
 		if err != nil {
 			return nil, err
+		}
+		if skipPredicate != nil {
+			skip, err := skipPredicate(cfg, resolved)
+			if err != nil {
+				return nil, err
+			}
+			if skip {
+				continue
+			}
 		}
 		res = append(res, resolved)
 	}
 	return res, nil
+}
+
+func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
+	return resolveMultiSource(
+		p1, p2, "CDERUN_DEVICE", subcommand, tools, global, r, fs, ",",
+		func(s string) (DeviceConfig, error) {
+			parsed, ok := ParseDeviceConfig(s)
+			if !ok {
+				return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
+			}
+			return parsed, nil
+		},
+		func(dc *DeviceConfig, pwd string) { dc.SetBaseDir(pwd) },
+		func(t ToolConfig) []DeviceConfig { return t.Devices },
+		func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		func(dc DeviceConfig) (container.DeviceMapping, error) { return dc.Resolve(r) },
+		nil,
+	)
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
@@ -252,73 +314,23 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
-	var mcs []MountConfig
-
-	if p1 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p1 {
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config (override): %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if p2 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p2 {
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if env, ok := fs.LookupEnv("CDERUN_MOUNT"); ok {
-		mcs = []MountConfig{}
-		for m := range strings.SplitSeq(env, ";") {
-			m = strings.TrimSpace(m)
-			if m == "" {
-				continue
-			}
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
-			mcs = tool.Mounts
-		}
-	}
-
-	if mcs == nil && global != nil {
-		mcs = global.Defaults.Mounts
-	}
-
-	var res []container.Mount
-	for _, mc := range mcs {
-		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
-			hostPath, err := mc.Source.Resolve(r)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := fs.Stat(hostPath); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					// Skip if source doesn't exist
-					continue
+	return resolveMultiSource(
+		p1, p2, "CDERUN_MOUNT", subcommand, tools, global, r, fs, ";",
+		ParseMountFlag,
+		func(mc *MountConfig, pwd string) { mc.SetBaseDir(pwd) },
+		func(t ToolConfig) []MountConfig { return t.Mounts },
+		func(g CDERunConfig) []MountConfig { return g.Defaults.Mounts },
+		func(mc MountConfig) (container.Mount, error) { return mc.Resolve(r) },
+		func(mc MountConfig, m container.Mount) (bool, error) {
+			if mc.Optional && (mc.Type == "bind" || mc.Type == "") && m.Source != "" {
+				if _, err := fs.Stat(m.Source); err != nil {
+					if errors.Is(err, os.ErrNotExist) {
+						return true, nil // skip
+					}
+					return false, err
 				}
-				return nil, err
 			}
-		}
-
-		resolved, err := mc.Resolve(r)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, resolved)
-	}
-	return res, nil
+			return false, nil
+		},
+	)
 }

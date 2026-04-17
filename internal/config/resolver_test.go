@@ -166,7 +166,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		res, err := resolveConfigPath(false, "", false, "", "UNSET", "sub", nil, nil, nil, nil, "{{HOME}}/sock", r, "path", mfs)
+		res, err := resolveConfigPath(configPathOptions{envKey: "UNSET", subcommand: "sub", fallback: "{{HOME}}/sock", pathType: "path"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/home/user/sock", res)
 	})
@@ -608,11 +608,11 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "/global", resMounts[0].Source)
 
 		// resolveConfigPath P1 and CLI
-		resPath, err := resolveConfigPath(true, "/p1", false, "", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		resPath, err := resolveConfigPath(configPathOptions{p1Set: true, p1Val: "/p1", pathType: "path"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/p1", resPath)
 
-		resPath, err = resolveConfigPath(false, "", true, "/cli", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+		resPath, err = resolveConfigPath(configPathOptions{cliSet: true, cliVal: "/cli", pathType: "path"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/cli", resPath)
 	})
@@ -628,13 +628,13 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		cliDev := CLIOptions{Image: "alpine", ImageSet: true, Devices: []string{":"}}
 		_, err = ResolveWithFS("sh", &cliDev, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device config")
+		assert.Contains(t, err.Error(), "invalid config")
 
 		// resolveMounts invalid format in CLI
 		cliMnt := CLIOptions{Image: "alpine", ImageSet: true, Mounts: []string{"invalid"}}
 		_, err = ResolveWithFS("sh", &cliMnt, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid mount config")
+		assert.Contains(t, err.Error(), "invalid config")
 
 		// invalid memory
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Memory: "invalid", MemorySet: true}, nil, nil, &MockFileSystem{})

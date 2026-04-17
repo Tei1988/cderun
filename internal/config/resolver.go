@@ -408,17 +408,16 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		}
 
 		var errPath error
-		rv.res.SocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_SOCKET_PATH",
-			"", nil, nil,
-			rv.global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
-			"",
-			rv.r,
-			"path",
-			rv.fs,
-		)
+		rv.res.SocketPath, errPath = resolveConfigPath(configPathOptions{
+			p1Set:    p1Set,
+			p1Val:    p1Val.String(),
+			cliSet:   p2Set,
+			cliVal:   p2Val.String(),
+			envKey:   "CDERUN_SOCKET_PATH",
+			global:   rv.global,
+			globalGetter: func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			pathType: "path",
+		}, rv.r, rv.fs)
 		if errPath != nil {
 			return errPath
 		}
@@ -474,7 +473,10 @@ func (rv *resolver) resolveTransitiveOptions() error {
 
 	// Resolve mount-all-tools (transitive trigger)
 	{
-		opt, _ := GetBoolOption("mount-all-tools")
+		opt, ok := GetBoolOption("mount-all-tools")
+		if !ok {
+			return fmt.Errorf("registry mismatch: boolean option %q not found", "mount-all-tools")
+		}
 		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", rv.cliVal)
 		if err != nil {
 			return err
@@ -485,7 +487,10 @@ func (rv *resolver) resolveTransitiveOptions() error {
 
 	var mountCderunSpecified bool
 	{
-		opt, _ := GetBoolOption("mount-cderun")
+		opt, ok := GetBoolOption("mount-cderun")
+		if !ok {
+			return fmt.Errorf("registry mismatch: boolean option %q not found", "mount-cderun")
+		}
 		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", rv.cliVal)
 		if err != nil {
 			return err
@@ -504,17 +509,19 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		}
 
 		var errPath error
-		rv.res.MountCderunPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_CDERUN_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-			"",
-			rv.r,
-			"path",
-			rv.fs,
-		)
+		rv.res.MountCderunPath, errPath = resolveConfigPath(configPathOptions{
+			p1Set:      p1Set,
+			p1Val:      p1Val.String(),
+			cliSet:     p2Set,
+			cliVal:     p2Val.String(),
+			envKey:     "CDERUN_MOUNT_CDERUN_PATH",
+			subcommand: rv.subcommand,
+			tools:      rv.tools,
+			toolGetter: func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+			global:     rv.global,
+			globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			pathType:   "path",
+		}, rv.r, rv.fs)
 		if errPath != nil {
 			return errPath
 		}
@@ -522,7 +529,10 @@ func (rv *resolver) resolveTransitiveOptions() error {
 
 	var mountSocketSpecified bool
 	{
-		opt, _ := GetBoolOption("mount-socket")
+		opt, ok := GetBoolOption("mount-socket")
+		if !ok {
+			return fmt.Errorf("registry mismatch: boolean option %q not found", "mount-socket")
+		}
 		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", rv.cliVal)
 		if err != nil {
 			return err
@@ -541,17 +551,20 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		}
 
 		var errPath error
-		rv.res.MountSocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
-			"CDERUN_MOUNT_SOCKET_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
-			rv.res.SocketPath,
-			rv.r,
-			"path",
-			rv.fs,
-		)
+		rv.res.MountSocketPath, errPath = resolveConfigPath(configPathOptions{
+			p1Set:      p1Set,
+			p1Val:      p1Val.String(),
+			cliSet:     p2Set,
+			cliVal:     p2Val.String(),
+			envKey:     "CDERUN_MOUNT_SOCKET_PATH",
+			subcommand: rv.subcommand,
+			tools:      rv.tools,
+			toolGetter: func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+			global:     rv.global,
+			globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			fallback:   rv.res.SocketPath,
+			pathType:   "path",
+		}, rv.r, rv.fs)
 		if errPath != nil {
 			return errPath
 		}

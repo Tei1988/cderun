@@ -264,6 +264,9 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
+			if exprErr := rv.r.Error(); exprErr != nil {
+				return exprErr
+			}
 			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
 		}
 		if positive && d <= 0 {

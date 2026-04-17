@@ -467,7 +467,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"VOL": "/host:/cont:ro"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "VOL", "", nil, nil, nil, nil, "", r, "volume", mfs)
+		val, err := resolveConfigPath(configPathOptions{envKey: "VOL", pathType: "volume"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/host:/cont:ro", val)
 	})
@@ -476,7 +476,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"DEV": "/dev/a:/dev/b:rw"}, WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "DEV", "", nil, nil, nil, nil, "", r, "device", mfs)
+		val, err := resolveConfigPath(configPathOptions{envKey: "DEV", pathType: "device"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/a:/dev/b:rw", val)
 	})
@@ -500,7 +500,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/fallback:ro", r, "volume", mfs)
+		val, err := resolveConfigPath(configPathOptions{envKey: "NONEXISTENT", fallback: "/fallback:ro", pathType: "volume"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/fallback:ro", val)
 	})
@@ -509,7 +509,7 @@ func TestUnit_Config_Resolver_More_Coverage(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		val, err := resolveConfigPath(false, "", false, "", "NONEXISTENT", "", nil, nil, nil, nil, "/dev/null:/dev/null:rw", r, "device", mfs)
+		val, err := resolveConfigPath(configPathOptions{envKey: "NONEXISTENT", fallback: "/dev/null:/dev/null:rw", pathType: "device"}, r, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/null:/dev/null:rw", val)
 	})

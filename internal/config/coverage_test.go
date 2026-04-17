@@ -229,14 +229,14 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Error(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	r, _ := NewExpressionResolverWithFS(nil, mfs)
 	r.setError(errors.New("err"))
-	_, err := resolveConfigPath(true, "val", false, "", "E", "s", nil, nil, nil, nil, "", r, "path", mfs)
+	_, err := resolveConfigPath(configPathOptions{p1Set: true, p1Val: "val", envKey: "E", subcommand: "s", pathType: "path"}, r, mfs)
 	require.Error(t, err)
 }
 
 func TestUnit_Coverage_Resolver_ResolveConfigPath_ExpressionError(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	r, _ := NewExpressionResolver(nil)
-	_, err := resolveConfigPath(true, "{{file:missing}}", false, "", "", "", nil, nil, nil, nil, "", r, "path", mfs)
+	_, err := resolveConfigPath(configPathOptions{p1Set: true, p1Val: "{{file:missing}}", pathType: "path"}, r, mfs)
 	require.Error(t, err)
 }
 
@@ -246,29 +246,51 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Hierarchy(t *testing.T) {
 
 	// Tool config match
 	tools := ToolsConfig{"node": {MountCderunPath: ConfigPath{Raw: "/tool/path"}}}
-	res, err := resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, nil, nil, "/fallback", r, "path", mfs)
+	res, err := resolveConfigPath(configPathOptions{
+		subcommand: "node",
+		tools:      tools,
+		toolGetter: func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		fallback:   "/fallback",
+		pathType:   "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/tool/path", res)
 
 	// Tool config exists but empty, falls back to global
 	tools = ToolsConfig{"node": {}}
 	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	res, err = resolveConfigPath(configPathOptions{
+		subcommand:   "node",
+		tools:        tools,
+		toolGetter:   func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global:       global,
+		globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		fallback:     "/fallback",
+		pathType:     "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/global/path", res)
 
 	// Both tool and global empty, falls back to fallback
 	global = &CDERunConfig{}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	res, err = resolveConfigPath(configPathOptions{
+		subcommand:   "node",
+		tools:        tools,
+		toolGetter:   func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global:       global,
+		globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		fallback:     "/fallback",
+		pathType:     "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/fallback", res)
 
 	// Test "volume" and "device" path types
-	res, err = resolveConfigPath(true, "vol", false, "", "", "", nil, nil, nil, nil, "", r, "volume", mfs)
+	res, err = resolveConfigPath(configPathOptions{p1Set: true, p1Val: "vol", pathType: "volume"}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "vol", res)
 
-	res, err = resolveConfigPath(true, "dev", false, "", "", "", nil, nil, nil, nil, "", r, "device", mfs)
+	res, err = resolveConfigPath(configPathOptions{p1Set: true, p1Val: "dev", pathType: "device"}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "dev", res)
 }
@@ -837,36 +859,50 @@ func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {
 	r, _ := NewExpressionResolver(nil)
 
 	// Mode: volume
-	res, err := resolveConfigPath(true, "/v", false, "", "", "s", nil, nil, nil, nil, "", r, "volume", mfs)
+	res, err := resolveConfigPath(configPathOptions{p1Set: true, p1Val: "/v", pathType: "volume"}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/v", res)
 
 	// Mode: device
-	res, err = resolveConfigPath(true, "/d", false, "", "", "s", nil, nil, nil, nil, "", r, "device", mfs)
+	res, err = resolveConfigPath(configPathOptions{p1Set: true, p1Val: "/d", pathType: "device"}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/d", res)
 
 	// Fallback to ENV (should override tools and global)
 	mfs.Env = map[string]string{"CDERUN_SOCKET_PATH": "/env/socket"}
-	res, err = resolveConfigPath(false, "", false, "", "CDERUN_SOCKET_PATH", "node",
-		ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/path"}}},
-		func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-		&CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}},
-		func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
-		"", r, "path", mfs)
+	res, err = resolveConfigPath(configPathOptions{
+		envKey:     "CDERUN_SOCKET_PATH",
+		subcommand: "node",
+		tools:      ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/path"}}},
+		toolGetter: func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global:     &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}},
+		globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		pathType:   "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/env/socket", res)
 	mfs.Env = nil // Cleanup
 
 	// Fallback to tools
 	tools := ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/cderun"}}}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, nil, nil, "", r, "path", mfs)
+	res, err = resolveConfigPath(configPathOptions{
+		subcommand: "node",
+		tools:      tools,
+		toolGetter: func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		pathType:   "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/tools/cderun", res)
 
 	// Fallback to global
 	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/cderun"}}}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", nil, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "", r, "path", mfs)
+	res, err = resolveConfigPath(configPathOptions{
+		subcommand:   "node",
+		toolGetter:   func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+		global:       global,
+		globalGetter: func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		pathType:     "path",
+	}, r, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/global/cderun", res)
 }
@@ -878,18 +914,18 @@ func TestUnit_Coverage_Resolver_resolveDevices_Errors(t *testing.T) {
 	// Malformed in p1 (empty container path)
 	_, err := resolveDevices([]string{"a:"}, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config (override)")
+	assert.Contains(t, err.Error(), "invalid config (override)")
 
 	// Malformed in p2 (empty host path)
 	_, err = resolveDevices(nil, []string{":b"}, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config")
+	assert.Contains(t, err.Error(), "invalid config")
 
 	// Malformed in Env (empty parts)
 	mfs.Env = map[string]string{"CDERUN_DEVICE": "a:"}
 	_, err = resolveDevices(nil, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid device config in CDERUN_DEVICE")
+	assert.Contains(t, err.Error(), "invalid config in CDERUN_DEVICE")
 }
 
 func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
@@ -899,18 +935,18 @@ func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
 	// Malformed in p1
 	_, err := resolveMounts([]string{"invalid"}, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config (override)")
+	assert.Contains(t, err.Error(), "invalid config (override)")
 
 	// Malformed in p2
 	_, err = resolveMounts(nil, []string{"invalid"}, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config")
+	assert.Contains(t, err.Error(), "invalid config")
 
 	// Malformed in Env
 	mfs.Env = map[string]string{"CDERUN_MOUNT": "invalid"}
 	_, err = resolveMounts(nil, nil, "s", nil, nil, r, mfs)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid mount config in CDERUN_MOUNT")
+	assert.Contains(t, err.Error(), "invalid config in CDERUN_MOUNT")
 
 	// Optional mount Stat error (other than NotExist)
 	mfs.Env = map[string]string{"CDERUN_MOUNT": "source=/s,target=/t,optional"}

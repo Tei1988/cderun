@@ -1,9 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var sensitiveKeywords = map[string]struct{}{
@@ -64,11 +64,9 @@ func MaskSensitiveEnv(key, value string) string {
 				isAcronym := false
 				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
 					// Check for acronym boundary (e.g. APIKey -> API, Key)
-					for _, nextRune := range key[i+len(string(r)):] {
-						if unicode.IsLower(nextRune) {
-							isAcronym = true
-						}
-						break
+					nextRune, size := utf8.DecodeRuneInString(key[i+utf8.RuneLen(r):])
+					if size > 0 && unicode.IsLower(nextRune) {
+						isAcronym = true
 					}
 				}
 
@@ -125,7 +123,7 @@ func MaskSensitiveEnvList(env []string) []string {
 	res := make([]string, len(env))
 	for i, e := range env {
 		if k, v, found := strings.Cut(e, "="); found {
-			res[i] = fmt.Sprintf("%s=%s", k, MaskSensitiveEnv(k, v))
+			res[i] = k + "=" + MaskSensitiveEnv(k, v)
 		} else {
 			res[i] = e
 		}
