@@ -1,9 +1,12 @@
 package config
 
 import (
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestUnit_Config_ValidateImageName(t *testing.T) {
@@ -162,6 +165,13 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 		{"Port with control char", "80\n", true},
 		{"Too many colons", "127.0.0.1:80:80:80", true},
 		{"Invalid IP", "999.999.999.999:80:80", true},
+		// Uncovered branch coverage
+		{"1-segment: non-numeric", "abc", true},
+		{"2-segments: non-numeric container", "8080:abc", true},
+		{"3-segments: non-numeric container", "127.0.0.1:8080:abc", true},
+		{"3-segments: non-numeric host", "127.0.0.1:abc:80", true},
+		{"3-segments: invalid IP", "abc:8080:80", true},
+		{"3-segments: empty host port", "127.0.0.1::80", false}, // Valid (dynamic host port)
 	}
 
 	for _, tt := range tests {
@@ -174,6 +184,128 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_Config_ValidateExposePort_Extra(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Range with non-numeric start", "abc-90", true},
+		{"Range with non-numeric end", "80-abc", true},
+		{"Non-numeric single port", "abc", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateExposePort(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+type securityMockFS struct {
+	MockFileSystem
+	absErr     error
+	homeDirErr error
+}
+
+func (m *securityMockFS) Abs(path string) (string, error) {
+	if m.absErr != nil {
+		return "", m.absErr
+	}
+	return m.MockFileSystem.Abs(path)
+}
+
+func (m *securityMockFS) UserHomeDir() (string, error) {
+	if m.homeDirErr != nil {
+		return "", m.homeDirErr
+	}
+	return m.MockFileSystem.UserHomeDir()
+}
+
+func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tilde resolution when resolver is nil", func(t *testing.T) {
+		// ResolvePath(p, baseDir, nil)
+		val, err := ResolvePath("~/file", "/work", nil)
+		require.NoError(t, err)
+		// We can't easily mock RealFileSystem here, so we just check it resolved to some absolute path ending in /file
+		assert.True(t, filepath.IsAbs(val))
+		assert.True(t, strings.HasSuffix(val, "/file"))
+	})
+
+	t.Run("tilde resolution fail when resolver is nil and UserHomeDir fails", func(t *testing.T) {
+		mfs := &securityMockFS{
+			homeDirErr: assert.AnError,
+		}
+		// Since ResolvePath uses RealFileSystem if r is nil, we can't easily inject a mock here
+		// unless we modify ResolvePath or provide a way to inject FS.
+		// Looking at ResolvePath:
+		// var fs FileSystem = RealFileSystem{}
+		// if r != nil && r.fs != nil { fs = r.fs }
+		// So if r is nil, it uses RealFileSystem.
+
+		// Wait, I can pass a resolver with a mock FS but with other fields nil?
+		r := &ExpressionResolver{fs: mfs}
+		_, err := ResolvePath("~/file", "/work", r)
+		require.Error(t, err)
+	})
+
+	t.Run("fs.Abs failure for anchorPath in validateAnchorBoundaries", func(t *testing.T) {
+		mfs := &securityMockFS{
+			MockFileSystem: MockFileSystem{
+				HomeDir: "/home/user",
+				WD:      "/work",
+			},
+			absErr: assert.AnError,
+		}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		// We need to trigger validateAnchorBoundaries with an anchor
+		// and make fs.Abs fail for the anchor path.
+		// In validateAnchorBoundaries:
+		// absAnchor, err := fs.Abs(anchorPath)
+
+		_, err := ResolvePath("~/file", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get absolute path for anchor")
+	})
+
+	t.Run("anchor path is empty", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/work"}
+		r := &ExpressionResolver{
+			fs:   mfs,
+			Home: "", // Empty home
+		}
+		_, err := ResolvePath("~/file", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "anchor path is empty")
+	})
+
+	t.Run("BASE_HOME fallback to HOME when HostContext is nil", func(t *testing.T) {
+		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		val, err := ResolvePath("{{BASE_HOME}}/file", "/work", r)
+		require.NoError(t, err)
+		assert.Equal(t, "/home/user/file", val)
+	})
+
+	t.Run("BASE_PWD fallback to PWD when HostContext is nil", func(t *testing.T) {
+		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		val, err := ResolvePath("{{BASE_PWD}}/file", "/work", r)
+		require.NoError(t, err)
+		assert.Equal(t, "/work/file", val)
+	})
 }
 
 func TestUnit_Config_ValidateDNS(t *testing.T) {

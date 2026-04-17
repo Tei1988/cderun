@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -189,6 +190,132 @@ func TestUnit_Expression_FileError(t *testing.T) {
 		r2.resolveString("{{ file:.go-version }}")
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "failed to read file")
+	})
+}
+
+type fileDetailMockFS struct {
+	MockFileSystem
+	statErr  error
+	readErr  error
+	failStat bool
+}
+
+func (m *fileDetailMockFS) Stat(name string) (os.FileInfo, error) {
+	if m.failStat && m.statErr != nil {
+		return nil, m.statErr
+	}
+	return m.MockFileSystem.Stat(name)
+}
+
+func (m *fileDetailMockFS) ReadFile(name string) ([]byte, error) {
+	if m.readErr != nil {
+		return nil, m.readErr
+	}
+	return m.MockFileSystem.ReadFile(name)
+}
+
+func TestUnit_Expression_Optimization(t *testing.T) {
+	t.Run("optimization exact match magic word", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		// "{{PWD}}" is an exact match for a magic word
+		val := r.resolveString("{{PWD}}")
+		assert.Equal(t, "/work", val)
+		assert.NoError(t, r.Error())
+	})
+
+	t.Run("optimization exact match directive", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{Env: map[string]string{"FOO": "BAR"}})
+		val := r.resolveString("{{env:FOO}}")
+		assert.Equal(t, "BAR", val)
+		assert.NoError(t, r.Error())
+	})
+
+	t.Run("no optimization for nested expressions", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		// strings.Count(s, "{{") == 1 is FALSE here (it's 2)
+		val := r.resolveString("{{ file:{{ PWD }} }}")
+		// This should NOT be optimized and handled by the general loop
+		assert.Contains(t, val, "{{")
+	})
+
+	t.Run("directive resolves to something with expressions", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{
+			WD:  "/work",
+			Env: map[string]string{"NESTED": "{{PWD}}"},
+		})
+		// resolveDirective returns "{{PWD}}"
+		// strings.HasPrefix(res, "{{") is true
+		// so it falls through to the loop.
+		// The loop resolves "{{env:NESTED}}" to "{{PWD}}" and stops.
+		val := r.resolveString("{{env:NESTED}}")
+		assert.Equal(t, "{{PWD}}", val)
+	})
+
+	t.Run("mixed resolution in loop", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		val := r.resolveString("prefix {{PWD}} suffix")
+		assert.Equal(t, "prefix /work suffix", val)
+	})
+}
+
+func TestUnit_Expression_FileDetail(t *testing.T) {
+	hostCtx := &HostContext{}
+
+	t.Run("ReadFile failure (large file check)", func(t *testing.T) {
+		fs := &fileDetailMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.cderun.yaml": []byte("1")},
+				Dirs:  map[string]bool{"/project": true},
+				WD:    "/project",
+			},
+			readErr: assert.AnError,
+		}
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r.resolveString("{{ file:.cderun.yaml }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "failed to read file")
+	})
+
+	t.Run("File too large via Stat", func(t *testing.T) {
+		// Create a file that reports large size in Stat
+		fs := &MockFileSystem{
+			Files: map[string][]byte{"/project/large": make([]byte, 100)},
+			Dirs:  map[string]bool{"/project": true},
+			WD:    "/project",
+		}
+		// Since MockFileSystem.Stat uses the actual length of the byte slice,
+		// we need to provide a byte slice larger than MaxDirectiveFileSize
+		largeData := make([]byte, MaxDirectiveFileSize+1)
+		fs.Files["/project/large"] = largeData
+
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r.resolveString("{{ file:large }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "is too large")
+	})
+
+	t.Run("Cache hit for errors", func(t *testing.T) {
+		fs := &fileDetailMockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{"/project/.cderun.yaml": []byte("1")},
+				Dirs:  map[string]bool{"/project": true},
+				WD:    "/project",
+			},
+			readErr: assert.AnError,
+		}
+		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		// First attempt
+		r.resolveString("{{ file:.cderun.yaml }}")
+		err1 := r.Error()
+		require.Error(t, err1)
+		assert.Contains(t, err1.Error(), "failed to read file")
+
+		// Reset error state and try again
+		r.err = nil
+		r.resolveString("{{ file:.cderun.yaml }}")
+		err2 := r.Error()
+		require.Error(t, err2)
+		assert.Equal(t, err1.Error(), err2.Error())
 	})
 }
 
