@@ -11,7 +11,7 @@ Add native containerd support as a third runtime, using the containerd Go client
 
 New files:
 
-```
+```text
 internal/runtime/
   containerd.go         # ContainerdRuntime implementing ContainerRuntime interface
   containerd_test.go    # Unit tests with mock containerd client
