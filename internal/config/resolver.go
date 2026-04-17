@@ -1473,7 +1473,7 @@ func containsFold(s, substr string) bool {
 	}
 	for i := 0; i <= kLen-n; i++ {
 		match := true
-		for j := 0; j < n; j++ {
+		for j := range n {
 			c1 := s[i+j]
 			c2 := substr[j]
 			if c1 != c2 {
