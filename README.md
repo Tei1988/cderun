@@ -291,14 +291,29 @@ Use `{{file:.go-version}}` or `{{file:.nvmrc}}` in your tool configuration to en
 # .tools.yaml
 go:
   image: "golang:{{file:.go-version}}"
+node:
+  image: "node:{{file:.nvmrc}}-alpine"
 ```
 
 ### Context-Aware Pathing
 
-Use `{{find_dir:.git}}` to reference the project root regardless of your current working directory:
+Use `{{find_dir:.git}}` to reference the project root regardless of your current working directory. This is especially useful for mounting shared resources like `node_modules` or `logs` from the repository root:
 
 ```bash
+# Mount logs from repository root
 cderun --mount type=bind,source="{{find_dir:.git}}/logs",target=/logs my-tool
+
+# Reference configuration in repository root
+cderun --env "CONFIG_PATH={{find_dir:package.json}}/config/app.json" my-node-app
+```
+
+### Environment-Based Image Selection
+
+Leverage environment variables with default values to switch between different image versions easily:
+
+```bash
+# Uses NODE_VERSION env var if set, otherwise falls back to 20-alpine
+cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 ```
 
 ## Development & Testing

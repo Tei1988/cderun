@@ -132,4 +132,6 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 ### デバイス設定 (`devices`)
 
-`devices` 配列の各要素は、文字列形式 (`<host-path>:<container-path>[:<permissions>]`) またはオブジェクト形式で記述可能です。
+`devices` 配列の各要素は、文字列形式 (`<host-path>:<container-path>[:<permissions>]`) で記述します。
+
+> **Note**: 現在、YAML内でのデバイス指定は文字列形式のみをサポートしています。
