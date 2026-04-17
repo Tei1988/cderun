@@ -2,7 +2,11 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockDockerClientForSignal struct {
@@ -51,4 +55,30 @@ func TestSignalValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSignalContainerDaemonRejection(t *testing.T) {
+	// Mock client that returns an error when ContainerKill is called,
+	// simulating a daemon rejecting an invalid signal that passed local validation.
+	mock := &mockDockerClientForSignalRejection{
+		killErr: errors.New("daemon error: invalid signal"),
+	}
+	rt := &DockerRuntime{client: mock}
+
+	err := rt.SignalContainer(context.Background(), "test-id", "SIGINVALID")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "daemon error: invalid signal")
+}
+
+type mockDockerClientForSignalRejection struct {
+	dockerClient
+	killErr error
+}
+
+func (m *mockDockerClientForSignalRejection) Close() error {
+	return nil
+}
+
+func (m *mockDockerClientForSignalRejection) ContainerKill(ctx context.Context, containerID string, signal string) error {
+	return m.killErr
 }
