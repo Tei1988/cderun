@@ -93,11 +93,15 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		if p2Field == nil || p1Field == nil {
 			panic(fmt.Sprintf("could not find fields for int option %q", opt.Name))
 		}
+		defaultVal := 0
+		if opt.Default != nil {
+			defaultVal = *opt.Default
+		}
 		intDefs = append(intDefs, intFlagDef{
 			p2Name:     opt.Name,
 			p1Name:     "cderun-" + opt.Name,
 			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
+			defaultVal: defaultVal,
 			p2Usage:    opt.Usage,
 			p2Field:    p2Field,
 			p1Field:    p1Field,
@@ -110,11 +114,15 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 		if p2Field == nil || p1Field == nil {
 			panic(fmt.Sprintf("could not find fields for float64 option %q", opt.Name))
 		}
+		defaultVal := 0.0
+		if opt.Default != nil {
+			defaultVal = *opt.Default
+		}
 		float64Defs = append(float64Defs, float64FlagDef{
 			p2Name:     opt.Name,
 			p1Name:     "cderun-" + opt.Name,
 			p2Short:    opt.Shorthand,
-			defaultVal: opt.Default,
+			defaultVal: defaultVal,
 			p2Usage:    opt.Usage,
 			p2Field:    p2Field,
 			p1Field:    p1Field,

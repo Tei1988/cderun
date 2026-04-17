@@ -35,7 +35,7 @@ type IntOption struct {
 	FieldName    string // PascalCase, used for reflection (pre-calculated)
 	Shorthand    string
 	Usage        string
-	Default      int
+	Default      *int
 	EnvKey       string
 	ToolGetter   func(ToolConfig) *int
 	GlobalGetter func(CDERunConfig) *int
@@ -47,7 +47,7 @@ type Float64Option struct {
 	FieldName    string // PascalCase, used for reflection (pre-calculated)
 	Shorthand    string
 	Usage        string
-	Default      float64
+	Default      *float64
 	EnvKey       string
 	ToolGetter   func(ToolConfig) *float64
 	GlobalGetter func(CDERunConfig) *float64
@@ -70,7 +70,7 @@ var IntOptions = []IntOption{
 		Name:    "pull-max-retries",
 		EnvKey:  "CDERUN_PULL_MAX_RETRIES",
 		Usage:   "Maximum number of retries for image pull",
-		Default: 3,
+		Default: ptr(3),
 		ToolGetter: func(t ToolConfig) *int {
 			return t.PullMaxRetries
 		},
@@ -168,10 +168,10 @@ var StringSliceOptions = []StringSliceOption{
 		EnvKey:    "CDERUN_CAP_ADD",
 		Usage:     "Add Linux capabilities",
 		ToolGetter: func(t ToolConfig) []string {
-			return t.CapAdd
+			return t.AddHosts
 		},
 		GlobalGetter: func(g CDERunConfig) []string {
-			return g.Defaults.CapAdd
+			return g.Defaults.AddHosts
 		},
 	},
 	{

@@ -202,7 +202,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
+		Fallback:     opt.Default,
 	}
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
@@ -240,7 +240,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
+		Fallback:     opt.Default,
 	}
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)

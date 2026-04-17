@@ -23,7 +23,13 @@ var sensitiveKeywords = map[string]struct{}{
 	"ACCESS":      {},
 	"JWT":         {},
 	"SALT":        {},
+	"SIGNATURE":   {},
+	"BEARER":      {},
+	"OTP":         {},
+	"SENSITIVE":   {},
 }
+
+const sensitiveKeywordChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
@@ -31,8 +37,12 @@ func MaskSensitiveEnv(key, value string) string {
 		return ""
 	}
 
-	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
+	// Fast path: if the key doesn't contain any potential sensitive characters, skip complex splitting.
 	upperKey := strings.ToUpper(key)
+	if !strings.ContainsAny(upperKey, sensitiveKeywordChars) {
+		return value
+	}
+
 	hasSensitive := false
 	for kw := range sensitiveKeywords {
 		if strings.Contains(upperKey, kw) {
