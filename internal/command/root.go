@@ -732,7 +732,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = rt.Close() }()
+	defer rt.Close() //nolint:errcheck
 	defer cleanup()
 
 	// Detect if host stdin is a terminal once
