@@ -128,7 +128,8 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
-	hasExpr := strings.Contains(s, "{{")
+	startIdx := strings.Index(s, "{{")
+	hasExpr := startIdx != -1
 
 	// Fast-path: no expressions and no tilde expansion
 	if !hasExpr && !strings.HasPrefix(s, "~") {
@@ -139,7 +140,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	resolved := s
 	if hasExpr {
 		// Optimization: handle exact matches of magic words or simple directives (e.g. "{{HOME}}", "{{env:KEY}}")
-		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") && strings.Count(s, "{{") == 1 {
+		if startIdx == 0 && strings.HasSuffix(s, "}}") && strings.Count(s, "{{") == 1 {
 			content := strings.TrimSpace(s[2 : len(s)-2])
 			if !strings.Contains(content, "{{") { // No nested expressions
 				res, err := r.resolveDirective(content)
@@ -152,32 +153,32 @@ func (r *ExpressionResolver) resolveString(s string) string {
 
 		if hasExpr {
 			var sb strings.Builder
+			sb.Grow(len(s))
 			last := 0
-			curr := s
 			for {
-				start := strings.Index(curr[last:], "{{")
+				start := strings.Index(s[last:], "{{")
 				if start == -1 {
-					sb.WriteString(curr[last:])
+					sb.WriteString(s[last:])
 					break
 				}
 				start += last
-				sb.WriteString(curr[last:start])
+				sb.WriteString(s[last:start])
 
-				end := strings.Index(curr[start:], "}}")
+				end := strings.Index(s[start:], "}}")
 				if end == -1 {
-					sb.WriteString(curr[start:])
+					sb.WriteString(s[start:])
 					break
 				}
 				end += start
 
 				if r.err != nil {
-					sb.WriteString(curr[start : end+2])
+					sb.WriteString(s[start : end+2])
 				} else {
-					content := strings.TrimSpace(curr[start+2 : end])
+					content := strings.TrimSpace(s[start+2 : end])
 					res, err := r.resolveDirective(content)
 					if err != nil {
 						r.setError(err)
-						sb.WriteString(curr[start : end+2])
+						sb.WriteString(s[start : end+2])
 					} else {
 						sb.WriteString(res)
 					}

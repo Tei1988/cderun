@@ -1390,11 +1390,11 @@ func MaskSensitiveEnv(key, value string) string {
 		return ""
 	}
 
-	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	upperKey := strings.ToUpper(key)
+	// Fast path: check if the key contains any sensitive keywords in a case-insensitive manner.
+	// We avoid strings.ToUpper(key) here to prevent heap allocations for non-sensitive keys.
 	hasSensitive := false
 	for kw := range sensitiveKeywords {
-		if strings.Contains(upperKey, kw) {
+		if containsFold(key, kw) {
 			hasSensitive = true
 			break
 		}
@@ -1403,10 +1403,8 @@ func MaskSensitiveEnv(key, value string) string {
 		return value
 	}
 
-	// Split by non-alphanumeric characters and also split camelCase.
-	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
-	// We perform a single pass and check segments against sensitiveKeywords without extra allocations.
-	useUpperDirectly := len(upperKey) == len(key)
+	// Detailed scanning for exact segment matches.
+	// Since we already know it contains a sensitive keyword, we can perform detailed splitting.
 	start := -1
 	var lastRune rune
 
@@ -1423,6 +1421,7 @@ func MaskSensitiveEnv(key, value string) string {
 				isAcronym := false
 				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
 					// Check for acronym boundary (e.g. APIKey -> API, Key)
+					// We only look ahead one rune.
 					for _, nextRune := range key[i+len(string(r)):] {
 						if unicode.IsLower(nextRune) {
 							isAcronym = true
@@ -1432,13 +1431,8 @@ func MaskSensitiveEnv(key, value string) string {
 				}
 
 				if isCamel || isLetterDigit || isAcronym {
-					var segment string
-					if useUpperDirectly {
-						segment = upperKey[start:i]
-					} else {
-						segment = strings.ToUpper(key[start:i])
-					}
-					if _, ok := sensitiveKeywords[segment]; ok {
+					segment := key[start:i]
+					if isSensitiveSegment(segment) {
 						return "[REDACTED]"
 					}
 					start = i
@@ -1446,13 +1440,8 @@ func MaskSensitiveEnv(key, value string) string {
 			}
 		} else {
 			if start != -1 {
-				var segment string
-				if useUpperDirectly {
-					segment = upperKey[start:i]
-				} else {
-					segment = strings.ToUpper(key[start:i])
-				}
-				if _, ok := sensitiveKeywords[segment]; ok {
+				segment := key[start:i]
+				if isSensitiveSegment(segment) {
 					return "[REDACTED]"
 				}
 				start = -1
@@ -1462,18 +1451,56 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	if start != -1 {
-		var segment string
-		if useUpperDirectly {
-			segment = upperKey[start:]
-		} else {
-			segment = strings.ToUpper(key[start:])
-		}
-		if _, ok := sensitiveKeywords[segment]; ok {
+		segment := key[start:]
+		if isSensitiveSegment(segment) {
 			return "[REDACTED]"
 		}
 	}
 
 	return value
+}
+
+// containsFold checks if s contains substr case-insensitively.
+// substr is assumed to be all-caps ASCII.
+func containsFold(s, substr string) bool {
+	n := len(substr)
+	if n == 0 {
+		return true
+	}
+	kLen := len(s)
+	if n > kLen {
+		return false
+	}
+	for i := 0; i <= kLen-n; i++ {
+		match := true
+		for j := 0; j < n; j++ {
+			c1 := s[i+j]
+			c2 := substr[j]
+			if c1 != c2 {
+				if c1 >= 'a' && c1 <= 'z' {
+					c1 -= 'a' - 'A'
+				}
+				if c1 != c2 {
+					match = false
+					break
+				}
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+// isSensitiveSegment checks if the segment matches any sensitive keyword case-insensitively.
+func isSensitiveSegment(segment string) bool {
+	for kw := range sensitiveKeywords {
+		if strings.EqualFold(segment, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
