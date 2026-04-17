@@ -209,8 +209,8 @@ func (c *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	task, err := container.Task(ctx, nil)
 	if err == nil {
 		// Kill and delete task if it exists
-		_ = task.Kill(ctx, syscall.SIGKILL)
-		_, _ = task.Delete(ctx)
+		_ = task.Kill(ctx, syscall.SIGKILL) //nolint:errcheck
+		_, _ = task.Delete(ctx)             //nolint:errcheck
 	}
 
 	return container.Delete(ctx, client.WithSnapshotCleanup)
@@ -250,6 +250,9 @@ func (c *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 		return err
 	}
 
+	if cols > 0xffff || rows > 0xffff {
+		return fmt.Errorf("terminal size too large: %dx%d", cols, rows)
+	}
 	return task.Resize(ctx, uint32(cols), uint32(rows))
 }
 
