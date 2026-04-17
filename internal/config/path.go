@@ -578,6 +578,9 @@ func ValidateImageName(s string) error {
 	if !imageRegex.MatchString(s) {
 		return fmt.Errorf("invalid image name: %q", s)
 	}
+	if strings.Count(s, "@") > 1 {
+		return fmt.Errorf("invalid image name (multiple @ symbols): %q", s)
+	}
 	return nil
 }
 
@@ -716,6 +719,41 @@ func ValidateCapability(s string) error {
 		return fmt.Errorf("invalid Linux capability: %q", s)
 	}
 	return nil
+}
+
+// ValidateSocketPath ensures the socket path is absolute and safe.
+func ValidateSocketPath(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !filepath.IsAbs(s) {
+		return fmt.Errorf("socket path must be an absolute path: %q", s)
+	}
+	return validatePathChars(s)
+}
+
+// ValidateExecutablePath ensures the executable path is absolute and safe.
+func ValidateExecutablePath(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !filepath.IsAbs(s) {
+		return fmt.Errorf("executable path must be an absolute path: %q", s)
+	}
+	return validatePathChars(s)
+}
+
+// ValidatePullPolicy ensures the pull policy is one of the allowed values.
+func ValidatePullPolicy(s string) error {
+	if s == "" {
+		return nil
+	}
+	switch s {
+	case "always", "missing", "never":
+		return nil
+	default:
+		return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", s)
+	}
 }
 
 var workdirRegex = regexp.MustCompile(`^/[a-zA-Z0-9._\-/]*$`)

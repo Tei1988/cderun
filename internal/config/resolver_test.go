@@ -135,6 +135,14 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		assert.Equal(t, []string{"MY_PASSWORD=secret"}, res)
 	})
 
+	t.Run("MaskSensitiveEnv with new keywords", func(t *testing.T) {
+		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("SIGNATURE", "secret"))
+		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("BEARER_TOKEN", "secret"))
+		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("MY_OTP", "secret"))
+		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("SENSITIVE_DATA", "secret"))
+		assert.Equal(t, "safe", MaskSensitiveEnv("SAFE_VAR", "safe"))
+	})
+
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		r, err := NewExpressionResolver(nil)
 		require.NoError(t, err)

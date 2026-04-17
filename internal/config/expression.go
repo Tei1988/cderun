@@ -315,6 +315,9 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 // It supports default value syntax: {{env:KEY:-default}}.
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	key, defaultValue, hasDefault := strings.Cut(input, ":-")
+	if err := ValidateEnvKey(key); err != nil {
+		return "", err
+	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
 		return defaultValue, nil

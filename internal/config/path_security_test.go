@@ -18,6 +18,7 @@ func TestUnit_Config_ValidateImageName(t *testing.T) {
 		{"Image with port", "localhost:5000/my-image", false},
 		{"Image with digest", "alpine@sha256:abcdef123456", false},
 		{"Complex image", "my.registry.com:5000/user/repo:tag@sha256:digest", false},
+		{"Image with multiple @ symbols", "alpine@sha256:digest@sha256:other", true},
 		{"Image with underscore", "my_image", false},
 		{"Image with dot", "my.image", false},
 		{"Empty image", "", false}, // Allowed (handled in resolver)
@@ -272,6 +273,55 @@ func TestUnit_Config_ValidateWorkdir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateWorkdir(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidateSocketPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Absolute path", "/var/run/docker.sock", false},
+		{"Empty path", "", false},
+		{"Relative path", "docker.sock", true},
+		{"Control character", "/var/run/docker.sock\n", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSocketPath(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ValidatePullPolicy(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Always", "always", false},
+		{"Missing", "missing", false},
+		{"Never", "never", false},
+		{"Invalid", "sometimes", true},
+		{"Empty", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePullPolicy(tt.input)
 			if tt.wantErr {
 				require.Error(t, err, "input: %q", tt.input)
 			} else {

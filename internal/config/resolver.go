@@ -941,15 +941,16 @@ func (rv *resolver) validateSecurity() error {
 		{"network", rv.res.Network, ValidateNetworkName},
 		{"hostname", rv.res.Hostname, ValidateHostname},
 		{"workdir", rv.res.Workdir, ValidateWorkdir},
+		{"pull", rv.res.Pull, ValidatePullPolicy},
 		{"runtime", rv.res.Runtime, func(s string) error {
 			if s != "docker" && s != "podman" && s != "containerd" {
 				return fmt.Errorf("unsupported runtime: %q", s)
 			}
 			return nil
 		}},
-		{"socket-path", rv.res.SocketPath, nil},
-		{"mount-socket-path", rv.res.MountSocketPath, nil},
-		{"mount-cderun-path", rv.res.MountCderunPath, nil},
+		{"socket-path", rv.res.SocketPath, ValidateSocketPath},
+		{"mount-socket-path", rv.res.MountSocketPath, ValidateSocketPath},
+		{"mount-cderun-path", rv.res.MountCderunPath, ValidateExecutablePath},
 		{"dry-run-format", rv.res.DryRunFormat, func(s string) error {
 			if s != "" && s != "yaml" && s != "json" && s != "simple" {
 				return fmt.Errorf("unsupported dry-run format: %q", s)
@@ -1382,6 +1383,10 @@ var sensitiveKeywords = map[string]struct{}{
 	"ACCESS":      {},
 	"JWT":         {},
 	"SALT":        {},
+	"SIGNATURE":   {},
+	"BEARER":      {},
+	"OTP":         {},
+	"SENSITIVE":   {},
 }
 
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
