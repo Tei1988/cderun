@@ -179,7 +179,9 @@ func (r *ExpressionResolver) resolveString(s string) string {
 							sb.WriteString(s[start : i+2])
 						} else {
 							content := strings.TrimSpace(s[start+2 : i])
-							res, err := r.resolveDirective(content)
+							// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
+							resolvedContent := r.resolveString(content)
+							res, err := r.resolveDirective(resolvedContent)
 							if err != nil {
 								r.setError(err)
 								sb.WriteString(s[start : i+2])

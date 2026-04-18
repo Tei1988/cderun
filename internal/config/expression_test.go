@@ -242,14 +242,12 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 
 	hostCtx := &HostContext{}
 
-	t.Run("nested expressions (partial match due to non-recursive regex)", func(t *testing.T) {
+	t.Run("nested expressions (recursive resolution)", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 		val := r.resolveString("{{ file:{{ file:inner.txt }} }}")
-		// Matches "{{ file:{{ file:inner.txt }}" and fails to find such file
-		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "file not found")
-		assert.Equal(t, "{{ file:{{ file:inner.txt }} }}", val)
+		require.NoError(t, r.Error())
+		assert.Equal(t, "content", val)
 	})
 
 	t.Run("multiple expressions", func(t *testing.T) {

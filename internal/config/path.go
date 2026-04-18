@@ -568,6 +568,9 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		if err != nil {
 			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
 		}
+		if strings.Contains(anchorPath, "{{") {
+			return fmt.Errorf("unresolved expression in anchor %q: %q", anchor, anchorPath)
+		}
 		if err := processBoundary(anchor, anchorPath); err != nil {
 			return err
 		}
