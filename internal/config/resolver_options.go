@@ -118,15 +118,11 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	if p1Set {
 		if v, ok := p1Val.Interface().([]string); ok {
 			p1v = v
-		} else {
-			p1Set = false
 		}
 	}
 	if p2Set {
 		if v, ok := p2Val.Interface().([]string); ok {
 			p2v = v
-		} else {
-			p2Set = false
 		}
 	}
 
