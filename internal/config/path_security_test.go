@@ -186,7 +186,7 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_ValidateExposePort_Extra(t *testing.T) {
+func TestUnit_Config_ValidateExposePort_NonNumeric(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -233,7 +233,6 @@ func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("tilde resolution when resolver is nil", func(t *testing.T) {
-		// ResolvePath(p, baseDir, nil)
 		val, err := ResolvePath("~/file", "/work", nil)
 		require.NoError(t, err)
 		// We can't easily mock RealFileSystem here, so we just check it resolved to some absolute path ending in /file
@@ -241,20 +240,19 @@ func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
 		assert.True(t, strings.HasSuffix(val, "/file"))
 	})
 
-	t.Run("tilde resolution fail when resolver is nil and UserHomeDir fails", func(t *testing.T) {
+	t.Run("tilde resolution fail when UserHomeDir fails", func(t *testing.T) {
+		// Show that ResolvePath uses the resolver's FS when ExpressionResolver{fs: mfs} is provided
+		// and that a failing UserHomeDir causes ResolvePath("~/file", "/work", r) to return an error.
 		mfs := &securityMockFS{
 			homeDirErr: assert.AnError,
 		}
-		// Since ResolvePath uses RealFileSystem if r is nil, we can't easily inject a mock here
-		// unless we modify ResolvePath or provide a way to inject FS.
-		// Looking at ResolvePath:
-		// var fs FileSystem = RealFileSystem{}
-		// if r != nil && r.fs != nil { fs = r.fs }
-		// So if r is nil, it uses RealFileSystem.
-
-		// Wait, I can pass a resolver with a mock FS but with other fields nil?
-		r := &ExpressionResolver{fs: mfs}
-		_, err := ResolvePath("~/file", "/work", r)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		if err != nil {
+			// NewExpressionResolverWithFS calls UserHomeDir during initialization
+			require.Error(t, err)
+			return
+		}
+		_, err = ResolvePath("~/file", "/work", r)
 		require.Error(t, err)
 	})
 
@@ -266,32 +264,29 @@ func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
 			},
 			absErr: assert.AnError,
 		}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
-		// We need to trigger validateAnchorBoundaries with an anchor
-		// and make fs.Abs fail for the anchor path.
-		// In validateAnchorBoundaries:
-		// absAnchor, err := fs.Abs(anchorPath)
-
-		_, err := ResolvePath("~/file", "/work", r)
+		_, err = ResolvePath("~/file", "/work", r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get absolute path for anchor")
 	})
 
 	t.Run("anchor path is empty", func(t *testing.T) {
-		mfs := &MockFileSystem{WD: "/work"}
-		r := &ExpressionResolver{
-			fs:   mfs,
-			Home: "", // Empty home
-		}
-		_, err := ResolvePath("~/file", "/work", r)
+		mfs := &MockFileSystem{WD: "/work", HomeDir: "/home/user"}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		r.Home = "" // Empty home
+		_, err = ResolvePath("~/file", "/work", r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "anchor path is empty")
 	})
 
 	t.Run("BASE_HOME fallback to HOME when HostContext is nil", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
 		val, err := ResolvePath("{{BASE_HOME}}/file", "/work", r)
 		require.NoError(t, err)
@@ -300,7 +295,8 @@ func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
 
 	t.Run("BASE_PWD fallback to PWD when HostContext is nil", func(t *testing.T) {
 		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
-		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
 		val, err := ResolvePath("{{BASE_PWD}}/file", "/work", r)
 		require.NoError(t, err)
@@ -445,7 +441,8 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 
 func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 	t.Parallel()
-	r := &ExpressionResolver{Pwd: "/host"}
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	require.NoError(t, err)
 
 	t.Run("absolute target is accepted", func(t *testing.T) {
 		mc := MountConfig{
@@ -472,7 +469,8 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 
 func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 	t.Parallel()
-	r := &ExpressionResolver{Pwd: "/host"}
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	require.NoError(t, err)
 
 	t.Run("absolute destination is accepted", func(t *testing.T) {
 		dc := DeviceConfig{

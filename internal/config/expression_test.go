@@ -195,13 +195,12 @@ func TestUnit_Expression_FileError(t *testing.T) {
 
 type fileDetailMockFS struct {
 	MockFileSystem
-	statErr  error
-	readErr  error
-	failStat bool
+	statErr error
+	readErr error
 }
 
 func (m *fileDetailMockFS) Stat(name string) (os.FileInfo, error) {
-	if m.failStat && m.statErr != nil {
+	if m.statErr != nil {
 		return nil, m.statErr
 	}
 	return m.MockFileSystem.Stat(name)
@@ -216,7 +215,8 @@ func (m *fileDetailMockFS) ReadFile(name string) ([]byte, error) {
 
 func TestUnit_Expression_Optimization(t *testing.T) {
 	t.Run("optimization exact match magic word", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		require.NoError(t, err)
 		// "{{PWD}}" is an exact match for a magic word
 		val := r.resolveString("{{PWD}}")
 		assert.Equal(t, "/work", val)
@@ -224,25 +224,31 @@ func TestUnit_Expression_Optimization(t *testing.T) {
 	})
 
 	t.Run("optimization exact match directive", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{Env: map[string]string{"FOO": "BAR"}})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{Env: map[string]string{"FOO": "BAR"}})
+		require.NoError(t, err)
 		val := r.resolveString("{{env:FOO}}")
 		assert.Equal(t, "BAR", val)
 		assert.NoError(t, r.Error())
 	})
 
 	t.Run("no optimization for nested expressions", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		require.NoError(t, err)
 		// strings.Count(s, "{{") == 1 is FALSE here (it's 2)
 		val := r.resolveString("{{ file:{{ PWD }} }}")
-		// This should NOT be optimized and handled by the general loop
-		assert.Contains(t, val, "{{")
+		// The general loop handles it. It finds the first "{{", then the first "}}".
+		// content will be "file:{{ PWD".
+		// resolveDirective("file:{{ PWD") returns "{{file:{{ PWD}}", which contains "{{"
+		// so it will eventually result in "{{ file:{{ PWD }} }}"
+		assert.Equal(t, "{{ file:{{ PWD }} }}", val)
 	})
 
 	t.Run("directive resolves to something with expressions", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{
 			WD:  "/work",
 			Env: map[string]string{"NESTED": "{{PWD}}"},
 		})
+		require.NoError(t, err)
 		// resolveDirective returns "{{PWD}}"
 		// strings.HasPrefix(res, "{{") is true
 		// so it falls through to the loop.
@@ -252,7 +258,8 @@ func TestUnit_Expression_Optimization(t *testing.T) {
 	})
 
 	t.Run("mixed resolution in loop", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		require.NoError(t, err)
 		val := r.resolveString("prefix {{PWD}} suffix")
 		assert.Equal(t, "prefix /work suffix", val)
 	})
@@ -270,7 +277,8 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 			},
 			readErr: assert.AnError,
 		}
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ file:.cderun.yaml }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "failed to read file")
@@ -288,7 +296,8 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 		largeData := make([]byte, MaxDirectiveFileSize+1)
 		fs.Files["/project/large"] = largeData
 
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		r.resolveString("{{ file:large }}")
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "is too large")
@@ -303,18 +312,22 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 			},
 			readErr: assert.AnError,
 		}
-		r, _ := NewExpressionResolverWithFS(hostCtx, fs)
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
 		// First attempt
 		r.resolveString("{{ file:.cderun.yaml }}")
 		err1 := r.Error()
 		require.Error(t, err1)
 		assert.Contains(t, err1.Error(), "failed to read file")
 
+		// Prove cache hit: clear the simulated error
+		fs.readErr = nil
 		// Reset error state and try again
 		r.err = nil
 		r.resolveString("{{ file:.cderun.yaml }}")
 		err2 := r.Error()
 		require.Error(t, err2)
+		// Must be the same error from cache, even though fs.readErr is now nil
 		assert.Equal(t, err1.Error(), err2.Error())
 	})
 }
