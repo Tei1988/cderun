@@ -11,6 +11,7 @@ import (
 
 type mockDockerClientForSignal struct {
 	dockerClient
+	killErr error
 }
 
 func (m *mockDockerClientForSignal) Close() error {
@@ -18,7 +19,7 @@ func (m *mockDockerClientForSignal) Close() error {
 }
 
 func (m *mockDockerClientForSignal) ContainerKill(ctx context.Context, containerID string, signal string) error {
-	return nil
+	return m.killErr
 }
 
 func TestSignalValidation(t *testing.T) {
@@ -58,9 +59,8 @@ func TestSignalValidation(t *testing.T) {
 }
 
 func TestSignalContainerDaemonRejection(t *testing.T) {
-	// Mock client that returns an error when ContainerKill is called,
-	// simulating a daemon rejecting an invalid signal that passed local validation.
-	mock := &mockDockerClientForSignalRejection{
+	// Use mock client with killErr set to simulate daemon rejection.
+	mock := &mockDockerClientForSignal{
 		killErr: errors.New("daemon error: invalid signal"),
 	}
 	rt := &DockerRuntime{client: mock}
@@ -68,17 +68,4 @@ func TestSignalContainerDaemonRejection(t *testing.T) {
 	err := rt.SignalContainer(context.Background(), "test-id", "SIGINVALID")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "daemon error: invalid signal")
-}
-
-type mockDockerClientForSignalRejection struct {
-	dockerClient
-	killErr error
-}
-
-func (m *mockDockerClientForSignalRejection) Close() error {
-	return nil
-}
-
-func (m *mockDockerClientForSignalRejection) ContainerKill(ctx context.Context, containerID string, signal string) error {
-	return m.killErr
 }
