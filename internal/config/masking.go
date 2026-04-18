@@ -29,7 +29,7 @@ var sensitiveKeywords = map[string]struct{}{
 	"SENSITIVE":   {},
 }
 
-const sensitiveKeywordChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const sensitiveFirstChars = "ABCDEFGHIJKLMNOPQRSTUVWJ" // First letters of all sensitiveKeywords
 
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
@@ -39,7 +39,7 @@ func MaskSensitiveEnv(key, value string) string {
 
 	// Fast path: if the key doesn't contain any potential sensitive characters, skip complex splitting.
 	upperKey := strings.ToUpper(key)
-	if !strings.ContainsAny(upperKey, sensitiveKeywordChars) {
+	if !strings.ContainsAny(upperKey, sensitiveFirstChars) {
 		return value
 	}
 

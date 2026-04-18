@@ -85,7 +85,7 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
 	if setIdx != -1 {
 		return val.Field(setIdx).Bool(), val.Field(valIdx)
 	}
-	// For slices and other types without a explicit Set flag
+	// For slices and other types without an explicit Set flag
 	v := val.Field(valIdx)
 	if v.Kind() == reflect.Slice || v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface || v.Kind() == reflect.Map {
 		return !v.IsNil(), v
@@ -118,11 +118,15 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	if p1Set {
 		if v, ok := p1Val.Interface().([]string); ok {
 			p1v = v
+		} else {
+			p1Set = false
 		}
 	}
 	if p2Set {
 		if v, ok := p2Val.Interface().([]string); ok {
 			p2v = v
+		} else {
+			p2Set = false
 		}
 	}
 

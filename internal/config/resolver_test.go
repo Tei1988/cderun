@@ -932,3 +932,21 @@ func TestUnit_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 		assert.Equal(t, "my-reg.com/node:20", res.Image)
 	})
 }
+
+func TestUnit_Resolver_AddHosts_CapAdd_Independence(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{}
+	tools := ToolsConfig{
+		"app": ToolConfig{
+			Image:    "alpine",
+			AddHosts: []string{"host1:1.1.1.1"},
+			CapAdd:   []string{"SYS_ADMIN"},
+		},
+	}
+
+	res, err := ResolveWithFS("app", &CLIOptions{}, tools, nil, mfs)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"host1:1.1.1.1"}, res.AddHosts)
+	assert.Equal(t, []string{"SYS_ADMIN"}, res.CapAdd)
+}

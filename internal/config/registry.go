@@ -168,10 +168,10 @@ var StringSliceOptions = []StringSliceOption{
 		EnvKey:    "CDERUN_CAP_ADD",
 		Usage:     "Add Linux capabilities",
 		ToolGetter: func(t ToolConfig) []string {
-			return t.AddHosts
+			return t.CapAdd
 		},
 		GlobalGetter: func(g CDERunConfig) []string {
-			return g.Defaults.AddHosts
+			return g.Defaults.CapAdd
 		},
 	},
 	{
