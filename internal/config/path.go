@@ -469,10 +469,12 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i, r := range s {
+	runePos := 0
+	for _, r := range s {
 		if r <= 31 || r == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, runePos)
 		}
+		runePos++
 	}
 	return nil
 }

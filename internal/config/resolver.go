@@ -1485,7 +1485,7 @@ func MaskSensitiveEnv(key, value string) string {
 	return value
 }
 
-// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
+// containsIgnoreCase returns true if substr is contained in s, case-insensitively.
 func containsIgnoreCase(s, substr string) bool {
 	if len(substr) == 0 {
 		return true
@@ -1501,6 +1501,7 @@ func containsIgnoreCase(s, substr string) bool {
 	return false
 }
 
+// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
 func MaskSensitiveEnvList(env []string) []string {
 	if env == nil {
 		return nil
