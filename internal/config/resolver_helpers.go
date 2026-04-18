@@ -10,51 +10,95 @@ import (
 	"cderun/internal/logging"
 )
 
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
-	var dcs []DeviceConfig
-
+func pickConfigs[T any](
+	p1 []string,
+	p2 []string,
+	envKey string,
+	envSep string,
+	subcommand string,
+	tools ToolsConfig,
+	toolGetter func(ToolConfig) []T,
+	global *CDERunConfig,
+	globalGetter func(CDERunConfig) []T,
+	parser func(string, string) (T, error),
+	fs FileSystem,
+) ([]T, error) {
 	if p1 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p1 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %q", d)
+		res := make([]T, 0, len(p1))
+		for _, s := range p1 {
+			v, err := parser(s, "override")
+			if err != nil {
+				return nil, err
 			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
+			res = append(res, v)
 		}
-	} else if p2 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p2 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config: %q", d)
+		return res, nil
+	}
+	if p2 != nil {
+		res := make([]T, 0, len(p2))
+		for _, s := range p2 {
+			v, err := parser(s, "")
+			if err != nil {
+				return nil, err
 			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
+			res = append(res, v)
 		}
-	} else if env, ok := fs.LookupEnv("CDERUN_DEVICE"); ok {
-		dcs = []DeviceConfig{}
-		for d := range strings.SplitSeq(env, ",") {
-			d = strings.TrimSpace(d)
-			if d == "" {
-				continue
+		return res, nil
+	}
+	if envKey != "" {
+		if env, ok := fs.LookupEnv(envKey); ok {
+			res := []T{}
+			for s := range strings.SplitSeq(env, envSep) {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					continue
+				}
+				v, err := parser(s, "env")
+				if err != nil {
+					return nil, err
+				}
+				res = append(res, v)
 			}
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", d)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
-			dcs = tool.Devices
+			return res, nil
 		}
 	}
+	if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if v := toolGetter(tool); v != nil {
+				return v, nil
+			}
+		}
+	}
+	if global != nil {
+		if v := globalGetter(*global); v != nil {
+			return v, nil
+		}
+	}
+	return nil, nil
+}
 
-	if dcs == nil && global != nil {
-		dcs = global.Defaults.Devices
+func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
+	dcs, err := pickConfigs(
+		p1, p2, "CDERUN_DEVICE", ",", subcommand, tools,
+		func(t ToolConfig) []DeviceConfig { return t.Devices },
+		global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		func(s, src string) (DeviceConfig, error) {
+			parsed, ok := ParseDeviceConfig(s)
+			if !ok {
+				if src == "override" {
+					return DeviceConfig{}, fmt.Errorf("invalid device config (override): %q", s)
+				} else if src == "env" {
+					return DeviceConfig{}, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", s)
+				}
+				return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
+			}
+			parsed.SetBaseDir(r.Pwd)
+			return parsed, nil
+		},
+		fs,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	var res []container.DeviceMapping
@@ -69,29 +113,15 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var envs []string
-
-	if p1 != nil {
-		envs = p1
-	} else if p2 != nil {
-		envs = p2
-	} else if env, ok := fs.LookupEnv(envKey); ok {
-		envs = []string{}
-		for e := range strings.SplitSeq(env, ";") {
-			e = strings.TrimSpace(e)
-			if e == "" {
-				continue
-			}
-			envs = append(envs, e)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
-			envs = tool.Env
-		}
-	}
-
-	if envs == nil && global != nil {
-		envs = global.Defaults.Env
+	envs, err := pickConfigs(
+		p1, p2, envKey, ";", subcommand, tools,
+		func(t ToolConfig) []string { return t.Env },
+		global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		func(s, src string) (string, error) { return s, nil },
+		fs,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Deduplicate within the winning source (last-one-wins for the same key)
@@ -213,50 +243,27 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
-	var mcs []MountConfig
-
-	if p1 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p1 {
-			parsed, err := ParseMountFlag(m)
+	mcs, err := pickConfigs(
+		p1, p2, "CDERUN_MOUNT", ";", subcommand, tools,
+		func(t ToolConfig) []MountConfig { return t.Mounts },
+		global, func(g CDERunConfig) []MountConfig { return g.Defaults.Mounts },
+		func(s, src string) (MountConfig, error) {
+			parsed, err := ParseMountFlag(s)
 			if err != nil {
-				return nil, fmt.Errorf("invalid mount config (override): %w", err)
+				if src == "override" {
+					return MountConfig{}, fmt.Errorf("invalid mount config (override): %w", err)
+				} else if src == "env" {
+					return MountConfig{}, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
+				}
+				return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 			}
 			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if p2 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p2 {
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if env, ok := fs.LookupEnv("CDERUN_MOUNT"); ok {
-		mcs = []MountConfig{}
-		for m := range strings.SplitSeq(env, ";") {
-			m = strings.TrimSpace(m)
-			if m == "" {
-				continue
-			}
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
-			mcs = tool.Mounts
-		}
-	}
-
-	if mcs == nil && global != nil {
-		mcs = global.Defaults.Mounts
+			return parsed, nil
+		},
+		fs,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	var res []container.Mount

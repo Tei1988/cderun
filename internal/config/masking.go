@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var sensitiveKeywords = map[string]struct{}{
@@ -64,11 +65,13 @@ func MaskSensitiveEnv(key, value string) string {
 				isAcronym := false
 				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
 					// Check for acronym boundary (e.g. APIKey -> API, Key)
-					for _, nextRune := range key[i+len(string(r)):] {
-						if unicode.IsLower(nextRune) {
+					// Look ahead to the next rune without allocation.
+					nextIdx := i + utf8.RuneLen(r)
+					if nextIdx < len(key) {
+						nextRune, _ := utf8.DecodeRuneInString(key[nextIdx:])
+						if nextRune != utf8.RuneError && unicode.IsLower(nextRune) {
 							isAcronym = true
 						}
-						break
 					}
 				}
 

@@ -337,39 +337,36 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
-func (rv *resolver) extractIntValue(v reflect.Value, set *bool) int {
-	if !*set || !v.IsValid() {
-		return 0
+func (rv *resolver) extractIntValue(v reflect.Value, set bool) (int, bool) {
+	if !set || !v.IsValid() {
+		return 0, false
 	}
 	k := v.Kind()
 	if k >= reflect.Int && k <= reflect.Int64 {
-		return int(v.Int())
+		return int(v.Int()), true
 	}
-	*set = false
-	return 0
+	return 0, false
 }
 
-func (rv *resolver) extractFloatValue(v reflect.Value, set *bool) float64 {
-	if !*set || !v.IsValid() {
-		return 0.0
+func (rv *resolver) extractFloatValue(v reflect.Value, set bool) (float64, bool) {
+	if !set || !v.IsValid() {
+		return 0.0, false
 	}
 	k := v.Kind()
 	if k == reflect.Float32 || k == reflect.Float64 {
-		return v.Float()
+		return v.Float(), true
 	}
-	*set = false
-	return 0.0
+	return 0.0, false
 }
 
-func (rv *resolver) extractStringSliceValue(v reflect.Value, set *bool) []string {
-	if !*set {
-		return nil
+func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string, bool) {
+	if !set || !v.IsValid() {
+		return nil, false
 	}
 	if val, ok := v.Interface().([]string); ok {
-		return val
+		return val, true
 	}
-	*set = false
-	return nil
+	return nil, false
 }
 
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
@@ -404,8 +401,14 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		return err
 	}
 
-	p1v := rv.extractStringSliceValue(p1Val, &p1Set)
-	p2v := rv.extractStringSliceValue(p2Val, &p2Set)
+	p1v, ok1 := rv.extractStringSliceValue(p1Val, p1Set)
+	if !ok1 {
+		p1Set = false
+	}
+	p2v, ok2 := rv.extractStringSliceValue(p2Val, p2Set)
+	if !ok2 {
+		p2Set = false
+	}
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -459,8 +462,14 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		return err
 	}
 
-	p1Int := rv.extractIntValue(p1Val, &p1Set)
-	p2Int := rv.extractIntValue(p2Val, &p2Set)
+	p1Int, ok1 := rv.extractIntValue(p1Val, p1Set)
+	if !ok1 {
+		p1Set = false
+	}
+	p2Int, ok2 := rv.extractIntValue(p2Val, p2Set)
+	if !ok2 {
+		p2Set = false
+	}
 
 	def := OptionDef[*int]{
 		EnvKey:       opt.EnvKey,
@@ -480,8 +489,14 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		return err
 	}
 
-	p1Float := rv.extractFloatValue(p1Val, &p1Set)
-	p2Float := rv.extractFloatValue(p2Val, &p2Set)
+	p1Float, ok1 := rv.extractFloatValue(p1Val, p1Set)
+	if !ok1 {
+		p1Set = false
+	}
+	p2Float, ok2 := rv.extractFloatValue(p2Val, p2Set)
+	if !ok2 {
+		p2Set = false
+	}
 
 	def := OptionDef[*float64]{
 		EnvKey:       opt.EnvKey,
