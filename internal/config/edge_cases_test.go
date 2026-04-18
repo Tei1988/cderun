@@ -14,7 +14,7 @@ func TestUnit_Config_ValidatePort_Malformed(t *testing.T) {
 	}{
 		{"Too many segments", "127.0.0.1:80:80:80", true},
 		{"Empty segments (3rd)", "127.0.0.1:80:", true},
-		{"Empty segments (2nd)", "127.0.0.1::80", false},
+		{"Empty segments (2nd)", "127.0.0.1::80", false}, // documents current behavior: empty host port is accepted
 		{"Empty IP in 3-segment", ":80:80", true},
 		{"Invalid IP in 3-segment", "999.999.999.999:80:80", true},
 		{"Non-numeric container port (3-segment)", "127.0.0.1:80:abc", true},
@@ -22,7 +22,7 @@ func TestUnit_Config_ValidatePort_Malformed(t *testing.T) {
 		{"Non-numeric container port (2-segment)", "127.0.0.1:abc", true},
 		{"Non-numeric host port (2-segment)", "abc:80", true},
 		{"Non-numeric container port (1-segment)", "abc", true},
-		{"Empty container port (1-segment)", ":", true},
+		{"Both segments empty", ":", true},
 	}
 
 	for _, tt := range tests {
@@ -105,5 +105,32 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
 		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.InDelta(t, 1.5, res, 1e-9)
+	})
+
+	t.Run("resolveIntOpt with invalid env but valid ToolGetter", func(t *testing.T) {
+		toolVal := 42
+		def := OptionDef[*int]{
+			EnvKey:     "TEST_INT",
+			ToolGetter: func(tc ToolConfig) *int { return &toolVal },
+			Fallback:   ptr(10),
+		}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
+		tools := ToolsConfig{"sub": ToolConfig{}}
+		// Env is invalid, so it should proceed to ToolGetter (P4) which is valid.
+		res := resolveIntOpt(def, false, 0, false, 0, "sub", tools, nil, mfs)
+		assert.Equal(t, 42, res)
+	})
+
+	t.Run("resolveFloat64Opt with invalid env but valid GlobalGetter", func(t *testing.T) {
+		globalVal := 3.14
+		def := OptionDef[*float64]{
+			EnvKey:       "TEST_FLOAT",
+			GlobalGetter: func(c CDERunConfig) *float64 { return &globalVal },
+			Fallback:     ptr(1.5),
+		}
+		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
+		// Env is invalid, ToolGetter is nil, so it should proceed to GlobalGetter (P5) which is valid.
+		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
+		assert.InDelta(t, 3.14, res, 1e-9)
 	})
 }

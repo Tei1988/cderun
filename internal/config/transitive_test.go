@@ -125,25 +125,6 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 		assert.True(t, res.MountSocket)
 	})
 
-	t.Run("complex override: P4 Tool enables, but P2 CLI disables mount-cderun", func(t *testing.T) {
-		tools := ToolsConfig{
-			"sh": ToolConfig{
-				MountTools: []string{"node"},
-			},
-		}
-		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    false,
-			MountCderunSet: true,
-		}
-		res, err := ResolveWithFS("sh", cli, tools, nil, fs)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"node"}, res.MountTools)
-		assert.False(t, res.MountCderun)
-		assert.False(t, res.MountSocket)
-	})
-
 	t.Run("complex override: P4 Tool enables mount-tools, but P2 CLI disables mount-cderun", func(t *testing.T) {
 		tools := ToolsConfig{
 			"sh": ToolConfig{
