@@ -85,12 +85,14 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		func(s, src string) (DeviceConfig, error) {
 			parsed, ok := ParseDeviceConfig(s)
 			if !ok {
-				if src == "override" {
+				switch src {
+				case "override":
 					return DeviceConfig{}, fmt.Errorf("invalid device config (override): %q", s)
-				} else if src == "env" {
+				case "env":
 					return DeviceConfig{}, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", s)
+				default:
+					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
-				return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			return parsed, nil
@@ -250,12 +252,14 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		func(s, src string) (MountConfig, error) {
 			parsed, err := ParseMountFlag(s)
 			if err != nil {
-				if src == "override" {
+				switch src {
+				case "override":
 					return MountConfig{}, fmt.Errorf("invalid mount config (override): %w", err)
-				} else if src == "env" {
+				case "env":
 					return MountConfig{}, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
+				default:
+					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
-				return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 			}
 			parsed.SetBaseDir(r.Pwd)
 			return parsed, nil

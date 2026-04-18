@@ -401,14 +401,8 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		return err
 	}
 
-	p1v, ok1 := rv.extractStringSliceValue(p1Val, p1Set)
-	if !ok1 {
-		p1Set = false
-	}
-	p2v, ok2 := rv.extractStringSliceValue(p2Val, p2Set)
-	if !ok2 {
-		p2Set = false
-	}
+	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
+	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
