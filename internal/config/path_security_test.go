@@ -40,6 +40,30 @@ func TestUnit_Config_ValidateImageName(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ValidateExecutablePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Absolute path", "/usr/local/bin/cderun", false},
+		{"Empty path", "", false},
+		{"Relative path", "cderun", true},
+		{"Control character", "/usr/local/bin/cderun\r", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateExecutablePath(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidateEnvKey(t *testing.T) {
 	tests := []struct {
 		name    string

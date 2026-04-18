@@ -721,26 +721,24 @@ func ValidateCapability(s string) error {
 	return nil
 }
 
-// ValidateSocketPath ensures the socket path is absolute and safe.
-func ValidateSocketPath(s string) error {
+func validateAbsoluteAndChars(s string, label string) error {
 	if s == "" {
 		return nil
 	}
 	if !filepath.IsAbs(s) {
-		return fmt.Errorf("socket path must be an absolute path: %q", s)
+		return fmt.Errorf("%s must be an absolute path: %q", label, s)
 	}
 	return validatePathChars(s)
 }
 
+// ValidateSocketPath ensures the socket path is absolute and safe.
+func ValidateSocketPath(s string) error {
+	return validateAbsoluteAndChars(s, "socket path")
+}
+
 // ValidateExecutablePath ensures the executable path is absolute and safe.
 func ValidateExecutablePath(s string) error {
-	if s == "" {
-		return nil
-	}
-	if !filepath.IsAbs(s) {
-		return fmt.Errorf("executable path must be an absolute path: %q", s)
-	}
-	return validatePathChars(s)
+	return validateAbsoluteAndChars(s, "executable path")
 }
 
 // ValidatePullPolicy ensures the pull policy is one of the allowed values.
