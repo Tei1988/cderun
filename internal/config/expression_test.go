@@ -197,6 +197,7 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 		Files: map[string][]byte{
 			"/project/empty.txt":  []byte("   "),
 			"/project/normal.txt": []byte("content"),
+			"/project/inner.txt":  []byte("outer.txt"),
 		},
 		Dirs: map[string]bool{
 			"/project": true,
@@ -218,6 +219,24 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 		val := r.resolveString("{{ file:normal.txt }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "content", val)
+	})
+
+	t.Run("unmatched braces (literal treatment)", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		// {{ PWD finds a match at {{ file:inner.txt }}
+		val := r.resolveString("{{ PWD {{ file:inner.txt }} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{PWD outer.txt}}", val)
+	})
+
+	t.Run("complex unmatched and nested", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		// {{ env:VAR finds {{ PWD }} but the outer stays unmatched
+		val := r.resolveString("{{ env:VAR {{ PWD }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{ env:VAR /project", val)
 	})
 
 	t.Run("cached empty file still works", func(t *testing.T) {

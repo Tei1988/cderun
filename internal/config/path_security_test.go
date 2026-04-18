@@ -129,6 +129,8 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Traversal escaping find_dir anchor", "{{find_dir:.git}}/../../etc/passwd", true},
 		{"Safe nested anchor", "{{env:DIR:-{{HOME}}}}/file", false},
 		{"Traversal escaping nested anchor", "{{env:DIR:-{{HOME}}}}/../../etc/passwd", true},
+		{"Unmatched brace anchor (still validated)", "{{HOME}} {{/../../etc/passwd", true},
+		{"Inner matched anchor in unmatched outer", "{{ PWD {{HOME}}/../../etc/passwd", true},
 	}
 
 	for _, tt := range tests {
