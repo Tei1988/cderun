@@ -104,55 +104,64 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	pwd := "/work"
 
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name         string
+		input        string
+		expectedErr  string
+		extraEnv     map[string]string
+		extraDirs    map[string]bool
+		extraFiles   map[string][]byte
+		skipHostCtx  bool
+		level        int
 	}{
-		{"Safe home path", "{{HOME}}/file", false},
-		{"Safe tilde path", "~/file", false},
-		{"Safe pwd path", "{{PWD}}/file", false},
-		{"Traversal within home", "{{HOME}}/subdir/../file", false},
-		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true},
-		{"Traversal escaping tilde", "~/../../etc/passwd", true},
-		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
-		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
-		{"Bypass attempt anywhere in string", "foo{{HOME}}/../../etc/passwd", true},
-		{"Bypass attempt anywhere in string with tilde", "a~", false}, // No longer a bypass as ~ only matches at boundaries
-		{"Tilde at boundary", "foo/~", true},
-		{"Tilde at start", "~/file", false},
-		{"Multiple anchors", "{{HOME}}/subdir/{{HOME}}/file", false},
-		{"False positive traversal prefix", "{{HOME}}/..config/file", false},
-		{"No anchor no traversal check", "../../etc/passwd", false}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
-		{"Safe env anchor", "{{env:MY_PATH}}/file", false},
-		{"Traversal escaping env anchor", "{{env:MY_PATH}}/../../etc/passwd", true},
-		{"Safe find_dir anchor", "{{find_dir:.git}}/file", false},
-		{"Traversal escaping find_dir anchor", "{{find_dir:.git}}/../../etc/passwd", true},
-		{"Safe nested anchor", "{{env:DIR:-{{HOME}}}}/file", false},
-		{"Traversal escaping nested anchor", "{{env:DIR:-{{HOME}}}}/../../etc/passwd", true},
-		{"Unmatched brace anchor (still validated)", "{{HOME}} {{/../../etc/passwd", true},
-		{"Inner matched anchor in unmatched outer", "{{ PWD {{HOME}}/../../etc/passwd", true},
+		{name: "Safe home path", input: "{{HOME}}/file"},
+		{name: "Safe tilde path", input: "~/file"},
+		{name: "Safe pwd path", input: "{{PWD}}/file"},
+		{name: "Traversal within home", input: "{{HOME}}/subdir/../file"},
+		{name: "Traversal escaping home", input: "{{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Traversal escaping tilde", input: "~/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Traversal escaping pwd", input: "{{PWD}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Anchor after slash", input: "/{{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Bypass attempt anywhere in string", input: "foo{{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Bypass attempt anywhere in string with tilde", input: "a~"}, // No longer a bypass as ~ only matches at boundaries
+		{name: "Tilde at boundary", input: "foo/~", expectedErr: "path traversal detected"},
+		{name: "Tilde at start", input: "~/file"},
+		{name: "Multiple anchors", input: "{{HOME}}/subdir/{{HOME}}/file"},
+		{name: "False positive traversal prefix", input: "{{HOME}}/..config/file"},
+		{name: "No anchor no traversal check", input: "../../etc/passwd"}, // Relative paths are resolved against baseDir, not restricted by default unless anchor is used
+		{name: "Safe env anchor", input: "{{env:MY_PATH}}/file", extraEnv: map[string]string{"MY_PATH": "/work/safe"}},
+		{name: "Traversal escaping env anchor", input: "{{env:MY_PATH}}/../../etc/passwd", expectedErr: "path traversal detected", extraEnv: map[string]string{"MY_PATH": "/work/safe"}},
+		{name: "Safe find_dir anchor", input: "{{find_dir:.git}}/file", extraDirs: map[string]bool{"/work/.git": true}},
+		{name: "Traversal escaping find_dir anchor", input: "{{find_dir:.git}}/../../etc/passwd", expectedErr: "path traversal detected", extraDirs: map[string]bool{"/work/.git": true}},
+		{name: "Safe nested anchor", input: "{{env:DIR:-{{HOME}}}}/file", extraEnv: map[string]string{"DIR": ""}},
+		{name: "Traversal escaping nested anchor", input: "{{env:DIR:-{{HOME}}}}/../../etc/passwd", expectedErr: "path traversal detected", extraEnv: map[string]string{"DIR": ""}},
+		{name: "Unmatched brace anchor (still validated)", input: "{{HOME}} {{/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Inner matched anchor in unmatched outer", input: "{{ PWD {{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Multiple anchors - mixed types (all must be satisfied)", input: "{{HOME}}/{{PWD}}/file", expectedErr: "path traversal detected"}, // HOME is /home/user, PWD is /work. Final is /home/user/work/file. Escapes /work boundary.
+		{name: "Unresolved anchor error", input: "{{unknown:directive}}/file", expectedErr: "unresolved expression in anchor"},
+		{name: "Empty anchor error", input: "{{env:UNSET}}/file", expectedErr: "anchor path is empty"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mfs := &MockFileSystem{
 				WD:      pwd,
 				HomeDir: home,
-				Env: map[string]string{
-					"MY_PATH": "/work/safe",
-					"DIR":     "",
-				},
-				Dirs: map[string]bool{
-					"/work/.git": true,
-				},
+				Env:     tt.extraEnv,
+				Dirs:    tt.extraDirs,
+				Files:   tt.extraFiles,
 			}
-			r, err := NewExpressionResolverWithFS(nil, mfs)
+			var hostCtx *HostContext
+			if !tt.skipHostCtx {
+				hostCtx = &HostContext{Level: tt.level}
+			}
+			r, err := NewExpressionResolverWithFS(hostCtx, mfs)
 			require.NoError(t, err)
 
 			_, err = ResolvePath(tt.input, pwd, r)
-			if tt.wantErr {
+			if tt.expectedErr != "" {
 				require.Error(t, err, "input: %q", tt.input)
-				assert.Contains(t, err.Error(), "path traversal detected")
+				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				require.NoError(t, err, "input: %q", tt.input)
 			}

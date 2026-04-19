@@ -551,7 +551,13 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		if r == nil {
 			return fmt.Errorf("expression resolver required for anchor validation")
 		}
-		anchorPath, err := r.ResolveString(anchor)
+		// Use a fresh resolver instance for each anchor to ensure that a sticky error
+		// from one anchor resolution doesn't skip subsequent anchor resolutions.
+		cleanR, err := NewExpressionResolverWithFS(r.HostContext, r.fs)
+		if err != nil {
+			return fmt.Errorf("failed to create fresh resolver for anchor %q: %w", anchor, err)
+		}
+		anchorPath, err := cleanR.ResolveString(anchor)
 		if err != nil {
 			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
 		}
