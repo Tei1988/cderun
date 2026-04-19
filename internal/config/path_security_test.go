@@ -104,14 +104,12 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	pwd := "/work"
 
 	tests := []struct {
-		name         string
-		input        string
-		expectedErr  string
-		extraEnv     map[string]string
-		extraDirs    map[string]bool
-		extraFiles   map[string][]byte
-		skipHostCtx  bool
-		level        int
+		name        string
+		input       string
+		expectedErr string
+		extraEnv    map[string]string
+		extraDirs   map[string]bool
+		extraFiles  map[string][]byte
 	}{
 		{name: "Safe home path", input: "{{HOME}}/file"},
 		{name: "Safe tilde path", input: "~/file"},
@@ -132,8 +130,13 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{name: "Traversal escaping env anchor", input: "{{env:MY_PATH}}/../../etc/passwd", expectedErr: "path traversal detected", extraEnv: map[string]string{"MY_PATH": "/work/safe"}},
 		{name: "Safe find_dir anchor", input: "{{find_dir:.git}}/file", extraDirs: map[string]bool{"/work/.git": true}},
 		{name: "Traversal escaping find_dir anchor", input: "{{find_dir:.git}}/../../etc/passwd", expectedErr: "path traversal detected", extraDirs: map[string]bool{"/work/.git": true}},
-		{name: "Safe nested anchor", input: "{{env:DIR:-{{HOME}}}}/file", extraEnv: map[string]string{"DIR": ""}},
-		{name: "Traversal escaping nested anchor", input: "{{env:DIR:-{{HOME}}}}/../../etc/passwd", expectedErr: "path traversal detected", extraEnv: map[string]string{"DIR": ""}},
+
+		// Nested anchor tests
+		{name: "Safe nested anchor - unset (fallback to HOME)", input: "{{env:DIR:-{{HOME}}}}/file"}, // extraEnv doesn't have DIR
+		{name: "Traversal escaping nested anchor - unset (fallback to HOME)", input: "{{env:DIR:-{{HOME}}}}/../../etc/passwd", expectedErr: "path traversal detected"},
+		{name: "Safe nested anchor - empty string (stays empty)", input: "{{env:DIR}}/file", extraEnv: map[string]string{"DIR": ""}, expectedErr: "anchor path is empty"},
+		{name: "Safe nested anchor - empty value (stays empty)", input: "{{env:DIR:-}}/file", extraEnv: map[string]string{"DIR": ""}, expectedErr: "anchor path is empty"},
+
 		{name: "Unmatched brace anchor (still validated)", input: "{{HOME}} {{/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Inner matched anchor in unmatched outer", input: "{{ PWD {{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Multiple anchors - mixed types (all must be satisfied)", input: "{{HOME}}/{{PWD}}/file", expectedErr: "path traversal detected"}, // HOME is /home/user, PWD is /work. Final is /home/user/work/file. Escapes /work boundary.
@@ -151,11 +154,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 				Dirs:    tt.extraDirs,
 				Files:   tt.extraFiles,
 			}
-			var hostCtx *HostContext
-			if !tt.skipHostCtx {
-				hostCtx = &HostContext{Level: tt.level}
-			}
-			r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+			r, err := NewExpressionResolverWithFS(&HostContext{}, mfs)
 			require.NoError(t, err)
 
 			_, err = ResolvePath(tt.input, pwd, r)
