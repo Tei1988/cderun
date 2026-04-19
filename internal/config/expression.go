@@ -14,6 +14,45 @@ type fileCacheEntry struct {
 	err     error
 }
 
+type anchorRange struct {
+	start int // inclusive index of the first '{'
+	end   int // exclusive index after the last '}'
+}
+
+// scanAnchors finds all top-level matched {{...}} expression ranges in a string.
+// It handles nested braces and treats unmatched openers as literal text.
+func scanAnchors(s string) []anchorRange {
+	var res []anchorRange
+	for i := 0; i < len(s)-1; i++ {
+		if s[i] == '{' && s[i+1] == '{' {
+			start := i
+			depth := 1
+			i += 2
+			for ; i < len(s)-1; i++ {
+				if s[i] == '{' && s[i+1] == '{' {
+					depth++
+					i++
+				} else if s[i] == '}' && s[i+1] == '}' {
+					depth--
+					if depth == 0 {
+						break
+					}
+					i++
+				}
+			}
+
+			if depth == 0 {
+				res = append(res, anchorRange{start: start, end: i + 2})
+				// i will be incremented by the loop, so it will point after the last '}'
+			} else {
+				// Unmatched opener, continue scan from after the '{{'
+				i = start + 1
+			}
+		}
+	}
+	return res
+}
+
 // ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
 type ExpressionResolver struct {
 	fs          FileSystem
@@ -151,40 +190,31 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		if hasExpr {
-			var sb strings.Builder
-			last := 0
-			curr := s
-			for {
-				start := strings.Index(curr[last:], "{{")
-				if start == -1 {
-					sb.WriteString(curr[last:])
-					break
-				}
-				start += last
-				sb.WriteString(curr[last:start])
-
-				end := strings.Index(curr[start:], "}}")
-				if end == -1 {
-					sb.WriteString(curr[start:])
-					break
-				}
-				end += start
-
-				if r.err != nil {
-					sb.WriteString(curr[start : end+2])
-				} else {
-					content := strings.TrimSpace(curr[start+2 : end])
-					res, err := r.resolveDirective(content)
-					if err != nil {
-						r.setError(err)
-						sb.WriteString(curr[start : end+2])
+			ranges := scanAnchors(s)
+			if len(ranges) > 0 {
+				var sb strings.Builder
+				last := 0
+				for _, rng := range ranges {
+					sb.WriteString(s[last:rng.start])
+					if r.err != nil {
+						sb.WriteString(s[rng.start:rng.end])
 					} else {
-						sb.WriteString(res)
+						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
+						// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
+						resolvedContent := r.resolveString(content)
+						res, err := r.resolveDirective(resolvedContent)
+						if err != nil {
+							r.setError(err)
+							sb.WriteString(s[rng.start:rng.end])
+						} else {
+							sb.WriteString(res)
+						}
 					}
+					last = rng.end
 				}
-				last = end + 2
+				sb.WriteString(s[last:])
+				resolved = sb.String()
 			}
-			resolved = sb.String()
 		}
 	}
 
