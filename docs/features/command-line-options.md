@@ -529,7 +529,7 @@ cderun --hang-timeout 5s node script.js
 - **デフォルト**: `warn`
 - **環境変数**: `CDERUN_LOG_LEVEL`
 - **説明**: ログレベルを直接指定
-- **値**: `error`, `warn`, `info`, `debug`, `trace`
+- **値**: `error`, `warn`, `info`, `debug`, `trace` (`warn` のエイリアスとして `warning` も使用可能)
 - **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
 
 ```bash

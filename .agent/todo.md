@@ -11,7 +11,7 @@ Add native containerd support as a third runtime, using the containerd Go client
 
 New files:
 
-```
+```text
 internal/runtime/
   containerd.go         # ContainerdRuntime implementing ContainerRuntime interface
   containerd_test.go    # Unit tests with mock containerd client
@@ -78,3 +78,12 @@ Dependency: `github.com/containerd/containerd/v2` client library.
 
 ### Inconsistency in containerd Support
 The security validator in `internal/config/resolver.go` allows `containerd` as a valid runtime, but the `runtimeFactory` in `internal/command/root.go` does not yet support it. This should be addressed when implementing native containerd support.
+
+### DeviceConfig YAML Format
+`DeviceConfig.UnmarshalYAML` in `internal/config/path.go` currently only supports string format (`host:container[:perms]`). It should be updated to support object format as mentioned in some documentation.
+
+### Anchor Validation Regex
+`magicWordPreRegex` in `internal/config/path.go` identifies anchors for `~` even when not at the start of a path (e.g., in `/foo/~bar`), but the expansion logic in `internal/config/expression.go` only expands `~` at the start of a string. This inconsistency may lead to unexpected path traversal validation errors for paths that are not actually expanded.
+
+### System Memory Inconsistency (containerd)
+The AI system memory (context) claims that native containerd support is fully implemented, but the `internal/runtime/containerd.go` file is missing from the repository. The implementation should follow the plan outlined in TODO P-9.

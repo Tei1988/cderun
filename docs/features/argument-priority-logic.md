@@ -64,6 +64,8 @@
   - `remove: true`
   - `runtime: docker`
   - `pull: missing`
+  - `pullMaxRetries: 3`
+  - `pullBackoffBase: 1s`
   - `logLevel: warn`
   - `logFormat: text`
   - `logTimestamp: true`
