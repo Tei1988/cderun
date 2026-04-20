@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,68 +39,70 @@ func (m *exprMockFS) ReadFile(name string) ([]byte, error) {
 
 func TestUnit_Expression_BaseHomeAndBasePwd(t *testing.T) {
 	fs := &MockFileSystem{
-		WD:      "/container/work",
-		HomeDir: "/root",
+		WD:      filepath.FromSlash("/container/work"),
+		HomeDir: filepath.FromSlash("/root"),
 	}
 
 	t.Run("BASE_HOME and BASE_PWD fall back to HOME/PWD at level 0", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
-		assert.Equal(t, "/root", r.resolveString("{{BASE_HOME}}"))
-		assert.Equal(t, "/container/work", r.resolveString("{{BASE_PWD}}"))
+		assert.Equal(t, filepath.FromSlash("/root"), r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, filepath.FromSlash("/container/work"), r.resolveString("{{BASE_PWD}}"))
 	})
 
 	t.Run("BASE_HOME and BASE_PWD return host values in nested execution", func(t *testing.T) {
 		hostCtx := &HostContext{
 			Level:      1,
-			HomeDir:    "/Users/user",
-			WorkingDir: "/Users/user/project",
+			HomeDir:    filepath.FromSlash("/Users/user"),
+			WorkingDir: filepath.FromSlash("/Users/user/project"),
 		}
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
-		assert.Equal(t, "/Users/user", r.resolveString("{{BASE_HOME}}"))
-		assert.Equal(t, "/Users/user/project", r.resolveString("{{BASE_PWD}}"))
+		assert.Equal(t, filepath.FromSlash("/Users/user"), r.resolveString("{{BASE_HOME}}"))
+		assert.Equal(t, filepath.FromSlash("/Users/user/project"), r.resolveString("{{BASE_PWD}}"))
 		// HOME and PWD still return container-local values
-		assert.Equal(t, "/root", r.resolveString("{{HOME}}"))
-		assert.Equal(t, "/container/work", r.resolveString("{{PWD}}"))
+		assert.Equal(t, filepath.FromSlash("/root"), r.resolveString("{{HOME}}"))
+		assert.Equal(t, filepath.FromSlash("/container/work"), r.resolveString("{{PWD}}"))
 	})
 
 	t.Run("NewExpressionResolverWithFS - UserHomeDir failure", func(t *testing.T) {
 		fsErr := &exprMockFS{
 			homeDirErr: assert.AnError,
 			MockFileSystem: MockFileSystem{
-				WD: "/wd",
+				WD: filepath.FromSlash("/wd"),
 			},
 		}
-		_, err := NewExpressionResolverWithFS(nil, fsErr)
+		r, err := NewExpressionResolverWithFS(nil, fsErr)
 		require.Error(t, err)
+		require.Nil(t, r)
 	})
 
 	t.Run("NewExpressionResolverWithFS - Getwd failure", func(t *testing.T) {
 		fsErr := &exprMockFS{
 			getwdErr: assert.AnError,
 			MockFileSystem: MockFileSystem{
-				HomeDir: "/home",
+				HomeDir: filepath.FromSlash("/home"),
 			},
 		}
-		_, err := NewExpressionResolverWithFS(nil, fsErr)
+		r, err := NewExpressionResolverWithFS(nil, fsErr)
 		require.Error(t, err)
+		require.Nil(t, r)
 	})
 }
 
 func TestUnit_Expression_FindDir(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/modules/foo":                      []byte("bar"),
-			"/project/services/production/.cderun.yaml": []byte("runtime: docker"),
+			filepath.FromSlash("/project/modules/foo"):                      []byte("bar"),
+			filepath.FromSlash("/project/services/production/.cderun.yaml"): []byte("runtime: docker"),
 		},
 		Dirs: map[string]bool{
-			"/project":                     true,
-			"/project/modules":             true,
-			"/project/services":            true,
-			"/project/services/production": true,
+			filepath.FromSlash("/project"):                     true,
+			filepath.FromSlash("/project/modules"):             true,
+			filepath.FromSlash("/project/services"):            true,
+			filepath.FromSlash("/project/services/production"): true,
 		},
-		WD: "/project/services/production",
+		WD: filepath.FromSlash("/project/services/production"),
 	}
 
 	hostCtx := &HostContext{}
@@ -129,9 +132,9 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	t.Run("filepath.Rel failure in resolveFindDir", func(t *testing.T) {
 		// On Unix, filepath.Rel("rel", "/abs") fails.
 		fs := &MockFileSystem{
-			Files: map[string][]byte{"/abs/foo": []byte("bar")},
-			Dirs:  map[string]bool{"/abs": true},
-			WD:    "/abs",
+			Files: map[string][]byte{filepath.FromSlash("/abs/foo"): []byte("bar")},
+			Dirs:  map[string]bool{filepath.FromSlash("/abs"): true},
+			WD:    filepath.FromSlash("/abs"),
 		}
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
@@ -150,12 +153,12 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 func TestUnit_Expression_FileError(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/.go-version": []byte("1.21\n"),
+			filepath.FromSlash("/project/.go-version"): []byte("1.21\n"),
 		},
 		Dirs: map[string]bool{
-			"/project": true,
+			filepath.FromSlash("/project"): true,
 		},
-		WD: "/project",
+		WD: filepath.FromSlash("/project"),
 	}
 
 	hostCtx := &HostContext{}
@@ -179,9 +182,9 @@ func TestUnit_Expression_FileError(t *testing.T) {
 	t.Run("ReadFile failure in resolveFile", func(t *testing.T) {
 		fsErr := &exprMockFS{
 			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/project/.go-version": []byte("1.21")},
-				Dirs:  map[string]bool{"/project": true},
-				WD:    "/project",
+				Files: map[string][]byte{filepath.FromSlash("/project/.go-version"): []byte("1.21")},
+				Dirs:  map[string]bool{filepath.FromSlash("/project"): true},
+				WD:    filepath.FromSlash("/project"),
 			},
 			readFileErr: assert.AnError,
 		}
@@ -215,11 +218,11 @@ func (m *fileDetailMockFS) ReadFile(name string) ([]byte, error) {
 
 func TestUnit_Expression_Optimization(t *testing.T) {
 	t.Run("optimization exact match magic word", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: filepath.FromSlash("/work")})
 		require.NoError(t, err)
 		// "{{PWD}}" is an exact match for a magic word
 		val := r.resolveString("{{PWD}}")
-		assert.Equal(t, "/work", val)
+		assert.Equal(t, filepath.FromSlash("/work"), val)
 		assert.NoError(t, r.Error())
 	})
 
@@ -232,20 +235,18 @@ func TestUnit_Expression_Optimization(t *testing.T) {
 	})
 
 	t.Run("no optimization for nested expressions", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: filepath.FromSlash("/work")})
 		require.NoError(t, err)
 		// strings.Count(s, "{{") == 1 is FALSE here (it's 2)
 		val := r.resolveString("{{ file:{{ PWD }} }}")
-		// The general loop handles it. It finds the first "{{", then the first "}}".
-		// content will be "file:{{ PWD".
-		// resolveDirective("file:{{ PWD") returns "{{file:{{ PWD}}", which contains "{{"
-		// so it will eventually result in "{{ file:{{ PWD }} }}"
+		// NOTE: Current single-pass parser does not support nested expressions.
+		// It identifies the first "{{" and first "}}", resulting in "file:{{ PWD".
 		assert.Equal(t, "{{ file:{{ PWD }} }}", val)
 	})
 
 	t.Run("directive resolves to something with expressions", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{
-			WD:  "/work",
+			WD:  filepath.FromSlash("/work"),
 			Env: map[string]string{"NESTED": "{{PWD}}"},
 		})
 		require.NoError(t, err)
@@ -258,7 +259,7 @@ func TestUnit_Expression_Optimization(t *testing.T) {
 	})
 
 	t.Run("mixed resolution in loop", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/work"})
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: filepath.FromSlash("/work")})
 		require.NoError(t, err)
 		val := r.resolveString("prefix {{PWD}} suffix")
 		assert.Equal(t, "prefix /work suffix", val)
@@ -271,9 +272,9 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 	t.Run("ReadFile failure (large file check)", func(t *testing.T) {
 		fs := &fileDetailMockFS{
 			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/project/.cderun.yaml": []byte("1")},
-				Dirs:  map[string]bool{"/project": true},
-				WD:    "/project",
+				Files: map[string][]byte{filepath.FromSlash("/project/.cderun.yaml"): []byte("1")},
+				Dirs:  map[string]bool{filepath.FromSlash("/project"): true},
+				WD:    filepath.FromSlash("/project"),
 			},
 			readErr: assert.AnError,
 		}
@@ -287,14 +288,14 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 	t.Run("File too large via Stat", func(t *testing.T) {
 		// Create a file that reports large size in Stat
 		fs := &MockFileSystem{
-			Files: map[string][]byte{"/project/large": make([]byte, 100)},
-			Dirs:  map[string]bool{"/project": true},
-			WD:    "/project",
+			Files: map[string][]byte{filepath.FromSlash("/project/large"): make([]byte, 100)},
+			Dirs:  map[string]bool{filepath.FromSlash("/project"): true},
+			WD:    filepath.FromSlash("/project"),
 		}
 		// Since MockFileSystem.Stat uses the actual length of the byte slice,
 		// we need to provide a byte slice larger than MaxDirectiveFileSize
 		largeData := make([]byte, MaxDirectiveFileSize+1)
-		fs.Files["/project/large"] = largeData
+		fs.Files[filepath.FromSlash("/project/large")] = largeData
 
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
@@ -306,9 +307,9 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 	t.Run("Cache hit for errors", func(t *testing.T) {
 		fs := &fileDetailMockFS{
 			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{"/project/.cderun.yaml": []byte("1")},
-				Dirs:  map[string]bool{"/project": true},
-				WD:    "/project",
+				Files: map[string][]byte{filepath.FromSlash("/project/.cderun.yaml"): []byte("1")},
+				Dirs:  map[string]bool{filepath.FromSlash("/project"): true},
+				WD:    filepath.FromSlash("/project"),
 			},
 			readErr: assert.AnError,
 		}
@@ -335,13 +336,13 @@ func TestUnit_Expression_FileDetail(t *testing.T) {
 func TestUnit_Expression_FileEmpty(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/empty.txt":  []byte("   "),
-			"/project/normal.txt": []byte("content"),
+			filepath.FromSlash("/project/empty.txt"):  []byte("   "),
+			filepath.FromSlash("/project/normal.txt"): []byte("content"),
 		},
 		Dirs: map[string]bool{
-			"/project": true,
+			filepath.FromSlash("/project"): true,
 		},
-		WD: "/project",
+		WD: filepath.FromSlash("/project"),
 	}
 
 	hostCtx := &HostContext{}
@@ -371,13 +372,13 @@ func TestUnit_Expression_FileEmpty(t *testing.T) {
 func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	fs := &MockFileSystem{
 		Files: map[string][]byte{
-			"/project/inner.txt": []byte("outer.txt"),
-			"/project/outer.txt": []byte("content"),
+			filepath.FromSlash("/project/inner.txt"): []byte("outer.txt"),
+			filepath.FromSlash("/project/outer.txt"): []byte("content"),
 		},
 		Dirs: map[string]bool{
-			"/project": true,
+			filepath.FromSlash("/project"): true,
 		},
-		WD: "/project",
+		WD: filepath.FromSlash("/project"),
 	}
 
 	hostCtx := &HostContext{}
@@ -397,7 +398,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		val := r.resolveString("{{ PWD }}/{{ file:inner.txt }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "/project/outer.txt", val)
+		assert.Equal(t, filepath.FromSlash("/project/outer.txt"), val)
 	})
 
 	t.Run("path traversal attempt in file", func(t *testing.T) {
@@ -452,12 +453,12 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 
 	t.Run("complex mixed resolution", func(t *testing.T) {
 		fsWithHome := *fs
-		fsWithHome.HomeDir = "/home/user"
+		fsWithHome.HomeDir = filepath.FromSlash("/home/user")
 		r, err := NewExpressionResolverWithFS(hostCtx, &fsWithHome)
 		require.NoError(t, err)
 		val := r.resolveString("~/.config/{{file:inner.txt}}/settings.json")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "/home/user/.config/outer.txt/settings.json", val)
+		assert.Equal(t, filepath.FromSlash("/home/user/.config/outer.txt/settings.json"), val)
 	})
 
 	t.Run("sticky error state", func(t *testing.T) {
@@ -479,14 +480,14 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 
 func TestUnit_Expression_Resolve_Complex(t *testing.T) {
 	fs := &MockFileSystem{
-		WD: "/work",
+		WD: filepath.FromSlash("/work"),
 	}
 	r, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
 
 	t.Run("Resolve []any", func(t *testing.T) {
 		input := []any{"{{PWD}}", 123, []any{"{{PWD}}"}}
-		expected := []any{"/work", 123, []any{"/work"}}
+		expected := []any{filepath.FromSlash("/work"), 123, []any{"/work"}}
 		actual := r.Resolve(input)
 		assert.Equal(t, expected, actual)
 	})
@@ -498,9 +499,9 @@ func TestUnit_Expression_Resolve_Complex(t *testing.T) {
 			"c": map[string]any{"d": "{{PWD}}"},
 		}
 		expected := map[string]any{
-			"a": "/work",
+			"a": filepath.FromSlash("/work"),
 			"b": 456,
-			"c": map[string]any{"d": "/work"},
+			"c": map[string]any{"d": filepath.FromSlash("/work")},
 		}
 		actual := r.Resolve(input)
 		assert.Equal(t, expected, actual)
@@ -513,7 +514,7 @@ func TestUnit_Expression_Resolve_Complex(t *testing.T) {
 }
 
 func TestUnit_Expression_Security_Advanced(t *testing.T) {
-	fs := &MockFileSystem{WD: "/work"}
+	fs := &MockFileSystem{WD: filepath.FromSlash("/work")}
 
 	t.Run("resolveFindDir absolute path", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, fs)

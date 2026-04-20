@@ -103,8 +103,8 @@ func TestUnit_Config_ValidatePathChars(t *testing.T) {
 
 func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 	t.Parallel()
-	home := "/home/user"
-	pwd := "/work"
+	home := filepath.FromSlash("/home/user")
+	pwd := filepath.FromSlash("/work")
 	mfs := &MockFileSystem{
 		WD:      pwd,
 		HomeDir: home,
@@ -124,7 +124,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{"Traversal escaping home", "{{HOME}}/../../etc/passwd", true},
 		{"Traversal escaping tilde", "~/../../etc/passwd", true},
 		{"Traversal escaping pwd", "{{PWD}}/../../etc/passwd", true},
-		{"Anchor after slash", "/{{HOME}}/../../etc/passwd", true},
+		{"Anchor after slash", filepath.FromSlash("/{{HOME}}/../../etc/passwd"), true},
 		{"Bypass attempt anywhere in string", "foo{{HOME}}/../../etc/passwd", true},
 		{"Bypass attempt anywhere in string with tilde", "a~", false}, // No longer a bypass as ~ only matches at boundaries
 		{"Tilde at boundary", "foo/~", true},
@@ -233,74 +233,77 @@ func TestUnit_Config_ResolvePath_AnchorBoundary_EdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("tilde resolution when resolver is nil", func(t *testing.T) {
-		val, err := ResolvePath("~/file", "/work", nil)
+		val, err := ResolvePath("~/file", filepath.FromSlash("/work"), nil)
 		require.NoError(t, err)
 		// We can't easily mock RealFileSystem here, so we just check it resolved to some absolute path ending in /file
 		assert.True(t, filepath.IsAbs(val))
-		assert.True(t, strings.HasSuffix(val, "/file"))
+		assert.True(t, strings.HasSuffix(val, filepath.FromSlash("/file")))
 	})
 
-	t.Run("tilde resolution fail when UserHomeDir fails", func(t *testing.T) {
-		// Show that ResolvePath uses the resolver's FS when ExpressionResolver{fs: mfs} is provided
-		// and that a failing UserHomeDir causes ResolvePath("~/file", "/work", r) to return an error.
+	t.Run("ExpressionResolver initialization fails when UserHomeDir fails", func(t *testing.T) {
+		// Verify that ExpressionResolver initialization fails if the filesystem's UserHomeDir returns an error.
 		mfs := &securityMockFS{
 			homeDirErr: assert.AnError,
 		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
-		if err != nil {
-			// NewExpressionResolverWithFS calls UserHomeDir during initialization
-			require.Error(t, err)
-			return
-		}
-		_, err = ResolvePath("~/file", "/work", r)
 		require.Error(t, err)
+		require.Nil(t, r)
 	})
 
 	t.Run("fs.Abs failure for anchorPath in validateAnchorBoundaries", func(t *testing.T) {
 		mfs := &securityMockFS{
 			MockFileSystem: MockFileSystem{
-				HomeDir: "/home/user",
-				WD:      "/work",
+				HomeDir: filepath.FromSlash("/home/user"),
+				WD:      filepath.FromSlash("/work"),
 			},
 			absErr: assert.AnError,
 		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		_, err = ResolvePath("~/file", "/work", r)
+		_, err = ResolvePath("~/file", filepath.FromSlash("/work"), r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get absolute path for anchor")
 	})
 
 	t.Run("anchor path is empty", func(t *testing.T) {
-		mfs := &MockFileSystem{WD: "/work", HomeDir: "/home/user"}
+		mfs := &MockFileSystem{
+			WD:      filepath.FromSlash("/work"),
+			HomeDir: filepath.FromSlash("/home/user"),
+		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
 		r.Home = "" // Empty home
-		_, err = ResolvePath("~/file", "/work", r)
+		_, err = ResolvePath("~/file", filepath.FromSlash("/work"), r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "anchor path is empty")
 	})
 
 	t.Run("BASE_HOME fallback to HOME when HostContext is nil", func(t *testing.T) {
-		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
+		mfs := &MockFileSystem{
+			HomeDir: filepath.FromSlash("/home/user"),
+			WD:      filepath.FromSlash("/work"),
+		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		val, err := ResolvePath("{{BASE_HOME}}/file", "/work", r)
+		val, err := ResolvePath("{{BASE_HOME}}/file", filepath.FromSlash("/work"), r)
 		require.NoError(t, err)
-		assert.Equal(t, "/home/user/file", val)
+		assert.Equal(t, filepath.FromSlash("/home/user/file"), val)
 	})
 
 	t.Run("BASE_PWD fallback to PWD when HostContext is nil", func(t *testing.T) {
-		mfs := &MockFileSystem{HomeDir: "/home/user", WD: "/work"}
+		mfs := &MockFileSystem{
+			HomeDir: filepath.FromSlash("/home/user"),
+			WD:      filepath.FromSlash("/work"),
+		}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		val, err := ResolvePath("{{BASE_PWD}}/file", "/work", r)
+		val, err := ResolvePath("{{BASE_PWD}}/file", filepath.FromSlash("/work"), r)
 		require.NoError(t, err)
-		assert.Equal(t, "/work/file", val)
+		assert.Equal(t, filepath.FromSlash("/work/file"), val)
 	})
 }
 
@@ -389,12 +392,12 @@ func TestUnit_Config_ValidateWorkdir(t *testing.T) {
 		input   string
 		wantErr bool
 	}{
-		{"Absolute", "/app", false},
-		{"Root", "/", false},
+		{"Absolute", filepath.FromSlash("/app"), false},
+		{"Root", filepath.FromSlash("/"), false},
 		{"Empty", "", false},
 		{"Relative", "app", true},
 		{"Home tilde", "~/app", true},
-		{"Injection attempt", "/app; rm -rf /", true},
+		{"Injection attempt", filepath.FromSlash("/app; rm -rf /"), true},
 	}
 
 	for _, tt := range tests {
@@ -420,7 +423,7 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 		{"Tool name with underscore", "tool_name", false},
 		{"Tool name with double dot", "tool..name", false},
 		{"Empty tool name", "", true},
-		{"Absolute path tool name", "/abs/path", true},
+		{"Absolute path tool name", filepath.FromSlash("/abs/path"), true},
 		{"Parent directory traversal", "../parent", true},
 		{"Subdirectory tool name (Linux)", "subdir/tool", true},
 		{"Subdirectory tool name (Windows)", "subdir\\tool", true},
@@ -441,24 +444,24 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 
 func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 	t.Parallel()
-	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: filepath.FromSlash("/host")})
 	require.NoError(t, err)
 
 	t.Run("absolute target is accepted", func(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
-			Source: ConfigPath{Raw: "/src"},
-			Target: ConfigPath{Raw: "/tgt"},
+			Source: ConfigPath{Raw: filepath.FromSlash("/src")},
+			Target: ConfigPath{Raw: filepath.FromSlash("/tgt")},
 		}
 		m, err := mc.Resolve(r)
 		require.NoError(t, err)
-		assert.Equal(t, "/tgt", m.Target)
+		assert.Equal(t, filepath.FromSlash("/tgt"), m.Target)
 	})
 
 	t.Run("relative target is rejected", func(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
-			Source: ConfigPath{Raw: "/src"},
+			Source: ConfigPath{Raw: filepath.FromSlash("/src")},
 			Target: ConfigPath{Raw: "relative/path"},
 		}
 		_, err := mc.Resolve(r)
@@ -469,23 +472,23 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 
 func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 	t.Parallel()
-	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: filepath.FromSlash("/host")})
 	require.NoError(t, err)
 
 	t.Run("absolute destination is accepted", func(t *testing.T) {
 		dc := DeviceConfig{
-			Source:      ConfigPath{Raw: "/dev/sda"},
-			Destination: ConfigPath{Raw: "/dev/sda"},
+			Source:      ConfigPath{Raw: filepath.FromSlash("/dev/sda")},
+			Destination: ConfigPath{Raw: filepath.FromSlash("/dev/sda")},
 			Permissions: "rwm",
 		}
 		d, err := dc.Resolve(r)
 		require.NoError(t, err)
-		assert.Equal(t, "/dev/sda", d.PathInContainer)
+		assert.Equal(t, filepath.FromSlash("/dev/sda"), d.PathInContainer)
 	})
 
 	t.Run("relative destination is rejected", func(t *testing.T) {
 		dc := DeviceConfig{
-			Source:      ConfigPath{Raw: "/dev/sda"},
+			Source:      ConfigPath{Raw: filepath.FromSlash("/dev/sda")},
 			Destination: ConfigPath{Raw: "dev/sda"},
 			Permissions: "rwm",
 		}
@@ -498,8 +501,8 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 	t.Parallel()
 	fs := &MockFileSystem{
-		HomeDir: "/home/user",
-		WD:      "/work",
+		HomeDir: filepath.FromSlash("/home/user"),
+		WD:      filepath.FromSlash("/work"),
 	}
 
 	tests := []struct {
