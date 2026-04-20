@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var errDaemonInvalidSignal = errors.New("daemon error: invalid signal")
+
 type mockDockerClientForSignal struct {
 	dockerClient
 	killErr error
@@ -50,6 +52,7 @@ func TestSignalValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := rt.SignalContainer(context.Background(), "test-id", tt.sig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SignalContainer() error = %v, wantErr %v for sig %q", err, tt.wantErr, tt.sig)
@@ -59,13 +62,13 @@ func TestSignalValidation(t *testing.T) {
 }
 
 func TestSignalContainerDaemonRejection(t *testing.T) {
-	// Use mock client with killErr set to simulate daemon rejection.
+	// Use mock client with killErr set to a sentinel error to simulate daemon rejection.
 	mock := &mockDockerClientForSignal{
-		killErr: errors.New("daemon error: invalid signal"),
+		killErr: errDaemonInvalidSignal,
 	}
 	rt := &DockerRuntime{client: mock}
 
 	err := rt.SignalContainer(context.Background(), "test-id", "SIGINVALID")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "daemon error: invalid signal")
+	assert.ErrorIs(t, err, errDaemonInvalidSignal)
 }
