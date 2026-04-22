@@ -55,9 +55,7 @@ func TestSignalValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := rt.SignalContainer(context.Background(), "test-id", tt.sig)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SignalContainer() error = %v, wantErr %v for sig %q", err, tt.wantErr, tt.sig)
-			}
+			assert.Equal(t, tt.wantErr, err != nil, "SignalContainer() error = %v, wantErr %v for sig %q", err, tt.wantErr, tt.sig)
 		})
 	}
 }
