@@ -40,8 +40,9 @@ func TestSignalValidation(t *testing.T) {
 		{"Custom signal SIGUSR1", "SIGUSR1", false},
 		// "SIGINVALID" matches the regex ^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$,
 		// so SignalContainer accepts it and propagates it to the daemon.
-		// This confirms that we allow validly formatted but non-existent signal names.
-		{"Validly formatted non-existent signal", "SIGINVALID", false},
+		// This confirms that we allow validly formatted but non-existent signal names
+		// that pass local regex validation but may be rejected by the daemon.
+		{"Validly formatted but non-existent signal", "SIGINVALID", false},
 		{"Negative numeric signal", "-9", true},
 		{"Injection attempt ; rm -rf", "SIGTERM; rm -rf /", true},
 		{"Injection attempt \n", "SIGTERM\n", true},
