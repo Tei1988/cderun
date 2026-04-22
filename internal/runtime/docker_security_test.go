@@ -62,6 +62,8 @@ func TestSignalValidation(t *testing.T) {
 }
 
 func TestSignalContainerDaemonRejection(t *testing.T) {
+	t.Parallel()
+
 	// Use mock client with killErr set to a sentinel error to simulate daemon rejection.
 	mock := &mockDockerClientForSignal{
 		killErr: errDaemonInvalidSignal,
