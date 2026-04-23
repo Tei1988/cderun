@@ -55,7 +55,12 @@ func TestSignalValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := rt.SignalContainer(context.Background(), "test-id", tt.sig)
-			assert.Equal(t, tt.wantErr, err != nil, "SignalContainer() error = %v, wantErr %v for sig %q", err, tt.wantErr, tt.sig)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid signal")
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
