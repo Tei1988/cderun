@@ -24,7 +24,7 @@ func (m *mockDockerClientForSignal) ContainerKill(ctx context.Context, container
 	return m.killErr
 }
 
-func TestSignalValidation(t *testing.T) {
+func TestUnit_Signal_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
 		sig     string
@@ -65,7 +65,7 @@ func TestSignalValidation(t *testing.T) {
 	}
 }
 
-func TestSignalContainerDaemonRejection(t *testing.T) {
+func TestUnit_Signal_DaemonRejection(t *testing.T) {
 	t.Parallel()
 
 	// Use mock client with killErr set to a sentinel error to simulate daemon rejection.
