@@ -90,6 +90,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 
 type mockDockerClient struct {
 	closeErr         error
+	closeCalled      bool
 	imageInspectErr  error
 	imageInspectFunc func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
 	inspectCount     int
@@ -130,6 +131,7 @@ type mockDockerClient struct {
 }
 
 func (m *mockDockerClient) Close() error {
+	m.closeCalled = true
 	return m.closeErr
 }
 
@@ -1020,6 +1022,7 @@ func TestUnit_Docker_Close(t *testing.T) {
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.Close()
 		require.NoError(t, err)
+		assert.True(t, mock.closeCalled)
 	})
 
 	t.Run("Close error propagation", func(t *testing.T) {
@@ -1028,5 +1031,6 @@ func TestUnit_Docker_Close(t *testing.T) {
 		runtime := &DockerRuntime{client: mock}
 		err := runtime.Close()
 		require.ErrorIs(t, err, expectedErr)
+		assert.True(t, mock.closeCalled)
 	})
 }
