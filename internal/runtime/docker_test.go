@@ -809,18 +809,14 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 	t.Run("sleep completes", func(t *testing.T) {
 		ctx := context.Background()
-		rt := runtime
-
-		err := rt.sleepFunc(ctx, 1*time.Millisecond)
+		err := runtime.sleepFunc(ctx, 1*time.Millisecond)
 		require.NoError(t, err)
 	})
 
 	t.Run("sleep cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		rt := runtime
-
-		err := rt.sleepFunc(ctx, 1*time.Second)
+		err := runtime.sleepFunc(ctx, 1*time.Second)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
@@ -1015,5 +1011,22 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, ready)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "output failed")
+	})
+}
+
+func TestUnit_Docker_Close(t *testing.T) {
+	t.Run("Close success", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.Close()
+		require.NoError(t, err)
+	})
+
+	t.Run("Close error propagation", func(t *testing.T) {
+		expectedErr := errors.New("close error")
+		mock := &mockDockerClient{closeErr: expectedErr}
+		runtime := &DockerRuntime{client: mock}
+		err := runtime.Close()
+		require.ErrorIs(t, err, expectedErr)
 	})
 }

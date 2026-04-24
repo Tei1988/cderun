@@ -52,9 +52,12 @@ type DockerRuntimeOption func(*DockerRuntime)
 
 // WithAttachCloseWriteGrace sets the grace period before closing the write side of an attached connection.
 // This is useful in slow or high-latency environments where the default 100ms might be too short
-// for the daemon to process the EOF.
+// for the daemon to process the EOF. If d is non-positive, a minimum duration of 1ms is used.
 func WithAttachCloseWriteGrace(d time.Duration) DockerRuntimeOption {
 	return func(rt *DockerRuntime) {
+		if d <= 0 {
+			d = 1 * time.Millisecond
+		}
 		rt.attachCloseWriteGrace = d
 	}
 }
