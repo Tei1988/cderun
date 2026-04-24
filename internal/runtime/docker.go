@@ -8,22 +8,22 @@ import (
 	"strings"
 	"time"
 
-	"cderun/internal/container"
-	"cderun/internal/logging"
-
-	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"cderun/internal/container"
+	"cderun/internal/logging"
 )
 
 const (
-	attachCloseWriteGrace = 1 * time.Second
+	attachCloseWriteGrace = 100 * time.Millisecond
 )
 
 type dockerClient interface {
@@ -52,13 +52,12 @@ type DockerRuntime struct {
 
 // NewDockerRuntime creates a new Docker runtime instance with name "docker".
 func NewDockerRuntime(socket string) (ContainerRuntime, error) {
-	return NewDockerRuntimeWithOptions(socket, "docker", client.WithAPIVersionNegotiation())
+	return NewDockerRuntimeWithOptions(socket, "docker")
 }
 
 // NewDockerRuntimeWithName creates a new Docker runtime instance with a specific name.
-// It uses default API version negotiation.
 func NewDockerRuntimeWithName(socket string, name string) (ContainerRuntime, error) {
-	return NewDockerRuntimeWithOptions(socket, name, client.WithAPIVersionNegotiation())
+	return NewDockerRuntimeWithOptions(socket, name)
 }
 
 // NewDockerRuntimeWithOptions creates a new Docker runtime instance with specific client options.
@@ -66,7 +65,8 @@ func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt)
 	if socket == "" {
 		return nil, fmt.Errorf("creating docker client: empty socket path")
 	}
-	opts = append(opts, client.WithHost("unix://"+socket))
+
+	opts = append(opts, client.WithHost("unix://"+socket), client.WithAPIVersionNegotiation())
 
 	cli, err := client.NewClientWithOpts(opts...)
 	if err != nil {
@@ -90,7 +90,11 @@ func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt)
 	}, nil
 }
 
-// PullImage pulls the specified image based on the pull policy.
+// Close closes the underlying docker client.
+func (d *DockerRuntime) Close() error {
+	return d.client.Close()
+}
+
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
 		return nil
@@ -357,11 +361,6 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
-}
-
-// Close closes the underlying docker client.
-func (d *DockerRuntime) Close() error {
-	return d.client.Close()
 }
 
 func isRetryablePullError(err error) bool {
