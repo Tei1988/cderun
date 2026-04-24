@@ -809,8 +809,8 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 	t.Run("sleep completes", func(t *testing.T) {
 		ctx := context.Background()
-		rt, ok := runtime.(*DockerRuntime)
-		require.True(t, ok)
+		rt := runtime
+
 		err := rt.sleepFunc(ctx, 1*time.Millisecond)
 		require.NoError(t, err)
 	})
@@ -818,8 +818,8 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 	t.Run("sleep cancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		rt, ok := runtime.(*DockerRuntime)
-		require.True(t, ok)
+		rt := runtime
+
 		err := rt.sleepFunc(ctx, 1*time.Second)
 		require.ErrorIs(t, err, context.Canceled)
 	})
@@ -827,7 +827,7 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 func TestUnit_Docker_New_Error(t *testing.T) {
 	// client.WithHost("invalid") should fail during client.NewClientWithOpts
-	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
+	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", []client.Opt{client.WithHost("invalid")})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "creating docker client")
 	assert.Contains(t, err.Error(), "unable to parse docker host")
