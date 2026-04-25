@@ -112,12 +112,14 @@ func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client
 	return rt, nil
 }
 
+// Close closes the DockerRuntime and releases associated resources.
 func (d *DockerRuntime) Close() error {
 	d.closeOnce.Do(func() {
 		d.closeErr = d.client.Close()
 	})
 	return d.closeErr
 }
+
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
