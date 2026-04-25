@@ -1033,7 +1033,8 @@ func TestUnit_Docker_Close(t *testing.T) {
 		// Second call (idempotency check)
 		err = runtime.Close()
 		require.NoError(t, err)
-		assert.Equal(t, 2, mock.closeCount)
+		// Should still be 1 because it's idempotent
+		assert.Equal(t, 1, mock.closeCount)
 	})
 
 	t.Run("Close error propagation", func(t *testing.T) {
@@ -1048,9 +1049,10 @@ func TestUnit_Docker_Close(t *testing.T) {
 		assert.True(t, mock.closeCalled)
 		assert.Equal(t, 1, mock.closeCount)
 
-		// Second call
+		// Second call (idempotency check - returns same error)
 		err = runtime.Close()
 		require.ErrorIs(t, err, expectedErr)
-		assert.Equal(t, 2, mock.closeCount)
+		// Should still be 1 because it's idempotent
+		assert.Equal(t, 1, mock.closeCount)
 	})
 }

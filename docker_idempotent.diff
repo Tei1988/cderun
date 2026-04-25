@@ -1,0 +1,45 @@
+<<<<<<< SEARCH
+import (
+	"context"
+	"fmt"
+=======
+import (
+	"context"
+	"fmt"
+	"sync"
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+// DockerRuntime implements ContainerRuntime using Docker Engine API.
+type DockerRuntime struct {
+	client                dockerClient
+	socket                string
+	name                  string
+	sleepFunc             func(context.Context, time.Duration) error
+	attachCloseWriteGrace time.Duration
+}
+=======
+// DockerRuntime implements ContainerRuntime using Docker Engine API.
+type DockerRuntime struct {
+	client                dockerClient
+	socket                string
+	name                  string
+	sleepFunc             func(context.Context, time.Duration) error
+	attachCloseWriteGrace time.Duration
+	closeOnce             sync.Once
+}
+>>>>>>> REPLACE
+<<<<<<< SEARCH
+// Close closes the underlying docker client.
+func (d *DockerRuntime) Close() error {
+	return d.client.Close()
+}
+=======
+// Close closes the underlying docker client. It is idempotent.
+func (d *DockerRuntime) Close() error {
+	var err error
+	d.closeOnce.Do(func() {
+		err = d.client.Close()
+	})
+	return err
+}
+>>>>>>> REPLACE

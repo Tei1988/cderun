@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"sync"
 	"context"
 	"fmt"
 	"io"
@@ -45,6 +46,8 @@ type DockerRuntime struct {
 	name                  string
 	sleepFunc             func(context.Context, time.Duration) error
 	attachCloseWriteGrace time.Duration
+	closeOnce             sync.Once
+	closeErr              error
 }
 
 // DockerRuntimeOption defines a functional option for DockerRuntime.
@@ -109,11 +112,12 @@ func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client
 	return rt, nil
 }
 
-// Close closes the underlying docker client.
 func (d *DockerRuntime) Close() error {
-	return d.client.Close()
+	d.closeOnce.Do(func() {
+		d.closeErr = d.client.Close()
+	})
+	return d.closeErr
 }
-
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if pullPolicy == "never" {
