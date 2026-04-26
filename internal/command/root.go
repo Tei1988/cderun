@@ -771,17 +771,18 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
 }
 
-func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (runtime.ContainerRuntime, string, func(), error) {
+
+func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (rt runtime.ContainerRuntime, containerID string, cleanup func(), err error) {
 	// Initialize Runtime
-	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
+	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return nil, "", nil, &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+		err = &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+		return
 	}
 
 	// Ensure runtime is closed on early error paths
-	closed := false
 	defer func() {
-		if !closed && err != nil && rt != nil {
+		if err != nil && rt != nil {
 			if closeErr := rt.Close(); closeErr != nil {
 				o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
 			}
@@ -789,20 +790,18 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	}()
 
 	o.logger.Trace("Creating container...")
-	var containerID string
 	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
+		err = fmt.Errorf("failed to pull image: %w", err)
+		return
 	}
 
 	containerID, err = rt.CreateContainer(ctx, cc)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
+		err = fmt.Errorf("failed to create container: %w", err)
+		return
 	}
 
-	// Success path, caller will own rt
-	closed = true
-
-	cleanup := func() {}
+	cleanup = func() {}
 	if cc.Remove {
 		cleanupCtx := context.WithoutCancel(ctx)
 		cleanup = func() {
@@ -813,9 +812,8 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		}
 	}
 
-	return rt, containerID, cleanup, nil
+	return
 }
-
 func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *container.ContainerConfig) func() {
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
