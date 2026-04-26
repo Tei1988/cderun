@@ -255,7 +255,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -268,7 +268,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("-t shorthand for --tty", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "-t", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -370,7 +370,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 			AttachErr: errors.New("attach failed"),
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -386,7 +386,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 	t.Run("workdir, mount and device flags", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -411,7 +411,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 			},
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -444,7 +444,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 	t.Run("subcommand is excluded from CMD", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "ls", "-l", "/tmp"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -1316,12 +1316,12 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 		assert.NotNil(t, rt)
 	})
 
-		t.Run("containerd runtime not implemented", func(t *testing.T) {
-			rt, err := o.runtimeFactory("containerd", "/tmp/containerd.sock")
-			require.Error(t, err)
-			assert.Nil(t, rt)
-			require.ErrorContains(t, err, "binary does not support the containerd runtime")
-		})
+	t.Run("containerd runtime not implemented", func(t *testing.T) {
+		rt, err := o.runtimeFactory("containerd", "/tmp/containerd.sock")
+		require.Error(t, err)
+		assert.Nil(t, rt)
+		require.ErrorContains(t, err, "binary does not support the containerd runtime")
+	})
 	t.Run("unsupported runtime", func(t *testing.T) {
 		rt, err := o.runtimeFactory("invalid", "")
 		require.Error(t, err)
@@ -1345,7 +1345,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-diagnosis", "--cderun-config", "/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1366,7 +1366,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--config", "/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1387,7 +1387,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 		}
 		var buf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--tool-config", "/t1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			cmd.SetOut(&buf)
@@ -1927,7 +1927,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDiagnosis JSON error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 				return nil, errors.New("json error")
 			}
@@ -1938,7 +1938,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDiagnosis YAML error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--diagnosis", "--diagnosis-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.yamlMarshal = func(v any) ([]byte, error) {
 				return nil, errors.New("yaml error")
 			}
@@ -1949,7 +1949,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDryRun JSON error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 				return nil, errors.New("json dry-run error")
 			}
@@ -1960,7 +1960,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 
 	t.Run("handleDryRun YAML error", func(t *testing.T) {
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.exitFunc = func(int) {}
+			o.exitFunc = func(int) {}
 			o.yamlMarshal = func(v any) ([]byte, error) {
 				return nil, errors.New("yaml dry-run error")
 			}

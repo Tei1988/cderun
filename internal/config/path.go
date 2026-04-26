@@ -1,8 +1,8 @@
 package config
 
 import (
-	"path"
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"

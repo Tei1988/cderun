@@ -647,7 +647,6 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfsError)
 		require.Error(t, err)
 
-
 		// Expression error
 		mfsExpr := &MockFileSystem{WD: "/app"}
 		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"VAR={{file:missing}}"}}
