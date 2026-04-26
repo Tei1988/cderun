@@ -182,7 +182,7 @@ func defaultOptions() rootOptions {
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
 			case "containerd":
-				return nil, fmt.Errorf("containerd support is not yet implemented")
+				return nil, fmt.Errorf("this binary does not support the containerd runtime (it is valid in config but not yet implemented in this version); please use \"docker\" or \"podman\" instead")
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -770,7 +770,6 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
 }
-
 
 func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (rt runtime.ContainerRuntime, containerID string, cleanup func(), err error) {
 	// Initialize Runtime
