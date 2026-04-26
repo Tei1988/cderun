@@ -181,6 +181,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewDockerRuntime(socket)
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
+			case "containerd":
+				return nil, fmt.Errorf("containerd support is not yet implemented")
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -731,8 +733,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		return 0, err
 	}
 	defer func() {
-		if closeErr := rt.Close(); closeErr != nil {
-			o.logger.Debug("failed to close runtime: %v", closeErr)
+		if rt != nil {
+			if closeErr := rt.Close(); closeErr != nil {
+				o.logger.Debug("failed to close runtime: %v", closeErr)
+			}
 		}
 	}()
 	defer cleanup()
@@ -777,7 +781,7 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	// Ensure runtime is closed on early error paths
 	closed := false
 	defer func() {
-		if !closed && err != nil {
+		if !closed && err != nil && rt != nil {
 			if closeErr := rt.Close(); closeErr != nil {
 				o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
 			}
@@ -1325,4 +1329,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	return processedArgs, nil
 }
-

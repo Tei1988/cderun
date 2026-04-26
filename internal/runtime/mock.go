@@ -233,10 +233,12 @@ func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) 
 	return false, exitCode, nil
 }
 
+// Name returns the name of the runtime.
 func (m *MockRuntime) Name() string {
 	return "mock"
 }
 
+// Close closes the MockRuntime.
 func (m *MockRuntime) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
