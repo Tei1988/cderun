@@ -182,7 +182,7 @@ func defaultOptions() rootOptions {
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
 			case "containerd":
-				return nil, fmt.Errorf("this binary does not support the containerd runtime (it is valid in config but not yet implemented in this version); please use \"docker\" or \"podman\" instead")
+				return runtime.NewContainerdRuntime(socket)
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}

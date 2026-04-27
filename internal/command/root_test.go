@@ -1331,12 +1331,11 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 		assert.NotNil(t, rt)
 	})
 
-	t.Run("containerd runtime not implemented", func(t *testing.T) {
-		rt, err := o.runtimeFactory("containerd", "/tmp/containerd.sock")
-		require.Error(t, err)
-		assert.Nil(t, rt)
-		require.ErrorContains(t, err, "binary does not support the containerd runtime")
-	})
+		t.Run("containerd runtime success", func(t *testing.T) {
+			rt, err := o.runtimeFactory("containerd", "/tmp/containerd.sock")
+			require.NoError(t, err)
+			assert.NotNil(t, rt)
+		})
 	t.Run("unsupported runtime", func(t *testing.T) {
 		rt, err := o.runtimeFactory("invalid", "")
 		require.Error(t, err)

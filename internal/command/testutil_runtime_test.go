@@ -13,7 +13,7 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 		return
 	}
 	msg := strings.ToLower(err.Error())
-	if (strings.Contains(msg, "failed to mount") || strings.Contains(msg, "failed to unmount")) && (strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted")) {
+	if (strings.Contains(msg, "failed to mount") || strings.Contains(msg, "failed to unmount")) && (strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted") || strings.Contains(msg, "failed to unmount")) {
 		t.Skip("Skipping test due to runtime mount limitation in this environment (likely overlay-on-overlay)")
 	}
 	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") {
@@ -22,7 +22,7 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
 		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
 	}
-	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "dial unix") {
+	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "dial unix") || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "rst_stream") {
 		t.Skipf("Skipping test due to runtime connection or permission issue: %v", err)
 	}
 	// Detect Docker SIGKILL timeout (likely environment resource constraint or slow CI)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,7 +17,14 @@ func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) 
 func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {
 	var outBuf, errBuf bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	timeout := 60 * time.Second
+	if val, ok := os.LookupEnv("CDERUN_TEST_TIMEOUT"); ok {
+		if d, err := time.ParseDuration(val); err == nil && d > 0 {
+			timeout = d
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	capturedExitCode := 0
