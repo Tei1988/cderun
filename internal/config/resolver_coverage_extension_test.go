@@ -661,10 +661,11 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("validateSecurity exhaustive critical fields", func(t *testing.T) {
 		testCases := []struct {
-			name        string
-			cli         CLIOptions
-			wantErr     bool
-			errContains string
+			name         string
+			cli          CLIOptions
+			wantErr      bool
+			errContains  string
+			wantLogLevel string
 		}{
 			{
 				name: "Valid warning alias for log-level",
@@ -672,7 +673,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 					Image: "alpine", ImageSet: true,
 					LogLevel: "warning", LogLevelSet: true,
 				},
-				wantErr: false,
+				wantErr:      false,
+				wantLogLevel: "warning",
 			},
 			{
 				name: "Invalid log-level",
@@ -729,8 +731,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 					assert.Contains(t, err.Error(), tc.errContains)
 				} else {
 					require.NoError(t, err)
-					if tc.name == "Valid warning alias for log-level" {
-						assert.Equal(t, "warning", res.LogLevel)
+					if tc.wantLogLevel != "" {
+						assert.Equal(t, tc.wantLogLevel, res.LogLevel)
 					}
 				}
 			})
