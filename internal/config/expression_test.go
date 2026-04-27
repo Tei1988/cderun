@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,13 +109,13 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 	t.Run("find_dir existing directory", func(t *testing.T) {
 		val := r.resolveString("{{ find_dir:modules }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "../..", val)
+		assert.Equal(t, filepath.FromSlash("/project"), val)
 	})
 
 	t.Run("find_dir existing file", func(t *testing.T) {
 		val := r.resolveString("{{ find_dir:modules/foo }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "../../modules", val)
+		assert.Equal(t, filepath.FromSlash("/project/modules"), val)
 	})
 
 	t.Run("find_dir not found", func(t *testing.T) {
@@ -125,25 +126,7 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: \"nonexistent\"")
 	})
 
-	t.Run("filepath.Rel failure in resolveFindDir", func(t *testing.T) {
-		// On Unix, filepath.Rel("rel", "/abs") fails.
-		fs := &MockFileSystem{
-			Files: map[string][]byte{"/abs/foo": []byte("bar")},
-			Dirs:  map[string]bool{"/abs": true},
-			WD:    "/abs",
-		}
-		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
 
-		// Force find_dir to use a search result that will fail Rel against r2.Pwd
-		// resolveFindDir calls FindConfigs, which returns absolute paths from MockFileSystem.Abs
-		// Then it calls filepath.Rel(r.Pwd, dir)
-		r2.Pwd = "relative" // rel
-		// FindConfigs will find /abs/foo
-		r2.resolveString("{{ find_dir:foo }}")
-		require.Error(t, r2.Error())
-		assert.Contains(t, r2.Error().Error(), "failed to calculate relative path")
-	})
 }
 
 func TestUnit_Expression_FileError(t *testing.T) {
@@ -465,4 +448,67 @@ func TestUnit_Expression_EnvWithDefault(t *testing.T) {
 			assert.Equal(t, tt.expected, val)
 		})
 	}
+}
+
+func TestUnit_Expression_FindDir_Nested(t *testing.T) {
+	// fs is unused but kept for structure if needed later
+	_ = &MockFileSystem{
+		Dirs: map[string]bool{
+			"/host/project":      true,
+			"/host/project/package.json": true,
+		},
+		WD: "/host/project",
+	}
+
+	t.Run("find_dir in nested environment - mapped", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/project", Target: "/app", Level: 1},
+			},
+		}
+		// In the container, /app is mapped to /host/project.
+		// If we are in /app, find_dir:package.json should find /app/package.json (which is /host/project/package.json on host)
+		containerFS := &MockFileSystem{
+			Files: map[string][]byte{
+				filepath.FromSlash("/app/package.json"): []byte(""),
+			},
+			Dirs: map[string]bool{
+				filepath.FromSlash("/app"):      true,
+			},
+			WD: filepath.FromSlash("/app"),
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, containerFS)
+		require.NoError(t, err)
+
+		val := r.resolveString("{{ find_dir:package.json }}")
+		require.NoError(t, r.Error())
+		// It finds /app, then reverse-resolves it to /host/project
+		assert.Equal(t, filepath.FromSlash("/host/project"), val)
+	})
+
+	t.Run("find_dir in nested environment - not mapped", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 1,
+			Mounts: []MountMapping{
+				{Source: "/host/other", Target: "/other", Level: 1},
+			},
+		}
+		containerFS := &MockFileSystem{
+			Files: map[string][]byte{
+				filepath.FromSlash("/app/package.json"): []byte(""),
+			},
+			Dirs: map[string]bool{
+				filepath.FromSlash("/app"):      true,
+			},
+			WD: filepath.FromSlash("/app"),
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, containerFS)
+		require.NoError(t, err)
+
+		val := r.resolveString("{{ find_dir:package.json }}")
+		require.NoError(t, r.Error())
+		// /app is not under any mount, so it stays as /app
+		assert.Equal(t, filepath.FromSlash("/app"), val)
+	})
 }

@@ -1,0 +1,7 @@
+?   	cderun	[no test files]
+ok  	cderun/internal/command	(cached)
+ok  	cderun/internal/config	(cached)
+ok  	cderun/internal/container	(cached)
+ok  	cderun/internal/logging	(cached)
+ok  	cderun/internal/runtime	(cached)
+ok  	cderun/internal/version	(cached)
