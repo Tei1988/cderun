@@ -183,6 +183,21 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			args:     []string{"cderun", "node", "--cderun-tty"},
 			expected: []string{"cderun", "--cderun-tty", "node"},
 		},
+		{
+			name:     "Polyglot mode with flags before and after",
+			args:     []string{"node", "-v", "--cderun-tty", "app.js"},
+			expected: []string{"cderun", "--cderun-tty", "node", "-v", "app.js"},
+		},
+		{
+			name:     "Multiple P1 flags and mixed with others",
+			args:     []string{"cderun", "sh", "-c", "echo", "--cderun-tty", "--cderun-interactive", "-x"},
+			expected: []string{"cderun", "--cderun-tty", "--cderun-interactive", "sh", "-c", "echo", "-x"},
+		},
+		{
+			name:     "P1 flag with value and more arguments",
+			args:     []string{"cderun", "node", "--cderun-image", "node:20", "app.js", "--foo"},
+			expected: []string{"cderun", "--cderun-image", "node:20", "node", "app.js", "--foo"},
+		},
 	}
 
 	for _, tt := range tests {

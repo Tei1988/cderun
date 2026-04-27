@@ -758,32 +758,6 @@ func TestUnit_Config_ValidateUserName(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_ValidatePort(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"Port", "80", false},
-		{"Port mapping", "8080:80", false},
-		{"Port with proto", "80/tcp", false},
-		{"Mapping with proto", "8080:80/udp", false},
-		{"Empty port", "", false},
-		{"Invalid characters", "80!", true},
-		{"Invalid mapping", "8080:80:extra", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidatePort(tt.input)
-			if tt.wantErr {
-				require.Error(t, err, "input: %q", tt.input)
-			} else {
-				require.NoError(t, err, "input: %q", tt.input)
-			}
-		})
-	}
-}
 
 func TestUnit_Config_ValidateExposePort(t *testing.T) {
 	tests := []struct {

@@ -3,12 +3,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
@@ -339,23 +337,72 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
+func (rv *resolver) extractIntValue(v reflect.Value, set bool) (int, bool) {
+	if !set || !v.IsValid() {
+		return 0, false
+	}
+	k := v.Kind()
+	if k >= reflect.Int && k <= reflect.Int64 {
+		return int(v.Int()), true
+	}
+	return 0, false
+}
+
+func (rv *resolver) extractFloatValue(v reflect.Value, set bool) (float64, bool) {
+	if !set || !v.IsValid() {
+		return 0.0, false
+	}
+	k := v.Kind()
+	if k == reflect.Float32 || k == reflect.Float64 {
+		return v.Float(), true
+	}
+	return 0.0, false
+}
+
+func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string, bool) {
+	if !set || !v.IsValid() {
+		return nil, false
+	}
+	if val, ok := v.Interface().([]string); ok {
+		return val, true
+	}
+	return nil, false
+}
+
+func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.cliVal)
+	if err != nil {
+		return "", err
+	}
+
+	var tools ToolsConfig
+	var subcommand string
+	if tGetter != nil {
+		tools = rv.tools
+		subcommand = rv.subcommand
+	}
+
+	return resolveConfigPath(
+		p1Set, p1Val.String(),
+		p2Set, p2Val.String(),
+		envKey,
+		subcommand, tools, tGetter,
+		rv.global, gGetter,
+		fallback,
+		rv.r,
+		"path",
+		rv.fs,
+	)
+}
+
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
-	var p1v, p2v []string
-	if p1Set {
-		if v, ok := p1Val.Interface().([]string); ok {
-			p1v = v
-		}
-	}
-	if p2Set {
-		if v, ok := p2Val.Interface().([]string); ok {
-			p2v = v
-		}
-	}
+	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
+	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -409,24 +456,13 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		return err
 	}
 
-	p1Int := 0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p1Int = int(p1Val.Int())
-		} else {
-			p1Set = false
-		}
+	p1Int, ok1 := rv.extractIntValue(p1Val, p1Set)
+	if !ok1 {
+		p1Set = false
 	}
-
-	p2Int := 0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k >= reflect.Int && k <= reflect.Int64 {
-			p2Int = int(p2Val.Int())
-		} else {
-			p2Set = false
-		}
+	p2Int, ok2 := rv.extractIntValue(p2Val, p2Set)
+	if !ok2 {
+		p2Set = false
 	}
 
 	def := OptionDef[*int]{
@@ -447,24 +483,13 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		return err
 	}
 
-	p1Float := 0.0
-	if p1Set && p1Val.IsValid() {
-		k := p1Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p1Float = p1Val.Float()
-		} else {
-			p1Set = false
-		}
+	p1Float, ok1 := rv.extractFloatValue(p1Val, p1Set)
+	if !ok1 {
+		p1Set = false
 	}
-
-	p2Float := 0.0
-	if p2Set && p2Val.IsValid() {
-		k := p2Val.Kind()
-		if k == reflect.Float32 || k == reflect.Float64 {
-			p2Float = p2Val.Float()
-		} else {
-			p2Set = false
-		}
+	p2Float, ok2 := rv.extractFloatValue(p2Val, p2Set)
+	if !ok2 {
+		p2Set = false
 	}
 
 	def := OptionDef[*float64]{
@@ -704,22 +729,13 @@ func (rv *resolver) resolveComplexOptions() error {
 func (rv *resolver) resolveRuntimeAndSocket() error {
 	// Phase 5: Path resolution & Auto-detection (Socket)
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("socket-path", rv.cliVal)
-		if err != nil {
-			return err
-		}
-
 		var errPath error
-		rv.res.SocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
+		rv.res.SocketPath, errPath = rv.resolvePathValue(
+			"socket-path",
 			"CDERUN_SOCKET_PATH",
-			"", nil, nil,
-			rv.global, func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			nil,
+			func(g CDERunConfig) ConfigPath { return g.SocketPath },
 			"",
-			rv.r,
-			"path",
-			rv.fs,
 		)
 		if errPath != nil {
 			return errPath
@@ -800,22 +816,13 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun-path", rv.cliVal)
-		if err != nil {
-			return err
-		}
-
 		var errPath error
-		rv.res.MountCderunPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
+		rv.res.MountCderunPath, errPath = rv.resolvePathValue(
+			"mount-cderun-path",
 			"CDERUN_MOUNT_CDERUN_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			func(t ToolConfig) ConfigPath { return t.MountCderunPath },
+			func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
 			"",
-			rv.r,
-			"path",
-			rv.fs,
 		)
 		if errPath != nil {
 			return errPath
@@ -837,22 +844,13 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	{
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", rv.cliVal)
-		if err != nil {
-			return err
-		}
-
 		var errPath error
-		rv.res.MountSocketPath, errPath = resolveConfigPath(
-			p1Set, p1Val.String(),
-			p2Set, p2Val.String(),
+		rv.res.MountSocketPath, errPath = rv.resolvePathValue(
+			"mount-socket-path",
 			"CDERUN_MOUNT_SOCKET_PATH",
-			rv.subcommand, rv.tools, func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			rv.global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			func(t ToolConfig) ConfigPath { return t.MountSocketPath },
+			func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
 			rv.res.SocketPath,
-			rv.r,
-			"path",
-			rv.fs,
 		)
 		if errPath != nil {
 			return errPath
@@ -930,7 +928,30 @@ func (rv *resolver) resolveCustomParsing() error {
 }
 
 func (rv *resolver) validateSecurity() error {
-	// Security: validate resolved configuration for injection characters and identifier formats.
+	if err := rv.validateCriticalFields(); err != nil {
+		return err
+	}
+	if err := rv.validateSlices(); err != nil {
+		return err
+	}
+	if err := rv.validateEnvSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateMountSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateDeviceSecurity(); err != nil {
+		return err
+	}
+	if rv.res.Privileged {
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) validateCriticalFields() error {
 	criticalFields := []struct {
 		name      string
 		value     string
@@ -940,7 +961,7 @@ func (rv *resolver) validateSecurity() error {
 		{"user", rv.res.User, ValidateUserName},
 		{"network", rv.res.Network, ValidateNetworkName},
 		{"hostname", rv.res.Hostname, ValidateHostname},
-		{"workdir", rv.res.Workdir, nil},
+		{"workdir", rv.res.Workdir, ValidateWorkdir},
 		{"runtime", rv.res.Runtime, func(s string) error {
 			if s != "docker" && s != "podman" && s != "containerd" {
 				return fmt.Errorf("unsupported runtime: %q", s)
@@ -988,7 +1009,10 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateSlices() error {
 	criticalSlices := []struct {
 		name      string
 		slice     []string
@@ -997,10 +1021,10 @@ func (rv *resolver) validateSecurity() error {
 		{"entrypoint", rv.res.Entrypoint, nil},
 		{"ports", rv.res.Ports, ValidatePort},
 		{"expose", rv.res.Expose, ValidateExposePort},
-		{"dns", rv.res.DNS, nil},
-		{"add-hosts", rv.res.AddHosts, nil},
-		{"cap-add", rv.res.CapAdd, nil},
-		{"cap-drop", rv.res.CapDrop, nil},
+		{"dns", rv.res.DNS, ValidateDNS},
+		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
+		{"cap-add", rv.res.CapAdd, ValidateCapability},
+		{"cap-drop", rv.res.CapDrop, ValidateCapability},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {
@@ -1014,7 +1038,10 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
 		key, _, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
@@ -1024,7 +1051,10 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateMountSecurity() error {
 	for i, m := range rv.res.Mounts {
 		if err := validatePathChars(m.Source); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
@@ -1033,19 +1063,16 @@ func (rv *resolver) validateSecurity() error {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
 	}
+	return nil
+}
 
+func (rv *resolver) validateDeviceSecurity() error {
 	for i, d := range rv.res.Devices {
 		if err := validatePathChars(d.PathOnHost); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
-		}
-	}
-
-	if rv.res.Privileged {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 		}
 	}
 	return nil
@@ -1088,405 +1115,4 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	default:
 		return cp.Resolve(r)
 	}
-}
-
-func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
-	var dcs []DeviceConfig
-
-	if p1 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p1 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config (override): %q", d)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
-		}
-	} else if p2 != nil {
-		dcs = []DeviceConfig{}
-		for _, d := range p2 {
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config: %q", d)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
-		}
-	} else if env, ok := fs.LookupEnv("CDERUN_DEVICE"); ok {
-		dcs = []DeviceConfig{}
-		for d := range strings.SplitSeq(env, ",") {
-			d = strings.TrimSpace(d)
-			if d == "" {
-				continue
-			}
-			parsed, ok := ParseDeviceConfig(d)
-			if !ok {
-				return nil, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", d)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			dcs = append(dcs, parsed)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Devices != nil {
-			dcs = tool.Devices
-		}
-	}
-
-	if dcs == nil && global != nil {
-		dcs = global.Defaults.Devices
-	}
-
-	var res []container.DeviceMapping
-	for _, dc := range dcs {
-		resolved, err := dc.Resolve(r)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, resolved)
-	}
-	return res, nil
-}
-
-func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var envs []string
-
-	if p1 != nil {
-		envs = p1
-	} else if p2 != nil {
-		envs = p2
-	} else if env, ok := fs.LookupEnv(envKey); ok {
-		envs = []string{}
-		for e := range strings.SplitSeq(env, ";") {
-			e = strings.TrimSpace(e)
-			if e == "" {
-				continue
-			}
-			envs = append(envs, e)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Env != nil {
-			envs = tool.Env
-		}
-	}
-
-	if envs == nil && global != nil {
-		envs = global.Defaults.Env
-	}
-
-	// Deduplicate within the winning source (last-one-wins for the same key)
-	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
-	merged := mergeEnv(nil, nil, envs)
-
-	return resolveEnvValues(merged, strict, r, fs)
-}
-
-func mergeEnv(base, p2, p1 []string) []string {
-	total := len(base) + len(p2) + len(p1)
-	if total == 0 {
-		return nil
-	}
-	m := make(map[string]string, total)
-	keys := make([]string, 0, total)
-
-	add := func(env []string) {
-		for _, e := range env {
-			key, _, _ := strings.Cut(e, "=")
-			if _, ok := m[key]; !ok {
-				keys = append(keys, key)
-			}
-			m[key] = e
-		}
-	}
-
-	add(base)
-	add(p2)
-	add(p1)
-
-	res := make([]string, 0, len(keys))
-	for _, k := range keys {
-		res = append(res, m[k])
-	}
-	return res
-}
-
-func validateImageRegistryMatch(cliImage, configImage string) error {
-	if cliImage == "" || configImage == "" {
-		return nil
-	}
-
-	normalize := func(img string) (string, string) {
-		parts := strings.Split(img, "/")
-		var host, repo string
-		if len(parts) == 1 {
-			host = "docker.io"
-			repo = "library/" + parts[0]
-		} else if len(parts) == 2 {
-			if strings.ContainsAny(parts[0], ".:") || parts[0] == "localhost" {
-				host = parts[0]
-				repo = parts[1]
-			} else {
-				host = "docker.io"
-				repo = parts[0] + "/" + parts[1]
-			}
-		} else {
-			host = parts[0]
-			repo = strings.Join(parts[1:], "/")
-		}
-
-		if host == "docker.io" && !strings.Contains(repo, "/") {
-			repo = "library/" + repo
-		}
-
-		// Strip tags or digests from repo
-		if idx := strings.IndexAny(repo, ":@"); idx != -1 {
-			repo = repo[:idx]
-		}
-		return host, repo
-	}
-
-	cliHost, cliRepo := normalize(cliImage)
-	cfgHost, cfgRepo := normalize(configImage)
-
-	if cliHost != cfgHost || cliRepo != cfgRepo {
-		return &RegistryMismatchError{
-			ExpectedRegistry: fmt.Sprintf("%s/%s", cfgHost, cfgRepo),
-			ActualRegistry:   fmt.Sprintf("%s/%s", cliHost, cliRepo),
-		}
-	}
-
-	return nil
-}
-
-func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var res []string
-	for _, e := range env {
-		resolvedE := r.resolveString(e)
-		if err := r.Error(); err != nil {
-			return nil, err
-		}
-
-		var key, val string
-		if k, v, found := strings.Cut(resolvedE, "="); found {
-			key = k
-			val = v
-			if err := ValidateEnvKey(key); err != nil {
-				return nil, err
-			}
-		} else {
-			v, found := fs.LookupEnv(resolvedE)
-			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
-			}
-			key = resolvedE
-			val = v
-		}
-
-		// Apply masking for debug logs and quoting for safety
-		if logging.DebugEnabled() {
-			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
-		}
-
-		res = append(res, key+"="+val)
-	}
-	return res, nil
-}
-
-func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
-	var mcs []MountConfig
-
-	if p1 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p1 {
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config (override): %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if p2 != nil {
-		mcs = []MountConfig{}
-		for _, m := range p2 {
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if env, ok := fs.LookupEnv("CDERUN_MOUNT"); ok {
-		mcs = []MountConfig{}
-		for m := range strings.SplitSeq(env, ";") {
-			m = strings.TrimSpace(m)
-			if m == "" {
-				continue
-			}
-			parsed, err := ParseMountFlag(m)
-			if err != nil {
-				return nil, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
-			}
-			parsed.SetBaseDir(r.Pwd)
-			mcs = append(mcs, parsed)
-		}
-	} else if tools != nil {
-		if tool, ok := tools[subcommand]; ok && tool.Mounts != nil {
-			mcs = tool.Mounts
-		}
-	}
-
-	if mcs == nil && global != nil {
-		mcs = global.Defaults.Mounts
-	}
-
-	var res []container.Mount
-	for _, mc := range mcs {
-		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
-			hostPath, err := mc.Source.Resolve(r)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := fs.Stat(hostPath); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					// Skip if source doesn't exist
-					continue
-				}
-				return nil, err
-			}
-		}
-
-		resolved, err := mc.Resolve(r)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, resolved)
-	}
-	return res, nil
-}
-
-var sensitiveKeywords = map[string]struct{}{
-	"PASSWORD":    {},
-	"SECRET":      {},
-	"TOKEN":       {},
-	"KEY":         {},
-	"AUTH":        {},
-	"SIG":         {},
-	"CERT":        {},
-	"PEM":         {},
-	"PRIVATE":     {},
-	"CREDENTIALS": {},
-	"PASSPHRASE":  {},
-	"APIKEY":      {},
-	"SESSION":     {},
-	"ACCESS":      {},
-	"JWT":         {},
-	"SALT":        {},
-}
-
-// MaskSensitiveEnv redacts sensitive environment variables based on key names.
-func MaskSensitiveEnv(key, value string) string {
-	if value == "" {
-		return ""
-	}
-
-	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	upperKey := strings.ToUpper(key)
-	hasSensitive := false
-	for kw := range sensitiveKeywords {
-		if strings.Contains(upperKey, kw) {
-			hasSensitive = true
-			break
-		}
-	}
-	if !hasSensitive {
-		return value
-	}
-
-	// Split by non-alphanumeric characters and also split camelCase.
-	// This ensures segments like "dbPassword" are correctly identified as ["db", "Password"].
-	// We perform a single pass and check segments against sensitiveKeywords without extra allocations.
-	useUpperDirectly := len(upperKey) == len(key)
-	start := -1
-	var lastRune rune
-
-	for i, r := range key {
-		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || (r > 127 && (unicode.IsLetter(r) || unicode.IsDigit(r)))
-
-		if isAlphaNum {
-			if start == -1 {
-				start = i
-			} else {
-				// Boundary split logic (camelCase, letter/digit transition, acronyms)
-				isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
-				isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
-				isAcronym := false
-				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
-					// Check for acronym boundary (e.g. APIKey -> API, Key)
-					for _, nextRune := range key[i+len(string(r)):] {
-						if unicode.IsLower(nextRune) {
-							isAcronym = true
-						}
-						break
-					}
-				}
-
-				if isCamel || isLetterDigit || isAcronym {
-					var segment string
-					if useUpperDirectly {
-						segment = upperKey[start:i]
-					} else {
-						segment = strings.ToUpper(key[start:i])
-					}
-					if _, ok := sensitiveKeywords[segment]; ok {
-						return "[REDACTED]"
-					}
-					start = i
-				}
-			}
-		} else {
-			if start != -1 {
-				var segment string
-				if useUpperDirectly {
-					segment = upperKey[start:i]
-				} else {
-					segment = strings.ToUpper(key[start:i])
-				}
-				if _, ok := sensitiveKeywords[segment]; ok {
-					return "[REDACTED]"
-				}
-				start = -1
-			}
-		}
-		lastRune = r
-	}
-
-	if start != -1 {
-		var segment string
-		if useUpperDirectly {
-			segment = upperKey[start:]
-		} else {
-			segment = strings.ToUpper(key[start:])
-		}
-		if _, ok := sensitiveKeywords[segment]; ok {
-			return "[REDACTED]"
-		}
-	}
-
-	return value
-}
-
-// MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
-func MaskSensitiveEnvList(env []string) []string {
-	if env == nil {
-		return nil
-	}
-	res := make([]string, len(env))
-	for i, e := range env {
-		if k, v, found := strings.Cut(e, "="); found {
-			res[i] = fmt.Sprintf("%s=%s", k, MaskSensitiveEnv(k, v))
-		} else {
-			res[i] = e
-		}
-	}
-	return res
 }

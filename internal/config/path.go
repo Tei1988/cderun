@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -337,14 +338,14 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`({{\s*(HOME|PWD|BASE_HOME|BASE_PWD)\s*}})|(^~|[/\\]~)`)
+	magicWordPreRegex = regexp.MustCompile(`(^~|[/\\]~)`)
 
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 	userPartRegex = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
-	portRegex     = regexp.MustCompile(`^(\d+)(/tcp|/udp)?$`)
 	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
 	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	capRegex      = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -466,9 +467,22 @@ func SplitHostRemainder(s string) (string, string, bool) {
 	return s[:sepIdx], s[sepIdx+1:], true
 }
 
+// findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
+func findAnchors(s string) []string {
+	ranges := scanAnchors(s)
+	if len(ranges) == 0 {
+		return nil
+	}
+	res := make([]string, len(ranges))
+	for i, r := range ranges {
+		res[i] = s[r.start:r.end]
+	}
+	return res
+}
+
 // validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i, r := range []rune(s) {
+	for i, r := range s {
 		if r <= 31 || r == 127 {
 			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
 		}
@@ -477,8 +491,10 @@ func validatePathChars(s string) error {
 }
 
 func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
-	allMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
-	if len(allMatches) == 0 {
+	tildeMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
+	exprAnchors := findAnchors(original)
+
+	if len(tildeMatches) == 0 && len(exprAnchors) == 0 {
 		return nil
 	}
 
@@ -492,51 +508,9 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	}
 	absResolved = filepath.Clean(absResolved)
 
-	for _, matches := range allMatches {
-		var anchorPath string
-		exprMatch := matches[1]
-		tildeMatch := matches[3]
-
-		if tildeMatch != "" {
-			if r != nil {
-				anchorPath = r.Home
-			} else {
-				home, err := fs.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("failed to get anchor home directory: %w", err)
-				}
-				anchorPath = home
-			}
-		} else {
-			if r == nil {
-				return fmt.Errorf("expression resolver required for anchor validation")
-			}
-			word := matches[2]
-			switch word {
-			case "HOME":
-				anchorPath = r.Home
-			case "PWD":
-				anchorPath = r.Pwd
-			case "BASE_HOME":
-				if r.HostContext != nil && r.HostContext.HomeDir != "" {
-					anchorPath = r.HostContext.HomeDir
-				} else {
-					anchorPath = r.Home
-				}
-			case "BASE_PWD":
-				if r.HostContext != nil && r.HostContext.WorkingDir != "" {
-					anchorPath = r.HostContext.WorkingDir
-				} else {
-					anchorPath = r.Pwd
-				}
-			}
-		}
-
+	processBoundary := func(anchorRaw, anchorPath string) error {
 		if anchorPath == "" {
-			if exprMatch != "" {
-				return fmt.Errorf("anchor path is empty for %q", exprMatch)
-			}
-			return fmt.Errorf("anchor path is empty for %q", tildeMatch)
+			return fmt.Errorf("anchor path is empty for %q", anchorRaw)
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)
@@ -552,6 +526,46 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("path traversal detected: %q escapes anchor boundary %q", original, anchorPath)
+		}
+		return nil
+	}
+
+	for _, matches := range tildeMatches {
+		tildeMatch := matches[1]
+		var anchorPath string
+		if r != nil {
+			anchorPath = r.Home
+		} else {
+			home, err := fs.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get anchor home directory: %w", err)
+			}
+			anchorPath = home
+		}
+		if err := processBoundary(tildeMatch, anchorPath); err != nil {
+			return err
+		}
+	}
+
+	for _, anchor := range exprAnchors {
+		if r == nil {
+			return fmt.Errorf("expression resolver required for anchor validation")
+		}
+		// Use a fresh resolver instance for each anchor to ensure that a sticky error
+		// from one anchor resolution doesn't skip subsequent anchor resolutions.
+		cleanR, err := NewExpressionResolverWithFS(r.HostContext, r.fs)
+		if err != nil {
+			return fmt.Errorf("failed to create fresh resolver for anchor %q: %w", anchor, err)
+		}
+		anchorPath, err := cleanR.ResolveString(anchor)
+		if err != nil {
+			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
+		}
+		if unresolved := scanAnchors(anchorPath); len(unresolved) > 0 {
+			return fmt.Errorf("unresolved expression in anchor %q: %q", anchor, anchorPath)
+		}
+		if err := processBoundary(anchor, anchorPath); err != nil {
+			return err
 		}
 	}
 
@@ -622,23 +636,113 @@ func ValidateUserName(s string) error {
 	return nil
 }
 
-// ValidatePort ensures the port mapping (host:container/proto) is valid.
+// ValidatePort ensures the port mapping is valid.
+// Supports formats: [ip:][hostPort:]containerPort[/protocol]
 func ValidatePort(s string) error {
 	if s == "" {
 		return nil
 	}
-	// Format: [hostPort:]containerPort[/protocol]
+
+	proto := ""
 	remainder := s
-	if parts := strings.Split(remainder, ":"); len(parts) == 2 {
-		hostPort := parts[0]
-		if !portRegex.MatchString(hostPort) {
-			return fmt.Errorf("invalid host port: %q", hostPort)
+	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
+		remainder = parts[0]
+		proto = parts[1]
+		if proto != "tcp" && proto != "udp" {
+			return fmt.Errorf("invalid protocol: %q", proto)
 		}
-		remainder = parts[1]
 	}
 
-	if !portRegex.MatchString(remainder) {
-		return fmt.Errorf("invalid port mapping: %q", remainder)
+	parts := strings.Split(remainder, ":")
+	switch len(parts) {
+	case 1:
+		// containerPort
+		if _, err := strconv.Atoi(parts[0]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[0])
+		}
+	case 2:
+		// hostPort:containerPort OR ip:containerPort
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[1])
+		}
+		// If parts[0] is not a number, it must be an IP
+		if _, err := strconv.Atoi(parts[0]); err != nil {
+			if net.ParseIP(parts[0]) == nil {
+				return fmt.Errorf("invalid host port or IP: %q", parts[0])
+			}
+		}
+	case 3:
+		// ip:hostPort:containerPort
+		if _, err := strconv.Atoi(parts[2]); err != nil {
+			return fmt.Errorf("invalid container port: %q", parts[2])
+		}
+		if parts[1] != "" {
+			if _, err := strconv.Atoi(parts[1]); err != nil {
+				return fmt.Errorf("invalid host port: %q", parts[1])
+			}
+		}
+		if net.ParseIP(parts[0]) == nil {
+			return fmt.Errorf("invalid IP: %q", parts[0])
+		}
+	default:
+		return fmt.Errorf("invalid port format: %q", s)
+	}
+
+	return nil
+}
+
+// ValidateDNS ensures the DNS setting is a valid IP address.
+func ValidateDNS(s string) error {
+	if s == "" {
+		return nil
+	}
+	if net.ParseIP(s) == nil {
+		return fmt.Errorf("invalid DNS IP: %q", s)
+	}
+	return nil
+}
+
+// ValidateAddHost ensures the custom host-to-IP mapping (host:ip) is valid.
+func ValidateAddHost(s string) error {
+	if s == "" {
+		return nil
+	}
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid add-host format: %q (expected host:ip)", s)
+	}
+	if err := ValidateHostname(parts[0]); err != nil {
+		return fmt.Errorf("invalid host in add-host: %w", err)
+	}
+	if parts[1] != "host-gateway" && net.ParseIP(parts[1]) == nil {
+		return fmt.Errorf("invalid IP in add-host: %q", parts[1])
+	}
+	return nil
+}
+
+// ValidateCapability ensures the Linux capability follows a safe format.
+func ValidateCapability(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !capRegex.MatchString(s) {
+		return fmt.Errorf("invalid Linux capability: %q", s)
+	}
+	return nil
+}
+
+var workdirRegex = regexp.MustCompile(`^/[a-zA-Z0-9._\-/]*$`)
+
+// ValidateWorkdir ensures the working directory is a valid absolute path.
+func ValidateWorkdir(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !path.IsAbs(s) {
+		return fmt.Errorf("working directory must be an absolute path: %q", s)
+	}
+	if !workdirRegex.MatchString(s) {
+		return fmt.Errorf("invalid characters in working directory: %q", s)
 	}
 	return nil
 }
@@ -651,7 +755,7 @@ func ValidateExposePort(s string) error {
 	// Format: port[-port][/protocol]
 	proto := ""
 	remainder := s
-	if parts := strings.Split(s, "/"); len(parts) == 2 {
+	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
 		remainder = parts[0]
 		proto = parts[1]
 		if proto != "tcp" && proto != "udp" {
@@ -659,7 +763,7 @@ func ValidateExposePort(s string) error {
 		}
 	}
 
-	if parts := strings.Split(remainder, "-"); len(parts) == 2 {
+	if parts := strings.SplitN(remainder, "-", 2); len(parts) == 2 {
 		for _, p := range parts {
 			if _, err := strconv.Atoi(p); err != nil {
 				return fmt.Errorf("invalid port range: %q", remainder)

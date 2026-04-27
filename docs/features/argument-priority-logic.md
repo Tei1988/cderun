@@ -13,16 +13,16 @@
 
 - **定義**: `cderun` の動作を強制的に変更・上書きするための専用フラグ。シンボリックリンク（ポリグロットモード）利用時でも、ラップされたツールの引数と衝突せずに `cderun` 側の設定を指定することを可能にします。
 - **フラグ名**: `cderun` 標準フラグ（P2）のすべてに対応する `--cderun-` プレフィックス付きフラグ。
-  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`, `--cderun-image`, `--cderun-runtime`, `--cderun-remove`, `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-hang-timeout`
-  - **ネットワーク**: `--cderun-network`, `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-add-host`
-  - **リソース**: `--cderun-memory`, `--cderun-cpus`
-  - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
-  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
-  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`, `--cderun-diagnosis`, `--cderun-diagnosis-format`, `--cderun-log-level`, `--cderun-log-format`, `--cderun-log-timestamp`
-- **挙動**: これらが指定された場合、他の全て（P2〜P6）を無視してこの値を採用する。
-- **配置規則**:
-  - **Wrapper Mode**: 必ず**サブコマンドの後ろ**に配置する必要があります。前処理（Hoisting）によって内部的にサブコマンドの前方に移動され、`cderun` のフラグとしてパースされます。サブコマンドより前に配置した場合はエラーとなります。
-  - **Diagnosis Mode**: サブコマンドを必要としないため、任意の場所に配置可能です。
+  - **主要な P1 フラグ**:
+    - **実行制御**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`
+    - **マウント**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-cderun`
+    - **診断**: `--cderun-dry-run`, `--cderun-log-level`
+- **挙動**: これらが指定された場合、他のソース（P2〜P6）をすべて無視してこの値が最優先で採用されます。
+- **配置規則とホイスト (Hoisting)**:
+  - **Wrapper Mode**: 原則として**サブコマンドの後ろ**に配置します。`cderun` はサブコマンドの後ろにある `--cderun-*` フラグを検出し、内部的にサブコマンドの前に「ホイスト（前方移動）」してパースします。
+  - **メリット**: ラップ対象のツールが持つ独自のフラグ（例: `node --env`）と、`cderun` 側のフラグ（例: `node --cderun-env`）を完璧に分離できます。
+  - **注意**: Wrapper Mode でサブコマンドより前に配置すると、「P2 標準フラグ」と誤認されるのを防ぐため、バリデーションによりエラーとなります。
+  - **Diagnosis Mode**: サブコマンドがないため、フラグは任意の場所に配置可能です。
 
 「ホイスト（Hoisting）」メカニズムを含む詳細な動作については [引数解析](./argument-parsing.md) を参照してください。
 
@@ -64,6 +64,8 @@
   - `remove: true`
   - `runtime: docker`
   - `pull: missing`
+  - `pullMaxRetries: 3`
+  - `pullBackoffBase: 1s`
   - `logLevel: warn`
   - `logFormat: text`
   - `logTimestamp: true`
