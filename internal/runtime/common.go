@@ -9,8 +9,8 @@ import (
 	dockererrdefs "github.com/docker/docker/errdefs"
 )
 
-// isRetryablePullError returns true if the error from a pull operation is likely transient and worth retrying.
-func isRetryablePullError(err error) bool {
+// IsRetryablePullError returns true if the error from a pull operation is likely transient and worth retrying.
+func IsRetryablePullError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -21,6 +21,7 @@ func isRetryablePullError(err error) bool {
 	}
 
 	// docker/errdefs
+	//nolint:staticcheck // SA1019: dockererrdefs.IsSystem is deprecated, but we use it for compatibility
 	if dockererrdefs.IsSystem(err) || dockererrdefs.IsUnknown(err) || dockererrdefs.IsDeadline(err) || dockererrdefs.IsCancelled(err) {
 		return true
 	}
@@ -39,6 +40,7 @@ func isRetryablePullError(err error) bool {
 		"request canceled",
 		"rate limit exceeded",
 		"toomanyrequests",
+		"eof",
 	}
 
 	for _, m := range retryableMessages {
@@ -47,11 +49,11 @@ func isRetryablePullError(err error) bool {
 		}
 	}
 
-	return isTemporaryAuthError(err)
+	return IsTemporaryAuthError(err)
 }
 
-// isTemporaryAuthError returns true if the error is a temporary authentication or authorization failure.
-func isTemporaryAuthError(err error) bool {
+// IsTemporaryAuthError returns true if the error is a temporary authentication or authorization failure.
+func IsTemporaryAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -59,8 +61,8 @@ func isTemporaryAuthError(err error) bool {
 	return strings.Contains(msg, "401 unauthorized") || strings.Contains(msg, "403 forbidden") || strings.Contains(msg, "token expired") || strings.Contains(msg, "unauthorized")
 }
 
-// sleepFunc is a helper for cancellable sleep.
-func sleepFunc(ctx context.Context, d time.Duration) error {
+// SleepFunc is a helper for cancellable sleep.
+func SleepFunc(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {

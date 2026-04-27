@@ -11,26 +11,31 @@ import (
 	"syscall"
 	"time"
 
+	"cderun/internal/container"
+	"cderun/internal/logging"
+
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/google/uuid"
 	"github.com/opencontainers/runtime-spec/specs-go"
-
-	"cderun/internal/container"
-	"cderun/internal/logging"
 )
 
-// ContainerdRuntime implements ContainerRuntime using containerd Go client.
+const (
+	defaultNamespace = "cderun"
+)
+
+// ContainerdRuntime implements the ContainerRuntime interface using containerd.
 type ContainerdRuntime struct {
 	client    *client.Client
 	socket    string
 	namespace string
 	sleepFunc func(context.Context, time.Duration) error
 
-	mu    sync.RWMutex
-	ioMap map[string]cio.Creator
+	mu     sync.RWMutex
+	ioMap  map[string]cio.Creator
+	ioWait map[string]chan error
 
 	closeOnce sync.Once
 	closeErr  error
@@ -38,7 +43,6 @@ type ContainerdRuntime struct {
 
 // NewContainerdRuntime creates a new containerd runtime instance.
 func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
-	const defaultNamespace = "cderun"
 	c, err := client.New(socket, client.WithDefaultNamespace(defaultNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to containerd: %w", err)
@@ -48,17 +52,9 @@ func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
 		client:    c,
 		socket:    socket,
 		namespace: defaultNamespace,
+		sleepFunc: SleepFunc,
 		ioMap:     make(map[string]cio.Creator),
-		sleepFunc: func(ctx context.Context, d time.Duration) error {
-			timer := time.NewTimer(d)
-			defer timer.Stop()
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-timer.C:
-				return nil
-			}
-		},
+		ioWait:    make(map[string]chan error),
 	}, nil
 }
 
@@ -80,10 +76,10 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 	var lastErr error
 	attempts := maxRetries + 1
-	for i := range attempts {
+	for i := 0; i < attempts; i++ {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i+1, attempts, img, lastErr)
-			if err := r.sleepFunc(ctx, time.Duration(1<<i)*backoffBase); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
+			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
 				return err
 			}
 		}
@@ -96,7 +92,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 			}
 			if !errdefs.IsNotFound(err) {
 				lastErr = err
-				if isRetryablePullError(err) {
+				if IsRetryablePullError(err) {
 					continue
 				}
 				return fmt.Errorf("failed to check image: %w", err)
@@ -107,14 +103,14 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
 		if err != nil {
 			lastErr = err
-			if isRetryablePullError(err) {
+			if IsRetryablePullError(err) {
 				continue
 			}
 			return fmt.Errorf("failed to pull image: %w", err)
 		}
 		return nil
 	}
-	return fmt.Errorf("failed after %d attempts: %w", attempts, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
@@ -158,18 +154,23 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		if mountType == "" {
 			mountType = "bind"
 		}
-		var mOpts []string
+		var mountOptions []string
 		if m.ReadOnly {
-			mOpts = append(mOpts, "ro")
+			mountOptions = append(mountOptions, "ro")
 		} else {
-			mOpts = append(mOpts, "rw")
+			mountOptions = append(mountOptions, "rw")
 		}
 		if mountType == "bind" {
-			mOpts = append(mOpts, "rbind")
+			mountOptions = append(mountOptions, "rbind")
 		}
-		opts = append(opts, oci.WithMounts([]specs.Mount{{
-			Type: mountType, Source: m.Source, Destination: m.Target, Options: mOpts,
-		}}))
+		opts = append(opts, oci.WithMounts([]specs.Mount{
+			{
+				Type:        mountType,
+				Source:      m.Source,
+				Destination: m.Target,
+				Options:     mountOptions,
+			},
+		}))
 	}
 
 	if config.Privileged {
@@ -185,13 +186,15 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.Memory > 0 {
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
 	} else if config.Memory < 0 {
-		return "", fmt.Errorf("negative memory limit")
+		return "", fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
 
 	if config.CPUs > 0 {
 		period := uint64(100000)
 		quota := int64(config.CPUs * float64(period))
 		opts = append(opts, oci.WithCPUCFS(quota, period))
+	} else if config.CPUs < 0 {
+		return "", fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
 	}
 
 	for _, d := range config.Devices {
@@ -202,10 +205,12 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithHostname(config.Hostname))
 	}
 
-	if config.Network == "host" {
-		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
-	} else if config.Network != "" && config.Network != "bridge" && config.Network != "none" {
-		return "", fmt.Errorf("containerd runtime: custom network %q is not supported yet", config.Network)
+	if config.Network != "" {
+		if config.Network == "host" {
+			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
+		} else {
+			return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
+		}
 	}
 
 	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
@@ -215,7 +220,11 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		return "", fmt.Errorf("containerd runtime: custom DNS/hosts are not supported yet")
 	}
 
-	_, err = r.client.NewContainer(ctx, id, client.WithImage(img), client.WithNewSnapshot(id, img), client.WithNewSpec(opts...))
+	_, err = r.client.NewContainer(ctx, id,
+		client.WithImage(img),
+		client.WithNewSnapshot(id, img),
+		client.WithNewSpec(opts...),
+	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create: %w", err)
 	}
@@ -239,20 +248,22 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 
 	task, err := container.NewTask(ctx, creator)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create task: %w", err)
 	}
 
 	started := false
 	defer func() {
 		if !started {
-			cCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_, _ = task.Delete(cCtx, client.WithProcessKill) //nolint:errcheck
+			if _, delErr := task.Delete(cleanupCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
+				logging.Warn("failed to cleanup task for container %s after start failure: %v", containerID, delErr)
+			}
 		}
 	}()
 
 	if err := task.Start(ctx); err != nil {
-		return err
+		return fmt.Errorf("failed to start task: %w", err)
 	}
 	started = true
 	return nil
@@ -274,6 +285,12 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 
 	select {
 	case status := <-exitStatusC:
+		r.mu.RLock()
+		waitC, ok := r.ioWait[containerID]
+		r.mu.RUnlock()
+		if ok {
+			waitC <- status.Error()
+		}
 		return int(status.ExitCode()), status.Error()
 	case <-ctx.Done():
 		return 0, ctx.Err()
@@ -283,6 +300,10 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	cCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	r.mu.Lock()
+	delete(r.ioWait, containerID)
+	r.mu.Unlock()
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {
@@ -294,7 +315,10 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	task, err := container.Task(cCtx, nil)
 	if err == nil {
-		_, _ = task.Delete(cCtx, client.WithProcessKill) //nolint:errcheck
+		if _, delErr := task.Delete(cCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
+			logging.Warn("failed to delete task during container removal (best-effort): %v", delErr)
+			return fmt.Errorf("failed to delete task before container deletion: %w", delErr)
+		}
 	}
 
 	return container.Delete(cCtx, client.WithSnapshotCleanup)
@@ -319,6 +343,10 @@ func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID str
 }
 
 func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	if rows > math.MaxUint32 || cols > math.MaxUint32 {
+		return fmt.Errorf("terminal size exceeds maximum: rows=%d, cols=%d", rows, cols)
+	}
+
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return err
@@ -326,9 +354,6 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		return err
-	}
-	if rows > math.MaxUint32 || cols > math.MaxUint32 {
-		return fmt.Errorf("size out of range")
 	}
 	return task.Resize(ctx, uint32(cols), uint32(rows))
 }
@@ -341,44 +366,26 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		creator = cio.NewCreator(cio.WithStreams(stdin, stdout, stderr))
 	}
 
+	waitC := make(chan error, 1)
 	r.mu.Lock()
 	r.ioMap[containerID] = creator
+	r.ioWait[containerID] = waitC
 	r.mu.Unlock()
+
+	defer func() {
+		r.mu.Lock()
+		delete(r.ioMap, containerID)
+		delete(r.ioWait, containerID)
+		r.mu.Unlock()
+	}()
 
 	if ready != nil {
 		close(ready)
 	}
 
-	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil {
-		return err
-	}
-
-	var task client.Task
-	for {
-		task, err = container.Task(ctx, nil)
-		if err == nil {
-			break
-		}
-		if !errdefs.IsNotFound(err) {
-			return err
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(50 * time.Millisecond):
-			continue
-		}
-	}
-
-	exitStatusC, err := task.Wait(ctx)
-	if err != nil {
-		return err
-	}
-
 	select {
-	case <-exitStatusC:
-		return nil
+	case err := <-waitC:
+		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -412,7 +419,9 @@ func parseSignal(sig string) (syscall.Signal, error) {
 	}
 
 	name := strings.ToUpper(sig)
-	name, _ = strings.CutPrefix(name, "SIG")
+	if stripped, ok := strings.CutPrefix(name, "SIG"); ok {
+		name = stripped
+	}
 
 	signals := map[string]syscall.Signal{
 		"HUP": syscall.SIGHUP, "INT": syscall.SIGINT, "QUIT": syscall.SIGQUIT, "ILL": syscall.SIGILL,

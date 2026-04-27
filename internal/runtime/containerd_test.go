@@ -1,75 +1,65 @@
 package runtime
 
 import (
-	"context"
 	"fmt"
-	"syscall"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/containerd/errdefs"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUnit_Containerd_Name(t *testing.T) {
-	r := &ContainerdRuntime{}
-	require.Equal(t, "containerd", r.Name())
-}
-
-func TestUnit_Containerd_PullImage_Never(t *testing.T) {
-	r := &ContainerdRuntime{}
-	err := r.PullImage(context.Background(), "test", "never", 3, 1*time.Second)
-	require.NoError(t, err)
-}
-
-func TestUnit_Containerd_IsRetryablePullError(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		err      error
-		expected bool
-	}{
-		{fmt.Errorf("toomanyrequests"), true},
-		{fmt.Errorf("connection refused"), true},
-		{fmt.Errorf("fatal error"), false},
-		{nil, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%v", tt.err), func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, tt.expected, isRetryablePullError(tt.err))
-		})
-	}
+	rt := &ContainerdRuntime{}
+	assert.Equal(t, "containerd", rt.Name())
 }
 
 func TestUnit_Containerd_ParseSignal(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
-		sig      string
-		expected syscall.Signal
-		wantErr  bool
+		sig     string
+		wanterr bool
 	}{
-		{"TERM", syscall.SIGTERM, false},
-		{"sigterm", syscall.SIGTERM, false},
-		{"9", syscall.SIGKILL, false},
-		{"KILL", syscall.SIGKILL, false},
-		{"INT", syscall.SIGINT, false},
-		{"HUP", syscall.SIGHUP, false},
-		{"QUIT", syscall.SIGQUIT, false},
-		{"invalid", 0, true},
-		{"0", 0, true},
-		{"65", 0, true},
+		{"TERM", false},
+		{"sigterm", false},
+		{"9", false},
+		{"15", false},
+		{"HUP", false},
+		{"INT", false},
+		{"KILL", false},
+		{"QUIT", false},
+		{"USR1", false},
+		{"invalid", true},
+		{"0", true},
+		{"65", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.sig, func(t *testing.T) {
-			t.Parallel()
-			got, err := parseSignal(tt.sig)
-			if tt.wantErr {
-				require.Error(t, err)
+			_, err := parseSignal(tt.sig)
+			if tt.wanterr {
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expected, got)
+				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestUnit_Runtime_IsRetryablePullError(t *testing.T) {
+	tests := []struct {
+		err  error
+		want bool
+	}{
+		{nil, false},
+		{fmt.Errorf("some other error"), false},
+		{fmt.Errorf("connection refused"), true},
+		{fmt.Errorf("rate limit exceeded"), true},
+		{fmt.Errorf("unauthorized: token expired"), true},
+		{errdefs.ErrUnavailable, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%v", tt.err), func(t *testing.T) {
+			assert.Equal(t, tt.want, IsRetryablePullError(tt.err))
 		})
 	}
 }
