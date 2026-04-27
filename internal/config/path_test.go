@@ -677,7 +677,6 @@ func TestUnit_Path_SplitHostRemainder_Windows_Invalid(t *testing.T) {
 	})
 }
 
-
 func TestUnit_Config_ValidateHostname(t *testing.T) {
 	tests := []struct {
 		name    string

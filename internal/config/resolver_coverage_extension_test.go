@@ -417,10 +417,10 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("pull-max-retries non-positive", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:                "alpine",
-			ImageSet:             true,
-			PullMaxRetries:       0,
-			PullMaxRetriesSet:    true,
+			Image:             "alpine",
+			ImageSet:          true,
+			PullMaxRetries:    0,
+			PullMaxRetriesSet: true,
 		}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
@@ -467,12 +467,12 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("transitive options: mount-cderun and mount-socket specified", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:               "alpine",
-			ImageSet:            true,
-			MountCderun:         false,
-			MountCderunSet:      true,
-			MountSocket:         false,
-			MountSocketSet:      true,
+			Image:          "alpine",
+			ImageSet:       true,
+			MountCderun:    false,
+			MountCderunSet: true,
+			MountSocket:    false,
+			MountSocketSet: true,
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
@@ -482,12 +482,12 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("transitive options: mount-cderun overrides mount-tools", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:               "alpine",
-			ImageSet:            true,
-			MountTools:          "git",
-			MountToolsSet:       true,
-			MountCderun:         false,
-			MountCderunSet:      true,
+			Image:          "alpine",
+			ImageSet:       true,
+			MountTools:     "git",
+			MountToolsSet:  true,
+			MountCderun:    false,
+			MountCderunSet: true,
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
@@ -517,7 +517,6 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "my-reg.com/node:20", res.Image)
 	})
-
 
 	t.Run("memory expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}

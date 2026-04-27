@@ -6,10 +6,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
-
-	"cderun/internal/container"
-	"cderun/internal/logging"
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types"
@@ -20,13 +18,13 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-)
 
-const (
-	attachCloseWriteGrace = 1 * time.Second
+	"cderun/internal/container"
+	"cderun/internal/logging"
 )
 
 type dockerClient interface {
+	Close() error
 	ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)
 	ContainerCreate(ctx context.Context, config *dockercontainer.Config, hostConfig *dockercontainer.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (dockercontainer.CreateResponse, error)
@@ -43,38 +41,58 @@ var signalRegex = regexp.MustCompile(`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`)
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
-	client    dockerClient
-	socket    string
-	name      string
-	sleepFunc func(context.Context, time.Duration) error
+	client                dockerClient
+	socket                string
+	name                  string
+	sleepFunc             func(context.Context, time.Duration) error
+	attachCloseWriteGrace time.Duration
+	closeOnce             sync.Once
+	closeErr              error
 }
 
-// NewDockerRuntime creates a new DockerRuntime instance with name "docker".
+// DockerRuntimeOption defines a functional option for DockerRuntime.
+type DockerRuntimeOption func(*DockerRuntime)
+
+// WithAttachCloseWriteGrace sets the grace period before closing the write side of an attached connection.
+// This is useful in slow or high-latency environments where the default 100ms might be too short
+// for the daemon to process the EOF. If d is non-positive, a minimum duration of 1ms is used.
+func WithAttachCloseWriteGrace(d time.Duration) DockerRuntimeOption {
+	return func(rt *DockerRuntime) {
+		if d <= 0 {
+			d = 1 * time.Millisecond
+		}
+		rt.attachCloseWriteGrace = d
+	}
+}
+
+// NewDockerRuntime creates a new Docker runtime instance with name "docker".
 func NewDockerRuntime(socket string) (*DockerRuntime, error) {
-	return NewDockerRuntimeWithOptions(socket, "docker", client.WithAPIVersionNegotiation())
+	return NewDockerRuntimeWithOptions(socket, "docker", []client.Opt{client.WithAPIVersionNegotiation()})
 }
 
-// NewDockerRuntimeWithName creates a new DockerRuntime instance with a specific name.
-// It uses default API version negotiation.
+// NewDockerRuntimeWithName creates a new Docker runtime instance with a specific name.
 func NewDockerRuntimeWithName(socket string, name string) (*DockerRuntime, error) {
-	return NewDockerRuntimeWithOptions(socket, name, client.WithAPIVersionNegotiation())
+	return NewDockerRuntimeWithOptions(socket, name, []client.Opt{client.WithAPIVersionNegotiation()})
 }
 
-// NewDockerRuntimeWithOptions creates a new DockerRuntime instance with specific client options.
-func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt) (*DockerRuntime, error) {
-	allOpts := append([]client.Opt{
-		client.WithHost("unix://" + socket),
-	}, opts...)
-
-	cli, err := client.NewClientWithOpts(allOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %w", err)
+// NewDockerRuntimeWithOptions creates a new Docker runtime instance with specific client options and internal options.
+func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client.Opt, rtOpts ...DockerRuntimeOption) (*DockerRuntime, error) {
+	if socket == "" {
+		return nil, fmt.Errorf("creating docker client: empty socket path")
 	}
 
-	return &DockerRuntime{
-		client: cli,
-		socket: socket,
-		name:   name,
+	opts := append([]client.Opt{client.WithHost("unix://" + socket)}, clientOpts...)
+
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating docker client: %w", err)
+	}
+
+	rt := &DockerRuntime{
+		client:                cli,
+		socket:                socket,
+		name:                  name,
+		attachCloseWriteGrace: 100 * time.Millisecond,
 		sleepFunc: func(ctx context.Context, d time.Duration) error {
 			t := time.NewTimer(d)
 			defer t.Stop()
@@ -85,7 +103,21 @@ func NewDockerRuntimeWithOptions(socket string, name string, opts ...client.Opt)
 				return nil
 			}
 		},
-	}, nil
+	}
+
+	for _, opt := range rtOpts {
+		opt(rt)
+	}
+
+	return rt, nil
+}
+
+// Close closes the DockerRuntime and releases associated resources.
+func (d *DockerRuntime) Close() error {
+	d.closeOnce.Do(func() {
+		d.closeErr = d.client.Close()
+	})
+	return d.closeErr
 }
 
 // PullImage pulls the specified image based on the pull policy.
@@ -264,7 +296,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				// before the data has been fully consumed by the daemon.
 				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
 				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
-				if err := d.sleepFunc(ctx, attachCloseWriteGrace); err == nil {
+				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
 					logging.Trace("Calling CloseWrite on container %s connection", containerID)
 					if err := resp.CloseWrite(); err != nil {
 						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)

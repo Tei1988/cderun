@@ -2,20 +2,29 @@ package runtime
 
 import (
 	"context"
+	"errors"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
+
+var errDaemonInvalidSignal = errors.New("daemon error: invalid signal")
 
 type mockDockerClientForSignal struct {
 	dockerClient
+	killErr error
 }
 
-func (m *mockDockerClientForSignal) ContainerKill(ctx context.Context, containerID string, signal string) error {
+func (m *mockDockerClientForSignal) Close() error {
 	return nil
 }
 
-func TestSignalValidation(t *testing.T) {
+func (m *mockDockerClientForSignal) ContainerKill(ctx context.Context, containerID string, signal string) error {
+	return m.killErr
+}
+
+func TestUnit_Signal_Validation(t *testing.T) {
 	tests := []struct {
 		name    string
 		sig     string
@@ -28,24 +37,44 @@ func TestSignalValidation(t *testing.T) {
 		{"Standard SIG15", "SIG15", false},
 		{"Lowercase sigterm", "sigterm", false},
 		{"Empty signal", "", false},
-		{"Command injection attempt", "KILL; rm -rf /", true},
-		{"Newline injection attempt", "TERM\n", true},
+		{"Custom signal SIGUSR1", "SIGUSR1", false},
+		// "SIGINVALID" matches the regex ^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$,
+		// so SignalContainer accepts it and propagates it to the daemon.
+		// This confirms that we allow validly formatted but non-existent signal names
+		// that pass local regex validation but may be rejected by the daemon.
+		{"Validly formatted but non-existent signal", "SIGINVALID", false},
 		{"Negative numeric signal", "-9", true},
+		{"Injection attempt ; rm -rf", "SIGTERM; rm -rf /", true},
+		{"Injection attempt \n", "SIGTERM\n", true},
 	}
 
-	d := &DockerRuntime{
-		client: &mockDockerClientForSignal{},
-	}
+	mock := &mockDockerClientForSignal{}
+	rt := &DockerRuntime{client: mock}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := d.SignalContainer(context.Background(), "test-id", tt.sig)
+			t.Parallel()
+			err := rt.SignalContainer(context.Background(), "test-id", tt.sig)
 			if tt.wantErr {
-				require.Error(t, err, "sig: %q", tt.sig)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), "invalid signal")
 			} else {
-				require.NoError(t, err, "sig: %q", tt.sig)
+				assert.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestUnit_Signal_DaemonRejection(t *testing.T) {
+	t.Parallel()
+
+	// Use mock client with killErr set to a sentinel error to simulate daemon rejection.
+	mock := &mockDockerClientForSignal{
+		killErr: errDaemonInvalidSignal,
+	}
+	rt := &DockerRuntime{client: mock}
+
+	err := rt.SignalContainer(context.Background(), "test-id", "SIGINVALID")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errDaemonInvalidSignal)
 }

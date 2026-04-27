@@ -181,6 +181,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewDockerRuntime(socket)
 			case "podman":
 				return runtime.NewPodmanRuntime(socket)
+			case "containerd":
+				return nil, fmt.Errorf("this binary does not support the containerd runtime (it is valid in config but not yet implemented in this version); please use \"docker\" or \"podman\" instead")
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -730,6 +732,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, err
 	}
+	defer func() {
+		if rt != nil {
+			if closeErr := rt.Close(); closeErr != nil {
+				o.logger.Debug("failed to close runtime: %v", closeErr)
+			}
+		}
+	}()
 	defer cleanup()
 
 	// Detect if host stdin is a terminal once
@@ -762,24 +771,36 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
 }
 
-func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (runtime.ContainerRuntime, string, func(), error) {
+func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (rt runtime.ContainerRuntime, containerID string, cleanup func(), err error) {
 	// Initialize Runtime
-	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
+	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
 	if err != nil {
-		return nil, "", nil, &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+		err = &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+		return
 	}
+
+	// Ensure runtime is closed on early error paths
+	defer func() {
+		if err != nil && rt != nil {
+			if closeErr := rt.Close(); closeErr != nil {
+				o.logger.Debug("failed to close runtime on init failure: %v", closeErr)
+			}
+		}
+	}()
 
 	o.logger.Trace("Creating container...")
-	if err := rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
-		return nil, "", nil, fmt.Errorf("failed to pull image: %w", err)
+	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
+		err = fmt.Errorf("failed to pull image: %w", err)
+		return
 	}
 
-	containerID, err := rt.CreateContainer(ctx, cc)
+	containerID, err = rt.CreateContainer(ctx, cc)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create container: %w", err)
+		err = fmt.Errorf("failed to create container: %w", err)
+		return
 	}
 
-	cleanup := func() {}
+	cleanup = func() {}
 	if cc.Remove {
 		cleanupCtx := context.WithoutCancel(ctx)
 		cleanup = func() {
@@ -790,9 +811,8 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		}
 	}
 
-	return rt, containerID, cleanup, nil
+	return
 }
-
 func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *container.ContainerConfig) func() {
 	o.logger.Debug("Host STDIN is terminal: %v", isHostStdinTerminal)
 
@@ -1306,4 +1326,3 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	return processedArgs, nil
 }
-

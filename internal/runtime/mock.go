@@ -46,6 +46,8 @@ type MockRuntime struct {
 	WaitFunc    func(ctx context.Context, containerID string) (int, error)
 	AttachFunc  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
+	CloseCalled bool
+	CloseErr    error
 }
 
 // WithLockedMock executes the provided function while holding the mock's mutex.
@@ -231,8 +233,17 @@ func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) 
 	return false, exitCode, nil
 }
 
+// Name returns the name of the runtime.
 func (m *MockRuntime) Name() string {
 	return "mock"
+}
+
+// Close closes the MockRuntime.
+func (m *MockRuntime) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.CloseCalled = true
+	return m.CloseErr
 }
 
 // ResetCreatedConfig resets the created config to nil.

@@ -23,9 +23,9 @@ func (m *mockFileInfoLarge) Sys() any           { return nil }
 
 type largeFileMockFS struct {
 	MockFileSystem
-	statFileInfo  os.FileInfo
-	statErr       error
-	failStatPath  string
+	statFileInfo os.FileInfo
+	statErr      error
+	failStatPath string
 }
 
 func (m *largeFileMockFS) Stat(name string) (os.FileInfo, error) {

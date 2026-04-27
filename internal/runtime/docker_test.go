@@ -89,6 +89,9 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 }
 
 type mockDockerClient struct {
+	closeErr         error
+	closeCalled      bool
+	closeCount       int
 	imageInspectErr  error
 	imageInspectFunc func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error)
 	inspectCount     int
@@ -126,6 +129,12 @@ type mockDockerClient struct {
 	attachErr   error
 	inspectResp dockercontainer.InspectResponse
 	inspectErr  error
+}
+
+func (m *mockDockerClient) Close() error {
+	m.closeCalled = true
+	m.closeCount++
+	return m.closeErr
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -818,9 +827,10 @@ func TestUnit_Docker_DefaultSleepFunc(t *testing.T) {
 
 func TestUnit_Docker_New_Error(t *testing.T) {
 	// client.WithHost("invalid") should fail during client.NewClientWithOpts
-	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", client.WithHost("invalid"))
+	_, err := NewDockerRuntimeWithOptions("/tmp/mock.sock", "test", []client.Opt{client.WithHost("invalid")})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to create docker client")
+	assert.Contains(t, err.Error(), "creating docker client")
+	assert.Contains(t, err.Error(), "unable to parse docker host")
 }
 
 type syncFailingReader struct {
@@ -1005,5 +1015,44 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "id", true, stdin, io.Discard, io.Discard, ready)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "output failed")
+	})
+}
+
+func TestUnit_Docker_Close(t *testing.T) {
+	t.Run("Close success", func(t *testing.T) {
+		t.Parallel()
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{client: mock}
+
+		// First call
+		err := runtime.Close()
+		require.NoError(t, err)
+		assert.True(t, mock.closeCalled)
+		assert.Equal(t, 1, mock.closeCount)
+
+		// Second call (idempotency check)
+		err = runtime.Close()
+		require.NoError(t, err)
+		// Should still be 1 because it's idempotent
+		assert.Equal(t, 1, mock.closeCount)
+	})
+
+	t.Run("Close error propagation", func(t *testing.T) {
+		t.Parallel()
+		expectedErr := errors.New("close error")
+		mock := &mockDockerClient{closeErr: expectedErr}
+		runtime := &DockerRuntime{client: mock}
+
+		// First call
+		err := runtime.Close()
+		require.ErrorIs(t, err, expectedErr)
+		assert.True(t, mock.closeCalled)
+		assert.Equal(t, 1, mock.closeCount)
+
+		// Second call (idempotency check - returns same error)
+		err = runtime.Close()
+		require.ErrorIs(t, err, expectedErr)
+		// Should still be 1 because it's idempotent
+		assert.Equal(t, 1, mock.closeCount)
 	})
 }
