@@ -34,7 +34,6 @@ func TestUnit_Containerd_IsRetryablePullError(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(fmt.Sprintf("%v", tt.err), func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tt.expected, isRetryablePullError(tt.err))
@@ -62,7 +61,6 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.sig, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseSignal(tt.sig)

@@ -80,7 +80,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 	var lastErr error
 	attempts := maxRetries + 1
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) for %s after error: %v", i+1, attempts, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<i)*backoffBase); err != nil {
@@ -155,18 +155,32 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	for _, m := range config.Mounts {
 		mountType := m.Type
-		if mountType == "" { mountType = "bind" }
+		if mountType == "" {
+			mountType = "bind"
+		}
 		var mOpts []string
-		if m.ReadOnly { mOpts = append(mOpts, "ro") } else { mOpts = append(mOpts, "rw") }
-		if mountType == "bind" { mOpts = append(mOpts, "rbind") }
+		if m.ReadOnly {
+			mOpts = append(mOpts, "ro")
+		} else {
+			mOpts = append(mOpts, "rw")
+		}
+		if mountType == "bind" {
+			mOpts = append(mOpts, "rbind")
+		}
 		opts = append(opts, oci.WithMounts([]specs.Mount{{
 			Type: mountType, Source: m.Source, Destination: m.Target, Options: mOpts,
 		}}))
 	}
 
-	if config.Privileged { opts = append(opts, oci.WithPrivileged) }
-	if len(config.CapAdd) > 0 { opts = append(opts, oci.WithAddedCapabilities(config.CapAdd)) }
-	if len(config.CapDrop) > 0 { opts = append(opts, oci.WithDroppedCapabilities(config.CapDrop)) }
+	if config.Privileged {
+		opts = append(opts, oci.WithPrivileged)
+	}
+	if len(config.CapAdd) > 0 {
+		opts = append(opts, oci.WithAddedCapabilities(config.CapAdd))
+	}
+	if len(config.CapDrop) > 0 {
+		opts = append(opts, oci.WithDroppedCapabilities(config.CapDrop))
+	}
 
 	if config.Memory > 0 {
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
@@ -184,11 +198,13 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 	}
 
-	if config.Hostname != "" { opts = append(opts, oci.WithHostname(config.Hostname)) }
+	if config.Hostname != "" {
+		opts = append(opts, oci.WithHostname(config.Hostname))
+	}
 
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
-	} else if config.Network != "" && config.Network != "none" {
+	} else if config.Network != "" && config.Network != "bridge" && config.Network != "none" {
 		return "", fmt.Errorf("containerd runtime: custom network %q is not supported yet", config.Network)
 	}
 
@@ -208,39 +224,53 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	r.mu.Lock()
 	creator, ok := r.ioMap[containerID]
 	delete(r.ioMap, containerID)
 	r.mu.Unlock()
 
-	if !ok { creator = cio.NullIO }
+	if !ok {
+		creator = cio.NullIO
+	}
 
 	task, err := container.NewTask(ctx, creator)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	started := false
 	defer func() {
 		if !started {
 			cCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_, _ = task.Delete(cCtx, client.WithProcessKill)
+			_, _ = task.Delete(cCtx, client.WithProcessKill) //nolint:errcheck
 		}
 	}()
 
-	if err := task.Start(ctx); err != nil { return err }
+	if err := task.Start(ctx); err != nil {
+		return err
+	}
 	started = true
 	return nil
 }
 
 func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	task, err := container.Task(ctx, nil)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	exitStatusC, err := task.Wait(ctx)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 
 	select {
 	case status := <-exitStatusC:
@@ -256,13 +286,15 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {
-		if errdefs.IsNotFound(err) { return nil }
+		if errdefs.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
 	task, err := container.Task(cCtx, nil)
 	if err == nil {
-		_, _ = task.Delete(cCtx, client.WithProcessKill)
+		_, _ = task.Delete(cCtx, client.WithProcessKill) //nolint:errcheck
 	}
 
 	return container.Delete(cCtx, client.WithSnapshotCleanup)
@@ -270,22 +302,34 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 
 func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	task, err := container.Task(ctx, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	parsedSig, err := parseSignal(sig)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	return task.Kill(ctx, parsedSig)
 }
 
 func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	task, err := container.Task(ctx, nil)
-	if err != nil { return err }
-	if rows > math.MaxUint32 || cols > math.MaxUint32 { return fmt.Errorf("size out of range") }
+	if err != nil {
+		return err
+	}
+	if rows > math.MaxUint32 || cols > math.MaxUint32 {
+		return fmt.Errorf("size out of range")
+	}
 	return task.Resize(ctx, uint32(cols), uint32(rows))
 }
 
@@ -301,52 +345,74 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 	r.ioMap[containerID] = creator
 	r.mu.Unlock()
 
-	if ready != nil { close(ready) }
+	if ready != nil {
+		close(ready)
+	}
 
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	var task client.Task
 	for {
 		task, err = container.Task(ctx, nil)
-		if err == nil { break }
-		if !errdefs.IsNotFound(err) { return err }
+		if err == nil {
+			break
+		}
+		if !errdefs.IsNotFound(err) {
+			return err
+		}
 		select {
-		case <-ctx.Done(): return ctx.Err()
-		case <-time.After(50 * time.Millisecond): continue
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+			continue
 		}
 	}
 
 	exitStatusC, err := task.Wait(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	select {
-	case <-exitStatusC: return nil
-	case <-ctx.Done(): return ctx.Err()
+	case <-exitStatusC:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
 func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
 	container, err := r.client.LoadContainer(ctx, containerID)
-	if err != nil { return false, 0, err }
+	if err != nil {
+		return false, 0, err
+	}
 	task, err := container.Task(ctx, nil)
 	if err != nil {
-		if errdefs.IsNotFound(err) { return false, 0, nil }
+		if errdefs.IsNotFound(err) {
+			return false, 0, nil
+		}
 		return false, 0, err
 	}
 	status, err := task.Status(ctx)
-	if err != nil { return false, 0, err }
+	if err != nil {
+		return false, 0, err
+	}
 	return status.Status == client.Running, int(status.ExitStatus), nil
 }
 
 func parseSignal(sig string) (syscall.Signal, error) {
 	if n, err := strconv.Atoi(sig); err == nil {
-		if n <= 0 || n > 64 { return 0, fmt.Errorf("invalid signal number: %d", n) }
+		if n <= 0 || n > 64 {
+			return 0, fmt.Errorf("invalid signal number: %d", n)
+		}
 		return syscall.Signal(n), nil
 	}
 
 	name := strings.ToUpper(sig)
-	if strings.HasPrefix(name, "SIG") { name = strings.TrimPrefix(name, "SIG") }
+	name, _ = strings.CutPrefix(name, "SIG")
 
 	signals := map[string]syscall.Signal{
 		"HUP": syscall.SIGHUP, "INT": syscall.SIGINT, "QUIT": syscall.SIGQUIT, "ILL": syscall.SIGILL,
@@ -359,6 +425,8 @@ func parseSignal(sig string) (syscall.Signal, error) {
 		"PWR": syscall.SIGPWR, "SYS": syscall.SIGSYS,
 	}
 
-	if s, ok := signals[name]; ok { return s, nil }
+	if s, ok := signals[name]; ok {
+		return s, nil
+	}
 	return 0, fmt.Errorf("unsupported signal: %q", sig)
 }
