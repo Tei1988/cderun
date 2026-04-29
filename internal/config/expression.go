@@ -322,7 +322,6 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	if filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\") {
 		return "", fmt.Errorf("only a single file or directory name is allowed in find_dir directive: %q", name)
-		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in find_dir directive: %q", name)
 	}
 
 	r.ensureLoader()
