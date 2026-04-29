@@ -368,7 +368,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		fs = r.fs
 	}
 
-	res := p
+	var res string
 	if r != nil {
 		resolved, err := r.ResolveString(p)
 		if err != nil {
