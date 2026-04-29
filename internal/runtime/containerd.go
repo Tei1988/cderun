@@ -75,10 +75,10 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
-	attempts := maxRetries + 1
+	attempts := maxRetries
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
 				return err
 			}
@@ -110,7 +110,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		}
 		return nil
 	}
-	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {

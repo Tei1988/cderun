@@ -40,6 +40,9 @@ func IsRetryablePullError(err error) bool {
 		"request canceled",
 		"rate limit exceeded",
 		"toomanyrequests",
+		"rate exceeded",
+		"rate limit",
+		"data limit exceeded",
 		"eof",
 	}
 
@@ -58,6 +61,7 @@ func IsTemporaryAuthError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
+	// Catch temporary token issues or specific hints for re-authentication
 	return strings.Contains(msg, "unauthorized") || strings.Contains(msg, "403 forbidden") || strings.Contains(msg, "token expired")
 }
 

@@ -126,10 +126,10 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	}
 
 	var lastErr error
-	attempts := maxRetries + 1
+	attempts := maxRetries
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries, img, lastErr)
 			if err := d.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
 				return err
 			}
@@ -174,7 +174,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
 
 }
 
