@@ -31,11 +31,11 @@ jobs:
         VERSION=2.2.2
         TARBALL="containerd-${VERSION}-linux-amd64.tar.gz"
         URL="https://github.com/containerd/containerd/releases/download/v${VERSION}/${TARBALL}"
-        wget "$URL"
-        wget "${URL}.sha256sum"
+        wget -q "$URL"
+        wget -q "${URL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
-        sudo wget "https://raw.githubusercontent.com/containerd/containerd/v${VERSION}/containerd.service" -O /etc/systemd/system/containerd.service
+        sudo wget -q "https://raw.githubusercontent.com/containerd/containerd/v${VERSION}/containerd.service" -O /etc/systemd/system/containerd.service
         sudo systemctl daemon-reload
         sudo systemctl enable --now containerd
     - name: Install CNI plugins
@@ -43,9 +43,9 @@ jobs:
         VERSION=1.6.2
         TARBALL="cni-plugins-linux-amd64-v${VERSION}.tgz"
         URL="https://github.com/containernetworking/plugins/releases/download/v${VERSION}/${TARBALL}"
-        wget "$URL"
-        wget "${URL}.sha256"
-        echo "$(cat ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
+        wget -q "$URL"
+        wget -q "${URL}.sha256"
+        echo "$(awk '{print $1}' ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
         sudo mkdir -p /opt/cni/bin
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs

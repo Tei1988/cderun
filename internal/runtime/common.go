@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
-	dockererrdefs "github.com/docker/docker/errdefs"
 )
 
 // IsRetryablePullError returns true if the error from a pull operation is likely transient and worth retrying.
@@ -17,12 +16,6 @@ func IsRetryablePullError(err error) bool {
 
 	// containerd/errdefs
 	if errdefs.IsUnavailable(err) || errdefs.IsDeadlineExceeded(err) || errdefs.IsCanceled(err) {
-		return true
-	}
-
-	// docker/errdefs
-	// SA1019: dockererrdefs.IsSystem is deprecated: use containerd [cerrdefs.IsInternal]
-	if dockererrdefs.IsSystem(err) || dockererrdefs.IsUnknown(err) || dockererrdefs.IsDeadline(err) || dockererrdefs.IsCancelled(err) { //nolint:staticcheck
 		return true
 	}
 

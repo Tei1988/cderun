@@ -579,12 +579,27 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "docker", res.Runtime)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
-		// specified unknown runtime (e.g. from global)
-		global := &CDERunConfig{Runtime: "containerd"}
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		// containerd.sock exists
+		mfs = &MockFileSystem{
+			Dirs:  map[string]bool{"/run/containerd": true},
+			Files: map[string][]byte{"/run/containerd/containerd.sock": []byte("")},
+		}
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Runtime)
-		assert.Equal(t, "/var/run/docker.sock", res.SocketPath) // Fallback to docker socket
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
+
+		// specified containerd but no socket
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Runtime: "containerd", RuntimeSet: true}, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
+
+		// specified unknown runtime (e.g. from global)
+		global := &CDERunConfig{Runtime: "unknown"}
+		_, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported runtime: \"unknown\"")
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {
