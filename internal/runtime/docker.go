@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/containerd/errdefs"
 	"context"
 	"fmt"
 	"io"
@@ -8,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	dockererrdefs "github.com/docker/docker/errdefs"
+
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -140,7 +141,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			if err == nil {
 				return nil // Image exists locally
 			}
-			if !dockererrdefs.IsNotFound(err) {
+			if !errdefs.IsNotFound(err) {
 				lastErr = err
 				if IsRetryablePullError(err) {
 					continue
@@ -220,7 +221,7 @@ func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string)
 	if err != nil {
 		// Suppress errors if the container is already gone or removal is already in progress.
 		// This can happen when AutoRemove is enabled and the container finishes before the defer block runs.
-		if dockererrdefs.IsNotFound(err) || dockererrdefs.IsConflict(err) {
+		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
 			return nil
 		}
 	}
@@ -243,7 +244,7 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 	err := d.client.ContainerKill(ctx, containerID, sig)
 	if err != nil {
 		// Suppress errors if the container is already gone or not running.
-		if dockererrdefs.IsNotFound(err) || dockererrdefs.IsConflict(err) {
+		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
 			return nil
 		}
 	}

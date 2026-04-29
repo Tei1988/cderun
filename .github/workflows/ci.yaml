@@ -14,7 +14,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25.0'
     - name: Run unit tests
       run: go test -v ./...
 
@@ -25,21 +25,29 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25.0'
     - name: Install containerd
       run: |
         VERSION=2.2.2
-        wget https://github.com/containerd/containerd/releases/download/v${VERSION}/containerd-${VERSION}-linux-amd64.tar.gz
-        sudo tar Cxzvf /usr/local containerd-${VERSION}-linux-amd64.tar.gz
-        sudo wget https://raw.githubusercontent.com/containerd/containerd/main/containerd.service -O /etc/systemd/system/containerd.service
+        TARBALL="containerd-${VERSION}-linux-amd64.tar.gz"
+        URL="https://github.com/containerd/containerd/releases/download/v${VERSION}/${TARBALL}"
+        wget "$URL"
+        wget "${URL}.sha256sum"
+        sha256sum -c "${TARBALL}.sha256sum"
+        sudo tar Cxzvf /usr/local "$TARBALL"
+        sudo wget "https://raw.githubusercontent.com/containerd/containerd/v${VERSION}/containerd.service" -O /etc/systemd/system/containerd.service
         sudo systemctl daemon-reload
         sudo systemctl enable --now containerd
     - name: Install CNI plugins
       run: |
         VERSION=1.6.2
-        wget https://github.com/containernetworking/plugins/releases/download/v${VERSION}/cni-plugins-linux-amd64-v${VERSION}.tgz
+        TARBALL="cni-plugins-linux-amd64-v${VERSION}.tgz"
+        URL="https://github.com/containernetworking/plugins/releases/download/v${VERSION}/${TARBALL}"
+        wget "$URL"
+        wget "${URL}.sha256"
+        echo "$(cat ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
         sudo mkdir -p /opt/cni/bin
-        sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v${VERSION}.tgz
+        sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs
       run: |
         sudo apt-get install -y acl
@@ -47,5 +55,5 @@ jobs:
     - name: Run containerd integration tests
       run: |
         export CDERUN_RUNTIME=containerd
-        export CDERUN_SOCKET=/run/containerd/containerd.sock
+        export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
         go test -v ./internal/runtime/...

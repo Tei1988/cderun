@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -747,6 +746,8 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		if rv.res.SocketPath != "" {
 			if strings.Contains(rv.res.SocketPath, "podman") {
 				rv.res.Runtime = "podman"
+			} else if strings.Contains(rv.res.SocketPath, "containerd") {
+				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"
 			}
@@ -754,6 +755,9 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 			if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
 				rv.res.Runtime = "docker"
 				rv.res.SocketPath = "/var/run/docker.sock"
+			} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+				rv.res.Runtime = "containerd"
+				rv.res.SocketPath = "/run/containerd/containerd.sock"
 			} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
 				rv.res.Runtime = "podman"
 				rv.res.SocketPath = "/run/podman/podman.sock"
@@ -767,6 +771,8 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 	if rv.res.SocketPath == "" {
 		if rv.res.Runtime == "podman" {
 			rv.res.SocketPath = "/run/podman/podman.sock"
+		} else if rv.res.Runtime == "containerd" {
+			rv.res.SocketPath = "/run/containerd/containerd.sock"
 		} else {
 			rv.res.SocketPath = "/var/run/docker.sock"
 		}
@@ -1116,17 +1122,4 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	default:
 		return cp.Resolve(r)
 	}
-}
-
-func (r *ExpressionResolver) resolveContainerdSocket(ctx context.Context) (string, error) {
-	paths := []string{
-		"/run/containerd/containerd.sock",
-		"/var/run/containerd/containerd.sock",
-	}
-	for _, p := range paths {
-		if _, err := r.fs.Stat(p); err == nil {
-			return p, nil
-		}
-	}
-	return "", fmt.Errorf("containerd socket not found")
 }
