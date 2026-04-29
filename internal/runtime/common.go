@@ -14,8 +14,13 @@ func IsRetryablePullError(err error) bool {
 		return false
 	}
 
+	// Explicit cancellation should not be retried.
+	if errdefs.IsCanceled(err) {
+		return false
+	}
+
 	// containerd/errdefs
-	if errdefs.IsUnavailable(err) || errdefs.IsDeadlineExceeded(err) || errdefs.IsCanceled(err) {
+	if errdefs.IsUnavailable(err) || errdefs.IsDeadlineExceeded(err) {
 		return true
 	}
 
@@ -30,7 +35,6 @@ func IsRetryablePullError(err error) bool {
 		"no such host",
 		"tls handshake timeout",
 		"client.timeout exceeded",
-		"request canceled",
 		"rate limit exceeded",
 		"toomanyrequests",
 		"rate exceeded",
@@ -54,8 +58,20 @@ func IsTemporaryAuthError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	// Catch temporary token issues or specific hints for re-authentication
-	return strings.Contains(msg, "unauthorized") || strings.Contains(msg, "403 forbidden") || strings.Contains(msg, "token expired")
+	// Only return true for transient/refreshable conditions.
+	refreshableKeywords := []string{
+		"token expired",
+		"expired token",
+		"refresh token",
+		"reauthenticate",
+		"token refresh",
+	}
+	for _, kw := range refreshableKeywords {
+		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // SleepFunc is a helper for cancellable sleep.

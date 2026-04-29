@@ -75,11 +75,11 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	}
 
 	var lastErr error
-	attempts := maxRetries
+	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries, img, lastErr)
-			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, attempts, img, lastErr)
+			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
 		}
@@ -110,7 +110,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 		}
 		return nil
 	}
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
+	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
@@ -131,8 +131,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		}
 	}
 
-	if config.Network != "" && config.Network != "host" && config.Network != "bridge" {
-		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
+	if config.Network != "" && config.Network != "host" {
+		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet (only \"host\" is supported for containerd)", config.Network)
 	}
 	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
 		return "", fmt.Errorf("containerd runtime: port mapping is not supported yet")
@@ -363,6 +363,26 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 	r.ioMap[containerID] = creator
 	r.ioWait[containerID] = waitC
 	r.mu.Unlock()
+
+	go func() {
+		container, err := r.client.LoadContainer(ctx, containerID)
+		if err != nil {
+			return
+		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return
+		}
+		exitStatusC, err := task.Wait(ctx)
+		if err != nil {
+			return
+		}
+		select {
+		case status := <-exitStatusC:
+			waitC <- status.Error()
+		case <-ctx.Done():
+		}
+	}()
 
 	defer func() {
 		r.mu.Lock()

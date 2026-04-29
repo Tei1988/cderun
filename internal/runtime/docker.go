@@ -127,11 +127,11 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	}
 
 	var lastErr error
-	attempts := maxRetries
+	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, maxRetries, img, lastErr)
-			if err := d.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, attempts, img, lastErr)
+			if err := d.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
 		}
@@ -175,8 +175,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		return nil // Success
 	}
 
-	return fmt.Errorf("failed to pull image after %d attempts: %w", maxRetries, lastErr)
-
+	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
 }
 
 // CreateContainer creates a new container based on the provided config.
