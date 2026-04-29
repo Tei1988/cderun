@@ -351,12 +351,7 @@ func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	return val, nil
 }
 
-
 func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, error) {
-	if r.HostContext == nil || r.HostContext.Level == 0 {
-		return absPath, nil
-	}
-
 	abs := absPath
 	if !filepath.IsAbs(abs) {
 		a, err := r.fs.Abs(abs)
@@ -364,6 +359,10 @@ func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, err
 			return "", fmt.Errorf("failed to get absolute path for %q: %w", abs, err)
 		}
 		abs = a
+	}
+
+	if r.HostContext == nil || r.HostContext.Level == 0 {
+		return abs, nil
 	}
 
 	found := false
@@ -388,5 +387,5 @@ func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, err
 	if found {
 		return filepath.Join(bestSource, bestRel), nil
 	}
-	return absPath, nil
+	return abs, nil
 }

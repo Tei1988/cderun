@@ -447,15 +447,6 @@ func TestUnit_Expression_EnvWithDefault(t *testing.T) {
 }
 
 func TestUnit_Expression_FindDir_Nested(t *testing.T) {
-	// fs is unused but kept for structure if needed later
-	_ = &MockFileSystem{
-		Dirs: map[string]bool{
-			"/host/project":      true,
-			"/host/project/package.json": true,
-		},
-		WD: "/host/project",
-	}
-
 	t.Run("find_dir in nested environment - mapped", func(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 1,
@@ -463,8 +454,6 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 				{Source: "/host/project", Target: "/app", Level: 1},
 			},
 		}
-		// In the container, /app is mapped to /host/project.
-		// If we are in /app, find_dir:package.json should find /app/package.json (which is /host/project/package.json on host)
 		containerFS := &MockFileSystem{
 			Files: map[string][]byte{
 				filepath.FromSlash("/app/package.json"): []byte(""),
@@ -479,7 +468,6 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 
 		val := r.resolveString("{{ find_dir:package.json }}")
 		require.NoError(t, r.Error())
-		// It finds /app, then reverse-resolves it to /host/project
 		assert.Equal(t, filepath.FromSlash("/host/project"), val)
 	})
 
@@ -504,7 +492,6 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 
 		val := r.resolveString("{{ find_dir:package.json }}")
 		require.NoError(t, r.Error())
-		// /app is not under any mount, so it stays as /app
 		assert.Equal(t, filepath.FromSlash("/app"), val)
 	})
 }
