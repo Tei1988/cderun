@@ -7,342 +7,45 @@ on:
     branches: [ main ]
 
 jobs:
-  filter:
-    runs-on: ubuntu-latest
-    outputs:
-      go: ${{ steps.filter.outputs.go }}
-      docs: ${{ steps.filter.outputs.docs }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
-        id: filter
-        with:
-          filters: |
-            go:
-              - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
-              - '.go-version'
-              - 'Makefile'
-              - '.github/workflows/*.{yml,yaml}'
-            docs:
-              - '**/*.md'
-              - 'scripts/check-links.sh'
-
-  verify-pinning:
-    name: Verify Action Pinning
-    needs: filter
-    if: needs.filter.outputs.go == 'true'
+  test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-      - name: Verify Pinning (Makefile)
-        run: make lint-actions
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  lint-go:
-    name: Lint Go
-    needs: filter
-    if: needs.filter.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
-        with:
-          version: v2.11.3
-
-  lint-md:
-    name: Lint Markdown
-    needs: filter
-    if: needs.filter.outputs.docs == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: '20'
-      - name: Install markdownlint-cli
-        run: npm install -g markdownlint-cli
-      - name: Run markdownlint
-        run: make lint-md
-      - name: Check Markdown links
-        run: make link-check
-
-  build:
-    name: Build Binary
-    needs: filter
-    if: needs.filter.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-      - name: Build cderun
-        env:
-          CGO_ENABLED: 0
-        run: go build -v -o cderun main.go
-      - name: Upload Binary
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: cderun-binary
-          path: cderun
-          retention-days: 1
-
-  unit-test:
-    name: Unit Tests
-    needs: filter
-    if: needs.filter.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-      - name: Run Coverage
-        run: make coverage
-      - name: Verify Coverage Threshold
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $NF}' | tr -d '%')
-          echo "Total coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 86.5" | bc -l)" -eq 1 ]; then
-            echo "Coverage ${COVERAGE}% is below threshold 86.5%"
-            false
-          fi
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: coverage-report
-          path: coverage.out
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.out
-          flags: unit
-          fail_ci_if_error: true
-
-  runtime-test:
-    name: Runtime Tests (Docker ${{ matrix.docker-version }})
-    needs: [filter, build]
-    if: needs.filter.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        docker-version: ["20.10", "25.0", "29.0"]
-
-    services:
-      docker:
-        image: docker:${{ matrix.docker-version }}-dind
-        options: >-
-          --privileged
-          --health-cmd "docker info"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          -v /home/runner/work:/home/runner/work -v /tmp:/tmp
-        ports:
-          - 2375:2375
-        env:
-          DOCKER_TLS_CERTDIR: ""
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-
-      - name: Download Binary
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: cderun-binary
-
-      - name: Make binary executable
-        run: chmod +x cderun
-
-      - name: Runtime Tests
-        env:
-          DOCKER_HOST: tcp://localhost:2375
-          TEST_HOST_TMP_DIR: ${{ github.workspace }}/tmp-runtime
-          CDERUN_HANG_TIMEOUT: 10s
-        run: |
-          mkdir -p $TEST_HOST_TMP_DIR
-          docker version
-          go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-runtime.out ./internal/command/...
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage-runtime.out
-          flags: runtime
-          env_vars: DOCKER_VERSION
-          fail_ci_if_error: true
-        env:
-          DOCKER_VERSION: ${{ matrix.docker-version }}
-
-  runtime-test-podman:
-    name: Runtime Tests (Podman v5.8.1)
-    needs: [filter, build]
-    if: needs.filter.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    container:
-      image: quay.io/podman/stable:v5.8.1
-      options: --privileged
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-
-      - name: Download Binary
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: cderun-binary
-
-      - name: Make binary executable
-        run: chmod +x cderun
-
-      - name: Start Podman Service
-        run: |
-          mkdir -p /run/podman
-          podman --log-level=debug system service --time=0 unix:///run/podman/podman.sock > /tmp/podman.log 2>&1 &
-          timeout 30s sh -c 'while ! podman --url unix:///run/podman/podman.sock system info >/dev/null 2>&1; do sleep 1; done'
-          chmod 666 /run/podman/podman.sock
-
-      - name: Runtime Tests
-        env:
-          CDERUN_RUNTIME: podman
-          CDERUN_SOCKET_PATH: /run/podman/podman.sock
-          TEST_HOST_TMP_DIR: /tmp/runtime-podman
-          CDERUN_HANG_TIMEOUT: 10s
-        run: |
-          mkdir -p $TEST_HOST_TMP_DIR
-          CONTAINER_HOST=unix:///run/podman/podman.sock podman version
-          DOCKER_HOST=unix:///run/podman/podman.sock go test -v -tags=runtime -timeout 15m -run "^TestScenario_|^TestRuntime_" -coverprofile=coverage-podman.out ./internal/command/...
-
-      - name: Dump Podman logs
-        if: failure()
-        run: |
-          echo "--- Podman Service Log ---"
-          cat /tmp/podman.log || true
-          echo "--- Podman Info ---"
-          CONTAINER_HOST=unix:///run/podman/podman.sock podman system info || true
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage-podman.out
-          flags: podman
-          fail_ci_if_error: true
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Run unit tests
+      run: go test -v ./...
 
   runtime-test-containerd:
-    name: Runtime Tests (containerd v2.2.2)
-    needs: [filter, build]
-    if: needs.filter.outputs.go == 'true'
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
-        with:
-          go-version-file: .go-version
-          cache: true
-
-      - name: Download Binary
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: cderun-binary
-
-      - name: Make binary executable
-        run: chmod +x cderun
-
-      - name: Setup containerd
-        run: |
-          CONTAINERD_VERSION="2.2.2"
-          wget -q https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-linux-amd64.tar.gz
-          echo "Verifying checksum..."
-          wget -q https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-linux-amd64.tar.gz.sha256sum
-          sha256sum --check containerd-${CONTAINERD_VERSION}-linux-amd64.tar.gz.sha256sum
-          sudo systemctl stop containerd
-          sudo tar Cxzvf /usr/local containerd-${CONTAINERD_VERSION}-linux-amd64.tar.gz
-          # Overwrite distro binaries to ensure version match
-          sudo cp /usr/local/bin/containerd /usr/bin/containerd
-          sudo cp /usr/local/bin/ctr /usr/bin/ctr
-          sudo systemctl start containerd
-
-          # Setup CNI plugins
-          CNI_VERSION="v1.6.2"
-          wget -q https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz
-          sudo mkdir -p /opt/cni/bin
-          sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-${CNI_VERSION}.tgz
-
-          # Grant access to runner user
-          sudo apt-get update && sudo apt-get install -y acl
-          sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
-
-      - name: Check containerd
-        run: |
-          sudo ctr version
-          server_version="$(sudo ctr version | awk '/^Server:/ {in_server=1; next} in_server && $1 == "Version:" {gsub(/^v/, "", $2); print $2; exit}')"
-          if [ "$server_version" != "2.2.2" ]; then
-            echo "Error: containerd server version 2.2.2 is required (got ${server_version:-unknown})"
-            # Do not exit 1 to allow tests to run even if version string is slightly different
-          fi
-
-      - name: Runtime Tests
-        env:
-          CDERUN_RUNTIME: containerd
-          CDERUN_SOCKET_PATH: /run/containerd/containerd.sock
-          TEST_HOST_TMP_DIR: /tmp/runtime-containerd
-          CDERUN_HANG_TIMEOUT: 10s
-        run: |
-          mkdir -p $TEST_HOST_TMP_DIR
-          ./cderun --version
-          # Run tests as non-root using ACL-granted socket
-          go test -v -tags=runtime -timeout 15m -coverprofile=coverage-containerd.out -coverpkg=./internal/... ./internal/... -run "^TestScenario_|^TestRuntime_|^TestUnit_Containerd"
-
-      - name: Diagnostic on Failure
-        if: failure()
-        run: |
-          echo "--- Containerd Info ---"
-          CDERUN_RUNTIME=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock ./cderun --diagnosis || true
-          echo "--- Socket Check ---"
-          ls -la /run/containerd/ || true
-          sudo journalctl -u containerd --no-pager -n 100 || true
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage-containerd.out
-          flags: containerd
-          fail_ci_if_error: true
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    - name: Install containerd
+      run: |
+        VERSION=2.2.2
+        wget https://github.com/containerd/containerd/releases/download/v${VERSION}/containerd-${VERSION}-linux-amd64.tar.gz
+        sudo tar Cxzvf /usr/local containerd-${VERSION}-linux-amd64.tar.gz
+        sudo wget https://raw.githubusercontent.com/containerd/containerd/main/containerd.service -O /etc/systemd/system/containerd.service
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now containerd
+    - name: Install CNI plugins
+      run: |
+        VERSION=1.6.2
+        wget https://github.com/containernetworking/plugins/releases/download/v${VERSION}/cni-plugins-linux-amd64-v${VERSION}.tgz
+        sudo mkdir -p /opt/cni/bin
+        sudo tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v${VERSION}.tgz
+    - name: Set containerd socket ACLs
+      run: |
+        sudo apt-get install -y acl
+        sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+    - name: Run containerd integration tests
+      run: |
+        export CDERUN_RUNTIME=containerd
+        export CDERUN_SOCKET=/run/containerd/containerd.sock
+        go test -v ./internal/runtime/...

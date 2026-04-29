@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/errdefs"
+	dockererrdefs "github.com/docker/docker/errdefs"
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -53,6 +53,8 @@ type DockerRuntime struct {
 type DockerRuntimeOption func(*DockerRuntime)
 
 // WithAttachCloseWriteGrace sets the grace period before closing the write side of an attached connection.
+// This is useful in slow or high-latency environments where the default 100ms might be too short
+// for the daemon to process the EOF. If d is non-positive, a minimum duration of 1ms is used.
 func WithAttachCloseWriteGrace(d time.Duration) DockerRuntimeOption {
 	return func(rt *DockerRuntime) {
 		if d <= 0 {
@@ -90,7 +92,16 @@ func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client
 		socket:                socket,
 		name:                  name,
 		attachCloseWriteGrace: 100 * time.Millisecond,
-		sleepFunc:             SleepFunc,
+		sleepFunc: func(ctx context.Context, d time.Duration) error {
+			t := time.NewTimer(d)
+			defer t.Stop()
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-t.C:
+				return nil
+			}
+		},
 	}
 
 	for _, opt := range rtOpts {
@@ -116,7 +127,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 
 	var lastErr error
 	attempts := maxRetries + 1
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
 			if err := d.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
@@ -129,7 +140,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			if err == nil {
 				return nil // Image exists locally
 			}
-			if !errdefs.IsNotFound(err) {
+			if !dockererrdefs.IsNotFound(err) {
 				lastErr = err
 				if IsRetryablePullError(err) {
 					continue
@@ -138,6 +149,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			}
 		}
 
+		// Policy is "always" or "missing" (and not found locally)
 		logging.Info("Pulling image %s...", img)
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
@@ -148,6 +160,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 			return fmt.Errorf("failed to pull image: %w", err)
 		}
 
+		// Wait for pull to complete and check for errors in the stream
 		err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
 		_ = reader.Close() //nolint:errcheck
 		if err != nil {
@@ -162,6 +175,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	}
 
 	return fmt.Errorf("failed to pull image after %d attempts: %w", attempts, lastErr)
+
 }
 
 // CreateContainer creates a new container based on the provided config.
@@ -204,7 +218,9 @@ func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string)
 		Force: true,
 	})
 	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+		// Suppress errors if the container is already gone or removal is already in progress.
+		// This can happen when AutoRemove is enabled and the container finishes before the defer block runs.
+		if dockererrdefs.IsNotFound(err) || dockererrdefs.IsConflict(err) {
 			return nil
 		}
 	}
@@ -226,7 +242,8 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 	}
 	err := d.client.ContainerKill(ctx, containerID, sig)
 	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
+		// Suppress errors if the container is already gone or not running.
+		if dockererrdefs.IsNotFound(err) || dockererrdefs.IsConflict(err) {
 			return nil
 		}
 	}
@@ -245,6 +262,9 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	resp, err := d.client.ContainerAttach(ctx, containerID, dockercontainer.AttachOptions{
 		Stream: true,
+		// Logs: false is used here because we ensure the container is started only after
+		// attachment is established (via the ready channel). Using Logs: true can cause
+		// early EOF in some Docker versions if the container hasn't started yet.
 		Logs:   false,
 		Stdin:  stdin != nil,
 		Stdout: true,
@@ -270,6 +290,13 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				logging.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
 			} else {
 				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+
+				// Give a small grace period before closing the write side.
+				// In some Docker versions, calling CloseWrite immediately after io.Copy
+				// can cause the entire connection to be closed or the EOF to be processed
+				// before the data has been fully consumed by the daemon.
+				// Using d.sleepFunc ensures we respect context cancellation; if ctx is cancelled,
+				// sleepFunc returns an error and we skip CloseWrite to avoid redundant or late calls.
 				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
 					logging.Trace("Calling CloseWrite on container %s connection", containerID)
 					if err := resp.CloseWrite(); err != nil {
@@ -290,9 +317,11 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		var n int64
 		logging.Debug("Output goroutine started")
 		if tty {
+			// When TTY is enabled, the stream is raw (not multiplexed).
 			logging.Trace("Starting raw IO copy (TTY=true)")
 			n, err = io.Copy(stdout, resp.Reader)
 		} else {
+			// When TTY is disabled, the stream is multiplexed (stdout and stderr are separate).
 			logging.Trace("Starting multiplexed StdCopy (TTY=false)")
 			n, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
 		}
@@ -306,6 +335,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		outputDone <- err
 	}()
 
+	// Signal that goroutines are started and we are ready for the container to start.
 	if ready != nil {
 		close(ready)
 	}
@@ -314,6 +344,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	case err := <-outputDone:
 		logging.Trace("AttachContainer: output goroutine finished")
 		if err == nil {
+			// If output finished successfully, check if there was a pending stdin error.
 			select {
 			case <-stdinDone:
 				if stdinErr != nil {
@@ -329,6 +360,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			logging.Trace("AttachContainer: stdin goroutine finished with error")
 			return stdinErr
 		}
+		// If stdin is done, wait for the remaining output or context cancellation
 		select {
 		case err := <-outputDone:
 			logging.Trace("AttachContainer: output goroutine finished after stdin done")
@@ -337,6 +369,8 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			return ctx.Err()
 		}
 	case <-ctx.Done():
+		// Explicitly close the connection to force-unblock pending I/O on context cancellation.
+		// Double-closing is acceptable as resp.Close() error is intentionally ignored here or by defer.
 		resp.Close()
 		return ctx.Err()
 	}

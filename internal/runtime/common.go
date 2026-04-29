@@ -21,8 +21,8 @@ func IsRetryablePullError(err error) bool {
 	}
 
 	// docker/errdefs
-	//nolint:staticcheck // SA1019: dockererrdefs.IsSystem is deprecated, but we use it for compatibility
-	if dockererrdefs.IsSystem(err) || dockererrdefs.IsUnknown(err) || dockererrdefs.IsDeadline(err) || dockererrdefs.IsCancelled(err) {
+	// SA1019: dockererrdefs.IsSystem is deprecated: use containerd [cerrdefs.IsInternal]
+	if dockererrdefs.IsSystem(err) || dockererrdefs.IsUnknown(err) || dockererrdefs.IsDeadline(err) || dockererrdefs.IsCancelled(err) { //nolint:staticcheck
 		return true
 	}
 
@@ -58,7 +58,7 @@ func IsTemporaryAuthError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "401 unauthorized") || strings.Contains(msg, "403 forbidden") || strings.Contains(msg, "token expired") || strings.Contains(msg, "unauthorized")
+	return strings.Contains(msg, "unauthorized") || strings.Contains(msg, "403 forbidden") || strings.Contains(msg, "token expired")
 }
 
 // SleepFunc is a helper for cancellable sleep.

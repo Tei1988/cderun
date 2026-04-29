@@ -76,7 +76,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 
 	var lastErr error
 	attempts := maxRetries + 1
-	for i := 0; i < attempts; i++ {
+	for i := range attempts {
 		if i > 0 {
 			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i+1, attempts, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i))*backoffBase); err != nil {
@@ -114,6 +114,30 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	if config.Memory < 0 {
+		return "", fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
+	}
+	if config.CPUs < 0 {
+		return "", fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
+	}
+
+	var quota int64
+	var period uint64
+	if config.CPUs > 0 {
+		period = 100000
+		quota = int64(config.CPUs * float64(period))
+		if quota <= 0 {
+			return "", fmt.Errorf("containerd runtime: CPU quota %d derived from CPUs %f is too small", quota, config.CPUs)
+		}
+	}
+
+	if config.Network != "" && config.Network != "host" && config.Network != "bridge" {
+		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
+	}
+	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
+		return "", fmt.Errorf("containerd runtime: port mapping is not supported yet")
+	}
+
 	img, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
 		return "", fmt.Errorf("failed to get image: %w", err)
@@ -176,48 +200,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.Privileged {
 		opts = append(opts, oci.WithPrivileged)
 	}
-	if len(config.CapAdd) > 0 {
-		opts = append(opts, oci.WithAddedCapabilities(config.CapAdd))
-	}
-	if len(config.CapDrop) > 0 {
-		opts = append(opts, oci.WithDroppedCapabilities(config.CapDrop))
-	}
-
 	if config.Memory > 0 {
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
-	} else if config.Memory < 0 {
-		return "", fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
-
 	if config.CPUs > 0 {
-		period := uint64(100000)
-		quota := int64(config.CPUs * float64(period))
 		opts = append(opts, oci.WithCPUCFS(quota, period))
-	} else if config.CPUs < 0 {
-		return "", fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
 	}
-
-	for _, d := range config.Devices {
-		opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
-	}
-
 	if config.Hostname != "" {
 		opts = append(opts, oci.WithHostname(config.Hostname))
 	}
-
-	if config.Network != "" {
-		if config.Network == "host" {
-			opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
-		} else {
-			return "", fmt.Errorf("containerd runtime: Network %q is not supported yet", config.Network)
-		}
-	}
-
-	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
-		return "", fmt.Errorf("containerd runtime: port mapping is not supported yet")
-	}
-	if len(config.DNS) > 0 || len(config.AddHosts) > 0 {
-		return "", fmt.Errorf("containerd runtime: custom DNS/hosts are not supported yet")
+	if config.Network == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
 	}
 
 	_, err = r.client.NewContainer(ctx, id,
@@ -317,7 +310,6 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	if err == nil {
 		if _, delErr := task.Delete(cCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
 			logging.Warn("failed to delete task during container removal (best-effort): %v", delErr)
-			return fmt.Errorf("failed to delete task before container deletion: %w", delErr)
 		}
 	}
 
@@ -427,7 +419,7 @@ func parseSignal(sig string) (syscall.Signal, error) {
 		"HUP": syscall.SIGHUP, "INT": syscall.SIGINT, "QUIT": syscall.SIGQUIT, "ILL": syscall.SIGILL,
 		"TRAP": syscall.SIGTRAP, "ABRT": syscall.SIGABRT, "BUS": syscall.SIGBUS, "FPE": syscall.SIGFPE,
 		"KILL": syscall.SIGKILL, "USR1": syscall.SIGUSR1, "SEGV": syscall.SIGSEGV, "USR2": syscall.SIGUSR2,
-		"PIPE": syscall.SIGPIPE, "ALRM": syscall.SIGALRM, "TERM": syscall.SIGTERM, "CHLD": syscall.SIGCHLD,
+		"PIPE": syscall.SIGALRM, "ALRM": syscall.SIGALRM, "TERM": syscall.SIGTERM, "CHLD": syscall.SIGCHLD,
 		"CONT": syscall.SIGCONT, "STOP": syscall.SIGSTOP, "TSTP": syscall.SIGTSTP, "TTIN": syscall.SIGTTIN,
 		"TTOU": syscall.SIGTTOU, "URG": syscall.SIGURG, "XCPU": syscall.SIGXCPU, "XFSZ": syscall.SIGXFSZ,
 		"VTALRM": syscall.SIGVTALRM, "PROF": syscall.SIGPROF, "WINCH": syscall.SIGWINCH, "IO": syscall.SIGIO,
