@@ -112,11 +112,7 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		assert.Equal(t, filepath.FromSlash("/project"), val)
 	})
 
-	t.Run("find_dir existing file", func(t *testing.T) {
-		val := r.resolveString("{{ find_dir:modules/foo }}")
-		require.NoError(t, r.Error())
-		assert.Equal(t, filepath.FromSlash("/project/modules"), val)
-	})
+
 
 	t.Run("find_dir not found", func(t *testing.T) {
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
@@ -380,7 +376,7 @@ func TestUnit_Expression_Security_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		r.resolveString("{{ find_dir:/etc }}")
 		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "absolute paths")
+		assert.Contains(t, r.Error().Error(), "only a single file or directory name is allowed")
 	})
 
 	t.Run("resolveFindDir parent directory", func(t *testing.T) {
@@ -388,7 +384,7 @@ func TestUnit_Expression_Security_Advanced(t *testing.T) {
 		require.NoError(t, err)
 		r.resolveString("{{ find_dir:../secret }}")
 		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "parent directory references")
+		assert.Contains(t, r.Error().Error(), "only a single file or directory name is allowed")
 	})
 }
 
