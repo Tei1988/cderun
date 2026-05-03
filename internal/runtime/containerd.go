@@ -206,6 +206,12 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.CPUs > 0 {
 		opts = append(opts, oci.WithCPUCFS(quota, period))
 	}
+		if config.Devices != nil {
+		for _, d := range config.Devices {
+			opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+		}
+	}
+
 	if config.Hostname != "" {
 		opts = append(opts, oci.WithHostname(config.Hostname))
 	}

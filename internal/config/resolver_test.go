@@ -589,7 +589,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "containerd", res.Runtime)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
-				// detection priority: docker > containerd > podman
+				// Priority: docker > containerd > podman
 		mfs = &MockFileSystem{
 			Dirs:  map[string]bool{"/var/run": true, "/run/containerd": true, "/run/podman": true},
 			Files: map[string][]byte{
