@@ -494,4 +494,29 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 		require.NoError(t, r.Error())
 		assert.Equal(t, filepath.FromSlash("/app"), val)
 	})
+	t.Run("find_dir in nested environment - prefer longest target", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level: 2,
+			Mounts: []MountMapping{
+				{Source: "/host", Target: "/app", Level: 1},
+				{Source: "/host/project", Target: "/app/project", Level: 2},
+			},
+		}
+		containerFS := &MockFileSystem{
+			Files: map[string][]byte{
+				filepath.FromSlash("/app/project/package.json"): []byte(""),
+			},
+			Dirs: map[string]bool{
+				filepath.FromSlash("/app/project"): true,
+			},
+			WD: filepath.FromSlash("/app/project"),
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, containerFS)
+		require.NoError(t, err)
+
+		val := r.resolveString("{{ find_dir:package.json }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, filepath.FromSlash("/host/project"), val)
+	})
+
 }

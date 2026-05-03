@@ -54,7 +54,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 
 		val, err = ResolvePath("just-name", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, filepath.Join(baseDir, "just-name"), val) // No ./ prefix, no resolution
+		assert.Equal(t, filepath.Join(baseDir, "just-name"), val) // resolved absolute/joined path, no ./ prefix
 
 		// fs.Abs failure case
 		mfsErr := &pathMockFS{

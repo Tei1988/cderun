@@ -160,7 +160,7 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	if err != nil {
 		return container.Mount{}, err
 	}
-	if target != "" && !filepath.IsAbs(mc.Target.Raw) {
+	if target != "" && !isAbsRaw(mc.Target.Raw) {
 		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
 	}
 
@@ -231,7 +231,7 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	if containerPath != "" && !filepath.IsAbs(dc.Destination.Raw) {
+	if containerPath != "" && !isAbsRaw(dc.Destination.Raw) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
 	}
 	return container.DeviceMapping{
@@ -354,14 +354,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return p, nil
 	}
 
-	prefix := schemeRegex.FindString(p)
-	if prefix != "" {
-		if r != nil {
-			return r.ResolveString(p)
-		}
-		return p, nil
-	}
-
 	raw := p
 	var fs FileSystem = RealFileSystem{}
 	if r != nil && r.fs != nil {
@@ -381,6 +373,11 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 			return "", err
 		}
 		res = expanded
+	}
+
+	// If expanded value contains a scheme, return it as is
+	if schemeRegex.FindString(res) != "" {
+		return res, nil
 	}
 
 	if !filepath.IsAbs(res) {
@@ -821,4 +818,15 @@ func isNamedVolume(s string) bool {
 		return false
 	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
+}
+
+func isAbsRaw(s string) bool {
+	if s == "" {
+		return false
+	}
+	// On Windows, absolute paths can start with C: or \.
+	// On Unix, they start with /.
+	// filepath.IsAbs is OS-dependent.
+	// We want to know if it LOOKED absolute in the config.
+	return filepath.IsAbs(s)
 }

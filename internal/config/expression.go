@@ -373,7 +373,7 @@ func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, err
 
 	for _, m := range r.HostContext.Mounts {
 		rel, err := filepath.Rel(m.Target, abs)
-		if err == nil && !strings.HasPrefix(rel, "..") {
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			if len(m.Target) > len(bestTarget) || (len(m.Target) == len(bestTarget) && m.Level > maxLevel) {
 				maxLevel = m.Level
 				bestTarget = m.Target
