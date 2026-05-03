@@ -78,7 +78,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, attempts, img, lastErr)
+			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
@@ -206,7 +206,8 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.CPUs > 0 {
 		opts = append(opts, oci.WithCPUCFS(quota, period))
 	}
-		if config.Devices != nil {
+
+	if config.Devices != nil {
 		for _, d := range config.Devices {
 			opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 		}
