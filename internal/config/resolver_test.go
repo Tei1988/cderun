@@ -573,6 +573,12 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "podman", res.Runtime)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
+				// SocketPath explicit containerd
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "/run/containerd/containerd.sock", SocketPathSet: true}, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
+
 		// specified docker but no socket
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, Runtime: "docker", RuntimeSet: true}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)

@@ -58,6 +58,19 @@ func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
 	}, nil
 }
 
+func (r *ContainerdRuntime) notifyWait(containerID string, err error) {
+	r.mu.RLock()
+	waitC, ok := r.ioWait[containerID]
+	r.mu.RUnlock()
+	if ok {
+		// Non-blocking send
+		select {
+		case waitC <- err:
+		default:
+		}
+	}
+}
+
 func (r *ContainerdRuntime) Close() error {
 	r.closeOnce.Do(func() {
 		r.closeErr = r.client.Close()
@@ -78,7 +91,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull (%d/%d) with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
+			logging.Warn("Retrying image pull retry %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
@@ -234,6 +247,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
+		r.notifyWait(containerID, err)
 		return err
 	}
 
@@ -248,6 +262,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 
 	task, err := container.NewTask(ctx, creator)
 	if err != nil {
+		r.notifyWait(containerID, err)
 		return fmt.Errorf("failed to create task: %w", err)
 	}
 
@@ -263,6 +278,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 	}()
 
 	if err := task.Start(ctx); err != nil {
+		r.notifyWait(containerID, err)
 		return fmt.Errorf("failed to start task: %w", err)
 	}
 	started = true
@@ -285,12 +301,7 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 
 	select {
 	case status := <-exitStatusC:
-		r.mu.RLock()
-		waitC, ok := r.ioWait[containerID]
-		r.mu.RUnlock()
-		if ok {
-			waitC <- status.Error()
-		}
+		r.notifyWait(containerID, status.Error())
 		return int(status.ExitCode()), status.Error()
 	case <-ctx.Done():
 		return 0, ctx.Err()
@@ -372,22 +383,41 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 	r.mu.Unlock()
 
 	go func() {
-		container, err := r.client.LoadContainer(ctx, containerID)
-		if err != nil {
-			return
-		}
-		task, err := container.Task(ctx, nil)
-		if err != nil {
-			return
-		}
-		exitStatusC, err := task.Wait(ctx)
-		if err != nil {
-			return
-		}
-		select {
-		case status := <-exitStatusC:
-			waitC <- status.Error()
-		case <-ctx.Done():
+		for {
+			container, err := r.client.LoadContainer(ctx, containerID)
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					r.notifyWait(containerID, err)
+					return
+				}
+			} else {
+				task, err := container.Task(ctx, nil)
+				if err != nil {
+					if !errdefs.IsNotFound(err) {
+						r.notifyWait(containerID, err)
+						return
+					}
+				} else {
+					exitStatusC, err := task.Wait(ctx)
+					if err != nil {
+						r.notifyWait(containerID, err)
+						return
+					}
+					select {
+					case status := <-exitStatusC:
+						r.notifyWait(containerID, status.Error())
+						return
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
