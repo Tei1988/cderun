@@ -117,7 +117,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		mount, err = mc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "volume", mount.Type)
-		assert.Equal(t, filepath.Join(baseDir, "myvol"), mount.Source)
+		assert.Equal(t, "myvol", mount.Source)
 		assert.Equal(t, "/data", mount.Target)
 	})
 

@@ -137,7 +137,6 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 		mc.Target.BaseDir = baseDir
 	}
 }
-
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	source := ""
 	if mc.Type == "bind" {
@@ -156,11 +155,13 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
+	// Resolve the target using WithoutHostContext to avoid reverse resolution on the target itself.
 	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.Mount{}, err
 	}
-	if target != "" && !isAbsRaw(mc.Target.Raw) {
+	// Check if it's absolute after resolution (Feedback point 3)
+	if target != "" && !filepath.IsAbs(target) {
 		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
 	}
 
@@ -221,7 +222,6 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 		dc.Destination.BaseDir = baseDir
 	}
 }
-
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
 	host, err := dc.Source.Resolve(r)
 	if err != nil {
@@ -231,7 +231,8 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	if containerPath != "" && !isAbsRaw(dc.Destination.Raw) {
+	// Check if it's absolute after resolution (Feedback point 3)
+	if containerPath != "" && !filepath.IsAbs(containerPath) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
 	}
 	return container.DeviceMapping{
@@ -380,21 +381,15 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return res, nil
 	}
 
-	if !filepath.IsAbs(res) {
-		if strings.HasPrefix(raw, "./") || strings.HasPrefix(raw, "../") || raw == "." || raw == ".." {
-			res = filepath.Join(baseDir, res)
-		} else {
-			abs, err := fs.Abs(res)
-			if err != nil {
-				return "", fmt.Errorf("failed to get absolute path for %q: %w", res, err)
-			}
-			res = abs
-		}
+	// Join with baseDir if it's relative
+	if !filepath.IsAbs(res) && baseDir != "" {
+		res = filepath.Join(baseDir, res)
 	}
 
 	absPath := filepath.Clean(res)
 
-	if !filepath.IsAbs(absPath) {
+	// Ensure absolute path via fs.Abs ONLY if we are in a nested context (Level > 0)
+	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
 		abs, err := fs.Abs(absPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to get absolute path for %q: %w", absPath, err)
@@ -422,31 +417,38 @@ var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
-		if isNamedVolume(v) {
-			if r != nil {
-				return r.ResolveString(v)
+		resolved := v
+		if r != nil {
+			var err error
+			resolved, err = r.ResolveString(v)
+			if err != nil {
+				return "", err
 			}
-			return v, nil
+		}
+		if isNamedVolume(resolved) {
+			return resolved, nil
 		}
 		return ResolvePath(v, baseDir, r)
 	}
 
-	if isNamedVolume(host) {
-		if r != nil {
-			resolvedHost, err := r.ResolveString(host)
-			if err != nil {
-				return "", err
-			}
-			return resolvedHost + ":" + remainder, nil
+	resolvedHost := host
+	if r != nil {
+		var err error
+		resolvedHost, err = r.ResolveString(host)
+		if err != nil {
+			return "", err
 		}
-		return v, nil
 	}
 
-	resolvedHost, err := ResolvePath(host, baseDir, r)
+	if isNamedVolume(resolvedHost) {
+		return resolvedHost + ":" + remainder, nil
+	}
+
+	finalHost, err := ResolvePath(host, baseDir, r)
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	return finalHost + ":" + remainder, nil
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
@@ -818,15 +820,4 @@ func isNamedVolume(s string) bool {
 		return false
 	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
-}
-
-func isAbsRaw(s string) bool {
-	if s == "" {
-		return false
-	}
-	// On Windows, absolute paths can start with C: or \.
-	// On Unix, they start with /.
-	// filepath.IsAbs is OS-dependent.
-	// We want to know if it LOOKED absolute in the config.
-	return filepath.IsAbs(s)
 }
