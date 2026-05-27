@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"errors"
 	"testing"
 
@@ -270,7 +271,7 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Hierarchy(t *testing.T) {
 
 	res, err = resolveConfigPath(true, "dev", false, "", "", "", nil, nil, nil, nil, "", r, "device", mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "dev", res)
+	expected := filepath.Join(r.Pwd, "dev"); assert.Equal(t, expected, res)
 }
 
 func TestUnit_Coverage_Resolver_ResolveDevices_Env(t *testing.T) {

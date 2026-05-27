@@ -54,7 +54,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 
 		val, err = ResolvePath("just-name", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, "just-name", val) // No ./ prefix, no resolution
+		assert.Equal(t, filepath.Join(baseDir, "just-name"), val) // resolved absolute/joined path, no ./ prefix
 
 		// fs.Abs failure case
 		mfsErr := &pathMockFS{
@@ -202,7 +202,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 
 		val, err = ResolvePath("unix:////var/run/docker.sock", baseDir, r)
 		require.NoError(t, err)
-		assert.Equal(t, "unix:///var/run/docker.sock", val)
+		assert.Equal(t, "unix:////var/run/docker.sock", val)
 
 		val, err = ResolvePath("http://example.com/path", baseDir, r)
 		require.NoError(t, err)

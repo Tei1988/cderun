@@ -137,7 +137,6 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 		mc.Target.BaseDir = baseDir
 	}
 }
-
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	source := ""
 	if mc.Type == "bind" {
@@ -156,11 +155,13 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
+	// Resolve the target using WithoutHostContext to avoid reverse resolution on the target itself.
 	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.Mount{}, err
 	}
-	if target != "" && !path.IsAbs(target) {
+	// Check if it's absolute after resolution (Feedback point 3)
+	if target != "" && !filepath.IsAbs(target) {
 		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
 	}
 
@@ -221,17 +222,17 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 		dc.Destination.BaseDir = baseDir
 	}
 }
-
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
 	host, err := dc.Source.Resolve(r)
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	containerPath, err := dc.Destination.Resolve(r)
+	containerPath, err := dc.Destination.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	if containerPath != "" && !path.IsAbs(containerPath) {
+	// Check if it's absolute after resolution (Feedback point 3)
+	if containerPath != "" && !filepath.IsAbs(containerPath) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
 	}
 	return container.DeviceMapping{
@@ -354,74 +355,60 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return p, nil
 	}
 
-	prefix := schemeRegex.FindString(p)
-	raw := strings.TrimPrefix(p, prefix)
-	p = raw
-
 	var fs FileSystem = RealFileSystem{}
 	if r != nil && r.fs != nil {
 		fs = r.fs
 	}
 
+	var res string
 	if r != nil {
 		resolved, err := r.ResolveString(p)
 		if err != nil {
 			return "", err
 		}
-		p = resolved
+		res = resolved
 	} else {
 		expanded, err := expandHome(p, fs)
 		if err != nil {
 			return "", err
 		}
-		p = expanded
+		res = expanded
 	}
 
-	if !filepath.IsAbs(p) && (strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../") || p == "." || p == "..") {
-		p = filepath.Join(baseDir, p)
+	// If expanded value contains a scheme, return it as is
+	if schemeRegex.FindString(res) != "" {
+		return res, nil
 	}
 
-	absPath := filepath.Clean(p)
+	// Always join with baseDir for relative inputs (Feedback point 1)
+	if !filepath.IsAbs(res) {
+		res = filepath.Join(baseDir, res)
+	}
 
-	if err := validateAnchorBoundaries(raw, absPath, r, fs); err != nil {
+	absPath := filepath.Clean(res)
+
+	// Ensure absolute path via fs.Abs ONLY if we are in a nested context (Level > 0)
+	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
+		abs, err := fs.Abs(absPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get absolute path for %q: %w", absPath, err)
+		}
+		absPath = abs
+	}
+
+	if err := validateAnchorBoundaries(p, absPath, r, fs); err != nil {
 		return "", err
 	}
 
-	if r != nil && r.HostContext != nil && r.HostContext.Level > 0 {
-		abs := absPath
-		if !filepath.IsAbs(abs) {
-			a, err := fs.Abs(abs)
-			if err != nil {
-				return "", fmt.Errorf("failed to get absolute path for %q: %w", abs, err)
-			}
-			abs = a
+	if r != nil {
+		resolvedAbs, err := r.applyReverseResolution(absPath)
+		if err != nil {
+			return "", err
 		}
-
-		found := false
-		bestRel := ""
-		bestSource := ""
-		bestTarget := ""
-		maxLevel := -1
-
-		for _, m := range r.HostContext.Mounts {
-			rel, err := filepath.Rel(m.Target, abs)
-			if err == nil && !strings.HasPrefix(rel, "..") {
-				if len(m.Target) > len(bestTarget) || (len(m.Target) == len(bestTarget) && m.Level > maxLevel) {
-					maxLevel = m.Level
-					bestTarget = m.Target
-					bestSource = m.Source
-					bestRel = rel
-					found = true
-				}
-			}
-		}
-
-		if found {
-			absPath = filepath.Join(bestSource, bestRel)
-		}
+		absPath = resolvedAbs
 	}
 
-	return prefix + absPath, nil
+	return absPath, nil
 }
 
 var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
@@ -429,13 +416,38 @@ var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
+		resolved := v
+		if r != nil {
+			var err error
+			resolved, err = r.ResolveString(v)
+			if err != nil {
+				return "", err
+			}
+		}
+		if isNamedVolume(resolved) {
+			return resolved, nil
+		}
 		return ResolvePath(v, baseDir, r)
 	}
-	resolvedHost, err := ResolvePath(host, baseDir, r)
+
+	resolvedHost := host
+	if r != nil {
+		var err error
+		resolvedHost, err = r.ResolveString(host)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if isNamedVolume(resolvedHost) {
+		return resolvedHost + ":" + remainder, nil
+	}
+
+	finalHost, err := ResolvePath(host, baseDir, r)
 	if err != nil {
 		return "", err
 	}
-	return resolvedHost + ":" + remainder, nil
+	return finalHost + ":" + remainder, nil
 }
 
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
@@ -800,4 +812,11 @@ func ValidateToolName(name string) error {
 	}
 
 	return nil
+}
+
+func isNamedVolume(s string) bool {
+	if s == "" {
+		return false
+	}
+	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
 }
