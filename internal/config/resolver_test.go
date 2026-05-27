@@ -595,7 +595,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "containerd", res.Runtime)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
-				// Priority: docker > containerd > podman
+		// Priority: docker > containerd > podman
 		mfs = &MockFileSystem{
 			Dirs:  map[string]bool{"/var/run": true, "/run/containerd": true, "/run/podman": true},
 			Files: map[string][]byte{
@@ -615,33 +615,6 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 			Files: map[string][]byte{
 				"/run/containerd/containerd.sock": []byte(""),
 				"/run/podman/podman.sock": []byte(""),
-			},
-		}
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
-		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
-
-				// Priority: docker > containerd > podman
-		mfs = &MockFileSystem{
-			Dirs: map[string]bool{"/var/run": true, "/run/containerd": true, "/run/podman": true},
-			Files: map[string][]byte{
-				"/var/run/docker.sock":            []byte(""),
-				"/run/containerd/containerd.sock": []byte(""),
-				"/run/podman/podman.sock":         []byte(""),
-			},
-		}
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
-		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
-
-		// Priority: containerd > podman
-		mfs = &MockFileSystem{
-			Dirs: map[string]bool{"/run/containerd": true, "/run/podman": true},
-			Files: map[string][]byte{
-				"/run/containerd/containerd.sock": []byte(""),
-				"/run/podman/podman.sock":         []byte(""),
 			},
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)

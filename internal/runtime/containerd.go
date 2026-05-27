@@ -91,7 +91,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull retry %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
+			logging.Warn("Retrying image pull %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
