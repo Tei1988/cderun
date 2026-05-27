@@ -337,7 +337,8 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 
 func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 	t.Parallel()
-	r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	require.NoError(t, err)
 
 	t.Run("absolute target is accepted", func(t *testing.T) {
 		mc := MountConfig{
@@ -364,7 +365,8 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 
 func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 	t.Parallel()
-	r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{WD: "/host"})
+	require.NoError(t, err)
 
 	t.Run("absolute destination is accepted", func(t *testing.T) {
 		dc := DeviceConfig{

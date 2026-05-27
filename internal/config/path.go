@@ -227,7 +227,7 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	containerPath, err := dc.Destination.Resolve(r)
+	containerPath, err := dc.Destination.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
@@ -355,7 +355,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return p, nil
 	}
 
-	raw := p
 	var fs FileSystem = RealFileSystem{}
 	if r != nil && r.fs != nil {
 		fs = r.fs
@@ -381,8 +380,8 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		return res, nil
 	}
 
-	// Join with baseDir if it's relative
-	if !filepath.IsAbs(res) && baseDir != "" {
+	// Always join with baseDir for relative inputs (Feedback point 1)
+	if !filepath.IsAbs(res) {
 		res = filepath.Join(baseDir, res)
 	}
 
@@ -397,7 +396,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		absPath = abs
 	}
 
-	if err := validateAnchorBoundaries(raw, absPath, r, fs); err != nil {
+	if err := validateAnchorBoundaries(p, absPath, r, fs); err != nil {
 		return "", err
 	}
 
