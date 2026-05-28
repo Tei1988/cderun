@@ -40,9 +40,9 @@ func TestUnit_Docker_New(t *testing.T) {
 }
 
 func TestUnit_Docker_PullImage_Retry(t *testing.T) {
-	t.Run("retry on EOF", func(t *testing.T) {
+	t.Run("retry on unexpected EOF", func(t *testing.T) {
 		mock := &mockDockerClient{
-			imagePullErr: errors.New("EOF"),
+			imagePullErr: errors.New("unexpected EOF"),
 		}
 
 		var sleeps []time.Duration
@@ -57,11 +57,12 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 
 		err := runtime.PullImage(context.Background(), "alpine", "always", 3, 1*time.Second)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
-		assert.Equal(t, 3, mock.pullCount)
-		assert.Len(t, sleeps, 2)
-		assert.Equal(t, 2000*time.Millisecond, sleeps[0]) // 1<<1 * 1s
-		assert.Equal(t, 4000*time.Millisecond, sleeps[1]) // 1<<2 * 1s
+		assert.Contains(t, err.Error(), "failed to pull image after 4 attempts")
+		assert.Equal(t, 4, mock.pullCount)
+		assert.Len(t, sleeps, 3)
+		assert.Equal(t, 1000*time.Millisecond, sleeps[0]) // 1<<0 * 1s
+		assert.Equal(t, 2000*time.Millisecond, sleeps[1]) // 1<<1 * 1s
+		assert.Equal(t, 4000*time.Millisecond, sleeps[2]) // 1<<2 * 1s
 	})
 
 	t.Run("success after retry", func(t *testing.T) {
@@ -210,16 +211,16 @@ func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID str
 }
 
 func TestUnit_Docker_RetryablePullError(t *testing.T) {
-	assert.False(t, isRetryablePullError(nil))
-	assert.True(t, isRetryablePullError(errors.New("toomanyrequests")))
-	assert.True(t, isRetryablePullError(errors.New("Rate exceeded")))
-	assert.True(t, isRetryablePullError(errors.New("rate limit")))
-	assert.True(t, isRetryablePullError(errors.New("data limit exceeded")))
-	assert.True(t, isRetryablePullError(errors.New("i/o timeout")))
-	assert.True(t, isRetryablePullError(errors.New("connection refused")))
-	assert.True(t, isRetryablePullError(errors.New("connection reset")))
-	assert.True(t, isRetryablePullError(errors.New("EOF")))
-	assert.False(t, isRetryablePullError(errors.New("other error")))
+	assert.False(t, IsRetryablePullError(nil))
+	assert.True(t, IsRetryablePullError(errors.New("toomanyrequests")))
+	assert.True(t, IsRetryablePullError(errors.New("Rate exceeded")))
+	assert.True(t, IsRetryablePullError(errors.New("rate limit")))
+	assert.True(t, IsRetryablePullError(errors.New("data limit exceeded")))
+	assert.True(t, IsRetryablePullError(errors.New("i/o timeout")))
+	assert.True(t, IsRetryablePullError(errors.New("connection refused")))
+	assert.True(t, IsRetryablePullError(errors.New("connection reset")))
+	assert.True(t, IsRetryablePullError(errors.New("unexpected EOF")))
+	assert.False(t, IsRetryablePullError(errors.New("other error")))
 }
 
 type mockRetryDockerClient struct {
@@ -265,7 +266,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
 			count++
 			if count == 1 {
-				return image.InspectResponse{}, errors.New("eof")
+				return image.InspectResponse{}, errors.New("unexpected eof")
 			}
 			return image.InspectResponse{}, nil
 		}
@@ -282,7 +283,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock.imageInspectFunc = func(ctx context.Context, imageID string, options ...client.ImageInspectOption) (image.InspectResponse, error) {
 			count++
 			if count == 1 {
-				return image.InspectResponse{}, errors.New("eof")
+				return image.InspectResponse{}, errors.New("unexpected eof")
 			}
 			return image.InspectResponse{}, errNotFound{errors.New("not found")}
 		}
@@ -323,8 +324,8 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 		err := runtime.PullImage(context.Background(), "test-image", "always", 3, 1*time.Second)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to pull image after 3 attempts")
-		assert.Equal(t, 3, mock.pullCount)
+		assert.Contains(t, err.Error(), "failed to pull image after 4 attempts")
+		assert.Equal(t, 4, mock.pullCount)
 	})
 
 	t.Run("succeeds after retries", func(t *testing.T) {
@@ -359,8 +360,8 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock.imagePullFunc = func(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error) {
 			count++
 			if count == 1 {
-				// Return a reader that will cause jsonmessage.DisplayJSONMessagesStream to return "EOF" error
-				return io.NopCloser(strings.NewReader(`{"errorDetail":{"message":"EOF"}}`)), nil
+				// Return a reader that will cause jsonmessage.DisplayJSONMessagesStream to return "unexpected EOF" error
+				return io.NopCloser(strings.NewReader(`{"errorDetail":{"message":"unexpected EOF"}}`)), nil
 			}
 			return io.NopCloser(strings.NewReader(`{"status":"success"}`)), nil
 		}

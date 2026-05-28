@@ -746,6 +746,8 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		if rv.res.SocketPath != "" {
 			if strings.Contains(rv.res.SocketPath, "podman") {
 				rv.res.Runtime = "podman"
+			} else if strings.Contains(rv.res.SocketPath, "containerd") {
+				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"
 			}
@@ -753,6 +755,9 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 			if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
 				rv.res.Runtime = "docker"
 				rv.res.SocketPath = "/var/run/docker.sock"
+			} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+				rv.res.Runtime = "containerd"
+				rv.res.SocketPath = "/run/containerd/containerd.sock"
 			} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
 				rv.res.Runtime = "podman"
 				rv.res.SocketPath = "/run/podman/podman.sock"
@@ -766,6 +771,8 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 	if rv.res.SocketPath == "" {
 		if rv.res.Runtime == "podman" {
 			rv.res.SocketPath = "/run/podman/podman.sock"
+		} else if rv.res.Runtime == "containerd" {
+			rv.res.SocketPath = "/run/containerd/containerd.sock"
 		} else {
 			rv.res.SocketPath = "/var/run/docker.sock"
 		}
