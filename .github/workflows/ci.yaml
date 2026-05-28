@@ -35,7 +35,9 @@ jobs:
         wget -q "${URL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
-        sudo wget -q "https://raw.githubusercontent.com/containerd/containerd/v${VERSION}/containerd.service" -O /etc/systemd/system/containerd.service
+        sudo wget -q "https://raw.githubusercontent.com/containerd/containerd/v${VERSION}/containerd.service" -O /tmp/containerd.service
+        echo "1941362cbaa89dd591b99c32b050d82c583d3cd2e5fa63085d7017457ec5fca8  /tmp/containerd.service" | sha256sum -c -
+        sudo mv /tmp/containerd.service /etc/systemd/system/containerd.service
         sudo systemctl daemon-reload
         sudo systemctl enable --now containerd
     - name: Install CNI plugins

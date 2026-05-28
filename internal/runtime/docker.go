@@ -110,6 +110,9 @@ func (d *DockerRuntime) Close() error {
 
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
 	if pullPolicy == "never" {
 		return nil
 	}

@@ -83,6 +83,9 @@ func (r *ContainerdRuntime) Name() string {
 }
 
 func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
 	if pullPolicy == "never" {
 		return nil
 	}
@@ -309,7 +312,7 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 }
 
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
-	cCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	r.mu.Lock()

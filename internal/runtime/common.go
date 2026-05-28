@@ -40,7 +40,6 @@ func IsRetryablePullError(err error) bool {
 		"rate exceeded",
 		"rate limit",
 		"data limit exceeded",
-		"eof",
 	}
 
 	for _, m := range retryableMessages {
