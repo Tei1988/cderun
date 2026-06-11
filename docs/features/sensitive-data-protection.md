@@ -27,14 +27,16 @@ The following segments (case-insensitive) trigger masking:
 - `JWT`
 - `SALT`
 
+> **Note**: Keywords like `SIGNATURE`, `BEARER`, `OTP`, and `SENSITIVE` are planned for future inclusion in the default masking list.
+
 ### Intelligent Segmentation
 
-The system splits keys into segments to accurately identify sensitive information while minimizing false positives. Segmentation occurs at:
+The system performs a single-pass scan of the key string to accurately identify sensitive information while minimizing false positives and memory allocations. Segmentation occurs at:
 
-- **Non-alphanumeric characters**: e.g., `DB_PASSWORD` → `["DB", "PASSWORD"]`
-- **CamelCase transitions**: e.g., `apiToken` → `["API", "TOKEN"]`
-- **Letter-to-digit boundaries**: e.g., `accessKey2` → `["ACCESS", "KEY", "2"]`
-- **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `["JSON", "TOKEN"]`
+- **Non-alphanumeric characters**: e.g., `DB_PASSWORD` → `DB`, `PASSWORD`
+- **CamelCase transitions**: e.g., `apiToken` → `api`, `Token`
+- **Letter-to-digit boundaries**: e.g., `accessKey2` → `accessKey`, `2`
+- **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `JSON`, `Token`
 
 A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
 
