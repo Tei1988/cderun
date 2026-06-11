@@ -153,3 +153,63 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 		assert.Empty(t, r.resolveString("{{env:MISSING}}"))
 	})
 }
+
+func TestUnit_ExpressionResolver_ResolveFindDir_AbsError(t *testing.T) {
+	mfs := &MockFileSystem{
+		WD:      "/work",
+		AbsErr:  assert.AnError,
+		HomeDir: "/home",
+		Files:   map[string][]byte{"/work/.git": []byte("")},
+		Dirs:    map[string]bool{"/work": true},
+	}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	require.NoError(t, err)
+
+	_, err = r.ResolveString("{{ find_dir:.git }}")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get absolute path")
+}
+
+func TestUnit_ExpressionResolver_ApplyReverseResolution_AbsError(t *testing.T) {
+	mfs := &MockFileSystem{
+		WD:      "/work",
+		HomeDir: "/home",
+	}
+	hostCtx := &HostContext{Level: 1}
+	r, err := NewExpressionResolverWithFS(hostCtx, mfs)
+	require.NoError(t, err)
+
+	// induce Abs error
+	mfs.AbsErr = assert.AnError
+	_, err = r.applyReverseResolution("relative/path")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get absolute path")
+}
+
+func TestUnit_ExpressionResolver_Resolve_Exhaustive(t *testing.T) {
+	t.Run("sticky error in Resolve", func(t *testing.T) {
+		r, _ := NewExpressionResolver(nil)
+		r.err = assert.AnError
+		assert.Equal(t, "input", r.Resolve("input"))
+	})
+
+	t.Run("slice resolution", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/jules", WD: "/work"})
+		input := []any{"{{HOME}}", "literal"}
+		res := r.Resolve(input).([]any)
+		assert.Equal(t, "/home/jules", res[0])
+		assert.Equal(t, "literal", res[1])
+	})
+
+	t.Run("map resolution", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/jules", WD: "/work"})
+		input := map[string]any{"key": "{{HOME}}"}
+		res := r.Resolve(input).(map[string]any)
+		assert.Equal(t, "/home/jules", res["key"])
+	})
+
+	t.Run("default case", func(t *testing.T) {
+		r, _ := NewExpressionResolver(nil)
+		assert.Equal(t, 123, r.Resolve(123))
+	})
+}
