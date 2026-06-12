@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -26,6 +25,37 @@ var sensitiveKeywords = map[string]struct{}{
 	"SALT":        {},
 }
 
+// containsIgnoreCase checks if s contains substr (which must be uppercase ASCII letters) case-insensitively.
+// This function is optimized for performance and avoids allocations.
+func containsIgnoreCase(s, substr string) bool {
+	if len(substr) > len(s) {
+		return false
+	}
+	firstUpper := substr[0]
+	firstLower := firstUpper + ('a' - 'A')
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		c := s[i]
+		if c == firstUpper || c == firstLower {
+			match := true
+			for j := 1; j < len(substr); j++ {
+				curr := s[i+j]
+				if curr >= 'a' && curr <= 'z' {
+					curr -= 'a' - 'A'
+				}
+				if curr != substr[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // MaskSensitiveEnv redacts sensitive environment variables based on key names.
 func MaskSensitiveEnv(key, value string) string {
 	if value == "" {
@@ -33,16 +63,28 @@ func MaskSensitiveEnv(key, value string) string {
 	}
 
 	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
-	upperKey := strings.ToUpper(key)
 	hasSensitive := false
 	for kw := range sensitiveKeywords {
-		if strings.Contains(upperKey, kw) {
+		if containsIgnoreCase(key, kw) {
 			hasSensitive = true
 			break
 		}
 	}
 	if !hasSensitive {
 		return value
+	}
+
+	// Avoid ToUpper if already uppercase
+	upperKey := key
+	alreadyUpper := true
+	for i := 0; i < len(key); i++ {
+		if key[i] >= 'a' && key[i] <= 'z' {
+			alreadyUpper = false
+			break
+		}
+	}
+	if !alreadyUpper {
+		upperKey = strings.ToUpper(key)
 	}
 
 	// Split by non-alphanumeric characters and also split camelCase.
@@ -128,7 +170,12 @@ func MaskSensitiveEnvList(env []string) []string {
 	res := make([]string, len(env))
 	for i, e := range env {
 		if k, v, found := strings.Cut(e, "="); found {
-			res[i] = fmt.Sprintf("%s=%s", k, MaskSensitiveEnv(k, v))
+			maskedV := MaskSensitiveEnv(k, v)
+			if maskedV == v {
+				res[i] = e
+			} else {
+				res[i] = k + "=" + maskedV
+			}
 		} else {
 			res[i] = e
 		}

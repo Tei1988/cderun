@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -21,33 +22,45 @@ type anchorRange struct {
 
 // scanAnchors finds all top-level matched {{...}} expression ranges in a string.
 // It handles nested braces and treats unmatched openers as literal text.
+// It performs a single-pass scan to ensure O(n) complexity.
 func scanAnchors(s string) []anchorRange {
-	var res []anchorRange
+	var allPairs []anchorRange
+	var stack []int
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
-			start := i
-			depth := 1
-			i += 2
-			for ; i < len(s)-1; i++ {
-				if s[i] == '{' && s[i+1] == '{' {
-					depth++
-					i++
-				} else if s[i] == '}' && s[i+1] == '}' {
-					depth--
-					if depth == 0 {
-						break
-					}
-					i++
-				}
+			stack = append(stack, i)
+			i++
+		} else if s[i] == '}' && s[i+1] == '}' {
+			if len(stack) > 0 {
+				start := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				allPairs = append(allPairs, anchorRange{start: start, end: i + 2})
 			}
+			i++
+		}
+	}
 
-			if depth == 0 {
-				res = append(res, anchorRange{start: start, end: i + 2})
-				// i will be incremented by the loop, so it will point after the last '}'
-			} else {
-				// Unmatched opener, continue scan from after the '{{'
-				i = start + 1
-			}
+	if len(allPairs) == 0 {
+		return nil
+	}
+
+	// Sort pairs by start (ascending) and end (descending).
+	// This allows us to identify top-level (outermost) ranges in a single pass.
+	sort.Slice(allPairs, func(i, j int) bool {
+		if allPairs[i].start != allPairs[j].start {
+			return allPairs[i].start < allPairs[j].start
+		}
+		return allPairs[i].end > allPairs[j].end
+	})
+
+	var res []anchorRange
+	lastEnd := -1
+	for _, p := range allPairs {
+		// Since we sorted by start ascending and end descending,
+		// the first pair starting at or after lastEnd will be the outermost one.
+		if p.start >= lastEnd {
+			res = append(res, p)
+			lastEnd = p.end
 		}
 	}
 	return res
