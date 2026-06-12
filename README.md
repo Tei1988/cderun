@@ -274,11 +274,11 @@ The masking logic is intelligent and handles CamelCase (e.g., `dbPassword`) and 
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
-  in configuration files and CLI flags.
+- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}` in configuration files and CLI flags.
+- **Nested Expressions**: Supports recursive resolution like `{{env:VAR:-{{HOME}}}}`.
+- **Literal Braces**: Unknown directives (e.g., `{{TYPO}}`) are currently preserved as literal text to support templates for other tools.
 - **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
-- **Relative Path Handling**: Intelligent absolute path resolution based on the
-  origin of the setting (config file location vs. current directory).
+- **Relative Path Handling**: Intelligent absolute path resolution based on the origin of the setting (config file location vs. current directory).
 - See [Value Resolution](docs/features/value-resolution.md) for details.
 
 ## Best Practices

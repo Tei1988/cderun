@@ -141,7 +141,8 @@ if err != nil {
 pflag はポインタ束縛を直接サポートしないため、cobra への束縛は `rootOptions` の値フィールドのまま維持し、`resolveSettings` での詰め替え時にジェネリックヘルパーで変換する。
 
 ```go
-func opt[T any](changed bool, v T) *T {
+func opt[T any]
+(changed bool, v T) *T {
     if !changed { return nil }
     return &v
 }

@@ -38,6 +38,15 @@ The system splits keys into segments to accurately identify sensitive informatio
 
 A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
 
+### False Positives and Limitations
+
+The keyword-based approach can occasionally lead to false positives where non-sensitive information is masked.
+
+- **`ACCESS` keyword**: This keyword is included primarily to catch `AWS_ACCESS_KEY_ID`. However, it also causes variables like `ACCESS_LOG` or `LOG_ACCESS_LEVEL` to be redacted, which can hinder debugging in dry-run mode.
+- **`KEY` keyword**: Similar to `ACCESS`, generic keys like `CACHE_KEY` or `CONFIG_KEY_PATH` may be masked.
+
+Future improvements (see [TODO T08](../../.agent/todo.md)) plan to move away from automatic keyword detection towards an explicit configuration-based masking system (e.g., a `sensitiveEnv` list in config files) to provide users with more control.
+
 ## Presentation Layer Safety
 
 Masking is applied at the presentation layer (`handleDryRun`) and logging layer, ensuring that the actual container execution still receives the plaintext values.
@@ -52,4 +61,4 @@ All error messages referencing paths, tool identifiers, or user-provided input u
 
 ### Secure Logging
 
-Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure.
+Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure. Masking is also applied to debug logs when environment variables are resolved, ensuring that secrets do not appear in trace output even when log level is set to `debug` or `trace`.

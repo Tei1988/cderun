@@ -8,20 +8,23 @@ The `validatePathChars` function ensures that critical configuration strings do 
 
 This validation is applied to:
 
-- Image names
-- User names
-- Network modes
-- Hostnames
-- Working directories
-- Runtime
-- Socket paths (`--socket-path`, `--mount-socket-path`)
-- cderun binary mount path (`--mount-cderun-path`)
-- Output formats (`--dry-run-format`, `--diagnosis-format`)
-- Logging settings (`--log-level`, `--log-format`)
-- Entrypoint elements
-- Port mappings and exposed ports (`--publish`, `--expose`)
-- DNS servers and host mappings (`--dns`, `--add-host`)
-- Linux capabilities (`--cap-add`, `--cap-drop`)
+- **Image names**
+- **User names** (`user`)
+- **Network modes** (`network`)
+- **Hostnames** (`hostname`)
+- **Working directories** (`workdir`)
+- **Runtime names** (`runtime`)
+- **Socket paths** (`--socket-path`, `--mount-socket-path`)
+- **cderun binary mount path** (`--mount-cderun-path`)
+- **Output formats** (`--dry-run-format`, `--diagnosis-format`)
+- **Logging settings** (`--log-level`, `--log-format`)
+- **Entrypoint elements**
+- **Port mappings and exposed ports** (`--publish`, `--expose`)
+- **DNS servers and host mappings** (`--dns`, `--add-host`)
+- **Linux capabilities** (`--cap-add`, `--cap-drop`)
+- **Mount sources and targets** (`--mount`)
+- **Device host and container paths** (`--device`)
+- **Environment variable keys** (`--env`)
 
 Any string containing unsafe characters will cause an immediate resolution failure.
 
