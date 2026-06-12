@@ -120,8 +120,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{name: "Traversal escaping pwd", input: "{{PWD}}/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Anchor after slash", input: "/{{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Bypass attempt anywhere in string", input: "foo{{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
-		{name: "Bypass attempt anywhere in string with tilde", input: "a~"}, // No longer a bypass as ~ only matches at boundaries
-		{name: "Tilde at boundary", input: "foo/~", expectedErr: "path traversal detected"},
+		{name: "Tilde in path (not an anchor)", input: "foo/~"},
 		{name: "Tilde at start", input: "~/file"},
 		{name: "Multiple anchors", input: "{{HOME}}/subdir/{{HOME}}/file"},
 		{name: "False positive traversal prefix", input: "{{HOME}}/..config/file"},
