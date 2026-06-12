@@ -48,7 +48,12 @@ func scanAnchors(s string) []anchorRange {
 			res = append(res, anchorRange{start: start, end: curr + 2})
 			i = curr + 2
 		} else {
-			// Unmatched opener, continue scan from after the '{{'
+			// Unmatched opener. If there are no closing '}}' anywhere else in the string,
+			// we can't possibly match any more expressions.
+			if strings.Index(s[start+2:], "}}") == -1 {
+				break
+			}
+			// Otherwise, continue scan from after the '{{'
 			i = start + 2
 		}
 	}
