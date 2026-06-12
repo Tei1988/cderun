@@ -336,34 +336,34 @@ func TestUnit_Config_Path_Validators_Coverage(t *testing.T) {
 	t.Run("ValidateImageName exhaustive", func(t *testing.T) {
 		assert.NoError(t, ValidateImageName(""))
 		assert.NoError(t, ValidateImageName("alpine"))
-		assert.Error(t, ValidateImageName("alpine!"))
+		require.Error(t, ValidateImageName("alpine!"))
 	})
 
 	t.Run("ValidateWorkdir exhaustive", func(t *testing.T) {
 		assert.NoError(t, ValidateWorkdir(""))
 		assert.NoError(t, ValidateWorkdir("/app"))
-		assert.Error(t, ValidateWorkdir("relative"))
-		assert.Error(t, ValidateWorkdir("/app!"))
+		require.Error(t, ValidateWorkdir("relative"))
+		require.Error(t, ValidateWorkdir("/app!"))
 	})
 
 	t.Run("ValidateCapability exhaustive", func(t *testing.T) {
 		assert.NoError(t, ValidateCapability(""))
 		assert.NoError(t, ValidateCapability("SYS_ADMIN"))
-		assert.Error(t, ValidateCapability("sys_admin"))
+		require.Error(t, ValidateCapability("sys_admin"))
 	})
 
 	t.Run("ValidateEnvKey exhaustive", func(t *testing.T) {
-		assert.Error(t, ValidateEnvKey(""))
+		require.Error(t, ValidateEnvKey(""))
 		assert.NoError(t, ValidateEnvKey("VALID_KEY"))
-		assert.Error(t, ValidateEnvKey("INVALID-KEY"))
+		require.Error(t, ValidateEnvKey("INVALID-KEY"))
 	})
 
 	t.Run("ValidateExposePort exhaustive", func(t *testing.T) {
 		assert.NoError(t, ValidateExposePort(""))
 		assert.NoError(t, ValidateExposePort("80-90/tcp"))
-		assert.Error(t, ValidateExposePort("80-invalid/tcp"))
-		assert.Error(t, ValidateExposePort("invalid-90/tcp"))
-		assert.Error(t, ValidateExposePort("invalid"))
-		assert.Error(t, ValidateExposePort("80/invalid"))
+		require.Error(t, ValidateExposePort("80-invalid/tcp"))
+		require.Error(t, ValidateExposePort("invalid-90/tcp"))
+		require.Error(t, ValidateExposePort("invalid"))
+		require.Error(t, ValidateExposePort("80/invalid"))
 	})
 }
