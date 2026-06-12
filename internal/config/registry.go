@@ -106,14 +106,14 @@ var StringSliceOptions = []StringSliceOption{
 		GlobalGetter: func(g CDERunConfig) []string {
 			return g.Defaults.Env
 		},
-		SkipResolution: true, // Phase 4: Complex resolution
+		SkipResolution: true, // Handle complex resolution manually in resolveComplexOptions
 	},
 	{
 		Name:           "mount",
 		FieldName:      "Mounts",
 		EnvKey:         "CDERUN_MOUNT",
 		Usage:          "Attach a filesystem mount to the container",
-		SkipResolution: true, // Phase 4: Complex resolution
+		SkipResolution: true, // Handle complex resolution manually in resolveComplexOptions
 	},
 	{
 		Name:      "publish",
@@ -202,7 +202,7 @@ var StringSliceOptions = []StringSliceOption{
 		FieldName:      "Devices",
 		EnvKey:         "CDERUN_DEVICE",
 		Usage:          "Add a host device to the container",
-		SkipResolution: true, // Phase 8: Complex resolution
+		SkipResolution: true, // Handle complex resolution manually in resolveCustomParsing
 	},
 }
 
@@ -226,7 +226,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.SocketPath.Raw
 		},
-		SkipResolution: true, // Phase 5: Path resolution & Auto-detection
+		SkipResolution: true, // Handle path resolution and auto-detection in resolveRuntimeAndSocket
 	},
 	{
 		Name:   "mount-socket-path",
@@ -238,7 +238,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Defaults.MountSocketPath.Raw
 		},
-		SkipResolution: true, // Phase 6: Transitive options
+		SkipResolution: true, // Handle transitive options in resolveTransitiveOptions
 	},
 	{
 		Name:   "mount-cderun-path",
@@ -250,7 +250,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Defaults.MountCderunPath.Raw
 		},
-		SkipResolution: true, // Phase 6: Transitive options
+		SkipResolution: true, // Handle transitive options in resolveTransitiveOptions
 	},
 	{
 		Name:   "image",
@@ -290,7 +290,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return strings.Join(g.Defaults.MountTools, ",")
 		},
-		SkipResolution: true, // Phase 6: Transitive options (comma-separated string)
+		SkipResolution: true, // Handle transitive options as a comma-separated string in resolveTransitiveOptions
 	},
 	{
 		Name:           "config",
@@ -350,7 +350,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Defaults.PullBackoffBase
 		},
-		SkipResolution: true, // Phase 8: Parsed as duration
+		SkipResolution: true, // Parsed manually as time.Duration in resolveCustomParsing
 	},
 	{
 		Name:      "memory",
@@ -363,7 +363,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Defaults.Memory
 		},
-		SkipResolution: true, // Phase 8: Parsed as bytes
+		SkipResolution: true, // Parsed manually as memory bytes in resolveCustomParsing
 	},
 	{
 		Name:      "dry-run-format",
@@ -425,7 +425,7 @@ var StringOptions = []StringOption{
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Defaults.HangTimeout
 		},
-		SkipResolution: true, // Phase 7: Parsed as duration
+		SkipResolution: true, // Parsed manually as time.Duration in resolveCustomParsing
 	},
 }
 

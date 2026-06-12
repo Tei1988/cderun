@@ -22,11 +22,9 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
-| T10 | `forceTerminateIfRunning` のコメント・命名整理 | クリーンアップ | 低 | 小 | - |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
 | T13 | runtime 層へのロガー注入 | リファクタ | 低 | 中 | - |
-| T14 | `Phase N` コメントの整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
 | T17 | `ParseMountFlag` の未知キーをエラーにする | バグ/UX | 低 | 小 | - |

@@ -835,7 +835,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: &runtime.MockRuntime{ExitCode: 123},
 			IsRunning:   false,
 		}
-		exitCode, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		exitCode, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, 123, exitCode)
 		assert.Empty(t, mockRuntime.SignaledContainerID)
@@ -846,7 +846,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			IsRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
@@ -857,7 +857,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			InspectErr:  errors.New("inspect failed"),
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 	})
@@ -867,7 +867,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
 			IsRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
@@ -1922,7 +1922,7 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, logBuf.String(), "IO finished, waiting up to 100ms for container")
-	assert.Contains(t, logBuf.String(), "forcing termination")
+	assert.Contains(t, logBuf.String(), "sending SIGKILL")
 	assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 }
 

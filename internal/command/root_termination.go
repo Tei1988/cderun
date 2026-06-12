@@ -22,7 +22,7 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool,
 	return hangTimeout
 }
 
-func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {
+func (o *rootOptions) signalKillIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {
 	isRunning, exitCode, err := rt.InspectContainer(ctx, containerID)
 	if err != nil {
 		o.logger.Debug("failed to inspect container %s before kill: %v", containerID, err)
@@ -35,11 +35,10 @@ func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.Co
 		return exitCode, nil
 	}
 
-	o.logger.Debug("Container %s still running, forcing termination", containerID)
+	o.logger.Debug("Container %s still running, sending SIGKILL", containerID)
 	if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
-		o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
+		o.logger.Debug("failed to send SIGKILL to container %s: %v", containerID, err)
 	}
 
-	// Wait for the kill to take effect
 	return exitCode, nil
 }

@@ -1003,7 +1003,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					exitCode = result.code
 				case <-time.After(effectiveHangTimeout):
 					var err error
-					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
+					exitCode, err = o.signalKillIfRunning(context.Background(), rt, containerID)
 					if err != nil {
 						return 0, err
 					}
