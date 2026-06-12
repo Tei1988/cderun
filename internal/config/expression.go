@@ -23,31 +23,33 @@ type anchorRange struct {
 // It handles nested braces and treats unmatched openers as literal text.
 func scanAnchors(s string) []anchorRange {
 	var res []anchorRange
-	for i := 0; i < len(s)-1; i++ {
-		if s[i] == '{' && s[i+1] == '{' {
-			start := i
-			depth := 1
-			i += 2
-			for ; i < len(s)-1; i++ {
-				if s[i] == '{' && s[i+1] == '{' {
-					depth++
-					i++
-				} else if s[i] == '}' && s[i+1] == '}' {
-					depth--
-					if depth == 0 {
-						break
-					}
-					i++
+	for i := 0; i < len(s)-1; {
+		idx := strings.Index(s[i:], "{{")
+		if idx == -1 {
+			break
+		}
+		start := i + idx
+		depth := 1
+		curr := start + 2
+		for ; curr < len(s)-1; curr++ {
+			if s[curr] == '{' && s[curr+1] == '{' {
+				depth++
+				curr++
+			} else if s[curr] == '}' && s[curr+1] == '}' {
+				depth--
+				if depth == 0 {
+					break
 				}
+				curr++
 			}
+		}
 
-			if depth == 0 {
-				res = append(res, anchorRange{start: start, end: i + 2})
-				// i will be incremented by the loop, so it will point after the last '}'
-			} else {
-				// Unmatched opener, continue scan from after the '{{'
-				i = start + 1
-			}
+		if depth == 0 {
+			res = append(res, anchorRange{start: start, end: curr + 2})
+			i = curr + 2
+		} else {
+			// Unmatched opener, continue scan from after the '{{'
+			i = start + 2
 		}
 	}
 	return res
