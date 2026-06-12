@@ -170,7 +170,7 @@ pflag はポインタ束縛を直接サポートしないため、cobra への�
 
 ```go
 // T05 example
-func opt[T any](changed bool, v T) *T {
+func opt[T any] (changed bool, v T) *T {
     if !changed { return nil }
     return &v
 }
@@ -447,12 +447,12 @@ Phase コメントは `registry.go` と `resolver.go` の両方に散在する�
 
 ### 問題
 
-containerd は IO を task 作成時に渡す必要があるため、`AttachContainer` 内で goroutine が 100ms ごとに task の出現を待つポーリングになっている。Docker のネイティブ attach と比べてアーキテクチャ上の回避策であり、コンテナが瞬時に終了した場合などエッジケースで動作が不安定になる可能性がある。
+containerd は IO をタスク作成時に渡す必要があるため、`AttachContainer` 内で goroutine が 100ms ごとにタスクの出現を待つポーリングになっている。Docker のネイティブ attach と比べてアーキテクチャ上の回避策であり、コンテナが瞬時に終了した場合などエッジケースで動作が不安定になる可能性がある。
 
 ### 方針（2 案、(b) 推奨）
 
 1. (a) containerd の events API（`client.Subscribe`）で TaskStart イベントを待つ — 汎用的だがイベント購読のエラー処理が増える
-2. (b) 既存 of `ioMap`（`containerd.go:37-38`）と同様に `taskReady map[string]chan struct{}` を持ち、`StartContainer` が task 生成完了時に通知する — 外部依存なし・変更量小。cderun は自分で起動したコンテナにしか attach しないため十分
+2. (b) 既存の `ioMap`（`containerd.go:37-38`）と同様に `taskReady map[string]chan struct{}` を持ち、`StartContainer` がタスク生成完了時に通知する — 外部依存なし・変更量小。cderun は自分で起動したコンテナにしか attach しないため十分
 
 ### 完了条件
 
