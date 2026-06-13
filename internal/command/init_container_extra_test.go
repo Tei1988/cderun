@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -32,23 +33,28 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 	})
 
 	t.Run("runtime close failure on init error", func(t *testing.T) {
-		// This path is hard to verify with assertions but we can trigger it for coverage.
 		mock := &runtime.MockRuntime{
 			PullErr:  errors.New("pull failed"),
 			CloseErr: errors.New("close failed"),
 		}
+		var logBuf bytes.Buffer
+		logger := logging.NewLogger()
+		logger.Init("debug", "text", false)
+		logger.SetOutput(&logBuf)
+
 		opts := &rootOptions{
 			runtimeFactory: func(name, socket string) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			},
-			logger: logging.NewLogger(),
+			logger: logger,
 		}
-		// Initialize logger to avoid nil panic
-		opts.logger.Init("debug", "text", false)
 
 		resolved := &config.ResolvedConfig{}
 		_, _, _, err := opts.initContainer(context.Background(), resolved, &container.ContainerConfig{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "pull failed")
+
+		// Verify that the close failure was logged
+		assert.Contains(t, logBuf.String(), "failed to close runtime on init failure: close failed")
 	})
 }

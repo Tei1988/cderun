@@ -87,53 +87,51 @@ func TestUnit_Polyglot_ExtraScenarios(t *testing.T) {
 func TestUnit_Wrapper_P1Positions(t *testing.T) {
 	t.Parallel()
 
-	t.Run("wrapper mode - P1 flag at various positions", func(t *testing.T) {
-		mock := &runtime.MockRuntime{}
-		mfs := &config.MockFileSystem{
-			WD: "/project",
-			Files: map[string][]byte{
-				"/project/.tools.yaml": []byte("node:\n  image: node:20"),
-			},
-		}
+	mock := &runtime.MockRuntime{}
+	mfs := &config.MockFileSystem{
+		WD: "/project",
+		Files: map[string][]byte{
+			"/project/.tools.yaml": []byte("node:\n  image: node:20"),
+		},
+	}
 
-		tests := []struct {
-			name string
-			args []string
-		}{
-			{
-				name: "P1 immediately after subcmd",
-				args: []string{"cderun", "node", "--cderun-tty", "-v"},
-			},
-			{
-				name: "P1 at the end",
-				args: []string{"cderun", "node", "-v", "--cderun-tty"},
-			},
-			{
-				name: "Multiple P1 flags",
-				args: []string{"cderun", "node", "--cderun-tty", "-v", "--cderun-image", "node:alpine"},
-			},
-		}
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "P1 immediately after subcmd",
+			args: []string{"cderun", "node", "--cderun-tty", "-v"},
+		},
+		{
+			name: "P1 at the end",
+			args: []string{"cderun", "node", "-v", "--cderun-tty"},
+		},
+		{
+			name: "Multiple P1 flags",
+			args: []string{"cderun", "node", "--cderun-tty", "-v", "--cderun-image", "node:alpine"},
+		},
+	}
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				defer cancel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 
-				err := ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
-					o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
-						return mock, nil
-					}
-					o.exitFunc = func(code int) {}
-					o.fs = mfs
-					o.configLoader = config.NewConfigLoaderWithFS(mfs)
-					cmd.SetOut(io.Discard)
-					cmd.SetErr(io.Discard)
-				})
-				require.NoError(t, err)
-				cfg := mock.GetCreatedConfig()
-				require.NotNil(t, cfg)
-				assert.True(t, cfg.TTY)
+			err := ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.fs = mfs
+				o.configLoader = config.NewConfigLoaderWithFS(mfs)
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
 			})
-		}
-	})
+			require.NoError(t, err)
+			cfg := mock.GetCreatedConfig()
+			require.NotNil(t, cfg)
+			assert.True(t, cfg.TTY)
+		})
+	}
 }
