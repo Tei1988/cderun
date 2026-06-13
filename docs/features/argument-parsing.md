@@ -46,7 +46,7 @@ cderun go --version
 
 ## P1 内部オーバーライドのホイスト
 
-`--cderun-` で始まるフラグは、サブコマンドの**後ろ**に置かれていても、前処理（`preprocessArgs`）によってサブコマンドの**前**に移動（ホイスト）され、`cderun` 自体の設定として解釈されます。
+`--cderun-` で始まるフラグは、**Wrapper Mode においては必ずサブコマンドの後ろ**に配置する必要があります。これらは前処理（`preprocessArgs`）によってサブコマンドの**前**に移動（ホイスト）され、`cderun` 自体の設定（P1 Internal Overrides）として解釈されます。
 
 ### ホイストの仕組み (Hoisting Mechanics)
 
@@ -83,6 +83,8 @@ cderun node app.js --cderun-tty --cderun-image node:20-alpine
 # 内部的なホイスト後の引数
 cderun --cderun-tty --cderun-image node:20-alpine node app.js
 ```
+
+**注意**: Wrapper Mode において `--cderun-` フラグをサブコマンドの**前**に配置すると、エラー（`cderun internal override flag ... must be placed after the subcommand`）となります。これは、標準フラグ（P2）との混同を避け、ラップ対象ツールの引数解析との境界を明確にするための制約です。
 
 このメカニズムにより、コンテナ内で実行されるコマンドが自身のフラグ（例: `node --version`）を持っていても、`cderun` の設定と曖昧さなく区別することが可能になります。
 

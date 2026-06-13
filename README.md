@@ -235,8 +235,9 @@ python:
 
 ### Multi-Runtime Support & Auto-detection
 
-`cderun` supports both **Docker** and **Podman**. It can automatically detect
-the available runtime by checking for common Unix socket paths.
+`cderun` supports **Docker**, **containerd** (experimental), and **Podman**. It can automatically detect
+the available runtime by checking for common Unix socket paths in the following priority:
+Docker > containerd > Podman.
 
 ### Intelligent Argument Parsing
 

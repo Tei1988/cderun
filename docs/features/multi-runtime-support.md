@@ -21,9 +21,11 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 
 ### 将来的な拡張
 
-- **containerd (Planned / In-progress)**:
-  ネイティブの containerd API (gRPC) を直接利用したサポートを計画しています。
-  - **開発ステータス**: 内部的な設定バリデータ（`resolver.go`）では将来の対応を見越して `containerd` を有効な値として受け入れますが、**現時点ではランタイムの実装が完了していないため、指定しても実行時にエラーとなります。**
+- **containerd (Experimental)**:
+  ネイティブの containerd API (gRPC) を直接利用したサポートを実装しています。
+  - **開発ステータス**: 実験的な機能として利用可能ですが、以下の制限事項があります。
+    - ネットワークモードは `host` のみがサポートされます。
+    - ポートマッピング（`--publish`, `--publish-all`, `--expose`）は未対応です。
   - **目的**: Docker/Podman デーモンを経由しない、より軽量なコンテナ実行の実現。
 - **nerdctl (Backlog)**:
   containerd の CLI である `nerdctl` をラップして実行する方式の検討。
@@ -69,6 +71,7 @@ Docker と Podman をフルサポートしています。Podman は Docker 互�
 1. `--runtime` または `CDERUN_RUNTIME` が指定されている場合はそれを使用。
 2. 指定がない場合、以下のデフォルトパスを順に確認し、最初に見つかったものを使用。
    - `/var/run/docker.sock` (Runtime: `docker`)
+   - `/run/containerd/containerd.sock` (Runtime: `containerd`)
    - `/run/podman/podman.sock` (Runtime: `podman`)
 3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
 
