@@ -59,28 +59,35 @@ flowchart TD
     Start([引数リストの入力]) --> DetectSubcmd[1. サブコマンドの特定<br/>最初の非フラグ引数を探す]
     DetectSubcmd --> ScanP1[2. P1フラグのスキャン<br/>サブコマンド以降の --cderun-* を収集]
     ScanP1 --> HandleValues[3. 値のハンドリング<br/>フラグに続く引数もセットで抽出]
-    HandleValues --> Reconstruct[4. 引数リストの再構成<br/>P1フラグを先頭へ移動]
-    Reconstruct --> End([パーサーへ渡す準備完了])
+    HandleValues --> Reconstruct[4. 引数リストの再構成<br/>P1フラグをサブコマンドの前へ移動]
+    Reconstruct --> End([Cobra パーサーへ渡す準備完了])
 
-    subgraph "Hoisting 実行例"
+    subgraph "Hoisting 実例 (Wrapper Mode)"
     ExampleInput["cderun node app.js --cderun-image node:20"]
     ExampleOutput["cderun --cderun-image node:20 node app.js"]
-    ExampleInput -.-> ExampleOutput
+    ExampleInput -- 前処理 --> ExampleOutput
+    end
+
+    subgraph "Hoisting 実例 (Symlink Mode)"
+    SymlinkInput["node app.js --cderun-image node:20"]
+    SymlinkOutput["cderun --cderun-image node:20 node app.js"]
+    SymlinkInput -- 前処理 --> SymlinkOutput
     end
 ```
 
 #### 解析ロジックの詳細
 
-1. **サブコマンドの特定**: 最初の非フラグ引数をサブコマンドとして特定します。この際、既知の `cderun` 標準フラグ（P2）とその引数は、Cobra のフラグ定義に基づいて適切にスキップされます。
-2. **P1フラグの収集**: サブコマンド以降の引数リストをスキャンし、`--cderun-` で始まるフラグを抽出します。
-3. **引数値のハンドリング**: フラグが値を必要とする場合（例: `--cderun-image node:20-alpine` のように `=` を使わない形式）、パーサーの定義を参照して次の引数もセットで収集・移動されます。
-4. **再構成**: 収集された P1 フラグを `cderun` バイナリ名の直後（サブコマンドの前）に挿入し、残りの引数（サブコマンドとパススルー引数）をその後に配置します。
+1. **サブコマンドの特定**: 最初の非フラグ引数（Cobra のフラグ定義に合致しないもの）をサブコマンドとして特定します。
+2. **P1フラグの収集**: サブコマンドの境界より後ろにある引数リストをスキャンし、`--cderun-` で始まるフラグをすべて抽出します。
+3. **引数値のハンドリング**: フラグが値を必要とする場合（例: `--cderun-image node:20-alpine`）、内部的なフラグ定義レジストリを参照して次の引数もセットで収集・移動対象とします。
+4. **再構成**: 抽出された P1 フラグをサブコマンドの直前に挿入します。これにより、Cobra パーサーはこれらを `cderun` 自体のグローバルフラグとしてパースできるようになります。
 
 ```bash
 # 実行時の入力
 cderun node app.js --cderun-tty --cderun-image node:20-alpine
 
-# 内部的なホイスト後の引数
+# 前処理（ホイスト）後の内部的な引数状態
+# これが Cobra パーサーに渡される
 cderun --cderun-tty --cderun-image node:20-alpine node app.js
 ```
 
@@ -88,19 +95,28 @@ cderun --cderun-tty --cderun-image node:20-alpine node app.js
 
 ### ホイストの重要性とシンボリックリンク
 
-ホイストは、特に**シンボリックリンク（ポリグロットモード）**において重要な役割を果たします。
+ホイストは、特に**シンボリックリンク（ポリグロットモード）**において、`cderun` の動作を動的に制御するための唯一かつ安全な手段を提供します。
 
-ポリグロットモードでは、サブコマンド名の後にある引数のうち、**`--cderun-` プレフィックスが付いたフラグのみ**がホイストされます。これにより、ラップ対象のツールが持つ同名のフラグ（例: `--tty`, `--env`）との衝突を回避できます。
+シンボリックリンク経由で実行された場合、実行ファイル名（例: `node`）が自動的にサブコマンド（キー）として扱われます。このモードでは、サブコマンド名の後にある引数のうち、**`--cderun-` プレフィックスが付いたフラグのみ**がホイストされ、`cderun` 自身の設定として解釈されます。それ以外の引数はすべてラップ対象のツールへそのまま引き渡されます。
+
+これにより、ラップ対象のツールが持つ同名のフラグ（例: `--tty`, `--env`）との衝突を完全に回避できます。
 
 ```bash
 # node が cderun へのシンボリックリンクの場合
+# ホスト環境で実行：
 node --env DEBUG=app app.js --cderun-env NODE_ENV=production
+
+# 内部的な解釈：
+# 1. 'node' をサブコマンド（キー）として特定
+# 2. '--cderun-env NODE_ENV=production' を検出し、前方に移動
+# 3. 残りの '--env DEBUG=app app.js' は node への引数（パススルー）として保持
+# 4. 最終的に Alpine/Node コンテナ内で 'node --env DEBUG=app app.js' を実行
 ```
 
 この例では：
 
-1. `--env DEBUG=app` はホイストされず、`node`（コンテナ内の実行コマンド）にそのまま渡されます。
-2. `--cderun-env NODE_ENV=production` はホイストされ、`cderun` 自体の環境変数設定として処理されます。
+1. `--env DEBUG=app` は `cderun` の標準フラグ（P2）と同じ名前ですが、サブコマンドの後ろにあるためホイストの対象にならず、`node`（コンテナ内の実行コマンド）にそのまま渡されます。
+2. `--cderun-env NODE_ENV=production` は P1 内部オーバーライドとしてホイストされ、`cderun` 自体の環境変数設定（P1）として、YAML 設定や P3 環境変数を上書きして適用されます。
 
 詳細は [polyglot-entry.md](./polyglot-entry.md) を参照してください。
 

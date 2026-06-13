@@ -8,7 +8,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **Spec-First**: 「仕様変更あり」のタスクは対応する `docs/features/*.md` の更新が完了条件に含まれる
 - テスト追加・修正時は `docs/testing/` 以下のドキュメント（特に `organization.md` の命名規則）を遵守
 - 各タスクは自己完結している。原則 1 タスク = 1 PR とし、「完了条件」をすべて満たすこと
-- 記載のファイルパス・行番号は 2026-06-04 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
+- 記録のファイルパス・行番号は 2026-06-04 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
 
 ## タスク一覧（サマリ）
 
@@ -26,7 +26,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
 | T13 | runtime 層へのロガー注入 | リファクタ | 低 | 中 | - |
-| T14 | `Phase N` コメントの整理 | クリーンアップ | 低 | 小 | - |
+| T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
 | T17 | `ParseMountFlag` の未知キーをエラーにする | バグ/UX | 低 | 小 | - |
@@ -35,6 +35,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり |
+| T23 | `MaskSensitiveEnv` への不足キーワード追加 | 改善 | 低 | 小 | - |
 
 依存関係・統合の注意:
 
@@ -125,7 +126,7 @@ if err != nil {
 - 種別: リファクタリング
 - 優先度: 高
 - 対象:
-  - `internal/config/resolver.go:67-218`（`CLIOptions`。`root.go` の `rootOptions` とは別物）
+  - `internal/config/resolver.go:67-218`（`CLIOptions`。`root.go` の `rootOptions`とは別物）
   - `internal/command/root.go:258` 以降（`resolveSettings()` の `CLIOptions` 組み立て）
 
 ### 問題
@@ -141,7 +142,8 @@ if err != nil {
 pflag はポインタ束縛を直接サポートしないため、cobra への束縛は `rootOptions` の値フィールドのまま維持し、`resolveSettings` での詰め替え時にジェネリックヘルパーで変換する。
 
 ```go
-func opt[T any](changed bool, v T) *T {
+// T05 example
+func opt[T any] (changed bool, v T) *T {
     if !changed { return nil }
     return &v
 }
@@ -418,12 +420,12 @@ Phase コメントは `registry.go` と `resolver.go` の両方に散在する�
 
 ### 問題
 
-containerd は IO を task 作成時に渡す必要があるため、`AttachContainer` 内で goroutine が 100ms ごとに task の出現を待つポーリングになっている。Docker のネイティブ attach と比べてアーキテクチャ上の回避策であり、コンテナが瞬時に終了した場合などエッジケースで動作が不安定になる可能性がある。
+containerd は IO をタスク作成時に渡す必要があるため、`AttachContainer` 内で goroutine が 100ms ごとにタスクの出現を待つポーリングになっている。Docker のネイティブ attach と比べてアーキテクチャ上の回避策であり、コンテナが瞬時に終了した場合などエッジケースで動作が不安定になる可能性がある。
 
 ### 方針（2 案、(b) 推奨）
 
 1. (a) containerd の events API（`client.Subscribe`）で TaskStart イベントを待つ — 汎用的だがイベント購読のエラー処理が増える
-2. (b) 既存の `ioMap`（`containerd.go:37-38`）と同様に `taskReady map[string]chan struct{}` を持ち、`StartContainer` が task 生成完了時に通知する — 外部依存なし・変更量小。cderun は自分で起動したコンテナにしか attach しないため十分
+2. (b) 既存の `ioMap`（`containerd.go:37-38`）と同様に `taskReady map[string]chan struct{}` を持ち、`StartContainer` がタスク生成完了時に通知する — 外部依存なし・変更量小。cderun は自分で起動したコンテナにしか attach しないため十分
 
 ### 完了条件
 
@@ -613,3 +615,23 @@ cderun --prune
 - 仕様ドキュメントが先に作成され、実装が一致している
 - 全ランタイムで cderun 製コンテナのみが対象になることのテストがある
 - 実行中コンテナがデフォルトで除外される
+
+---
+
+## T23: `MaskSensitiveEnv` への不足キーワード追加
+
+- 種別: 改善
+- 対象: `internal/config/masking.go:10-27` (`sensitiveKeywords`)
+
+### 問題
+
+プロジェクトの記憶（Memory）には機密キーワードとして `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` が含まれていると言及されているが、実際のコード上の `sensitiveKeywords` マップにはこれらが含まれていない。
+
+### 方針
+
+`masking.go` の `sensitiveKeywords` に上記 4 つのキーワードを追加し、テストコードでこれらが正しくマスクされることを確認する。
+
+### 完了条件
+
+- `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` がキーワードリストに追加されている
+- 追加されたキーワードを含む環境変数が `MaskSensitiveEnv` で `[REDACTED]` にマスクされる
