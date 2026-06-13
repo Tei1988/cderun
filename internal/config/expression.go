@@ -191,9 +191,9 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	resolved := s
 	if hasExpr {
 		// Optimization: handle exact matches of magic words or simple directives (e.g. "{{HOME}}", "{{env:KEY}}")
-		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") && strings.Count(s, "{{") == 1 {
+		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") {
 			content := strings.TrimSpace(s[2 : len(s)-2])
-			if !strings.Contains(content, "{{") { // No nested expressions
+			if !strings.Contains(content, "{{") && !strings.Contains(content, "}}") { // No nested expressions
 				res, err := r.resolveDirective(content)
 				if err == nil && !strings.HasPrefix(res, "{{") {
 					resolved = res
