@@ -150,16 +150,16 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "registry mismatch: info for option \"hc\" not found")
 
-	// Reset StringOptions before Phase 1 test to avoid triggering same error again
+	// Reset StringOptions before early resolution test to avoid triggering same error again
 	StringOptions = originalOptions
-	// Phase 1 Early resolution mismatch
+	// Early resolution mismatch
 	originalBool := BoolOptions
 	BoolOptions = append(BoolOptions, BoolOption{Name: "diagnosis", FieldName: "NonExistent"})
 	defer func() { BoolOptions = originalBool }()
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
-	require.NoError(t, err) // It continues if mismatch in Phase 1 (currently)
+	require.NoError(t, err) // It continues if mismatch in resolveEarly (currently)
 
-	// Phase 3 remaining bool mismatch
+	// Remaining bool mismatch
 	BoolOptions = append(originalBool, BoolOption{Name: "bad-bool", FieldName: "NonExistent"})
 	_, err = ResolveWithFS("sh", &cli, nil, nil, &MockFileSystem{})
 	require.Error(t, err)
@@ -932,7 +932,7 @@ func TestUnit_Coverage_Resolver_resolveEnv_Strict(t *testing.T) {
 }
 
 func TestUnit_Coverage_Resolver_NumericTypeMismatch(t *testing.T) {
-	// To cover the 'else' branch in Phase 8 where a field's Kind is not numeric,
+	// To cover the 'else' branch in extractIntValue/extractFloatValue where a field's Kind is not numeric,
 	// we manually manipulate fieldInfo to point an Int/Float option to a String field in CLIOptions,
 	// while keeping the target field in ResolvedConfig numeric to avoid panic on SetInt/SetFloat.
 
