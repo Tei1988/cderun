@@ -588,20 +588,27 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	return nil
 }
 
+func isEnvKeyStartChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+func isEnvKeyChar(c byte) bool {
+	return isEnvKeyStartChar(c) || (c >= '0' && c <= '9')
+}
+
 // ValidateEnvKey ensures the environment variable key follows a safe and standard format.
 func ValidateEnvKey(s string) error {
 	if s == "" {
 		return fmt.Errorf("environment variable key cannot be empty")
 	}
-	// Manual check: ^[a-zA-Z_][a-zA-Z0-9_]*$
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if i == 0 {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+			if !isEnvKeyStartChar(c) {
 				return fmt.Errorf("invalid environment variable key: %q", s)
 			}
 		} else {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			if !isEnvKeyChar(c) {
 				return fmt.Errorf("invalid environment variable key: %q", s)
 			}
 		}

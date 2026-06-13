@@ -426,9 +426,6 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 
 	switch opt.Name {
 	case "image":
-		if fieldInfo["image"].p1ValIdx == -1 || fieldInfo["image"].p2ValIdx == -1 {
-			return fmt.Errorf("registry mismatch: CLI reflection fields for option \"image\" missing in CLIOptions")
-		}
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunImageSet, rv.cli.CderunImage, rv.cli.ImageSet, rv.cli.Image
 	case "network":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunNetworkSet, rv.cli.CderunNetwork, rv.cli.NetworkSet, rv.cli.Network
