@@ -9,7 +9,7 @@ The `validatePathChars` function ensures that critical configuration strings do 
 This validation is applied to:
 
 - **Image names**
-- **User names** (`user`)
+- **Usernames** (`user`)
 - **Network modes** (`network`)
 - **Hostnames** (`hostname`)
 - **Working directories** (`workdir`)
