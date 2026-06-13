@@ -186,16 +186,44 @@ func (dc DeviceConfig) DeepCopy() DeviceConfig {
 }
 
 func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
-	var s string
-	if err := node.Decode(&s); err != nil {
-		return err
+	if node.Kind == yaml.ScalarNode {
+		var s string
+		if err := node.Decode(&s); err != nil {
+			return err
+		}
+		parsed, ok := ParseDeviceConfig(s)
+		if !ok {
+			return fmt.Errorf("invalid device config: %q", s)
+		}
+		*dc = parsed
+		return nil
 	}
-	parsed, ok := ParseDeviceConfig(s)
-	if !ok {
-		return fmt.Errorf("invalid device config: %q", s)
+
+	if node.Kind == yaml.MappingNode {
+		var a struct {
+			Source      ConfigPath `yaml:"source"`
+			Destination ConfigPath `yaml:"destination"`
+			Permissions string     `yaml:"permissions"`
+		}
+		if err := node.Decode(&a); err != nil {
+			return err
+		}
+		if a.Source.IsEmpty() {
+			return fmt.Errorf("device source is required at line %d", node.Line)
+		}
+		if a.Destination.IsEmpty() {
+			return fmt.Errorf("device destination is required at line %d", node.Line)
+		}
+		dc.Source = a.Source
+		dc.Destination = a.Destination
+		dc.Permissions = a.Permissions
+		if dc.Permissions == "" {
+			dc.Permissions = "rwm"
+		}
+		return nil
 	}
-	*dc = parsed
-	return nil
+
+	return fmt.Errorf("invalid device config at line %d (tag %s): %v", node.Line, node.Tag, node.Value)
 }
 
 func (dc DeviceConfig) IsEmpty() bool {

@@ -15,7 +15,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | ID | タイトル | 種別 | 優先度 | 規模 | 仕様変更 |
 | --- | --- | --- | --- | --- | --- |
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - |
-| T02 | `DeviceConfig` のオブジェクト形式 YAML サポート | 機能 | 低 | 小 | あり |
 | T04 | スナップショット失敗の silent failure 解消 | バグ | 中 | 小 | - |
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - |
@@ -41,6 +40,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T05 と T06 は統合可能**（`registry.go` のメタデータを single source of truth にすれば両方解決する）。別々に着手する場合は T05 → T06 の順
 - **T08 は旧項目「`ACCESS` キーワードによる偽陽性」を吸収済み**（T08 採用でキーワード方式自体が消えるため）
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
+- **DOCS**: `docs/features/configuration-file-support.md` を更新し、`DeviceConfig` がオブジェクト形式（`source`, `destination`, `permissions`）をサポートしたことを記載する。
 
 ---
 
@@ -64,28 +64,6 @@ macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソル�
 
 - 原因が特定され、再現手順とともに記録されている（修正は別タスク化してよい）
 
----
-
-## T02: `DeviceConfig` のオブジェクト形式 YAML サポート
-
-- 種別: 機能追加
-- 対象: `internal/config/path.go:188`（`DeviceConfig.UnmarshalYAML`）
-
-### 問題
-
-`DeviceConfig.UnmarshalYAML` は文字列形式（`host:container[:perms]`）のみサポートしている。ドキュメントで言及されているオブジェクト形式に対応すべき。
-
-### 方針
-
-同ファイルの `MountConfig.UnmarshalYAML`（`path.go:80`）が既に構造体形式のデコードを実装しているため、そのパターンを流用する。`node.Kind`（`yaml.ScalarNode` / `yaml.MappingNode`）で分岐するのが簡潔。
-
-### 完了条件
-
-- 文字列形式・オブジェクト形式の両方をデコードできる（既存の文字列形式の後方互換を維持）
-- 両形式のユニットテストを追加
-- 対応する `docs/features/*.md` の記述と実装が一致している
-
----
 
 ## T04: スナップショット失敗の silent failure 解消
 
