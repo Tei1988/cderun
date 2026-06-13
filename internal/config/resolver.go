@@ -629,7 +629,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 }
 
 func (rv *resolver) resolveEarly() error {
-	// Phase 1: Early resolution (Diagnosis & StrictEnv)
+	// Early resolution (Diagnosis & StrictEnv)
 	for _, name := range []string{"diagnosis", "strict-env"} {
 		opt, ok := GetBoolOption(name)
 		if !ok {
@@ -643,7 +643,7 @@ func (rv *resolver) resolveEarly() error {
 }
 
 func (rv *resolver) resolveStandardOptions() error {
-	// Phase 2: Registry-based options (String & Bool)
+	// Registry-based options (String & Bool)
 
 	for _, opt := range StringOptions {
 		if opt.SkipResolution {
@@ -693,13 +693,13 @@ func (rv *resolver) resolveStandardOptions() error {
 		}
 	}
 
-	// Phase 3: Remaining Boolean options
+	// Remaining Boolean options
 	for _, opt := range BoolOptions {
-		// Skip early options already resolved in Phase 1
+		// Skip early options already resolved in resolveEarly
 		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
 			continue
 		}
-		// Skip transitive options handled in Phase 6
+		// Skip transitive options handled in resolveTransitiveOptions
 		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
 			continue
 		}
@@ -713,7 +713,7 @@ func (rv *resolver) resolveStandardOptions() error {
 
 func (rv *resolver) resolveComplexOptions() error {
 	var err error
-	// Phase 4: Complex types (Mounts, Env)
+	// Complex types (Mounts, Env)
 	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if err != nil {
 		return err
@@ -727,7 +727,7 @@ func (rv *resolver) resolveComplexOptions() error {
 }
 
 func (rv *resolver) resolveRuntimeAndSocket() error {
-	// Phase 5: Path resolution & Auto-detection (Socket)
+	// Path resolution & Auto-detection (Socket)
 	{
 		var errPath error
 		rv.res.SocketPath, errPath = rv.resolvePathValue(
@@ -782,7 +782,7 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 }
 
 func (rv *resolver) resolveTransitiveOptions() error {
-	// Phase 6: Transitive options (MountTools -> MountCderun -> MountSocket)
+	// Transitive options (MountTools -> MountCderun -> MountSocket)
 	rv.res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
 			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
@@ -867,8 +867,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 }
 
 func (rv *resolver) resolveCustomParsing() error {
-	// Phase 7: Duration and Slice options
-	// Resolve hang-timeout via registry entry (skipped in Phase 2)
+	// Duration and Slice options
+	// Resolve hang-timeout via registry entry (skipped in resolveStandardOptions)
 	if opt, ok := GetStringOption("hang-timeout"); ok {
 		if err := rv.applyDurationOption(opt, &rv.res.HangTimeout, false); err != nil {
 			return err
@@ -885,7 +885,7 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
-	// Phase 8: Integer & Float options
+	// Integer & Float options
 	for _, opt := range IntOptions {
 		if err := rv.applyIntOption(opt); err != nil {
 			return err
