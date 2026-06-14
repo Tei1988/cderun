@@ -266,3 +266,104 @@ func TestUnit_Config_Path_ResolveVolume_ResolveDevice_Errors(t *testing.T) {
 		assert.Contains(t, err.Error(), "path traversal detected")
 	})
 }
+
+func TestUnit_Config_Path_isNamedVolume_Exhaustive(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"", false},
+		{"my-volume", true},
+		{"my.volume", true},
+		{"my_volume", true},
+		{"/path/to/vol", false},
+		{"\\path\\to\\vol", false},
+		{"./local", false},
+		{"../parent", false},
+		{"~/home", false},
+		{"named:volume", true},
+		{"vol:", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, isNamedVolume(tt.input))
+		})
+	}
+}
+
+func TestUnit_Config_Path_ValidatePort_Exhaustive(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input   string
+		wantErr bool
+	}{
+		{"80", false},
+		{"80/tcp", false},
+		{"80/udp", false},
+		{"80/http", true},
+		{"80/tcp/extra", true},
+		{"invalid", true},
+		{"80:80", false},
+		{"80:invalid", true},
+		{"invalid:80", true},
+		{"1.2.3.4:80", false},
+		{"1.2.3.4:80/tcp", false},
+		{"1.2.3.4:80:80", false},
+		{"1.2.3.4::80", false},
+		{"1.2.3.4:80:invalid", true},
+		{"1.2.3.4:invalid:80", true},
+		{"invalid:80:80", true},
+		{"1.2.3.4:80:80:80", true},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			err := ValidatePort(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_Path_Validators_Coverage(t *testing.T) {
+	t.Parallel()
+	t.Run("ValidateImageName exhaustive", func(t *testing.T) {
+		assert.NoError(t, ValidateImageName(""))
+		assert.NoError(t, ValidateImageName("alpine"))
+		require.Error(t, ValidateImageName("alpine!"))
+	})
+
+	t.Run("ValidateWorkdir exhaustive", func(t *testing.T) {
+		assert.NoError(t, ValidateWorkdir(""))
+		assert.NoError(t, ValidateWorkdir("/app"))
+		require.Error(t, ValidateWorkdir("relative"))
+		require.Error(t, ValidateWorkdir("/app!"))
+	})
+
+	t.Run("ValidateCapability exhaustive", func(t *testing.T) {
+		assert.NoError(t, ValidateCapability(""))
+		assert.NoError(t, ValidateCapability("SYS_ADMIN"))
+		require.Error(t, ValidateCapability("sys_admin"))
+	})
+
+	t.Run("ValidateEnvKey exhaustive", func(t *testing.T) {
+		require.Error(t, ValidateEnvKey(""))
+		assert.NoError(t, ValidateEnvKey("VALID_KEY"))
+		require.Error(t, ValidateEnvKey("INVALID-KEY"))
+	})
+
+	t.Run("ValidateExposePort exhaustive", func(t *testing.T) {
+		assert.NoError(t, ValidateExposePort(""))
+		assert.NoError(t, ValidateExposePort("80-90/tcp"))
+		require.Error(t, ValidateExposePort("80-invalid/tcp"))
+		require.Error(t, ValidateExposePort("invalid-90/tcp"))
+		require.Error(t, ValidateExposePort("invalid"))
+		require.Error(t, ValidateExposePort("80/invalid"))
+	})
+}

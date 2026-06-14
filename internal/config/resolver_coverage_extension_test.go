@@ -614,6 +614,30 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Empty(t, res.DNS)
 	})
 
+	t.Run("validateSecurity privileged warning", func(t *testing.T) {
+		origLevel := logging.GetGlobalLogger().GetLevel()
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, Privileged: true, PrivilegedSet: true}
+		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+	})
+
+	t.Run("validateEnvSecurity invalid key", func(t *testing.T) {
+		// Test case where resolveEnvValues doesn't catch the invalid key because there's no "="
+		// and it's not in strict mode.
+		cli := &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"BAD\nKEY"}}
+		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
+
+		cli = &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"-INVALID"}}
+		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
+	})
+
 	t.Run("resolveStandardOptions registry mismatch on bool option", func(t *testing.T) {
 		withPatchedFieldInfo(t, "tty", func() {
 			delete(fieldInfo, "tty")
