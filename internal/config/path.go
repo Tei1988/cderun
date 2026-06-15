@@ -494,19 +494,20 @@ func findAnchors(s string) []string {
 
 // validatePathChars ensures the string does not contain ASCII control characters.
 func validatePathChars(s string) error {
-	for i, r := range s {
-		if r <= 31 || r == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, i)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c <= 31 || c == 127 {
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", c, i)
 		}
 	}
 	return nil
 }
 
 func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, fs FileSystem) error {
-	tildeMatches := magicWordPreRegex.FindAllStringSubmatch(original, -1)
+	hasTilde := strings.HasPrefix(original, "~") && (len(original) == 1 || original[1] == '/' || original[1] == '\\')
 	exprAnchors := findAnchors(original)
 
-	if len(tildeMatches) == 0 && len(exprAnchors) == 0 {
+	if !hasTilde && len(exprAnchors) == 0 {
 		return nil
 	}
 
@@ -542,8 +543,7 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		return nil
 	}
 
-	for _, matches := range tildeMatches {
-		tildeMatch := matches[1]
+	if hasTilde {
 		var anchorPath string
 		if r != nil {
 			anchorPath = r.Home
@@ -554,7 +554,7 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 			}
 			anchorPath = home
 		}
-		if err := processBoundary(tildeMatch, anchorPath); err != nil {
+		if err := processBoundary("~", anchorPath); err != nil {
 			return err
 		}
 	}
@@ -565,9 +565,13 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		}
 		// Use a fresh resolver instance for each anchor to ensure that a sticky error
 		// from one anchor resolution doesn't skip subsequent anchor resolutions.
-		cleanR, err := NewExpressionResolverWithFS(r.HostContext, r.fs)
-		if err != nil {
-			return fmt.Errorf("failed to create fresh resolver for anchor %q: %w", anchor, err)
+		// Reusing Home and Pwd from current resolver to avoid redundant syscalls.
+		cleanR := &ExpressionResolver{
+			fs:          r.fs,
+			Home:        r.Home,
+			Pwd:         r.Pwd,
+			HostContext: r.HostContext,
+			shared:      r.shared,
 		}
 		anchorPath, err := cleanR.ResolveString(anchor)
 		if err != nil {
@@ -584,13 +588,30 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	return nil
 }
 
+func isEnvKeyStartChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+func isEnvKeyChar(c byte) bool {
+	return isEnvKeyStartChar(c) || (c >= '0' && c <= '9')
+}
+
 // ValidateEnvKey ensures the environment variable key follows a safe and standard format.
 func ValidateEnvKey(s string) error {
 	if s == "" {
 		return fmt.Errorf("environment variable key cannot be empty")
 	}
-	if !envKeyRegex.MatchString(s) {
-		return fmt.Errorf("invalid environment variable key: %q", s)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if i == 0 {
+			if !isEnvKeyStartChar(c) {
+				return fmt.Errorf("invalid environment variable key: %q", s)
+			}
+		} else {
+			if !isEnvKeyChar(c) {
+				return fmt.Errorf("invalid environment variable key: %q", s)
+			}
+		}
 	}
 	return nil
 }
@@ -600,8 +621,27 @@ func ValidateImageName(s string) error {
 	if s == "" {
 		return nil
 	}
-	if !imageRegex.MatchString(s) {
-		return fmt.Errorf("invalid image name: %q", s)
+	// Manual check: ^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$
+	// Rejects multiple @ symbols
+	atCount := 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if i == 0 {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+				return fmt.Errorf("invalid image name: %q", s)
+			}
+		} else {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+				c == '.' || c == '_' || c == '-' || c == '/' || c == ':' || c == '@') {
+				return fmt.Errorf("invalid image name: %q", s)
+			}
+			if c == '@' {
+				atCount++
+			}
+		}
+	}
+	if atCount > 1 {
+		return fmt.Errorf("invalid image name: %q (multiple @ symbols)", s)
 	}
 	return nil
 }
@@ -625,8 +665,19 @@ func ValidateNetworkName(s string) error {
 	if s == "" {
 		return nil
 	}
-	if !networkRegex.MatchString(s) {
-		return fmt.Errorf("invalid network name: %q", s)
+	// Manual check: ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if i == 0 {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+				return fmt.Errorf("invalid network name: %q", s)
+			}
+		} else {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+				c == '_' || c == '.' || c == '-') {
+				return fmt.Errorf("invalid network name: %q", s)
+			}
+		}
 	}
 	return nil
 }

@@ -416,9 +416,50 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
+	var p1Set, p2Set bool
+	var p1Val, p2Val string
+
+	// Fast-path for common options to avoid reflection
+	if _, ok := fieldInfo[opt.Name]; !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	switch opt.Name {
+	case "image":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunImageSet, rv.cli.CderunImage, rv.cli.ImageSet, rv.cli.Image
+	case "network":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunNetworkSet, rv.cli.CderunNetwork, rv.cli.NetworkSet, rv.cli.Network
+	case "workdir":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunWorkdirSet, rv.cli.CderunWorkdir, rv.cli.WorkdirSet, rv.cli.Workdir
+	case "runtime":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRuntimeSet, rv.cli.CderunRuntime, rv.cli.RuntimeSet, rv.cli.Runtime
+	case "user":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunUserSet, rv.cli.CderunUser, rv.cli.UserSet, rv.cli.User
+	case "log-level":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogLevelSet, rv.cli.CderunLogLevel, rv.cli.LogLevelSet, rv.cli.LogLevel
+	case "log-format":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogFormatSet, rv.cli.CderunLogFormat, rv.cli.LogFormatSet, rv.cli.LogFormat
+	case "socket-path", "mount-socket-path", "mount-cderun-path", "mount-tools", "pull", "pull-backoff-base", "memory", "hang-timeout":
+		// These are skipped in Phase 2 or handled specially, but still part of StringOptions
+		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
+		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rv.resVal.Field(info.targetIdx).SetString(resolved)
+		return nil
+	default:
+		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
+		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rv.resVal.Field(info.targetIdx).SetString(resolved)
+		return nil
 	}
 
 	def := OptionDef[string]{
@@ -428,15 +469,68 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		Fallback:     opt.Default,
 	}
 
-	resolved := resolveStringOpt(def, p1Set, p1Val.String(), p2Set, p2Val.String(), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetString(resolved)
+	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	// Apply resolved value back to rv.res fields directly for fast-path options
+	switch opt.Name {
+	case "image":
+		rv.res.Image = resolved
+	case "network":
+		rv.res.Network = resolved
+	case "workdir":
+		rv.res.Workdir = resolved
+	case "runtime":
+		rv.res.Runtime = resolved
+	case "user":
+		rv.res.User = resolved
+	case "log-level":
+		rv.res.LogLevel = resolved
+	case "log-format":
+		rv.res.LogFormat = resolved
+	}
 	return nil
 }
 
 func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
+	var p1Set, p2Set bool
+	var p1Val, p2Val bool
+
+	// Fast-path for common options
+	if _, ok := fieldInfo[opt.Name]; !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	switch opt.Name {
+	case "tty":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunTTYSet, rv.cli.CderunTTY, rv.cli.TTYSet, rv.cli.TTY
+	case "interactive":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunInteractiveSet, rv.cli.CderunInteractive, rv.cli.InteractiveSet, rv.cli.Interactive
+	case "remove":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRemoveSet, rv.cli.CderunRemove, rv.cli.RemoveSet, rv.cli.Remove
+	case "diagnosis":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDiagnosisSet, rv.cli.CderunDiagnosis, rv.cli.DiagnosisSet, rv.cli.Diagnosis
+	case "strict-env":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunStrictEnvSet, rv.cli.CderunStrictEnv, rv.cli.StrictEnvSet, rv.cli.StrictEnv
+	case "mount-socket", "mount-cderun", "mount-all-tools", "publish-all", "privileged", "log-timestamp":
+		// Transitive or skipped in Phase 3
+		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Set, p1Val, p2Set, p2Val = s1, v1.Bool(), s2, v2.Bool()
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		rv.resVal.Field(info.targetIdx).SetBool(resolved)
+		return nil
+	default:
+		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Set, p1Val, p2Set, p2Val = s1, v1.Bool(), s2, v2.Bool()
+		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		rv.resVal.Field(info.targetIdx).SetBool(resolved)
+		return nil
 	}
 
 	def := OptionDef[*bool]{
@@ -445,8 +539,19 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetBool(resolved)
+	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+	switch opt.Name {
+	case "tty":
+		rv.res.TTY = resolved
+	case "interactive":
+		rv.res.Interactive = resolved
+	case "remove":
+		rv.res.Remove = resolved
+	case "diagnosis":
+		rv.res.Diagnosis = resolved
+	case "strict-env":
+		rv.res.StrictEnv = resolved
+	}
 	return nil
 }
 

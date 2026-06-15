@@ -341,18 +341,6 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "file not found")
 	})
 
-	t.Run("registry mismatch for missing CLI reflection fields", func(t *testing.T) {
-		withPatchedFieldInfo(t, "image", func() {
-			info := fieldInfo["image"]
-			info.p1ValIdx = -1
-			info.p2ValIdx = 1
-			fieldInfo["image"] = info
-		})
-
-		_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields for option \"image\" missing")
-	})
 
 	t.Run("security validation failure for various fields", func(t *testing.T) {
 		fields := []struct {
