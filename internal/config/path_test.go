@@ -618,15 +618,80 @@ source: ./data
 	t.Run("DeviceConfig", func(t *testing.T) {
 		var dc DeviceConfig
 
-		// Valid
+		// Valid (String)
 		err := yaml.Unmarshal([]byte("/dev/video0:/dev/video0:rwm"), &dc)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0", dc.Source.Raw)
+		assert.Equal(t, "/dev/video0", dc.Destination.Raw)
+		assert.Equal(t, "rwm", dc.Permissions)
 
-		// Invalid
+		// Valid (Object - full)
+		yamlStr := `
+source: /dev/video1
+destination: /dev/video1
+permissions: rw
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.NoError(t, err)
+		assert.Equal(t, "/dev/video1", dc.Source.Raw)
+		assert.Equal(t, "/dev/video1", dc.Destination.Raw)
+		assert.Equal(t, "rw", dc.Permissions)
+
+		// Valid (Object - default permissions)
+		yamlStr = `
+source: /dev/fuse
+destination: /dev/fuse
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.NoError(t, err)
+		assert.Equal(t, "/dev/fuse", dc.Source.Raw)
+		assert.Equal(t, "rwm", dc.Permissions)
+
+		// Invalid (String)
 		err = yaml.Unmarshal([]byte(":/container:rwm"), &dc)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
+
+		// Invalid (String - invalid permissions)
+		err = yaml.Unmarshal([]byte("/dev/host:/dev/cont:rx"), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device permissions")
+
+		// Invalid (Object - missing source)
+		yamlStr = `
+destination: /dev/video1
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device source is required")
+
+		// Invalid (Object - missing destination)
+		yamlStr = `
+source: /dev/video1
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device destination is required")
+
+		// Invalid (Object - invalid permissions type)
+		// Let's test a real type mismatch.
+		yamlStr = `
+source: /dev/s
+destination: /dev/d
+permissions: [r, w]
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.Error(t, err)
+
+		// Invalid (Object - invalid permissions characters)
+		yamlStr = `
+source: /dev/s
+destination: /dev/d
+permissions: rx
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device permissions")
 	})
 }
 
