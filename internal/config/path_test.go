@@ -652,6 +652,11 @@ destination: /dev/fuse
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid device config")
 
+		// Invalid (String - invalid permissions)
+		err = yaml.Unmarshal([]byte("/dev/host:/dev/cont:rx"), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device permissions")
+
 		// Invalid (Object - missing source)
 		yamlStr = `
 destination: /dev/video1
@@ -668,14 +673,8 @@ source: /dev/video1
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "device destination is required")
 
-		// Invalid (Object - invalid field type)
-		yamlStr = `
-source: 123
-destination: /dev/v
-`
-		// ConfigPath is a struct, so it might fail or decode differently depending on yaml.Node.Decode
-		// But if we pass it a mapping or scalar it should work if it's a string.
-		// Let's test a real type mismatch if possible.
+		// Invalid (Object - invalid permissions type)
+		// Let's test a real type mismatch.
 		yamlStr = `
 source: /dev/s
 destination: /dev/d
@@ -683,6 +682,16 @@ permissions: [r, w]
 `
 		err = yaml.Unmarshal([]byte(yamlStr), &dc)
 		require.Error(t, err)
+
+		// Invalid (Object - invalid permissions characters)
+		yamlStr = `
+source: /dev/s
+destination: /dev/d
+permissions: rx
+`
+		err = yaml.Unmarshal([]byte(yamlStr), &dc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device permissions")
 	})
 }
 

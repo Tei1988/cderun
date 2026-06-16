@@ -193,8 +193,22 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 		}
 		parsed, ok := ParseDeviceConfig(s)
 		if !ok {
-			return fmt.Errorf("invalid device config: %q", s)
+			return fmt.Errorf("invalid device config: %q at line %d", s, node.Line)
 		}
+
+		// Validate permissions for string format if they were explicitly provided
+		// ParseDeviceConfig defaults to "rwm" if not present or invalid.
+		// We can detect if it was provided by checking the raw string.
+		if _, remainder, ok := SplitHostRemainder(s); ok {
+			lastColon := strings.LastIndex(remainder, ":")
+			if lastColon != -1 {
+				perms := remainder[lastColon+1:]
+				if !permsRegex.MatchString(perms) {
+					return fmt.Errorf("invalid device permissions at line %d: %q", node.Line, perms)
+				}
+			}
+		}
+
 		*dc = parsed
 		return nil
 	}
@@ -214,6 +228,10 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 		if a.Destination.IsEmpty() {
 			return fmt.Errorf("device destination is required at line %d", node.Line)
 		}
+		if a.Permissions != "" && !permsRegex.MatchString(a.Permissions) {
+			return fmt.Errorf("invalid device permissions at line %d: %q", node.Line, a.Permissions)
+		}
+
 		dc.Source = a.Source
 		dc.Destination = a.Destination
 		dc.Permissions = a.Permissions
