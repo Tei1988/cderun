@@ -605,6 +605,9 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
+	if opt.Name == "pull-max-retries" {
+		rv.res.PullMaxRetries = resolved
+	}
 	return nil
 }
 
@@ -636,6 +639,9 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
+	if opt.Name == "cpus" {
+		rv.res.CPUs = resolved
+	}
 	return nil
 }
 
@@ -649,11 +655,12 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 
 	var p1Set, p2Set bool
 	var p1Val, p2Val string
-	if opt.Name == "hang-timeout" {
+	switch opt.Name {
+	case "hang-timeout":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunHangTimeoutSet, rv.cli.CderunHangTimeout, rv.cli.HangTimeoutSet, rv.cli.HangTimeout
-	} else if opt.Name == "pull-backoff-base" {
+	case "pull-backoff-base":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPullBackoffBaseSet, rv.cli.CderunPullBackoffBase, rv.cli.PullBackoffBaseSet, rv.cli.PullBackoffBase
-	} else {
+	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 		if err != nil {
 			return err
@@ -688,9 +695,10 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 
 	var p1Set, p2Set bool
 	var p1Val, p2Val string
-	if opt.Name == "memory" {
+	switch opt.Name {
+	case "memory":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMemorySet, rv.cli.CderunMemory, rv.cli.MemorySet, rv.cli.Memory
-	} else {
+	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 		if err != nil {
 			return err
