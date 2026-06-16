@@ -103,7 +103,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		return nil, err
 	}
 
-	var res []container.DeviceMapping
+	res := make([]container.DeviceMapping, 0, len(dcs))
 	for _, dc := range dcs {
 		resolved, err := dc.Resolve(r)
 		if err != nil {
@@ -163,7 +163,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 }
 
 func validateImageRegistryMatch(cliImage, configImage string) error {
-	if cliImage == "" || configImage == "" {
+	if cliImage == "" || configImage == "" || cliImage == configImage {
 		return nil
 	}
 
@@ -211,7 +211,7 @@ func validateImageRegistryMatch(cliImage, configImage string) error {
 }
 
 func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var res []string
+	res := make([]string, 0, len(env))
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
@@ -270,14 +270,14 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 		return nil, err
 	}
 
-	var res []container.Mount
+	res := make([]container.Mount, 0, len(mcs))
 	for _, mc := range mcs {
 		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
 			hostPath, err := mc.Source.Resolve(r)
 			if err != nil {
 				return nil, err
 			}
-			if _, err := fs.Stat(hostPath); err != nil {
+			if _, err := r.Stat(hostPath); err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					// Skip if source doesn't exist
 					continue
