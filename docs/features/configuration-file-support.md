@@ -106,7 +106,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)
-- `devices` ([]DeviceConfig)
+- `devices` (slice of `DeviceConfig` object or string)
 
 ### `.tools.yaml` (Tool Mappings)
 
@@ -125,13 +125,22 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 `mounts` 配列の各要素は以下のフィールドを持ちます。
 
-- `type`: `bind` | `volume` | `tmpfs`
-- `source`: ホスト側のパス（bindの場合）
+- `type`: `bind` | `volume` | `tmpfs` (デフォルト: `bind`)
+- `source`: ホスト側のパス
 - `target` (必須): コンテナ内のパス
-- `readOnly`: bool
+- `read_only`: bool
+- `optional`: bool (`type=bind` の場合、ホスト側のソースが存在しなくてもエラーにせずスキップする)
 
 ### デバイス設定 (`devices`)
 
-`devices` 配列の各要素は、文字列形式 (`<host-path>:<container-path>[:<permissions>]`) で記述します。
+`devices` 配列の各要素は、オブジェクト形式または文字列形式をサポートしています。
 
-> **Note**: 現在、YAML内でのデバイス指定は文字列形式のみをサポートしています。
+#### オブジェクト形式
+
+- `source` (必須): ホスト側のデバイスパス
+- `destination` (必須): コンテナ内のデバイスパス
+- `permissions`: デバイスの権限 (例: `rwm`)。デフォルトは `rwm`。
+
+#### 文字列形式
+
+`<host-path>:<container-path>[:<permissions>]` の形式で記述します。

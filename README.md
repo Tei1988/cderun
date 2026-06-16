@@ -78,7 +78,16 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy (**P1** > **P2** CLI Flags > **P3** Env Vars > **P4** Tool Config > **P5** Global Config > **P6** Hardcoded Defaults).
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy.
+
+| Priority | Level | Source | Description |
+| :--- | :--- | :--- | :--- |
+| **Highest** | **P1** | **Internal Overrides** | `--cderun-*` flags (placed after subcommand) |
+| | **P2** | **CLI Flags** | Standard flags (placed before subcommand) |
+| | **P3** | **Env Vars** | `CDERUN_*` environment variables |
+| | **P4** | **Tool Config** | `.tools.yaml` specific tool settings |
+| | **P5** | **Global Config** | `.cderun.yaml` default settings |
+| **Lowest** | **P6** | **Defaults** | Hardcoded internal defaults |
 
 In standard **Wrapper Mode**, these flags **must** be placed **after** the subcommand. `cderun` performs a "Hoisting" operation during preprocessing, moving these flags before the subcommand internally so they are parsed as `cderun` settings rather than being passed to the container.
 
@@ -274,12 +283,18 @@ The masking logic is intelligent and handles CamelCase (e.g., `dbPassword`) and 
 
 ### Unified Value Resolution
 
-- **Expressions**: Use `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`, `{{file:name}}` (limit 1MB), `{{find_dir:name}}`, `{{env:KEY}}`, and `{{env:KEY:-default}}`
-  in configuration files and CLI flags.
-- **Tilde Expansion**: `~` and `~/` paths are expanded to the user's home directory.
-- **Relative Path Handling**: Intelligent absolute path resolution based on the
-  origin of the setting (config file location vs. current directory).
-- See [Value Resolution](docs/features/value-resolution.md) for details.
+cderun dynamically resolves values in both configuration files and CLI flags.
+
+- **Expressions**: Use `{{...}}` syntax to inject dynamic values.
+  - **Magic Words**: `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`
+  - **Directives**:
+    - `{{file:name}}`: Read content from a file (e.g., `{{file:.go-version}}`).
+    - `{{find_dir:name}}`: Find a file/dir and return its absolute directory path (e.g., `{{find_dir:.git}}`).
+    - `{{env:KEY:-default}}`: Inject environment variables with optional default value.
+- **Tilde Expansion**: `~` and `~/` paths at the beginning of a string are expanded to the user's home directory.
+- **Relative Path Handling**: Paths like `./src` are resolved to absolute paths based on the context (e.g., the directory containing the `.tools.yaml` file).
+
+See [Value Resolution](docs/features/value-resolution.md) for detailed specifications and security constraints.
 
 ## Best Practices
 

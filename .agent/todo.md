@@ -42,6 +42,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T08 は旧項目「`ACCESS` キーワードによる偽陽性」を吸収済み**（T08 採用でキーワード方式自体が消えるため）
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
 - **DOCS**: `docs/features/configuration-file-support.md` を更新し、`DeviceConfig` がオブジェクト形式（`source`, `destination`, `permissions`）をサポートしたことを記載する。
+- **FIX**: YAMLタグの命名規則の不一致を解消する（`CDERunConfig`はcamelCaseだが、`MountConfig`はsnake_caseになっている）。
 
 ---
 
