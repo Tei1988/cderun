@@ -310,17 +310,23 @@ func TestUnit_Coverage_Resolver_ResolveMounts_Optional_Exists(t *testing.T) {
 		Files: map[string][]byte{"/exists": {}},
 		WD:    "/",
 	}
-	r, _ := NewExpressionResolver(nil)
 	mcs := []string{"source=/exists,target=/t,optional"}
-	res, err := resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
-	require.NoError(t, err)
-	assert.Len(t, res, 1)
-	assert.Equal(t, "/exists", res[0].Source)
 
-	// Stat error (not NotExist)
-	mfs.StatErr = errors.New("perm denied")
-	_, err = resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
-	require.Error(t, err)
+	t.Run("success", func(t *testing.T) {
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		res, err := resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
+		require.NoError(t, err)
+		assert.Len(t, res, 1)
+		assert.Equal(t, "/exists", res[0].Source)
+	})
+
+	t.Run("stat error", func(t *testing.T) {
+		mfs.StatErr = errors.New("perm denied")
+		defer func() { mfs.StatErr = nil }()
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+		_, err := resolveMounts(mcs, nil, "sh", nil, nil, r, mfs)
+		require.Error(t, err)
+	})
 }
 
 func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
@@ -895,7 +901,7 @@ func TestUnit_Coverage_Resolver_resolveDevices_Errors(t *testing.T) {
 
 func TestUnit_Coverage_Resolver_resolveMounts_Errors(t *testing.T) {
 	mfs := &MockFileSystem{}
-	r, _ := NewExpressionResolver(nil)
+	r, _ := NewExpressionResolverWithFS(nil, mfs)
 
 	// Malformed in p1
 	_, err := resolveMounts([]string{"invalid"}, nil, "s", nil, nil, r, mfs)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,6 +16,11 @@ type fileCacheEntry struct {
 	err     error
 }
 
+type statCacheEntry struct {
+	info os.FileInfo
+	err  error
+}
+
 type anchorRange struct {
 	start int // inclusive index of the first '{'
 	end   int // exclusive index after the last '}'
@@ -24,6 +30,9 @@ type anchorRange struct {
 // It handles nested braces and treats unmatched openers as literal text.
 // It performs a single-pass scan to ensure O(n) complexity.
 func scanAnchors(s string) []anchorRange {
+	if !strings.Contains(s, "{{") {
+		return nil
+	}
 	var allPairs []anchorRange
 	var stack []int
 	for i := 0; i < len(s)-1; i++ {
@@ -77,7 +86,9 @@ type ExpressionResolver struct {
 }
 
 type resolverSharedState struct {
+	mu         sync.RWMutex
 	fileCache  map[string]fileCacheEntry
+	statCache  map[string]statCacheEntry
 	loader     *ConfigLoader
 	cacheOnce  sync.Once
 	loaderOnce sync.Once
@@ -129,6 +140,9 @@ func (r *ExpressionResolver) ensureFileCache() {
 		if r.shared.fileCache == nil {
 			r.shared.fileCache = make(map[string]fileCacheEntry)
 		}
+		if r.shared.statCache == nil {
+			r.shared.statCache = make(map[string]statCacheEntry)
+		}
 	})
 }
 
@@ -144,6 +158,28 @@ func (r *ExpressionResolver) setError(err error) {
 	if r.err == nil {
 		r.err = err
 	}
+}
+
+func (r *ExpressionResolver) Stat(name string) (os.FileInfo, error) {
+	if r.shared == nil {
+		return r.fs.Stat(name)
+	}
+	r.ensureFileCache()
+
+	r.shared.mu.RLock()
+	cached, ok := r.shared.statCache[name]
+	r.shared.mu.RUnlock()
+	if ok {
+		return cached.info, cached.err
+	}
+
+	info, err := r.fs.Stat(name)
+
+	r.shared.mu.Lock()
+	r.shared.statCache[name] = statCacheEntry{info: info, err: err}
+	r.shared.mu.Unlock()
+
+	return info, err
 }
 
 // Resolve processes a value (string, slice, or map) and resolves any expressions or tilde expansion found.
@@ -288,8 +324,16 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %q", filename)
 	}
 
+	if r.shared == nil {
+		// Fallback for file directive requires shared loader state
+		return "", fmt.Errorf("file directive resolution requires a resolver with shared state")
+	}
+
 	r.ensureFileCache()
-	if cached, ok := r.shared.fileCache[filename]; ok {
+	r.shared.mu.RLock()
+	cached, ok := r.shared.fileCache[filename]
+	r.shared.mu.RUnlock()
+	if ok {
 		return cached.content, cached.err
 	}
 
@@ -297,38 +341,50 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	paths := r.shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %q", filename)
+		r.shared.mu.Lock()
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.mu.Unlock()
 		return "", err
 	}
 
-	info, err := r.fs.Stat(paths[0])
+	info, err := r.Stat(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to stat file %q: %w", paths[0], err)
+		r.shared.mu.Lock()
 		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.mu.Unlock()
 		return "", wrappedErr
 	}
 
 	if info.Size() > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
+		r.shared.mu.Lock()
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.mu.Unlock()
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %q: %w", paths[0], err)
+		r.shared.mu.Lock()
 		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		r.shared.mu.Unlock()
 		return "", wrappedErr
 	}
 
 	if int64(len(data)) > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
+		r.shared.mu.Lock()
 		r.shared.fileCache[filename] = fileCacheEntry{err: err}
+		r.shared.mu.Unlock()
 		return "", err
 	}
 
 	result := strings.TrimSpace(string(data))
+	r.shared.mu.Lock()
 	r.shared.fileCache[filename] = fileCacheEntry{content: result}
+	r.shared.mu.Unlock()
 	return result, nil
 }
 
