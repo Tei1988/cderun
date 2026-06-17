@@ -573,7 +573,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Equal(t, "podman", res.Runtime)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
-				// SocketPath explicit containerd
+		// SocketPath explicit containerd
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "/run/containerd/containerd.sock", SocketPathSet: true}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Runtime)
@@ -597,11 +597,11 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// Priority: docker > containerd > podman
 		mfs = &MockFileSystem{
-			Dirs:  map[string]bool{"/var/run": true, "/run/containerd": true, "/run/podman": true},
+			Dirs: map[string]bool{"/var/run": true, "/run/containerd": true, "/run/podman": true},
 			Files: map[string][]byte{
-				"/var/run/docker.sock": []byte(""),
+				"/var/run/docker.sock":            []byte(""),
 				"/run/containerd/containerd.sock": []byte(""),
-				"/run/podman/podman.sock": []byte(""),
+				"/run/podman/podman.sock":         []byte(""),
 			},
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
@@ -611,10 +611,10 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// Priority: containerd > podman
 		mfs = &MockFileSystem{
-			Dirs:  map[string]bool{"/run/containerd": true, "/run/podman": true},
+			Dirs: map[string]bool{"/run/containerd": true, "/run/podman": true},
 			Files: map[string][]byte{
 				"/run/containerd/containerd.sock": []byte(""),
-				"/run/podman/podman.sock": []byte(""),
+				"/run/podman/podman.sock":         []byte(""),
 			},
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
@@ -1013,10 +1013,10 @@ func TestUnit_Resolver_Env_Strict_Missing(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{}
 	cli := &CLIOptions{
-		Image:    "alpine",
-		ImageSet: true,
-		Env:      []string{"MISSING_HOST_VAR"},
-		StrictEnv: true,
+		Image:        "alpine",
+		ImageSet:     true,
+		Env:          []string{"MISSING_HOST_VAR"},
+		StrictEnv:    true,
 		StrictEnvSet: true,
 	}
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)

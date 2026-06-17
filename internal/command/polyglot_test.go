@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -39,7 +40,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		go func() {
 			// Simulating "node --interactive=true --image alpine cat"
 			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--interactive=true", "--image", "alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}
@@ -87,7 +88,7 @@ func TestUnit_Polyglot_InternalOverridesHoisting(t *testing.T) {
 		go func() {
 			// Simulating "node --cderun-interactive=true --cderun-image=node:alpine cat"
 			execErr = ExecuteContextWithOptions(ctx, []string{"node", "--cderun-interactive=true", "--cderun-image=node:alpine", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}

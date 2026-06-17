@@ -825,7 +825,6 @@ func TestUnit_Config_ValidateUserName(t *testing.T) {
 	}
 }
 
-
 func TestUnit_Config_ValidateExposePort(t *testing.T) {
 	tests := []struct {
 		name    string

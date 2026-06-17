@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -33,7 +34,7 @@ func TestUnit_Polyglot_ExtraScenarios(t *testing.T) {
 		defer cancel()
 
 		err := ExecuteContextWithOptions(ctx, []string{"node", "--cderun-tty", "-v", "--cderun-image", "node:alpine", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -66,7 +67,7 @@ func TestUnit_Polyglot_ExtraScenarios(t *testing.T) {
 		defer cancel()
 
 		err := ExecuteContextWithOptions(ctx, []string{"/usr/local/bin/node", "--cderun-tty", "-v"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -119,7 +120,7 @@ func TestUnit_Wrapper_P1Positions(t *testing.T) {
 			defer cancel()
 
 			err := ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}

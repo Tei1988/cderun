@@ -31,6 +31,7 @@ type ContainerdRuntime struct {
 	client    *client.Client
 	socket    string
 	namespace string
+	logger    *logging.Logger
 	sleepFunc func(context.Context, time.Duration) error
 
 	mu     sync.RWMutex
@@ -41,21 +42,41 @@ type ContainerdRuntime struct {
 	closeErr  error
 }
 
+// ContainerdRuntimeOption defines a functional option for ContainerdRuntime.
+type ContainerdRuntimeOption func(*ContainerdRuntime)
+
+// WithContainerdLogger sets the logger for the containerd runtime.
+func WithContainerdLogger(l *logging.Logger) ContainerdRuntimeOption {
+	return func(rt *ContainerdRuntime) {
+		rt.logger = l
+	}
+}
+
 // NewContainerdRuntime creates a new containerd runtime instance.
-func NewContainerdRuntime(socket string) (*ContainerdRuntime, error) {
+func NewContainerdRuntime(socket string, opts ...ContainerdRuntimeOption) (*ContainerdRuntime, error) {
 	c, err := client.New(socket, client.WithDefaultNamespace(defaultNamespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to containerd: %w", err)
 	}
 
-	return &ContainerdRuntime{
+	rt := &ContainerdRuntime{
 		client:    c,
 		socket:    socket,
 		namespace: defaultNamespace,
 		sleepFunc: SleepFunc,
 		ioMap:     make(map[string]cio.Creator),
 		ioWait:    make(map[string]chan error),
-	}, nil
+	}
+
+	for _, opt := range opts {
+		opt(rt)
+	}
+
+	if rt.logger == nil {
+		rt.logger = logging.GetGlobalLogger()
+	}
+
+	return rt, nil
 }
 
 func (r *ContainerdRuntime) notifyWait(containerID string, err error) {
@@ -94,7 +115,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
+			r.logger.Warn("Retrying image pull %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
 			if err := r.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
@@ -115,7 +136,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 			}
 		}
 
-		logging.Info("Pulling image %s...", img)
+		r.logger.Info("Pulling image %s...", img)
 		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
 		if err != nil {
 			lastErr = err
@@ -275,7 +296,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if _, delErr := task.Delete(cleanupCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
-				logging.Warn("failed to cleanup task for container %s after start failure: %v", containerID, delErr)
+				r.logger.Warn("failed to cleanup task for container %s after start failure: %v", containerID, delErr)
 			}
 		}
 	}()
@@ -330,7 +351,7 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	task, err := container.Task(cCtx, nil)
 	if err == nil {
 		if _, delErr := task.Delete(cCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
-			logging.Warn("failed to delete task during container removal (best-effort): %v", delErr)
+			r.logger.Warn("failed to delete task during container removal (best-effort): %v", delErr)
 		}
 	}
 

@@ -133,7 +133,7 @@ type rootOptions struct {
 	setupSignals       func(chan os.Signal)
 	setupResizeSignal  func(chan os.Signal)
 	stopSignalHandling func(chan os.Signal)
-	runtimeFactory     func(string, string) (runtime.ContainerRuntime, error)
+	runtimeFactory     func(string, string, *logging.Logger) (runtime.ContainerRuntime, error)
 	jsonMarshalIndent  func(v any, prefix, indent string) ([]byte, error)
 	yamlMarshal        func(v any) ([]byte, error)
 
@@ -175,14 +175,14 @@ func defaultOptions() rootOptions {
 		},
 		attachGracePeriod: attachGracePeriod,
 		logger:            logging.GetGlobalLogger(),
-		runtimeFactory: func(name string, socket string) (runtime.ContainerRuntime, error) {
+		runtimeFactory: func(name string, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
-				return runtime.NewDockerRuntime(socket)
+				return runtime.NewDockerRuntimeWithOptions(socket, "docker", nil, runtime.WithLogger(l))
 			case "podman":
-				return runtime.NewPodmanRuntime(socket)
+				return runtime.NewPodmanRuntime(socket, runtime.WithLogger(l))
 			case "containerd":
-				return runtime.NewContainerdRuntime(socket)
+				return runtime.NewContainerdRuntime(socket, runtime.WithContainerdLogger(l))
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -773,7 +773,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (rt runtime.ContainerRuntime, containerID string, cleanup func(), err error) {
 	// Initialize Runtime
-	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath)
+	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
 	if err != nil {
 		err = &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
 		return
@@ -1003,7 +1003,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					exitCode = result.code
 				case <-time.After(effectiveHangTimeout):
 					var err error
-					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
+					exitCode, err = o.signalKillIfRunning(context.Background(), rt, containerID)
 					if err != nil {
 						return 0, err
 					}
