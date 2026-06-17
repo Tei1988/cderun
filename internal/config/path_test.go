@@ -179,7 +179,9 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid readonly value")
 
 		_, err = ParseMountFlag("type=bind,src=/s,target=/t,unknown=val")
-		require.NoError(t, err) // unknown keys are ignored
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown mount option: \"unknown\"")
+		assert.Contains(t, err.Error(), "supported: type, source, src, target, dst, destination, readonly, optional")
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {

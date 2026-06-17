@@ -28,7 +28,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
-| T17 | `ParseMountFlag` の未知キーをエラーにする | バグ/UX | 低 | 小 | - |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - |
@@ -431,31 +430,6 @@ containerd は IO をタスク作成時に渡す必要があるため、`AttachC
 
 - containerd + `--network` / `--publish` がコンテナ作成前にエラーになる
 - エラーメッセージに「どのランタイムが何を未対応か」が含まれる
-
----
-
-## T17: `ParseMountFlag` の未知キーをエラーにする
-
-- 種別: バグ/UX 修正
-- 対象: `internal/config/path.go:245-296`（無音スキップは 287 行目付近、`default` ケースなし）
-
-### 問題
-
-`--mount type=bind,source=/foo,targed=/bar` のようなタイポをしても未知キーが無視され、最終的に「mount target is required」という別のエラーになる。原因の特定が難しい。未知キーはエラーを返して即座に止めるべき。ログへの警告出力はコマンドの出力と混ざるため不可。
-
-```go
-default:
-    return MountConfig{}, fmt.Errorf("unknown mount option: %q", key)
-```
-
-### 実装上の注意
-
-docker の `--mount` には `bind-propagation` / `consistency` / `volume-driver` 等 cderun 未対応のキーが存在し、docker から移行してきたユーザーが指定する可能性がある。エラーメッセージに **サポートされるキー一覧**（`type`, `source`/`src`, `target`/`dst`/`destination`, `readonly`, `optional`）を含めると移行時の混乱が減る。
-
-### 完了条件
-
-- 未知キーが即エラーになり、メッセージにサポートキー一覧が含まれる
-- タイポケースのテストがある
 
 ---
 
