@@ -1133,7 +1133,8 @@ intended for the subcommand.`,
 
 		// Create snapshot if nested execution support is requested or already active
 		var snapshotDir string
-		if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || (globalCfg != nil && globalCfg.HostContext != nil) {
+		explicitNested := resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0
+		if explicitNested || (globalCfg != nil && globalCfg.HostContext != nil) {
 			o.logger.Debug("Creating execution snapshot for nested support...")
 			// Ensure globalCfg is initialized for snapshot if it was nil
 			if globalCfg == nil {
@@ -1141,6 +1142,9 @@ intended for the subcommand.`,
 			}
 			sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
 			if err != nil {
+				if explicitNested {
+					return fmt.Errorf("failed to create snapshot for nested execution: %w", err)
+				}
 				o.logger.Warn("failed to create snapshot: %v", err)
 			} else {
 				snapshotDir = sDir
