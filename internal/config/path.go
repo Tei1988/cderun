@@ -331,6 +331,7 @@ func ParseMountFlag(s string) (MountConfig, error) {
 			}
 			res.Optional = b
 		default:
+			return MountConfig{}, fmt.Errorf("unknown mount option: %q (supported: type, source, src, target, dst, destination, readonly, optional)", key)
 		}
 	}
 
