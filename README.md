@@ -293,6 +293,7 @@ cderun dynamically resolves values in both configuration files and CLI flags.
     - `{{env:KEY:-default}}`: Inject environment variables with optional default value.
 - **Tilde Expansion**: `~` and `~/` paths at the beginning of a string are expanded to the user's home directory.
 - **Relative Path Handling**: Paths like `./src` are resolved to absolute paths based on the context (e.g., the directory containing the `.tools.yaml` file).
+- **Security**: All resolved paths undergo **Anchor Boundary Validation** to prevent directory traversal. Paths cannot escape their defined anchor (like `{{HOME}}` or `{{PWD}}`).
 
 See [Value Resolution](docs/features/value-resolution.md) for detailed specifications and security constraints.
 

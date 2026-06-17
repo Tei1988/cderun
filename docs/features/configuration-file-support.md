@@ -81,7 +81,9 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 ## 設定スキーマ
 
-設定ファイルで使用するキー名は、コマンドラインフラグに対応した**キャメルケース（camelCase）**です。
+設定ファイルで使用するキー名は、原則としてコマンドラインフラグに対応した**キャメルケース（camelCase）**です。
+
+> **例外**: `mounts` 配列内の各要素（`MountConfig`）のフィールド名のみ、一部でスネークケース（snake_case）が使用されています（例: `read_only`, `optional`）。これは、一般的なコンテナ設定の慣習や互換性を考慮したものです。
 
 ### `.cderun.yaml` (Global Settings)
 
@@ -98,11 +100,12 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 #### `defaults` ブロックでサポートされるフィールド
 
 - `tty`, `interactive`, `remove`, `strictEnv` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `memory`, `hangTimeout` (string)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout` (string)
 - `cpus` (float64)
+- `pullMaxRetries` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
 - `mountCderunPath`, `mountSocketPath` (ConfigPath object/string)
-- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env` ([]string)
+- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env`, `devices` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)

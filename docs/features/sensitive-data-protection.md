@@ -27,8 +27,6 @@ The following segments (case-insensitive) trigger masking:
 - `JWT`
 - `SALT`
 
-> **Note**: Keywords like `SIGNATURE`, `BEARER`, `OTP`, and `SENSITIVE` are planned for future inclusion in the default masking list.
-
 ### Intelligent Segmentation
 
 The system performs a single-pass scan of the key string to accurately identify sensitive information while minimizing false positives and memory allocations. Segmentation occurs at:
