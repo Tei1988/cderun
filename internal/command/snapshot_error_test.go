@@ -90,7 +90,7 @@ func TestUnit_Snapshot_ErrorHandling(t *testing.T) {
 
 		err := cmd.ExecuteContext(context.Background())
 		// Should NOT return an error because it's only a warning for implicit propagation
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Contains(t, logBuf.String(), "failed to create snapshot: failed to create snapshot directory: mkdir failed")
 	})
