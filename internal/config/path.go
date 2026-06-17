@@ -415,11 +415,11 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 		}
 		res = resolved
 	} else {
-		expanded, err := expandHome(p, fs)
+		home, err := fs.UserHomeDir()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to get home directory: %w", err)
 		}
-		res = expanded
+		res = expandHome(p, home)
 	}
 
 	// If expanded value contains a scheme, return it as is
