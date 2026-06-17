@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,7 +37,7 @@ func TestUnit_Path_MountConfig_UnmarshalYAML_Extra(t *testing.T) {
 		var mc MountConfig
 		// Provide a non-mapping node (sequence) to trigger Decode error into struct
 		err := yaml.Unmarshal([]byte("- item"), &mc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount config")
 	})
 }
