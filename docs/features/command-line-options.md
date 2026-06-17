@@ -202,6 +202,12 @@ cderun node app.js --cderun-env=NODE_ENV=production
 - **環境変数**: `CDERUN_MOUNT`
 - **説明**: マウントの設定（bind, volume, tmpfsをサポート）
 - **用途**: `type=bind,source=hostPath,target=containerPath[,readonly][,optional]`
+- **キーワード**:
+  - `type`: `bind` | `volume` | `tmpfs`
+  - `source` (エイリアス: `src`): ホスト側のパス
+  - `target` (エイリアス: `dst`, `destination`): コンテナ内のパス
+  - `readonly`: 読み取り専用マウント
+  - `optional`: ホスト側のソースが存在しなくてもエラーにせずスキップする（`type=bind` のみ）
 - **補足**:
   - `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
   - CLIフラグ（P1/P2）では、複数のマウントを指定する場合、フラグを繰り返す必要があります。
