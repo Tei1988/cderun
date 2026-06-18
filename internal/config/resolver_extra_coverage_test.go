@@ -101,7 +101,7 @@ func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
 		// Test resolveStringOpt error via mock FS
 		mfs.ReadFileErr = assert.AnError
 		_, err := resolveEnvValues([]string{"KEY={{file:err}}"}, false, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveMounts errors", func(t *testing.T) {
@@ -113,12 +113,12 @@ func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
 		// Test mc.Source.Resolve error via pickConfigs
 		mfs.ReadFileErr = assert.AnError
 		_, err := resolveMounts([]string{"type=bind,source={{file:err}},target=/t"}, nil, "", nil, nil, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// Test r.Stat(hostPath) error that is not os.ErrNotExist
 		mfs.ReadFileErr = nil
 		mfs.StatErr = assert.AnError
 		_, err = resolveMounts([]string{"type=bind,source=/host,target=/t,optional"}, nil, "", nil, nil, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }

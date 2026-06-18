@@ -173,37 +173,17 @@ func TestUnit_Path_Resolve_Errors_Extra(t *testing.T) {
 		mfs2 := &exprMockFS{
 			homeDirErr: assert.AnError,
 		}
-		// ResolvePath calls expandHome if r == nil
-		_, err := ResolvePath("~/foo", "/base", nil)
-		// Wait, if r is nil, it uses RealFileSystem unless we can inject it.
-		// ResolvePath uses RealFileSystem if r is nil.
-		// To test this we need r != nil but ResolveString to return something starting with ~
-		// Or we can just rely on the coverage of other paths.
-		// Actually ResolvePath has:
-		/*
-		if r != nil {
-			resolved, err := r.ResolveString(p)
-			if err != nil {
-				return "", err
-			}
-			res = resolved
-		} else {
-			expanded, err := expandHome(p, fs)
-			...
-		}
-		*/
-		// If r is nil, it uses RealFileSystem. We can't mock RealFileSystem easily.
 		// But we can pass r with a mock fs.
 		r, _ := NewExpressionResolverWithFS(nil, mfs2)
 		// Force ResolveString to return ~ by using an env var or similar
 		mfs2.Env = map[string]string{"HOME_VAL": "~/foo"}
-		_, err = ResolvePath("{{env:HOME_VAL}}", "/base", r)
-		assert.Error(t, err)
+		_, err := ResolvePath("{{env:HOME_VAL}}", "/base", r)
+		require.Error(t, err)
 	})
 
 	t.Run("validatePathChars", func(t *testing.T) {
 		err := validatePathChars("path\x01")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid character")
 	})
 
@@ -215,11 +195,11 @@ func TestUnit_Path_Resolve_Errors_Extra(t *testing.T) {
 		r.setError(assert.AnError)
 		// Case: host:remainder, but ResolveString(host) fails
 		_, err := resolveVolumePath("{{file:err}}:/container", "/base", r)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// Case: no separator, ResolveString(v) fails
 		_, err = resolveVolumePath("{{file:err}}", "/base", r)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("validateAnchorBoundaries errors", func(t *testing.T) {
@@ -228,12 +208,12 @@ func TestUnit_Path_Resolve_Errors_Extra(t *testing.T) {
 		}
 		// trigger fs.Abs(resolved) error
 		err := validateAnchorBoundaries("~", "relative", nil, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		// trigger ResolveString error for anchor
 		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home"})
 		r.setError(assert.AnError)
 		err = validateAnchorBoundaries("{{err}}", "/abs", r, &MockFileSystem{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
