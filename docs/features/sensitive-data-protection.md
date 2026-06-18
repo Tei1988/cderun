@@ -27,6 +27,8 @@ The following segments (case-insensitive) trigger masking:
 - `JWT`
 - `SALT`
 
+> **Note**: Keywords like `SIGNATURE`, `BEARER`, `OTP`, and `SENSITIVE` are slated for addition to the core masking engine to further enhance protection across diverse authentication schemes.
+
 ### Intelligent Segmentation
 
 The system performs a single-pass scan of the key string to accurately identify sensitive information while minimizing false positives and memory allocations. Segmentation occurs at:
@@ -36,7 +38,7 @@ The system performs a single-pass scan of the key string to accurately identify 
 - **Letter-to-digit boundaries**: e.g., `accessKey2` → `accessKey`, `2`
 - **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `JSON`, `Token`
 
-A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
+This intelligent approach ensures that `MONKEY` is correctly identified as non-sensitive (matching no keywords). In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be accurately masked as `[REDACTED]`.
 
 ## Presentation Layer Safety
 

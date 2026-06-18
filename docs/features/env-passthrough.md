@@ -2,7 +2,7 @@
 
 ## 概要
 
-実行ホストの環境変数を選択的にコンテナに引き継ぐ機能。
+**実行ホスト (Execution Host)** の環境変数を選択的にコンテナに引き継ぐ機能。
 **デフォルトでは環境変数は引き継がれない。**明示的に指定した環境変数のみがコンテナに渡される。
 
 `.tools.yaml`（優先順位 P4）、`--env` フラグ（優先順位 P2）、`--cderun-env` フラグ（優先順位 P1）および環境変数 `CDERUN_ENV`（優先順位 P3）による指定がサポートされており、`KEY=value` 形式（明示的指定）と `KEY` 形式（ホストからの取得）の両方に対応しています。
@@ -14,7 +14,7 @@
 ### env配列の形式
 
 1. **`KEY=value`** (明示的指定): 指定された値をそのまま使用。
-2. **`KEY`** (パススルー): 実行ホストの環境変数から値を取得して `KEY=value` 形式に変換。
+2. **`KEY`** (パススルー): **実行ホスト (Execution Host)** の環境変数から値を取得して `KEY=value` 形式に変換。
 
 ## 設定方法
 
@@ -25,8 +25,8 @@
 node:
   env:
     - NODE_ENV=production      # 明示的な値
-    - NPM_TOKEN                 # 実行ホストから取得
-    - HOME                      # 実行ホストから取得
+    - NPM_TOKEN                 # 実行ホスト (Execution Host) から取得
+    - HOME                      # 実行ホスト (Execution Host) から取得
 ```
 
 ### コマンドライン
@@ -96,14 +96,14 @@ cderun node app.js
 # ContainerConfig.Env = ["NODE_ENV=production", "PORT=3000"]
 ```
 
-### 例2: 実行ホストから取得
+### 例2: 実行ホスト (Execution Host) から取得
 
 ```yaml
 # .tools.yaml
 node:
   env:
-    - NPM_TOKEN  # 実行ホストから取得
-    - HOME       # 実行ホストから取得
+    - NPM_TOKEN  # 実行ホスト (Execution Host) から取得
+    - HOME       # 実行ホスト (Execution Host) から取得
 ```
 
 ```bash
@@ -121,7 +121,7 @@ cderun node app.js
 node:
   env:
     - NODE_ENV=production  # 明示的
-    - NPM_TOKEN            # 実行ホストから
+    - NPM_TOKEN            # 実行ホスト (Execution Host) から
     - PORT=3000            # 明示的
 ```
 
@@ -139,7 +139,7 @@ cderun node app.js
 
 ### デフォルト動作
 
-実行ホストに存在しない環境変数は空文字列として渡される：
+**実行ホスト (Execution Host)** に存在しない環境変数は空文字列として渡される：
 
 ```bash
 cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
@@ -149,7 +149,7 @@ cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 
 ### 厳密モード (Strict Mode)
 
-`strictEnv` を `true` に設定すると、指定された環境変数が実行ホストに存在しない場合にエラーを返します。
+`strictEnv` を `true` に設定すると、指定された環境変数が **実行ホスト (Execution Host)** に存在しない場合にエラーを返します。
 
 #### 設定方法
 
@@ -182,7 +182,7 @@ Error: required environment variable not found: NPM_TOKEN
 
 ## 環境変数の解決ロジック
 
-コンテナを作成する前に、`Env` 配列内の各要素をスキャンし、`=` を含まない要素（キーのみの指定）については、実行ホストの `os.Getenv(key)` を呼び出して値を解決する。解決された値は `KEY=value` の形式でランタイムAPIに渡される。
+コンテナを作成する前に、`Env` 配列内の各要素をスキャンし、`=` を含まない要素（キーのみの指定）については、**実行ホスト (Execution Host)** の `os.Getenv(key)` を呼び出して値を解決する。解決された値は `KEY=value` の形式でランタイムAPIに渡される。
 
 ## ベストプラクティスと使い分け
 

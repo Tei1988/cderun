@@ -52,6 +52,10 @@ cderun go --version
 
 `cderun` は実行時に引数リストをスキャンし、`--cderun-` プレフィックスを持つフラグを発見すると、それをサブコマンドの境界を越えて前方に移動させます（Hoisting）。これにより、Cobra などのコマンドラインパーサーがそれらを `cderun` コマンド自体のフラグ（P1 Internal Overrides）として正しく認識できるようになります。
 
+**重要**: 標準の **Wrapper Mode** において、これらの P1 フラグは **必ずサブコマンドの後ろ** に配置する必要があります。サブコマンドの前に配置すると、バリデーションによりエラーとなります（Diagnosis Mode を除く）。
+
+この仕組みは、ラップ対象のツールが持つ独自のフラグ（例: `node --env`）と、`cderun` 側の設定（例: `node --cderun-env`）を完全に分離し、フラグ名の衝突を回避するために不可欠な役割を果たしています。
+
 #### 処理フローの視覚化
 
 ```mermaid
@@ -83,12 +87,16 @@ flowchart TD
 4. **再構成**: 抽出された P1 フラグをサブコマンドの直前に挿入します。これにより、Cobra パーサーはこれらを `cderun` 自体のグローバルフラグとしてパースできるようになります。
 
 ```bash
-# 実行時の入力
+# 実行時の入力 (Wrapper Mode: P1フラグは後ろ)
 cderun node app.js --cderun-tty --cderun-image node:20-alpine
 
 # 前処理（ホイスト）後の内部的な引数状態
 # これが Cobra パーサーに渡される
 cderun --cderun-tty --cderun-image node:20-alpine node app.js
+
+# エラーになる例 (Wrapper Mode で前に置く)
+cderun --cderun-tty node app.js
+# Error: cderun internal override flag "--cderun-tty" must be placed after the subcommand
 ```
 
 このメカニズムにより、コンテナ内で実行されるコマンドが自身のフラグ（例: `node --version`）を持っていても、`cderun` の設定と曖昧さなく区別することが可能になります。

@@ -87,6 +87,7 @@ hostContext:
   binPath: "/usr/local/bin/cderun"          # 基底ホスト上のバイナリ位置
   snapshotDir: "/tmp/cderun-snap-xxxx"     # 基底ホスト上のスナップショットディレクトリ位置
   workingDir: "/home/user/project"         # 現在のカレントワーキングディレクトリのホスト側パス
+  homeDir: "/home/user"                    # 基底ホスト上のユーザーホームディレクトリ
   level: 1                                 # 現在のネストレベル
   mounts:                                  # 基底ホストパスと現在のコンテナパスのマッピング
     - source: "/home/user/project"
@@ -107,8 +108,8 @@ hostContext:
 3. **マッピングの検索**: `hostContext.mounts` を検索し、解決した絶対パスのプレフィックスとして最もよく一致する `target` を探します。
 
 4. **一致の優先順位**:
-    - **最長一致（Longest Match）**: より長い `target` パスが優先されます（例: `/tmp` への一致は `/` への一致より優先される）。これにより、OverlayFS によるルートマッピングよりも明示的なボリュームマウントが優先されます。
-    - **最新レベル（Deepest Level）**: ターゲットパスの長さが同じ場合、より高い `level`（より深いネストで追加されたマッピング）が優先されます。
+   - **最長一致（Longest Match）**: より長い `target` パスが優先されます（例: `/app/config` への一致は `/app` への一致より優先される）。これにより、OverlayFS によるルートマッピングよりも明示的なボリュームマウントが、より広域なマウントよりも狭域なマウントが優先されます。
+   - **最新レベル（Deepest Level）**: ターゲットパスの長さが同じ場合、より高い `level`（より深いネストレベルで追加されたマッピング）が優先されます。
 
 5. 一致した `target` プレフィックスを、対応する `source`（基底ホスト上のパス）に置き換えます。
 
