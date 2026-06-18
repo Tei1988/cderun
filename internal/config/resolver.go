@@ -330,6 +330,7 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 }
 
 type resolver struct {
+	ignoreFastPath bool
 	subcommand string
 	cli        *CLIOptions
 	tools      ToolsConfig
@@ -428,7 +429,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	var p1Val, p2Val string
 
 	// Fast-path for common options to avoid reflection
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "image":
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunImageSet, rv.cli.CderunImage, rv.cli.ImageSet, rv.cli.Image
@@ -516,7 +517,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	var p1Val, p2Val bool
 
 	// Fast-path for common options
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "tty":
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunTTYSet, rv.cli.CderunTTY, rv.cli.TTYSet, rv.cli.TTY
@@ -602,7 +603,6 @@ func (rv *resolver) applyIntOptionReflect(opt IntOption) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	var ok1, ok2 bool
 	p1Int, ok1 := rv.extractIntValue(v1, s1)
 	if !ok1 {
 		s1 = false
@@ -625,7 +625,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	var p1Set, p2Set bool
 	var p1Int, p2Int int
 
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "pull-max-retries":
 			p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
@@ -663,7 +663,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	var p1Set, p2Set bool
 	var p1Float, p2Float float64
 
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "cpus":
 			p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
@@ -696,7 +696,6 @@ func (rv *resolver) applyFloat64OptionReflect(opt Float64Option) error {
 	if err != nil {
 		return err
 	}
-	var ok1, ok2 bool
 	p1Float, ok1 := rv.extractFloatValue(v1, s1)
 	if !ok1 {
 		s1 = false
@@ -723,7 +722,7 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	var p1Val, p2Val string
 	var valStr string
 
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "hang-timeout":
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunHangTimeoutSet, rv.cli.CderunHangTimeout, rv.cli.HangTimeoutSet, rv.cli.HangTimeout
@@ -776,7 +775,7 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	var p1Val, p2Val string
 	var valStr string
 
-	if !testIgnoreFastPath {
+	if !rv.ignoreFastPath {
 		switch opt.Name {
 		case "memory":
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMemorySet, rv.cli.CderunMemory, rv.cli.MemorySet, rv.cli.Memory
@@ -839,6 +838,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 	res := &ResolvedConfig{}
 	rv := &resolver{
+		ignoreFastPath: testIgnoreFastPath,
 		subcommand: subcommand,
 		cli:        cli,
 		tools:      tools,
@@ -1055,7 +1055,7 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-all-tools")
 		var p1Set, p2Set bool
 		var p1Val, p2Val bool
-		if !testIgnoreFastPath {
+		if !rv.ignoreFastPath {
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
 		} else {
 			_, s1, v1, s2, v2, err := fetchFieldAndParams("mount-all-tools", rv.cliVal)
@@ -1073,7 +1073,7 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-cderun")
 		var p1Set, p2Set bool
 		var p1Val, p2Val bool
-		if !testIgnoreFastPath {
+		if !rv.ignoreFastPath {
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
 		} else {
 			_, s1, v1, s2, v2, err := fetchFieldAndParams("mount-cderun", rv.cliVal)
@@ -1108,7 +1108,7 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-socket")
 		var p1Set, p2Set bool
 		var p1Val, p2Val bool
-		if !testIgnoreFastPath {
+		if !rv.ignoreFastPath {
 			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
 		} else {
 			_, s1, v1, s2, v2, err := fetchFieldAndParams("mount-socket", rv.cliVal)
