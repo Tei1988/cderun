@@ -520,6 +520,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("applyIntOption with non-int field", func(t *testing.T) {
+		testIgnoreFastPath = true
+		defer func() { testIgnoreFastPath = false }()
 		withPatchedFieldInfo(t, "pull-max-retries", func() {
 			info := fieldInfo["pull-max-retries"]
 			// Point p1ValIdx to a string field (Image)
@@ -535,6 +537,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("applyFloat64Option with non-float field", func(t *testing.T) {
+		testIgnoreFastPath = true
+		defer func() { testIgnoreFastPath = false }()
 		withPatchedFieldInfo(t, "cpus", func() {
 			info := fieldInfo["cpus"]
 			// Point p1ValIdx to a string field (Image)
@@ -550,6 +554,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("applyIntOption p2 non-int", func(t *testing.T) {
+		testIgnoreFastPath = true
+		defer func() { testIgnoreFastPath = false }()
 		withPatchedFieldInfo(t, "pull-max-retries", func() {
 			info := fieldInfo["pull-max-retries"]
 			info.p2ValIdx = 0
@@ -563,6 +569,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("applyFloat64Option p2 non-float", func(t *testing.T) {
+		testIgnoreFastPath = true
+		defer func() { testIgnoreFastPath = false }()
 		withPatchedFieldInfo(t, "cpus", func() {
 			info := fieldInfo["cpus"]
 			info.p2ValIdx = partOfCLIOptionsImage()

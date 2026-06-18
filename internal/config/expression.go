@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -33,44 +32,27 @@ func scanAnchors(s string) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
-	var allPairs []anchorRange
+	var res []anchorRange
 	var stack []int
+	var marks []int
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
+			marks = append(marks, len(res))
 			i++
 		} else if s[i] == '}' && s[i+1] == '}' {
-			if len(stack) > 0 {
-				start := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				allPairs = append(allPairs, anchorRange{start: start, end: i + 2})
+			if n := len(stack); n > 0 {
+				start := stack[n-1]
+				mark := marks[n-1]
+				stack = stack[:n-1]
+				marks = marks[:n-1]
+				res = append(res[:mark], anchorRange{start: start, end: i + 2})
 			}
 			i++
 		}
 	}
-
-	if len(allPairs) == 0 {
+	if len(res) == 0 {
 		return nil
-	}
-
-	// Sort pairs by start (ascending) and end (descending).
-	// This allows us to identify top-level (outermost) ranges in a single pass.
-	sort.Slice(allPairs, func(i, j int) bool {
-		if allPairs[i].start != allPairs[j].start {
-			return allPairs[i].start < allPairs[j].start
-		}
-		return allPairs[i].end > allPairs[j].end
-	})
-
-	var res []anchorRange
-	lastEnd := -1
-	for _, p := range allPairs {
-		// Since we sorted by start ascending and end descending,
-		// the first pair starting at or after lastEnd will be the outermost one.
-		if p.start >= lastEnd {
-			res = append(res, p)
-			lastEnd = p.end
-		}
 	}
 	return res
 }
@@ -229,9 +211,9 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		// Optimization: handle exact matches of magic words or simple directives (e.g. "{{HOME}}", "{{env:KEY}}")
 		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") {
 			content := strings.TrimSpace(s[2 : len(s)-2])
-			if !strings.Contains(content, "{{") && !strings.Contains(content, "}}") { // No nested expressions
+			if !strings.Contains(content, "{{") { // No nested expressions
 				res, err := r.resolveDirective(content)
-				if err == nil && !strings.HasPrefix(res, "{{") {
+				if err == nil {
 					resolved = res
 					hasExpr = false // Resolved
 				}
@@ -242,6 +224,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			ranges := scanAnchors(s)
 			if len(ranges) > 0 {
 				var sb strings.Builder
+				sb.Grow(len(s))
 				last := 0
 				for _, rng := range ranges {
 					sb.WriteString(s[last:rng.start])
@@ -250,8 +233,14 @@ func (r *ExpressionResolver) resolveString(s string) string {
 					} else {
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
 						// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
-						resolvedContent := r.resolveString(content)
-						res, err := r.resolveDirective(resolvedContent)
+						var res string
+						var err error
+						if strings.Contains(content, "{{") {
+							resolvedContent := r.resolveString(content)
+							res, err = r.resolveDirective(resolvedContent)
+						} else {
+							res, err = r.resolveDirective(content)
+						}
 						if err != nil {
 							r.setError(err)
 							sb.WriteString(s[rng.start:rng.end])
