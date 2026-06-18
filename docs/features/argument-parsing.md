@@ -63,8 +63,8 @@ flowchart TD
     Reconstruct --> End([Cobra パーサーへ渡す準備完了])
 
     subgraph "Hoisting 実例 (Wrapper Mode)"
-    ExampleInput["cderun node app.js --cderun-image node:20"]
-    ExampleOutput["cderun --cderun-image node:20 node app.js"]
+    ExampleInput["cderun --tty node app.js --cderun-image node:20"]
+    ExampleOutput["cderun --cderun-image node:20 --tty node app.js"]
     ExampleInput -- 前処理 --> ExampleOutput
     end
 
@@ -97,7 +97,7 @@ cderun --cderun-tty --cderun-image node:20-alpine node app.js
 
 ホイストは、特に**シンボリックリンク（ポリグロットモード）**において、`cderun` の動作を動的に制御するための唯一かつ安全な手段を提供します。
 
-シンボリックリンク経由で実行された場合、実行ファイル名（例: `node`）が自動的にサブコマンド（キー）として扱われます。このモードでは、サブコマンド名の後にある引数のうち、**`--cderun-` プレフィックスが付いたフラグのみ**がホイストされ、`cderun` 自身の設定として解釈されます。それ以外の引数はすべてラップ対象のツールへそのまま引き渡されます。
+シンボリックリンク経由で実行された場合、実行ファイル名（例: `node`）が自動的にサブコマンド（キー）として扱われます。このモードでは、サブコマンド名の後にある引数のうち、**`--cderun-` プレフィックスが付いたフラグ（P1）のみ**がホイストされ、`cderun` 自身の設定として解釈されます。標準のフラグ（例: `--tty`）をサブコマンドの後ろに置いても、それはホイストされず、ラップ対象のツールへの引数として扱われます。
 
 これにより、ラップ対象のツールが持つ同名のフラグ（例: `--tty`, `--env`）との衝突を完全に回避できます。
 
