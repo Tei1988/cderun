@@ -826,7 +826,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	assert.Empty(t, mockRuntime.Signal)
 }
 
-func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
+func TestUnit_Root_SignalKillIfRunning(t *testing.T) {
 	t.Parallel()
 	o := &rootOptions{logger: &logging.Logger{}}
 
@@ -862,13 +862,14 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 	})
 
-	t.Run("Signal fails, ignore error", func(t *testing.T) {
+	t.Run("Signal fails, propagate error", func(t *testing.T) {
 		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
 			IsRunning:   true,
 		}
 		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "signal failed")
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
@@ -1894,8 +1895,12 @@ func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (
 		return m.WaitFunc(ctx, id)
 	}
 	close(m.waitStarted)
-	<-ctx.Done()
-	return 137, ctx.Err()
+	select {
+	case <-m.MockRuntime.SigChan:
+		return 137, nil
+	case <-ctx.Done():
+		return 137, ctx.Err()
+	}
 }
 
 func (m *hangTimeoutMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {

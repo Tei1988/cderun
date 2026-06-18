@@ -397,6 +397,9 @@ func TestUnit_Stdin_PipedContinuousLogOutput(t *testing.T) {
 		mock.CreatedContainerID = "test-piped-logs"
 		mock.ExitCode = 0
 		mock.WaitDelay = 10 * time.Second
+		mock.InspectFunc = func(ctx context.Context, containerID string) (bool, int, error) {
+			return true, 0, nil
+		}
 
 		var outBuf bytes.Buffer
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

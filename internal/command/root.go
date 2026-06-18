@@ -1002,8 +1002,10 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					}
 					exitCode = result.code
 				case <-time.After(effectiveHangTimeout):
+					killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer killCancel()
 					var err error
-					exitCode, err = o.signalKillIfRunning(context.Background(), rt, containerID)
+					exitCode, err = o.signalKillIfRunning(killCtx, rt, containerID)
 					if err != nil {
 						return 0, err
 					}
@@ -1011,7 +1013,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					case result := <-waitDone:
 						exitCode = result.code
 					case <-time.After(effectiveHangTimeout):
-						return exitCode, nil
+						return exitCode, fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)
 					}
 				}
 			} else {
