@@ -588,11 +588,13 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
-	home, err := l.fs.UserHomeDir()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+	if strings.HasPrefix(path, "~") {
+		home, err := l.fs.UserHomeDir()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		path = expandHome(path, home)
 	}
-	path = expandHome(path, home)
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
@@ -618,11 +620,13 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
-	home, err := l.fs.UserHomeDir()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+	if strings.HasPrefix(path, "~") {
+		home, err := l.fs.UserHomeDir()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		path = expandHome(path, home)
 	}
-	path = expandHome(path, home)
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
