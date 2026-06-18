@@ -11,11 +11,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -452,86 +450,101 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	}
 
 	// Handle mounting flags
-	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
-		exePath := resolved.MountCderunPath
-		if exePath == "" {
-			var err error
-			exePath, err = o.fs.Executable()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get executable path: %w", err)
-			}
-		}
+	if err := o.appendToolMounts(resolved, containerConfig, toolsCfg); err != nil {
+		return nil, err
+	}
 
-		// Translate exePath for nested execution if it was determined from os.Executable()
-		// (MountCderunPath is already resolved during resolution if it came from config/flags)
-		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
-			r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
+	o.appendSocketMount(resolved, containerConfig)
+
+	return containerConfig, nil
+}
+
+func (o *rootOptions) appendToolMounts(resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig, toolsCfg config.ToolsConfig) error {
+	if !resolved.MountCderun && !resolved.MountAllTools && len(resolved.MountTools) == 0 {
+		return nil
+	}
+
+	exePath := resolved.MountCderunPath
+	if exePath == "" {
+		var err error
+		exePath, err = o.fs.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get executable path: %w", err)
+		}
+	}
+
+	// Translate exePath for nested execution if it was determined from os.Executable()
+	// (MountCderunPath is already resolved during resolution if it came from config/flags)
+	if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
+		r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
+		if err != nil {
+			o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
+		} else {
+			resolvedPath, err := config.ResolvePath(exePath, "", r)
 			if err != nil {
-				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
+				o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
 			} else {
-				resolvedPath, err := config.ResolvePath(exePath, "", r)
-				if err != nil {
-					o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
-				} else {
-					exePath = resolvedPath
-				}
-			}
-		}
-
-		// Add binary mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-			Type:     "bind",
-			Source:   exePath,
-			Target:   "/usr/local/bin/cderun",
-			ReadOnly: true,
-		})
-
-		// Handle MountTools / MountAllTools
-		if resolved.MountAllTools {
-			if len(toolsCfg) == 0 {
-				o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
-			}
-			// Sort tool names to ensure deterministic mount order
-			toolNames := make([]string, 0, len(toolsCfg))
-			for name := range toolsCfg {
-				toolNames = append(toolNames, name)
-			}
-			sort.Strings(toolNames)
-
-			for _, toolName := range toolNames {
-				if err := config.ValidateToolName(toolName); err != nil {
-					return nil, fmt.Errorf("invalid tool name in tools configuration %q: %w", toolName, err)
-				}
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
-			}
-		} else if len(resolved.MountTools) > 0 {
-			for _, toolName := range resolved.MountTools {
-				if err := config.ValidateToolName(toolName); err != nil {
-					return nil, fmt.Errorf("invalid tool name in mount-tools %q: %w", toolName, err)
-				}
-				if _, ok := toolsCfg[toolName]; !ok {
-					available := make([]string, 0, len(toolsCfg))
-					for k := range toolsCfg {
-						available = append(available, k)
-					}
-					sort.Strings(available)
-					return nil, fmt.Errorf("tool %q not found in .tools.yaml\navailable tools: %s", toolName, strings.Join(available, ", "))
-				}
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
+				exePath = resolvedPath
 			}
 		}
 	}
 
+	// Add binary mount
+	containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+		Type:     "bind",
+		Source:   exePath,
+		Target:   "/usr/local/bin/cderun",
+		ReadOnly: true,
+	})
+
+	// Handle MountTools / MountAllTools
+	if resolved.MountAllTools {
+		if len(toolsCfg) == 0 {
+			o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
+		}
+		// Sort tool names to ensure deterministic mount order
+		toolNames := make([]string, 0, len(toolsCfg))
+		for name := range toolsCfg {
+			toolNames = append(toolNames, name)
+		}
+		sort.Strings(toolNames)
+
+		for _, toolName := range toolNames {
+			if err := config.ValidateToolName(toolName); err != nil {
+				return fmt.Errorf("invalid tool name in tools configuration %q: %w", toolName, err)
+			}
+			containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+				Type:     "bind",
+				Source:   exePath,
+				Target:   "/usr/local/bin/" + toolName,
+				ReadOnly: true,
+			})
+		}
+	} else if len(resolved.MountTools) > 0 {
+		for _, toolName := range resolved.MountTools {
+			if err := config.ValidateToolName(toolName); err != nil {
+				return fmt.Errorf("invalid tool name in mount-tools %q: %w", toolName, err)
+			}
+			if _, ok := toolsCfg[toolName]; !ok {
+				available := make([]string, 0, len(toolsCfg))
+				for k := range toolsCfg {
+					available = append(available, k)
+				}
+				sort.Strings(available)
+				return fmt.Errorf("tool %q not found in .tools.yaml\navailable tools: %s", toolName, strings.Join(available, ", "))
+			}
+			containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+				Type:     "bind",
+				Source:   exePath,
+				Target:   "/usr/local/bin/" + toolName,
+				ReadOnly: true,
+			})
+		}
+	}
+	return nil
+}
+
+func (o *rootOptions) appendSocketMount(resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) {
 	if resolved.MountSocket {
 		// Add socket mount
 		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
@@ -541,141 +554,6 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			ReadOnly: false, // Socket needs to be writable
 		})
 	}
-
-	return containerConfig, nil
-}
-
-type diagnosticsInfo struct {
-	Runtime struct {
-		Name   string `json:"name" yaml:"name"`
-		Socket string `json:"socket" yaml:"socket"`
-		Status string `json:"status" yaml:"status"`
-	} `json:"runtime" yaml:"runtime"`
-	Configs struct {
-		Global []string `json:"global" yaml:"global"`
-		Tools  []string `json:"tools" yaml:"tools"`
-	} `json:"configs" yaml:"configs"`
-	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
-}
-
-func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
-	switch strings.ToLower(format) {
-	case "json":
-		marshaled, err := o.jsonMarshalIndent(data, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		_, err = fmt.Fprintln(w, string(marshaled))
-		return err
-	case "simple":
-		simpleWriter(w)
-		return nil
-	case "yaml", "": // Default to YAML if format is empty
-		marshaled, err := o.yamlMarshal(data)
-		if err != nil {
-			return fmt.Errorf("failed to marshal YAML: %w", err)
-		}
-		_, err = fmt.Fprint(w, string(marshaled))
-		return err
-	default:
-		return fmt.Errorf("unsupported output format: %q", format)
-	}
-}
-
-func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
-	o.ensureHooks()
-	info := diagnosticsInfo{}
-	info.Runtime.Name = resolved.Runtime
-	info.Runtime.Socket = resolved.SocketPath
-	if _, err := o.fs.Stat(resolved.SocketPath); err == nil {
-		info.Runtime.Status = "accessible"
-	} else {
-		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
-	}
-	info.Configs.Global = globalPaths
-	info.Configs.Tools = toolsPaths
-	for toolName := range toolsCfg {
-		info.AvailableTools = append(info.AvailableTools, toolName)
-	}
-	sort.Strings(info.AvailableTools)
-
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
-	})
-}
-
-func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
-	o.ensureHooks()
-
-	// Mask sensitive environment variables in dry-run output
-	maskedContainerConfig := *containerConfig
-	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env)
-
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)
-		var quotedCmd []string
-		for _, arg := range maskedContainerConfig.Command {
-			quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
-		}
-		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
-		_, _ = fmt.Fprintf(w, "TTY: %v\n", maskedContainerConfig.TTY)
-		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
-		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
-		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
-		var mounts []string
-		for _, m := range maskedContainerConfig.Mounts {
-			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
-		}
-		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		var quotedEnvs []string
-		for _, e := range maskedContainerConfig.Env {
-			if k, v, found := strings.Cut(e, "="); found {
-				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
-			} else {
-				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
-			}
-		}
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
-		_, _ = fmt.Fprintf(w, "Workdir: %s\n", maskedContainerConfig.Workdir)
-		_, _ = fmt.Fprintf(w, "User: %s\n", maskedContainerConfig.User)
-		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(maskedContainerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(w, "PublishAll: %v\n", maskedContainerConfig.PublishAll)
-		_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(maskedContainerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(w, "Hostname: %s\n", maskedContainerConfig.Hostname)
-		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(maskedContainerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(maskedContainerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
-		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
-
-		var devices []string
-		for _, d := range maskedContainerConfig.Devices {
-			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
-				devices = append(devices, d.PathOnHost)
-			} else {
-				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
-			}
-		}
-		_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
-
-		if maskedContainerConfig.Memory > 0 {
-			_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(maskedContainerConfig.Memory)))
-		}
-		if maskedContainerConfig.CPUs > 0 {
-			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))
-		}
-		if len(maskedContainerConfig.Entrypoint) > 0 {
-			var quotedEntry []string
-			for _, arg := range maskedContainerConfig.Entrypoint {
-				quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
-			}
-			_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
-		}
-	})
 }
 
 func getFd(r any) (int, bool) {
@@ -1003,7 +881,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					exitCode = result.code
 				case <-time.After(effectiveHangTimeout):
 					var err error
-					exitCode, err = o.forceTerminateIfRunning(context.Background(), rt, containerID)
+					exitCode, err = o.signalKillIfRunning(context.Background(), rt, containerID)
 					if err != nil {
 						return 0, err
 					}
@@ -1226,34 +1104,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	isPolyglot := execName != "cderun"
 
 	// Find the subcommand index robustly by skipping flags and their arguments
-	subcmdIdx := -1
-	if isPolyglot {
-		subcmdIdx = 0
-	} else {
-		for i := 1; i < len(args); i++ {
-			arg := args[i]
-			if !strings.HasPrefix(arg, "-") {
-				subcmdIdx = i
-				break
-			}
-			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
-			if strings.HasPrefix(arg, "--") {
-				name := strings.SplitN(arg[2:], "=", 2)[0]
-				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
-					// Flag exists, takes an argument, and no '=' used, so skip next argument.
-					i++
-				}
-			} else if len(arg) > 1 {
-				// Shorthand(s), e.g., -i, -it, -p 80:80
-				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
-				lastChar := string(arg[len(arg)-1])
-				if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
-					// Last shorthand takes an argument, skip next argument.
-					i++
-				}
-			}
-		}
-	}
+	subcmdIdx := findSubcommandIndex(cmd, args, isPolyglot)
 
 	// If not polyglot, check for P1 flags before the subcommand
 	if !isPolyglot && subcmdIdx != -1 {
@@ -1325,4 +1176,33 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	processedArgs = append(processedArgs, others...)
 
 	return processedArgs, nil
+}
+
+func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int {
+	if isPolyglot {
+		return 0
+	}
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") {
+			return i
+		}
+		// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
+		if strings.HasPrefix(arg, "--") {
+			name := strings.SplitN(arg[2:], "=", 2)[0]
+			if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+				// Flag exists, takes an argument, and no '=' used, so skip next argument.
+				i++
+			}
+		} else if len(arg) > 1 {
+			// Shorthand(s), e.g., -i, -it, -p 80:80
+			// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
+			lastChar := string(arg[len(arg)-1])
+			if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+				// Last shorthand takes an argument, skip next argument.
+				i++
+			}
+		}
+	}
+	return -1
 }
