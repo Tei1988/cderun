@@ -1257,8 +1257,9 @@ func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 		}
 		cmd.SetErr(&logBuf)
 	})
-	require.NoError(t, err)
-	assert.Contains(t, logBuf.String(), "failed to create snapshot: failed to create snapshot directory")
+	// Now this should fail because --mount-cderun is an explicit request
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create snapshot for nested execution: failed to create snapshot directory: permission denied")
 }
 
 func TestUnit_Root_RunE_LoadConfigFailure(t *testing.T) {
