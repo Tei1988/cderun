@@ -27,6 +27,15 @@ The following segments (case-insensitive) trigger masking:
 - `JWT`
 - `SALT`
 
+### 今後の追加予定キーワード (Future Keyword Additions)
+
+プロジェクトのロードマップとして、以下のキーワードも将来的に自動マスクの対象に追加される予定です。
+
+- `SIGNATURE`
+- `BEARER`
+- `OTP`
+- `SENSITIVE`
+
 ### Intelligent Segmentation
 
 The system performs a single-pass scan of the key string to accurately identify sensitive information while minimizing false positives and memory allocations. Segmentation occurs at:
@@ -37,6 +46,16 @@ The system performs a single-pass scan of the key string to accurately identify 
 - **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `JSON`, `Token`
 
 A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
+
+#### 判定の具体例 (Segmentation Examples)
+
+| 環境変数名 | セグメント分割 | 判定 | 理由 |
+| :--- | :--- | :--- | :--- |
+| `DB_PASSWORD` | `DB`, `PASSWORD` | **MASKED** | `PASSWORD` がキーワードに合致 |
+| `apiToken` | `api`, `Token` | **MASKED** | `Token` がキーワードに合致 |
+| `accessKey2` | `accessKey`, `2` | **MASKED** | `accessKey` がキーワードに合致 (CamelCase) |
+| `MONKEY` | `MONKEY` | **SAFE** | `KEY` 以外のセグメントがなく、合致しない |
+| `ACCESS_LOG` | `ACCESS`, `LOG` | **MASKED** | `ACCESS` がキーワードに合致 (注意: 偽陽性の可能性あり) |
 
 ## Presentation Layer Safety
 
