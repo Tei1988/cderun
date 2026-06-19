@@ -71,25 +71,25 @@ cderunが特別な意味を持つと定義しているキーワードです。
 
 ```mermaid
 graph TD
-    subgraph "Base Host (Level 0)"
+    subgraph L0 ["Base Host (Level 0)"]
         H0["{{HOME}} = /Users/user"]
         P0["{{PWD}} = /work"]
         BH0["{{BASE_HOME}} = /Users/user"]
         BP0["{{BASE_PWD}} = /work"]
     end
 
-    H0 -.-> |"cderun --mount-cderun"| L1
+    L0 -.-> |"cderun --mount-cderun"| L1
 
-    subgraph "Container (Level 1)"
+    subgraph L1 ["Container (Level 1)"]
         H1["{{HOME}} = /root"]
         P1["{{PWD}} = /app"]
         BH1["{{BASE_HOME}} = /Users/user"]
         BP1["{{BASE_PWD}} = /work"]
     end
 
-    H1 -.-> |"cderun --mount-cderun"| L2
+    L1 -.-> |"cderun --mount-cderun"| L2
 
-    subgraph "Nested Container (Level 2)"
+    subgraph L2 ["Nested Container (Level 2)"]
         H2["{{HOME}} = /root"]
         P2["{{PWD}} = /app"]
         BH2["{{BASE_HOME}} = /Users/user"]

@@ -31,6 +31,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり |
 | T23 | `MaskSensitiveEnv` への不足キーワード追加 | 改善 | 低 | 小 | - |
+| T24 | `internal/command/snapshot_error_test.go` のビルドエラー修正 | バグ | 高 | 小 | - |
 
 依存関係・統合の注意:
 
@@ -512,3 +513,16 @@ cderun --prune
 
 - `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` がキーワードリストに追加されている
 - 追加されたキーワードを含む環境変数が `MaskSensitiveEnv` で `[REDACTED]` にマスクされる
+
+## T24: `internal/command/snapshot_error_test.go` のビルドエラー修正
+
+- 種別: バグ
+- 対象: `internal/command/snapshot_error_test.go`
+
+### 問題
+
+`runtimeFactory` のシグニチャ変更（`*logging.Logger` 引数の追加）がテストコードに反映されておらず、コンパイルエラーが発生している。
+
+### 完了条件
+
+- `snapshot_error_test.go` 内の `runtimeFactory` モック割り当てに `*logging.Logger` 引数を追加し、ビルドが通る
