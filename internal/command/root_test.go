@@ -236,7 +236,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 		// Use ExecuteContextWithOptions directly to capture exit code and use mock runtime
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "node:20-alpine", "--tty", "-i", "--network", "host", "node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {
@@ -271,7 +271,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -284,7 +284,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "-t", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -386,7 +386,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -402,7 +402,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--workdir", "/my/workdir", "--mount", "type=bind,source=/h,target=/c,readonly", "--device", "/dev/fuse:/dev/fuse:rm", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -427,7 +427,7 @@ func TestUnit_Root_Flags_MountingAndDevices(t *testing.T) {
 		}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -460,7 +460,7 @@ func TestUnit_Root_Execution_StrictBehavior(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "ls", "-l", "/tmp"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
@@ -606,7 +606,7 @@ func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
 
 		var stderrBuf bytes.Buffer
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -625,7 +625,7 @@ func TestUnit_Root_Env_StrictEnvFlags(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
 		mfs := &config.MockFileSystem{} // Empty environment
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--strict-env", "--env", "NONEXISTENT", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -790,7 +790,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "0"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
 			cmd.SetErr(&logBuf)
@@ -826,7 +826,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	assert.Empty(t, mockRuntime.Signal)
 }
 
-func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
+func TestUnit_Root_SignalKillIfRunning(t *testing.T) {
 	t.Parallel()
 	o := &rootOptions{logger: &logging.Logger{}}
 
@@ -835,7 +835,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: &runtime.MockRuntime{ExitCode: 123},
 			IsRunning:   false,
 		}
-		exitCode, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		exitCode, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, 123, exitCode)
 		assert.Empty(t, mockRuntime.SignaledContainerID)
@@ -846,7 +846,7 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			IsRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
@@ -857,18 +857,19 @@ func TestUnit_Root_ForceTerminateIfRunning(t *testing.T) {
 			MockRuntime: runtime.NewMockRuntime(),
 			InspectErr:  errors.New("inspect failed"),
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
 		require.NoError(t, err)
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 	})
 
-	t.Run("Signal fails, ignore error", func(t *testing.T) {
+	t.Run("Signal fails, propagate error", func(t *testing.T) {
 		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
 			IsRunning:   true,
 		}
-		_, err := o.forceTerminateIfRunning(t.Context(), mockRuntime, "c1")
-		require.NoError(t, err)
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "signal failed")
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
 		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
@@ -1026,7 +1027,7 @@ func TestUnit_RunCderunCore_Errors_Additions(t *testing.T) {
 
 		var errBuf bytes.Buffer
 		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -1152,7 +1153,7 @@ func TestUnit_Root_RunE_InvalidPullPolicy(t *testing.T) {
 	// And use a mock runtime to avoid actual image pulling
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--pull", "invalid", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(int) {}
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
@@ -1172,7 +1173,7 @@ func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		cmd.SetErr(&logBuf)
@@ -1190,7 +1191,7 @@ func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
 		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
@@ -1202,7 +1203,7 @@ func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
 	t.Parallel()
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(int) {}
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		o.isTerminal = func(fd int) bool { return true }
@@ -1230,7 +1231,7 @@ func TestUnit_Root_RunE_BuildContainerConfigFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 	})
@@ -1252,7 +1253,7 @@ func TestUnit_Root_RunE_SnapshotCreationFailure(t *testing.T) {
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
 		o.isTerminal = func(fd int) bool { return true }
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 		cmd.SetErr(&logBuf)
@@ -1321,25 +1322,25 @@ func TestUnit_Root_DefaultOptions_RuntimeFactory(t *testing.T) {
 	o := defaultOptions()
 
 	t.Run("docker runtime success", func(t *testing.T) {
-		rt, err := o.runtimeFactory("docker", "/tmp/docker.sock")
+		rt, err := o.runtimeFactory("docker", "/tmp/docker.sock", o.logger)
 		require.NoError(t, err)
 		assert.NotNil(t, rt)
 	})
 
 	t.Run("podman runtime success", func(t *testing.T) {
-		rt, err := o.runtimeFactory("podman", "/tmp/podman.sock")
+		rt, err := o.runtimeFactory("podman", "/tmp/podman.sock", o.logger)
 		require.NoError(t, err)
 		assert.NotNil(t, rt)
 	})
 
 	t.Run("containerd runtime implemented", func(t *testing.T) {
-		rt, err := o.runtimeFactory("containerd", "/run/containerd/containerd.sock")
+		rt, err := o.runtimeFactory("containerd", "/run/containerd/containerd.sock", o.logger)
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", rt.Name())
 		rt.Close()
 	})
 	t.Run("unsupported runtime", func(t *testing.T) {
-		rt, err := o.runtimeFactory("invalid", "")
+		rt, err := o.runtimeFactory("invalid", "", o.logger)
 		require.Error(t, err)
 		assert.Nil(t, rt)
 		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
@@ -1454,7 +1455,7 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 			mockRuntime := &runtime.MockRuntime{}
 			tt.setup(mockRuntime)
 			err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+				o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return false }
 				o.exitFunc = func(code int) {}
 			})
@@ -1551,7 +1552,7 @@ func TestUnit_RunCderunCore_WithStdin(t *testing.T) {
 	ctx := context.Background()
 
 	execErr := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.exitFunc = func(code int) {}
 		cmd.SetIn(stdin)
 		cmd.SetOut(&outBuf)
@@ -1570,7 +1571,9 @@ func TestUnit_Root_ResolveSettings_Coverage(t *testing.T) {
 		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.isTerminal = func(fd int) bool { return true }
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return &runtime.MockRuntime{}, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
 		cmd.SetOut(&buf)
 	})
 	require.NoError(t, err)
@@ -1585,7 +1588,7 @@ func TestUnit_Root_Execute_WaitContainer_Interrupted(t *testing.T) {
 		WaitErr: errors.New("wait interrupted"),
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 	})
@@ -1602,7 +1605,9 @@ func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 		ExitCode:  42,
 	}
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 	})
@@ -1669,7 +1674,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
 			o.setupSignals = setupSignalsMock
@@ -1721,7 +1726,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
 			o.attachGracePeriod = 100 * time.Millisecond
@@ -1776,7 +1781,7 @@ func TestUnit_Root_Execute_AttachFailureAfterExit(t *testing.T) {
 	}
 
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 		o.attachGracePeriod = 2 * time.Second
@@ -1791,7 +1796,7 @@ func TestUnit_Root_Execute_MakeRawFailure_Warning(t *testing.T) {
 	mockRuntime := &runtime.MockRuntime{}
 	var stderrBuf bytes.Buffer
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return true }
 		o.makeRaw = func(fd int) (*term.State, error) { return nil, errors.New("makeRaw failed") }
 		o.exitFunc = func(code int) {}
@@ -1832,7 +1837,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		errCh := make(chan error, 1)
 		go func() {
 			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+				o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return true }
 				o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }
 				o.setupResizeSignal = setupResizeSignalMock
@@ -1891,8 +1896,12 @@ func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (
 		return m.WaitFunc(ctx, id)
 	}
 	close(m.waitStarted)
-	<-ctx.Done()
-	return 137, ctx.Err()
+	select {
+	case <-m.MockRuntime.SigChan:
+		return 137, nil
+	case <-ctx.Done():
+		return 137, ctx.Err()
+	}
 }
 
 func (m *hangTimeoutMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
@@ -1915,7 +1924,7 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 
 	var logBuf safeBuffer
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "100ms"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(n, s string) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
+		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false } // Non-terminal
 		o.exitFunc = func(code int) {}
 		cmd.SetErr(&logBuf)

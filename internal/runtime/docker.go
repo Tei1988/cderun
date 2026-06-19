@@ -1,9 +1,9 @@
 package runtime
 
 import (
-	"github.com/containerd/errdefs"
 	"context"
 	"fmt"
+	"github.com/containerd/errdefs"
 	"io"
 	"regexp"
 	"sync"
@@ -43,6 +43,7 @@ type DockerRuntime struct {
 	client                dockerClient
 	socket                string
 	name                  string
+	logger                *logging.Logger
 	sleepFunc             func(context.Context, time.Duration) error
 	attachCloseWriteGrace time.Duration
 	closeOnce             sync.Once
@@ -51,6 +52,13 @@ type DockerRuntime struct {
 
 // DockerRuntimeOption defines a functional option for DockerRuntime.
 type DockerRuntimeOption func(*DockerRuntime)
+
+// WithLogger sets the logger for the Docker runtime.
+func WithLogger(l *logging.Logger) DockerRuntimeOption {
+	return func(rt *DockerRuntime) {
+		rt.logger = l
+	}
+}
 
 // WithAttachCloseWriteGrace sets the grace period before closing the write side of an attached connection.
 func WithAttachCloseWriteGrace(d time.Duration) DockerRuntimeOption {
@@ -97,6 +105,10 @@ func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client
 		opt(rt)
 	}
 
+	if rt.logger == nil {
+		rt.logger = logging.GetGlobalLogger()
+	}
+
 	return rt, nil
 }
 
@@ -121,7 +133,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 	attempts := maxRetries + 1
 	for i := range attempts {
 		if i > 0 {
-			logging.Warn("Retrying image pull %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
+			d.logger.Warn("Retrying image pull %d/%d with exponential backoff for %s after error: %v", i, maxRetries, img, lastErr)
 			if err := d.sleepFunc(ctx, time.Duration(1<<uint(i-1))*backoffBase); err != nil {
 				return err
 			}
@@ -142,7 +154,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		}
 
 		// Policy is "always" or "missing" (and not found locally)
-		logging.Info("Pulling image %s...", img)
+		d.logger.Info("Pulling image %s...", img)
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
 			lastErr = err
@@ -191,14 +203,14 @@ func (d *DockerRuntime) StartContainer(ctx context.Context, containerID string) 
 
 // WaitContainer waits for a container to exit and returns its exit code.
 func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	logging.Trace("Waiting for container %s to stop...", containerID)
+	d.logger.Trace("Waiting for container %s to stop...", containerID)
 	resultC, errC := d.client.ContainerWait(ctx, containerID, dockercontainer.WaitConditionNotRunning)
 	select {
 	case err := <-errC:
-		logging.Trace("ContainerWait for %s returned error: %v", containerID, err)
+		d.logger.Trace("ContainerWait for %s returned error: %v", containerID, err)
 		return 0, err
 	case result := <-resultC:
-		logging.Trace("ContainerWait for %s returned status: %d", containerID, result.StatusCode)
+		d.logger.Trace("ContainerWait for %s returned status: %d", containerID, result.StatusCode)
 		return int(result.StatusCode), nil
 	}
 }
@@ -240,7 +252,7 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 
 // AttachContainer attaches to a container's IO streams.
 func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	logging.Debug("Attaching to container %s (tty=%v, stdin=%v)", containerID, tty, stdin != nil)
+	d.logger.Debug("Attaching to container %s (tty=%v, stdin=%v)", containerID, tty, stdin != nil)
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -268,17 +280,17 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	if stdin != nil {
 		go func() {
-			logging.Debug("Starting to copy STDIN to container %s", containerID)
+			d.logger.Debug("Starting to copy STDIN to container %s", containerID)
 			var n int64
 			n, stdinErr = io.Copy(resp.Conn, stdin)
 			if stdinErr != nil {
-				logging.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
+				d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
 			} else {
-				logging.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+				d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
-					logging.Trace("Calling CloseWrite on container %s connection", containerID)
+					d.logger.Trace("Calling CloseWrite on container %s connection", containerID)
 					if err := resp.CloseWrite(); err != nil {
-						logging.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+						d.logger.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
 					}
 				}
 			}
@@ -289,24 +301,24 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	}
 
 	outputDone := make(chan error, 1)
-	logging.Debug("Starting to copy output from container %s", containerID)
+	d.logger.Debug("Starting to copy output from container %s", containerID)
 	go func() {
 		var err error
 		var n int64
-		logging.Debug("Output goroutine started")
+		d.logger.Debug("Output goroutine started")
 		if tty {
-			logging.Trace("Starting raw IO copy (TTY=true)")
+			d.logger.Trace("Starting raw IO copy (TTY=true)")
 			n, err = io.Copy(stdout, resp.Reader)
 		} else {
-			logging.Trace("Starting multiplexed StdCopy (TTY=false)")
+			d.logger.Trace("Starting multiplexed StdCopy (TTY=false)")
 			n, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
 		}
-		logging.Trace("Output copy from container %s finished: n=%d, err=%v", containerID, n, err)
+		d.logger.Trace("Output copy from container %s finished: n=%d, err=%v", containerID, n, err)
 
 		if err != nil {
-			logging.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
+			d.logger.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
 		} else {
-			logging.Debug("Output copy from container %s finished: %d bytes", containerID, n)
+			d.logger.Debug("Output copy from container %s finished: %d bytes", containerID, n)
 		}
 		outputDone <- err
 	}()
@@ -317,12 +329,12 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 
 	select {
 	case err := <-outputDone:
-		logging.Trace("AttachContainer: output goroutine finished")
+		d.logger.Trace("AttachContainer: output goroutine finished")
 		if err == nil {
 			select {
 			case <-stdinDone:
 				if stdinErr != nil {
-					logging.Trace("AttachContainer: output finished but returning pending stdin error")
+					d.logger.Trace("AttachContainer: output finished but returning pending stdin error")
 					return stdinErr
 				}
 			default:
@@ -331,12 +343,12 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		return err
 	case <-stdinDone:
 		if stdinErr != nil {
-			logging.Trace("AttachContainer: stdin goroutine finished with error")
+			d.logger.Trace("AttachContainer: stdin goroutine finished with error")
 			return stdinErr
 		}
 		select {
 		case err := <-outputDone:
-			logging.Trace("AttachContainer: output goroutine finished after stdin done")
+			d.logger.Trace("AttachContainer: output goroutine finished after stdin done")
 			return err
 		case <-ctx.Done():
 			return ctx.Err()

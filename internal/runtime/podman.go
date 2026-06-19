@@ -10,7 +10,7 @@ import (
 
 // NewPodmanRuntime creates a new Podman runtime instance.
 // It uses the Docker-compatible API provided by Podman.
-func NewPodmanRuntime(socket string) (*DockerRuntime, error) {
+func NewPodmanRuntime(socket string, opts ...DockerRuntimeOption) (*DockerRuntime, error) {
 	// Create a custom transport to handle unix sockets and disable keep-alives.
 	// DisableKeepAlives: true is a known workaround for EOF issues with some
 	// container runtime proxies (especially Podman's system service).
@@ -32,5 +32,6 @@ func NewPodmanRuntime(socket string) (*DockerRuntime, error) {
 			// Explicitly using 1.41 (compatible with Podman 4.0+) is more stable.
 			client.WithVersion("1.41"),
 		},
+		opts...,
 	)
 }

@@ -1,8 +1,8 @@
 package config
 
 import (
-	"path/filepath"
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -271,7 +271,8 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Hierarchy(t *testing.T) {
 
 	res, err = resolveConfigPath(true, "dev", false, "", "", "", nil, nil, nil, nil, "", r, "device", mfs)
 	require.NoError(t, err)
-	expected := filepath.Join(r.Pwd, "dev"); assert.Equal(t, expected, res)
+	expected := filepath.Join(r.Pwd, "dev")
+	assert.Equal(t, expected, res)
 }
 
 func TestUnit_Coverage_Resolver_ResolveDevices_Env(t *testing.T) {

@@ -20,10 +20,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
-| T10 | `forceTerminateIfRunning` のコメント・命名整理 | クリーンアップ | 低 | 小 | - |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
-| T13 | runtime 層へのロガー注入 | リファクタ | 低 | 中 | - |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
@@ -228,25 +226,6 @@ stdout が先に終了した場合、stdin エラーは `stdinDone` がすでに
 
 ---
 
-## T10: `forceTerminateIfRunning` のコメント・命名整理
-
-- 種別: クリーンアップ（実害なし）
-- 対象: `internal/command/root_termination.go:25`（コメントは 43 行目付近）
-
-### 問題
-
-SIGKILL を送った直後に return しており、コンテナの終了を実際には待っていない。コメントの `// Wait for the kill to take effect` と実装が矛盾している。呼び出し元（`root.go` の `waitForCompletion`）で `waitDone` を待つため致命的ではないが、関数の責務が不明確。
-
-### 方針
-
-実装を変えるよりコメント削除＋関数名の変更（例: `signalKillIfRunning`）で、責務を「kill シグナル送信と直前の exitCode 返却」に明確化するだけで十分。待機は呼び出し元 `waitForCompletion` の `waitDone` が担っている現状の構造で正しい。
-
-### 完了条件
-
-- コメントと実装の矛盾が解消されている（挙動変更なし）
-
----
-
 ## T11: 未知の `{{...}}` ディレクティブをエラーにする
 
 - 種別: 挙動変更
@@ -305,26 +284,6 @@ return "", fmt.Errorf("unknown directive: %q", content)
 
 - string マッチが型付き判定に置き換わっている（残す場合は理由をコメントで明記）
 - 「リトライすべき/すべきでない」の代表ケースについてテーブルドリブンテストがある
-
----
-
-## T13: runtime 層へのロガー注入
-
-- 種別: リファクタリング
-- 対象: `internal/runtime/docker.go`、`internal/runtime/common.go`、`internal/command/root.go:178-189`
-
-### 問題
-
-`command` 層は `o.logger.SetOutput(cmd.ErrOrStderr())` でログ出力先を cobra のライターに向けているが、runtime 層は `logging.Debug(...)` 等のグローバル関数を直接呼んでいる。テストで `cmd.SetErr(&buf)` しても runtime 層のログだけ取れないという非対称性がある。
-
-### 方針
-
-注入点は `root.go` の `defaultOptions()` 内 `runtimeFactory`（`root.go:178-189`）。各ランタイムのコンストラクタ（`NewDockerRuntimeWithOptions` = `docker.go:75` 等）に `*logging.Logger` を受けるオプションを追加し、factory で `o.logger` を渡すだけで配線できる。`DockerRuntimeOption`（`docker.go:52`）の functional options パターンが既にあるので `WithLogger(l)` を足すのが自然。
-
-### 完了条件
-
-- runtime 層のグローバルロガー呼び出しがインスタンスロガー経由に置き換わっている（全ランタイム: docker / containerd / podman 相当箇所）
-- テストから runtime 層のログを捕捉できることを示すテストがある
 
 ---
 

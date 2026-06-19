@@ -41,9 +41,9 @@ func TestUnit_Resolver_ResolveTransitiveOptions_Extra(t *testing.T) {
 
 	t.Run("mount-cderun path resolution error", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderunPath: "{{file:missing}}",
+			Image:              "alpine",
+			ImageSet:           true,
+			MountCderunPath:    "{{file:missing}}",
 			MountCderunPathSet: true,
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{WD: "/app"})
@@ -53,9 +53,9 @@ func TestUnit_Resolver_ResolveTransitiveOptions_Extra(t *testing.T) {
 
 	t.Run("mount-socket path resolution error", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountSocketPath: "{{file:missing}}",
+			Image:              "alpine",
+			ImageSet:           true,
+			MountSocketPath:    "{{file:missing}}",
 			MountSocketPathSet: true,
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{WD: "/app"})
@@ -65,10 +65,10 @@ func TestUnit_Resolver_ResolveTransitiveOptions_Extra(t *testing.T) {
 
 	t.Run("invalid tool name in mount-tools", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountTools:     "../bad",
-			MountToolsSet:  true,
+			Image:         "alpine",
+			ImageSet:      true,
+			MountTools:    "../bad",
+			MountToolsSet: true,
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
