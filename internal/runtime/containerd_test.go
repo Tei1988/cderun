@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"cderun/internal/container"
+	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"cderun/internal/container"
 )
 
 func TestUnit_Containerd_Name(t *testing.T) {
-	rt := &ContainerdRuntime{}
+	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 	assert.Equal(t, "containerd", rt.Name())
 }
 
@@ -49,7 +50,7 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 }
 
 func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
-	rt := &ContainerdRuntime{}
+	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 
 	t.Run("negative memory limit", func(t *testing.T) {
 		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{

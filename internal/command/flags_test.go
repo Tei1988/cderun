@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--image", "alpine",
 			"alpine", "ls", "-l"}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
@@ -87,7 +88,7 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--cderun-cpus", "2.0",
 			"ls", "-l"}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}

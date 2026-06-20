@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -31,7 +32,7 @@ func TestScenario_Nested_RecursiveToolFlow(t *testing.T) {
 	}
 
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--mount-cderun", "node", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		o.exitFunc = func(code int) {}
@@ -79,7 +80,7 @@ hostContext:
 	}
 
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "node:20", "--mount", "type=bind,source=/app/src,target=/src", "node", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		o.exitFunc = func(code int) {}
@@ -132,7 +133,7 @@ hostContext:
 	}
 
 	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount", "type=bind,source=/mnt/logs,target=/logs", "alpine", "cat", "/logs/err.log"}, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		o.exitFunc = func(code int) {}

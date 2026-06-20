@@ -15,16 +15,13 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | ID | タイトル | 種別 | 優先度 | 規模 | 仕様変更 |
 | --- | --- | --- | --- | --- | --- |
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - |
-| T04 | スナップショット失敗の silent failure 解消 | バグ | 中 | 小 | - |
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
-| T10 | `forceTerminateIfRunning` のコメント・命名整理 | クリーンアップ | 低 | 小 | - |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
-| T13 | runtime 層へのロガー注入 | リファクタ | 低 | 中 | - |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
@@ -63,39 +60,6 @@ macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソル�
 
 - 原因が特定され、再現手順とともに記録されている（修正は別タスク化してよい）
 
-
-## T04: スナップショット失敗の silent failure 解消
-
-- 種別: バグ修正（エラーハンドリング）
-- 対象: `internal/command/root.go:1144`
-
-### 問題
-
-ネスト実行（コンテナ内で `cderun` を呼ぶ）に必要なスナップショット作成が失敗しても、警告ログを出すだけで処理が続行される。
-
-```go
-if err != nil {
-    o.logger.Warn("failed to create snapshot: %v", err)
-    // → エラーにならずそのまま続行
-}
-```
-
-ネスト実行が必要な状況でスナップショットが壊れていた場合、エラーが出ずに動作が不完全になる。
-
-### 方針
-
-一律エラーにするより段階を分ける:
-
-- ユーザーが明示的にネスト実行を要求した場合（`resolved.MountCderun` / `MountTools` / `MountAllTools` が有効）→ **ハードエラー**
-- `globalCfg.HostContext != nil` による伝播のみ（既にネスト環境内で単に実行しているだけ）→ **best-effort 継続で warn**
-
-後者までエラーにするとネスト環境内での通常実行が脆くなるため不可。
-
-### 完了条件
-
-- 上記 2 分岐が実装され、それぞれのケースのテストがある
-
----
 
 ## T05: `CLIOptions` の `Set` フィールドをポインタ型に統一
 
@@ -262,25 +226,6 @@ stdout が先に終了した場合、stdin エラーは `stdinDone` がすでに
 
 ---
 
-## T10: `forceTerminateIfRunning` のコメント・命名整理
-
-- 種別: クリーンアップ（実害なし）
-- 対象: `internal/command/root_termination.go:25`（コメントは 43 行目付近）
-
-### 問題
-
-SIGKILL を送った直後に return しており、コンテナの終了を実際には待っていない。コメントの `// Wait for the kill to take effect` と実装が矛盾している。呼び出し元（`root.go` の `waitForCompletion`）で `waitDone` を待つため致命的ではないが、関数の責務が不明確。
-
-### 方針
-
-実装を変えるよりコメント削除＋関数名の変更（例: `signalKillIfRunning`）で、責務を「kill シグナル送信と直前の exitCode 返却」に明確化するだけで十分。待機は呼び出し元 `waitForCompletion` の `waitDone` が担っている現状の構造で正しい。
-
-### 完了条件
-
-- コメントと実装の矛盾が解消されている（挙動変更なし）
-
----
-
 ## T11: 未知の `{{...}}` ディレクティブをエラーにする
 
 - 種別: 挙動変更
@@ -339,26 +284,6 @@ return "", fmt.Errorf("unknown directive: %q", content)
 
 - string マッチが型付き判定に置き換わっている（残す場合は理由をコメントで明記）
 - 「リトライすべき/すべきでない」の代表ケースについてテーブルドリブンテストがある
-
----
-
-## T13: runtime 層へのロガー注入
-
-- 種別: リファクタリング
-- 対象: `internal/runtime/docker.go`、`internal/runtime/common.go`、`internal/command/root.go:178-189`
-
-### 問題
-
-`command` 層は `o.logger.SetOutput(cmd.ErrOrStderr())` でログ出力先を cobra のライターに向けているが、runtime 層は `logging.Debug(...)` 等のグローバル関数を直接呼んでいる。テストで `cmd.SetErr(&buf)` しても runtime 層のログだけ取れないという非対称性がある。
-
-### 方針
-
-注入点は `root.go` の `defaultOptions()` 内 `runtimeFactory`（`root.go:178-189`）。各ランタイムのコンストラクタ（`NewDockerRuntimeWithOptions` = `docker.go:75` 等）に `*logging.Logger` を受けるオプションを追加し、factory で `o.logger` を渡すだけで配線できる。`DockerRuntimeOption`（`docker.go:52`）の functional options パターンが既にあるので `WithLogger(l)` を足すのが自然。
-
-### 完了条件
-
-- runtime 層のグローバルロガー呼び出しがインスタンスロガー経由に置き換わっている（全ランタイム: docker / containerd / podman 相当箇所）
-- テストから runtime 層のログを捕捉できることを示すテストがある
 
 ---
 

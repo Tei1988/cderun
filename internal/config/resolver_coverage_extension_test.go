@@ -341,7 +341,6 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "file not found")
 	})
 
-
 	t.Run("security validation failure for various fields", func(t *testing.T) {
 		fields := []struct {
 			name string

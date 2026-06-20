@@ -283,13 +283,14 @@ defaults:
 		require.Error(t, err)
 	})
 
-	t.Run("LoadCDERunConfigFromPath - expandHome failure", func(t *testing.T) {
+	t.Run("LoadCDERunConfigFromPath - homeDir failure", func(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfigFromPath("~/config.yaml")
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get home directory")
 	})
 
 	t.Run("LoadCDERunConfigFromPath - Abs failure", func(t *testing.T) {
@@ -344,13 +345,14 @@ node:
 		require.Error(t, err)
 	})
 
-	t.Run("LoadToolsConfigFromPath - expandHome failure", func(t *testing.T) {
+	t.Run("LoadToolsConfigFromPath - homeDir failure", func(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("~/tools.yaml")
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get home directory")
 	})
 
 	t.Run("LoadToolsConfigFromPath - Abs failure", func(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
 
@@ -16,7 +17,7 @@ func withMockFS(mfs *config.MockFileSystem) func(o *rootOptions, cmd *cobra.Comm
 
 func withMockRuntime(mock runtime.ContainerRuntime, extras ...func(o *rootOptions, cmd *cobra.Command)) func(o *rootOptions, cmd *cobra.Command) {
 	return func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mock, nil
 		}
 		// Default exitFunc to a no-op to prevent tests from terminating the process.
