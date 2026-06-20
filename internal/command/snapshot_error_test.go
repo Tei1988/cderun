@@ -31,7 +31,7 @@ func TestUnit_Snapshot_ErrorHandling(t *testing.T) {
 		opts.logger.Init("error", "text", false)
 
 		// Set up a mock runtime factory
-		opts.runtimeFactory = func(name, socket string, logger *logging.Logger) (runtime.ContainerRuntime, error) {
+		opts.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
 		}
 
@@ -74,7 +74,7 @@ func TestUnit_Snapshot_ErrorHandling(t *testing.T) {
 		// So we should set the output of the COMMAND'S stderr.
 
 		// Mock runtime that returns a successful exit code
-		opts.runtimeFactory = func(name, socket string, logger *logging.Logger) (runtime.ContainerRuntime, error) {
+		opts.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{
 				ExitCode: 0,
 			}, nil
