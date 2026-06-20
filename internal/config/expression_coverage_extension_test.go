@@ -211,3 +211,70 @@ func TestUnit_ExpressionResolver_Resolve_Exhaustive(t *testing.T) {
 		assert.Equal(t, 123, r.Resolve(123))
 	})
 }
+
+func TestUnit_Expression_ScanAnchors_Coverage(t *testing.T) {
+	t.Run("Overlapping ranges with same end", func(t *testing.T) {
+		// scanAnchors sorts by end descending for same start.
+		// We want to test the case where sorting by end descending is necessary.
+		// Actually scanAnchors handles nesting.
+		s := "{{{{HOME}}}}"
+		// Inner: {{HOME}} at [2, 10)
+		// Outer: {{...}} at [0, 12)
+		// scanAnchors should return [0, 12)
+		res := scanAnchors(s)
+		require.Len(t, res, 1)
+		assert.Equal(t, 0, res[0].start)
+		assert.Equal(t, 12, res[0].end)
+	})
+
+	t.Run("Unmatched braces", func(t *testing.T) {
+		assert.Nil(t, scanAnchors("{{PWD}"))
+		assert.Nil(t, scanAnchors("{PWD}}"))
+		assert.Nil(t, scanAnchors("PWD"))
+	})
+}
+
+func TestUnit_Expression_ResolveFile_SharedState_Required(t *testing.T) {
+	r := &ExpressionResolver{
+		fs: &MockFileSystem{},
+	}
+	// r.shared is nil
+	_, err := r.resolveFile("test.txt")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires a resolver with shared state")
+}
+
+func TestUnit_Expression_Nested_Deep(t *testing.T) {
+	t.Run("Deep nested", func(t *testing.T) {
+		fs := &MockFileSystem{
+			WD:      "/work",
+			HomeDir: "/home",
+			Env:     map[string]string{"DIR": "proj", "FILE": "ver.txt"},
+			Files: map[string][]byte{
+				"/work/proj/ver.txt": []byte("1.0"),
+			},
+			Dirs: map[string]bool{"/work/proj": true, "/work": true},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		// {{ file:{{ env:DIR }}/{{ env:FILE }} }} -> {{ file:proj/ver.txt }} -> 1.0
+		val := r.resolveString("{{ file:{{ env:DIR }}/{{ env:FILE }} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "1.0", val)
+	})
+
+	t.Run("Nested with default", func(t *testing.T) {
+		fs := &MockFileSystem{
+			WD:      "/work",
+			HomeDir: "/home",
+		}
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		// {{ env:MISSING:-{{ HOME }} }} -> {{ env:MISSING:-/home }} -> /home
+		val := r.resolveString("{{ env:MISSING:-{{ HOME }} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "/home", val)
+	})
+}

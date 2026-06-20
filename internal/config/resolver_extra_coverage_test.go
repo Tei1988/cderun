@@ -90,3 +90,35 @@ func TestUnit_Resolver_ApplyMemoryOption_Extra(t *testing.T) {
 		assert.Contains(t, err.Error(), "file not found")
 	})
 }
+
+func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
+	t.Run("resolveEnvValues errors", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+		}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		// Test resolveStringOpt error via mock FS
+		mfs.ReadFileErr = assert.AnError
+		_, err := resolveEnvValues([]string{"KEY={{file:err}}"}, false, r, mfs)
+		require.Error(t, err)
+	})
+
+	t.Run("resolveMounts errors", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+		}
+		r, _ := NewExpressionResolverWithFS(nil, mfs)
+
+		// Test mc.Source.Resolve error via pickConfigs
+		mfs.ReadFileErr = assert.AnError
+		_, err := resolveMounts([]string{"type=bind,source={{file:err}},target=/t"}, nil, "", nil, nil, r, mfs)
+		require.Error(t, err)
+
+		// Test r.Stat(hostPath) error that is not os.ErrNotExist
+		mfs.ReadFileErr = nil
+		mfs.StatErr = assert.AnError
+		_, err = resolveMounts([]string{"type=bind,source=/host,target=/t,optional"}, nil, "", nil, nil, r, mfs)
+		require.Error(t, err)
+	})
+}
