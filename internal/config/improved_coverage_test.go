@@ -19,8 +19,7 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 		}
 		fs := &MockFileSystem{
 			Files: map[string][]byte{"/project/limit.txt": content},
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 
@@ -32,8 +31,7 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 	t.Run("resolveFile exceeding MaxDirectiveFileSize in Stat", func(t *testing.T) {
 		fs := &MockFileSystem{
 			Files: map[string][]byte{"/project/large.txt": make([]byte, MaxDirectiveFileSize+1)},
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
 
@@ -45,12 +43,10 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 	t.Run("resolveFile exceeding MaxDirectiveFileSize in ReadFile", func(t *testing.T) {
 		fs := &MockFileSystem{
 			Files: map[string][]byte{"/project/race.txt": make([]byte, MaxDirectiveFileSize+1)},
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		cfs := &customStatFS{
 			MockFileSystem: *fs,
-			statSize:       10,
-		}
+			statSize:       10}
 
 		r, err := NewExpressionResolverWithFS(hostCtx, cfs)
 		require.NoError(t, err)
@@ -63,8 +59,7 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 	t.Run("resolveFile error caching", func(t *testing.T) {
 		fs := &exprMockFS{
 			MockFileSystem: MockFileSystem{WD: "/project"},
-			readFileErr:    assert.AnError,
-		}
+			readFileErr:    assert.AnError}
 		fs.Files = map[string][]byte{"/project/err.txt": []byte("data")}
 
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
@@ -132,10 +127,7 @@ func TestUnit_Config_SetBaseDirBehavior(t *testing.T) {
 		cfg := &CDERunConfig{
 			HostContext: &HostContext{
 				Mounts: []MountMapping{
-					{Source: "./src", Target: "/tgt"},
-				},
-			},
-		}
+					{Source: "./src", Target: "/tgt"}}}}
 		err := cfg.SetBaseDir("/base")
 		require.NoError(t, err)
 		assert.Equal(t, "/base/src", cfg.HostContext.Mounts[0].Source)
@@ -144,9 +136,7 @@ func TestUnit_Config_SetBaseDirBehavior(t *testing.T) {
 	t.Run("ToolConfig.SetBaseDir", func(t *testing.T) {
 		tc := &ToolConfig{
 			Mounts: []MountConfig{
-				{Source: ConfigPath{Raw: "./s"}, Target: ConfigPath{Raw: "/t"}},
-			},
-		}
+				{Source: ConfigPath{Raw: "./s"}, Target: ConfigPath{Raw: "/t"}}}}
 		tc.SetBaseDir("/base")
 		assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
 	})
@@ -155,19 +145,19 @@ func TestUnit_Config_SetBaseDirBehavior(t *testing.T) {
 func TestUnit_Resolver_InternalHelpers(t *testing.T) {
 	t.Run("ptr helper", func(t *testing.T) {
 		v := 123
-		p := ptr(v)
+		p := Ptr(v)
 		assert.Equal(t, v, *p)
 	})
 
 	t.Run("getFieldInfo for non-slice types", func(t *testing.T) {
-		cli := &CLIOptions{TTY: true, TTYSet: true}
+		cli := &CLIOptions{TTY: Ptr(true)}
 		cliVal := reflect.ValueOf(cli).Elem()
 
 		fieldOnce.Do(initFieldInfo)
 		info, ok := fieldInfo["tty"]
 		assert.True(t, ok, "fieldInfo['tty'] must exist")
 
-		set, val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
+		set, val := getFieldInfo(cliVal, info.p2ValIdx)
 		assert.True(t, set)
 		assert.True(t, val.Bool())
 	})

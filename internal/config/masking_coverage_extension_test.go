@@ -20,8 +20,7 @@ func TestUnit_Config_MaskSensitiveEnv_Advanced(t *testing.T) {
 		{"Multiple acronyms", "SSH_API_KEY", "secret", "[REDACTED]"},
 		{"Acronym at the end", "MySSH", "value", "value"}, // SSH not a keyword
 		{"Acronym at the end with keyword", "MySSHKey", "value", "[REDACTED]"},
-		{"Single letter segments", "A_B_C_KEY", "value", "[REDACTED]"},
-	}
+		{"Single letter segments", "A_B_C_KEY", "value", "[REDACTED]"}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -24,8 +24,7 @@ func TestUnit_Config_ValidateImageName(t *testing.T) {
 		{"Invalid character (space)", "my image", true},
 		{"Invalid character (control)", "alpine\n", true},
 		{"Invalid character (semicolon)", "alpine;rm -rf /", true},
-		{"Invalid character (shell)", "alpine|ls", true},
-	}
+		{"Invalid character (shell)", "alpine|ls", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,8 +54,7 @@ func TestUnit_Config_ValidateEnvKey(t *testing.T) {
 		{"Key with space", "MY VAR", true},
 		{"Key with dot", "MY.VAR", true},
 		{"Key with control char", "MY\nVAR", true},
-		{"Key with shell char", "MY;VAR", true},
-	}
+		{"Key with shell char", "MY;VAR", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,8 +81,7 @@ func TestUnit_Config_ValidatePathChars(t *testing.T) {
 		{"Path with carriage return (control)", "path/with/\r/return", true},
 		{"Path with null byte", "path/with/\x00/null", true},
 		{"Path with escape char", "path/with/\x1b/escape", true},
-		{"Path with delete char", "path/with/\x7f/delete", true},
-	}
+		{"Path with delete char", "path/with/\x7f/delete", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,8 +137,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{name: "Inner matched anchor in unmatched outer", input: "{{ PWD {{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Multiple anchors - mixed types (all must be satisfied)", input: "{{HOME}}/{{PWD}}/file", expectedErr: "path traversal detected"}, // HOME is /home/user, PWD is /work. Final is /home/user/work/file. Escapes /work boundary.
 		{name: "Unresolved anchor error", input: "{{unknown:directive}}/file", expectedErr: "unresolved expression in anchor"},
-		{name: "Empty anchor error", input: "{{env:UNSET}}/file", expectedErr: "anchor path is empty"},
-	}
+		{name: "Empty anchor error", input: "{{env:UNSET}}/file", expectedErr: "anchor path is empty"}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,8 +147,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 				HomeDir: home,
 				Env:     tt.extraEnv,
 				Dirs:    tt.extraDirs,
-				Files:   tt.extraFiles,
-			}
+				Files:   tt.extraFiles}
 			r, err := NewExpressionResolverWithFS(&HostContext{}, mfs)
 			require.NoError(t, err)
 
@@ -184,8 +179,7 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 		{"Invalid protocol", "80:80/http", true},
 		{"Port with control char", "80\n", true},
 		{"Too many colons", "127.0.0.1:80:80:80", true},
-		{"Invalid IP", "999.999.999.999:80:80", true},
-	}
+		{"Invalid IP", "999.999.999.999:80:80", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,8 +204,7 @@ func TestUnit_Config_ValidateDNS(t *testing.T) {
 		{"Empty", "", false},
 		{"Invalid IP", "8.8.8.256", true},
 		{"Hostname", "google.com", true},
-		{"Injection attempt", "8.8.8.8; rm -rf /", true},
-	}
+		{"Injection attempt", "8.8.8.8; rm -rf /", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -237,8 +230,7 @@ func TestUnit_Config_ValidateAddHost(t *testing.T) {
 		{"Missing colon", "myhost127.0.0.1", true},
 		{"Invalid IP", "myhost:999.999.999.999", true},
 		{"Invalid Hostname", "my_host:127.0.0.1", true},
-		{"Injection attempt", "myhost:127.0.0.1; rm -rf /", true},
-	}
+		{"Injection attempt", "myhost:127.0.0.1; rm -rf /", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -263,8 +255,7 @@ func TestUnit_Config_ValidateCapability(t *testing.T) {
 		{"Empty", "", false},
 		{"Lowercase", "sys_admin", true},
 		{"Injection attempt", "SYS_ADMIN; rm -rf /", true},
-		{"Space", "SYS ADMIN", true},
-	}
+		{"Space", "SYS ADMIN", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -289,8 +280,7 @@ func TestUnit_Config_ValidateWorkdir(t *testing.T) {
 		{"Empty", "", false},
 		{"Relative", "app", true},
 		{"Home tilde", "~/app", true},
-		{"Injection attempt", "/app; rm -rf /", true},
-	}
+		{"Injection attempt", "/app; rm -rf /", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -319,8 +309,7 @@ func TestUnit_Config_ValidateToolName(t *testing.T) {
 		{"Parent directory traversal", "../parent", true},
 		{"Subdirectory tool name (Linux)", "subdir/tool", true},
 		{"Subdirectory tool name (Windows)", "subdir\\tool", true},
-		{"Control character in tool name", "tool\tname", true},
-	}
+		{"Control character in tool name", "tool\tname", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -343,8 +332,7 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/src"},
-			Target: ConfigPath{Raw: "/tgt"},
-		}
+			Target: ConfigPath{Raw: "/tgt"}}
 		m, err := mc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "/tgt", m.Target)
@@ -354,8 +342,7 @@ func TestUnit_Config_Mount_AbsoluteTarget(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/src"},
-			Target: ConfigPath{Raw: "relative/path"},
-		}
+			Target: ConfigPath{Raw: "relative/path"}}
 		_, err := mc.Resolve(r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target must be an absolute path")
@@ -371,8 +358,7 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/sda"},
 			Destination: ConfigPath{Raw: "/dev/sda"},
-			Permissions: "rwm",
-		}
+			Permissions: "rwm"}
 		d, err := dc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/sda", d.PathInContainer)
@@ -382,8 +368,7 @@ func TestUnit_Config_Device_AbsoluteDestination(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/sda"},
 			Destination: ConfigPath{Raw: "dev/sda"},
-			Permissions: "rwm",
-		}
+			Permissions: "rwm"}
 		_, err := dc.Resolve(r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "device destination must be an absolute path")
@@ -394,8 +379,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 	t.Parallel()
 	fs := &MockFileSystem{
 		HomeDir: "/home/user",
-		WD:      "/work",
-	}
+		WD:      "/work"}
 
 	tests := []struct {
 		name    string
@@ -405,58 +389,39 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 		{
 			name: "Invalid control char in LogFormat",
 			cli: &CLIOptions{
-				Image:        "alpine",
-				ImageSet:     true,
-				LogFormat:    "text\t",
-				LogFormatSet: true,
-			},
-			wantErr: "security validation failed for \"log-format\"",
-		},
+				Image: Ptr("alpine"),
+				LogFormat: Ptr("text\t")},
+			wantErr: "security validation failed for \"log-format\""},
 		{
 			name: "Invalid control char in Env key",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
-			},
-			wantErr: "invalid environment variable key",
-		},
+				Image: Ptr("alpine"),
+				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"}},
+			wantErr: "invalid environment variable key"},
 		{
 			name: "Multiline Env value (PEM) is allowed",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
-			},
+				Image: Ptr("alpine"),
+				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"}},
 			wantErr: "", // No error expected
 		},
 		{
 			name: "Invalid control char in Ports element",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Ports:    []string{"8080:80\r"},
-			},
-			wantErr: "security validation failed for ports[0]",
-		},
+				Image: Ptr("alpine"),
+				Ports:    []string{"8080:80\r"}},
+			wantErr: "security validation failed for ports[0]"},
 		{
 			name: "Invalid ImageName in ResolveWithFS",
 			cli: &CLIOptions{
-				Image:    "alpine;rm -rf /",
-				ImageSet: true,
-			},
-			wantErr: "security validation failed for \"image\"",
-		},
+				Image: Ptr("alpine;rm -rf /")},
+			wantErr: "security validation failed for \"image\""},
 		{
 			name: "Invalid EnvKey in ResolveWithFS (CLI)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"INVALID-KEY=VALUE"},
-			},
-			wantErr: "invalid environment variable key",
-		},
-	}
+				Image: Ptr("alpine"),
+				Env:      []string{"INVALID-KEY=VALUE"}},
+			wantErr: "invalid environment variable key"}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -16,33 +16,25 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 		mfs := &MockFileSystem{
 			WD: "/home/user/project",
 			Files: map[string][]byte{
-				"/home/user/project/.go-version": []byte("1.25"),
-			},
+				"/home/user/project/.go-version": []byte("1.25")},
 			Env: map[string]string{
 				"PROJECT_ENV":  "production",
-				"CDERUN_IMAGE": "node:{{file:.go-version}}-{{env:PROJECT_ENV}}",
-			},
-		}
+				"CDERUN_IMAGE": "node:{{file:.go-version}}-{{env:PROJECT_ENV}}"}}
 
 		cli := CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true, // P1
-			TTY:          false,
-			TTYSet:       true, // P2
+			CderunTTY: Ptr(true), // P1
+			TTY: Ptr(false), // P2
 		}
 
 		tools := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:latest", // P4 (should be overridden by P3 Env Var with expression)
-				TTY:   ptr(false),
-			},
-		}
+				TTY:   Ptr(false)}}
 
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				TTY: ptr(false), // P5
-			},
-		}
+				TTY: Ptr(false), // P5
+			}}
 
 		// When: Resolving configuration
 		res, err := ResolveWithFS("node", &cli, tools, global, mfs)
@@ -68,17 +60,13 @@ func TestScenario_ConfigResolution_NestedOverrides(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
 				Network: "bridge",
-				Remove:  ptr(true),
-				Env:     []string{"GLOBAL=1"},
-			},
-		}
+				Remove:  Ptr(true),
+				Env:     []string{"GLOBAL=1"}}}
 		tools := ToolsConfig{
 			"app": ToolConfig{
-				Image:   "my-app",
+				Image: "my-app",
 				Network: "host",
-				Env:     []string{"TOOL=1"},
-			},
-		}
+				Env:     []string{"TOOL=1"}}}
 
 		// When: Resolving configuration for "app" with isolated FS
 		res, err := ResolveWithFS("app", &CLIOptions{}, tools, global, mfs)
@@ -96,9 +84,7 @@ func TestScenario_Expression_EnvResolution(t *testing.T) {
 	// Given: Expression resolver and environment variable
 	mfs := &MockFileSystem{
 		Env: map[string]string{
-			"TEST_VERSION": "1.2.3",
-		},
-	}
+			"TEST_VERSION": "1.2.3"}}
 	resolver, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 
@@ -113,8 +99,7 @@ func TestScenario_Expression_EnvResolution(t *testing.T) {
 func TestUnit_Config_SetBaseDir_Exhaustive(t *testing.T) {
 	t.Parallel()
 	cfg := &CDERunConfig{
-		SocketPath: ConfigPath{Raw: "./sock"},
-	}
+		SocketPath: ConfigPath{Raw: "./sock"}}
 	err := cfg.SetBaseDir("/base")
 	require.NoError(t, err)
 	assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
@@ -125,9 +110,7 @@ func TestUnit_Config_LoadFromPath_Direct(t *testing.T) {
 	mfs := &MockFileSystem{
 		WD: "/app",
 		Files: map[string][]byte{
-			"/app/custom.yaml": []byte("runtime: podman"),
-		},
-	}
+			"/app/custom.yaml": []byte("runtime: podman")}}
 	loader := NewConfigLoaderWithFS(mfs)
 	cfg, paths, err := loader.LoadCDERunConfigFromPath("custom.yaml")
 	require.NoError(t, err)
@@ -197,8 +180,7 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 func TestUnit_Config_MockFS_FileDetails(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{
-		Files: map[string][]byte{"/dir/f": []byte("data")},
-	}
+		Files: map[string][]byte{"/dir/f": []byte("data")}}
 	info, err := mfs.Stat("/dir/f")
 	require.NoError(t, err)
 	// After fix in Stat, Name() should return only the base name "f"
@@ -213,8 +195,7 @@ func TestUnit_Config_MockFS_FileDetails(t *testing.T) {
 func TestUnit_Config_MockFS_LookupEnv(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{
-		Env: map[string]string{"K": "V"},
-	}
+		Env: map[string]string{"K": "V"}}
 	val, ok := mfs.LookupEnv("K")
 	assert.True(t, ok)
 	assert.Equal(t, "V", val)
@@ -228,28 +209,28 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT_TOOLS": "t1,t2"}}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"t1", "t2"}, res.MountTools)
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.InDelta(t, 0.5, res.CPUs, 0.0001)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
-		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"MISSING"}, StrictEnv: true, StrictEnvSet: true}
+		cli := CLIOptions{Image: Ptr("alpine"), Env: []string{"MISSING"}, StrictEnv: Ptr(true)}
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
-		cli := CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{PWD}}/docker.sock", SocketPathSet: true}
+		cli := CLIOptions{Image: Ptr("alpine"), SocketPath: Ptr("{{PWD}}/docker.sock")}
 		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/work/docker.sock", res.SocketPath)
@@ -447,8 +428,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 	t.Run("resolveEnvValues expression error", func(t *testing.T) {
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{WD: "/app"},
-			readFileErr:    assert.AnError,
-		}
+			readFileErr:    assert.AnError}
 		// Create a resolver that will error on some expression
 		rErr, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)

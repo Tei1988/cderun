@@ -15,8 +15,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | ID | タイトル | 種別 | 優先度 | 規模 | 仕様変更 |
 | --- | --- | --- | --- | --- | --- |
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - |
-| T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - |
-| T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
@@ -63,66 +61,6 @@ macOS ターミナルで cderun 経由で kiro-cli を実行中、カーソル�
 - 原因が特定され、再現手順とともに記録されている（修正は別タスク化してよい）
 
 
-## T05: `CLIOptions` の `Set` フィールドをポインタ型に統一
-
-- 種別: リファクタリング
-- 優先度: 高
-- 対象:
-  - `internal/config/resolver.go:67-218`（`CLIOptions`。`root.go` の `rootOptions`とは別物）
-  - `internal/command/root.go:258` 以降（`resolveSettings()` の `CLIOptions` 組み立て）
-
-### 問題
-
-`CLIOptions` では全フラグに `FooSet bool` フィールドが存在し、フィールド数が実質 2 倍になっている。`ConfigDefaults`（`internal/config/config.go:53-90`）が既に `*bool` / `*int` 等を使っているのと同様に、`CLIOptions` もポインタ型（`*bool`, `*string` 等）に統一することで `Set` フィールドを廃止できる。
-
-- `nil` = 未指定、値あり = 明示的に指定、と意味が明確になる
-- `resolveSettings()` の組み立て部分のコード量が約半分になる
-- フラグ追加時の修正箇所が減る
-
-### 方針
-
-pflag はポインタ束縛を直接サポートしないため、cobra への束縛は `rootOptions` の値フィールドのまま維持し、`resolveSettings` での詰め替え時にジェネリックヘルパーで変換する。
-
-```go
-// T05 example
-func opt[T any] (changed bool, v T) *T {
-    if !changed { return nil }
-    return &v
-}
-// 使用例: Image: opt(cmd.Flags().Changed("image"), o.image)
-```
-
-これなら cobra 側は無変更で `CLIOptions` のフィールド数だけ半減できる。さらに `registry.go` のメタデータ＋リフレクションを使えば詰め替え自体も自動化でき、T06 と統合できる。
-
-### 完了条件
-
-- `CLIOptions` から `FooSet` フィールドが全廃されている
-- 「未指定」「明示的にゼロ値を指定」（例: `--tty=false`）の区別が全オプションで維持されている（回帰テスト）
-
----
-
-## T06: `--cderun-*` フラグのボイラープレートをコード生成化
-
-- 種別: リファクタリング
-- 対象: `internal/config/registry.go`、`internal/command/flags.go`、`internal/config/resolver.go`
-
-### 問題
-
-すべてのフラグに通常版（`--tty`）と内部オーバーライド版（`--cderun-tty`）が存在し、`rootOptions`・`CLIOptions`・`flags.go` の 3 箇所に手書きで反映する必要がある。追加漏れや不整合が起きやすい。
-
-### 方針
-
-生成元はゼロから作る必要がない。`internal/config/registry.go` に既に `StringOptions` / `BoolOptions` / `IntOptions` / `Float64Options` / `StringSliceOptions` としてオプションのメタデータ（Name / FieldName / EnvKey / Shorthand / Getter）が一元化されている。これを **唯一の定義源（single source of truth）** として `go generate` で `flags.go` と `CLIOptions` を生成する。
-
-これにより `docs/guidelines/working-guide.md`（42-63 行目）の「新オプション追加チェックリスト」の大半を機械化できる（= AI エージェントの追加漏れ防止という本来の目的に直結）。
-
-### 完了条件
-
-- registry のメタデータ 1 箇所を変更すれば新オプションが追加できる状態になっている
-- 生成コードと手書きコードの境界が明確（生成ファイルにヘッダコメント）
-- `docs/guidelines/working-guide.md` のチェックリストを新手順に合わせて更新
-
----
 
 ## T07: `preprocessArgs` の引数ホイスト簡略化
 

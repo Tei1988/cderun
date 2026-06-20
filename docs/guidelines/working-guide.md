@@ -46,16 +46,14 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 
 ### チェックリスト
 
-- [ ] **P1**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--cderun-<name>`）
-- [ ] **P2**: フラグ定義を `internal/command/flags.go` に追加し、`rootOptions` のフィールドを `internal/command/root.go` で定義する（`--<name>`）
-- [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する
-- [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
-- [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
-- [ ] **P6**: `resolver.go` のハードコードデフォルト値を設定する
-- [ ] **CLIOptions**: `CLIOptions` 構造体（`resolver.go`）に `<Name>` / `<Name>Set` / `Cderun<Name>` / `Cderun<Name>Set` フィールドを追加する
-- [ ] **ResolvedConfig**: `ResolvedConfig` 構造体（`resolver.go`）に結果フィールドを追加する
-- [ ] **resolveSettings**: `root.go` の `resolveSettings` で `CLIOptions` への代入を追加する
-- [ ] **DeepCopy**: `ToolConfig.DeepCopy()` / `ConfigDefaults.DeepCopy()` に新フィールドのコピー処理を追加する（ポインタ型・スライス型の場合）
+- [ ] **Registry**: `internal/config/registry.go` の適切なスライス（`StringOptions` 等）にメタデータを追加する。
+- [ ] **Code Generation**: `go generate ./...` を実行し、`CLIOptions` やフラグ登録コードを自動生成する。
+- [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する（通常は `resolveStandardOptions` 内で自動処理される）。
+- [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する。
+- [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する。
+- [ ] **P6**: `registry.go` でハードコードデフォルト値を設定する。
+- [ ] **ResolvedConfig**: `ResolvedConfig` 構造体（`resolver.go`）に結果フィールドを追加する。
+- [ ] **DeepCopy**: `ToolConfig.DeepCopy()` / `ConfigDefaults.DeepCopy()` に新フィールドのコピー処理を追加する（ポインタ型・スライス型の場合）。
 - [ ] **ドキュメント**: 以下のドキュメントを更新する
   - `docs/features/argument-priority-logic.md`（P1/P2/P3 のフラグ・環境変数リスト）
   - `docs/features/command-line-options.md`（オプションの説明）

@@ -40,8 +40,7 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"CREDENTIALS keyword", "AWS_CREDENTIALS", "value", "[REDACTED]"},
 		{"PASSPHRASE keyword", "SSH_PASSPHRASE", "value", "[REDACTED]"},
 		{"APIKEY keyword", "MY_APIKEY", "value", "[REDACTED]"},
-		{"SESSION keyword", "SESSION_ID", "value", "[REDACTED]"},
-	}
+		{"SESSION keyword", "SESSION_ID", "value", "[REDACTED]"}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

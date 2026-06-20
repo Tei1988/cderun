@@ -24,8 +24,7 @@ func TestUnit_Config_Path_ValidateToolName_Exhaustive(t *testing.T) {
 		{"Invalid character colon", "node:js", true},
 		{"Invalid character slash", "node/js", true},
 		{"Invalid character backslash", "node\\js", true},
-		{"Valid alphanumeric", "node123", false},
-	}
+		{"Valid alphanumeric", "node123", false}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -42,11 +41,9 @@ func TestUnit_Config_Path_ValidateToolName_Exhaustive(t *testing.T) {
 func TestUnit_Config_Path_ResolvePath_AbsError(t *testing.T) {
 	mfs := &MockFileSystem{
 		AbsErr: assert.AnError,
-		WD:     "/work",
-	}
+		WD:     "/work"}
 	hostCtx := &HostContext{
-		Level: 1,
-	}
+		Level: 1}
 	r, err := NewExpressionResolverWithFS(hostCtx, mfs)
 	require.NoError(t, err)
 
@@ -58,17 +55,14 @@ func TestUnit_Config_Path_ResolvePath_AbsError(t *testing.T) {
 func TestUnit_Config_Path_ResolvePath_HostContext_Coverage(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{
-		WD: "/work",
-	}
+		WD: "/work"}
 	// Case where multiple mounts match, should pick the longest target or deepest level
 	hostCtx := &HostContext{
 		Level: 1,
 		Mounts: []MountMapping{
 			{Source: "/host/a", Target: "/work", Level: 1},
 			{Source: "/host/b", Target: "/work/subdir", Level: 1},
-			{Source: "/host/c", Target: "/work/subdir", Level: 2},
-		},
-	}
+			{Source: "/host/c", Target: "/work/subdir", Level: 2}}}
 
 	t.Run("pick deepest level for same target length", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
@@ -83,9 +77,7 @@ func TestUnit_Config_Path_ResolvePath_HostContext_Coverage(t *testing.T) {
 			Level: 1,
 			Mounts: []MountMapping{
 				{Source: "/host/a", Target: "/work", Level: 1},
-				{Source: "/host/b", Target: "/work/subdir", Level: 1},
-			},
-		}
+				{Source: "/host/b", Target: "/work/subdir", Level: 1}}}
 		r, err := NewExpressionResolverWithFS(hostCtx2, mfs)
 		require.NoError(t, err)
 		res, err := ResolvePath("/work/subdir/file", "/work", r)
@@ -105,8 +97,7 @@ func TestUnit_Config_Path_SplitHostRemainder_Windows(t *testing.T) {
 		{"C:\\path:rem", "C:\\path", "rem", true},
 		{"D:/path:rem", "D:/path", "rem", true},
 		{"C:\\path", "", "", false},
-		{"E:/path", "", "", false},
-	}
+		{"E:/path", "", "", false}}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -171,8 +162,7 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 	t.Run("BASE_HOME and BASE_PWD", func(t *testing.T) {
 		hostCtx := &HostContext{
 			HomeDir:    "/base/home",
-			WorkingDir: "/base/pwd",
-		}
+			WorkingDir: "/base/pwd"}
 		r, err := NewExpressionResolverWithFS(hostCtx, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
 		require.NoError(t, err)
 
@@ -198,8 +188,7 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 	t.Run("fs.Abs failure for anchorPath", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			HomeDir: "/home",
-			AbsErr:  assert.AnError,
-		}
+			AbsErr:  assert.AnError}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -210,8 +199,7 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 
 	t.Run("fs.Abs failure for resolved path", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			HomeDir: "/home",
-		}
+			HomeDir: "/home"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -232,8 +220,7 @@ func TestUnit_Config_Path_ValidateAnchorBoundaries_Coverage(t *testing.T) {
 
 	t.Run("UserHomeDir failure when r is nil", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			HomeDirErr: assert.AnError,
-		}
+			HomeDirErr: assert.AnError}
 		err := validateAnchorBoundaries("~", "/file", nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get anchor home directory")
@@ -283,8 +270,7 @@ func TestUnit_Config_Path_isNamedVolume_Exhaustive(t *testing.T) {
 		{"../parent", false},
 		{"~/home", false},
 		{"named:volume", true},
-		{"vol:", true},
-	}
+		{"vol:", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -316,8 +302,7 @@ func TestUnit_Config_Path_ValidatePort_Exhaustive(t *testing.T) {
 		{"1.2.3.4:invalid:80", true},
 		{"invalid:80:80", true},
 		{"1.2.3.4:80:80:80", true},
-		{"", false},
-	}
+		{"", false}}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

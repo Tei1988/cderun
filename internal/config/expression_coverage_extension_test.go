@@ -43,10 +43,8 @@ func TestUnit_ExpressionResolver_ResolveFile_LargeFile(t *testing.T) {
 		MockFileSystem: MockFileSystem{
 			WD:    "/work",
 			Files: map[string][]byte{"/work/large.txt": []byte("too large")},
-			Dirs:  map[string]bool{"/work": true},
-		},
-		statFileInfo: &mockFileInfoLarge{name: "large.txt", size: MaxDirectiveFileSize + 1},
-	}
+			Dirs:  map[string]bool{"/work": true}},
+		statFileInfo: &mockFileInfoLarge{name: "large.txt", size: MaxDirectiveFileSize + 1}}
 
 	r, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
@@ -63,10 +61,8 @@ func TestUnit_ExpressionResolver_ResolveFile_LargeData(t *testing.T) {
 		MockFileSystem: MockFileSystem{
 			WD:    "/work",
 			Files: map[string][]byte{"/work/large_data.txt": data},
-			Dirs:  map[string]bool{"/work": true},
-		},
-		statFileInfo: &mockFileInfoLarge{name: "large_data.txt", size: 100},
-	}
+			Dirs:  map[string]bool{"/work": true}},
+		statFileInfo: &mockFileInfoLarge{name: "large_data.txt", size: 100}}
 
 	r, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
@@ -81,10 +77,8 @@ func TestUnit_ExpressionResolver_ResolveFile_StatError(t *testing.T) {
 		MockFileSystem: MockFileSystem{
 			WD:    "/work",
 			Files: map[string][]byte{"/work/err.txt": []byte("content")},
-			Dirs:  map[string]bool{"/work": true},
-		},
-		statErr: assert.AnError,
-	}
+			Dirs:  map[string]bool{"/work": true}},
+		statErr: assert.AnError}
 
 	r, err := NewExpressionResolverWithFS(nil, fs)
 	require.NoError(t, err)
@@ -112,8 +106,7 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 
 	t.Run("expandHome error", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			HomeDir: "/home/user",
-		}
+			HomeDir: "/home/user"}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -126,8 +119,7 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 	t.Run("magic words exhaustive", func(t *testing.T) {
 		hostCtx := &HostContext{
 			HomeDir:    "/base/home",
-			WorkingDir: "/base/pwd",
-		}
+			WorkingDir: "/base/pwd"}
 		r, _ := NewExpressionResolverWithFS(hostCtx, &MockFileSystem{HomeDir: "/home", WD: "/pwd"})
 
 		assert.Equal(t, "/home", r.resolveString("{{HOME}}"))
@@ -145,8 +137,7 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 
 	t.Run("env with default", func(t *testing.T) {
 		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{
-			Env: map[string]string{"EXISTING": "val"},
-		})
+			Env: map[string]string{"EXISTING": "val"}})
 
 		assert.Equal(t, "val", r.resolveString("{{env:EXISTING:-default}}"))
 		assert.Equal(t, "default", r.resolveString("{{env:MISSING:-default}}"))
@@ -160,8 +151,7 @@ func TestUnit_ExpressionResolver_ResolveFindDir_AbsError(t *testing.T) {
 		AbsErr:  assert.AnError,
 		HomeDir: "/home",
 		Files:   map[string][]byte{"/work/.git": []byte("")},
-		Dirs:    map[string]bool{"/work": true},
-	}
+		Dirs:    map[string]bool{"/work": true}}
 	r, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 
@@ -173,8 +163,7 @@ func TestUnit_ExpressionResolver_ResolveFindDir_AbsError(t *testing.T) {
 func TestUnit_ExpressionResolver_ApplyReverseResolution_AbsError(t *testing.T) {
 	mfs := &MockFileSystem{
 		WD:      "/work",
-		HomeDir: "/home",
-	}
+		HomeDir: "/home"}
 	hostCtx := &HostContext{Level: 1}
 	r, err := NewExpressionResolverWithFS(hostCtx, mfs)
 	require.NoError(t, err)

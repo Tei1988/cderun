@@ -58,49 +58,47 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 		Ptr:       &s,
 		Interface: s,
 		Map:       map[string]string{"a": "b"},
-		Zero:      0,
-	}
+		Zero:      0}
 	val := reflect.ValueOf(ts)
 
 	t.Run("Ptr set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 0)
+		set, _ := getFieldInfo(val, 0)
 		assert.True(t, set)
 	})
 
 	t.Run("Interface set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 1)
+		set, _ := getFieldInfo(val, 1)
 		assert.True(t, set)
 	})
 
 	t.Run("Map set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 2)
+		set, _ := getFieldInfo(val, 2)
 		assert.True(t, set)
 	})
 
 	t.Run("Zero not set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 3)
+		set, _ := getFieldInfo(val, 3)
 		assert.False(t, set)
 	})
 
 	tsNil := testStruct{
 		Ptr:       nil,
 		Interface: nil,
-		Map:       nil,
-	}
+		Map:       nil}
 	valNil := reflect.ValueOf(tsNil)
 
 	t.Run("Ptr nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 0)
+		set, _ := getFieldInfo(valNil, 0)
 		assert.False(t, set)
 	})
 
 	t.Run("Interface nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 1)
+		set, _ := getFieldInfo(valNil, 1)
 		assert.False(t, set)
 	})
 
 	t.Run("Map nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 2)
+		set, _ := getFieldInfo(valNil, 2)
 		assert.False(t, set)
 	})
 }
@@ -130,15 +128,13 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("registry mismatch validation with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			Env: map[string]string{"CDERUN_IMAGE": "my-reg.com/node:{{env:UNKNOWN}}"},
-		}
+			Env: map[string]string{"CDERUN_IMAGE": "my-reg.com/node:{{env:UNKNOWN}}"}}
 		tools := ToolsConfig{
 			// The registry check logic uses ResolveString which sets the sticky error if it fails.
 			// However, ResolveWithFS calls validateImageRegistryMatch which uses r.ResolveString.
 			// If r.ResolveString fails, it returns the error, BUT validateImageRegistryMatch
 			// only fails if both errCLI and errCfg are nil.
-			"node": ToolConfig{Image: "my-reg.com/node:18"},
-		}
+			"node": ToolConfig{Image: "my-reg.com/node:18"}}
 		res, err := ResolveWithFS("node", nil, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.Contains(t, res.Image, "my-reg.com/node:")
@@ -147,9 +143,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("registry mismatch validation with config expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "my-reg.com/node:{{env:UNKNOWN}}"},
-		}
-		cli := &CLIOptions{Image: "my-reg.com/node:20", ImageSet: true}
+			"node": ToolConfig{Image: "my-reg.com/node:{{env:UNKNOWN}}"}}
+		cli := &CLIOptions{Image: Ptr("my-reg.com/node:20")}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "my-reg.com/node:20", res.Image)
@@ -157,8 +152,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("negative duration in tool config", func(t *testing.T) {
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "alpine", HangTimeout: "-1s"},
-		}
+			"node": ToolConfig{Image: "alpine", HangTimeout: "-1s"}}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duration cannot be negative")
@@ -166,8 +160,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("invalid duration in tool config", func(t *testing.T) {
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "alpine", HangTimeout: "invalid"},
-		}
+			"node": ToolConfig{Image: "alpine", HangTimeout: "invalid"}}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid hang-timeout value")
@@ -175,8 +168,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("pull-backoff-base invalid in tool config", func(t *testing.T) {
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "alpine", PullBackoffBase: "invalid"},
-		}
+			"node": ToolConfig{Image: "alpine", PullBackoffBase: "invalid"}}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull-backoff-base value")
@@ -184,8 +176,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("pull-backoff-base zero in tool config", func(t *testing.T) {
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "alpine", PullBackoffBase: "0s"},
-		}
+			"node": ToolConfig{Image: "alpine", PullBackoffBase: "0s"}}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be positive")
@@ -193,22 +184,21 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("memory invalid in tool config", func(t *testing.T) {
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "alpine", Memory: "invalid"},
-		}
+			"node": ToolConfig{Image: "alpine", Memory: "invalid"}}
 		_, err := ResolveWithFS("node", nil, tools, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid memory value")
 	})
 
 	t.Run("security validation failure for user", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, User: "user\nname", UserSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), User: Ptr("user\nname")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for \"user\"")
 	})
 
 	t.Run("security validation failure for env key", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"BAD\nKEY=val"}}
+		cli := &CLIOptions{Image: Ptr("alpine"), Env: []string{"BAD\nKEY=val"}}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid environment variable key")
@@ -216,19 +206,15 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("security validation failure for mounts", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Mounts:   []string{"source=/bad\n,target=/good"},
-		}
+			Image: Ptr("alpine"),
+			Mounts:   []string{"source=/bad\n,target=/good"}}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for mounts[0] (source)")
 
 		cli = &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Mounts:   []string{"source=/good,target=/bad\r"},
-		}
+			Image: Ptr("alpine"),
+			Mounts:   []string{"source=/good,target=/bad\r"}}
 		_, err = ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for mounts[0] (target)")
@@ -236,19 +222,15 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("security validation failure for devices", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Devices:  []string{"/bad\n:/good"},
-		}
+			Image: Ptr("alpine"),
+			Devices:  []string{"/bad\n:/good"}}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for devices[0] (path-on-host)")
 
 		cli = &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Devices:  []string{"/good:/bad\r"},
-		}
+			Image: Ptr("alpine"),
+			Devices:  []string{"/good:/bad\r"}}
 		_, err = ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for devices[0] (path-in-container)")
@@ -257,10 +239,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("resolveDevices fallback to global", func(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/global"}, Destination: ConfigPath{Raw: "/dev/global"}}},
-			},
-		}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+				Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/global"}, Destination: ConfigPath{Raw: "/dev/global"}}}}}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 1)
 		assert.Equal(t, "/dev/global", res.Devices[0].PathOnHost)
@@ -269,28 +249,24 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("resolveEnv fallback to global", func(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				Env: []string{"GLOBAL=1"},
-			},
-		}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+				Env: []string{"GLOBAL=1"}}}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "GLOBAL=1")
 	})
 
 	t.Run("resolveDevices with empty segments in environment", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/a , , /dev/b:/dev/b"},
-		}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+			Env: map[string]string{"CDERUN_DEVICE": "/dev/a:/dev/a , , /dev/b:/dev/b"}}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 2)
 	})
 
 	t.Run("resolveEnv with empty segments in environment", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			Env: map[string]string{"CDERUN_ENV": "A=1 ; ; B=2"},
-		}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+			Env: map[string]string{"CDERUN_ENV": "A=1 ; ; B=2"}}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Contains(t, res.Env, "A=1")
 		assert.Contains(t, res.Env, "B=2")
@@ -300,17 +276,15 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("resolveMounts fallback to global", func(t *testing.T) {
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				Mounts: []MountConfig{{Source: ConfigPath{Raw: "/src"}, Target: ConfigPath{Raw: "/dst"}}},
-			},
-		}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, &MockFileSystem{})
+				Mounts: []MountConfig{{Source: ConfigPath{Raw: "/src"}, Target: ConfigPath{Raw: "/dst"}}}}}
+		res, err := ResolveWithFS("node", &CLIOptions{Image: Ptr("alpine")}, nil, global, &MockFileSystem{})
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
 		assert.Equal(t, "/src", res.Mounts[0].Source)
 	})
 
 	t.Run("transitive options: mount-all-tools", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountAllTools: true, MountAllToolsSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), MountAllTools: Ptr(true)}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.True(t, res.MountAllTools)
@@ -319,7 +293,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("transitive options: mount-tools", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, MountTools: "git", MountToolsSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), MountTools: Ptr("git")}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"git"}, res.MountTools)
@@ -330,12 +304,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("RAMInBytes error with sticky expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
+			Image: Ptr("alpine"),
 			Env:       []string{"FOO={{file:missing}}"},
-			Memory:    "invalid",
-			MemorySet: true,
-		}
+			Memory: Ptr("invalid")}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
@@ -347,18 +318,17 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			name string
 			cli  CLIOptions
 		}{
-			{"network", CLIOptions{Network: "net\r", NetworkSet: true}},
-			{"hostname", CLIOptions{Hostname: "host\t", HostnameSet: true}},
-			{"workdir", CLIOptions{Workdir: "dir\v", WorkdirSet: true}},
-			{"runtime", CLIOptions{Runtime: "run\f", RuntimeSet: true}},
-			{"dry-run-format", CLIOptions{DryRunFormat: "fmt\n", DryRunFormatSet: true}},
-			{"log-level", CLIOptions{LogLevel: "level\r", LogLevelSet: true}},
-		}
+			{"network", CLIOptions{Network: Ptr("net\r")}},
+			{"hostname", CLIOptions{Hostname: Ptr("host\t")}},
+			{"workdir", CLIOptions{Workdir: Ptr("dir\v")}},
+			{"runtime", CLIOptions{Runtime: Ptr("run\f")}},
+			{"dry-run-format", CLIOptions{DryRunFormat: Ptr("fmt\n")}},
+			{"log-level", CLIOptions{LogLevel: Ptr("level\r")}}}
 
 		for _, f := range fields {
 			t.Run(f.name, func(t *testing.T) {
-				f.cli.Image = "alpine"
-				f.cli.ImageSet = true
+				f.cli.Image = Ptr("alpine")
+
 				_, err := ResolveWithFS("node", &f.cli, nil, nil, &MockFileSystem{})
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), fmt.Sprintf("security validation failed for %q", f.name))
@@ -377,13 +347,12 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			{"dns", CLIOptions{DNS: []string{"8.8.8.8\v"}}},
 			{"add-hosts", CLIOptions{AddHosts: []string{"host:ip\f"}}},
 			{"cap-add", CLIOptions{CapAdd: []string{"SYS_ADMIN\n"}}},
-			{"cap-drop", CLIOptions{CapDrop: []string{"ALL\r"}}},
-		}
+			{"cap-drop", CLIOptions{CapDrop: []string{"ALL\r"}}}}
 
 		for _, s := range slices {
 			t.Run(s.name, func(t *testing.T) {
-				s.cli.Image = "alpine"
-				s.cli.ImageSet = true
+				s.cli.Image = Ptr("alpine")
+
 				_, err := ResolveWithFS("node", &s.cli, nil, nil, &MockFileSystem{})
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), fmt.Sprintf("security validation failed for %s[0]", s.name))
@@ -393,11 +362,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("invalid tool name in mount-tools", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			MountTools:    "../bad",
-			MountToolsSet: true,
-		}
+			Image: Ptr("alpine"),
+			MountTools: Ptr("../bad")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid tool name in mount-tools")
@@ -405,11 +371,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("pull-max-retries non-positive", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:             "alpine",
-			ImageSet:          true,
-			PullMaxRetries:    0,
-			PullMaxRetriesSet: true,
-		}
+			Image: Ptr("alpine"),
+			PullMaxRetries: Ptr(0)}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull-max-retries value \"0\"")
@@ -420,34 +383,34 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		logging.GetGlobalLogger().SetLevel(logging.TraceLevel)
 		defer logging.GetGlobalLogger().SetLevel(origLevel)
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 	})
 
 	t.Run("security validation failure for image", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine\n", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine\n")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for image")
 	})
 
 	t.Run("hang-timeout invalid duration", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, HangTimeout: "invalid", HangTimeoutSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), HangTimeout: Ptr("invalid")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid hang-timeout value")
 	})
 
 	t.Run("pull-backoff-base invalid duration", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullBackoffBase: "invalid", CderunPullBackoffBaseSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), CderunPullBackoffBase: Ptr("invalid")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid pull-backoff-base value")
 	})
 
 	t.Run("pull-backoff-base non-positive", func(t *testing.T) {
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullBackoffBase: "0s", CderunPullBackoffBaseSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), CderunPullBackoffBase: Ptr("0s")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be positive")
@@ -455,13 +418,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("transitive options: mount-cderun and mount-socket specified", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    false,
-			MountCderunSet: true,
-			MountSocket:    false,
-			MountSocketSet: true,
-		}
+			Image: Ptr("alpine"),
+			MountCderun: Ptr(false),
+			MountSocket: Ptr(false)}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.False(t, res.MountCderun)
@@ -470,13 +429,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("transitive options: mount-cderun overrides mount-tools", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountTools:     "git",
-			MountToolsSet:  true,
-			MountCderun:    false,
-			MountCderunSet: true,
-		}
+			Image: Ptr("alpine"),
+			MountTools: Ptr("git"),
+			MountCderun: Ptr(false)}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.False(t, res.MountCderun)
@@ -486,13 +441,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("transitive options: mount-socket false explicitly with mount-cderun true", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    true,
-			MountCderunSet: true,
-			MountSocket:    false,
-			MountSocketSet: true,
-		}
+			Image: Ptr("alpine"),
+			MountCderun: Ptr(true),
+			MountSocket: Ptr(false)}
 		res, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.True(t, res.MountCderun)
@@ -500,7 +451,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	})
 
 	t.Run("registry mismatch: only CLI image provided", func(t *testing.T) {
-		cli := &CLIOptions{CderunImage: "my-reg.com/node:20", CderunImageSet: true}
+		cli := &CLIOptions{CderunImage: Ptr("my-reg.com/node:20")}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, "my-reg.com/node:20", res.Image)
@@ -509,11 +460,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("memory expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/app"}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "{{file:missing}}",
-			MemorySet: true,
-		}
+			Image: Ptr("alpine"),
+			Memory: Ptr("{{file:missing}}")}
 		_, err := ResolveWithFS("node", cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "file not found")
@@ -527,7 +475,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["pull-max-retries"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunPullMaxRetriesSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		// Should fallback to default (3) because k is not int
@@ -542,7 +490,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["cpus"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunCPUsSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		// Should be 0.0 because k is not float
@@ -556,7 +504,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["pull-max-retries"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, PullMaxRetriesSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Equal(t, 3, res.PullMaxRetries)
@@ -569,7 +517,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["cpus"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CPUsSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.InDelta(t, 0.0, res.CPUs, 1e-9)
@@ -583,7 +531,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["dns"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, CderunDNS: []string{"8.8.8.8"}} // This will not be used because reflection will see String
+		cli := &CLIOptions{Image: Ptr("alpine"), CderunDNS: []string{"8.8.8.8"}} // This will not be used because reflection will see String
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Empty(t, res.DNS)
@@ -596,7 +544,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			fieldInfo["dns"] = info
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, DNS: []string{"8.8.8.8"}}
+		cli := &CLIOptions{Image: Ptr("alpine"), DNS: []string{"8.8.8.8"}}
 		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		assert.Empty(t, res.DNS)
@@ -607,7 +555,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
 		defer logging.GetGlobalLogger().SetLevel(origLevel)
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, Privileged: true, PrivilegedSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine"), Privileged: Ptr(true)}
 		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
 	})
@@ -615,12 +563,12 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	t.Run("validateEnvSecurity invalid key", func(t *testing.T) {
 		// Test case where resolveEnvValues doesn't catch the invalid key because there's no "="
 		// and it's not in strict mode.
-		cli := &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"BAD\nKEY"}}
+		cli := &CLIOptions{Image: Ptr("alpine"), Env: []string{"BAD\nKEY"}}
 		_, err := ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
 
-		cli = &CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"-INVALID"}}
+		cli = &CLIOptions{Image: Ptr("alpine"), Env: []string{"-INVALID"}}
 		_, err = ResolveWithFS("sh", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
@@ -631,7 +579,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			delete(fieldInfo, "tty")
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"tty\" not found")
@@ -642,7 +590,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			delete(fieldInfo, "pull-max-retries")
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"pull-max-retries\" not found")
@@ -653,7 +601,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			delete(fieldInfo, "cpus")
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"cpus\" not found")
@@ -664,7 +612,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			delete(fieldInfo, "dns")
 		})
 
-		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		cli := &CLIOptions{Image: Ptr("alpine")}
 		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"dns\" not found")
@@ -681,58 +629,45 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			{
 				name: "Valid warning alias for log-level",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					LogLevel: "warning", LogLevelSet: true,
-				},
+					Image: Ptr("alpine"),
+					LogLevel: Ptr("warning")},
 				wantErr:      false,
-				wantLogLevel: "warning",
-			},
+				wantLogLevel: "warning"},
 			{
 				name: "Invalid log-level",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					LogLevel: "invalid", LogLevelSet: true,
-				},
+					Image: Ptr("alpine"),
+					LogLevel: Ptr("invalid")},
 				wantErr:     true,
-				errContains: "unsupported log level: \"invalid\"",
-			},
+				errContains: "unsupported log level: \"invalid\""},
 			{
 				name: "Invalid runtime",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					Runtime: "rkt", RuntimeSet: true,
-				},
+					Image: Ptr("alpine"),
+					Runtime: Ptr("rkt")},
 				wantErr:     true,
-				errContains: "unsupported runtime: \"rkt\"",
-			},
+				errContains: "unsupported runtime: \"rkt\""},
 			{
 				name: "Invalid dry-run-format",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					DryRunFormat: "xml", DryRunFormatSet: true,
-				},
+					Image: Ptr("alpine"),
+					DryRunFormat: Ptr("xml")},
 				wantErr:     true,
-				errContains: "unsupported dry-run format: \"xml\"",
-			},
+				errContains: "unsupported dry-run format: \"xml\""},
 			{
 				name: "Invalid diagnosis-format",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					DiagnosisFormat: "xml", DiagnosisFormatSet: true,
-				},
+					Image: Ptr("alpine"),
+					DiagnosisFormat: Ptr("xml")},
 				wantErr:     true,
-				errContains: "unsupported diagnosis format: \"xml\"",
-			},
+				errContains: "unsupported diagnosis format: \"xml\""},
 			{
 				name: "Invalid log-format",
 				cli: CLIOptions{
-					Image: "alpine", ImageSet: true,
-					LogFormat: "xml", LogFormatSet: true,
-				},
+					Image: Ptr("alpine"),
+					LogFormat: Ptr("xml")},
 				wantErr:     true,
-				errContains: "unsupported log format: \"xml\"",
-			},
-		}
+				errContains: "unsupported log format: \"xml\""}}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {

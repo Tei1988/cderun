@@ -26,8 +26,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 	baseDir := "/abs/path"
 	mfs := &MockFileSystem{
 		WD:      baseDir,
-		HomeDir: home,
-	}
+		HomeDir: home}
 	r, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 
@@ -59,10 +58,8 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		// fs.Abs failure case
 		mfsErr := &pathMockFS{
 			MockFileSystem: MockFileSystem{
-				WD: "/wd",
-			},
-			absErr: assert.AnError,
-		}
+				WD: "/wd"},
+			absErr: assert.AnError}
 		hostCtx := &HostContext{Level: 1} // Trigger nested check
 		rErr, err := NewExpressionResolverWithFS(hostCtx, mfsErr)
 		require.NoError(t, err)
@@ -88,8 +85,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			Type:     "bind",
 			Source:   ConfigPath{Raw: "./data", BaseDir: baseDir},
 			Target:   ConfigPath{Raw: "/app/data", BaseDir: baseDir},
-			ReadOnly: false,
-		}
+			ReadOnly: false}
 		mount, err := mc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "bind", mount.Type)
@@ -101,8 +97,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			Type:     "bind",
 			Source:   ConfigPath{Raw: "~/config", BaseDir: baseDir},
 			Target:   ConfigPath{Raw: "/root/config", BaseDir: baseDir},
-			ReadOnly: true,
-		}
+			ReadOnly: true}
 		mount, err = mc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(home, "config"), mount.Source)
@@ -112,8 +107,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		mc = MountConfig{
 			Type:   "volume",
 			Source: ConfigPath{Raw: "myvol"},
-			Target: ConfigPath{Raw: "/data"},
-		}
+			Target: ConfigPath{Raw: "/data"}}
 		mount, err = mc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "volume", mount.Type)
@@ -125,8 +119,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
 			Destination: ConfigPath{Raw: "/dev/video0", BaseDir: baseDir},
-			Permissions: "rwm",
-		}
+			Permissions: "rwm"}
 		mapping, err := dc.Resolve(r)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0", mapping.PathOnHost)
@@ -215,9 +208,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/home/user/project", Target: "/app", Level: 1},
-			},
-		}
+				{Source: "/home/user/project", Target: "/app", Level: 1}}}
 		rn, err := NewExpressionResolver(hostCtx)
 		require.NoError(t, err)
 
@@ -237,9 +228,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			Level: 2,
 			Mounts: []MountMapping{
 				{Source: "/home/user/project", Target: "/app", Level: 1},
-				{Source: "/home/user/project/src", Target: "/src", Level: 2},
-			},
-		}
+				{Source: "/home/user/project/src", Target: "/src", Level: 2}}}
 		rn, err := NewExpressionResolver(hostCtx)
 		require.NoError(t, err)
 
@@ -260,8 +249,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			Mounts: []MountMapping{
 				{Source: "/tmp", Target: "/tmp", Level: 1},                      // Broad but specific
 				{Source: "/var/lib/docker/overlay/diff", Target: "/", Level: 2}, // Higher level but root
-			},
-		}
+			}}
 		rn, err := NewExpressionResolver(hostCtx)
 		require.NoError(t, err)
 
@@ -281,9 +269,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 			Level: 2,
 			Mounts: []MountMapping{
 				{Source: "/host/v1", Target: "/app", Level: 1},
-				{Source: "/host/v2", Target: "/app", Level: 2},
-			},
-		}
+				{Source: "/host/v2", Target: "/app", Level: 2}}}
 		rn, err := NewExpressionResolver(hostCtx)
 		require.NoError(t, err)
 
@@ -297,9 +283,7 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/host/app", Target: "/app", Level: 1},
-			},
-		}
+				{Source: "/host/app", Target: "/app", Level: 1}}}
 		rn, err := NewExpressionResolver(hostCtx)
 		require.NoError(t, err)
 
@@ -318,17 +302,14 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		hostCtx := &HostContext{
 			Level: 1,
 			Mounts: []MountMapping{
-				{Source: "/Users/user/.config/gcloud", Target: "/root/.config/gcloud", Level: 1},
-			},
-		}
+				{Source: "/Users/user/.config/gcloud", Target: "/root/.config/gcloud", Level: 1}}}
 		rn, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/root/.config/gcloud"},
-			Target: ConfigPath{Raw: "/.config/gcloud"},
-		}
+			Target: ConfigPath{Raw: "/.config/gcloud"}}
 		mount, err := mc.Resolve(rn)
 		require.NoError(t, err)
 		// source should be reverse-resolved to host path
@@ -355,8 +336,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/host"},
-			Target: ConfigPath{Raw: "/container"},
-		}
+			Target: ConfigPath{Raw: "/container"}}
 		data, err := yaml.Marshal(mc)
 		require.NoError(t, err)
 		assert.Contains(t, string(data), "type: bind")
@@ -373,8 +353,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/video0"},
 			Destination: ConfigPath{Raw: "/dev/video1"},
-			Permissions: "rw",
-		}
+			Permissions: "rw"}
 		data, err := yaml.Marshal(dc)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/video0:/dev/video1:rw\n", string(data))
@@ -382,8 +361,7 @@ func TestUnit_Path_MarshalYAML(t *testing.T) {
 		dc = DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/fuse"},
 			Destination: ConfigPath{Raw: "/dev/fuse"},
-			Permissions: "rwm",
-		}
+			Permissions: "rwm"}
 		data, err = yaml.Marshal(dc)
 		require.NoError(t, err)
 		assert.Equal(t, "/dev/fuse:/dev/fuse\n", string(data))
@@ -474,8 +452,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "{{file:missing}}"},
-			Target: ConfigPath{Raw: "/target"},
-		}
+			Target: ConfigPath{Raw: "/target"}}
 		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
 		require.NoError(t, err)
 		_, err = mc.Resolve(r)
@@ -486,8 +463,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mc := MountConfig{
 			Type:   "bind",
 			Source: ConfigPath{Raw: "/source"},
-			Target: ConfigPath{Raw: "{{file:missing}}"},
-		}
+			Target: ConfigPath{Raw: "{{file:missing}}"}}
 		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
 		require.NoError(t, err)
 		_, err = mc.Resolve(r)
@@ -497,8 +473,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 	t.Run("DeviceConfig.Resolve - Source error", func(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "{{file:missing}}"},
-			Destination: ConfigPath{Raw: "/dev/v"},
-		}
+			Destination: ConfigPath{Raw: "/dev/v"}}
 		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
 		require.NoError(t, err)
 		_, err = dc.Resolve(r)
@@ -508,8 +483,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 	t.Run("DeviceConfig.Resolve - Destination error", func(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/h"},
-			Destination: ConfigPath{Raw: "{{file:missing}}"},
-		}
+			Destination: ConfigPath{Raw: "{{file:missing}}"}}
 		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{})
 		require.NoError(t, err)
 		_, err = dc.Resolve(r)
@@ -524,8 +498,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 
 	t.Run("expandHome error", func(t *testing.T) {
 		mfs := &customMockFS{
-			homeDirErr: assert.AnError,
-		}
+			homeDirErr: assert.AnError}
 		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
@@ -533,8 +506,7 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 	t.Run("Expression error in ResolvePath", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, &customMockFS{
 			MockFileSystem: MockFileSystem{WD: "/base"},
-			readFileErr:    assert.AnError,
-		})
+			readFileErr:    assert.AnError})
 		require.NoError(t, err)
 		// {{file:foo}} will trigger an error when it tries to read the file
 		_, err = ResolvePath("{{file:foo}}", "/base", r)
@@ -561,16 +533,14 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 
 	t.Run("resolveVolumePath - ResolvePath error", func(t *testing.T) {
 		mfs := &customMockFS{
-			homeDirErr: assert.AnError,
-		}
+			homeDirErr: assert.AnError}
 		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveDevicePath - ResolvePath error", func(t *testing.T) {
 		mfs := &customMockFS{
-			homeDirErr: assert.AnError,
-		}
+			homeDirErr: assert.AnError}
 		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
 	})
@@ -729,8 +699,7 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 	t.Run("DeviceConfig.SetBaseDir", func(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/a"},
-			Destination: ConfigPath{Raw: "/dev/b"},
-		}
+			Destination: ConfigPath{Raw: "/dev/b"}}
 		dc.SetBaseDir("/base")
 		assert.Equal(t, "/base", dc.Source.BaseDir)
 		assert.Equal(t, "/base", dc.Destination.BaseDir)
@@ -757,8 +726,7 @@ func TestUnit_Config_ValidateHostname(t *testing.T) {
 		{"Too long hostname", string(make([]byte, 254)), true},
 		{"Invalid characters", "host!", true},
 		{"Starts with hyphen", "-host", true},
-		{"Ends with hyphen", "host-", true},
-	}
+		{"Ends with hyphen", "host-", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -783,8 +751,7 @@ func TestUnit_Config_ValidateNetworkName(t *testing.T) {
 		{"Network with underscore", "my_net", false},
 		{"Empty network", "", false},
 		{"Invalid characters", "net!", true},
-		{"Starts with hyphen", "-net", true},
-	}
+		{"Starts with hyphen", "-net", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -810,8 +777,7 @@ func TestUnit_Config_ValidateUserName(t *testing.T) {
 		{"User with dollar", "user$", false},
 		{"Empty user", "", false},
 		{"Invalid characters", "user!", true},
-		{"Too many colons", "user:group:extra", true},
-	}
+		{"Too many colons", "user:group:extra", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -838,8 +804,7 @@ func TestUnit_Config_ValidateExposePort(t *testing.T) {
 		{"Range with proto", "80-90/udp", false},
 		{"Empty port", "", false},
 		{"Invalid protocol", "80/http", true},
-		{"Invalid range", "80-extra", true},
-	}
+		{"Invalid range", "80-extra", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -15,21 +15,16 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 	// Here we test the result of that hoisting in the resolver.
 
 	mfs := &MockFileSystem{
-		WD: "/work",
-	}
+		WD: "/work"}
 
 	tools := ToolsConfig{
 		"node": ToolConfig{
 			Image: "node:18",
-			TTY:   ptr(false),
-		},
-	}
+			TTY:   Ptr(false)}}
 
 	t.Run("P1 override in Wrapper Mode", func(t *testing.T) {
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-		}
+			CderunTTY: Ptr(true)}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P1 should override tool config")
@@ -37,9 +32,7 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 
 	t.Run("P2 override in Wrapper Mode", func(t *testing.T) {
 		cli := &CLIOptions{
-			TTY:    true,
-			TTYSet: true,
-		}
+			TTY: Ptr(true)}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P2 should override tool config")
@@ -47,11 +40,8 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 
 	t.Run("P1 and P2 both present: P1 wins", func(t *testing.T) {
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-			TTY:          false,
-			TTYSet:       true,
-		}
+			CderunTTY: Ptr(true),
+			TTY: Ptr(false)}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P1 should win over P2")
@@ -65,23 +55,18 @@ func TestScenario_Config_SymlinkMode(t *testing.T) {
 	// Again, hoisting is in internal/command. Here we verify resolver behavior.
 
 	mfs := &MockFileSystem{
-		WD: "/work",
-	}
+		WD: "/work"}
 
 	tools := ToolsConfig{
 		"node": ToolConfig{
 			Image: "node:18",
-			TTY:   ptr(false),
-		},
-	}
+			TTY:   Ptr(false)}}
 
 	t.Run("Only P1 overrides in Symlink Mode (simulated)", func(t *testing.T) {
 		// Simulate 'node --cderun-tty --tty' where --tty is for node, but --cderun-tty is for cderun.
 		// Preprocessing would move --cderun-tty to CderunTTY, but keep --tty as passthrough (not in cli).
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-		}
+			CderunTTY: Ptr(true)}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)

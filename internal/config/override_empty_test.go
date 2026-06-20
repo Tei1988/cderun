@@ -16,28 +16,21 @@ func TestUnit_Resolver_EmptyListOverride(t *testing.T) {
 				{
 					Type:   "bind",
 					Source: ConfigPath{Raw: "/global"},
-					Target: ConfigPath{Raw: "/global"},
-				},
-			},
+					Target: ConfigPath{Raw: "/global"}}},
 			Devices: []DeviceConfig{
 				{
 					Source:      ConfigPath{Raw: "/dev/global"},
 					Destination: ConfigPath{Raw: "/dev/global"},
-					Permissions: "rwm",
-				},
-			},
-		},
-	}
+					Permissions: "rwm"}}}}
 
 	// P4 Tool Config with explicit empty lists
 	tools := ToolsConfig{
 		"empty-tool": ToolConfig{
-			Image:   "alpine",
+			Image: "alpine",
 			Env:     []string{},       // Explicit empty list
 			Mounts:  []MountConfig{},  // Explicit empty list
 			Devices: []DeviceConfig{}, // Explicit empty list
-		},
-	}
+		}}
 
 	cli := CLIOptions{}
 
@@ -60,24 +53,16 @@ func TestUnit_Resolver_EmptyEnvOverride(t *testing.T) {
 				{
 					Type:   "bind",
 					Source: ConfigPath{Raw: "/global"},
-					Target: ConfigPath{Raw: "/global"},
-				},
-			},
+					Target: ConfigPath{Raw: "/global"}}},
 			Devices: []DeviceConfig{
 				{
 					Source:      ConfigPath{Raw: "/dev/global"},
 					Destination: ConfigPath{Raw: "/dev/global"},
-					Permissions: "rwm",
-				},
-			},
-		},
-	}
+					Permissions: "rwm"}}}}
 
 	tools := ToolsConfig{
 		"test-tool": ToolConfig{
-			Image: "alpine",
-		},
-	}
+			Image: "alpine"}}
 
 	cli := CLIOptions{}
 
@@ -86,9 +71,7 @@ func TestUnit_Resolver_EmptyEnvOverride(t *testing.T) {
 		Env: map[string]string{
 			"CDERUN_ENV":    "",
 			"CDERUN_MOUNT":  "",
-			"CDERUN_DEVICE": "",
-		},
-	}
+			"CDERUN_DEVICE": ""}}
 
 	res, err := ResolveWithFS("test-tool", &cli, tools, global, fs)
 	require.NoError(t, err)

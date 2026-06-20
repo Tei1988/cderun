@@ -17,8 +17,7 @@ func TestUnit_Path_ValidateImageName_Extra(t *testing.T) {
 		{"Invalid start character", "_alpine", true},
 		{"Invalid middle character", "alpine!", true},
 		{"Multiple @ symbols", "alpine@sha256:abc@def", true},
-		{"Valid with @", "alpine@sha256:abc", false},
-	}
+		{"Valid with @", "alpine@sha256:abc", false}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

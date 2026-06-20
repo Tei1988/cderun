@@ -14,15 +14,13 @@ func TestUnit_Config_Errors_Coverage(t *testing.T) {
 	t.Run("RegistryMismatchError", func(t *testing.T) {
 		err := &RegistryMismatchError{
 			ExpectedRegistry: "expected.com/repo",
-			ActualRegistry:   "actual.com/repo",
-		}
+			ActualRegistry:   "actual.com/repo"}
 		assert.Equal(t, "container registry mismatch: expected \"expected.com/repo\", got \"actual.com/repo\"", err.Error())
 	})
 
 	t.Run("ImageNotFoundError", func(t *testing.T) {
 		err := &ImageNotFoundError{
-			Tool: "my-tool",
-		}
+			Tool: "my-tool"}
 		assert.Equal(t, "no image mapping found for tool: \"my-tool\"", err.Error())
 	})
 
@@ -30,14 +28,12 @@ func TestUnit_Config_Errors_Coverage(t *testing.T) {
 		baseErr := errors.New("base error")
 		err := &RuntimeInitError{
 			Runtime: "docker",
-			Err:     baseErr,
-		}
+			Err:     baseErr}
 		assert.Equal(t, "failed to initialize runtime \"docker\": base error", err.Error())
 		require.Equal(t, baseErr, err.Unwrap())
 
 		errNoBase := &RuntimeInitError{
-			Runtime: "podman",
-		}
+			Runtime: "podman"}
 		assert.Equal(t, "failed to initialize runtime \"podman\"", errNoBase.Error())
 		require.NoError(t, errNoBase.Unwrap())
 	})
@@ -47,8 +43,7 @@ func TestUnit_Config_Errors_Coverage(t *testing.T) {
 		err := &InvalidConfigError{
 			Field: "memory",
 			Value: "invalid",
-			Err:   baseErr,
-		}
+			Err:   baseErr}
 		// Error() already covered but let's be sure
 		assert.Equal(t, "invalid memory value \"invalid\": invalid format", err.Error())
 		require.Equal(t, baseErr, err.Unwrap())

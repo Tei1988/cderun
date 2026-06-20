@@ -22,8 +22,7 @@ func TestUnit_Config_ValidatePort_Malformed(t *testing.T) {
 		{"Non-numeric container port (2-segment)", "127.0.0.1:abc", true},
 		{"Non-numeric host port (2-segment)", "abc:80", true},
 		{"Non-numeric container port (1-segment)", "abc", true},
-		{"Both segments empty", ":", true},
-	}
+		{"Both segments empty", ":", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,8 +48,7 @@ func TestUnit_Config_ValidateExposePort_Malformed(t *testing.T) {
 		{"Non-numeric start range", "abc-90", true},
 		{"Non-numeric end range", "80-abc", true},
 		{"Invalid protocol", "80/http", true},
-		{"Malformed protocol part", "80/", true},
-	}
+		{"Malformed protocol part", "80/", true}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,8 +73,7 @@ func TestUnit_Config_Masking_Advanced(t *testing.T) {
 		{"Acronym APIKey", "APIKey", "secret", "[REDACTED]"},
 		{"camelCase with digits db1Password", "db1Password", "secret", "[REDACTED]"},
 		{"Snake case with Unicode ユーザー_TOKEN", "ユーザー_TOKEN", "secret", "[REDACTED]"},
-		{"Boundary split acronym transition APIKeyExample", "APIKeyExample", "secret", "[REDACTED]"},
-	}
+		{"Boundary split acronym transition APIKeyExample", "APIKeyExample", "secret", "[REDACTED]"}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,8 +87,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 	t.Run("resolveIntOpt with invalid env", func(t *testing.T) {
 		def := OptionDef[*int]{
 			EnvKey:   "TEST_INT",
-			Fallback: ptr(10),
-		}
+			Fallback: Ptr(10)}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.Equal(t, 10, res)
@@ -100,8 +96,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 	t.Run("resolveFloat64Opt with invalid env", func(t *testing.T) {
 		def := OptionDef[*float64]{
 			EnvKey:   "TEST_FLOAT",
-			Fallback: ptr(1.5),
-		}
+			Fallback: Ptr(1.5)}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
 		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
 		assert.InDelta(t, 1.5, res, 1e-9)
@@ -112,8 +107,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		def := OptionDef[*int]{
 			EnvKey:     "TEST_INT",
 			ToolGetter: func(tc ToolConfig) *int { return &toolVal },
-			Fallback:   ptr(10),
-		}
+			Fallback:   Ptr(10)}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		tools := ToolsConfig{"sub": ToolConfig{}}
 		// Env is invalid, so it should proceed to ToolGetter (P4) which is valid.
@@ -126,8 +120,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		def := OptionDef[*float64]{
 			EnvKey:       "TEST_FLOAT",
 			GlobalGetter: func(c CDERunConfig) *float64 { return &globalVal },
-			Fallback:     ptr(1.5),
-		}
+			Fallback:     Ptr(1.5)}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
 		// Env is invalid, ToolGetter is nil, so it should proceed to GlobalGetter (P5) which is valid.
 		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)

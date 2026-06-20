@@ -16,9 +16,7 @@ func TestIntegration_Config_Load_MockFS(t *testing.T) {
 	mfs := &MockFileSystem{
 		WD: tmpDir,
 		Files: map[string][]byte{
-			filepath.Join(tmpDir, ".cderun.yaml"): []byte(content),
-		},
-	}
+			filepath.Join(tmpDir, ".cderun.yaml"): []byte(content)}}
 	loader := NewConfigLoaderWithFS(mfs)
 	cfg, paths, err := loader.LoadCDERunConfig()
 
@@ -45,15 +43,12 @@ func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
 		WD: childDir,
 		Dirs: map[string]bool{
 			parentDir: true,
-			childDir:  true,
-		},
+			childDir:  true},
 		Files: map[string][]byte{
 			filepath.Join(parentDir, ".cderun.yaml"): []byte("runtime: docker\ndefaults:\n  tty: false\n  network: bridge"),
 			filepath.Join(parentDir, ".tools.yaml"):  []byte("node:\n  image: node:14\n  env: [\"PARENT=1\"]"),
 			filepath.Join(childDir, ".cderun.yaml"):  []byte("defaults:\n  tty: true"),
-			filepath.Join(childDir, ".tools.yaml"):   []byte("node:\n  image: node:16\npython:\n  image: python:3.9"),
-		},
-	}
+			filepath.Join(childDir, ".tools.yaml"):   []byte("node:\n  image: node:16\npython:\n  image: python:3.9")}}
 	loader := NewConfigLoaderWithFS(mfs)
 
 	t.Run("CDERunConfig Merge", func(t *testing.T) {
@@ -92,9 +87,7 @@ func TestIntegration_Config_Expression_Resolve(t *testing.T) {
 		WD:      "/app",
 		HomeDir: "/home/user",
 		Files: map[string][]byte{
-			"/app/version.txt": []byte(" 1.2.3 \n"),
-		},
-	}
+			"/app/version.txt": []byte(" 1.2.3 \n")}}
 	resolver, err := NewExpressionResolverWithFS(nil, mfs)
 	require.NoError(t, err)
 

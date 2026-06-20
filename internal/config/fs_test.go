@@ -53,8 +53,7 @@ func TestUnit_Config_FS_MockFileSystem(t *testing.T) {
 	// mfs is shared between subtests.
 	mfs := &MockFileSystem{
 		ExecPath: "/bin/cderun",
-		Env:      map[string]string{"K": "V"},
-	}
+		Env:      map[string]string{"K": "V"}}
 
 	t.Run("Executable", func(t *testing.T) {
 		exe, err := mfs.Executable()
@@ -153,8 +152,7 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 		}{
 			{"relative", "dir/file", "/work/dir/file"},
 			{"absolute", "/other/file", "/other/file"},
-			{"dot", ".", "/work"},
-		}
+			{"dot", ".", "/work"}}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				abs, err := mfs.Abs(tt.path)
@@ -167,13 +165,11 @@ func TestUnit_FileSystem_Abs(t *testing.T) {
 	t.Run("ResolvePath propagates Abs error", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			WD:     "/work",
-			AbsErr: assert.AnError,
-		}
+			AbsErr: assert.AnError}
 		// ResolvePath uses fs.Abs when r.HostContext.Level > 0
 		hostCtx := &HostContext{
 			Level:  1,
-			Mounts: []MountMapping{{Source: "/host", Target: "/work", Level: 1}},
-		}
+			Mounts: []MountMapping{{Source: "/host", Target: "/work", Level: 1}}}
 		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 

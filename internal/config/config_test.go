@@ -41,10 +41,8 @@ func TestUnit_Config_LoadCDERun(t *testing.T) {
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{
 				Files: map[string][]byte{"/project/.cderun.yaml": []byte("runtime: docker")},
-				WD:    "/project",
-			},
-			readFileErr: assert.AnError,
-		}
+				WD:    "/project"},
+			readFileErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfig()
 		require.Error(t, err)
@@ -55,8 +53,7 @@ func TestUnit_Config_LoadCDERun(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
 			Dirs:  map[string]bool{"/project": true},
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -72,11 +69,9 @@ defaults:
 `
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/project/.cderun.yaml": []byte(content),
-			},
+				"/project/.cderun.yaml": []byte(content)},
 			Dirs: map[string]bool{"/project": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -90,12 +85,10 @@ defaults:
 	t.Run("found in home dir", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/home/user/.config/cderun/.cderun.yaml": []byte("runtime: podman"),
-			},
+				"/home/user/.config/cderun/.cderun.yaml": []byte("runtime: podman")},
 			Dirs:    map[string]bool{"/project": true},
 			WD:      "/project",
-			HomeDir: "/home/user",
-		}
+			HomeDir: "/home/user"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -108,11 +101,9 @@ defaults:
 	t.Run("found in run dir", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/run/cderun/.cderun.yaml": []byte("defaults:\n  network: host"),
-			},
+				"/run/cderun/.cderun.yaml": []byte("defaults:\n  network: host")},
 			Dirs: map[string]bool{"/project": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -128,15 +119,12 @@ defaults:
 				"/a/b/c": true,
 				"/a/b":   true,
 				"/a":     true,
-				"/":      true,
-			},
+				"/":      true},
 			Files: map[string][]byte{
 				"/a/b/c/.cderun.yaml": []byte(""),
 				"/a/.cderun.yaml":     []byte(""),
-				"/.cderun.yaml":       []byte(""),
-			},
-			WD: "/a/b/c",
-		}
+				"/.cderun.yaml":       []byte("")},
+			WD: "/a/b/c"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		paths := loader.FindConfigs(".cderun.yaml")
 
@@ -144,8 +132,7 @@ defaults:
 		expected := []string{
 			"/a/b/c/.cderun.yaml",
 			"/a/.cderun.yaml",
-			"/.cderun.yaml",
-		}
+			"/.cderun.yaml"}
 		assert.Equal(t, expected, paths)
 	})
 
@@ -154,10 +141,8 @@ defaults:
 			MockFileSystem: MockFileSystem{
 				Files: map[string][]byte{"/a/.cderun.yaml": []byte("")},
 				Dirs:  map[string]bool{"/a": true},
-				WD:    "/a",
-			},
-			absErr: assert.AnError,
-		}
+				WD:    "/a"},
+			absErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		paths := loader.FindConfigs(".cderun.yaml")
 		assert.Contains(t, paths, "/a/.cderun.yaml") // Still included even if Abs fails, using the calculated path
@@ -175,11 +160,9 @@ hostContext:
 `
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/run/cderun/.cderun.yaml": []byte(content),
-			},
+				"/run/cderun/.cderun.yaml": []byte(content)},
 			Dirs: map[string]bool{"/project": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, _, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -197,10 +180,8 @@ func TestUnit_Config_LoadTools(t *testing.T) {
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{
 				Files: map[string][]byte{"/project/.tools.yaml": []byte("node: {image: node}")},
-				WD:    "/project",
-			},
-			readFileErr: assert.AnError,
-		}
+				WD:    "/project"},
+			readFileErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfig()
 		require.Error(t, err)
@@ -215,11 +196,9 @@ node:
 `
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/project/.tools.yaml": []byte(content),
-			},
+				"/project/.tools.yaml": []byte(content)},
 			Dirs: map[string]bool{"/project": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
@@ -259,11 +238,9 @@ defaults:
 `
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/custom/cderun.yaml": []byte(content),
-			},
+				"/custom/cderun.yaml": []byte(content)},
 			Dirs: map[string]bool{"/custom": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		cfg, paths, err := loader.LoadCDERunConfigFromPath("/custom/cderun.yaml")
 		require.NoError(t, err)
@@ -276,8 +253,7 @@ defaults:
 	t.Run("LoadCDERunConfigFromPath - missing", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfigFromPath("/missing.yaml")
 		require.Error(t, err)
@@ -285,8 +261,7 @@ defaults:
 
 	t.Run("LoadCDERunConfigFromPath - expandHome failure", func(t *testing.T) {
 		mfs := &customMockFS{
-			homeDirErr: assert.AnError,
-		}
+			homeDirErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfigFromPath("~/config.yaml")
 		require.Error(t, err)
@@ -294,8 +269,7 @@ defaults:
 
 	t.Run("LoadCDERunConfigFromPath - Abs failure", func(t *testing.T) {
 		mfs := &customMockFS{
-			absErr: assert.AnError,
-		}
+			absErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfigFromPath("/config.yaml")
 		require.Error(t, err)
@@ -305,10 +279,8 @@ defaults:
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{
 				Files: map[string][]byte{"/config.yaml": []byte("foo")},
-				WD:    "/",
-			},
-			readFileErr: assert.AnError,
-		}
+				WD:    "/"},
+			readFileErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfigFromPath("/config.yaml")
 		require.Error(t, err)
@@ -321,11 +293,9 @@ node:
 `
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/custom/tools.yaml": []byte(content),
-			},
+				"/custom/tools.yaml": []byte(content)},
 			Dirs: map[string]bool{"/custom": true},
-			WD:   "/project",
-		}
+			WD:   "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		cfg, paths, err := loader.LoadToolsConfigFromPath("/custom/tools.yaml")
 		require.NoError(t, err)
@@ -337,8 +307,7 @@ node:
 	t.Run("LoadToolsConfigFromPath - missing", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: make(map[string][]byte),
-			WD:    "/project",
-		}
+			WD:    "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("/missing.yaml")
 		require.Error(t, err)
@@ -346,8 +315,7 @@ node:
 
 	t.Run("LoadToolsConfigFromPath - expandHome failure", func(t *testing.T) {
 		mfs := &customMockFS{
-			homeDirErr: assert.AnError,
-		}
+			homeDirErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("~/tools.yaml")
 		require.Error(t, err)
@@ -355,8 +323,7 @@ node:
 
 	t.Run("LoadToolsConfigFromPath - Abs failure", func(t *testing.T) {
 		mfs := &customMockFS{
-			absErr: assert.AnError,
-		}
+			absErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("/tools.yaml")
 		require.Error(t, err)
@@ -366,10 +333,8 @@ node:
 		mfs := &customMockFS{
 			MockFileSystem: MockFileSystem{
 				Files: map[string][]byte{"/tools.yaml": []byte("foo")},
-				WD:    "/",
-			},
-			readFileErr: assert.AnError,
-		}
+				WD:    "/"},
+			readFileErr: assert.AnError}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadToolsConfigFromPath("/tools.yaml")
 		require.Error(t, err)
@@ -380,10 +345,8 @@ func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
 	t.Run("LoadCDERunConfig - malformed YAML", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/project/.cderun.yaml": []byte("invalid: yaml: ["),
-			},
-			WD: "/project",
-		}
+				"/project/.cderun.yaml": []byte("invalid: yaml: [")},
+			WD: "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfig()
 		require.Error(t, err)
@@ -393,10 +356,8 @@ func TestUnit_Config_LoadCDERunErrors(t *testing.T) {
 	t.Run("LoadCDERunConfig - unknown field", func(t *testing.T) {
 		mfs := &MockFileSystem{
 			Files: map[string][]byte{
-				"/project/.cderun.yaml": []byte("unknown_field: true"),
-			},
-			WD: "/project",
-		}
+				"/project/.cderun.yaml": []byte("unknown_field: true")},
+			WD: "/project"}
 		loader := &ConfigLoader{fs: mfs}
 		_, _, err := loader.LoadCDERunConfig()
 		require.Error(t, err)
@@ -412,18 +373,12 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 				MountCderunPath: ConfigPath{Raw: "cderun"},
 				MountSocketPath: ConfigPath{Raw: "socket"},
 				Mounts: []MountConfig{
-					{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
-				},
+					{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}}},
 				Devices: []DeviceConfig{
-					{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
-				},
-			},
+					{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}}}},
 			HostContext: &HostContext{
 				Mounts: []MountMapping{
-					{Source: "./relative"},
-				},
-			},
-		}
+					{Source: "./relative"}}}}
 		err := cfg.SetBaseDir("/base")
 		require.NoError(t, err)
 		assert.Equal(t, "/base", cfg.SocketPath.BaseDir)
@@ -441,12 +396,9 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 			MountCderunPath: ConfigPath{Raw: "cderun"},
 			MountSocketPath: ConfigPath{Raw: "socket"},
 			Mounts: []MountConfig{
-				{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}},
-			},
+				{Source: ConfigPath{Raw: "src"}, Target: ConfigPath{Raw: "dst"}}},
 			Devices: []DeviceConfig{
-				{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}},
-			},
-		}
+				{Source: ConfigPath{Raw: "dev_src"}, Destination: ConfigPath{Raw: "dev_dst"}}}}
 		tc.SetBaseDir("/base")
 		assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
 		assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
@@ -459,9 +411,7 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 	t.Run("CDERunConfig SetBaseDir HostContext resolution", func(t *testing.T) {
 		cfg := &CDERunConfig{
 			HostContext: &HostContext{
-				Mounts: []MountMapping{{Source: "/absolute/path"}},
-			},
-		}
+				Mounts: []MountMapping{{Source: "/absolute/path"}}}}
 		// SetBaseDir calls ResolvePath(..., nil) which uses RealFileSystem.
 		err := cfg.SetBaseDir("/base")
 		require.NoError(t, err)
@@ -578,13 +528,10 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 			Runtime: "docker",
 			Defaults: ConfigDefaults{
 				TTY: &tty,
-				Env: []string{"A=1"},
-			},
+				Env: []string{"A=1"}},
 			HostContext: &HostContext{
 				Level:  1,
-				Mounts: []MountMapping{{Source: "/a", Target: "/b"}},
-			},
-		}
+				Mounts: []MountMapping{{Source: "/a", Target: "/b"}}}}
 
 		cloned := orig.DeepCopy()
 		assertDeepCopyDistinct(t, orig, cloned)
@@ -603,9 +550,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		orig := ToolsConfig{
 			"node": ToolConfig{
 				Image: "node:20",
-				Env:   []string{"NODE_ENV=dev"},
-			},
-		}
+				Env:   []string{"NODE_ENV=dev"}}}
 
 		cloned := orig.DeepCopy()
 		assertDeepCopyDistinct(t, orig, cloned)
@@ -628,8 +573,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 		f := 2.0
 		orig := CDERunConfig{
 			Logging: LoggingConfig{
-				Timestamp: &b,
-			},
+				Timestamp: &b},
 			Defaults: ConfigDefaults{
 				TTY:             &b,
 				Interactive:     &b,
@@ -655,9 +599,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 				Mounts:          []MountConfig{{Type: "bind", Target: ConfigPath{Raw: "/t"}}},
 				Devices:         []DeviceConfig{{Source: ConfigPath{Raw: "/s"}, Destination: ConfigPath{Raw: "/d"}}},
 				MountCderunPath: ConfigPath{Raw: "rcp"},
-				MountSocketPath: ConfigPath{Raw: "rsp"},
-			},
-		}
+				MountSocketPath: ConfigPath{Raw: "rsp"}}}
 
 		cloned := orig.DeepCopy()
 		assert.Equal(t, orig, cloned)
@@ -693,8 +635,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 			Mounts:          []MountConfig{{Type: "bind", Target: ConfigPath{Raw: "/t"}}},
 			Devices:         []DeviceConfig{{Source: ConfigPath{Raw: "/s"}, Destination: ConfigPath{Raw: "/d"}}},
 			MountCderunPath: ConfigPath{Raw: "rcp"},
-			MountSocketPath: ConfigPath{Raw: "rsp"},
-		}
+			MountSocketPath: ConfigPath{Raw: "rsp"}}
 
 		cloned := orig.DeepCopy()
 		assert.Equal(t, orig, cloned)
@@ -709,12 +650,9 @@ func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
 		HomeDir: "/home/user",
 		Dirs: map[string]bool{
 			"/work":      true,
-			"/home/user": true,
-		},
+			"/home/user": true},
 		Files: map[string][]byte{
-			"/work/.cderun.yaml": []byte("runtime: docker"),
-		},
-	}
+			"/work/.cderun.yaml": []byte("runtime: docker")}}
 	loader := NewConfigLoaderWithFS(fs)
 
 	// First call to FindConfigs
@@ -741,8 +679,7 @@ func TestUnit_Config_FindConfigs_Cache(t *testing.T) {
 
 func TestUnit_Config_CachedStat_DoubleCheck(t *testing.T) {
 	fs := &MockFileSystem{
-		Files: map[string][]byte{"/test": []byte("foo")},
-	}
+		Files: map[string][]byte{"/test": []byte("foo")}}
 	loader := NewConfigLoaderWithFS(fs)
 
 	// Access via cachedStat directly

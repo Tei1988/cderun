@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"cderun/internal/config"
-
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,81 +103,6 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 		assert.Equal(t, int64(2*1024*1024*1024), cfg.Memory)
 		assert.InDelta(t, 2.0, cfg.CPUs, 0.0001)
 	})
-}
-
-func TestUnit_Flags_GetStringPointers_Coverage(t *testing.T) {
-	o := &rootOptions{}
-	for _, opt := range config.StringOptions {
-		t.Run(opt.Name, func(t *testing.T) {
-			p2, p1 := getStringPointers(o, opt.Name)
-			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
-			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
-			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
-		})
-	}
-	p2, p1 := getStringPointers(o, "unknown")
-	assert.Nil(t, p2)
-	assert.Nil(t, p1)
-}
-
-func TestUnit_Flags_GetBoolPointers_Coverage(t *testing.T) {
-	o := &rootOptions{}
-	for _, opt := range config.BoolOptions {
-		t.Run(opt.Name, func(t *testing.T) {
-			p2, p1 := getBoolPointers(o, opt.Name)
-			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
-			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
-			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
-		})
-	}
-	p2, p1 := getBoolPointers(o, "unknown")
-	assert.Nil(t, p2)
-	assert.Nil(t, p1)
-}
-
-func TestUnit_Flags_GetIntPointers_Coverage(t *testing.T) {
-	o := &rootOptions{}
-	for _, opt := range config.IntOptions {
-		t.Run(opt.Name, func(t *testing.T) {
-			p2, p1 := getIntPointers(o, opt.Name)
-			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
-			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
-			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
-		})
-	}
-	p2, p1 := getIntPointers(o, "unknown")
-	assert.Nil(t, p2)
-	assert.Nil(t, p1)
-}
-
-func TestUnit_Flags_GetFloat64Pointers_Coverage(t *testing.T) {
-	o := &rootOptions{}
-	for _, opt := range config.Float64Options {
-		t.Run(opt.Name, func(t *testing.T) {
-			p2, p1 := getFloat64Pointers(o, opt.Name)
-			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
-			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
-			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
-		})
-	}
-	p2, p1 := getFloat64Pointers(o, "unknown")
-	assert.Nil(t, p2)
-	assert.Nil(t, p1)
-}
-
-func TestUnit_Flags_GetStringSlicePointers_Coverage(t *testing.T) {
-	o := &rootOptions{}
-	for _, opt := range config.StringSliceOptions {
-		t.Run(opt.Name, func(t *testing.T) {
-			p2, p1 := getStringSlicePointers(o, opt.Name)
-			assert.NotNil(t, p2, "P2 field pointer for %s should not be nil", opt.Name)
-			assert.NotNil(t, p1, "P1 field pointer for %s should not be nil", opt.Name)
-			assert.NotSame(t, p1, p2, "P1 and P2 field pointers for %s should be different", opt.Name)
-		})
-	}
-	p2, p1 := getStringSlicePointers(o, "unknown")
-	assert.Nil(t, p2)
-	assert.Nil(t, p1)
 }
 
 func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {

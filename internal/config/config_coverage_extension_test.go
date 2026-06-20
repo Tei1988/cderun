@@ -12,14 +12,11 @@ func TestUnit_Config_LoadCDERunConfig_FromPath_Hierarchical(t *testing.T) {
 		mfs := &MockFileSystem{
 			Dirs: map[string]bool{
 				"/project":    true,
-				"/etc/cderun": true,
-			},
+				"/etc/cderun": true},
 			Files: map[string][]byte{
 				"/etc/cderun/.cderun.yaml": []byte("runtime: docker\nlogging:\n  level: info"),
-				"/project/.cderun.yaml":    []byte("runtime: podman"),
-			},
-			WD: "/project",
-		}
+				"/project/.cderun.yaml":    []byte("runtime: podman")},
+			WD: "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
@@ -35,14 +32,11 @@ func TestUnit_Config_LoadToolsConfig_FromPath_Merging(t *testing.T) {
 		mfs := &MockFileSystem{
 			Dirs: map[string]bool{
 				"/project":    true,
-				"/etc/cderun": true,
-			},
+				"/etc/cderun": true},
 			Files: map[string][]byte{
 				"/etc/cderun/.tools.yaml": []byte("node:\n  image: node:18\n  tty: true"),
-				"/project/.tools.yaml":    []byte("node:\n  image: node:20"),
-			},
-			WD: "/project",
-		}
+				"/project/.tools.yaml":    []byte("node:\n  image: node:20")},
+			WD: "/project"}
 		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
 		cfg, _, err := loader.LoadToolsConfig()
 		require.NoError(t, err)
