@@ -26,6 +26,10 @@ The following segments (case-insensitive) trigger masking:
 - `ACCESS`
 - `JWT`
 - `SALT`
+- `SIGNATURE`
+- `BEARER`
+- `OTP`
+- `SENSITIVE`
 
 ### Intelligent Segmentation
 
