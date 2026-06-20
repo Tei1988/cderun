@@ -83,6 +83,22 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		assert.Contains(t, err.Error(), "Network \"custom\" is not supported yet")
 	})
 
+	t.Run("publish all unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			PublishAll: true,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
+
+	t.Run("expose unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			Expose: []string{"80"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
+
 	t.Run("port mapping unsupported", func(t *testing.T) {
 		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
 			Ports: []string{"80:80"},

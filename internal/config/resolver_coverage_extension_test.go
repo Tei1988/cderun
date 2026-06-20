@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -757,4 +758,85 @@ func partOfCLIOptionsImage() int {
 		panic("Field 'Image' not found in CLIOptions")
 	}
 	return f.Index[0]
+}
+
+func TestUnit_Config_ReflectionFallback(t *testing.T) {
+	t.Run("applyIntOption reflection", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:             "alpine",
+			ImageSet:          true,
+			PullMaxRetries:    5,
+			PullMaxRetriesSet: true,
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.Equal(t, 5, res.PullMaxRetries)
+	})
+
+	t.Run("applyFloat64Option reflection", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CPUs:     2.5,
+			CPUsSet:  true,
+		}
+		res, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.NoError(t, err)
+		assert.InDelta(t, 2.5, res.CPUs, 1e-9)
+	})
+}
+
+func TestUnit_Config_Resolver_ErrorPaths_Extra(t *testing.T) {
+	t.Run("applyIntOption registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "pull-max-retries", func() {
+			delete(fieldInfo, "pull-max-retries")
+		})
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"pull-max-retries\" not found")
+	})
+
+	t.Run("applyFloat64Option registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "cpus", func() {
+			delete(fieldInfo, "cpus")
+		})
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"cpus\" not found")
+	})
+
+	t.Run("applyStringSliceOption registry mismatch", func(t *testing.T) {
+		withPatchedFieldInfo(t, "dns", func() {
+			delete(fieldInfo, "dns")
+		})
+		cli := &CLIOptions{Image: "alpine", ImageSet: true}
+		_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"dns\" not found")
+	})
+
+	t.Run("applyDurationOption default case mismatch", func(t *testing.T) {
+		// Use a StringOption that is handled by applyDurationOption but not in its switch
+		opt := StringOption{Name: "nonexistent", EnvKey: "NONEXISTENT"}
+		rv := &resolver{
+			cli:    &CLIOptions{},
+			cliVal: reflect.ValueOf(&CLIOptions{}).Elem(),
+		}
+		err := rv.applyDurationOption(opt, new(time.Duration), false)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
+	})
+
+	t.Run("applyMemoryOption registry mismatch", func(t *testing.T) {
+		opt := StringOption{Name: "nonexistent", EnvKey: "NONEXISTENT"}
+		rv := &resolver{
+			cli:    &CLIOptions{},
+			cliVal: reflect.ValueOf(&CLIOptions{}).Elem(),
+		}
+		err := rv.applyMemoryOption(opt, new(int64))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
+	})
 }
