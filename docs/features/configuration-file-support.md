@@ -83,12 +83,10 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 設定ファイルで使用するキー名は、原則としてコマンドラインフラグに対応した**キャメルケース（camelCase）**（例: `socketPath`, `pullMaxRetries`）です。
 
-> **例外**: 以下のフィールドではスネークケース（snake_case）が使用されます：
+> **例外**: `mounts` および `devices` ブロック内のフィールド名は、コンテナエコシステムの慣習（Docker等）との互換性を考慮し、キャメルケースではなく **小文字 (lowercase)** または **スネークケース (snake_case)** が使用されます。
 >
-> - `mounts` 配列内の各要素（`MountConfig`）のフィールド名（例: `read_only`, `optional`）
-> - `devices` 配列内の各要素（`DeviceConfig`）のフィールド名（例: `source`, `destination`）
->
-> これは、一般的なコンテナ設定の慣習や互換性を考慮した例外的な命名規則です。
+> - `mounts`: `type`, `source`, `target`, `read_only`, `optional`
+> - `devices`: `source`, `destination`, `permissions`
 
 ### `.cderun.yaml` (Global Settings)
 
