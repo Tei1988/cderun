@@ -304,18 +304,14 @@ func copyStringSlice(s []string) []string {
 	return res
 }
 
-func expandHome(p string, fs FileSystem) (string, error) {
-	if strings.HasPrefix(p, "~/") || p == "~" {
-		home, err := fs.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
-		}
-		if p == "~" {
-			return home, nil
-		}
-		return filepath.Join(home, p[2:]), nil
+func expandHome(p string, home string) string {
+	if p == "~" {
+		return home
 	}
-	return p, nil
+	if strings.HasPrefix(p, "~/") {
+		return filepath.Join(home, p[2:])
+	}
+	return p
 }
 
 // FileSystem defines the interface for filesystem operations.
@@ -592,11 +588,13 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 // LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
 func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
-	expanded, err := expandHome(path, l.fs)
-	if err != nil {
-		return nil, nil, err
+	if strings.HasPrefix(path, "~") {
+		home, err := l.fs.UserHomeDir()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		path = expandHome(path, home)
 	}
-	path = expanded
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
@@ -622,11 +620,13 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
-	expanded, err := expandHome(path, l.fs)
-	if err != nil {
-		return nil, nil, err
+	if strings.HasPrefix(path, "~") {
+		home, err := l.fs.UserHomeDir()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		path = expandHome(path, home)
 	}
-	path = expanded
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)

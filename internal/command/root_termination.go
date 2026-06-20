@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cderun/internal/config"
@@ -22,7 +23,7 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool,
 	return hangTimeout
 }
 
-func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {
+func (o *rootOptions) signalKillIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {
 	isRunning, exitCode, err := rt.InspectContainer(ctx, containerID)
 	if err != nil {
 		o.logger.Debug("failed to inspect container %s before kill: %v", containerID, err)
@@ -36,10 +37,11 @@ func (o *rootOptions) forceTerminateIfRunning(ctx context.Context, rt runtime.Co
 	}
 
 	o.logger.Debug("Container %s still running, forcing termination", containerID)
-	if err := rt.SignalContainer(context.Background(), containerID, "SIGKILL"); err != nil {
+	if err := rt.SignalContainer(ctx, containerID, "SIGKILL"); err != nil {
 		o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
+		return exitCode, fmt.Errorf("failed to force terminate container: %w", err)
 	}
 
-	// Wait for the kill to take effect
+	// SIGKILL is sent asynchronously. The caller should wait for the container to exit if needed.
 	return exitCode, nil
 }

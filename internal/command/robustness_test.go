@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cderun/internal/logging"
 	"context"
 	"io"
 	"os"
@@ -50,7 +51,7 @@ func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "ls"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
 				o.exitFunc = func(code int) {}
@@ -82,7 +83,7 @@ func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return &waitBlockingMock{
 						blockingMockRuntime: mock,
 						blockWait:           blockWait,
@@ -131,7 +132,7 @@ func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sleep", "60"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return &waitBlockingMock{
 						blockingMockRuntime: mock,
 						blockWait:           blockWait,
@@ -180,7 +181,7 @@ func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 		defer cancel()
 
 		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "false"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {
@@ -291,7 +292,7 @@ func TestRobustness_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "--cderun-hang-timeout=100ms", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {
@@ -330,7 +331,7 @@ func TestRobustness_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "-t", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string) (runtime.ContainerRuntime, error) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
 			o.exitFunc = func(code int) {

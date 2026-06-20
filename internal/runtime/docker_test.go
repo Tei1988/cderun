@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"cderun/internal/container"
+	"cderun/internal/logging"
 
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -46,7 +47,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 		}
 
 		var sleeps []time.Duration
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client: mock,
 			name:   "test",
 			sleepFunc: func(ctx context.Context, d time.Duration) error {
@@ -77,7 +78,7 @@ func TestUnit_Docker_PullImage_Retry(t *testing.T) {
 			return io.NopCloser(strings.NewReader("")), nil
 		}
 
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client:    mock,
 			name:      "test",
 			sleepFunc: noopSleepFunc,
@@ -239,7 +240,7 @@ func (m *mockRetryDockerClient) ImagePull(ctx context.Context, ref string, optio
 func TestUnit_Docker_PullImage(t *testing.T) {
 	t.Run("never policy", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "never", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
@@ -247,7 +248,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 	t.Run("missing policy - exists", func(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: nil}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 0, mock.pullCount)
@@ -255,7 +256,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 	t.Run("missing policy - unexpected error", func(t *testing.T) {
 		mock := &mockDockerClient{imageInspectErr: errors.New("boom")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to inspect image")
@@ -270,7 +271,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			}
 			return image.InspectResponse{}, nil
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
@@ -287,7 +288,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			}
 			return image.InspectResponse{}, errNotFound{errors.New("not found")}
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "missing", 3, 1*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
@@ -296,7 +297,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 	t.Run("non-retryable pull error", func(t *testing.T) {
 		mock := &mockDockerClient{imagePullErr: errors.New("fatal error")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image")
@@ -307,7 +308,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{
 			pullReader: io.NopCloser(strings.NewReader("invalid json")),
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.PullImage(context.Background(), "test", "always", 3, 1*time.Second)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to pull image (stream)")
@@ -317,7 +318,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{
 			imagePullErr: errors.New("toomanyrequests: too many requests"),
 		}
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client:    mock,
 			sleepFunc: noopSleepFunc,
 		}
@@ -330,7 +331,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 
 	t.Run("succeeds after retries", func(t *testing.T) {
 		mock := &mockRetryDockerClient{maxFailures: 2}
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client:    mock,
 			sleepFunc: noopSleepFunc,
 		}
@@ -343,7 +344,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		mock := &mockDockerClient{
 			imagePullErr: errors.New("toomanyrequests"),
 		}
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client: mock,
 			sleepFunc: func(ctx context.Context, d time.Duration) error {
 				return context.Canceled
@@ -366,7 +367,7 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 			return io.NopCloser(strings.NewReader(`{"status":"success"}`)), nil
 		}
 
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client:    mock,
 			name:      "test",
 			sleepFunc: noopSleepFunc,
@@ -384,7 +385,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "created-id"},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		config := &container.ContainerConfig{
 			Image:   "test-image",
@@ -419,7 +420,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 	})
 
 	t.Run("invalid port spec", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Ports: []string{"invalid"},
 		})
@@ -427,7 +428,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 	})
 
 	t.Run("invalid expose port", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Expose: []string{"invalid"},
 		})
@@ -435,14 +436,14 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 	})
 
 	t.Run("nil config", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nil container config")
 	})
 
 	t.Run("invalid mount type", func(t *testing.T) {
-		runtime := &DockerRuntime{client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Mounts: []container.Mount{{Type: "invalid", Source: "/src", Target: "/dst"}},
 		})
@@ -453,7 +454,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {
 	t.Run("interactive sets StdinOnce", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
 			Interactive: true,
 		})
@@ -469,7 +470,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 
 	t.Run("Start", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.StartContainer(ctx, id)
 		require.NoError(t, err)
 		assert.Equal(t, id, mock.startID)
@@ -479,7 +480,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		mock := &mockDockerClient{
 			waitResp: dockercontainer.WaitResponse{StatusCode: 0},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		code, err := runtime.WaitContainer(ctx, id)
 		require.NoError(t, err)
 		assert.Equal(t, 0, code)
@@ -490,14 +491,14 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 		mock := &mockDockerClient{
 			waitErrOut: errors.New("wait error"),
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		_, err := runtime.WaitContainer(ctx, id)
 		require.Error(t, err)
 	})
 
 	t.Run("Remove", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.RemoveContainer(ctx, id)
 		require.NoError(t, err)
 		assert.Equal(t, id, mock.removeID)
@@ -505,7 +506,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 
 	t.Run("Resize", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.ResizeContainerTTY(ctx, id, 24, 80)
 		require.NoError(t, err)
 		assert.Equal(t, id, mock.resizeID)
@@ -515,7 +516,7 @@ func TestUnit_Docker_Lifecycle(t *testing.T) {
 
 	t.Run("Signal", func(t *testing.T) {
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.SignalContainer(ctx, id, "SIGINT")
 		require.NoError(t, err)
 		assert.Equal(t, id, mock.killID)
@@ -549,7 +550,7 @@ func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, stdoutBuf, stderrBuf, nil)
 		require.NoError(t, err)
@@ -560,7 +561,7 @@ func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 
 	t.Run("attach error", func(t *testing.T) {
 		mock := &mockDockerClient{attachErr: errors.New("attach failed")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil, nil)
 		require.Error(t, err)
 	})
@@ -595,7 +596,7 @@ func TestUnit_Docker_Attach(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("output data")),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		stdout := &strings.Builder{}
 		err := runtime.AttachContainer(context.Background(), "test-id", true, nil, stdout, nil, nil)
@@ -612,7 +613,7 @@ func TestUnit_Docker_Attach(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("")),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		stdin := strings.NewReader("input data")
 		err := runtime.AttachContainer(context.Background(), "test-id", true, stdin, nil, nil, nil)
@@ -633,7 +634,7 @@ func TestUnit_Docker_Attach(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
@@ -653,7 +654,7 @@ func TestUnit_Docker_AttachOptions(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("")),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		err := runtime.AttachContainer(context.Background(), "test-id", false, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -671,7 +672,7 @@ func TestUnit_Docker_AttachOptions(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("")),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		stdin := strings.NewReader("input")
 		err := runtime.AttachContainer(context.Background(), "test-id", false, stdin, nil, nil, nil)
@@ -690,7 +691,7 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 			},
 		}
 		// sleepFunc returns error to simulate cancellation
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client: mock,
 			sleepFunc: func(ctx context.Context, d time.Duration) error {
 				return context.Canceled
@@ -712,7 +713,7 @@ func TestUnit_Docker_Attach_SleepCancellation(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("")),
 			},
 		}
-		runtime := &DockerRuntime{
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(),
 			client:    mock,
 			sleepFunc: noopSleepFunc,
 		}
@@ -745,7 +746,7 @@ func TestUnit_Docker_InspectContainer(t *testing.T) {
 				},
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		running, code, err := runtime.InspectContainer(ctx, "id")
 		require.NoError(t, err)
 		assert.True(t, running)
@@ -754,7 +755,7 @@ func TestUnit_Docker_InspectContainer(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		mock := &mockDockerClient{inspectErr: errors.New("inspect failed")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		_, _, err := runtime.InspectContainer(ctx, "id")
 		require.Error(t, err)
 	})
@@ -764,21 +765,21 @@ func TestUnit_Docker_RemoveContainer_Suppression(t *testing.T) {
 	ctx := context.Background()
 	t.Run("suppress not found", func(t *testing.T) {
 		mock := &mockDockerClient{removeErr: errNotFound{errors.New("not found")}}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.RemoveContainer(ctx, "id")
 		require.NoError(t, err)
 	})
 
 	t.Run("suppress conflict", func(t *testing.T) {
 		mock := &mockDockerClient{removeErr: errConflict{errors.New("conflict")}}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.RemoveContainer(ctx, "id")
 		require.NoError(t, err)
 	})
 
 	t.Run("other error", func(t *testing.T) {
 		mock := &mockDockerClient{removeErr: errors.New("boom")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.RemoveContainer(ctx, "id")
 		require.Error(t, err)
 	})
@@ -788,21 +789,21 @@ func TestUnit_Docker_SignalContainer_Suppression(t *testing.T) {
 	ctx := context.Background()
 	t.Run("suppress not found", func(t *testing.T) {
 		mock := &mockDockerClient{killErr: errNotFound{errors.New("not found")}}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
 		require.NoError(t, err)
 	})
 
 	t.Run("suppress conflict", func(t *testing.T) {
 		mock := &mockDockerClient{killErr: errConflict{errors.New("conflict")}}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
 		require.NoError(t, err)
 	})
 
 	t.Run("other error", func(t *testing.T) {
 		mock := &mockDockerClient{killErr: errors.New("boom")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		err := runtime.SignalContainer(ctx, "id", "SIGKILL")
 		require.Error(t, err)
 	})
@@ -846,7 +847,7 @@ func (f *syncFailingReader) Read(p []byte) (n int, err error) {
 func TestUnit_Docker_Attach_Errors(t *testing.T) {
 	t.Run("attach error with ready channel", func(t *testing.T) {
 		mock := &mockDockerClient{attachErr: errors.New("attach failed")}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 		ready := make(chan struct{})
 		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil, ready)
 		require.Error(t, err)
@@ -866,7 +867,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		started := make(chan struct{})
 		ready := make(chan struct{})
@@ -888,7 +889,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(strings.NewReader("some output")),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		// This should not panic and should succeed
 		err := runtime.AttachContainer(context.Background(), "id", true, nil, nil, nil, nil)
@@ -904,7 +905,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		go func() {
 			_ = pw.CloseWithError(errors.New("pipe error"))
@@ -924,7 +925,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		go func() {
 			// Write invalid multiplexed header to trigger stdcopy error
@@ -945,7 +946,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		done := make(chan struct{})
 		ready := make(chan struct{})
@@ -973,7 +974,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		stdin := strings.NewReader("input")
@@ -1002,7 +1003,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{client: mock, sleepFunc: noopSleepFunc}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		stdin := strings.NewReader("input")
 		ready := make(chan struct{})
@@ -1023,7 +1024,7 @@ func TestUnit_Docker_Close(t *testing.T) {
 	t.Run("Close success", func(t *testing.T) {
 		t.Parallel()
 		mock := &mockDockerClient{}
-		runtime := &DockerRuntime{client: mock}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock}
 
 		// First call
 		err := runtime.Close()
@@ -1042,7 +1043,7 @@ func TestUnit_Docker_Close(t *testing.T) {
 		t.Parallel()
 		expectedErr := errors.New("close error")
 		mock := &mockDockerClient{closeErr: expectedErr}
-		runtime := &DockerRuntime{client: mock}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock}
 
 		// First call
 		err := runtime.Close()

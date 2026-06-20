@@ -33,7 +33,7 @@ func TestUnit_Root_Execute_AttachFailure(t *testing.T) {
 			AttachErr: errors.New("attach failed"),
 		}
 		opts := &rootOptions{
-			runtimeFactory: func(name, socket string) (runtime.ContainerRuntime, error) {
+			runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			},
 		}
@@ -58,7 +58,7 @@ func TestUnit_Root_Execute_AttachFailure(t *testing.T) {
 			},
 		}
 		opts := &rootOptions{
-			runtimeFactory: func(name, socket string) (runtime.ContainerRuntime, error) {
+			runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			},
 		}

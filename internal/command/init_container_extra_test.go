@@ -20,7 +20,7 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 
 	t.Run("runtime factory failure", func(t *testing.T) {
 		opts := &rootOptions{
-			runtimeFactory: func(name, socket string) (runtime.ContainerRuntime, error) {
+			runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return nil, errors.New("factory failed")
 			},
 		}
@@ -43,7 +43,7 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 		logger.SetOutput(&logBuf)
 
 		opts := &rootOptions{
-			runtimeFactory: func(name, socket string) (runtime.ContainerRuntime, error) {
+			runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			},
 			logger: logger,

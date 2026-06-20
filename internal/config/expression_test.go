@@ -112,8 +112,6 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		assert.Equal(t, filepath.FromSlash("/project"), val)
 	})
 
-
-
 	t.Run("find_dir not found", func(t *testing.T) {
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
@@ -121,7 +119,6 @@ func TestUnit_Expression_FindDir(t *testing.T) {
 		require.Error(t, r2.Error())
 		assert.Contains(t, r2.Error().Error(), "item not found for find_dir: \"nonexistent\"")
 	})
-
 
 }
 
@@ -459,7 +456,7 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 				filepath.FromSlash("/app/package.json"): []byte(""),
 			},
 			Dirs: map[string]bool{
-				filepath.FromSlash("/app"):      true,
+				filepath.FromSlash("/app"): true,
 			},
 			WD: filepath.FromSlash("/app"),
 		}
@@ -483,7 +480,7 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 				filepath.FromSlash("/app/package.json"): []byte(""),
 			},
 			Dirs: map[string]bool{
-				filepath.FromSlash("/app"):      true,
+				filepath.FromSlash("/app"): true,
 			},
 			WD: filepath.FromSlash("/app"),
 		}

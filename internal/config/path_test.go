@@ -526,8 +526,10 @@ func TestUnit_Path_Resolve_Errors(t *testing.T) {
 		mfs := &customMockFS{
 			homeDirErr: assert.AnError,
 		}
+		// NewExpressionResolverWithFS calls UserHomeDir
 		_, err := NewExpressionResolverWithFS(nil, mfs)
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get user home directory")
 	})
 
 	t.Run("Expression error in ResolvePath", func(t *testing.T) {
@@ -824,7 +826,6 @@ func TestUnit_Config_ValidateUserName(t *testing.T) {
 		})
 	}
 }
-
 
 func TestUnit_Config_ValidateExposePort(t *testing.T) {
 	tests := []struct {
