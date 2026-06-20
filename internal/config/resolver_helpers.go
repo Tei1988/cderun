@@ -219,14 +219,15 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 		}
 
 		var key, val string
-		if k, v, found := strings.Cut(resolvedE, "="); found {
+		k, v, found := strings.Cut(resolvedE, "=")
+		if found {
 			key = k
 			val = v
 			if err := ValidateEnvKey(key); err != nil {
 				return nil, err
 			}
 		} else {
-			v, found := fs.LookupEnv(resolvedE)
+			v, found = fs.LookupEnv(resolvedE)
 			if !found && strict {
 				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
 			}
@@ -239,7 +240,11 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 		}
 
-		res = append(res, key+"="+val)
+		if resolvedE == e && strings.Contains(e, "=") {
+			res = append(res, e)
+		} else {
+			res = append(res, key+"="+val)
+		}
 	}
 	return res, nil
 }

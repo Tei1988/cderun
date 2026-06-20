@@ -107,6 +107,8 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 
 func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	// Not Parallel because it mutates global fieldInfo or global logger level
+	testIgnoreFastPath = true
+	defer func() { testIgnoreFastPath = false }()
 
 	t.Run("registry mismatch for early boolean option", func(t *testing.T) {
 		withPatchedFieldInfo(t, "diagnosis", func() {
