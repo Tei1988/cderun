@@ -41,6 +41,10 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"PASSPHRASE keyword", "SSH_PASSPHRASE", "value", "[REDACTED]"},
 		{"APIKEY keyword", "MY_APIKEY", "value", "[REDACTED]"},
 		{"SESSION keyword", "SESSION_ID", "value", "[REDACTED]"},
+		{"SIGNATURE keyword", "MY_SIGNATURE", "value", "[REDACTED]"},
+		{"BEARER keyword", "BEARER_TOKEN", "value", "[REDACTED]"},
+		{"OTP keyword", "MY_OTP_CODE", "value", "[REDACTED]"},
+		{"SENSITIVE keyword", "SENSITIVE_DATA", "value", "[REDACTED]"},
 	}
 
 	for _, tt := range tests {

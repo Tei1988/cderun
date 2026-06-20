@@ -23,6 +23,10 @@ var sensitiveKeywords = map[string]struct{}{
 	"ACCESS":      {},
 	"JWT":         {},
 	"SALT":        {},
+	"SIGNATURE":   {},
+	"BEARER":      {},
+	"OTP":         {},
+	"SENSITIVE":   {},
 }
 
 // containsIgnoreCase checks if s contains substr (which must be uppercase ASCII letters) case-insensitively.

@@ -139,7 +139,7 @@ func TestUnit_Config_ResolvePath_AnchorBoundary(t *testing.T) {
 		{name: "Unmatched brace anchor (still validated)", input: "{{HOME}} {{/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Inner matched anchor in unmatched outer", input: "{{ PWD {{HOME}}/../../etc/passwd", expectedErr: "path traversal detected"},
 		{name: "Multiple anchors - mixed types (all must be satisfied)", input: "{{HOME}}/{{PWD}}/file", expectedErr: "path traversal detected"}, // HOME is /home/user, PWD is /work. Final is /home/user/work/file. Escapes /work boundary.
-		{name: "Unresolved anchor error", input: "{{unknown:directive}}/file", expectedErr: "unresolved expression in anchor"},
+		{name: "Unresolved anchor error", input: "{{unknown:directive}}/file", expectedErr: "unknown directive or magic word"},
 		{name: "Empty anchor error", input: "{{env:UNSET}}/file", expectedErr: "anchor path is empty"},
 	}
 
@@ -185,6 +185,9 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 		{"Port with control char", "80\n", true},
 		{"Too many colons", "127.0.0.1:80:80:80", true},
 		{"Invalid IP", "999.999.999.999:80:80", true},
+		{"Shell metacharacter ;", "80;rm", true},
+		{"Shell metacharacter |", "80|ls", true},
+		{"Shell metacharacter &", "80&", true},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +214,7 @@ func TestUnit_Config_ValidateDNS(t *testing.T) {
 		{"Invalid IP", "8.8.8.256", true},
 		{"Hostname", "google.com", true},
 		{"Injection attempt", "8.8.8.8; rm -rf /", true},
+		{"Control char", "8.8.8.8\t", true},
 	}
 
 	for _, tt := range tests {
@@ -238,6 +242,7 @@ func TestUnit_Config_ValidateAddHost(t *testing.T) {
 		{"Invalid IP", "myhost:999.999.999.999", true},
 		{"Invalid Hostname", "my_host:127.0.0.1", true},
 		{"Injection attempt", "myhost:127.0.0.1; rm -rf /", true},
+		{"Control char", "myhost:127.0.0.1\n", true},
 	}
 
 	for _, tt := range tests {
@@ -264,6 +269,7 @@ func TestUnit_Config_ValidateCapability(t *testing.T) {
 		{"Lowercase", "sys_admin", true},
 		{"Injection attempt", "SYS_ADMIN; rm -rf /", true},
 		{"Space", "SYS ADMIN", true},
+		{"Control char", "SYS_ADMIN\r", true},
 	}
 
 	for _, tt := range tests {
