@@ -247,12 +247,22 @@ func (r *ExpressionResolver) resolveString(s string) string {
 						sb.WriteString(s[rng.start:rng.end])
 					} else {
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
-						// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
-						resolvedContent := content
-						if strings.Contains(content, "{{") {
-							resolvedContent = r.resolveString(content)
+
+						var res string
+						var err error
+
+						// Escape mechanism: {{{{...}}}} -> {{...}}
+						if strings.HasPrefix(content, "{{") && strings.HasSuffix(content, "}}") {
+							res = content
+						} else {
+							// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
+							resolvedContent := content
+							if strings.Contains(content, "{{") {
+								resolvedContent = r.resolveString(content)
+							}
+							res, err = r.resolveDirective(resolvedContent)
 						}
-						res, err := r.resolveDirective(resolvedContent)
+
 						if err != nil {
 							r.setError(err)
 							sb.WriteString(s[rng.start:rng.end])
@@ -319,7 +329,21 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 		return r.resolveEnv(after)
 	}
 
-	return "{{" + content + "}}", nil // Keep as is if unknown
+	// Strict resolution (T11): error on unknown directives or magic words.
+	// Heuristic: ALL_UPPER (magic word style) or contains ":" (directive style).
+	isMagicWordCandidate := len(content) > 0
+	for i := 0; i < len(content); i++ {
+		c := content[i]
+		if (c < 'A' || c > 'Z') && c != '_' && (c < '0' || c > '9') {
+			isMagicWordCandidate = false
+			break
+		}
+	}
+	if isMagicWordCandidate || strings.Contains(content, ":") {
+		return "", fmt.Errorf("unknown directive or magic word: %q", content)
+	}
+
+	return "{{" + content + "}}", nil // Keep as is if it doesn't look like a directive
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {

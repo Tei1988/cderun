@@ -756,6 +756,9 @@ func ValidatePort(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 
 	proto := ""
 	remainder := s
@@ -810,6 +813,9 @@ func ValidateDNS(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	if net.ParseIP(s) == nil {
 		return fmt.Errorf("invalid DNS IP: %q", s)
 	}
@@ -820,6 +826,9 @@ func ValidateDNS(s string) error {
 func ValidateAddHost(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
@@ -838,6 +847,9 @@ func ValidateAddHost(s string) error {
 func ValidateCapability(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if !capRegex.MatchString(s) {
 		return fmt.Errorf("invalid Linux capability: %q", s)
@@ -865,6 +877,9 @@ func ValidateWorkdir(s string) error {
 func ValidateExposePort(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	// Format: port[-port][/protocol]
 	proto := ""
