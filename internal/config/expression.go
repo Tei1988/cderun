@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -53,25 +52,23 @@ func scanAnchors(s string) []anchorRange {
 		return nil
 	}
 
-	// Sort pairs by start (ascending) and end (descending).
-	// This allows us to identify top-level (outermost) ranges in a single pass.
-	sort.Slice(allPairs, func(i, j int) bool {
-		if allPairs[i].start != allPairs[j].start {
-			return allPairs[i].start < allPairs[j].start
-		}
-		return allPairs[i].end > allPairs[j].end
-	})
-
+	// Since allPairs are collected in order of their closing braces, we can
+	// identify top-level (outermost) ranges in a single backward pass.
 	var res []anchorRange
-	lastEnd := -1
-	for _, p := range allPairs {
-		// Since we sorted by start ascending and end descending,
-		// the first pair starting at or after lastEnd will be the outermost one.
-		if p.start >= lastEnd {
+	lastStart := len(s) + 1
+	for i := len(allPairs) - 1; i >= 0; i-- {
+		p := allPairs[i]
+		if p.end <= lastStart {
 			res = append(res, p)
-			lastEnd = p.end
+			lastStart = p.start
 		}
 	}
+
+	// Reverse to maintain original order
+	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
+		res[i], res[j] = res[j], res[i]
+	}
+
 	return res
 }
 
@@ -217,9 +214,10 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	}
 
 	hasExpr := strings.Contains(s, "{{")
+	hasTilde := strings.HasPrefix(s, "~")
 
 	// Fast-path: no expressions and no tilde expansion
-	if !hasExpr && !strings.HasPrefix(s, "~") {
+	if !hasExpr && !hasTilde {
 		return s
 	}
 
@@ -250,7 +248,10 @@ func (r *ExpressionResolver) resolveString(s string) string {
 					} else {
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
 						// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
-						resolvedContent := r.resolveString(content)
+						resolvedContent := content
+						if strings.Contains(content, "{{") {
+							resolvedContent = r.resolveString(content)
+						}
 						res, err := r.resolveDirective(resolvedContent)
 						if err != nil {
 							r.setError(err)
@@ -273,12 +274,14 @@ func (r *ExpressionResolver) resolveString(s string) string {
 
 	// 2. Expand ~ if it's at the beginning
 	if strings.HasPrefix(resolved, "~") {
-		expanded, err := expandHome(resolved, r.fs)
-		if err != nil {
-			r.setError(err)
-			return resolved
+		if resolved == "~" {
+			return r.Home
 		}
-		return expanded
+		if strings.HasPrefix(resolved, "~/") {
+			return filepath.Join(r.Home, resolved[2:])
+		}
+		// Fallback for cases like ~user (though not explicitly supported as primary feature)
+		return expandHome(resolved, r.Home)
 	}
 
 	return resolved

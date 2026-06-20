@@ -110,17 +110,15 @@ func TestUnit_ExpressionResolver_ResolveString_Coverage(t *testing.T) {
 		assert.Equal(t, "{{HOME}}", r.resolveString("{{HOME}}"))
 	})
 
-	t.Run("expandHome error", func(t *testing.T) {
-		mfs := &MockFileSystem{
+	t.Run("expandHome direct", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, &MockFileSystem{
 			HomeDir: "/home/user",
-		}
-		r, err := NewExpressionResolverWithFS(nil, mfs)
+			WD:      "/work",
+		})
 		require.NoError(t, err)
 
-		mfs.HomeDirErr = assert.AnError
-		res := r.resolveString("~/path")
-		assert.Equal(t, "~/path", res)
-		assert.Error(t, r.err)
+		assert.Equal(t, "/home/user/path", r.resolveString("~/path"))
+		assert.Equal(t, "/home/user", r.resolveString("~"))
 	})
 
 	t.Run("magic words exhaustive", func(t *testing.T) {
