@@ -270,13 +270,44 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		assert.Contains(t, r.Error().Error(), "are not allowed")
 	})
 
-	t.Run("invalid directive", func(t *testing.T) {
+	t.Run("invalid directive (strict resolution)", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
-		val := r.resolveString("{{ unknown:value }}")
+		r.resolveString("{{ unknown:value }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "unknown directive or magic word: \"unknown:value\"")
+	})
+
+	t.Run("typo in magic word (strict resolution)", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		r.resolveString("{{ HOM }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "unknown directive or magic word: \"HOM\"")
+	})
+
+	t.Run("escaping with double braces", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ {{LITERAL}} }}")
 		require.NoError(t, r.Error())
-		// Unknown directive is returned as is (but trimmed)
-		assert.Equal(t, "{{unknown:value}}", val)
+		assert.Equal(t, "{{LITERAL}}", val)
+	})
+
+	t.Run("escaping magic word", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ {{HOME}} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{HOME}}", val)
+	})
+
+	t.Run("keep literal if not directive style", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ foo }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "{{foo}}", val)
 	})
 
 	t.Run("unclosed expression", func(t *testing.T) {
