@@ -57,6 +57,7 @@ cderun -ti bash  # 短縮形
 - **環境変数**: `CDERUN_NETWORK`
 - **説明**: コンテナを接続するネットワーク
 - **値**: `bridge`, `host`, `none`, カスタムネットワーク名
+- **注意**: `containerd` ランタイム使用時は、現在は `host` ネットワークのみをサポートしています。
 
 ```bash
 cderun --network host node server.js
@@ -250,7 +251,8 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **型**: string
 - **デフォルト**: `docker`
 - **環境変数**: `CDERUN_RUNTIME`
-- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman`）
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）
+- **注意**: `containerd` ランタイムは実験的（Experimental）であり、現時点ではネットワーク設定などの一部機能に制限があります。
 
 ```bash
 cderun --runtime podman node app.js
@@ -274,6 +276,7 @@ cderun --remove=false node app.js  # コンテナを残す
 - **説明**: ポートマッピング（ホストポート:コンテナポート）
 - **用途**: コンテナのポートをホストに公開
 - **補足**:
+  - `containerd` ランタイム使用時は、現在はポートマッピングをサポートしていません。
   - CLIフラグ（P1/P2）では、複数のポートを指定する場合、フラグを繰り返す必要があります。
   - 環境変数 `CDERUN_PUBLISH` (P3) では、カンマ (`,`) をセパレータとして使用します。
   - P1/P2/P3 のいずれかで**明示的に空のリスト**（YAMLでの `[]` や環境変数での空文字列）を指定した場合、それは意図的な「空の設定」とみなされ、下位レベルの設定を上書き（無効化）します。
