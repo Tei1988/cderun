@@ -51,9 +51,9 @@ cderunの内部では、文字列だけでなく、スライス（配列）や�
 | 指定されたパス | 解決後の絶対パス | 判定 | 理由 |
 | :--- | :--- | :--- | :--- |
 | `{{HOME}}/work/file` | `/home/user/work/file` | **PASS** | 全アンカーの境界内 |
-| `{{PWD}}/../config` | `/home/user/config` | **PASS** | `/home/user` (HOME) の境界内。かつ、`/home/user/work` (PWD) の境界を越えていない（PWD自身もHOMEの内側であるため） |
+| `{{PWD}}/../config` | `/home/user/config` | **FAIL** | `{{PWD}}`（起点 `/home/user/work`）の境界を越えているためエラー（全アンカーの境界条件を満たす必要がある） |
 | `{{PWD}}/../../other` | `/home/other` | **FAIL** | 両方の境界（HOMEとPWD）を脱出 |
-| `{{HOME}}/{{PWD}}/file` | `/home/user/home/user/work/file` | **FAIL** | `{{PWD}}` (起点 `/home/user/work`) の境界条件を `/home/user/home...` は満たさない |
+| `{{HOME}}/{{PWD}}/file` | `/home/user/home/user/work/file` | **FAIL** | `{{PWD}}`（起点 `/home/user/work`）の境界条件を満たさない |
 
 ### 複数アンカーの取り扱い (Handling Multiple Anchors)
 
