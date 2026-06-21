@@ -5,6 +5,7 @@ import (
 
 	"cderun/internal/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Containerd_WithContainerdLogger(t *testing.T) {
@@ -18,7 +19,7 @@ func TestUnit_Containerd_WithContainerdLogger(t *testing.T) {
 func TestUnit_Containerd_NewContainerdRuntime_Error(t *testing.T) {
 	// Empty socket should cause an error in client.New
 	_, err := NewContainerdRuntime("")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to connect to containerd")
 }
 

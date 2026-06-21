@@ -7,6 +7,7 @@ import (
 
 	"cderun/internal/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnitDockerRetryablePullErrorExhaustive(t *testing.T) {
@@ -51,7 +52,7 @@ func TestUnit_Docker_Options(t *testing.T) {
 func TestUnit_Docker_NewDockerRuntimeWithOptions_Error(t *testing.T) {
 	t.Run("empty socket path", func(t *testing.T) {
 		_, err := NewDockerRuntimeWithOptions("", "docker", nil)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty socket path")
 	})
 }
