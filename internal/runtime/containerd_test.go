@@ -91,6 +91,22 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port mapping is not supported yet")
 	})
+
+	t.Run("publish all unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			PublishAll: true,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
+
+	t.Run("expose unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			Expose: []string{"80"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
 }
 
 func TestUnit_Runtime_Common_IsRetryablePullError(t *testing.T) {
