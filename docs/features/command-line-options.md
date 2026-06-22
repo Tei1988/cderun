@@ -55,7 +55,7 @@ cderun -ti bash  # 短縮形
 - **型**: string
 - **デフォルト**: `bridge`
 - **環境変数**: `CDERUN_NETWORK`
-- **説明**: コンテナを接続するネットワーク
+- **説明**: コンテナを接続するネットワーク。**注意**: `containerd` ランタイムは現在 `host` ネットワークのみをサポートしています。
 - **値**: `bridge`, `host`, `none`, カスタムネットワーク名
 
 ```bash
@@ -250,7 +250,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **型**: string
 - **デフォルト**: `docker`
 - **環境変数**: `CDERUN_RUNTIME`
-- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman`）
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）。**注意**: `containerd` は現在実験的なサポートです。
 
 ```bash
 cderun --runtime podman node app.js

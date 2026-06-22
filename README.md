@@ -76,9 +76,9 @@ cderun --tty docker --tty
   +---------------------- cderun command
 ```
 
-### P1 Internal Overrides
+### P1 Internal Overrides (Advanced Configuration)
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy.
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy, allowing you to override any configuration (from YAML or environment variables) directly from the command line.
 
 | Priority | Level | Source | Description |
 | :--- | :--- | :--- | :--- |
@@ -99,9 +99,11 @@ cderun node app.js --cderun-image node:20-alpine
 cderun --cderun-image node:20-alpine node app.js
 ```
 
-#### Hoisting Mechanics
+#### Why P1 Overrides?
 
-Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
+The primary purpose of P1 overrides is to avoid flag collisions. When you wrap a tool like `node` or `docker`, those tools have their own flags (e.g., `--env`, `--tty`). P1 overrides allow you to configure `cderun` (e.g., `--cderun-tty`) without worrying about whether the wrapped tool also uses a flag with the same name.
+
+#### Hoisting Mechanics
 
 1. **Detection**: `cderun` scans for the **subcommand** boundary.
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
@@ -131,7 +133,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 
 #### Network & Ports
 
-- `--network`: Connect a container to a network. (Default: `bridge`)
+- `--network`: Connect a container to a network. (Default: `bridge`) Note: `containerd` runtime only supports `host` network.
 - `--hostname`: Container host name.
 - `--publish`, `-p`: Publish a container's port(s) to the host.
 - `--publish-all`, `-P`: Publish all exposed ports to random ports. (Default: `false`)
@@ -163,7 +165,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--runtime`: Container runtime to use (`docker`/`podman`).
+- `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`). Note: `containerd` is experimental.
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -244,8 +246,10 @@ python:
 
 ### Multi-Runtime Support & Auto-detection
 
-`cderun` supports both **Docker** and **Podman**. It can automatically detect
-the available runtime by checking for common Unix socket paths.
+`cderun` supports **Docker**, **Podman**, and **containerd** (experimental).
+It can automatically detect the available runtime by checking for common Unix socket paths.
+Note that the `containerd` runtime is currently experimental and only supports
+`host` network mode.
 
 ### Intelligent Argument Parsing
 
@@ -274,7 +278,7 @@ the available runtime by checking for common Unix socket paths.
 
 ### Sensitive Data Masking
 
-`cderun` protects your secrets. Environment variables containing sensitive keywords (like `PASSWORD`, `SECRET`, `TOKEN`, `JWT`) are automatically masked (`[REDACTED]`) in:
+`cderun` protects your secrets. Environment variables containing sensitive keywords (like `PASSWORD`, `SECRET`, `TOKEN`, `JWT`, `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE`) are automatically masked (`[REDACTED]`) in:
 
 - Dry-run output (`--dry-run`)
 - Debug logs (`--log-level debug`)
@@ -294,6 +298,8 @@ cderun dynamically resolves values in both configuration files and CLI flags.
 - **Tilde Expansion**: `~` and `~/` paths at the beginning of a string are expanded to the user's home directory.
 - **Relative Path Handling**: Paths like `./src` are resolved to absolute paths based on the context (e.g., the directory containing the `.tools.yaml` file).
 - **Security**: All resolved paths undergo **Anchor Boundary Validation** to prevent directory traversal. Paths cannot escape their defined anchor (like `{{HOME}}` or `{{PWD}}`).
+- **Strict Resolution**: To prevent typos (e.g., `{{HOM}}`), any expression that looks like a magic word (ALL_UPPER) or a directive (contains `:`) but is not recognized will result in an immediate error.
+- **Sticky Errors**: If any resolution error occurs (e.g., security violation or missing file), the resolver enters a "Sticky Error" state, halting further resolution to ensure system safety.
 
 See [Value Resolution](docs/features/value-resolution.md) for detailed specifications and security constraints.
 
