@@ -474,6 +474,7 @@ cderun --tool-config ~/tools-config.yaml node app.js
 - **型**: bool
 - **デフォルト**: `false`
 - **環境変数**: `CDERUN_DRY_RUN`
+- **設定ファイル**: `dryRun`
 - **説明**: 実際のコンテナ実行を行わずに、コンテナ構成を表示する
 
 ```bash
@@ -485,6 +486,7 @@ cderun --dry-run node --version
 - **型**: string
 - **デフォルト**: `yaml`
 - **環境変数**: `CDERUN_DRY_RUN_FORMAT`
+- **設定ファイル**: `dryRunFormat`
 - **説明**: ドライラン時の出力形式を指定
 - **値**: `yaml`, `json`, `simple`
 
@@ -498,6 +500,7 @@ cderun --dry-run -f simple node --version
 - **型**: bool
 - **デフォルト**: `false`
 - **環境変数**: `CDERUN_DIAGNOSIS`
+- **設定ファイル**: `diagnosis`
 - **説明**: システム診断情報と利用可能なツールの一覧を表示する。このモードはサブコマンドの指定を必要としません。
 
 ```bash
@@ -509,6 +512,7 @@ cderun --diagnosis
 - **型**: string
 - **デフォルト**: `yaml`
 - **環境変数**: `CDERUN_DIAGNOSIS_FORMAT`
+- **設定ファイル**: `diagnosisFormat`
 - **説明**: 診断情報の出力形式を指定
 - **値**: `yaml`, `json`, `simple`
 
