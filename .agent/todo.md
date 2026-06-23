@@ -21,7 +21,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
-| T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
@@ -259,33 +258,6 @@ return "", fmt.Errorf("unknown directive: %q", content)
 
 ---
 
-## T12: `IsRetryablePullError` を型付きエラー判定に移行
-
-- 種別: 改善（堅牢性）
-- 対象: `internal/runtime/common.go:12-52`
-
-### 問題
-
-エラーメッセージの文字列でリトライ可否を判定しており、ライブラリ側のメッセージ変更で気づかず壊れるリスクがある。また `"no such host"` は DNS 解決失敗（≒ほぼ設定ミス）であり一時的なエラーではないため、リトライするとユーザーが原因究明に詰まる。
-
-### 方針
-
-- `errdefs` の型付きエラー（`IsUnavailable`、`IsDeadlineExceeded` 等）を優先的に使う（`common.go:18-25` で既に部分使用済み）
-- string マッチングは最小限に絞り、`"no such host"` は対象から外す
-- HTTP ステータスコードで判定できるケース（429 Rate Limit、503 Unavailable）はそちらを使う
-
-### 型付き判定の追加材料
-
-- `"no such host"` は `*net.DNSError` として `errors.As` で取れる。`IsNotFound` フィールドで「ドメイン不存在 = 設定ミス」と「DNS サーバ不達 = 一時障害」を区別できるので、全部リトライ外しではなく後者だけ残す選択肢もある
-- `"toomanyrequests"` はレジストリの errcode（`TOOMANYREQUESTS`）由来なので docker/distribution の errcode 型でマッチ可能
-- `"i/o timeout"` 系は `net.Error` の `Timeout()` で取れる
-
-### 完了条件
-
-- string マッチが型付き判定に置き換わっている（残す場合は理由をコメントで明記）
-- 「リトライすべき/すべきでない」の代表ケースについてテーブルドリブンテストがある
-
----
 
 ## T14: `Phase N` コメントの整理
 
