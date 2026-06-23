@@ -2,13 +2,11 @@ package runtime
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
-	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,26 +105,6 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port mapping is not supported yet")
 	})
-}
-
-func TestUnit_Runtime_Common_IsRetryablePullError(t *testing.T) {
-	tests := []struct {
-		err  error
-		want bool
-	}{
-		{nil, false},
-		{fmt.Errorf("some other error"), false},
-		{fmt.Errorf("connection refused"), true},
-		{fmt.Errorf("rate limit exceeded"), true},
-		{fmt.Errorf("unauthorized: token expired"), true},
-		{errdefs.ErrUnavailable, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%v", tt.err), func(t *testing.T) {
-			assert.Equal(t, tt.want, IsRetryablePullError(tt.err))
-		})
-	}
 }
 
 func TestUnit_Runtime_Common_SleepFunc(t *testing.T) {

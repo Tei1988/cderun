@@ -63,6 +63,30 @@ func TestUnit_PreprocessArgs_EdgeCases(t *testing.T) {
 			args:     []string{"cderun", "--log-level=info", "ls"},
 			want:     []string{"cderun", "--log-level=info", "ls"},
 		},
+		{
+			name:     "Empty arguments",
+			execName: "cderun",
+			args:     []string{},
+			want:     []string{},
+		},
+		{
+			name:     "Standard mode - multiple P1 flags hoisted",
+			execName: "cderun",
+			args:     []string{"cderun", "ls", "--cderun-log-level", "debug", "--cderun-image", "alpine"},
+			want:     []string{"cderun", "--cderun-log-level", "debug", "--cderun-image", "alpine", "ls"},
+		},
+		{
+			name:     "Standard mode - P1 flag with equals syntax hoisted",
+			execName: "cderun",
+			args:     []string{"cderun", "ls", "--cderun-image=alpine"},
+			want:     []string{"cderun", "--cderun-image=alpine", "ls"},
+		},
+		{
+			name:     "Standard mode - P1 flag as last argument without value",
+			execName: "cderun",
+			args:     []string{"cderun", "ls", "--cderun-image"},
+			want:     []string{"cderun", "--cderun-image", "ls"},
+		},
 	}
 
 	for _, tt := range tests {
