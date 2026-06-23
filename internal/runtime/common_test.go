@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsRetryablePullError(t *testing.T) {
+func TestUnit_IsRetryablePullError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -50,7 +50,7 @@ func TestIsRetryablePullError(t *testing.T) {
 	}
 }
 
-func TestIsTemporaryAuthError(t *testing.T) {
+func TestUnit_IsTemporaryAuthError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -69,24 +69,22 @@ func TestIsTemporaryAuthError(t *testing.T) {
 	}
 }
 
-func TestSleepFunc(t *testing.T) {
-	t.Run("sleep completes", func(t *testing.T) {
-		start := time.Now()
-		err := SleepFunc(context.Background(), 10*time.Millisecond)
-		require.NoError(t, err)
-		assert.True(t, time.Since(start) >= 10*time.Millisecond)
-	})
+func TestUnit_Sleep_Completes(t *testing.T) {
+	start := time.Now()
+	err := SleepFunc(context.Background(), 10*time.Millisecond)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, time.Since(start), 10*time.Millisecond)
+}
 
-	t.Run("sleep canceled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			time.Sleep(5 * time.Millisecond)
-			cancel()
-		}()
-		err := SleepFunc(ctx, 100*time.Millisecond)
-		require.Error(t, err)
-		assert.Equal(t, context.Canceled, err)
-	})
+func TestUnit_Sleep_Canceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		cancel()
+	}()
+	err := SleepFunc(ctx, 100*time.Millisecond)
+	require.Error(t, err)
+	assert.Equal(t, context.Canceled, err)
 }
 
 type timeoutError struct{}
