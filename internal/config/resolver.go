@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -1218,6 +1219,13 @@ func (rv *resolver) validateSlices() error {
 		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
 		{"cap-add", rv.res.CapAdd, ValidateCapability},
 		{"cap-drop", rv.res.CapDrop, ValidateCapability},
+		{"sensitive-env", rv.res.SensitiveEnv, func(s string) error {
+			_, err := path.Match(s, "TEST")
+			if err != nil {
+				return fmt.Errorf("invalid glob pattern: %w", err)
+			}
+			return nil
+		}},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {

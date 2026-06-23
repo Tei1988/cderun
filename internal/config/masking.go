@@ -6,24 +6,24 @@ import (
 )
 
 // MaskSensitiveEnv redacts sensitive environment variables based on key names and provided patterns.
-// If patterns is nil, ALL environment variables are masked.
-// If patterns is non-nil (including empty slice), only keys matching the patterns are masked.
+// If patterns is nil or empty, no environment variables are masked.
+// If patterns is non-nil, only keys matching the patterns are masked.
 func MaskSensitiveEnv(key, value string, patterns []string) string {
-	if value == "" {
-		return ""
+	if value == "" || len(patterns) == 0 {
+		return value
 	}
 
-	// Case 1: patterns is nil (Unset) -> Mask everything
-	if patterns == nil {
-		return "[REDACTED]"
-	}
-
-	// Case 2: patterns is non-nil -> Mask only matching keys
+	// Case: patterns is non-nil -> Mask only matching keys
 	// Matching is case-insensitive for patterns and keys.
 	upperKey := strings.ToUpper(key)
 	for _, p := range patterns {
 		upperPattern := strings.ToUpper(p)
-		if matched, _ := path.Match(upperPattern, upperKey); matched {
+		matched, err := path.Match(upperPattern, upperKey)
+		if err != nil {
+			// Fail-closed: if the pattern is invalid, we redact to be safe.
+			return "[REDACTED]"
+		}
+		if matched {
 			return "[REDACTED]"
 		}
 	}

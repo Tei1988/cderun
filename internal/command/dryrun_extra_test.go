@@ -23,7 +23,6 @@ func TestUnit_Root_DryRun_SimpleFormat_ExtraExhaustive(t *testing.T) {
 	assert.Contains(t, output, "Workdir: /app")
 	assert.Contains(t, output, "User: nobody")
 	assert.Contains(t, output, "PublishAll: true")
-	// Note: env is masked as [REDACTED] by default because sensitive-env is unset.
-	assert.Contains(t, output, "Env: \"FOO\"=\"[REDACTED]\"")
+	assert.Contains(t, output, "Env: \"FOO\"=\"BAR\"")
 	assert.Contains(t, output, "Mounts: type=bind,source=\"/host\",target=\"/cont\",readonly=true")
 }

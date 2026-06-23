@@ -407,7 +407,7 @@ cderun --prefetch node,go      # 指定ツールのイメージのみ取得し�
 
 1. pull ポリシーとの整合 — prefetch は `missing` 相当で良いか、`--pull always` 併用で強制再取得を許すか
 2. **exit code** — 1 つでもイメージ取得に失敗したら非 0 で終了する（オフライン持ち込み前の検証としてはこれが重要）
-3. 既存ের `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
+3. 既存の `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
 4. オフライン用途では tag が動く（`latest` 等）と持ち込み後に意図と違うイメージになるため、`--diagnosis` 等で digest を表示できると再現性の確認に役立つ
 
 ### 完了条件

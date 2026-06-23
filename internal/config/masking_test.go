@@ -13,8 +13,8 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		patterns []string
 		expected string
 	}{
-		{"Unset patterns (mask all) - safe", "SAFE_VAR", "value", nil, "[REDACTED]"},
-		{"Unset patterns (mask all) - secret", "MY_PASSWORD", "secret", nil, "[REDACTED]"},
+		{"Unset patterns (mask none) - safe", "SAFE_VAR", "value", nil, "value"},
+		{"Unset patterns (mask none) - secret", "MY_PASSWORD", "secret", nil, "secret"},
 		{"Empty patterns (mask none) - safe", "SAFE_VAR", "value", []string{}, "value"},
 		{"Empty patterns (mask none) - secret", "MY_PASSWORD", "secret", []string{}, "secret"},
 		{"Exact match", "MY_PASSWORD", "secret", []string{"MY_PASSWORD"}, "[REDACTED]"},
@@ -24,6 +24,7 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Glob match middle", "MY_PASSWORD_VAR", "secret", []string{"*_PASSWORD_*"}, "[REDACTED]"},
 		{"No match", "SAFE_VAR", "value", []string{"*_PASSWORD"}, "value"},
 		{"Empty value", "EMPTY_SECRET", "", []string{"*"}, ""},
+		{"Invalid glob pattern (fail-closed)", "SECRET", "value", []string{"["}, "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
@@ -38,8 +39,8 @@ func TestMaskSensitiveEnvList(t *testing.T) {
 	env := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
 	orig := append([]string(nil), env...)
 
-	t.Run("Mask all", func(t *testing.T) {
-		expected := []string{"SAFE=[REDACTED]", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
+	t.Run("Mask none by default", func(t *testing.T) {
+		expected := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
 		got := MaskSensitiveEnvList(env, nil)
 		assert.Equal(t, expected, got)
 	})
