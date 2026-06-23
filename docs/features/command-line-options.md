@@ -163,6 +163,7 @@ cderun --mount-all-tools alpine sh
 - **注意**:
   - アドホック実行（設定にないツール名の指定）時には必須となります。
   - `{{env:KEY}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
+  - **重要**: `--image` フラグで指定されたイメージが、`.tools.yaml` で定義されているツールの公式イメージ（Registry）と異なる場合、セキュリティ上の理由からエラーとなります。
 
 ```bash
 cderun --image node:18-alpine node --version
@@ -451,6 +452,7 @@ cderun --device /dev/fuse alpine ls /dev/fuse
 - **環境変数**: `CDERUN_CONFIG`
 - **説明**: cderun自体の設定ファイル（`.cderun.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます。
 - **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+- **注意**: 設定ファイル内（`.cderun.yaml`, `.tools.yaml`）でこのオプションを指定することはできません。
 
 ```bash
 cderun --config my-cderun.yaml node app.js
@@ -463,6 +465,7 @@ cderun --config ~/.config/cderun/custom.yaml node app.js
 - **環境変数**: `CDERUN_TOOL_CONFIG`
 - **説明**: ツール実行設定ファイル（`.tools.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます。
 - **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+- **注意**: 設定ファイル内（`.cderun.yaml`, `.tools.yaml`）でこのオプションを指定することはできません。
 
 ```bash
 cderun --tool-config my-tools.yaml node app.js

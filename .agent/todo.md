@@ -20,7 +20,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
 | T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
-| T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
@@ -225,38 +224,6 @@ stdout が先に終了した場合、stdin エラーは `stdinDone` がすでに
 
 ---
 
-## T11: 未知の `{{...}}` ディレクティブをエラーにする
-
-- 種別: 挙動変更
-- 対象: `internal/config/expression.go:270`
-- 仕様変更: あり → `docs/features/value-resolution.md` の更新必須
-
-### 問題
-
-`{{HOM}}` のようなタイポでも無音で文字列がそのまま通り、コンテナに `{{HOM}}` を含むパスが渡ってしまう。
-
-```go
-// 現状（expression.go:270）
-return "{{" + content + "}}", nil // Keep as is if unknown
-
-// 改善案
-return "", fmt.Errorf("unknown directive: %q", content)
-```
-
-### 実装上の注意（単純にエラー化すると 2 つ壊れる）
-
-1. `resolveString` の単一式最適化パス（`expression.go:181-189`）は「結果が `{{` で始まったままか」（185 行目の `!strings.HasPrefix(res, "{{")`）で解決失敗を判定して全体スキャンへフォールバックしており、この分岐の書き換えが必要
-2. 設定値にリテラルの `{{...}}` を書くユースケース（Go template / Helm テンプレートを env 値や entrypoint に渡す等）が即エラーになる
-
-対策として、エラー化の対象を「既知ディレクティブに似たもの」（大文字英字のみ、または `env:` / `file:` / `find_dir:` 風の prefix）に限定するか、`{{{{` のようなエスケープ記法を導入する。
-
-### 完了条件
-
-- タイポ（`{{HOM}}` 等）が起動前にエラーになる
-- リテラル `{{...}}` を通すための仕様（限定エラー化 or エスケープ記法）が決定され、`docs/features/value-resolution.md` に明記されている
-- ネスト式（`{{env:{{VAR}}}}` 等）の回帰テストが通る
-
----
 
 ## T12: `IsRetryablePullError` を型付きエラー判定に移行
 

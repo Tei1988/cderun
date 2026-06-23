@@ -40,7 +40,7 @@ The system performs a single-pass scan of the key string to accurately identify 
 - **Letter-to-digit boundaries**: e.g., `accessKey2` → `accessKey`, `2`
 - **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `JSON`, `Token`
 
-A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
+A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, `accessKey2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
 
 ## Presentation Layer Safety
 
