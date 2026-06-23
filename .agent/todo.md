@@ -29,7 +29,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり |
-| T23 | `MaskSensitiveEnv` への不足キーワード追加 | 改善 | 低 | 小 | - |
 
 依存関係・統合の注意:
 
@@ -466,20 +465,3 @@ cderun --prune
 
 ---
 
-## T23: `MaskSensitiveEnv` への不足キーワード追加
-
-- 種別: 改善
-- 対象: `internal/config/masking.go:10-27` (`sensitiveKeywords`)
-
-### 問題
-
-プロジェクトの記憶（Memory）には機密キーワードとして `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` が含まれていると言及されているが、実際のコード上の `sensitiveKeywords` マップにはこれらが含まれていない。
-
-### 方針
-
-`masking.go` の `sensitiveKeywords` に上記 4 つのキーワードを追加し、テストコードでこれらが正しくマスクされることを確認する。
-
-### 完了条件
-
-- `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` がキーワードリストに追加されている
-- 追加されたキーワードを含む環境変数が `MaskSensitiveEnv` で `[REDACTED]` にマスクされる

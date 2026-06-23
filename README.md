@@ -78,11 +78,11 @@ cderun --tty docker --tty
 
 ### P1 Internal Overrides
 
-Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy.
+Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy and **must** be placed **after** the subcommand in Wrapper Mode.
 
 | Priority | Level | Source | Description |
 | :--- | :--- | :--- | :--- |
-| **Highest** | **P1** | **Internal Overrides** | `--cderun-*` flags (placed after subcommand) |
+| **Highest** | **P1** | **Internal Overrides** | `--cderun-*` flags (MUST be placed after subcommand) |
 | | **P2** | **CLI Flags** | Standard flags (placed before subcommand) |
 | | **P3** | **Env Vars** | `CDERUN_*` environment variables |
 | | **P4** | **Tool Config** | `.tools.yaml` specific tool settings |
