@@ -32,16 +32,21 @@ func scanAnchors(s string) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
-	var allPairs []anchorRange
-	var stack []int
+
+	var stackBuf [8]int
+	stack := stackBuf[:0]
+
+	var allPairsBuf [8]anchorRange
+	allPairs := allPairsBuf[:0]
+
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
 			i++
 		} else if s[i] == '}' && s[i+1] == '}' {
-			if len(stack) > 0 {
-				start := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
+			if n := len(stack); n > 0 {
+				start := stack[n-1]
+				stack = stack[:n-1]
 				allPairs = append(allPairs, anchorRange{start: start, end: i + 2})
 			}
 			i++
@@ -54,7 +59,7 @@ func scanAnchors(s string) []anchorRange {
 
 	// Since allPairs are collected in order of their closing braces, we can
 	// identify top-level (outermost) ranges in a single backward pass.
-	var res []anchorRange
+	res := make([]anchorRange, 0, len(allPairs))
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
 		p := allPairs[i]
@@ -240,6 +245,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			ranges := scanAnchors(s)
 			if len(ranges) > 0 {
 				var sb strings.Builder
+				sb.Grow(len(s))
 				last := 0
 				for _, rng := range ranges {
 					sb.WriteString(s[last:rng.start])

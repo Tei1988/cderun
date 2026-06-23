@@ -239,7 +239,11 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
 		}
 
-		res = append(res, key+"="+val)
+		if resolvedE == e && strings.Contains(e, "=") {
+			res = append(res, e)
+		} else {
+			res = append(res, key+"="+val)
+		}
 	}
 	return res, nil
 }
