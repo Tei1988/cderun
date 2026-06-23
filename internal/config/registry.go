@@ -204,6 +204,17 @@ var StringSliceOptions = []StringSliceOption{
 		Usage:          "Add a host device to the container",
 		SkipResolution: true, // resolved in resolveCustomParsing
 	},
+	{
+		Name:      "sensitive-env",
+		EnvKey:    "CDERUN_SENSITIVE_ENV",
+		Usage:     "List of environment variable patterns to mask (default masks all)",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.SensitiveEnv
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.SensitiveEnv
+		},
+	},
 }
 
 var StringOptions = []StringOption{

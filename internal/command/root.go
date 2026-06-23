@@ -114,6 +114,8 @@ type rootOptions struct {
 	cderunMemory          string
 	cderunCPUs            float64
 	cderunDevices         []string
+	sensitiveEnv          []string
+	cderunSensitiveEnv    []string
 	pullMaxRetries        int
 	cderunPullMaxRetries  int
 	pullBackoffBase       string
@@ -407,6 +409,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunCPUsSet:            cmd.Flags().Changed("cderun-cpus"),
 		Devices:                  o.devices,
 		CderunDevices:            o.cderunDevices,
+		SensitiveEnv:             o.sensitiveEnv,
+		CderunSensitiveEnv:       o.cderunSensitiveEnv,
 	}
 
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
@@ -613,7 +617,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 
 	// Mask sensitive environment variables in dry-run output
 	maskedContainerConfig := *containerConfig
-	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env)
+	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env, resolved.SensitiveEnv)
 
 	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
 		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)

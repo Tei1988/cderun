@@ -129,7 +129,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"MY_PASSWORD": "secret"}}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
-		res, err := resolveEnvValues([]string{"MY_PASSWORD"}, false, r, mfs)
+		res, err := resolveEnvValues([]string{"MY_PASSWORD"}, nil, false, r, mfs)
 		require.NoError(t, err)
 		// Verification: ensure the resolver returns plaintext for container execution
 		assert.Equal(t, []string{"MY_PASSWORD=secret"}, res)
@@ -139,7 +139,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		r, err := NewExpressionResolver(nil)
 		require.NoError(t, err)
 		mfs := &MockFileSystem{}
-		_, err = resolveEnvValues([]string{"UNSET"}, true, r, mfs)
+		_, err = resolveEnvValues([]string{"UNSET"}, nil, true, r, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "required environment variable not found")
 	})
@@ -149,7 +149,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		r.setError(assert.AnError)
-		_, err = resolveEnvValues([]string{"ANY"}, false, r, mfs)
+		_, err = resolveEnvValues([]string{"ANY"}, nil, false, r, mfs)
 		require.Error(t, err)
 	})
 

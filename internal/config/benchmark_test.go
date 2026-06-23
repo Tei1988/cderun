@@ -74,7 +74,7 @@ func BenchmarkMaskSensitiveEnv(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = MaskSensitiveEnv(key, val)
+		_ = MaskSensitiveEnv(key, val, nil)
 	}
 }
 

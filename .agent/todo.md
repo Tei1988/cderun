@@ -18,7 +18,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
-| T08 | `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計 | 設計変更 | 中 | 中 | あり |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
@@ -30,12 +29,10 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり |
-| T23 | `MaskSensitiveEnv` への不足キーワード追加 | 改善 | 低 | 小 | - |
 
 依存関係・統合の注意:
 
 - **T05 と T06 は統合可能**（`registry.go` のメタデータを single source of truth にすれば両方解決する）。別々に着手する場合は T05 → T06 の順
-- **T08 は旧項目「`ACCESS` キーワードによる偽陽性」を吸収済み**（T08 採用でキーワード方式自体が消えるため）
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
 
 ---
@@ -162,45 +159,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
-
----
-
-## T08: `MaskSensitiveEnv` を `sensitiveEnv` 明示指定方式に再設計
-
-- 種別: 設計変更
-- 対象: `internal/config/masking.go`
-- 仕様変更: あり → `docs/features/sensitive-data-protection.md` の全面改訂必須
-- 備考: 旧項目「`ACCESS` キーワードによる偽陽性」を本タスクに統合済み
-
-### 問題（背景）
-
-現在のキーワードベースの自動判定は偽陽性が多い。例えば `ACCESS` がセンシティブキーワード（`masking.go:10-27`）に含まれているため、`ACCESS_LOG` や `ACCESS_LEVEL` のような機密でない環境変数も `[REDACTED]` にマスクされ、dry-run 出力でのデバッグを妨げる。なお `ACCESS` が入っている経緯は `docs/features/sensitive-data-protection.md` に明記されており、`AWS_ACCESS_KEY_ID` のマスクが目的。
-
-### 方針
-
-- `sensitiveEnv` が未指定の場合: dry-run 出力で **全ての env 値を隠す**（安全なデフォルト）
-- `sensitiveEnv` が指定されている場合: 指定したキーにマッチする値のみ隠し、それ以外は表示する
-- 既存のキーワード自動判定ロジック（`masking.go`）は不要になるため削除
-
-```yaml
-defaults:
-  sensitiveEnv:
-    - "MY_API_KEY"
-    - "DB_*"  # glob パターン対応も検討
-```
-
-### 実装上の注意
-
-1. **Spec-First**: `docs/features/sensitive-data-protection.md` の全面改訂が必須（現行ドキュメントはキーワード方式を仕様として明記している）
-2. マスクの適用箇所は dry-run（`root.go` の `config.MaskSensitiveEnvList`）だけでなくデバッグログ経路（`internal/config/resolver_helpers.go` の `logging.Debug("Resolved Env: ...")`）にもある。`MaskSensitiveEnv` の呼び出し元を全て洗うこと
-3. glob は標準ライブラリの `path.Match` で足りる（`*` のみサポートで十分なら依存追加不要）
-4. セマンティクス再検討の余地: 「指定キーにマッチする値のみ隠す」の逆（指定したものだけ **表示する** allowlist 方式）も検討すること。allowlist の方が「隠し忘れ」が起きない
-
-### 完了条件
-
-- どちらのセマンティクスを採用したかが docs に明記され、実装と一致している
-- 全マスク経路（dry-run / デバッグログ）が新方式に切り替わっている
-- 旧キーワードリストが削除されている
 
 ---
 
@@ -449,7 +407,7 @@ cderun --prefetch node,go      # 指定ツールのイメージのみ取得し�
 
 1. pull ポリシーとの整合 — prefetch は `missing` 相当で良いか、`--pull always` 併用で強制再取得を許すか
 2. **exit code** — 1 つでもイメージ取得に失敗したら非 0 で終了する（オフライン持ち込み前の検証としてはこれが重要）
-3. 既存の `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
+3. 既存ের `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
 4. オフライン用途では tag が動く（`latest` 等）と持ち込み後に意図と違うイメージになるため、`--diagnosis` 等で digest を表示できると再現性の確認に役立つ
 
 ### 完了条件
@@ -491,23 +449,3 @@ cderun --prune
 - 仕様ドキュメントが先に作成され、実装が一致している
 - 全ランタイムで cderun 製コンテナのみが対象になることのテストがある
 - 実行中コンテナがデフォルトで除外される
-
----
-
-## T23: `MaskSensitiveEnv` への不足キーワード追加
-
-- 種別: 改善
-- 対象: `internal/config/masking.go:10-27` (`sensitiveKeywords`)
-
-### 問題
-
-プロジェクトの記憶（Memory）には機密キーワードとして `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` が含まれていると言及されているが、実際のコード上の `sensitiveKeywords` マップにはこれらが含まれていない。
-
-### 方針
-
-`masking.go` の `sensitiveKeywords` に上記 4 つのキーワードを追加し、テストコードでこれらが正しくマスクされることを確認する。
-
-### 完了条件
-
-- `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE` がキーワードリストに追加されている
-- 追加されたキーワードを含む環境変数が `MaskSensitiveEnv` で `[REDACTED]` にマスクされる

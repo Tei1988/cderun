@@ -453,7 +453,7 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 		rErr, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		// {{file:expr}} will trigger an error when it tries to read the file
-		_, err = resolveEnvValues([]string{"VAR={{file:expr}}"}, false, rErr, mfs)
+		_, err = resolveEnvValues([]string{"VAR={{file:expr}}"}, nil, false, rErr, mfs)
 		require.Error(t, err)
 	})
 

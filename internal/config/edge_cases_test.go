@@ -80,7 +80,7 @@ func TestUnit_Config_Masking_Advanced(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MaskSensitiveEnv(tt.key, tt.value)
+			got := MaskSensitiveEnv(tt.key, tt.value, nil)
 			assert.Equal(t, tt.expected, got, "key: %s", tt.key)
 		})
 	}

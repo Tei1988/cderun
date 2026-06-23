@@ -11,26 +11,22 @@ func TestUnit_Config_MaskSensitiveEnv_Advanced(t *testing.T) {
 		name     string
 		key      string
 		value    string
+		patterns []string
 		expected string
 	}{
-		{"Multiple sensitive keywords", "API_KEY_PASSWORD", "secret", "[REDACTED]"},
-		{"Complex camelCase", "OAuthToken", "token", "[REDACTED]"},
-		{"Acronym and CamelCase", "DBPasswordAcronym", "secret", "[REDACTED]"},
-		{"Mixed snake and camel", "MY_appPassword", "secret", "[REDACTED]"},
-		{"Multiple acronyms", "SSH_API_KEY", "secret", "[REDACTED]"},
-		{"Acronym at the end", "MySSH", "value", "value"}, // SSH not a keyword
-		{"Acronym at the end with keyword", "MySSHKey", "value", "[REDACTED]"},
-		{"Single letter segments", "A_B_C_KEY", "value", "[REDACTED]"},
+		{"Explicit pattern match", "API_KEY_PASSWORD", "secret", []string{"*PASSWORD*"}, "[REDACTED]"},
+		{"Mask all by default", "OAuthToken", "token", nil, "[REDACTED]"},
+		{"Mask none with empty patterns", "DBPasswordAcronym", "secret", []string{}, "secret"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MaskSensitiveEnv(tt.key, tt.value)
+			got := MaskSensitiveEnv(tt.key, tt.value, tt.patterns)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
 
 func TestUnit_Config_MaskSensitiveEnvList_Nil(t *testing.T) {
-	assert.Nil(t, MaskSensitiveEnvList(nil))
+	assert.Nil(t, MaskSensitiveEnvList(nil, nil))
 }

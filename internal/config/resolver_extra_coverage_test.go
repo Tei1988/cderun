@@ -100,7 +100,7 @@ func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
 
 		// Test resolveStringOpt error via mock FS
 		mfs.ReadFileErr = assert.AnError
-		_, err := resolveEnvValues([]string{"KEY={{file:err}}"}, false, r, mfs)
+		_, err := resolveEnvValues([]string{"KEY={{file:err}}"}, nil, false, r, mfs)
 		require.Error(t, err)
 	})
 

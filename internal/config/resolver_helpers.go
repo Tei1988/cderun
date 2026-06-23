@@ -114,7 +114,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
-func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
+func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	envs, err := pickConfigs(
 		p1, p2, envKey, ";", subcommand, tools,
 		func(t ToolConfig) []string { return t.Env },
@@ -130,7 +130,7 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
 	merged := mergeEnv(nil, nil, envs)
 
-	return resolveEnvValues(merged, strict, r, fs)
+	return resolveEnvValues(merged, sensitivePatterns, strict, r, fs)
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
@@ -210,7 +210,7 @@ func validateImageRegistryMatch(cliImage, configImage string) error {
 	return nil
 }
 
-func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
+func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	res := make([]string, 0, len(env))
 	for _, e := range env {
 		resolvedE := r.resolveString(e)
@@ -236,7 +236,7 @@ func resolveEnvValues(env []string, strict bool, r *ExpressionResolver, fs FileS
 
 		// Apply masking for debug logs and quoting for safety
 		if logging.DebugEnabled() {
-			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val))
+			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val, sensitivePatterns))
 		}
 
 		res = append(res, key+"="+val)
