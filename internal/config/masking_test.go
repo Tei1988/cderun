@@ -65,3 +65,11 @@ func TestMaskSensitiveEnvList(t *testing.T) {
 	// Verify non-destructive behavior
 	assert.Equal(t, orig, env, "original slice should not be modified")
 }
+
+func TestSensitiveKeywordsLength(t *testing.T) {
+	// Regression test for T08/T23 optimization in masking.go
+	// Ensure no keyword exceeds maxKeywordLen (16) used for stack-allocated buffer.
+	for kw := range sensitiveKeywords {
+		assert.LessOrEqual(t, len(kw), maxKeywordLen, "Keyword %q exceeds maxKeywordLen (%d)", kw, maxKeywordLen)
+	}
+}
