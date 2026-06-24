@@ -207,7 +207,7 @@ var StringSliceOptions = []StringSliceOption{
 	{
 		Name:      "sensitive-env",
 		EnvKey:    "CDERUN_SENSITIVE_ENV",
-		Usage:     "List of environment variable patterns to mask (default masks all)",
+		Usage:     "List of environment variable patterns to mask (default uses automatic keywords)",
 		ToolGetter: func(t ToolConfig) []string {
 			return t.SensitiveEnv
 		},

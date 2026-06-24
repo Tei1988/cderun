@@ -3,27 +3,171 @@ package config
 import (
 	"path"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
+var sensitiveKeywords = map[string]struct{}{
+	"PASSWORD":    {},
+	"SECRET":      {},
+	"TOKEN":       {},
+	"KEY":         {},
+	"AUTH":        {},
+	"SIG":         {},
+	"CERT":        {},
+	"PEM":         {},
+	"PRIVATE":     {},
+	"CREDENTIALS": {},
+	"PASSPHRASE":  {},
+	"APIKEY":      {},
+	"SESSION":     {},
+	"ACCESS":      {},
+	"JWT":         {},
+	"SALT":        {},
+	"SIGNATURE":   {},
+	"BEARER":      {},
+	"OTP":         {},
+	"SENSITIVE":   {},
+}
+
+// containsIgnoreCase checks if s contains substr (which must be uppercase ASCII letters) case-insensitively.
+func containsIgnoreCase(s, substr string) bool {
+	if len(substr) > len(s) {
+		return false
+	}
+	firstUpper := substr[0]
+	firstLower := firstUpper + ('a' - 'A')
+
+	for i := 0; i <= len(s)-len(substr); i++ {
+		c := s[i]
+		if c == firstUpper || c == firstLower {
+			match := true
+			for j := 1; j < len(substr); j++ {
+				curr := s[i+j]
+				if curr >= 'a' && curr <= 'z' {
+					curr -= 'a' - 'A'
+				}
+				if curr != substr[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // MaskSensitiveEnv redacts sensitive environment variables based on key names and provided patterns.
-// If patterns is nil or empty, no environment variables are masked.
-// If patterns is non-nil, only keys matching the patterns are masked.
 func MaskSensitiveEnv(key, value string, patterns []string) string {
-	if value == "" || len(patterns) == 0 {
+	if value == "" {
+		return ""
+	}
+
+	// Mode 1: patterns is nil (Unset) -> Use automatic keyword-based masking
+	if patterns == nil {
+		return maskByKeywords(key, value)
+	}
+
+	// Mode 2: patterns is non-nil but empty -> Disable masking
+	if len(patterns) == 0 {
 		return value
 	}
 
-	// Case: patterns is non-nil -> Mask only matching keys
-	// Matching is case-insensitive for patterns and keys.
+	// Mode 3: patterns provided -> Mask matching keys (fail-closed on invalid glob)
 	upperKey := strings.ToUpper(key)
 	for _, p := range patterns {
 		upperPattern := strings.ToUpper(p)
 		matched, err := path.Match(upperPattern, upperKey)
 		if err != nil {
-			// Fail-closed: if the pattern is invalid, we redact to be safe.
 			return "[REDACTED]"
 		}
 		if matched {
+			return "[REDACTED]"
+		}
+	}
+
+	return value
+}
+
+func maskByKeywords(key, value string) string {
+	// Fast path: if the key doesn't contain any potential sensitive keywords, skip complex splitting.
+	hasSensitive := false
+	for kw := range sensitiveKeywords {
+		if containsIgnoreCase(key, kw) {
+			hasSensitive = true
+			break
+		}
+	}
+	if !hasSensitive {
+		return value
+	}
+
+	upperKey := strings.ToUpper(key)
+	useUpperDirectly := len(upperKey) == len(key)
+	start := -1
+	var lastRune rune
+
+	for i, r := range key {
+		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || (r > 127 && (unicode.IsLetter(r) || unicode.IsDigit(r)))
+
+		if isAlphaNum {
+			if start == -1 {
+				start = i
+			} else {
+				isCamel := unicode.IsLower(lastRune) && unicode.IsUpper(r)
+				isLetterDigit := (unicode.IsLetter(lastRune) && unicode.IsDigit(r)) || (unicode.IsDigit(lastRune) && unicode.IsLetter(r))
+				isAcronym := false
+				if unicode.IsUpper(lastRune) && unicode.IsUpper(r) {
+					nextIdx := i + utf8.RuneLen(r)
+					if nextIdx < len(key) {
+						nextRune, _ := utf8.DecodeRuneInString(key[nextIdx:])
+						if nextRune != utf8.RuneError && unicode.IsLower(nextRune) {
+							isAcronym = true
+						}
+					}
+				}
+
+				if isCamel || isLetterDigit || isAcronym {
+					var segment string
+					if useUpperDirectly {
+						segment = upperKey[start:i]
+					} else {
+						segment = strings.ToUpper(key[start:i])
+					}
+					if _, ok := sensitiveKeywords[segment]; ok {
+						return "[REDACTED]"
+					}
+					start = i
+				}
+			}
+		} else {
+			if start != -1 {
+				var segment string
+				if useUpperDirectly {
+					segment = upperKey[start:i]
+				} else {
+					segment = strings.ToUpper(key[start:i])
+				}
+				if _, ok := sensitiveKeywords[segment]; ok {
+					return "[REDACTED]"
+				}
+				start = -1
+			}
+		}
+		lastRune = r
+	}
+
+	if start != -1 {
+		var segment string
+		if useUpperDirectly {
+			segment = upperKey[start:]
+		} else {
+			segment = strings.ToUpper(key[start:])
+		}
+		if _, ok := sensitiveKeywords[segment]; ok {
 			return "[REDACTED]"
 		}
 	}

@@ -4,16 +4,23 @@ cderun protects sensitive information from being accidentally leaked into logs o
 
 ## Environment Variable Masking
 
-Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. Users can explicitly opt-in to masking for specific environment variables.
+Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun supports three masking modes controlled by the `sensitive-env` configuration.
 
 ### Configuration (`sensitive-env`)
 
 The masking behavior is controlled by the `sensitive-env` option, which can be defined in configuration files, environment variables, or CLI flags.
 
-- **Unset / Empty (Default)**: By default, **no** environment variables are masked. This ensures that users can debug their configurations easily without accidental redaction.
-- **Explicit List**: If `sensitive-env` is provided as a list, only keys matching the specified patterns are masked as `[REDACTED]`. All other environment variables will be displayed in plaintext.
+- **Unset (Default)**: If `sensitive-env` is not specified (nil), cderun uses its **automatic keyword-based masking**. It scans environment variable keys for segments like `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, etc., and masks their values.
+- **Empty List**: If an explicit empty list is provided (e.g., `--sensitive-env=""` in CLI or `sensitiveEnv: []` in YAML), environment variable masking is **disabled**. This is useful for troubleshooting when you want to see all values.
+- **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. Automatic keyword-based masking is disabled in this mode.
 
-### Pattern Matching
+### Automatic Masking Keywords
+
+In the default mode (Unset), the following segments (case-insensitive) trigger masking:
+
+- `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `AUTH`, `SIG`, `CERT`, `PEM`, `PRIVATE`, `CREDENTIALS`, `PASSPHRASE`, `APIKEY`, `SESSION`, `ACCESS`, `JWT`, `SALT`, `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE`.
+
+### Pattern Matching (Explicit List)
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
@@ -24,10 +31,6 @@ defaults:
     - "DB_*"
     - "*_PASSWORD"
 ```
-
-### Transition from Keyword-based Masking
-
-Previous versions of cderun used a hardcoded list of keywords (like `PASSWORD`, `SECRET`, `ACCESS`) for automatic masking. This approach was retired because it produced frequent false positives (e.g., masking `ACCESS_LOG`). Users should now explicitly list the patterns they wish to mask.
 
 ## Presentation Layer Safety
 

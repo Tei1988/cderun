@@ -2020,7 +2020,8 @@ func TestUnit_Root_DryRun_Safety(t *testing.T) {
 		assert.Contains(t, output, "Command: \"sh\" \"-c\" \"echo 'hello world'\"")
 
 		// Verify Env masking and quoting
-		assert.Contains(t, output, "Env: \"SECRET_TOKEN\"=\"top-secret\", \"PLAIN_VAR\"=\"value\", \"VAR_WITH_SPACE\"=\"val with space\"")
+		// Note: env is masked by auto-keywords by default because sensitive-env is unset.
+		assert.Contains(t, output, "Env: \"SECRET_TOKEN\"=\"[REDACTED]\", \"PLAIN_VAR\"=\"value\", \"VAR_WITH_SPACE\"=\"val with space\"")
 	})
 
 	t.Run("Handles Entrypoint quoting", func(t *testing.T) {
