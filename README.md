@@ -144,6 +144,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--memory`, `-m`: Memory limit (e.g., `512m`, `1g`).
 - `--cpus`: Number of CPUs (float).
 - `--device`: Add a host device to the container.
+- `--sensitive-env`: List of environment variable patterns to mask (default masks all).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
@@ -274,12 +275,12 @@ the available runtime by checking for common Unix socket paths.
 
 ### Sensitive Data Masking
 
-`cderun` protects your secrets. Environment variables containing sensitive keywords (like `PASSWORD`, `SECRET`, `TOKEN`, `JWT`) are automatically masked (`[REDACTED]`) in:
+`cderun` protects your secrets. By default, **all** environment variable values are masked (`[REDACTED]`) in:
 
 - Dry-run output (`--dry-run`)
 - Debug logs (`--log-level debug`)
 
-The masking logic is intelligent and handles CamelCase (e.g., `dbPassword`) and different separators (e.g., `API_KEY`).
+This "Secure by Default" approach ensures that no credentials are accidentally leaked. You can customize this behavior using the `--sensitive-env` flag to only mask specific patterns (e.g., `*_PASSWORD`, `API_*`).
 
 ### Unified Value Resolution
 

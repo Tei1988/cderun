@@ -382,6 +382,16 @@ cderun --cap-add SYS_ADMIN alpine mount ...
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
   - 環境変数 `CDERUN_CAP_DROP` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
+### `--sensitive-env`
+
+- **型**: stringArray
+- **環境変数**: `CDERUN_SENSITIVE_ENV`
+- **説明**: マスク（非表示）にする環境変数のパターンのリスト。
+- **補足**:
+  - 未指定の場合、セキュリティのため**すべての環境変数**がマスクされます（Secure by Default）。
+  - 明示的に空を指定した場合（例: `--sensitive-env=""`）、マスクは無効化されます。
+  - `*` ワイルドカードを使用した glob パターンが使用可能です（例: `DB_*`, `*_PASSWORD`）。
+
 ### `--entrypoint`
 
 - **型**: stringArray
