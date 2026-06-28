@@ -234,12 +234,20 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			val = v
 		}
 
+		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.
+		final := ""
+		if strings.HasPrefix(e, key+"=") && e[len(key)+1:] == val {
+			final = e
+		} else {
+			final = key + "=" + val
+		}
+
 		// Apply masking for debug logs and quoting for safety
 		if logging.DebugEnabled() {
 			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val, sensitivePatterns))
 		}
 
-		res = append(res, key+"="+val)
+		res = append(res, final)
 	}
 	return res, nil
 }

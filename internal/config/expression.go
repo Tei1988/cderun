@@ -32,8 +32,13 @@ func scanAnchors(s string) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
-	var allPairs []anchorRange
-	var stack []int
+	// Heuristic: pre-allocate some capacity based on string length to reduce re-allocations.
+	capacity := len(s) / 10
+	if capacity < 2 {
+		capacity = 2
+	}
+	allPairs := make([]anchorRange, 0, capacity)
+	stack := make([]int, 0, capacity)
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
@@ -54,7 +59,7 @@ func scanAnchors(s string) []anchorRange {
 
 	// Since allPairs are collected in order of their closing braces, we can
 	// identify top-level (outermost) ranges in a single backward pass.
-	var res []anchorRange
+	res := make([]anchorRange, 0, len(allPairs))
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
 		p := allPairs[i]
@@ -240,6 +245,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			ranges := scanAnchors(s)
 			if len(ranges) > 0 {
 				var sb strings.Builder
+				sb.Grow(len(s))
 				last := 0
 				for _, rng := range ranges {
 					sb.WriteString(s[last:rng.start])
