@@ -322,6 +322,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("dry-run outputs configuration and skips execution", func(t *testing.T) {
 		// Dry-run with YAML (default)
+		// Note: env is masked as [REDACTED] by default because sensitive-env is unset.
 		output, err := executeCommand("--dry-run", "--image", "alpine", "--env", "K=V", "--mount", "type=bind,source=/s,target=/t", "sh", "echo", "hello")
 		require.NoError(t, err)
 		assert.Contains(t, output, "image: alpine")
@@ -329,7 +330,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.Contains(t, output, "- echo")
 		assert.Contains(t, output, "- hello")
 		assert.Contains(t, output, "env:")
-		assert.Contains(t, output, "- K=V")
+		assert.Contains(t, output, "- K=[REDACTED]")
 		assert.Contains(t, output, "mounts:")
 		assert.Contains(t, output, "target: /t")
 
@@ -344,7 +345,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, output, "Image: alpine")
 		assert.Contains(t, output, "Command: \"echo\" \"hello\"")
-		assert.Contains(t, output, "Env: \"K\"=\"V\"")
+		assert.Contains(t, output, "Env: \"K\"=\"[REDACTED]\"")
 		assert.Contains(t, output, "Mounts: type=bind,source=\"/s\",target=\"/t\",readonly=false")
 		assert.Contains(t, output, "Devices: /dev/fuse, /dev/snd:/dev/snd:rw")
 		assert.Contains(t, output, "Memory: 512MiB") // go-units formatting
@@ -2020,8 +2021,8 @@ func TestUnit_Root_DryRun_Safety(t *testing.T) {
 		assert.Contains(t, output, "Command: \"sh\" \"-c\" \"echo 'hello world'\"")
 
 		// Verify Env masking and quoting
-		// Note: env is masked by auto-keywords by default because sensitive-env is unset.
-		assert.Contains(t, output, "Env: \"SECRET_TOKEN\"=\"[REDACTED]\", \"PLAIN_VAR\"=\"value\", \"VAR_WITH_SPACE\"=\"val with space\"")
+		// Note: env is masked as [REDACTED] by default because sensitive-env is unset.
+		assert.Contains(t, output, "Env: \"SECRET_TOKEN\"=\"[REDACTED]\", \"PLAIN_VAR\"=\"[REDACTED]\", \"VAR_WITH_SPACE\"=\"[REDACTED]\"")
 	})
 
 	t.Run("Handles Entrypoint quoting", func(t *testing.T) {

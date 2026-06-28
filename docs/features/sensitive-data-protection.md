@@ -4,21 +4,15 @@ cderun protects sensitive information from being accidentally leaked into logs o
 
 ## Environment Variable Masking
 
-Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun supports three masking modes controlled by the `sensitive-env` configuration.
+Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
 
 ### Configuration (`sensitive-env`)
 
 The masking behavior is controlled by the `sensitive-env` option, which can be defined in configuration files, environment variables, or CLI flags.
 
-- **Unset (Default)**: If `sensitive-env` is not specified (nil), cderun uses its **automatic keyword-based masking**. It scans environment variable keys for segments like `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, etc., and masks their values.
+- **Unset (Default)**: If `sensitive-env` is not specified (nil), **all** environment variable values are masked as `[REDACTED]`. This ensures maximum safety for users who have not yet configured their sensitive environment variables.
 - **Empty List**: If an explicit empty list is provided (e.g., `--sensitive-env=""` in CLI or `sensitiveEnv: []` in YAML), environment variable masking is **disabled**. This is useful for troubleshooting when you want to see all values.
-- **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. Automatic keyword-based masking is disabled in this mode.
-
-### Automatic Masking Keywords
-
-In the default mode (Unset), the following segments (case-insensitive) trigger masking:
-
-- `PASSWORD`, `SECRET`, `TOKEN`, `KEY`, `AUTH`, `SIG`, `CERT`, `PEM`, `PRIVATE`, `CREDENTIALS`, `PASSPHRASE`, `APIKEY`, `SESSION`, `ACCESS`, `JWT`, `SALT`, `SIGNATURE`, `BEARER`, `OTP`, `SENSITIVE`.
+- **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. All other variables will be displayed in plaintext.
 
 ### Pattern Matching (Explicit List)
 

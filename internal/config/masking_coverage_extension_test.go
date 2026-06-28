@@ -15,8 +15,8 @@ func TestUnit_Config_MaskSensitiveEnv_Advanced(t *testing.T) {
 		expected string
 	}{
 		{"Explicit pattern match", "API_KEY_PASSWORD", "secret", []string{"*PASSWORD*"}, "[REDACTED]"},
-		{"Auto-keyword match", "OAuthToken", "token", nil, "[REDACTED]"},
-		{"Disabled with empty patterns", "OAuthToken", "token", []string{}, "token"},
+		{"Mask all by default (nil)", "OAuthToken", "token", nil, "[REDACTED]"},
+		{"Mask none with empty patterns", "OAuthToken", "token", []string{}, "token"},
 	}
 
 	for _, tt := range tests {
