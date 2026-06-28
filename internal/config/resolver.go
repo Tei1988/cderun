@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -61,6 +62,7 @@ type ResolvedConfig struct {
 	Memory          int64
 	CPUs            float64
 	Devices         []container.DeviceMapping
+	SensitiveEnv    []string
 }
 
 // CLIOptions represents values from CLI flags.
@@ -215,6 +217,8 @@ type CLIOptions struct {
 	CderunCPUsSet            bool
 	Devices                  []string
 	CderunDevices            []string
+	SensitiveEnv             []string
+	CderunSensitiveEnv       []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -800,6 +804,28 @@ func (rv *resolver) resolveEarly() error {
 			return err
 		}
 	}
+
+	// Sensitive Env Resolution (needed for masking in debug logs during further resolution)
+	{
+		opt, ok := GetStringSliceOption("sensitive-env")
+		if !ok {
+			return fmt.Errorf("registry mismatch: early string slice option %q not found", "sensitive-env")
+		}
+		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("sensitive-env", rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
+		p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
+
+		def := OptionDef[[]string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+		}
+
+		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	}
 	return nil
 }
 
@@ -880,7 +906,7 @@ func (rv *resolver) resolveComplexOptions() error {
 		return err
 	}
 
-	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.StrictEnv, rv.r, rv.fs)
+	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.SensitiveEnv, rv.res.StrictEnv, rv.r, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -1193,6 +1219,13 @@ func (rv *resolver) validateSlices() error {
 		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
 		{"cap-add", rv.res.CapAdd, ValidateCapability},
 		{"cap-drop", rv.res.CapDrop, ValidateCapability},
+		{"sensitive-env", rv.res.SensitiveEnv, func(s string) error {
+			_, err := path.Match(s, "TEST")
+			if err != nil {
+				return fmt.Errorf("invalid glob pattern: %w", err)
+			}
+			return nil
+		}},
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {

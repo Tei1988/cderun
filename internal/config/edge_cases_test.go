@@ -69,18 +69,19 @@ func TestUnit_Config_Masking_Advanced(t *testing.T) {
 		name     string
 		key      string
 		value    string
+		patterns []string
 		expected string
 	}{
-		{"Acronym JSONToken", "JSONToken", "secret", "[REDACTED]"},
-		{"Acronym APIKey", "APIKey", "secret", "[REDACTED]"},
-		{"camelCase with digits db1Password", "db1Password", "secret", "[REDACTED]"},
-		{"Snake case with Unicode ユーザー_TOKEN", "ユーザー_TOKEN", "secret", "[REDACTED]"},
-		{"Boundary split acronym transition APIKeyExample", "APIKeyExample", "secret", "[REDACTED]"},
+		{"Acronym JSONToken", "JSONToken", "secret", []string{"*TOKEN"}, "[REDACTED]"},
+		{"Acronym APIKey", "APIKey", "secret", []string{"*KEY"}, "[REDACTED]"},
+		{"camelCase with digits db1Password", "db1Password", "secret", []string{"*PASSWORD"}, "[REDACTED]"},
+		{"Snake case with Unicode ユーザー_TOKEN", "ユーザー_TOKEN", "secret", []string{"*_TOKEN"}, "[REDACTED]"},
+		{"Boundary split acronym transition APIKeyExample", "APIKeyExample", "secret", []string{"APIKEY*"}, "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MaskSensitiveEnv(tt.key, tt.value)
+			got := MaskSensitiveEnv(tt.key, tt.value, tt.patterns)
 			assert.Equal(t, tt.expected, got, "key: %s", tt.key)
 		})
 	}

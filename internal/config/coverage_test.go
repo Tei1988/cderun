@@ -206,7 +206,7 @@ func TestUnit_Coverage_Resolver_ResolveEnv_Error(t *testing.T) {
 	mfs := &MockFileSystem{WD: "/app"}
 	r, _ := NewExpressionResolverWithFS(nil, mfs)
 	r.setError(errors.New("err"))
-	_, err := resolveEnv(nil, []string{"VAR=VAL"}, "E", "s", nil, nil, false, r, mfs)
+	_, err := resolveEnv(nil, []string{"VAR=VAL"}, "E", "s", nil, nil, nil, false, r, mfs)
 	require.Error(t, err)
 }
 
@@ -294,13 +294,13 @@ func TestUnit_Coverage_Resolver_ResolveEnv_Strict(t *testing.T) {
 	r, _ := NewExpressionResolver(nil)
 
 	// B is missing from host environment
-	_, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
+	_, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, nil, true, r, mfs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required environment variable not found: \"B\"")
 
 	// B exists on host
 	mfs.Env["B"] = "2"
-	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, true, r, mfs)
+	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, nil, true, r, mfs)
 	require.NoError(t, err)
 	assert.Len(t, res, 3)
 	assert.Contains(t, res, "B=2")
@@ -333,7 +333,7 @@ func TestUnit_Coverage_Resolver_ResolveMounts_Optional_Exists(t *testing.T) {
 func TestUnit_Coverage_Resolver_ResolveEnv_NonStrict_Found(t *testing.T) {
 	mfs := &MockFileSystem{Env: map[string]string{"CDERUN_ENV": "B", "B": "2"}}
 	r, _ := NewExpressionResolver(nil)
-	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, false, r, mfs)
+	res, err := resolveEnv(nil, nil, "CDERUN_ENV", "sh", nil, nil, nil, false, r, mfs)
 	require.NoError(t, err)
 	assert.Contains(t, res, "B=2")
 }
@@ -585,7 +585,7 @@ func TestUnit_Coverage_Option_StringSlice_Priority(t *testing.T) {
 func TestUnit_Coverage_Resolver_ResolveEnv_EmptyParts(t *testing.T) {
 	mfs := &MockFileSystem{Env: map[string]string{"E": "A=1; ;B=2"}}
 	r, _ := NewExpressionResolver(nil)
-	res, _ := resolveEnv(nil, nil, "E", "s", nil, nil, false, r, mfs)
+	res, _ := resolveEnv(nil, nil, "E", "s", nil, nil, nil, false, r, mfs)
 	assert.Len(t, res, 2)
 }
 
@@ -933,7 +933,7 @@ func TestUnit_Coverage_Resolver_resolveEnv_Strict(t *testing.T) {
 	r, _ := NewExpressionResolver(nil)
 
 	// Strict env failure
-	_, err := resolveEnv(nil, []string{"MISSING"}, "E", "s", nil, nil, true, r, mfs)
+	_, err := resolveEnv(nil, []string{"MISSING"}, "E", "s", nil, nil, nil, true, r, mfs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required environment variable not found")
 }

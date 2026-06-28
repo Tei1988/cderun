@@ -10,46 +10,26 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		name     string
 		key      string
 		value    string
+		patterns []string
 		expected string
 	}{
-		{"Safe variable", "SAFE_VAR", "value", "value"},
-		{"Standard snake_case password", "MY_PASSWORD", "secret", "[REDACTED]"},
-		{"Standard snake_case secret", "DB_SECRET_VAR", "secret", "[REDACTED]"},
-		{"Standard snake_case token", "AUTH_TOKEN", "token", "[REDACTED]"},
-		{"Standard snake_case key", "PRIVATE_KEY", "key", "[REDACTED]"},
-		{"Standard snake_case auth", "API_AUTH_VAR", "auth", "[REDACTED]"},
-		{"Standard snake_case sig", "SIGNAL_SIG", "sig", "[REDACTED]"},
-		{"False positive MONKEY", "MONKEY", "value", "value"},
-		{"False positive KEYAKI", "KEYAKI", "value", "value"},
-		{"False positive KEYWORD", "KEYWORD", "value", "value"},
-		{"CamelCase password", "dbPassword", "secret", "[REDACTED]"},
-		{"CamelCase token", "apiToken", "secret", "[REDACTED]"},
-		{"CamelCase key", "appKey", "secret", "[REDACTED]"},
-		{"Acronym APIKey", "APIKey", "secret", "[REDACTED]"},
-		{"Acronym DBPassword", "DBPassword", "secret", "[REDACTED]"},
-		{"Acronym SSHKey", "SSHKey", "secret", "[REDACTED]"},
-		{"Already masked value", "APPKEY", "[REDACTED]", "[REDACTED]"},
-		{"Empty value", "EMPTY_SECRET", "", ""},
-		{"Lowercase password", "my_password", "secret", "[REDACTED]"},
-		{"Letter-digit boundary password", "PASSWORD2", "secret", "[REDACTED]"},
-		{"Digit-letter boundary key", "1KEY", "secret", "[REDACTED]"},
-		{"Letter-digit camel boundary", "dbPassword2", "secret", "[REDACTED]"},
-		{"CERT keyword", "MY_CERT", "value", "[REDACTED]"},
-		{"PEM keyword", "PRIVATE_PEM", "value", "[REDACTED]"},
-		{"PRIVATE keyword", "PRIVATE_DATA", "value", "[REDACTED]"},
-		{"CREDENTIALS keyword", "AWS_CREDENTIALS", "value", "[REDACTED]"},
-		{"PASSPHRASE keyword", "SSH_PASSPHRASE", "value", "[REDACTED]"},
-		{"APIKEY keyword", "MY_APIKEY", "value", "[REDACTED]"},
-		{"SESSION keyword", "SESSION_ID", "value", "[REDACTED]"},
-		{"SIGNATURE keyword", "MY_SIGNATURE", "value", "[REDACTED]"},
-		{"BEARER keyword", "BEARER_TOKEN", "value", "[REDACTED]"},
-		{"OTP keyword", "MY_OTP_CODE", "value", "[REDACTED]"},
-		{"SENSITIVE keyword", "SENSITIVE_DATA", "value", "[REDACTED]"},
+		{"Unset patterns (Mask All) - safe", "SAFE_VAR", "value", nil, "[REDACTED]"},
+		{"Unset patterns (Mask All) - secret", "MY_PASSWORD", "secret", nil, "[REDACTED]"},
+		{"Empty patterns (Mask None) - safe", "SAFE_VAR", "value", []string{}, "value"},
+		{"Empty patterns (Mask None) - secret", "MY_PASSWORD", "secret", []string{}, "secret"},
+		{"Exact match", "MY_PASSWORD", "secret", []string{"MY_PASSWORD"}, "[REDACTED]"},
+		{"Exact match case-insensitive", "my_password", "secret", []string{"MY_PASSWORD"}, "[REDACTED]"},
+		{"Glob match start", "DB_PASSWORD", "secret", []string{"DB_*"}, "[REDACTED]"},
+		{"Glob match end", "MY_PASSWORD", "secret", []string{"*_PASSWORD"}, "[REDACTED]"},
+		{"Glob match middle", "MY_PASSWORD_VAR", "secret", []string{"*_PASSWORD_*"}, "[REDACTED]"},
+		{"No match", "SAFE_VAR", "value", []string{"*_PASSWORD"}, "value"},
+		{"Empty value", "EMPTY_SECRET", "", []string{"*"}, ""},
+		{"Invalid glob pattern (fail-closed)", "SECRET", "value", []string{"["}, "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MaskSensitiveEnv(tt.key, tt.value)
+			got := MaskSensitiveEnv(tt.key, tt.value, tt.patterns)
 			assert.Equal(t, tt.expected, got, "key: %s", tt.key)
 		})
 	}
@@ -58,10 +38,25 @@ func TestMaskSensitiveEnv(t *testing.T) {
 func TestMaskSensitiveEnvList(t *testing.T) {
 	env := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
 	orig := append([]string(nil), env...)
-	expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
 
-	got := MaskSensitiveEnvList(env)
-	assert.Equal(t, expected, got)
+	t.Run("Mask all by default (nil patterns)", func(t *testing.T) {
+		expected := []string{"SAFE=[REDACTED]", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
+		got := MaskSensitiveEnvList(env, nil)
+		assert.Equal(t, expected, got)
+	})
+
+	t.Run("Mask none with empty patterns", func(t *testing.T) {
+		expected := []string{"SAFE=VALUE", "MY_PASSWORD=secret", "NO_EQUALS"}
+		got := MaskSensitiveEnvList(env, []string{})
+		assert.Equal(t, expected, got)
+	})
+
+	t.Run("Mask patterns", func(t *testing.T) {
+		expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
+		got := MaskSensitiveEnvList(env, []string{"*_PASSWORD"})
+		assert.Equal(t, expected, got)
+	})
+
 	// Verify non-destructive behavior
 	assert.Equal(t, orig, env, "original slice should not be modified")
 }

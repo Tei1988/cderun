@@ -4,43 +4,27 @@ cderun protects sensitive information from being accidentally leaked into logs o
 
 ## Environment Variable Masking
 
-Sensitive environment variables are automatically masked in non-execution contexts. The masking logic utilizes a segment-based approach to identify keywords while minimizing false positives.
+Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
 
-### Masking Keywords
+### Configuration (`sensitive-env`)
 
-The following segments (case-insensitive) trigger masking:
+The masking behavior is controlled by the `sensitive-env` option, which can be defined in configuration files, environment variables, or CLI flags.
 
-- `PASSWORD`
-- `SECRET`
-- `TOKEN`
-- `KEY`
-- `AUTH`
-- `SIG`
-- `CERT`
-- `PEM`
-- `PRIVATE`
-- `CREDENTIALS`
-- `PASSPHRASE`
-- `APIKEY`
-- `SESSION`
-- `ACCESS`
-- `JWT`
-- `SALT`
-- `SIGNATURE`
-- `BEARER`
-- `OTP`
-- `SENSITIVE`
+- **Unset (Default)**: If `sensitive-env` is not specified (nil), **all** environment variable values are masked as `[REDACTED]`. This ensures maximum safety for users who have not yet configured their sensitive environment variables.
+- **Empty List**: If an explicit empty list is provided (e.g., `--sensitive-env=""` in CLI or `sensitiveEnv: []` in YAML), environment variable masking is **disabled**. This is useful for troubleshooting when you want to see all values.
+- **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. All other variables will be displayed in plaintext.
 
-### Intelligent Segmentation
+### Pattern Matching (Explicit List)
 
-The system performs a single-pass scan of the key string to accurately identify sensitive information while minimizing false positives and memory allocations. Segmentation occurs at:
+Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
-- **Non-alphanumeric characters**: e.g., `DB_PASSWORD` → `DB`, `PASSWORD`
-- **CamelCase transitions**: e.g., `apiToken` → `api`, `Token`
-- **Letter-to-digit boundaries**: e.g., `accessKey2` → `accessKey`, `2`
-- **Acronyms**: Handles transitions from uppercase sequences to lowercase, e.g., `JSONToken` → `JSON`, `Token`
-
-A key like `MONKEY` is correctly identified as non-sensitive because none of its segments match the keywords. In contrast, `AWS_ACCESS_KEY_ID`, `dbPassword2`, or `SSL_CERT_FILE` will be masked as `[REDACTED]`.
+```yaml
+defaults:
+  sensitiveEnv:
+    - "MY_API_KEY"
+    - "DB_*"
+    - "*_PASSWORD"
+```
 
 ## Presentation Layer Safety
 
@@ -56,4 +40,4 @@ All error messages referencing paths, tool identifiers, or user-provided input u
 
 ### Secure Logging
 
-Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure.
+Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure. Masking is also applied to debug logs when environment variables are resolved.
