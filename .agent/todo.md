@@ -18,9 +18,9 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり |
-| T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - |
+| T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - | (DONE)
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり |
-| T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - |
+| T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | (DONE)
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - |
