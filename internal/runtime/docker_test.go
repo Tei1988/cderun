@@ -38,6 +38,22 @@ func TestUnit_Docker_New(t *testing.T) {
 	runtimeWithName, err := NewDockerRuntimeWithName("/var/run/docker.sock", "custom")
 	require.NoError(t, err)
 	assert.Equal(t, "custom", runtimeWithName.Name())
+
+	logger := logging.GetGlobalLogger()
+	runtimeWithOptions, err := NewDockerRuntimeWithOptions("/var/run/docker.sock", "opt", nil,
+		WithLogger(logger),
+		WithAttachCloseWriteGrace(10*time.Second),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, logger, runtimeWithOptions.logger)
+	assert.Equal(t, 10*time.Second, runtimeWithOptions.attachCloseWriteGrace)
+
+	// Test WithAttachCloseWriteGrace with non-positive duration
+	runtimeWithOptions2, err := NewDockerRuntimeWithOptions("/var/run/docker.sock", "opt", nil,
+		WithAttachCloseWriteGrace(0),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, 1*time.Millisecond, runtimeWithOptions2.attachCloseWriteGrace)
 }
 
 func TestUnit_Docker_PullImage_Retry(t *testing.T) {
@@ -449,6 +465,14 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid mount type")
+	})
+
+	t.Run("ContainerCreate error", func(t *testing.T) {
+		mock := &mockDockerClient{createErr: errors.New("creation failed")}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{Image: "test"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "creation failed")
 	})
 }
 func TestUnit_Docker_CreateContainer_Interactive(t *testing.T) {
@@ -1037,6 +1061,14 @@ func TestUnit_Docker_Close(t *testing.T) {
 		require.NoError(t, err)
 		// Should still be 1 because it's idempotent
 		assert.Equal(t, 1, mock.closeCount)
+	})
+
+	t.Run("missing policy - non-retryable inspect error", func(t *testing.T) {
+		mock := &mockDockerClient{imageInspectErr: errors.New("fatal")}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing", 0, 1*time.Second)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
 
 	t.Run("Close error propagation", func(t *testing.T) {

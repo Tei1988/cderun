@@ -18,6 +18,42 @@ func TestUnit_Containerd_Name(t *testing.T) {
 	assert.Equal(t, "containerd", rt.Name())
 }
 
+func TestUnit_Containerd_Options(t *testing.T) {
+	logger := logging.GetGlobalLogger()
+	rt := &ContainerdRuntime{}
+	opt := WithContainerdLogger(logger)
+	opt(rt)
+	assert.Equal(t, logger, rt.logger)
+}
+
+func TestUnit_Containerd_PullImage_Never(t *testing.T) {
+	rt := &ContainerdRuntime{}
+	err := rt.PullImage(context.Background(), "img", "never", 3, 1*time.Second)
+	assert.NoError(t, err)
+}
+
+func TestUnit_Containerd_Lifecycle_Local(t *testing.T) {
+	// NewContainerdRuntime usually succeeds even if socket is missing
+	// as connection is lazy or handled by grpc.
+	rt, err := NewContainerdRuntime("/tmp/containerd.sock")
+	require.NoError(t, err)
+	defer rt.Close()
+	assert.Equal(t, "containerd", rt.Name())
+}
+
+func TestUnit_Containerd_NotifyWait(t *testing.T) {
+	waitC := make(chan error, 1)
+	rt := &ContainerdRuntime{
+		ioWait: map[string]chan error{"c1": waitC},
+	}
+	err := fmt.Errorf("wait err")
+	rt.notifyWait("c1", err)
+	assert.Equal(t, err, <-waitC)
+
+	// Should not block or panic for unknown id
+	rt.notifyWait("unknown", err)
+}
+
 func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	tests := []struct {
 		sig     string
@@ -35,6 +71,8 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 		{"invalid", true},
 		{"0", true},
 		{"65", true},
+		{"SIGINVALID", true},
+		{"SIG", true},
 	}
 
 	for _, tt := range tests {
@@ -91,7 +129,38 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port mapping is not supported yet")
 	})
+
+	t.Run("publish all unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			PublishAll: true,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
+
+	t.Run("expose unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			Expose: []string{"80"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port mapping is not supported yet")
+	})
 }
+
+func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
+	rt := &ContainerdRuntime{}
+	t.Run("rows too large", func(t *testing.T) {
+		err := rt.ResizeContainerTTY(context.Background(), "id", 1<<33, 80)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "terminal size exceeds maximum")
+	})
+	t.Run("cols too large", func(t *testing.T) {
+		err := rt.ResizeContainerTTY(context.Background(), "id", 24, 1<<33)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "terminal size exceeds maximum")
+	})
+}
+
 
 func TestUnit_Runtime_Common_IsRetryablePullError(t *testing.T) {
 	tests := []struct {
