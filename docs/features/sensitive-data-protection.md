@@ -10,13 +10,17 @@ Environment variable values are masked in non-execution contexts (dry-run and de
 
 The masking behavior is controlled by the `sensitive-env` option, which can be defined in configuration files, environment variables, or CLI flags.
 
-- **Unset (Default)**: If `sensitive-env` is not specified (nil), **all** environment variable values are masked as `[REDACTED]`. This ensures maximum safety for users who have not yet configured their sensitive environment variables.
+- **Unset (Default)**: If `sensitive-env` is not specified (nil), **all** environment variable values are masked as `[REDACTED]`. This "Secure by Default" approach ensures maximum safety for users who have not yet configured their sensitive environment variables.
 - **Empty List**: If an explicit empty list is provided (e.g., `--sensitive-env=""` in CLI or `sensitiveEnv: []` in YAML), environment variable masking is **disabled**. This is useful for troubleshooting when you want to see all values.
 - **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. All other variables will be displayed in plaintext.
 
 ### Pattern Matching (Explicit List)
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
+
+#### Fail-Closed Logic
+
+cderun implements fail-closed logic for pattern matching. If a glob pattern is malformed (e.g., `[` without a closing bracket), `path.Match` will return an error. In this case, cderun redacts the value to prevent accidental exposure of potentially sensitive information.
 
 ```yaml
 defaults:

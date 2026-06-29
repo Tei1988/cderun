@@ -52,6 +52,8 @@ cderun go --version
 
 サブコマンドの後ろに置かれた `--cderun-` フラグは、前処理（`preprocessArgs`）によってサブコマンドの**前**に移動（ホイスト）され、`cderun` 自体の設定として解釈されます。
 
+> **なぜサブコマンドの後ろなのか**: 標準フラグ（P2）をサブコマンドの前に、オーバーライドフラグ（P1）を後ろに配置するよう仕様を分けることで、ラップ対象のツールが持つ同名のフラグ（例: `node --env`）との所有権の曖昧さを完全に排除しています。もし P1 フラグをサブコマンドの前に置いた場合、それはエラーとして報告されます。
+
 ### ホイストの仕組み (Hoisting Mechanics)
 
 `cderun` は実行時に引数リストをスキャンし、`--cderun-` プレフィックスを持つフラグを発見すると、それをサブコマンドの境界を越えて前方に移動させます（Hoisting）。これにより、Cobra などのコマンドラインパーサーがそれらを `cderun` コマンド自体のフラグ（P1 Internal Overrides）として正しく認識できるようになります。
@@ -66,13 +68,13 @@ flowchart TD
     HandleValues --> Reconstruct[4. 引数リストの再構成<br/>P1フラグをサブコマンドの前へ移動]
     Reconstruct --> End([Cobra パーサーへ渡す準備完了])
 
-    subgraph "Hoisting 実例 (Wrapper Mode)"
+    subgraph WRAPPER ["Hoisting 実例 (Wrapper Mode)"]
     ExampleInput["cderun --tty node app.js --cderun-image node:20"]
     ExampleOutput["cderun --cderun-image node:20 --tty node app.js"]
     ExampleInput -- 前処理 --> ExampleOutput
     end
 
-    subgraph "Hoisting 実例 (Symlink Mode)"
+    subgraph SYMLINK ["Hoisting 実例 (Symlink Mode)"]
     SymlinkInput["node app.js --cderun-image node:20"]
     SymlinkOutput["cderun --cderun-image node:20 node app.js"]
     SymlinkInput -- 前処理 --> SymlinkOutput

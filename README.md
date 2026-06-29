@@ -197,6 +197,7 @@ Key variables include:
 - `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
+- `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
 
 **Note on List-type Options:**
 
@@ -204,7 +205,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`
+  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
 
 ## Configuration
 
