@@ -198,6 +198,26 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			args:     []string{"cderun", "node", "--cderun-image", "node:20", "app.js", "--foo"},
 			expected: []string{"cderun", "--cderun-image", "node:20", "node", "app.js", "--foo"},
 		},
+		{
+			name:     "polyglot with relative path",
+			args:     []string{"./node", "--version"},
+			expected: []string{"cderun", "node", "--version"},
+		},
+		{
+			name:     "P1 unknown flag (hoisted because of prefix)",
+			args:     []string{"cderun", "node", "--cderun-unknown=val"},
+			expected: []string{"cderun", "--cderun-unknown=val", "node"},
+		},
+		{
+			name:     "P1 unknown flag with separate value (not hoisted because unknown)",
+			args:     []string{"cderun", "node", "--cderun-unknown", "val"},
+			expected: []string{"cderun", "--cderun-unknown", "node", "val"},
+		},
+		{
+			name:     "P1 flag at the very end without value",
+			args:     []string{"cderun", "node", "--cderun-image"},
+			expected: []string{"cderun", "--cderun-image", "node"},
+		},
 	}
 
 	for _, tt := range tests {
