@@ -32,13 +32,12 @@ func scanAnchors(s string) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
-	// Heuristic: pre-allocate some capacity based on string length to reduce re-allocations.
-	capacity := len(s) / 10
-	if capacity < 2 {
-		capacity = 2
-	}
-	allPairs := make([]anchorRange, 0, capacity)
-	stack := make([]int, 0, capacity)
+
+	var stackBuf [8]int
+	var allPairsBuf [8]anchorRange
+	stack := stackBuf[:0]
+	allPairs := allPairsBuf[:0]
+
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
@@ -59,7 +58,8 @@ func scanAnchors(s string) []anchorRange {
 
 	// Since allPairs are collected in order of their closing braces, we can
 	// identify top-level (outermost) ranges in a single backward pass.
-	res := make([]anchorRange, 0, len(allPairs))
+	var resBuf [8]anchorRange
+	res := resBuf[:0]
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
 		p := allPairs[i]
@@ -69,12 +69,15 @@ func scanAnchors(s string) []anchorRange {
 		}
 	}
 
+	finalRes := make([]anchorRange, len(res))
+	copy(finalRes, res)
+
 	// Reverse to maintain original order
-	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
-		res[i], res[j] = res[j], res[i]
+	for i, j := 0, len(finalRes)-1; i < j; i, j = i+1, j-1 {
+		finalRes[i], finalRes[j] = finalRes[j], finalRes[i]
 	}
 
-	return res
+	return finalRes
 }
 
 // ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
@@ -245,13 +248,22 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			ranges := scanAnchors(s)
 			if len(ranges) > 0 {
 				var sb strings.Builder
-				sb.Grow(len(s))
 				last := 0
+				usedSb := false
 				for _, rng := range ranges {
-					sb.WriteString(s[last:rng.start])
 					if r.err != nil {
-						sb.WriteString(s[rng.start:rng.end])
+						if usedSb {
+							sb.WriteString(s[last:rng.start])
+							sb.WriteString(s[rng.start:rng.end])
+						}
 					} else {
+						if !usedSb {
+							sb.Grow(len(s))
+							sb.WriteString(s[:rng.start])
+							usedSb = true
+						} else {
+							sb.WriteString(s[last:rng.start])
+						}
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
 
 						var res string
@@ -278,8 +290,10 @@ func (r *ExpressionResolver) resolveString(s string) string {
 					}
 					last = rng.end
 				}
-				sb.WriteString(s[last:])
-				resolved = sb.String()
+				if usedSb {
+					sb.WriteString(s[last:])
+					resolved = sb.String()
+				}
 			}
 		}
 	}
