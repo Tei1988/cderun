@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/containerd/errdefs"
 	"io"
@@ -276,15 +277,22 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	defer resp.Close()
 
 	var stdinErr error
+	var stdinMu sync.Mutex
 	stdinDone := make(chan struct{})
 
 	if stdin != nil {
 		go func() {
 			d.logger.Debug("Starting to copy STDIN to container %s", containerID)
 			var n int64
-			n, stdinErr = io.Copy(resp.Conn, stdin)
-			if stdinErr != nil {
-				d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, stdinErr)
+			var err error
+			n, err = io.Copy(resp.Conn, stdin)
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					stdinMu.Lock()
+					stdinErr = err
+					stdinMu.Unlock()
+				}
+				d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, err)
 			} else {
 				d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
@@ -331,20 +339,22 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	case err := <-outputDone:
 		d.logger.Trace("AttachContainer: output goroutine finished")
 		if err == nil {
-			select {
-			case <-stdinDone:
-				if stdinErr != nil {
-					d.logger.Trace("AttachContainer: output finished but returning pending stdin error")
-					return stdinErr
-				}
-			default:
+			stdinMu.Lock()
+			sErr := stdinErr
+			stdinMu.Unlock()
+			if sErr != nil {
+				d.logger.Trace("AttachContainer: output finished but returning pending stdin error")
+				return sErr
 			}
 		}
 		return err
 	case <-stdinDone:
-		if stdinErr != nil {
+		stdinMu.Lock()
+		sErr := stdinErr
+		stdinMu.Unlock()
+		if sErr != nil {
 			d.logger.Trace("AttachContainer: stdin goroutine finished with error")
-			return stdinErr
+			return sErr
 		}
 		select {
 		case err := <-outputDone:

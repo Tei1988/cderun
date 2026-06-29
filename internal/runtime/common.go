@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"errors"
+	"net"
 	"strings"
 	"time"
 
@@ -24,6 +26,25 @@ func IsRetryablePullError(err error) bool {
 		return true
 	}
 
+	// Typed error check: DNS errors
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		// If it's "no such host", it's likely a typo or missing registry.
+		if dnsErr.IsNotFound {
+			return false
+		}
+		// Other DNS errors (e.g. server failure, timeout) are worth retrying.
+		return true
+	}
+
+	// Typed error check: Network errors
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			return true
+		}
+	}
+
 	msg := strings.ToLower(err.Error())
 	retryableMessages := []string{
 		"connection refused",
@@ -32,7 +53,6 @@ func IsRetryablePullError(err error) bool {
 		"deadline exceeded",
 		"unexpected eof",
 		"i/o timeout",
-		"no such host",
 		"tls handshake timeout",
 		"client.timeout exceeded",
 		"rate limit exceeded",
