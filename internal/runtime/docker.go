@@ -287,7 +287,7 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 			var err error
 			n, err = io.Copy(resp.Conn, stdin)
 			if err != nil {
-				if !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+				if !errors.Is(err, context.Canceled) {
 					stdinMu.Lock()
 					stdinErr = err
 					stdinMu.Unlock()
