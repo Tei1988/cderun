@@ -236,7 +236,9 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.
 		final := ""
-		if strings.HasPrefix(e, key+"=") && e[len(key)+1:] == val {
+		if resolvedE == e && strings.Contains(e, "=") {
+			final = e
+		} else if strings.HasPrefix(e, key+"=") && e[len(key)+1:] == val {
 			final = e
 		} else {
 			final = key + "=" + val

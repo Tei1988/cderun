@@ -32,13 +32,13 @@ func scanAnchors(s string) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
-	// Heuristic: pre-allocate some capacity based on string length to reduce re-allocations.
-	capacity := len(s) / 10
-	if capacity < 2 {
-		capacity = 2
-	}
-	allPairs := make([]anchorRange, 0, capacity)
-	stack := make([]int, 0, capacity)
+
+	var stackBuf [8]int
+	stack := stackBuf[:0]
+
+	var allPairsBuf [8]anchorRange
+	allPairs := allPairsBuf[:0]
+
 	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
@@ -245,41 +245,67 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			ranges := scanAnchors(s)
 			if len(ranges) > 0 {
 				var sb strings.Builder
-				sb.Grow(len(s))
+				sbInitialized := false
 				last := 0
 				for _, rng := range ranges {
-					sb.WriteString(s[last:rng.start])
 					if r.err != nil {
-						sb.WriteString(s[rng.start:rng.end])
-					} else {
-						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
-
-						var res string
-						var err error
-
-						// Escape mechanism: {{{{...}}}} -> {{...}}
-						if strings.HasPrefix(content, "{{") && strings.HasSuffix(content, "}}") {
-							res = content
-						} else {
-							// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
-							resolvedContent := content
-							if strings.Contains(content, "{{") {
-								resolvedContent = r.resolveString(content)
-							}
-							res, err = r.resolveDirective(resolvedContent)
-						}
-
-						if err != nil {
-							r.setError(err)
+						if sbInitialized {
+							sb.WriteString(s[last:rng.start])
 							sb.WriteString(s[rng.start:rng.end])
-						} else {
-							sb.WriteString(res)
 						}
+						last = rng.end
+						continue
+					}
+
+					// Always add the part before the expression
+					if sbInitialized {
+						sb.WriteString(s[last:rng.start])
+					}
+
+					content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
+
+					var res string
+					var err error
+
+					// Escape mechanism: {{{{...}}}} -> {{...}}
+					if strings.HasPrefix(content, "{{") && strings.HasSuffix(content, "}}") {
+						res = content
+					} else {
+						// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
+						resolvedContent := content
+						if strings.Contains(content, "{{") {
+							resolvedContent = r.resolveString(content)
+						}
+						res, err = r.resolveDirective(resolvedContent)
+					}
+
+					if err != nil {
+						r.setError(err)
+						if sbInitialized {
+							sb.WriteString(s[last:rng.start])
+							sb.WriteString(s[rng.start:rng.end])
+						}
+						last = rng.end
+						continue
+					}
+
+					// Only initialize builder if something actually changed.
+					// We must check if the resolved value is different from the original expression string.
+					if !sbInitialized && res != s[rng.start:rng.end] {
+						sb.Grow(len(s))
+						sb.WriteString(s[:rng.start])
+						sbInitialized = true
+					}
+
+					if sbInitialized {
+						sb.WriteString(res)
 					}
 					last = rng.end
 				}
-				sb.WriteString(s[last:])
-				resolved = sb.String()
+				if sbInitialized {
+					sb.WriteString(s[last:])
+					resolved = sb.String()
+				}
 			}
 		}
 	}
