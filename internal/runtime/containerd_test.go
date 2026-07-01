@@ -147,7 +147,7 @@ func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
 func TestUnit_Containerd_New_Error(t *testing.T) {
 	// client.New will fail if the socket path is invalid or empty
 	_, err := NewContainerdRuntime("")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to connect to containerd")
 }
 

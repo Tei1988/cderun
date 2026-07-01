@@ -32,21 +32,6 @@ func TestUnitDockerRetryablePullErrorExhaustive(t *testing.T) {
 	assert.False(t, IsRetryablePullError(io.EOF))
 }
 
-type delayedReader struct {
-	data  []byte
-	delay time.Duration
-}
-
-func (r *delayedReader) Read(p []byte) (n int, err error) {
-	time.Sleep(r.delay)
-	if len(r.data) == 0 {
-		return 0, io.EOF
-	}
-	n = copy(p, r.data)
-	r.data = r.data[n:]
-	return n, nil
-}
-
 type blockingReader struct {
 	ctx context.Context
 }
@@ -83,19 +68,9 @@ func TestUnit_Docker_AttachContainer_RacesAndErrors(t *testing.T) {
 
 		err := rt.AttachContainer(context.Background(), "id", true, pr, io.Discard, io.Discard, nil)
 
-		// In the current implementation, if outputDone wins, it checks stdinErr under mutex.
-		// If the stdin goroutine hasn't set stdinErr yet, it might return nil.
-		// But here we want to see if we can catch the error if we wait a bit or if it's deterministic.
-
-		// Actually, if output finishes, it immediately returns.
-		// If stdin is still copying, it might be missed.
-
-		// Let's verify the current behavior.
-		if err != nil {
-			assert.Contains(t, err.Error(), "slow stdin error")
-		} else {
-			t.Log("Note: slow stdin error was missed as expected by current race condition")
-		}
+		// In the current implementation, if output finishes fast, the pending stdin error might be missed.
+		// This test documents the behavior (T09). Since output finishes immediately, it's expected to return nil.
+		assert.NoError(t, err, "Expected no error because stdout finishes before stdin error is recorded")
 	})
 
 	t.Run("stdin error wins", func(t *testing.T) {
@@ -125,10 +100,13 @@ func TestUnit_Docker_AttachContainer_RacesAndErrors(t *testing.T) {
 
 	t.Run("context cancellation during copy", func(t *testing.T) {
 		conn := &mockConn{}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		mock := &mockDockerClient{
 			attachResp: types.HijackedResponse{
 				Conn:   conn,
-				Reader: bufio.NewReader(&blockingReader{ctx: context.Background()}),
+				Reader: bufio.NewReader(&blockingReader{ctx: ctx}),
 			},
 		}
 		rt := &DockerRuntime{
@@ -137,13 +115,12 @@ func TestUnit_Docker_AttachContainer_RacesAndErrors(t *testing.T) {
 			sleepFunc: noopSleepFunc,
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
 			time.Sleep(50 * time.Millisecond)
 			cancel()
 		}()
 
-		err := rt.AttachContainer(ctx, "id", true, &blockingReader{ctx: context.Background()}, io.Discard, io.Discard, nil)
+		err := rt.AttachContainer(ctx, "id", true, &blockingReader{ctx: ctx}, io.Discard, io.Discard, nil)
 		require.ErrorIs(t, err, context.Canceled)
 	})
 }
@@ -206,7 +183,13 @@ func TestUnit_Docker_AttachContainer_CloseWriteGrace(t *testing.T) {
 		stdin := strings.NewReader("input")
 		err := rt.AttachContainer(context.Background(), "id", false, stdin, io.Discard, io.Discard, nil)
 		require.NoError(t, err)
-		<-graceCalled
+
+		select {
+		case <-graceCalled:
+			// Success
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for graceCalled")
+		}
 		assert.Eventually(t, func() bool { return conn.closeWriteCalled.Load() }, 500*time.Millisecond, 10*time.Millisecond)
 	})
 }
