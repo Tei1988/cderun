@@ -583,16 +583,21 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 }
 
 func (rv *resolver) applyIntOption(opt IntOption) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	var p1Set, p2Set bool
 	var p1Int, p2Int int
-	var info optionFields
+	var fastPathUsed bool
 
-	if opt.Name == "pull-max-retries" && fieldInfo["pull-max-retries"].p1ValIdx != -1 && cliType.Field(fieldInfo["pull-max-retries"].p1ValIdx).Name == "CderunPullMaxRetries" && cliType.Field(fieldInfo["pull-max-retries"].p2ValIdx).Name == "PullMaxRetries" {
+	if opt.Name == "pull-max-retries" &&
+		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
+		cliType.Field(info.p1ValIdx).Name == "CderunPullMaxRetries" &&
+		cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
 		p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
+		fastPathUsed = true
 	} else {
 		var s1, s2 bool
 		var v1, v2 reflect.Value
@@ -613,7 +618,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	}
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-	if opt.Name == "pull-max-retries" {
+	if fastPathUsed {
 		rv.res.PullMaxRetries = resolved
 	} else {
 		rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
@@ -622,16 +627,21 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 }
 
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	var p1Set, p2Set bool
 	var p1Float, p2Float float64
-	var info optionFields
+	var fastPathUsed bool
 
-	if opt.Name == "cpus" && fieldInfo["cpus"].p1ValIdx != -1 && cliType.Field(fieldInfo["cpus"].p1ValIdx).Name == "CderunCPUs" && cliType.Field(fieldInfo["cpus"].p2ValIdx).Name == "CPUs" {
+	if opt.Name == "cpus" &&
+		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
+		cliType.Field(info.p1ValIdx).Name == "CderunCPUs" &&
+		cliType.Field(info.p2ValIdx).Name == "CPUs" {
 		p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
+		fastPathUsed = true
 	} else {
 		var s1, s2 bool
 		var v1, v2 reflect.Value
@@ -652,7 +662,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	}
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-	if opt.Name == "cpus" {
+	if fastPathUsed {
 		rv.res.CPUs = resolved
 	} else {
 		rv.resVal.Field(info.targetIdx).SetFloat(resolved)
