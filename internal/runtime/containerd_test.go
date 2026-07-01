@@ -126,22 +126,21 @@ func TestUnit_Containerd_PullImage_EarlyReturn(t *testing.T) {
 func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
 	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 
-	t.Run("rows overflow", func(t *testing.T) {
-		// math.MaxUint32 + 1 can overflow at compile time if rows is uint and it's 32-bit.
-		// Use a value that is guaranteed to overflow uint32 but still fits in uint if 64-bit,
-		// or just use a large constant that we know is greater than math.MaxUint32.
-		var largeVal uint = math.MaxUint32 + 1
-		err := rt.ResizeContainerTTY(context.Background(), "cont1", largeVal, 80)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "exceeds maximum")
-	})
+	if uint64(^uint(0)) > math.MaxUint32 {
+		t.Run("rows overflow", func(t *testing.T) {
+			val := uint64(math.MaxUint32) + 1
+			err := rt.ResizeContainerTTY(context.Background(), "cont1", uint(val), 80)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "exceeds maximum")
+		})
 
-	t.Run("cols overflow", func(t *testing.T) {
-		var largeVal uint = math.MaxUint32 + 1
-		err := rt.ResizeContainerTTY(context.Background(), "cont1", 24, largeVal)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "exceeds maximum")
-	})
+		t.Run("cols overflow", func(t *testing.T) {
+			val := uint64(math.MaxUint32) + 1
+			err := rt.ResizeContainerTTY(context.Background(), "cont1", 24, uint(val))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "exceeds maximum")
+		})
+	}
 }
 
 func TestUnit_Containerd_New_Error(t *testing.T) {
