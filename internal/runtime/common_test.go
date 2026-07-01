@@ -23,7 +23,7 @@ func (e *nonTimeoutNetErr) Temporary() bool { return false }
 
 type cancelledErr struct{}
 
-func (e *cancelledErr) Error() string { return "cancelled" }
+func (e *cancelledErr) Error() string { return "timeout" }
 func (e *cancelledErr) Cancelled()    {}
 
 type unavailableErr struct{}

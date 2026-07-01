@@ -394,6 +394,14 @@ func TestUnit_Docker_PullImage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 2, count)
 	})
+
+	t.Run("missing policy - non-retryable inspect error", func(t *testing.T) {
+		mock := &mockDockerClient{imageInspectErr: errors.New("fatal")}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "missing", 0, 1*time.Second)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to inspect image")
+	})
 }
 
 func TestUnit_Docker_CreateContainer(t *testing.T) {
@@ -1061,14 +1069,6 @@ func TestUnit_Docker_Close(t *testing.T) {
 		require.NoError(t, err)
 		// Should still be 1 because it's idempotent
 		assert.Equal(t, 1, mock.closeCount)
-	})
-
-	t.Run("missing policy - non-retryable inspect error", func(t *testing.T) {
-		mock := &mockDockerClient{imageInspectErr: errors.New("fatal")}
-		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
-		err := runtime.PullImage(context.Background(), "test", "missing", 0, 1*time.Second)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to inspect image")
 	})
 
 	t.Run("Close error propagation", func(t *testing.T) {
