@@ -169,7 +169,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
 - `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
-- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Default: `warn`)
+- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
 - `--log-format`: Set log format (`text`, `json`).
 - `--log-timestamp`: Include timestamp in logs. (Default: `true`)
 
@@ -204,7 +204,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`
+  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
 
 ## Configuration
 
