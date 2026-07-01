@@ -496,6 +496,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	case "diagnosis-format":
 		rv.res.DiagnosisFormat = resolved
 	}
+
 	return nil
 }
 
@@ -582,22 +583,31 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 }
 
 func (rv *resolver) applyIntOption(opt IntOption) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
-	}
+	var p1Set, p2Set bool
+	var p1Int, p2Int int
+	var fastPathUsed bool
 
-	p1Int, ok1 := rv.extractIntValue(p1Val, p1Set)
-	if !ok1 {
-		p1Set = false
-	}
-	p2Int, ok2 := rv.extractIntValue(p2Val, p2Set)
-	if !ok2 {
-		p2Set = false
+	if opt.Name == "pull-max-retries" &&
+		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
+		cliType.Field(info.p1ValIdx).Name == "CderunPullMaxRetries" &&
+		cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
+		p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
+		fastPathUsed = true
+	} else {
+		var s1, s2 bool
+		var v1, v2 reflect.Value
+		var err error
+		info, s1, v1, s2, v2, err = fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Int, p1Set = rv.extractIntValue(v1, s1)
+		p2Int, p2Set = rv.extractIntValue(v2, s2)
 	}
 
 	def := OptionDef[*int]{
@@ -608,30 +618,40 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	}
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
-	if opt.Name == "pull-max-retries" {
+	if fastPathUsed {
 		rv.res.PullMaxRetries = resolved
+	} else {
+		rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	}
 	return nil
 }
 
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-	if err != nil {
-		return err
-	}
+	var p1Set, p2Set bool
+	var p1Float, p2Float float64
+	var fastPathUsed bool
 
-	p1Float, ok1 := rv.extractFloatValue(p1Val, p1Set)
-	if !ok1 {
-		p1Set = false
-	}
-	p2Float, ok2 := rv.extractFloatValue(p2Val, p2Set)
-	if !ok2 {
-		p2Set = false
+	if opt.Name == "cpus" &&
+		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
+		cliType.Field(info.p1ValIdx).Name == "CderunCPUs" &&
+		cliType.Field(info.p2ValIdx).Name == "CPUs" {
+		p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
+		fastPathUsed = true
+	} else {
+		var s1, s2 bool
+		var v1, v2 reflect.Value
+		var err error
+		info, s1, v1, s2, v2, err = fetchFieldAndParams(opt.Name, rv.cliVal)
+		if err != nil {
+			return err
+		}
+		p1Float, p1Set = rv.extractFloatValue(v1, s1)
+		p2Float, p2Set = rv.extractFloatValue(v2, s2)
 	}
 
 	def := OptionDef[*float64]{
@@ -642,9 +662,10 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	}
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
-	if opt.Name == "cpus" {
+	if fastPathUsed {
 		rv.res.CPUs = resolved
+	} else {
+		rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	}
 	return nil
 }
