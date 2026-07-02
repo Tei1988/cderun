@@ -29,6 +29,23 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
+| T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
+| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | - |
+| T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
 
 依存関係・統合の注意:
 
@@ -456,3 +473,616 @@ cderun --prune
 
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
+
+---
+
+## T23: `--group-add` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 高
+- 対象:
+  - `internal/container/config.go`（`ContainerConfig`）
+  - `internal/config/registry.go`（`StringSliceOptions`）
+  - `internal/config/resolver.go`（`CLIOptions`, `ResolvedConfig`）
+  - `internal/config/config.go`（`ConfigDefaults`, `ToolConfig`）
+  - `internal/command/root.go`（`rootOptions`, `resolveSettings`, `buildContainerConfig`, `handleDryRun`）
+  - `internal/command/flags.go`（`getStringSlicePointers`）
+  - `internal/runtime/docker_adapter.go`（`HostConfig.GroupAdd`）
+  - `internal/runtime/containerd.go`（OCI spec `Process.User.AdditionalGids`）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`--mount-tools` や `--mount-socket` 使用時に、コンテナ内のプロセスが Docker ソケットにアクセスするには、ソケットファイルの所有グループ（Mac Docker Desktop では GID 102 等）に所属している必要がある。現状、supplementary group を追加する手段がないため、非 root ユーザーのイメージでは `permission denied` で失敗する。
+
+### 仕様
+
+#### フラグ
+
+| フラグ | 短縮形 | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- | --- |
+| `--group-add` | (なし) | stringArray | (なし) | `CDERUN_GROUP_ADD` |
+| `--cderun-group-add` | (なし) | stringArray | - | - |
+
+- Docker の `--group-add` と同じ形式: グループ名（例: `docker`）またはGID（例: `102`）
+- 環境変数 `CDERUN_GROUP_ADD` はカンマ区切り（例: `102,docker`）
+
+#### 設定ファイル
+
+```yaml
+# .cderun.yaml
+defaults:
+  groupAdd:
+    - "102"
+
+# .tools.yaml
+git:
+  image: alpine/git
+  groupAdd:
+    - "102"
+```
+
+#### ランタイム別の変換
+
+- **Docker / Podman**: `HostConfig.GroupAdd []string` にそのまま渡す
+- **containerd**: OCI spec の `Process.User.AdditionalGids []uint32` に変換（数値のみ。名前解決はコンテナの `/etc/group` に依存するため、containerd では数値GIDのみサポート。名前が渡された場合はエラーとする）
+
+#### dry-run simple 出力
+
+```text
+GroupAdd: 102, docker
+```
+
+#### 優先順位
+
+既存の P1 > P2 > P3 > P4 > P5 > P6 に従う（StringSliceOption 標準パターン）。
+
+### 実装上の注意
+
+- `registry.go` の `StringSliceOptions` に追加する際、`EnvSep` はカンマ（`,`）を使用（`cap-add` と同一パターン）
+- `config.go` の `ConfigDefaults` / `ToolConfig` に `GroupAdd []string` を追加し、`DeepCopy` / `SetBaseDir` を適切に更新（`[]string` なので `DeepCopy` に `copyStringSlice` 追加が必要）
+- containerd で名前→GID変換を行わない設計判断は、コンテナイメージ内の `/etc/group` をマウント前に読むことが困難なため
+
+### 完了条件
+
+- [ ] 全経路チェックリスト（`docs/guidelines/working-guide.md` Section 3）を満たす
+- [ ] `docs/features/command-line-options.md` に `### --group-add` セクションが追加されている
+- [ ] Docker: `HostConfig.GroupAdd` に正しく渡されるユニットテスト
+- [ ] containerd: 数値GIDが `AdditionalGids` に変換されるユニットテスト
+- [ ] containerd: 非数値が渡された場合にエラーになるユニットテスト
+- [ ] dry-run simple format に `GroupAdd` が含まれるテスト
+- [ ] 既存テストが全パス
+
+---
+
+## T24: `--shm-size` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 高
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+Puppeteer / Playwright によるブラウザテスト、ML ワークロード（PyTorch DataLoader の共有メモリ）等で `/dev/shm` のサイズ不足が頻発する。Docker デフォルトは 64MB であり、多くのケースで不足する。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--shm-size` | string | (Docker デフォルト: 64MB) | `CDERUN_SHM_SIZE` |
+
+- Docker の `--shm-size` と同一形式（例: `256m`, `1g`, `2147483648`）
+- `docker/go-units` の `RAMInBytes` でパース
+- Docker: `HostConfig.ShmSize int64`
+- containerd: OCI spec の `/dev/shm` tmpfs マウントの `size` オプション
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T25: `--init` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 高
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+コンテナの PID 1 問題。`--init` なしだとシグナルがアプリに届かずゾンビプロセスが残る場合がある。特に `cderun` はシグナルフォワーディングを行うが、コンテナ内プロセスが PID 1 としてシグナルを適切にハンドリングしない場合に問題になる。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--init` | bool | `false` | `CDERUN_INIT` |
+
+- Docker: `HostConfig.Init *bool`
+- containerd: tini 等の init バイナリをコンテナに注入する機構が必要。containerd 単体では直接サポートしないため、エラーまたは警告とする設計判断が必要
+
+### 実装上の注意
+
+- containerd での対応方針を設計時に決定すること（エラーにする / 警告のみ / tini バイナリマウント）
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker: `HostConfig.Init` に渡るテスト
+- [ ] containerd: 設計決定に基づいた挙動のテスト
+
+---
+
+## T26: `--pid` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 高
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`--pid=host` でホストの PID 名前空間を共有し、デバッグや strace 等で必要。`--pid=container:<id>` も Docker はサポートするが、cderun ではエフェメラルコンテナの特性上 `host` のみで十分。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--pid` | string | (空 = プライベート) | `CDERUN_PID` |
+
+- 値: `host` または空文字列
+- Docker: `HostConfig.PidMode`
+- containerd: OCI spec の Linux namespaces で `pid` の `path` を設定
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T27: `--read-only` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 高
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+ルートファイルシステムを読み取り専用にすることで、セキュリティ強化・コンテナ内の不正な書き込み防止が可能。CI 環境で特に有用。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--read-only` | bool | `false` | `CDERUN_READ_ONLY` |
+
+- Docker: `HostConfig.ReadonlyRootfs`
+- containerd: OCI spec の `Root.Readonly`
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T28: `--ulimit` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`nofile`（ファイルディスクリプタ上限）を増やす必要があるワークロードが多い。Node.js の大規模プロジェクト、Go の大量並行テスト等で必要。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--ulimit` | stringArray | (なし) | `CDERUN_ULIMIT` |
+
+- 形式: `<type>=<soft>:<hard>` または `<type>=<value>`（例: `nofile=65535:65535`）
+- 環境変数はカンマ区切り
+- Docker: `Resources.Ulimits []*Ulimit`（`docker/go-units.Ulimit` 型）
+- containerd: OCI spec の `Process.Rlimits`
+
+### 実装上の注意
+
+- パースは `docker/go-units` の `ParseUlimit` を使用可能
+- `SkipResolution: true` にして `resolveComplexOptions` でカスタムパースが必要
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] パース + Docker / containerd 変換のユニットテスト
+
+---
+
+## T29: `--security-opt` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`no-new-privileges`、SELinux ラベル、AppArmor プロファイル等のセキュリティオプションを指定する。特に `no-new-privileges` は Docker のベストプラクティスとして推奨されている。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--security-opt` | stringArray | (なし) | `CDERUN_SECURITY_OPT` |
+
+- 形式: `key=value` または `key:value`（Docker互換）
+- 環境変数はカンマ区切り
+- Docker: `HostConfig.SecurityOpt []string`
+- containerd: OCI spec の対応フィールド（`no-new-privileges` → `Process.NoNewPrivileges` 等）
+
+### 実装上の注意
+
+- containerd では各オプションを個別にマッピングする必要がある（`no-new-privileges`, `seccomp=`, `apparmor=`, `label=`）
+- サポート範囲を明確に文書化すること
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker: `SecurityOpt` に渡るテスト
+- [ ] containerd: サポート範囲のテスト
+
+---
+
+## T30: `--sysctl` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`net.ipv4.ip_forward` 等のカーネルパラメータをコンテナ単位で設定する。ネットワーク関連のテストや VPN コンテナで必要になることがある。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--sysctl` | stringArray | (なし) | `CDERUN_SYSCTL` |
+
+- 形式: `key=value`（例: `net.ipv4.ip_forward=1`）
+- 環境変数はカンマ区切り
+- Docker: `HostConfig.Sysctls map[string]string`
+- containerd: OCI spec の `Linux.Sysctl map[string]string`
+
+### 実装上の注意
+
+- `map[string]string` 型なので、既存の `StringSliceOption` パターンとは少し異なる。`SkipResolution: true` + カスタムパースが必要
+- バリデーション: `key=value` 形式のチェック
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] パース + Docker / containerd 変換のユニットテスト
+
+---
+
+## T31: `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加
+
+- 種別: 機能追加 + 破壊的変更
+- 優先度: 高
+- 対象:
+  - `internal/config/registry.go`（`StringOptions` の `runtime` エントリ）
+  - `internal/command/root.go`（`rootOptions`, `resolveSettings`, `runtimeFactory`）
+  - `internal/config/resolver.go`（`CLIOptions`, `ResolvedConfig`）
+  - `internal/config/config.go`（`CDERunConfig.Runtime`）
+  - `internal/runtime/docker_adapter.go`（`HostConfig.Runtime`）
+  - すべてのテスト・ドキュメント
+- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md` を更新
+
+### 背景
+
+cderun の現行 `--runtime` は「どのコンテナエンジンに接続するか」（docker / podman / containerd）を指定するフラグ。一方 Docker の `--runtime` は「コンテナ実行時の OCI ランタイム」（runc / crun / nvidia / kata）を指定する。名前の衝突により、Docker 互換の OCI ランタイム指定が追加できない。
+
+### 仕様
+
+#### リネーム
+
+| 旧 | 新 | 環境変数 |
+| --- | --- | --- |
+| `--runtime` | `--engine` | `CDERUN_ENGINE`（旧 `CDERUN_RUNTIME` は非推奨エイリアス） |
+| `--cderun-runtime` | `--cderun-engine` | - |
+
+#### 新規追加
+
+| フラグ | 型 | デフォルト | 環境変数 | 説明 |
+| --- | --- | --- | --- | --- |
+| `--runtime` | string | (空 = Docker デフォルト) | `CDERUN_OCI_RUNTIME` | OCI ランタイムの指定 |
+
+- Docker: `HostConfig.Runtime string`
+- Podman: `--runtime` オプションとして透過的に渡す
+- containerd: OCI spec の runtime 指定（または未サポートエラー）
+
+#### 移行措置
+
+- `CDERUN_RUNTIME` 環境変数は `CDERUN_ENGINE` のエイリアスとして残す（1リリースの deprecation 期間）
+- `.cderun.yaml` の `runtime:` フィールドは `engine:` にリネーム、旧キーも読み込み可能にする
+
+### 実装上の注意
+
+- `resolveRuntimeAndSocket` 関数の変数名 `rv.res.Runtime` は `rv.res.Engine` にリネーム
+- テストの grep 範囲が広いので一括リネームツール（`gorename` 等）を使用推奨
+- P1 フラグの `--cderun-runtime` → `--cderun-engine` も忘れずに
+
+### 完了条件
+
+- [ ] `--engine` で docker/podman/containerd を指定可能
+- [ ] `--runtime` で OCI ランタイムを指定可能（Docker のみ。containerd はエラー）
+- [ ] `CDERUN_RUNTIME` が非推奨警告付きで動作する移行テスト
+- [ ] `.cderun.yaml` の `runtime:` キーが非推奨警告付きで動作するテスト
+- [ ] 全ドキュメント更新
+
+---
+
+## T32: `--dns-search` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+社内 DNS 環境で検索ドメインを設定する必要がある場合に使用。Kubernetes 環境のテストでも `svc.cluster.local` 等の検索ドメインが必要になる。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--dns-search` | stringArray | (なし) | `CDERUN_DNS_SEARCH` |
+
+- 環境変数はカンマ区切り
+- Docker: `HostConfig.DNSSearch []string`
+- containerd: OCI spec の DNS 設定
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T33: `--dns-option` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`resolv.conf` の `options` 行を設定。`ndots:5`, `timeout:2`, `attempts:3` 等。Kubernetes 互換の DNS 設定をコンテナに注入する場合に有用。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--dns-option` | stringArray | (なし) | `CDERUN_DNS_OPTION` |
+
+- 環境変数はカンマ区切り
+- Docker: `HostConfig.DNSOptions []string`
+- containerd: OCI spec の DNS 設定
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T34: `--ipc` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`--ipc=host` で共有メモリセグメントをホストと共有。PostgreSQL のパフォーマンスチューニングや、プロセス間通信を使うアプリケーションのテストで必要。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--ipc` | string | (空 = プライベート) | `CDERUN_IPC` |
+
+- 値: `host`, `private`, `shareable`, `none`, `container:<id>`
+- cderun のユースケースでは `host` と `private` のみ実質的に使用される
+- Docker: `HostConfig.IpcMode`
+- containerd: OCI spec の Linux namespaces で `ipc` 設定
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T35: `--gpus` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+ML ワークロードで NVIDIA GPU をコンテナにパススルーする。`docker run --gpus all` 相当の機能。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--gpus` | string | (なし) | `CDERUN_GPUS` |
+
+- 値: `all`, `"device=0,1"`, `"count=2"` 等（Docker 互換）
+- Docker: `Resources.DeviceRequests []DeviceRequest` に変換
+- containerd: CDI (Container Device Interface) または nvidia-container-runtime 経由
+
+### 実装上の注意
+
+- Docker の `--gpus` は内部で `DeviceRequest` に変換する複雑なパース処理がある
+- containerd では CDI spec を利用するか、`--runtime=nvidia` と組み合わせる形になる
+- 初期実装は Docker のみ対応し、containerd は未サポートエラーで良い
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker: `DeviceRequests` に変換されるユニットテスト
+- [ ] containerd: 未サポートエラーのテスト（T16 と連携）
+
+---
+
+## T36: `--cgroupns` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+cgroup v2 環境でのネームスペース分離を制御。Docker Engine 20.10+ ではデフォルトで `private` だが、ホストの cgroup ツリーを見たい場合に `host` を指定する。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--cgroupns` | string | (空 = Docker デフォルト) | `CDERUN_CGROUPNS` |
+
+- 値: `host`, `private`
+- Docker: `HostConfig.CgroupnsMode`
+- containerd: OCI spec の Linux namespaces で `cgroup` 設定
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T37: `--pids-limit` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+fork bomb 対策。CI 環境やマルチテナント環境でプロセス数を制限する。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--pids-limit` | int64 | (なし = 無制限) | `CDERUN_PIDS_LIMIT` |
+
+- `0` または `-1` は無制限
+- Docker: `Resources.PidsLimit *int64`
+- containerd: OCI spec の `Linux.Resources.Pids.Limit`
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T38: `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 中
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+`--cpus` よりも細かいリソース制御が必要な場合に使用。`--cpu-shares` は相対的な CPU ウェイト、`--cpuset-cpus` は特定 CPU コアへのピン止め。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--cpu-shares` | int64 | (なし) | `CDERUN_CPU_SHARES` |
+| `--cpuset-cpus` | string | (なし) | `CDERUN_CPUSET_CPUS` |
+| `--cpuset-mems` | string | (なし) | `CDERUN_CPUSET_MEMS` |
+
+- `--cpu-shares`: 相対ウェイト（デフォルト 1024）
+- `--cpuset-cpus`: CPU セット（例: `0-3`, `0,1`）
+- `--cpuset-mems`: メモリノード（例: `0-1`）
+- Docker: `Resources.CPUShares`, `Resources.CpusetCpus`, `Resources.CpusetMems`
+- containerd: OCI spec の `Linux.Resources.CPU`
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] Docker / containerd 両方のユニットテスト
+
+---
+
+## T39: `--restart` フラグの追加
+
+- 種別: 機能追加
+- 優先度: 低
+- 対象: 全経路
+- 仕様変更: あり → `docs/features/command-line-options.md` を更新
+
+### 背景
+
+cderun はエフェメラルコンテナを前提としているが、開発中のサーバープロセスをクラッシュ時に自動再起動させたいケースがある。`--remove=false` と組み合わせて使用する。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 |
+| --- | --- | --- | --- |
+| `--restart` | string | `no` | `CDERUN_RESTART` |
+
+- 値: `no`, `always`, `on-failure[:max-retries]`, `unless-stopped`
+- Docker: `HostConfig.RestartPolicy`
+- containerd: 未サポート（エラー）— containerd はデーモンとしてのリスタート管理を持たない
+
+### 実装上の注意
+
+- `--remove=true`（デフォルト）と `--restart` の組み合わせは Docker ではエラーになる。cderun 側でバリデーションし、分かりやすいエラーメッセージを出す
+- パース: `on-failure:3` のようなコロン区切り形式のパースが必要
+
+### 完了条件
+
+- [ ] 全経路チェックリスト満たす
+- [ ] `docs/features/command-line-options.md` に記載
+- [ ] `--remove=true` + `--restart` の排他バリデーションテスト
+- [ ] Docker: `RestartPolicy` に変換されるテスト
+- [ ] containerd: 未サポートエラーのテスト
