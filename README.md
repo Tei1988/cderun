@@ -197,6 +197,7 @@ Key variables include:
 - `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
+- `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
 
 **Note on List-type Options:**
 
