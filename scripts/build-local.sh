@@ -13,6 +13,8 @@ LDFLAGS="-X cderun/internal/version.Version=${VERSION} -X cderun/internal/versio
 
 mkdir -p "${BUILD_DIR}" "${DEST}"
 
+cd "${PROJECT_DIR}"
+
 for GOOS in darwin linux; do
   for GOARCH in amd64 arm64; do
     OUT="${BUILD_DIR}/cderun_${GOOS}_${GOARCH}"

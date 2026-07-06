@@ -26,8 +26,9 @@ coverage:
         informational: true
     patch:
       default:
+        # project ステータスと同様に参考指標（docs/testing/strategy.md 第6節）
         target: auto
-        threshold: 0%
+        informational: true
 
 flag_management:
   default_rules:
