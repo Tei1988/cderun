@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 echo "==> Checking Go toolchain..."
 if ! command -v go >/dev/null 2>&1; then
-    echo "ERROR: Go toolchain not found. Install Go 1.21+ first (https://go.dev/dl/)." >&2
+    echo "ERROR: Go toolchain not found. Install Go 1.25+ first (https://go.dev/dl/)." >&2
     echo "       go.mod の go directive のバージョンは GOTOOLCHAIN により自動取得されます。" >&2
     exit 1
 fi

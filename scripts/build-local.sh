@@ -19,8 +19,8 @@ for GOOS in darwin linux; do
   for GOARCH in amd64 arm64; do
     OUT="${BUILD_DIR}/cderun_${GOOS}_${GOARCH}"
     echo "Building ${OUT}..."
-    export CGO_ENABLED=0 GOOS GOARCH
-    go build -ldflags "${LDFLAGS}" -o "${OUT}" main.go
+    # Scoping variables to the go build command
+    CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags "${LDFLAGS}" -o "${OUT}" main.go
   done
 done
 
