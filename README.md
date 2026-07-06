@@ -247,7 +247,7 @@ python:
 ### Multi-Runtime Support & Auto-detection
 
 `cderun` supports **Docker** and **Podman**, plus experimental **containerd**
-support (host network only; `--network` and `--publish` are not supported on
+support (host network only; `--network`, `--publish`, `--publish-all`, and `--expose` are not supported on
 containerd). It can automatically detect the available runtime by checking for
 common Unix socket paths, in the order docker → containerd → podman.
 

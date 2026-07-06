@@ -128,7 +128,7 @@ Interactive: true
 Network: bridge
 Remove: true
 Mounts: type=bind,source=/home/user/project,target=/workspace,readonly=false
-Env: NODE_ENV=[REDACTED]
+Env: "NODE_ENV"="[REDACTED]"
 Workdir: /workspace
 User:
 Ports:

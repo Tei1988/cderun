@@ -36,7 +36,7 @@ make link-check     # ドキュメント内リンクの検証
 
 バックログは [.agent/todo.md](./.agent/todo.md) にあります。
 
-1. 着手前に本ファイル → `docs/guidelines/working-guide.md` を必ず読む
+1. 着手前に本ファイル → `.agent/todo.md` → `docs/guidelines/working-guide.md` を必ず読む
 2. 原則 **1 タスク = 1 PR**。タスクの「完了条件」をすべて満たすこと
 3. タスク内の file:line は記録時点のもの。ズレていたら grep で再特定する
 4. **Spec-First**: 「仕様変更あり」のタスクは、対応する `docs/features/*.md` の更新が完了条件に含まれる
