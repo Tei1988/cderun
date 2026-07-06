@@ -169,7 +169,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
 - `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
-- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Default: `warn`)
+- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
 - `--log-format`: Set log format (`text`, `json`).
 - `--log-timestamp`: Include timestamp in logs. (Default: `true`)
 
@@ -197,6 +197,7 @@ Key variables include:
 - `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
+- `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
 
 **Note on List-type Options:**
 

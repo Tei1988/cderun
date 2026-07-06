@@ -509,6 +509,11 @@ cderun --prune
 
 ## 発見された不整合・課題
 
+### `registry.go` の `sensitive-env` 説明文の不整合
+
+- **内容**: `internal/config/registry.go` の `sensitive-env` オプションの `Usage` フィールドが `"default uses automatic keywords"` となっているが、現在の実際の実装（および他のドキュメント）では「未指定時はすべての環境変数をマスクする (Mask-all)」挙動となっている。
+- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。
+
 ### 記憶 (Memory) と実装の乖離：環境変数マスキング
 
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。

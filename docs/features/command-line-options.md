@@ -388,6 +388,8 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 - **環境変数**: `CDERUN_SENSITIVE_ENV`
 - **説明**: マスク（非表示）にする環境変数のパターンのリスト。
 - **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_SENSITIVE_ENV` (P3) では、カンマ (`,`) をセパレータとして使用します。
   - 未指定の場合、セキュリティのため**すべての環境変数**がマスクされます（Secure by Default）。
   - 明示的に空を指定した場合（例: `--sensitive-env=""`）、マスクは無効化されます。
   - `*` ワイルドカードを使用した glob パターンが使用可能です（例: `DB_*`, `*_PASSWORD`）。
@@ -547,7 +549,7 @@ cderun --hang-timeout 5s node script.js
 - **デフォルト**: `warn`
 - **環境変数**: `CDERUN_LOG_LEVEL`
 - **説明**: ログレベルを直接指定
-- **値**: `error`, `warn`, `info`, `debug`, `trace` (`warn` のエイリアスとして `warning` も使用可能)
+- **値**: `error`, `warn`, `info`, `debug`, `trace` (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
 - **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
 
 ```bash
