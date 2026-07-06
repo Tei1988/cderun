@@ -56,7 +56,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | - |
 | T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | - |
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | - |
-| T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | - |
+| T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | - |
 | T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
 | T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
@@ -1379,6 +1379,10 @@ containerd の `CreateContainer` は `Network` / ports を明示的に拒否す�
 ### 完了条件
 
 - 不正なポリシー値が起動前にエラーになるテスト（CLI / env / YAML 各経路）
+
+### 完了確認（2026-07 マージ後）
+
+main 側で choke point のバリデーションが実装済みを確認（`internal/command/root.go:1100-1106` で `always` / `missing` / `never` 以外を起動前にエラー化）。ランタイム側の防御的チェック（`docker.go` / `containerd.go` の `PullImage` は依然フォールスルー）は任意項目のため未実施だが、通常の CLI 経路では未知値がランタイムに到達しなくなったため DONE とする。
 
 ---
 
