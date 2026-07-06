@@ -74,11 +74,19 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
+| T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | - |
+| T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
+| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
+| T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
+| T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 
 依存関係・統合の注意:
 
 - **T05 と T06 は統合可能**（`registry.go` のメタデータを single source of truth にすれば両方解決する）。別々に着手する場合は T05 → T06 の順
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
+- **T69 は T05/T06 と統合実装を強く推奨**（registry メタデータからテストを生成するため、single source of truth 化と同じ作業）
+- **T70 は T20 と統合実装を推奨**（CI の実ランタイムジョブをコンフォーマンススイートの器として作る）。T40/T45/T51 の再現ケースを必ず含めること
+- **テスト系タスク（T68〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T68 → T69 → T70 → T71 → T72
 
 ---
 
@@ -1755,3 +1763,134 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 - 早期ログが指定フォーマットで出力されるテスト
 - 不正な log-level が設定ロード前にエラーになるテスト
+
+---
+
+## T68: dry-run ゴールデンテスト基盤（L2）
+
+- 種別: テスト基盤
+- 優先度: 高
+- 対象: `internal/command/`（または専用の `test/golden/` ディレクトリ）、`docs/testing/strategy.md` 第3節 L2
+- 前提: `docs/testing/strategy.md` を必ず読むこと
+
+### 目的
+
+「CLI 呼び出し + 設定ファイル」の組み合わせコーパスに対して `--dry-run --dry-run-format json` の出力をスナップショットとして固定し、引数解析 → ホイスト → P1〜P6 解決 → `ContainerConfig` 構築のパイプライン全体の回帰をひとつの仕組みで検知する。デーモン不要・高速・hermetic。
+
+### 方針
+
+- コーパスは「1 ケース = 1 ディレクトリ」（`args.txt` + `.cderun.yaml` + `.tools.yaml` + `env.txt` + `expected.json`）等の宣言的な構造にし、ケース追加をデータ追加だけで行えるようにする
+- スナップショット更新は明示フラグ（例: `-update`）でのみ許可
+- 出力の環境依存部分（ホームディレクトリ、PWD 等）は正規化してから比較する
+- **必須ケース**: T44 の判別ケース（`cderun --image alpine --cderun-tty sh` → エラー）、`--` エスケープ（T53）、ネスト実行のスナップショット設定、明示的な空リストによる上書き、`{{...}}` 式の解決
+- 秘匿値マスキング（デフォルト mask-all）が dry-run 出力に効いていることもゴールデンで固定する
+
+### 完了条件
+
+- コーパス実行の共通ハーネスが存在し、`go test ./...` で毎 PR 実行される
+- 主要機能（引数解析 / 優先順位 / マウント / env / 式解決）を各 1 ケース以上カバー
+- ケース追加手順が `docs/testing/strategy.md` または専用 README に記載されている
+
+---
+
+## T69: registry 駆動の優先順位マトリクステスト生成（L1）
+
+- 種別: テスト基盤
+- 優先度: 高
+- 対象: `internal/config/registry.go`、`internal/config/resolver_test.go`（または生成テスト専用ファイル）
+- 依存: **T05/T06（registry を single source of truth にする codegen）と統合実装を強く推奨**
+- 前提: `docs/testing/strategy.md` を必ず読むこと
+
+### 目的
+
+P1〜P6 優先順位解決を「全オプション × 全ソース組み合わせ」で機械的に検証する。オプションごとの手書きテストでは網羅も保守も破綻するため、registry のメタデータ（`StringOptions` / `BoolOptions` / `IntOptions` / `Float64Options` / `StringSliceOptions`）からテーブルを生成する。
+
+### 方針
+
+- 各オプションについて「P1 のみ」「P2 のみ」…「P6 のみ」「P1+P3」「P2+P4」等の組み合わせでソースに sentinel 値を注入し、期待される勝者を assert する
+- bool の「明示的 false ≠ 未指定」、リストの「明示的空リストによる上書き」もマトリクスに含める
+- fast-path switch の詰め替え漏れ（値が黙って落ちるトラップ）はこのマトリクスで自動検出されるはず
+- `SkipResolution: true` のオプションは専用の期待値定義を用意する
+
+### 完了条件
+
+- registry にオプションを 1 つ追加すると、優先順位マトリクステストが自動で拡張される
+- 既知のトラップ（fast-path 詰め替え漏れ）を意図的に仕込むとテストが落ちることを確認済み
+
+---
+
+## T70: `ContainerRuntime` コンフォーマンススイート（L3）
+
+- 種別: テスト基盤
+- 優先度: 高
+- 対象: `internal/runtime/`（`conformance_test.go` 等）、`.github/workflows/ci.yaml`
+- 依存: **T20（Docker/Podman の CI ジョブ）と統合実装を推奨**。T16（事前バリデーション）、T40/T45/T51（containerd パリティバグ）と密接に関連
+- 前提: `docs/testing/strategy.md` を必ず読むこと
+
+### 目的
+
+「同じ `ContainerConfig` を渡したら、全ランタイム実装で同じ観測可能な挙動になる」ことを共通の契約テストスイートで保証する。T40（ENTRYPOINT 消失）・T45（cap-drop 黙殺）・T51（不正 OCI spec）のようなパリティバグをクラスごと検出可能にする。
+
+### 方針
+
+- `ContainerRuntime` の各メソッドに対する契約（例: 「Entrypoint 未指定 + Command 指定時はイメージの ENTRYPOINT が前置される」「未対応機能は明示エラーを返す」）をテスト関数群として定義し、実装をパラメータ化して全ランタイムで実行する
+- Mock は毎 PR、実ランタイム（Docker / Podman / containerd）は CI ジョブ（`-tags=runtime`）で同一スイートを回す
+- 「未対応」を返すことが正しいランタイムには、期待値を capability 宣言（T16 の `Capabilities()` 案）として表現できるとよい
+- 検証用イメージは軽量なもの（alpine / busybox + ENTRYPOINT 付きカスタム）に固定し、digest 固定で再現性を確保
+
+### 完了条件
+
+- 契約スイートが Mock + 最低 1 つの実ランタイムで CI 実行されている
+- T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている
+- 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている
+
+---
+
+## T71: mutation testing の導入
+
+- 種別: テスト / CI
+- 優先度: 中
+- 対象: `.github/workflows/`（夜間ジョブ）、`docs/testing/strategy.md` 第6節
+- 前提: `docs/testing/strategy.md` を必ず読むこと
+
+### 目的
+
+「実行はされるが assert されていない」テストを定量化する。行カバレッジに代わる第一指標として mutation score を導入し、生き残ミュータントを改善対象の具体的なリストとして使う。
+
+### 方針
+
+- ツールは gremlins 等の Go 用 mutation testing ツールから選定（メンテナンス状況を確認して決定）
+- 対象はまず `internal/config`（解決ロジック）と `internal/command`（引数解析）に絞る
+- 実行は夜間 / 週次の CI ジョブ（PR ごとには回さない。遅いため）
+- 初回実行の結果（ベースライン score と生き残ミュータント一覧）を記録し、上位の生き残りを T68/T69 のケース追加にフィードバックする
+
+### 完了条件
+
+- 夜間 CI ジョブとして mutation testing が動き、score がログ等で確認できる
+- ベースラインが記録され、`docs/testing/strategy.md` の指標運用と整合している
+
+---
+
+## T72: 既存 coverage 系テストの段階的整理・吸収
+
+- 種別: クリーンアップ（継続タスク）
+- 優先度: 低
+- 対象: `internal/config/*coverage*_test.go`、`internal/command/*coverage*_test.go` ほか（`ls internal/**/*coverage*` で列挙）
+- 依存: T68 / T69 の基盤が先。前提: `docs/testing/strategy.md` 第7節
+
+### 目的
+
+カバレッジ駆動で追加された実装詳細依存のテスト群を、振る舞いテスト（L1/L2）に段階的に吸収し、保守コストと誤った安心感を減らす。
+
+### 方針
+
+- **即削除しない**（回帰価値があるため）。領域単位で進める:
+  1. 対象領域の仕様が `docs/features/*.md` に明文化されていることを確認（なければ先に仕様化）
+  2. その領域の coverage 系テストが検証している挙動を L1/L2 テストとして再表現
+  3. mutation testing（T71）で置き換え後の検出力が落ちていないことを確認してから旧テストを削除
+- 1 領域 = 1 PR。全域を一度にやらない
+
+### 完了条件（領域ごと）
+
+- 対象領域の `*coverage*` ファイルが消え、対応する振る舞いテストが仕様参照コメント付きで存在する
+- mutation score が置き換え前より悪化していない
