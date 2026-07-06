@@ -164,7 +164,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--runtime`: Container runtime to use (`docker`/`podman`).
+- `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -184,7 +184,7 @@ Key variables include:
 - `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_RUNTIME`: Container runtime to use (docker/podman).
+- `CDERUN_RUNTIME`: Container runtime to use (docker/podman/containerd).
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
@@ -204,7 +204,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`
+  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
 
 ## Configuration
 
@@ -245,8 +245,10 @@ python:
 
 ### Multi-Runtime Support & Auto-detection
 
-`cderun` supports both **Docker** and **Podman**. It can automatically detect
-the available runtime by checking for common Unix socket paths.
+`cderun` supports **Docker** and **Podman**, plus experimental **containerd**
+support (host network only; `--network` and `--publish` are not supported on
+containerd). It can automatically detect the available runtime by checking for
+common Unix socket paths, in the order docker → containerd → podman.
 
 ### Intelligent Argument Parsing
 

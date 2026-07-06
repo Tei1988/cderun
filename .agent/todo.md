@@ -8,7 +8,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **Spec-First**: 「仕様変更あり」のタスクは対応する `docs/features/*.md` の更新が完了条件に含まれる
 - テスト追加・修正時は `docs/testing/` 以下のドキュメント（特に `organization.md` の命名規則）を遵守
 - 各タスクは自己完結している。原則 1 タスク = 1 PR とし、「完了条件」をすべて満たすこと
-- 記録のファイルパス・行番号は 2026-06-04 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
+- 記録のファイルパス・行番号は T01〜T39 が 2026-06-04 時点、T40 以降が 2026-07-03 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
 
 ## タスク一覧（サマリ）
 
@@ -19,9 +19,9 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - | - |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | - |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - | DONE |
-| T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | - |
+| T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | DONE |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | DONE |
-| T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | - |
+| T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | DONE |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | - |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | - |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | - |
@@ -46,6 +46,34 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
+| T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | - |
+| T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | - |
+| T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | - |
+| T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | - |
+| T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
+| T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | - |
+| T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
+| T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | - |
+| T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | - |
+| T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | - |
+| T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | - |
+| T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | - |
+| T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
+| T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
+| T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | - |
+| T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | - |
+| T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | - |
+| T57 | `{{file:...}}` のサブパス許可と設定ファイルの信頼境界 | セキュリティ | 中 | 中 | あり | - |
+| T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | - |
+| T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | - |
+| T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | - |
+| T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
+| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
+| T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | - |
+| T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | - |
+| T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
+| T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
+| T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -232,6 +260,10 @@ return "", fmt.Errorf("unknown directive: %q", content)
 - リテラル `{{...}}` を通すための仕様（限定エラー化 or エスケープ記法）が決定され、`docs/features/value-resolution.md` に明記されている
 - ネスト式（`{{env:{{VAR}}}}` 等）の回帰テストが通る
 
+### 完了確認（2026-07-03）
+
+実装済みを確認。`expression.go:352-366` で ALL_UPPER 候補と `:` を含む未知ディレクティブがエラーになり、`{{{{...}}}}` エスケープ（`expression.go:273-274`）と `docs/features/value-resolution.md` の仕様記載も存在する。
+
 ---
 
 ## T12: `IsRetryablePullError` を型付きエラー判定に移行
@@ -260,6 +292,10 @@ return "", fmt.Errorf("unknown directive: %q", content)
 - string マッチが型付き判定に置き換わっている（残す場合は理由をコメントで明記）
 - 「リトライすべき/すべきでない」の代表ケースについてテーブルドリブンテストがある
 
+### 残作業メモ（2026-07-03 検証）
+
+型付き判定（`errdefs`、`*net.DNSError` の `IsNotFound` 区別、`net.Error.Timeout()`）とテーブルドリブンテストは実装済み。ただし `common.go:49-63` の 13 エントリの string リストには「残す理由」のコメントがなく、`"timeout"` / `"rate limit"` のような広い substring が残存、`"toomanyrequests"` の errcode 型移行も未実施。小規模フォローアップとして T65 に含めず単独で対応してもよい。
+
 ---
 
 ## T14: `Phase N` コメントの整理
@@ -286,6 +322,10 @@ Phase コメントは `registry.go` と `resolver.go` の両方に散在する�
 ### 完了条件
 
 - `Phase N` 形式のコメントが消え、各 `SkipResolution` に実質的な理由コメントが付いている（挙動変更なし）
+
+### 完了確認（2026-07-03）
+
+実装済みを確認。`internal/config/` の非テストファイルに `Phase [0-9]` 形式のコメントは残っておらず、`registry.go` の `SkipResolution` には実質的な理由コメントが付いている。
 
 ---
 
@@ -494,6 +534,17 @@ cderun --prune
 ### 背景
 
 `--mount-tools` や `--mount-socket` 使用時に、コンテナ内のプロセスが Docker ソケットにアクセスするには、ソケットファイルの所有グループ（Mac Docker Desktop では GID 102 等）に所属している必要がある。現状、supplementary group を追加する手段がないため、非 root ユーザーのイメージでは `permission denied` で失敗する。
+
+**実運用での報告（2026-07、要再検証）**: ネスト実行 + `--mount-tools` でツールが `/var/run/docker.sock` の権限不足により実行できない事象が報告されている。ただし当該環境ではソケット自体がマウントされていなかった可能性があり、原因が「GID 不足（EACCES）」か「ソケット未マウント（ENOENT）」かは切り分けが必要。着手時はまず再現環境で `ls -la /var/run/docker.sock` と `id` を確認し、エラー種別を特定してから対応すること。
+
+### 追加検討: ソケット GID の自動付与
+
+GID（102 等）を環境ごとに手で調べて設定するのは UX が悪く、環境間でポータブルでもない。`--mount-socket` 有効時に、ホスト側でソケットファイルを `stat` して所有 GID を自動的に supplementary group へ追加するモードを検討する:
+
+- 案 A: `--group-add auto` の特殊値でソケット GID を解決する
+- 案 B: `--mount-socket` 時はデフォルトで自動付与し、opt-out を用意する（挙動変更になるため要仕様判断。ただし「ソケットをマウントしたのにアクセスできない」状態に価値はほぼない）
+- いずれの場合もソケットの `stat` 失敗時（リモートデーモン等）は警告のみで続行する
+- ネスト実行時は、コンテナ内から見えるソケットの GID とホスト側の GID が一致するとは限らないため、スナップショット経由でホスト側の情報を伝搬する必要がある点に注意
 
 ### 仕様
 
@@ -1086,3 +1137,612 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 - [ ] `--remove=true` + `--restart` の排他バリデーションテスト
 - [ ] Docker: `RestartPolicy` に変換されるテスト
 - [ ] containerd: 未サポートエラーのテスト
+
+---
+
+## T40: containerd: コマンド指定時にイメージの ENTRYPOINT が消失する
+
+- 種別: バグ修正
+- 優先度: 高
+- 対象: `internal/runtime/containerd.go:184-199`
+
+### 問題
+
+`config.Entrypoint` が空で `config.Command` が非空の場合、`args = config.Command` を `oci.WithProcessArgs(args...)` で渡している。`WithProcessArgs` は `Process.Args` を丸ごと置き換えるため、`oci.WithImageConfig(img)` が設定したイメージの ENTRYPOINT が破棄される。Docker 経路（`docker_adapter.go:25,33`）は `Cmd` のみ設定しデーモンが ENTRYPOINT を前置するため、挙動が食い違う。
+
+例: `ENTRYPOINT ["git"]` のイメージを `cderun git status` で実行すると、Docker では `git status`、containerd では素の `status` を exec しようとして失敗する。
+
+### 方針
+
+`config.Entrypoint` が空の場合はイメージの OCI config を読み（`img.Spec(ctx)` / `images.Config` + unmarshal）、その Entrypoint を `config.Command` の前に連結してから `WithProcessArgs` に渡す。両方空の場合のみスキップ。
+
+### 完了条件
+
+- ENTRYPOINT を持つイメージ + passthrough-args の組み合わせで Docker と containerd の実行コマンドが一致する
+- Entrypoint 明示指定 / Command のみ / 両方空 の各ケースのユニットテスト
+
+---
+
+## T41: snapshot 一時ディレクトリが `os.Exit` によりリークする
+
+- 種別: バグ修正（リーク）
+- 優先度: 高
+- 対象: `internal/command/root.go:1157-1178`（cleanup defer と `o.exitFunc(exitCode)`）、`root.go:1205`（`localOpts.exitFunc = os.Exit`）、`internal/command/snapshot.go:54-132`
+
+### 問題
+
+`RunE` 内で snapshot クリーンアップが `defer` 登録されているが、同じクロージャが最後に `o.exitFunc(exitCode)`（本番では `os.Exit`）を呼ぶため defer が実行されず、`--mount-cderun` / `--mount-tools` / `--mount-all-tools`（または `HostContext` あり）の全実行で `TempDir()` に `cderun-snap-<uuid>` ディレクトリ（シリアライズ済み `.cderun.yaml` / `.tools.yaml` を含む）がリークする。テストは `exitFunc` を差し替えているため検出できない。
+
+また `createSnapshot` 自身のエラーパス（`snapshot.go:63-73, 107-122`）でも `MkdirAll` 済みディレクトリが `RemoveAll` されない。
+
+### 方針
+
+- `exitFunc` 呼び出しの前に明示的にクリーンアップを呼ぶ、または exit code を typed エラー（例: `ExitCodeError`）で `RunE` から返し、`os.Exit` は `cmd.ExecuteContext` の完了後（`main` 側）でのみ呼ぶ構造にする（T47 と同じ構造変更で解決できるため統合推奨）
+- `createSnapshot` 内にエラー時 `defer os.RemoveAll` を追加
+
+### 完了条件
+
+- 本番経路（`exitFunc = os.Exit`）で snapshot ディレクトリが削除されることを検証するテスト（`exitFunc` をフックして defer 実行を確認する等）
+- `createSnapshot` のエラーパスでディレクトリが残らないテスト
+
+---
+
+## T42: 空文字サブコマンドで nil panic
+
+- 種別: バグ修正
+- 優先度: 高
+- 対象: `internal/command/root.go:1087-1092`（subcommand 抽出）、`root.go:619` / `root.go:720` / `root.go:1149`（nil deref 箇所）
+
+### 問題
+
+`len(args) > 0` かつ `args[0] == ""` の場合、`subcommand == ""` となり `containerConfig` が nil のまま処理が進む。`cderun --dry-run ""` は `handleDryRun` で、`cderun "" foo` は `execute`（`root.go:720`）または snapshot ブロック（`root.go:1149`）で nil deref panic する。resolver の image ガード（`resolver.go:865`）も `subcommand != ""` 条件のため素通りする。シェルで空の変数を quote して渡す（`cderun "$TOOL" ...`）と実際に発生し得る。
+
+### 方針
+
+`root.go:1089` で `args[0] == ""` を「サブコマンドなし」として扱い、help 表示または明示エラーにする。
+
+### 完了条件
+
+- `cderun ""`、`cderun --dry-run ""`、`cderun "" foo` が panic せず明示的なエラー（または help）になるテスト
+
+---
+
+## T43: attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる
+
+- 種別: バグ修正
+- 優先度: 高
+- 対象: `internal/command/root.go:982-994`（attach エラー分岐の `time.After(effectiveHangTimeout)`）、`internal/command/root_termination.go:12-24`（`getHangTimeout`）
+
+### 問題
+
+`AttachContainer` がコンテナ終了前に失敗した場合の分岐で `case <-time.After(effectiveHangTimeout)` を使っているが、TTY+interactive セッション（`getHangTimeout` が 0 を返す）やユーザー指定の `--hang-timeout 0` では `time.After(0)` がほぼ即時発火し、待たずに exit code 0 のまま返る。ドキュメント（`docs/features/hang-timeout.md`）の「`0` = 無期限に待機」と真逆の挙動。同関数内の正常分岐（`root.go:1000, 1023-1031`）は `if effectiveHangTimeout > 0` で正しく分岐している。
+
+### 方針
+
+正常分岐と同じ `effectiveHangTimeout > 0` の構造をエラー分岐にも適用する。
+
+### 完了条件
+
+- hang-timeout 0 + attach エラー時に `waitDone` を無期限に待つことのテスト
+- 既存の hang-timeout テストの回帰確認
+
+---
+
+## T44: `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する
+
+- 種別: バグ修正
+- 優先度: 高
+- 対象: `internal/command/root.go:1252, 1260`（`cmd.Flags().Lookup` / `ShorthandLookup`）、対比: `root.go:1313-1316`（第 2 ループは `PersistentFlags()` フォールバックあり）、`internal/command/flags.go:140`（全フラグは `PersistentFlags()` に登録）
+
+### 問題
+
+cobra は persistent flag を `Flags()` に遅延マージする（`ParseFlags`/`execute` 時）ため、`cmd.ExecuteContext` より前に走る `preprocessArgs` の時点では `cmd.Flags().Lookup` が常に nil を返し、値付きフラグの値スキップが一切行われていない。結果、`cderun --image alpine --cderun-tty sh` では `alpine` がサブコマンドと誤認され、仕様上のエラー `"cderun internal override flag %q must be placed after the subcommand"` が発生せず P1 フラグが黙って受理される。既存テストはこの 2 挙動を区別できるケースを含まない（検証済み）。
+
+### 方針
+
+第 2 ループと同じ `PersistentFlags().Lookup` フォールバックを第 1 ループにも適用する（または先に `cmd.LocalFlags()` を一度呼んでマージを強制する）。T07 のリライトを行う場合はその中で解消してもよいが、判別テストケースは必ず追加する。
+
+### 完了条件
+
+- `cderun --image alpine --cderun-tty sh` が仕様どおりエラーになるテスト
+- 値付き P2 フラグ + サブコマンドの組み合わせでサブコマンド検出が正しいことのテスト
+
+---
+
+## T45: containerd: cap-add / cap-drop / dns / add-host が黙って無視される
+
+- 種別: セキュリティ / バグ修正
+- 優先度: 高
+- 対象: `internal/runtime/containerd.go:153-269`（マッピング欠落）、対比: `internal/runtime/docker_adapter.go:56-59`
+
+### 問題
+
+containerd の `CreateContainer` は `Network` / ports を明示的に拒否する（`containerd.go:171-176`）一方、`config.CapAdd` / `CapDrop` / `DNS` / `AddHosts` は黙って捨てている。`--cap-drop ALL` が成功したように見えてコンテナはデフォルト capability のまま動く「見せかけのハードニング」になり、セキュリティ上危険。
+
+### 方針
+
+- CapAdd / CapDrop は `oci.WithAddedCapabilities` / `oci.WithCapabilities` でマッピングする
+- DNS / AddHosts は実装するか、network/ports と同じ「not supported yet」の明示エラーにする
+- T16（事前バリデーション）の対象リストに capability / DNS / AddHosts を明記して連携する
+
+### 完了条件
+
+- containerd で `--cap-add` / `--cap-drop` が OCI spec に反映されるユニットテスト
+- DNS / AddHosts が「反映される」か「明示エラーになる」かのどちらかであるテスト（黙殺の排除）
+
+---
+
+## T46: 設定レイヤーのマージで `BaseDir` が汚染される
+
+- 種別: バグ修正
+- 優先度: 中
+- 対象: `internal/config/config.go:135-144`（`ConfigDefaults.SetBaseDir`）、`config.go:269-278`（`ToolConfig.SetBaseDir`）、マージ箇所 `config.go:530, 575`
+
+### 問題
+
+`ConfigDefaults.SetBaseDir` / `ToolConfig.SetBaseDir` は `MountCderunPath.BaseDir` / `MountSocketPath.BaseDir` を **`Raw == ""` でも無条件に** 設定する。`mergo.Merge(..., WithOverride)` はフィールド単位で上書きするため、上位レイヤーが `mountCderunPath` を設定していなくても非空の `BaseDir` だけが下位レイヤーの値を上書きし、`Raw` は下位レイヤーのものが残る。結果、例えば `~/.config/cderun/.cderun.yaml` に書いた相対 `mountCderunPath` がプロジェクトディレクトリ基準で解決される。`CDERunConfig.SetBaseDir`（`config.go:37-39`）や `MountConfig` / `DeviceConfig`（`path.go:132-139, 263-270`）は `Raw != ""` ガードで正しく実装されている。
+
+### 方針
+
+両 `SetBaseDir` の `BaseDir` 代入を `Raw != ""` でガードする（既存の正しい実装に揃える）。
+
+### 完了条件
+
+- 「下位レイヤーで相対 `mountCderunPath` を指定 + 上位レイヤーで未指定」の合成テストで、下位レイヤーのディレクトリ基準で解決されること
+
+---
+
+## T47: エラー時にコンテナの exit code が破棄される
+
+- 種別: 改善（堅牢性）
+- 優先度: 中
+- 対象: `internal/command/root.go:1174-1177`、`main.go:11-14`
+- 仕様変更: あり → exit code の仕様を `docs/features/`（該当ドキュメント）に明記
+
+### 問題
+
+`waitForCompletion` は attach 失敗・タイムアウト時にもコンテナの exit code を収集して返す（`root.go:972, 994, 1020`）が、`RunE` は `err != nil` の時点で exit code を捨てて error だけ返し、`main` は一律 exit 1 で終了する。CI で最も重要な「フレーキーな attach でも実コマンドの exit status を返す」ケースが失われる。
+
+### 方針
+
+- exit code を保持する typed エラー（例: `ExitCodeError{Code int}`）を導入し、`main` 側で判別して exit する
+- cderun 内部エラーには docker CLI 互換の 125/126/127 系の採用を検討し、採用する場合は仕様化する
+- T41（`os.Exit` による defer スキップ）と同じ構造変更なので **統合実装を推奨**
+
+### 完了条件
+
+- attach エラー + 非 0 exit code のケースで実 exit code がプロセスの終了コードになるテスト
+- exit code 仕様がドキュメント化されている
+
+---
+
+## T48: Docker AutoRemove と `WaitContainer` の競合で exit code が失われる
+
+- 種別: バグ修正（競合）
+- 優先度: 中
+- 対象: `internal/runtime/docker.go:206-217`（`WaitContainer`）、`internal/runtime/docker_adapter.go:53`（`AutoRemove = config.Remove`）、`internal/command/root.go:767, 951`
+
+### 問題
+
+`HostConfig.AutoRemove = config.Remove`（デフォルト true）の状態で、`StartContainer` 後に `ContainerWait(..., WaitConditionNotRunning)` を発行している。コンテナが即終了してデーモンが auto-remove を完了した後に wait が登録されると `errC` が "No such container" となり、実 exit code が失われて "failed to wait for container" になる。Docker CLI は auto-remove 時に `WaitConditionRemoved` を使い、start 前に wait を登録することでこれを回避している。
+
+### 方針
+
+- `config.Remove` に応じて wait condition を `WaitConditionRemoved` に切り替える（`WaitContainer` に Remove を渡すか、Create 時に記憶する）
+- 加えて NotFound エラー時は失敗ではなくグレースフルにフォールバックする
+
+### 完了条件
+
+- 即終了コンテナ（例: `true` コマンド）+ `--remove` で exit code が正しく取得できるテスト（フレーク検証のため繰り返し実行）
+
+---
+
+## T49: Docker 明示 Remove で匿名ボリュームがリークする
+
+- 種別: バグ修正（リーク）
+- 優先度: 中
+- 対象: `internal/runtime/docker.go:220-230`
+
+### 問題
+
+`RemoveContainer` の `RemoveOptions{Force: true}` に `RemoveVolumes: true` がない。`VOLUME` を宣言するイメージでは、明示 remove 経路（`root.go:812` のクリーンアップが AutoRemove に勝った場合等）を通るたびに匿名ボリュームが残る。デーモン側の auto-remove は匿名ボリュームを削除するため、明示経路だけの問題。エフェメラルコンテナツールとしては一行で直せるリーク。
+
+### 方針
+
+`RemoveVolumes: true` を追加する（containerd 側は既に `WithSnapshotCleanup` 使用済み）。
+
+### 完了条件
+
+- `RemoveOptions` に `RemoveVolumes: true` が渡ることのユニットテスト
+
+---
+
+## T50: pull ポリシーの未知値が `always` として動作する
+
+- 種別: 改善（堅牢性）
+- 優先度: 中
+- 対象: `internal/runtime/docker.go:125-157`、`internal/runtime/containerd.go:106-137`、`internal/config/`（検証の追加先）
+
+### 問題
+
+両ランタイムの `PullImage` は `== "never"` / `== "missing"` のみチェックし、それ以外の値（タイポ `nevr`、大文字 `Never`、k8s 流儀の `IfNotPresent` 等）はすべて無条件 pull にフォールスルーする。どこにもポリシー値のバリデーションがない。
+
+### 方針
+
+設定解決段階（single choke point）で `always` / `missing` / `never` 以外を `InvalidConfigError` にする。ランタイム側にも防御的な `fmt.Errorf("unknown pull policy %q", ...)` を置いてよい。
+
+### 完了条件
+
+- 不正なポリシー値が起動前にエラーになるテスト（CLI / env / YAML 各経路）
+
+---
+
+## T51: containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる
+
+- 種別: バグ修正
+- 優先度: 中
+- 対象: `internal/runtime/containerd.go:213-235`、対比: `internal/runtime/docker_adapter.go:88-107`
+
+### 問題
+
+マウントループが `m.Type` をそのまま OCI spec に渡している。`volume` は OCI のマウントタイプではなく runc がタスク起動時に不明瞭なエラーで失敗する。`tmpfs` は `Source` が空のまま `rw`/`ro` オプションのみで出力され、runc に拒否される（source は `"tmpfs"` であるべき）。Docker 経路は 3 タイプすべて正しく処理している。
+
+### 方針
+
+- `volume` は network/ports と同じ「not supported by containerd runtime」の明示エラーにする
+- `tmpfs` は `Type: "tmpfs", Source: "tmpfs"` + 適切なオプションで正しく構築する
+
+### 完了条件
+
+- containerd + `type=volume` が明示エラーになるテスト
+- containerd + `type=tmpfs` が有効な OCI マウントになるテスト
+
+---
+
+## T52: コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む）
+
+- 種別: 改善（堅牢性）
+- 優先度: 中
+- 対象: `internal/command/root.go:735, 757, 767, 836-864`、`internal/command/signals_unix.go:12-14`
+- 仕様変更: あり → `docs/features/signal-handling-security.md` の更新
+
+### 問題
+
+1. `signal.Notify` はコンテナ start 直前（`root.go:757`）まで設置されないため、`PullImage` / `CreateContainer` 中の SIGINT/SIGTERM はデフォルト動作でプロセスを即死させる。`CreateContainer` 完了後〜Notify 前に受けると deferred remove が走らず orphan コンテナになる
+2. forwarder 開始（757）〜 `StartContainer`（767）の間に受けたシグナルは「未起動コンテナへの転送失敗（warn のみ）」で消費され、その後コンテナは何事もなく起動する — CI の SIGTERM が黙って握りつぶされる
+3. `sigChan` のバッファが 1 のため、`SignalContainer` ブロック中の連続シグナルが落ちる
+4. SIGHUP を Notify していないため、ターミナルクローズで即死し orphan コンテナが残る（T22 の `--prune` は事後対策であり予防にならない）
+
+### 方針
+
+- `initContainer` より前に `signal.Notify` を設置し、コンテナ起動まではシグナルをキューイングするか context キャンセルで作成を中断する
+- チャネルバッファを増やす（例: 4）
+- SIGHUP（必要なら SIGQUIT も）を転送対象に加える。意図的に除外する場合はその設計判断を `signal-handling-security.md` に明記する
+
+### 完了条件
+
+- pull/create 中のシグナルで orphan コンテナが残らないテスト
+- 起動直前のシグナルが失われず、起動後に転送されるかプロセスが安全に中断されるテスト
+- SIGHUP の扱いが実装とドキュメントで一致している
+
+---
+
+## T53: 引数ホイストの `--` エスケープ対応
+
+- 種別: 挙動変更
+- 優先度: 中
+- 対象: `internal/command/root.go:1299-1325`（ホイストループ）
+- 仕様変更: あり → `docs/features/argument-parsing.md` の更新必須
+
+### 問題
+
+ホイストはサブコマンド後の全引数を走査し `--` (end-of-flags) を認識しないため、`cderun echo -- --cderun-tty` でもホイストされてしまい、リテラルの `--cderun-*` 文字列をコンテナコマンドに渡す手段が存在しない。
+
+### 方針
+
+リテラル `--` 以降はホイスト対象外とする。`--` 自体を strip するか残すかを仕様として決定し `argument-parsing.md` に明記する。T07 のリライトと同時に実装するのが効率的。
+
+### 完了条件
+
+- `--` 以降の `--cderun-*` がコンテナに素通しされるテスト
+- 仕様が `docs/features/argument-parsing.md` に記載されている
+
+---
+
+## T54: 環境変数の bool/int/float パース失敗が黙殺される
+
+- 種別: 改善（堅牢性）
+- 優先度: 中
+- 対象: `internal/config/option.go:87-93`（bool）、`option.go:208-214`（float64）、`option.go:247-253`（int）
+
+### 問題
+
+`CDERUN_TTY=yes`、`CDERUN_PULL_MAX_RETRIES=abc`、`CDERUN_CPUS=two` などパース不能な環境変数は診断なしで下位優先度ソースにフォールスルーする。未知 YAML キーや未知ディレクティブ（T11）をエラーにする本パッケージの厳格な姿勢と矛盾し、挙動が黙って変わる。
+
+### 方針
+
+環境変数が設定されているのにパース不能な場合は `InvalidConfigError` を返す（ヘルパーにエラー戻り値を通す必要あり）。互換性を重視するなら最低限 `logging.Warn` を出す。
+
+### 完了条件
+
+- 不正な bool/int/float 環境変数がエラー（または警告）になるテーブルドリブンテスト
+
+---
+
+## T55: CLI `--device` が不正な perms を黙認する
+
+- 種別: 改善（堅牢性）
+- 優先度: 低
+- 対象: `internal/config/path.go:345-384`（`ParseDeviceConfig`）、`path.go:199-210`（YAML 側の重複検証）、`internal/config/resolver_helpers.go:85-99`
+
+### 問題
+
+`ParseDeviceConfig("/dev/x:/dev/y:bogus")` は `bogus` が `permsRegex` に不一致でも黙ってコンテナパスに折り込む（`Destination = "/dev/y:bogus"`、perms は `rwm`）。YAML 経路の `UnmarshalYAML` は明示的な perms 検証でエラーにするため、CLI / `CDERUN_DEVICE` 経路とで挙動が非対称。
+
+### 方針
+
+perms 検証を `ParseDeviceConfig` 側に移し（最終セグメントが `^[rwm]+$` 不一致かつ残りが有効ペアなら `ok=false`）、`UnmarshalYAML` の重複検証を削除する。
+
+### 完了条件
+
+- CLI / env / YAML の 3 経路で不正 perms が同一のエラーになるテスト
+
+---
+
+## T56: ポート番号の範囲検証（0 / 負数 / 65535 超）
+
+- 種別: 改善（堅牢性）
+- 優先度: 低
+- 対象: `internal/config/path.go:753-809`（`ValidatePort`）、`path.go:876-906`（`ValidateExposePort`）
+
+### 問題
+
+数値チェックが素の `strconv.Atoi` のみで、`-1`、`+80`、`0`、`70000` を受理する。`-p 70000:80` や `--expose -5` が「セキュリティ検証」を通過し、ランタイム層で不明瞭に失敗する。
+
+### 方針
+
+共通の `validatePortNumber(s string, allowZero bool)` で 1〜65535 を強制（host port の 0 =ランダム割当のみ許可）。`expose` の範囲指定には開始 ≤ 終了のチェックも追加。
+
+### 完了条件
+
+- 境界値（0 / 1 / 65535 / 65536 / 負数 / `+80`）のテーブルドリブンテスト
+
+---
+
+## T57: `{{file:...}}` のサブパス許可と設定ファイルの信頼境界
+
+- 種別: セキュリティ（設計判断が必要）
+- 優先度: 中
+- 対象: `internal/config/expression.go:369-371`（絶対パス・`..` のみ拒否）、対比: `expression.go:439`（`find_dir` は `/` `\` を全面拒否）、`internal/config/config.go:440-486`（`FindConfigs` の上方探索）
+- 仕様変更: あり → `docs/features/value-resolution.md` に脅威モデルを明記
+
+### 問題
+
+`resolveFile` は `.ssh/id_rsa` のような相対サブパスを受理し、`FindConfigs` は cwd から `/` まで祖先ディレクトリを探索して設定を自動ロードする。クローンしたリポジトリの `.tools.yaml` に `env: ["X={{file:.ssh/id_rsa}}"]` が仕込まれていた場合、`$HOME` 配下の cwd で `cderun <tool>` を実行するだけで `~/.ssh/id_rsa` が読まれ、ネットワークアクセスし得るコンテナへ注入される。`find_dir` がパス区切りを全面拒否しているのと非対称。
+
+### 方針（いずれかを設計判断）
+
+1. `file:` を `find_dir` と同様に単一ファイル名に制限する
+2. プロジェクトサブツリー内の dotfile 風の名前に制限する
+3. direnv 流の trust プロンプト（所有者が異なる設定の初回確認）を導入する
+4. 最低限、現状の脅威モデルを `value-resolution.md` に明記する
+
+### 完了条件
+
+- 採用した方針が実装され、`docs/features/value-resolution.md` に脅威モデルとともに記載されている
+- 祖先ディレクトリの機密ファイル読み出しシナリオのテスト（採用方針に応じて「拒否される」or「明示 opt-in が必要」）
+
+---
+
+## T58: ランタイム自動検出が substring マッチで誤検出し得る
+
+- 種別: 改善（堅牢性）
+- 優先度: 低
+- 対象: `internal/config/resolver.go:953-961`
+
+### 問題
+
+`strings.Contains(SocketPath, "podman")` のようなパス全体への substring マッチのため、`/home/podman-migration/docker.sock` が podman と誤検出される等、親ディレクトリ名の影響を受ける。
+
+### 方針
+
+パスの basename（`docker.sock` / `podman.sock` / `containerd.sock`）でマッチし、不一致は docker フォールバックにする。
+
+### 完了条件
+
+- 紛らわしいパス（親ディレクトリにランタイム名を含む等）での検出結果のテーブルドリブンテスト
+
+---
+
+## T59: クリーンアップ用 `RemoveContainer` にタイムアウトがない
+
+- 種別: 改善（堅牢性）
+- 優先度: 低
+- 対象: `internal/command/root.go:808-816`
+
+### 問題
+
+deferred cleanup は `context.WithoutCancel(ctx)` を使っており（ユーザーキャンセルを生き延びる意図は正しい）、上限がないためデーモンソケットが詰まるとワークロード完了後に cderun が永久にハングする。
+
+### 方針
+
+`context.WithTimeout`（例: 30s）でラップし、期限切れ時はログを出して諦める。
+
+### 完了条件
+
+- ハングする mock ランタイムで cleanup がタイムアウト後に返るテスト
+
+---
+
+## T60: duration オプションが式解決エラーを握りつぶす
+
+- 種別: 改善（堅牢性）
+- 優先度: 低
+- 対象: `internal/config/resolver.go:696-709`（`applyDurationOption`）、対比: `resolver.go:734-744`（`applyMemoryOption` は正しい）
+
+### 問題
+
+`hang-timeout` / `pull-backoff-base` 内の `{{...}}` 式が失敗すると、未解決文字列が `time.ParseDuration` に渡り `invalid hang-timeout value "{{env:...}}"` という誤解を招くエラーになる。`applyMemoryOption` は先に `rv.r.Error()` をチェックして本来のディレクティブエラーを返している。
+
+### 方針
+
+`applyDurationOption` にも `if exprErr := rv.r.Error(); exprErr != nil { return exprErr }` を追加する（`resolver.go:699` 付近）。
+
+### 完了条件
+
+- 式解決に失敗する duration 値で、ディレクティブ本来のエラーが返るテスト
+
+---
+
+## T61: Docker attach: stdin エラー時に出力を drain せず切断する
+
+- 種別: 改善
+- 優先度: 低
+- 対象: `internal/runtime/docker.go:351-358`
+
+### 問題
+
+`<-stdinDone` 分岐で stdin エラーがあると即 return し、deferred `resp.Close()` が出力コピーを途中で殺すため、stdin 失敗前後にコンテナが出力したデータが失われ得る。
+
+### 方針
+
+stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パターン）で `outputDone` を drain してから stdin エラーを返す。
+
+### 完了条件
+
+- stdin エラー発生時に直前のコンテナ出力が失われないテスト
+
+---
+
+## T62: containerd: `ioWait` 削除の競合と attach 順序契約の明文化
+
+- 種別: 改善（保守性・潜在競合）
+- 優先度: 低
+- 対象: `internal/runtime/containerd.go:339-341`（`RemoveContainer` の `ioWait` 削除）、`containerd.go:278-284, 403-407, 448-453`、`internal/runtime/interface.go:23`
+
+### 問題
+
+1. `RemoveContainer` が `r.ioWait[containerID]` を削除するが、このエントリは `AttachContainer` が登録・削除の所有権を持つ。attach が `waitC` でブロック中に Remove が走ると `notifyWait` が no-op になり ctx キャンセルでしか抜けられない。現在の呼び出し順（defer LIFO）では顕在化しないが、T22 の prune が任意 ID に `RemoveContainer` を呼ぶと踏む
+2. containerd の `AttachContainer` は `StartContainer` より先に呼ばれないと `cio.NullIO` にフォールバックして全 IO が黙って捨てられるが、この順序前提が `ContainerRuntime` インターフェースに文書化されていない（Docker は順序不問）
+
+### 方針
+
+- `containerd.go:339-341` の削除処理を除去する（ioMap/ioWait の所有権は Attach/Start 側に置く）
+- `interface.go` の `AttachContainer` に順序契約をコメントで明記し、containerd の `StartContainer` が `NullIO` フォールバックする際は warn ログを出す
+
+### 完了条件
+
+- attach 中に Remove しても notify が失われないテスト
+- インターフェースコメントと warn ログの追加
+
+---
+
+## T63: CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消
+
+- 種別: CI / ドキュメント
+- 優先度: 中
+- 対象: `.github/workflows/ci.yaml`、`docs/testing/coverage.md`、`docs/testing/runtime-tests.md`、`codecov.yml`
+
+### 問題
+
+`docs/testing/coverage.md`（Codecov 自動アップロード、unit ジョブの 86.5% fast-fail、Docker 20.10/25.0/29.0 の E2E マトリクス + カバレッジマージ）と `docs/testing/runtime-tests.md` の「CI 構成」（docker:dind マトリクス、Build-artifact ジョブ、`TEST_HOST_TMP_DIR`）が記述するパイプラインは、実際の `ci.yaml`（`go test -v ./...` + containerd 統合ジョブのみ）に存在しない。`codecov.yml` は `after_n_builds: 4` を期待するが CI は一度もアップロードしない。containerd ジョブは逆にドキュメント側に記載がない。
+
+### 方針（設計判断が必要）
+
+1. ドキュメントどおりのパイプラインを復元する（T20 の Docker/Podman ジョブ追加と統合可能）
+2. または現状の CI に合わせて両ドキュメントと `codecov.yml` を書き直す
+
+どちらを選ぶか判断し、選ばなかった側の記述を残さないこと。
+
+### 完了条件
+
+- `ci.yaml` と `docs/testing/` の記述が完全に一致している
+- `codecov.yml` の期待値が実際のアップロード数と一致している（または Codecov を廃止）
+
+---
+
+## T64: CLI help / Makefile の文字列修正（containerd・mask-all 反映）
+
+- 種別: クリーンアップ
+- 優先度: 低
+- 対象: `internal/config/registry.go:210, 277`、`Makefile:16`
+
+### 問題
+
+1. `registry.go:210` の `--sensitive-env` Usage が "(default uses automatic keywords)" — 実装（`masking.go:18-21`）は未指定時に全値マスクであり、キーワードベースのマスキングはコードに存在しない
+2. `registry.go:277` の `--runtime` Usage が "(docker/podman)" — containerd がサポート済み（`resolver.go:1180-1185`）。※ T31 のリネームが先に着手される場合はそちらに折り込む
+3. `Makefile:16` の `test-runtime` の echo も "(Docker/Podman)" のまま
+
+### 方針
+
+- `--sensitive-env`: "(unset: all values masked; empty: masking disabled)" 等、実挙動に合わせる
+- `--runtime`: "(docker/podman/containerd)" にする
+- Makefile の echo に containerd を追記
+
+### 完了条件
+
+- 3 箇所の文字列が実装と一致し、help のスナップショットテスト（あれば）が更新されている
+
+---
+
+## T65: dead code 削除・小規模クリーンアップ一括
+
+- 種別: クリーンアップ
+- 優先度: 低
+- 対象: 下記の各箇所（挙動変更なし）
+
+### 内容
+
+1. `internal/config/resolver.go:229-232` — 未使用の `ptr[T]` ヘルパー。`// ResolveWithFS combines...` の doc コメントが誤ってこの関数に付いている。関数を削除し、コメントを本来の `ResolveWithFS`（`resolver.go:748`）に移す
+2. `internal/config/path.go:389` — `magicWordPreRegex` はコンパイルされるが全リポジトリで未参照。削除
+3. `internal/config/resolver.go:323-325` — `initFieldInfo`（`resolver.go:283-285`）の挿入条件により到達不能な防御分岐。削除またはコメント化
+4. `internal/runtime/docker_adapter.go:61` — `Tmpfs: make(map[string]string)` は生成後一切書き込まれない dead フィールド初期化（tmpfs は `Mounts` 経由で処理済み）。削除
+5. `internal/runtime/docker.go:40` — `signalRegex` の第 2 選択肢が第 1・第 3 を包含しており実質 `^(?i)[A-Z0-9]+$`。containerd の `parseSignal`（`containerd.go:486-514`）流の検証に揃えるか正規表現を簡潔化
+6. `internal/config/registry.go:208-217` — `sensitive-env` が `resolveEarly`（`resolver.go:830-849`）と `resolveCustomParsing`（`resolver.go:1086-1094`）で二重解決されている。registry エントリに `SkipResolution: true // resolved early in resolveEarly (needed for masking during resolution)` を付ける
+
+### 完了条件
+
+- 全項目適用後、既存テストが全パス（挙動変更なしの確認）
+
+---
+
+## T66: テスト専用ヘルパーを `_test.go` に移動
+
+- 種別: クリーンアップ（保守性）
+- 優先度: 低
+- 対象: `internal/command/testhelpers.go`（`TerminationMockRuntime`, `RootErrorFS`）、`internal/command/run_helpers.go`（`runCderun`, `runCderunCore`）、`internal/command/runtime_helper.go`
+
+### 問題
+
+これらのシンボルは `*_test.go`（および相互）からしか参照されていない（grep 検証済み）のに通常ビルドに含まれ、`runtime.MockRuntime` / `config.MockFileSystem` を本番コンパイル単位に引き込んでいる。
+
+### 方針
+
+- `*_test.go` にリネームする（`runtime_helper.go` は `//go:build runtime` タグを `_test.go` ファイル内に維持）
+- ついでに `findCderunBinary`（`runtime_helper.go:61-86`）が「`cderun` という名前のディレクトリ」を誤ってバイナリとして返す問題を `!info.IsDir()` チェックで修正する
+
+### 完了条件
+
+- 非テストビルドに mock 型が含まれない（`go build ./...` 後のシンボル確認 or ファイル構成レビュー）
+- 既存テストが全パス
+
+---
+
+## T67: 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する
+
+- 種別: 改善（UX）
+- 優先度: 低
+- 対象: `internal/command/root.go:1069-1079`（`_ = o.logger.Init(initialLevel, "text", true)`）、`root.go:1120`（2 回目の Init）
+
+### 問題
+
+設定ロード中の早期ロガーは `CDERUN_LOG_FORMAT` / `--log-format` / `--log-timestamp` を無視して常に `text` + timestamp で出力し、不正な `--log-level` / `CDERUN_LOG_LEVEL` は黙って warn にフォールバックして 2 回目の Init まで報告されない。早期の debug ログを JSON で機械処理できず、レベルのタイポのエラーが遅れて出る。
+
+### 方針
+
+早期 Init でも CLI / env のフォーマット・タイムスタンプ指定を反映し、不正レベルは即時エラーにする。
+
+### 完了条件
+
+- 早期ログが指定フォーマットで出力されるテスト
+- 不正な log-level が設定ロード前にエラーになるテスト

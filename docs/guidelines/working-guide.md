@@ -28,15 +28,20 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 .
 ├── main.go               # エントリーポイント（極力シンプルに）
 ├── internal/             # 外部からimportされたくないコード
-│   ├── command/          # Cobraのコマンド定義 (root.go, root_test.go)
+│   ├── command/          # Cobraのコマンド定義 (root.go, flags.go)
+│   ├── config/           # 設定ファイル・オプション解決 (resolver.go, registry.go)
 │   ├── container/        # 中間表現 (config.go)
-│   └── runtime/          # コンテナランタイム抽象化・実装 (interface.go, docker.go)
-├── pkg/                  # (Optional) 外部公開しても良いライブラリコード
+│   ├── logging/          # ロガー
+│   ├── runtime/          # コンテナランタイム抽象化・実装 (interface.go, docker.go, podman.go, containerd.go)
+│   └── version/          # バージョン情報
 ├── docs/
 │   ├── features/         # 機能要件
 │   ├── architecture/     # アーキテクチャ・ライブラリ選定
+│   ├── testing/          # テスト設計・カバレッジ方針
 │   └── guidelines/       # このファイル
-└── tests/                # 統合テスト（必要な場合）
+├── scripts/              # ビルド・インストール等の補助スクリプト
+├── test/                 # ランタイムテスト用のフィクスチャ
+└── testdata/             # テストデータ
 ```
 
 ## 3. Adding a New Option

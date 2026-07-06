@@ -248,9 +248,9 @@ cderun --strict-env --env NPM_TOKEN node app.js
 ### `--runtime`
 
 - **型**: string
-- **デフォルト**: `docker`
+- **デフォルト**: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。いずれも見つからない場合は `docker` にフォールバック）
 - **環境変数**: `CDERUN_RUNTIME`
-- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman`）
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）
 
 ```bash
 cderun --runtime podman node app.js
@@ -391,6 +391,8 @@ cderun --cap-add SYS_ADMIN alpine mount ...
   - 未指定の場合、セキュリティのため**すべての環境変数**がマスクされます（Secure by Default）。
   - 明示的に空を指定した場合（例: `--sensitive-env=""`）、マスクは無効化されます。
   - `*` ワイルドカードを使用した glob パターンが使用可能です（例: `DB_*`, `*_PASSWORD`）。
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_SENSITIVE_ENV` (P3) では、カンマ (`,`) をセパレータとして使用します。
 
 ### `--entrypoint`
 

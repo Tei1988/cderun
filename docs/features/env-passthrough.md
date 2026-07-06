@@ -212,7 +212,9 @@ Error: required environment variable not found: NPM_TOKEN
 ```bash
 cderun --dry-run node app.js
 env:
-  - NODE_ENV=production
-  - NPM_TOKEN=secret123
-  - HOME=/home/alice
+  - NODE_ENV=[REDACTED]
+  - NPM_TOKEN=[REDACTED]
+  - HOME=[REDACTED]
 ```
+
+デフォルトでは**すべての**環境変数の値がマスクされます（Secure by Default）。実際の値を確認したい場合は `--sensitive-env=""` でマスクを無効化できます（[機密データ保護](./sensitive-data-protection.md) を参照）。

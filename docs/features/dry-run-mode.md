@@ -42,7 +42,7 @@ mounts:
     source: /home/user/project
     target: /workspace
 env:
-  - NODE_ENV=development
+  - NODE_ENV=[REDACTED]
 workdir: /workspace
 user: ""
 ports:
@@ -90,7 +90,7 @@ devices:
       "target": "/workspace"
     }
   ],
-  "env": ["NODE_ENV=development"],
+  "env": ["NODE_ENV=[REDACTED]"],
   "workdir": "/workspace",
   "user": "",
   "ports": ["8080:80"],
@@ -204,14 +204,16 @@ image: node:20-alpine
 
 ### 環境変数の展開
 
-ドライラン時も環境変数は実際の値に展開される：
+ドライラン時も環境変数は実際の値に解決されるが、出力上はデフォルトで**すべての値がマスクされる**（Secure by Default。[機密データ保護](./sensitive-data-protection.md) を参照）：
 
 ```bash
 export API_KEY=secret123
 cderun --dry-run --env API_KEY node app.js
 env:
-  - API_KEY=secret123
+  - API_KEY=[REDACTED]
 ```
+
+実際の値を出力で確認したい場合は、`--sensitive-env=""` を指定してマスクを無効化する。
 
 ### パスの解決
 

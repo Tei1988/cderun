@@ -89,7 +89,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 #### トップレベル
 
-- `runtime` (string): 使用するコンテナランタイム (`docker` | `podman`)
+- `runtime` (string): 使用するコンテナランタイム (`docker` | `podman` | `containerd`)
 - `socketPath` (string): ホスト上のランタイムソケットの絶対パス
 - `defaults` (object): cderunコマンドのデフォルト動作（下記参照）
 - `logging` (object): ログ出力設定
@@ -105,7 +105,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 - `pullMaxRetries` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
 - `mountCderunPath`, `mountSocketPath` (ConfigPath object/string)
-- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env`, `devices` ([]string)
+- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)

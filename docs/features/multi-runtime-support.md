@@ -39,7 +39,7 @@ cderun ContainerRuntimeインターフェース
         │
         ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
         ├── PodmanRuntime → Podman API (HTTP over Unix socket)
-        └── NerdctlRuntime → containerd API (gRPC)
+        └── ContainerdRuntime → containerd API (gRPC)
 ```
 
 ### 共通インターフェースの役割
