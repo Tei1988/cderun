@@ -4,7 +4,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 
 ## エージェント向け共通ルール
 
-- 着手前に必ず `AGENT.md` → `docs/guidelines/working-guide.md`を読むこと
+- 着手前に必ず `AGENTS.md` → `docs/guidelines/working-guide.md`を読むこと（環境構築は `bash scripts/setup-agent-env.sh`）
 - **Spec-First**: 「仕様変更あり」のタスクは対応する `docs/features/*.md` の更新が完了条件に含まれる
 - テスト追加・修正時は `docs/testing/` 以下のドキュメント（特に `organization.md` の命名規則）を遵守
 - 各タスクは自己完結している。原則 1 タスク = 1 PR とし、「完了条件」をすべて満たすこと
