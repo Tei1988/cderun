@@ -69,7 +69,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | - |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
 | T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
-| T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | - |
+| T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | - |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
@@ -1675,6 +1675,16 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 - `ci.yaml` と `docs/testing/` の記述が完全に一致している
 - `codecov.yml` の期待値が実際のアップロード数と一致している（または Codecov を廃止）
+
+### 完了確認（2026-07-06）
+
+「現実を正としつつ理想像の価値ある部分を段階的に取り込む」方針で解消済み:
+
+- `ci.yaml`: unit ジョブに `-coverprofile` + Codecov アップロード（`unit` フラグ）を追加
+- `codecov.yml`: `after_n_builds: 4 → 1` に修正。project ステータスの 86.5% ハード閾値を `informational` に変更（`docs/testing/strategy.md` 第6節と整合）
+- `docs/testing/coverage.md`: CI 節を実態（unit アップロードのみ + containerd ジョブ）に書き換え。runtime フラグは T20 で追加と明記
+- `docs/testing/runtime-tests.md`: 実在しない DinD マトリクス / Build-artifact ジョブの記述を削除し、実在する containerd ジョブを記載。Docker 3 バージョンマトリクスは不採用と判断を明記
+- 残タスク: T20 実装時に `runtime` フラグのアップロード追加と `after_n_builds` の更新（T20 に記載済みの完了条件と合わせて対応）
 
 ---
 
