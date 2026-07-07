@@ -226,7 +226,7 @@ func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDER
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
-// ResolveWithFS combines CLI flags, environment variables, tool-specific config, and global defaults using the provided filesystem.
+
 func ptr[T any](v T) *T {
 	return &v
 }
@@ -780,6 +780,7 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	return nil
 }
 
+// ResolveWithFS combines CLI flags, environment variables, tool-specific config, and global defaults using the provided filesystem.
 func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig, fs FileSystem) (*ResolvedConfig, error) {
 	if cli == nil {
 		cli = &CLIOptions{}
