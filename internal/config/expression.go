@@ -249,18 +249,18 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			if len(ranges) > 0 {
 				var sb strings.Builder
 				last := 0
-				usedSb := false
+				sbInitialized := false
 				for _, rng := range ranges {
 					if r.err != nil {
-						if usedSb {
+						if sbInitialized {
 							sb.WriteString(s[last:rng.start])
 							sb.WriteString(s[rng.start:rng.end])
 						}
 					} else {
-						if !usedSb {
+						if !sbInitialized {
 							sb.Grow(len(s))
 							sb.WriteString(s[:rng.start])
-							usedSb = true
+							sbInitialized = true
 						} else {
 							sb.WriteString(s[last:rng.start])
 						}
@@ -290,7 +290,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 					}
 					last = rng.end
 				}
-				if usedSb {
+				if sbInitialized {
 					sb.WriteString(s[last:])
 					resolved = sb.String()
 				}

@@ -24,38 +24,60 @@ func pickConfigs[T any](
 	fs FileSystem,
 ) ([]T, error) {
 	if p1 != nil {
-		res := make([]T, 0, len(p1))
-		for _, s := range p1 {
+		if parser == nil {
+			if res, ok := any(p1).([]T); ok {
+				return res, nil
+			}
+			return nil, errors.New("parser required for non-string types")
+		}
+		res := make([]T, len(p1))
+		for i, s := range p1 {
 			v, err := parser(s, "override")
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, v)
+			res[i] = v
 		}
 		return res, nil
 	}
 	if p2 != nil {
-		res := make([]T, 0, len(p2))
-		for _, s := range p2 {
+		if parser == nil {
+			if res, ok := any(p2).([]T); ok {
+				return res, nil
+			}
+			return nil, errors.New("parser required for non-string types")
+		}
+		res := make([]T, len(p2))
+		for i, s := range p2 {
 			v, err := parser(s, "")
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, v)
+			res[i] = v
 		}
 		return res, nil
 	}
 	if envKey != "" {
 		if env, ok := fs.LookupEnv(envKey); ok {
-			res := []T{}
+			var res []T
 			for s := range strings.SplitSeq(env, envSep) {
 				s = strings.TrimSpace(s)
 				if s == "" {
 					continue
 				}
-				v, err := parser(s, "env")
-				if err != nil {
-					return nil, err
+				var v T
+				if parser == nil {
+					if sv, ok := any(s).(T); ok {
+						v = sv
+					} else {
+						return nil, errors.New("parser required for non-string types")
+					}
+				} else {
+					var err error
+					v, err = parser(s, "env")
+					if err != nil {
+						return nil, err
+					}
 				}
 				res = append(res, v)
 			}
@@ -119,7 +141,7 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 		p1, p2, envKey, ";", subcommand, tools,
 		func(t ToolConfig) []string { return t.Env },
 		global, func(g CDERunConfig) []string { return g.Defaults.Env },
-		func(s, src string) (string, error) { return s, nil },
+		nil,
 		fs,
 	)
 	if err != nil {
