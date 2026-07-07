@@ -214,6 +214,7 @@ var StringSliceOptions = []StringSliceOption{
 		GlobalGetter: func(g CDERunConfig) []string {
 			return g.Defaults.SensitiveEnv
 		},
+		SkipResolution: true, // resolved early in resolveEarly
 	},
 }
 

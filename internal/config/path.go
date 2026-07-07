@@ -386,7 +386,6 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 var (
 	schemeRegex       = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex        = regexp.MustCompile(`^[rwm]+$`)
-	magicWordPreRegex = regexp.MustCompile(`^(~)([/\\]|$)`)
 
 	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
