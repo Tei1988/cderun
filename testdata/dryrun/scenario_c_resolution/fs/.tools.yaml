@@ -1,4 +1,4 @@
 go:
   image: golang:{{file:.go-version}}
   env:
-    - PROJECT_ROOT={{find_dir:.git}}
+    - PROJECT_ROOT={{find_dir:.git-mock}}
