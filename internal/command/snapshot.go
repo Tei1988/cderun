@@ -55,6 +55,14 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		return "", "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
+	// Ensure cleanup of the snapshot directory if any subsequent step fails.
+	var success bool
+	defer func() {
+		if !success {
+			_ = cleanupSnapshot(fs, snapshotDir)
+		}
+	}()
+
 	// When running inside a container (level > 0), snapshotDir is a container-local path.
 	// Resolve it to a host path for SnapshotDir, which is used as a mount source.
 	hostSnapshotDir := snapshotDir
@@ -121,6 +129,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		return "", "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 
+	success = true
 	return snapshotDir, hostSnapshotDir, nil
 }
 

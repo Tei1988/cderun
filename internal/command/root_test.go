@@ -239,12 +239,18 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
-			o.exitFunc = func(code int) {
-				capturedExitCode = code
-			}
 			o.isTerminal = func(fd int) bool { return true }
 		})
-		require.NoError(t, err)
+		if err != nil {
+			var exitErr *ExitCodeError
+			if errors.As(err, &exitErr) {
+				capturedExitCode = exitErr.Code
+			} else {
+				require.NoError(t, err)
+			}
+		} else {
+			capturedExitCode = 0
+		}
 
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
@@ -1931,7 +1937,14 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 		cmd.SetErr(&logBuf)
 	})
 
-	require.NoError(t, err)
+	if err != nil {
+		var exitErr *ExitCodeError
+		if errors.As(err, &exitErr) {
+			assert.Equal(t, 137, exitErr.Code)
+		} else {
+			require.NoError(t, err)
+		}
+	}
 	assert.Contains(t, logBuf.String(), "IO finished, waiting up to 100ms for container")
 	assert.Contains(t, logBuf.String(), "forcing termination")
 	assert.Equal(t, "SIGKILL", mockRuntime.Signal)

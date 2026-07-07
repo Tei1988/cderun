@@ -3,6 +3,7 @@ package command
 import (
 	"cderun/internal/logging"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -184,11 +185,17 @@ func TestRobustness_SignalHandling_ContainerInteractions(t *testing.T) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
-			o.exitFunc = func(code int) {
-				capturedExitCode = code
-			}
 		})
-		require.NoError(t, err)
+		if err != nil {
+			var exitErr *ExitCodeError
+			if errors.As(err, &exitErr) {
+				capturedExitCode = exitErr.Code
+			} else {
+				require.NoError(t, err)
+			}
+		} else {
+			capturedExitCode = 0
+		}
 		assert.Equal(t, 42, capturedExitCode)
 	})
 }
@@ -295,16 +302,22 @@ func TestRobustness_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
-			o.exitFunc = func(code int) {
-				capturedExitCode = code
-			}
 			o.isTerminal = func(fd int) bool { return false }
 		})
 	}()
 
 	select {
 	case err := <-done:
-		require.NoError(t, err)
+		if err != nil {
+			var exitErr *ExitCodeError
+			if errors.As(err, &exitErr) {
+				capturedExitCode = exitErr.Code
+			} else {
+				require.NoError(t, err)
+			}
+		} else {
+			capturedExitCode = 0
+		}
 		assert.Equal(t, 137, capturedExitCode, "Should capture SIGKILL exit code")
 		select {
 		case <-mock.killed:

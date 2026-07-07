@@ -39,7 +39,11 @@ func (o *rootOptions) signalKillIfRunning(ctx context.Context, rt runtime.Contai
 	o.logger.Debug("Container %s still running, forcing termination", containerID)
 	if err := rt.SignalContainer(ctx, containerID, "SIGKILL"); err != nil {
 		o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
-		return exitCode, fmt.Errorf("failed to force terminate container: %w", err)
+		code := exitCode
+		if code == 0 {
+			code = 125
+		}
+		return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to force terminate container: %w", err)}
 	}
 
 	// SIGKILL is sent asynchronously. The caller should wait for the container to exit if needed.
