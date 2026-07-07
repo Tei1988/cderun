@@ -51,13 +51,13 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | - |
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | - |
 | T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
-| T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | - |
+| T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
 | T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | - |
 | T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | - |
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | - |
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
-| T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | - |
+| T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
 | T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
 | T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
 | T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | - |

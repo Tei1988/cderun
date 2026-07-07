@@ -145,6 +145,48 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port mapping is not supported yet")
 	})
+
+	t.Run("DNS unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			DNS: []string{"8.8.8.8"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DNS setting is not supported yet")
+	})
+
+	t.Run("add-host unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			AddHosts: []string{"host:1.2.3.4"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "add-host is not supported yet")
+	})
+
+	t.Run("volume mount unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "volume", Source: "myvol", Target: "/data"},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "volume mount type is not supported")
+	})
+
+	t.Run("capabilities and tmpfs pass validation", func(t *testing.T) {
+		// These fields should not trigger an early error, and will instead proceed to client calls.
+		conf := &container.ContainerConfig{
+			Image:   "alpine",
+			CapAdd:  []string{"NET_ADMIN"},
+			CapDrop: []string{"KILL"},
+			Mounts: []container.Mount{
+				{Type: "tmpfs", Target: "/tmp"},
+			},
+		}
+		// Expect panic because rt.client is nil in this test context
+		assert.Panics(t, func() {
+			_, _ = rt.CreateContainer(context.Background(), conf)
+		})
+	})
 }
 
 func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {

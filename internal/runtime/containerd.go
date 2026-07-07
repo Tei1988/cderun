@@ -174,6 +174,18 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
 		return "", fmt.Errorf("containerd runtime: port mapping is not supported yet")
 	}
+	if len(config.DNS) > 0 {
+		return "", fmt.Errorf("containerd runtime: DNS setting is not supported yet")
+	}
+	if len(config.AddHosts) > 0 {
+		return "", fmt.Errorf("containerd runtime: add-host is not supported yet")
+	}
+
+	for _, m := range config.Mounts {
+		if m.Type == "volume" {
+			return "", fmt.Errorf("containerd runtime: volume mount type is not supported")
+		}
+	}
 
 	img, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
@@ -215,19 +227,26 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		if mountType == "" {
 			mountType = "bind"
 		}
+
+		source := m.Source
 		var mountOptions []string
 		if m.ReadOnly {
 			mountOptions = append(mountOptions, "ro")
 		} else {
 			mountOptions = append(mountOptions, "rw")
 		}
-		if mountType == "bind" {
+
+		switch mountType {
+		case "bind":
 			mountOptions = append(mountOptions, "rbind")
+		case "tmpfs":
+			source = "tmpfs"
 		}
+
 		opts = append(opts, oci.WithMounts([]specs.Mount{
 			{
 				Type:        mountType,
-				Source:      m.Source,
+				Source:      source,
 				Destination: m.Target,
 				Options:     mountOptions,
 			},
@@ -236,6 +255,12 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	if config.Privileged {
 		opts = append(opts, oci.WithPrivileged)
+	}
+	if len(config.CapAdd) > 0 {
+		opts = append(opts, oci.WithAddedCapabilities(config.CapAdd))
+	}
+	if len(config.CapDrop) > 0 {
+		opts = append(opts, oci.WithDroppedCapabilities(config.CapDrop))
 	}
 	if config.Memory > 0 {
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
