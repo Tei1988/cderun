@@ -1,0 +1,22 @@
+{
+  "command": [
+    "app.js",
+    "--tty"
+  ],
+  "env": [],
+  "image": "node:20-alpine",
+  "interactive": false,
+  "mounts": [
+    {
+      "source": "/",
+      "target": "/app",
+      "type": "bind"
+    }
+  ],
+  "network": "bridge",
+  "pull": "missing",
+  "remove": true,
+  "tty": false,
+  "user": "",
+  "workdir": ""
+}

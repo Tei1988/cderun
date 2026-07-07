@@ -1,0 +1,6 @@
+node:
+  image: node:20-alpine
+  mounts:
+    - type: bind
+      source: .
+      target: /app

@@ -1,0 +1,5 @@
+sh:
+  image: alpine
+  env:
+    - PUB={{env:PUBLIC_VAL}}
+    - PRIV={{env:PRIVATE_VAL}}

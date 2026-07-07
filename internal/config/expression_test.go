@@ -548,3 +548,54 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 	})
 
 }
+
+func TestUnit_Expression_ExtraEdgeCases(t *testing.T) {
+	fs := &MockFileSystem{
+		Files: map[string][]byte{
+			"/project/l1.txt": []byte("l2.txt"),
+			"/project/l2.txt": []byte("l3.txt"),
+			"/project/l3.txt": []byte("final content"),
+		},
+		Dirs: map[string]bool{
+			"/project": true,
+		},
+		WD: "/project",
+	}
+
+	hostCtx := &HostContext{}
+
+	t.Run("triple nested expressions", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("{{ file:{{ file:{{ file:l1.txt }} }} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "final content", val)
+	})
+
+	t.Run("magic word in the middle of a string", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		val := r.resolveString("Current path is {{PWD}} and it is good")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "Current path is /project and it is good", val)
+	})
+
+	t.Run("anchor boundary violation with nested resolution", func(t *testing.T) {
+		fsViolation := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/evil.txt": []byte("../../etc/passwd"),
+			},
+			Dirs: map[string]bool{
+				"/project": true,
+			},
+			WD: "/project",
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, fsViolation)
+		require.NoError(t, err)
+		// {{ file:evil.txt }} resolves to "../../etc/passwd"
+		// Then {{ file:../../etc/passwd }} should be blocked by anchor boundary validation
+		r.resolveString("{{ file:{{ file:evil.txt }} }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "parent directory references are not allowed")
+	})
+}
