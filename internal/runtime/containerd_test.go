@@ -145,6 +145,48 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port mapping is not supported yet")
 	})
+
+	t.Run("DNS unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			DNS: []string{"8.8.8.8"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DNS setting is not supported yet")
+	})
+
+	t.Run("add-host unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			AddHosts: []string{"host:1.2.3.4"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "add-host is not supported yet")
+	})
+
+	t.Run("volume mount unsupported", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "volume", Source: "myvol", Target: "/data"},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "volume mount type is not supported")
+	})
+
+	t.Run("capabilities and tmpfs pass validation", func(t *testing.T) {
+		// These fields should not trigger an early error, and will instead proceed to client calls.
+		conf := &container.ContainerConfig{
+			Image:   "alpine",
+			CapAdd:  []string{"NET_ADMIN"},
+			CapDrop: []string{"KILL"},
+			Mounts: []container.Mount{
+				{Type: "tmpfs", Target: "/tmp"},
+			},
+		}
+		// Expect panic because rt.client is nil in this test context
+		assert.Panics(t, func() {
+			_, _ = rt.CreateContainer(context.Background(), conf)
+		})
+	})
 }
 
 func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
@@ -159,6 +201,27 @@ func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "terminal size exceeds maximum")
 	})
+}
+
+// docs/features/command-line-options.md: --cap-add / --cap-drop は Docker 互換の
+// 短縮名（例: SYS_ADMIN）を受け付ける。OCI spec には CAP_ プレフィックス形式で渡す必要がある。
+func TestUnit_Containerd_NormalizeCapabilities(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"docker style", []string{"SYS_ADMIN", "NET_ADMIN"}, []string{"CAP_SYS_ADMIN", "CAP_NET_ADMIN"}},
+		{"already prefixed", []string{"CAP_KILL"}, []string{"CAP_KILL"}},
+		{"lowercase and whitespace", []string{" sys_admin ", "cap_kill"}, []string{"CAP_SYS_ADMIN", "CAP_KILL"}},
+		{"empty", []string{}, []string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeCapabilities(tt.in))
+		})
+	}
 }
 
 
