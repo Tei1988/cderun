@@ -31,7 +31,7 @@
 - **定義**: 実行時にユーザーが明示的に指定した標準フラグ。サブコマンドの**前**に置く必要があります。
 - **フラグ名**:
   - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--remove`, `--config`, `--tool-config`
-  - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--strict-env`, `--memory`, `--cpus`, `--device`
+  - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--pull-max-retries`, `--pull-backoff-base`, `--strict-env`, `--sensitive-env`, `--memory`, `--cpus`, `--device`, `--hang-timeout`
   - `--dry-run`, `--dry-run-format`, `--diagnosis`, `--diagnosis-format`, `--log-level`, `--log-format`, `--log-timestamp`
 - **判定条件**: ユーザーがコマンドラインで明示的にフラグを指定したこと。指定がない場合、P3以下の判定へ進みます。
 
@@ -40,7 +40,7 @@
 - **定義**: 実行環境全体に適用される設定。
 - **主要なキー**:
   - **設定・実行**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`
-  - **入出力・TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`
+  - **入出力・TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_ENV`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`
   - **ネットワーク**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`
   - **マウント・ツール**: `CDERUN_MOUNT`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_ALL_TOOLS`
   - **リソース・権限**: `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_DEVICE`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`
@@ -69,7 +69,7 @@
   - `interactive: false`
   - `network: bridge`
   - `remove: true`
-  - `runtime: docker`
+  - `runtime`: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。見つからない場合は `docker` にフォールバック）
   - `pull: missing`
   - `pullMaxRetries: 3`
   - `pullBackoffBase: 1s`
@@ -87,6 +87,7 @@
   - `diagnosis: false`
   - `diagnosisFormat: yaml`
   - `hangTimeout: 10s`
+  - `sensitiveEnv: nil`（未指定 = 全環境変数の値をマスク）
   - `image`: なし (Fatal Error)
 
 ## 解決の具体例 (Resolution Example)

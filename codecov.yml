@@ -1,8 +1,8 @@
 codecov:
   require_ci_to_pass: yes
   notify:
-    # Wait for 1 unit-test + 3 runtime-test (docker matrix) = 4 reports
-    after_n_builds: 4
+    # 現状は unit ジョブの 1 レポートのみ。Docker/Podman ランタイムジョブ追加時（T20）に増やすこと
+    after_n_builds: 1
 
 coverage:
   precision: 2
@@ -11,9 +11,9 @@ coverage:
   status:
     project:
       default:
-        # Overall project coverage must be at least 86.5%
-        target: 86.5%
-        threshold: 0%
+        # カバレッジは参考指標（docs/testing/strategy.md 第6節: 目標値として掲げない）
+        target: auto
+        informational: true
       unit:
         flags:
           - unit
@@ -26,8 +26,9 @@ coverage:
         informational: true
     patch:
       default:
+        # project ステータスと同様に参考指標（docs/testing/strategy.md 第6節）
         target: auto
-        threshold: 0%
+        informational: true
 
 flag_management:
   default_rules:

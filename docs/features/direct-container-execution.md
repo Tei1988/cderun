@@ -20,15 +20,15 @@ cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コ
 
 ### 実装ステータス (CRIインターフェース)
 
-| メソッド | Docker (moby) | Podman (compatible API) |
-| :--- | :---: | :---: |
-| `CreateContainer` | 実装済み | 実装済み |
-| `StartContainer` | 実装済み | 実装済み |
-| `WaitContainer` | 実装済み | 実装済み |
-| `RemoveContainer` | 実装済み | 実装済み |
-| `AttachContainer` | 実装済み | 実装済み |
-| `SignalContainer` | 実装済み | 実装済み |
-| `ResizeContainerTTY` | 実装済み | 実装済み |
+| メソッド | Docker (moby) | Podman (compatible API) | containerd (gRPC, 実験的) |
+| :--- | :---: | :---: | :---: |
+| `CreateContainer` | 実装済み | 実装済み | 実装済み（`--network`/`--publish` 未対応） |
+| `StartContainer` | 実装済み | 実装済み | 実装済み |
+| `WaitContainer` | 実装済み | 実装済み | 実装済み |
+| `RemoveContainer` | 実装済み | 実装済み | 実装済み |
+| `AttachContainer` | 実装済み | 実装済み | 実装済み |
+| `SignalContainer` | 実装済み | 実装済み | 実装済み |
+| `ResizeContainerTTY` | 実装済み | 実装済み | 実装済み |
 
 **メリット:**
 

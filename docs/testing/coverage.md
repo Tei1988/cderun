@@ -47,24 +47,22 @@ go tool cover -func=coverage.out
 
 #### c) Codecov (クラウド)
 
-GitHub Actions で実行されたテスト結果は自動的に [Codecov](https://codecov.io/gh/Tei1988/cderun) にアップロードされる。
+GitHub Actions の unit テストジョブで計測されたカバレッジは、`unit` フラグ付きで [Codecov](https://codecov.io/gh/Tei1988/cderun) にアップロードされる。
 Codecov 上では以下の機能が利用可能：
 
 - プルリクエストごとのカバレッジ変化の確認
 - ソースコード上でのカバレッジ可視化
-- UnitテストとE2Eテストのフラグ別集計
+- フラグ別集計（現状は `unit` のみ。`runtime` フラグはランタイムテストの CI ジョブ追加時に有効化する）
 
-## 3. インテグレーション・E2Eテストのカバレッジ計測
+## 3. ランタイムテストのカバレッジ計測
 
-Dockerコンテナを起動するテストにおいて、`go test` プロセス内で行われるロジックのカバレッジは標準的な方法で計測される。
-
-### CIでの計測
-
-E2Eテストジョブでは、Dockerの複数バージョン（20.10, 25.0, 29.0）のマトリックスでテストが実行され、それぞれのカバレッジデータが Codecov 上でマージされる。
+ランタイムテスト（`-tags=runtime`）でも、`go test` プロセス内で行われるロジックのカバレッジは標準的な方法で計測できる。
 
 ```bash
 go test -v -tags=runtime -coverprofile=coverage-runtime.out ./internal/command/...
 ```
+
+現状の CI ではランタイムテストのカバレッジ計測・アップロードは行っていない。Docker / Podman のランタイムテストジョブの追加（`.agent/todo.md` の T20）と同時に、`runtime` フラグ付きのアップロードを追加する計画である。
 
 ## 4. 自動化
 
@@ -92,9 +90,9 @@ coverage-html: coverage
 
 ## 5. CIへの統合
 
-継続的インテグレーション (CI) プロセスにカバレッジ計測と Codecov へのアップロードが組み込まれている。
+GitHub Actions ([`ci.yaml`](../../.github/workflows/ci.yaml)) の構成は以下のとおり。
 
-- GitHub Actions ([`ci.yaml`](../../.github/workflows/ci.yaml)) により、すべてのプッシュおよびプルリクエストにおいてカバレッジが計測される。
-- **Unitテストジョブ**: ローカルでのカバレッジしきい値チェック（**86.5%**）を行い、満たない場合はジョブが失敗する（ファストフェイル）。
-- **Codecov**: PR 上で詳細なステータスチェック（`unit` / `runtime` フラグ別のレポートを含む）を提供し、プロジェクト全体の品質管理を補完する。
-- **E2Eテスト**: Dockerバージョンごとに計測され、Codecov 上で自動的にマージされる。
+- **Unitテストジョブ**: すべてのプッシュおよびプルリクエストで `-coverprofile` 付きのテストを実行し、`unit` フラグで Codecov にアップロードする。
+- **containerd 統合ジョブ**: 実際の containerd に対して `internal/runtime` のテストを実行する（カバレッジ計測なし。詳細は [runtime-tests.md](./runtime-tests.md) を参照）。
+- **Codecov のステータス**: カバレッジは参考指標であり、目標値として扱わない（[テスト戦略 第6節](./strategy.md) を参照）。ステータスチェックはすべて `informational` であり、カバレッジ低下で CI は失敗しない。急落の検知と PR 上での可視化のために使う。
+- **今後**: Docker / Podman のランタイムテストジョブ（T20）と `runtime` フラグのアップロード追加時に、`codecov.yml` の `after_n_builds` をレポート数に合わせて更新すること。

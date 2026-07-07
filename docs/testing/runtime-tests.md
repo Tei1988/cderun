@@ -2,7 +2,7 @@
 
 ## 概要
 
-実際のコンテナランタイム（Docker または Podman）を使用して、システム全体の動作を検証する。
+実際のコンテナランタイム（Docker、Podman、または containerd）を使用して、システム全体の動作を検証する。
 MockRuntime を使用した統合テストではカバーできない、実際のデバイスマウント、バイナリの実行、コンテナのライフサイクル、OSシグナルの挙動などを実環境で保証する。
 
 ## テストの分類
@@ -54,23 +54,23 @@ make test-runtime
 
 ## CI 構成
 
-### Docker バージョンマトリックス
+現在の CI（[`ci.yaml`](../../.github/workflows/ci.yaml)）で実行されているランタイムテストは以下のとおり。
 
-`docker:dind` を GitHub Actions のサービスコンテナとして使用し、以下の3世代で検証する。
+### containerd 統合ジョブ（`runtime-test-containerd`）
 
-- **20.10**: レガシー環境との互換性
-- **25.0**: 現在広く普及しているバージョン
-- **29.0**: このマトリックスでの最新対象
+- containerd（バージョン固定・sha256 検証付き）と CNI プラグインを runner にインストールし、systemd で起動する
+- ソケットに ACL を設定し、非 root で接続可能にする
+- `CDERUN_RUNTIME=containerd` / `CDERUN_SOCKET_PATH=/run/containerd/containerd.sock` を設定して `go test ./internal/runtime/...` を実行する
 
-### ジョブ構成
+### 今後の拡張（`.agent/todo.md` を参照）
 
-1. **Build ジョブ**: バイナリを1回だけビルドし Artifacts に保存。
-2. **Unit Test ジョブ**: マトリックス外の単一ジョブで実行。
-3. **Runtime Test ジョブ**: 保存済みバイナリをダウンロードして使用。`-run "^TestScenario_"` でフィルタリング。
+- **T20**: Docker / Podman のランタイムテストジョブの追加。`ubuntu-latest` は Docker が標準搭載のため `/var/run/docker.sock` がそのまま使える。Podman は `podman.socket` の有効化が必要
+- **T70**: ランタイム間のコンフォーマンススイートを CI ジョブの器として実装する
+
+なお、複数の Docker バージョンを DinD でマトリックス検証する構成は、コスト対効果の観点から採用しない（cderun は Docker API の安定した部分のみを使用しており、バージョン間差異のリスクが小さいため）。
 
 ### CI 環境特有のパス解決
 
-GitHub Actions の DinD 環境では、Runner と Docker デーモンが動作する DinD コンテナは別物である。
+ランタイムのデーモンがテストプロセスと異なるファイルシステム名前空間で動く環境（DinD 等）では、バインドマウントのソースパスがデーモン側から解決できない場合がある。
 
-- Runner のワークスペース (`/home/runner/work`) を DinD コンテナの同じパスにマウントしている。
-- 一時ディレクトリは環境変数 `TEST_HOST_TMP_DIR` でベースパスを切り替え可能にしている。
+- 一時ディレクトリは環境変数 `TEST_HOST_TMP_DIR` でベースパスを切り替え可能にしている（`internal/command/scenario_test.go`）

@@ -248,9 +248,9 @@ cderun --strict-env --env NPM_TOKEN node app.js
 ### `--runtime`
 
 - **型**: string
-- **デフォルト**: `docker`
+- **デフォルト**: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。いずれも見つからない場合は `docker` にフォールバック）
 - **環境変数**: `CDERUN_RUNTIME`
-- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman`）
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）
 
 ```bash
 cderun --runtime podman node app.js

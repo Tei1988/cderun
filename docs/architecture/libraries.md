@@ -21,7 +21,8 @@
 現在プロジェクトで使用が承認されている主要ライブラリ：
 
 - **CLIフレームワーク:** [cobra](https://github.com/spf13/cobra)
-- **コンテナランタイムAPI:** [moby (Docker)](https://github.com/moby/moby), [containerd/errdefs](https://github.com/containerd/errdefs)
+- **コンテナランタイムAPI:** [moby (Docker)](https://github.com/moby/moby), [containerd/containerd/v2](https://github.com/containerd/containerd), [containerd/errdefs](https://github.com/containerd/errdefs)（containerd ランタイム対応で導入）
+- **OCI 仕様:** [opencontainers/image-spec](https://github.com/opencontainers/image-spec), [opencontainers/runtime-spec](https://github.com/opencontainers/runtime-spec)
 - **YAML & 設定ユーティリティ:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://dario.cat/mergo)
-- **ユーティリティ:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [x/term](https://golang.org/x/term)
+- **ユーティリティ:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [go-connections](https://github.com/docker/go-connections), [x/term](https://golang.org/x/term)
 - **テスト:** [testify](https://github.com/stretchr/testify)

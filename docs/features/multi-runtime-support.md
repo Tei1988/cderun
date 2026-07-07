@@ -19,9 +19,9 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
 - rootlessコンテナのサポート
 - Podman APIを使用（Docker互換）
 
-### 将来的な拡張
+### サポートされているランタイム
 
-- **containerd (In-progress / Experimental)**:
+- **containerd (Experimental)**:
   ネイティブの containerd API (gRPC) を直接利用したサポートを開発中です。
   - **目的**: Docker/Podman デーモンを経由しない、より軽量なコンテナ実行の実現。
   - **現状**: 基本的な実行機能は実装されていますが、現時点では `host` ネットワークのみをサポートしており、ポートマッピング（`--publish`）などの高度な機能を使用するとコンテナ作成時にエラーとなります。
@@ -39,7 +39,7 @@ cderun ContainerRuntimeインターフェース
         │
         ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
         ├── PodmanRuntime → Podman API (HTTP over Unix socket)
-        └── NerdctlRuntime → containerd API (gRPC)
+        └── ContainerdRuntime → containerd API (gRPC)
 ```
 
 ### 共通インターフェースの役割
