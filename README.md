@@ -144,7 +144,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--memory`, `-m`: Memory limit (e.g., `512m`, `1g`).
 - `--cpus`: Number of CPUs (float).
 - `--device`: Add a host device to the container.
-- `--sensitive-env`: List of environment variable patterns to mask (default masks all).
+- `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
@@ -204,8 +204,8 @@ Key variables include:
 - **CLI Flags (P1/P2)**: List-type flags must be repeated for each item.
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
-  - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-  - Comma (`,`): `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+  - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
 
 ## Configuration
 
@@ -247,9 +247,16 @@ python:
 ### Multi-Runtime Support & Auto-detection
 
 `cderun` supports **Docker** and **Podman**, plus experimental **containerd**
-support (host network only; `--network`, `--publish`, `--publish-all`, and `--expose` are not supported on
-containerd). It can automatically detect the available runtime by checking for
-common Unix socket paths, in the order docker → containerd → podman.
+support.
+
+**containerd limitations**:
+
+- Only the `host` network is supported (default `bridge` network is not supported).
+- Port mapping/exposure (`--publish`, `--publish-all`, `--expose`) is not supported.
+- Custom DNS settings (`--dns`) and host mappings (`--add-host`) are not supported.
+- `volume` type mounts are not supported (use `bind` or `tmpfs`).
+
+`cderun` can automatically detect the available runtime by checking for common Unix socket paths, in the order docker → containerd → podman.
 
 ### Intelligent Argument Parsing
 
