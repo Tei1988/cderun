@@ -257,10 +257,10 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		opts = append(opts, oci.WithPrivileged)
 	}
 	if len(config.CapAdd) > 0 {
-		opts = append(opts, oci.WithAddedCapabilities(config.CapAdd))
+		opts = append(opts, oci.WithAddedCapabilities(normalizeCapabilities(config.CapAdd)))
 	}
 	if len(config.CapDrop) > 0 {
-		opts = append(opts, oci.WithDroppedCapabilities(config.CapDrop))
+		opts = append(opts, oci.WithDroppedCapabilities(normalizeCapabilities(config.CapDrop)))
 	}
 	if config.Memory > 0 {
 		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
@@ -506,6 +506,20 @@ func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID st
 		return false, 0, err
 	}
 	return status.Status == client.Running, int(status.ExitStatus), nil
+}
+
+// normalizeCapabilities converts Docker-style capability names (e.g. "SYS_ADMIN")
+// to the CAP_-prefixed form the OCI spec expects. Already-prefixed values are preserved.
+func normalizeCapabilities(caps []string) []string {
+	normalized := make([]string, len(caps))
+	for i, c := range caps {
+		name := strings.ToUpper(strings.TrimSpace(c))
+		if !strings.HasPrefix(name, "CAP_") {
+			name = "CAP_" + name
+		}
+		normalized[i] = name
+	}
+	return normalized
 }
 
 func parseSignal(sig string) (syscall.Signal, error) {
