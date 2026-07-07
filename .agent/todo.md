@@ -79,6 +79,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
+| T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -1904,3 +1905,47 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 対象領域の `*coverage*` ファイルが消え、対応する振る舞いテストが仕様参照コメント付きで存在する
 - mutation score が置き換え前より悪化していない
+
+---
+
+## T73: ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加
+
+- 種別: クリーンアップ
+- 優先度: 中
+- 対象: `internal/runtime/containerd_test.go`、`internal/container/config.go`、その他 Go ソース全域
+- 前提: `AGENTS.md` の「English in Source Code」および「Runtime Adapter Conversion Contract」原則を参照
+
+### 背景
+
+本プロジェクトは public な OSS のため、ソースコード内のコメントは英語で統一する（`AGENTS.md` にルール化済み）。また、containerd で capability が `CAP_` プレフィックスなしのまま OCI spec に渡っていたバグの再発防止として、「Docker は暗黙に正規化するが OCI spec 直組み立てのランタイムでは変換責務がアダプタ側にある」という契約を `ContainerConfig` の doc comment として明文化する。
+
+### 作業内容
+
+1. **日本語コメントの英語化**: `internal/runtime/containerd_test.go` の `TestUnit_Containerd_NormalizeCapabilities` 直前のコメント（206-207 行付近）を英語化する。英訳案:
+
+   ```go
+   // docs/features/command-line-options.md: --cap-add / --cap-drop accept Docker-compatible
+   // short names (e.g. SYS_ADMIN); the OCI spec requires the CAP_-prefixed form.
+   ```
+
+2. **残存する日本語コメントの掃引**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で全 Go ソースを確認し、コメント・エラーメッセージ・ログメッセージ内の日本語を英語化する。
+   **注意**: `internal/config/edge_cases_test.go:78` 付近の `ユーザー_TOKEN` は Unicode キーのマスキング検証用の**意図的なテストデータ**であり、対象外（変更しないこと）。
+3. **`ContainerConfig` の契約コメント追加**: `internal/container/config.go` の `ContainerConfig` struct の doc comment に変換契約を追記する。ドラフト:
+
+   ```go
+   // ContainerConfig represents the intermediate representation of a container execution request.
+   //
+   // Field values hold Docker-CLI-compatible notation as entered by the user
+   // (e.g. CapAdd: "SYS_ADMIN", not "CAP_SYS_ADMIN"). The Docker daemon normalizes
+   // such notation implicitly, but runtimes that build an OCI spec directly
+   // (containerd) do NOT: each runtime adapter is responsible for converting every
+   // field it consumes into its native representation, and for returning an explicit
+   // error for fields it cannot support — never pass a value through unconverted or
+   // drop it silently.
+   ```
+
+### 完了条件
+
+- Go ソース内のコメント・エラーメッセージ・ログメッセージから日本語が消えている（意図的なテストデータを除く）
+- `ContainerConfig` の doc comment に変換契約が記載されている
+- 挙動変更なし（既存テストが全パス）
