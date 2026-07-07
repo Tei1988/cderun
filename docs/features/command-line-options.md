@@ -176,7 +176,7 @@ cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 - **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
 - **補足**:
   - CLIフラグ（P1/P2）では、複数の環境変数を指定する場合、フラグを繰り返す必要があります（例: `-e A=1 -e B=2`）。
-  - 環境変数 `CDERUN_ENV` (P3) では、セミコロン (`;`) をセパレータとして使用します（例: `export CDERUN_ENV="A=1;B=2"`）。
+  - 環境変数 `CDERUN_ENV` (P3) では、**セミコロン (`;`)** をセパレータとして使用します（例: `export CDERUN_ENV="A=1;B=2"`）。
   - 値には `{{PWD}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
@@ -211,7 +211,7 @@ cderun node app.js --cderun-env=NODE_ENV=production
 - **補足**:
   - `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
   - CLIフラグ（P1/P2）では、複数のマウントを指定する場合、フラグを繰り返す必要があります。
-  - 環境変数 `CDERUN_MOUNT` (P3) では、セミコロン (`;`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_MOUNT` (P3) では、**セミコロン (`;`)** をセパレータとして使用します。
   - `source` や `target` には `{{HOME}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
@@ -275,7 +275,7 @@ cderun --remove=false node app.js  # コンテナを残す
 - **用途**: コンテナのポートをホストに公開
 - **補足**:
   - CLIフラグ（P1/P2）では、複数のポートを指定する場合、フラグを繰り返す必要があります。
-  - 環境変数 `CDERUN_PUBLISH` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_PUBLISH` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
   - P1/P2/P3 のいずれかで**明示的に空のリスト**（YAMLでの `[]` や環境変数での空文字列）を指定した場合、それは意図的な「空の設定」とみなされ、下位レベルの設定を上書き（無効化）します。
 
 ```bash
@@ -296,7 +296,7 @@ cderun -p 8080:80 nginx
 - **説明**: 特定のポートまたはポート範囲を公開
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_EXPOSE` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_EXPOSE` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --expose 80 node app.js
@@ -320,7 +320,7 @@ cderun --hostname my-container alpine hostname
 - **説明**: カスタムDNSサーバの設定
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_DNS` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_DNS` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --dns 8.8.8.8 alpine ping google.com
@@ -333,7 +333,7 @@ cderun --dns 8.8.8.8 alpine ping google.com
 - **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_ADD_HOST` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_ADD_HOST` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --add-host my-server:192.168.1.10 alpine ping my-server
@@ -367,7 +367,7 @@ cderun --privileged alpine ls /dev
 - **説明**: Linuxケーパビリティの追加
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_CAP_ADD` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_CAP_ADD` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --cap-add SYS_ADMIN alpine mount ...
@@ -380,7 +380,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 - **説明**: Linuxケーパビリティの削除
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_CAP_DROP` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_CAP_DROP` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ### `--sensitive-env`
 
@@ -389,7 +389,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 - **説明**: マスク（非表示）にする環境変数のパターンのリスト。
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_SENSITIVE_ENV` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_SENSITIVE_ENV` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
   - 未指定の場合、セキュリティのため**すべての環境変数**がマスクされます（Secure by Default）。
   - 明示的に空を指定した場合（例: `--sensitive-env=""`）、マスクは無効化されます。
   - `*` ワイルドカードを使用した glob パターンが使用可能です（例: `DB_*`, `*_PASSWORD`）。
@@ -401,7 +401,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 - **説明**: イメージのデフォルトENTRYPOINTを上書き
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_ENTRYPOINT` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_ENTRYPOINT` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --entrypoint /bin/sh node -c "ls"
@@ -448,7 +448,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **説明**: ホストデバイスをコンテナに追加
 - **補足**:
   - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
-  - 環境変数 `CDERUN_DEVICE` (P3) では、カンマ (`,`) をセパレータとして使用します。
+  - 環境変数 `CDERUN_DEVICE` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --device /dev/fuse alpine ls /dev/fuse
