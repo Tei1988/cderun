@@ -420,165 +420,188 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	var p1Set, p2Set bool
 	var p1Val, p2Val string
+	var fastPathUsed bool
 
-	// Fast-path for common options to avoid reflection
+	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
 	case "image":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunImageSet, rv.cli.CderunImage, rv.cli.ImageSet, rv.cli.Image
+		fastPathUsed = true
 	case "network":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunNetworkSet, rv.cli.CderunNetwork, rv.cli.NetworkSet, rv.cli.Network
+		fastPathUsed = true
 	case "workdir":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunWorkdirSet, rv.cli.CderunWorkdir, rv.cli.WorkdirSet, rv.cli.Workdir
+		fastPathUsed = true
 	case "runtime":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRuntimeSet, rv.cli.CderunRuntime, rv.cli.RuntimeSet, rv.cli.Runtime
+		fastPathUsed = true
 	case "user":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunUserSet, rv.cli.CderunUser, rv.cli.UserSet, rv.cli.User
+		fastPathUsed = true
 	case "log-level":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogLevelSet, rv.cli.CderunLogLevel, rv.cli.LogLevelSet, rv.cli.LogLevel
+		fastPathUsed = true
 	case "log-format":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogFormatSet, rv.cli.CderunLogFormat, rv.cli.LogFormatSet, rv.cli.LogFormat
+		fastPathUsed = true
 	case "hostname":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunHostnameSet, rv.cli.CderunHostname, rv.cli.HostnameSet, rv.cli.Hostname
+		fastPathUsed = true
 	case "pull":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPullSet, rv.cli.CderunPull, rv.cli.PullSet, rv.cli.Pull
+		fastPathUsed = true
 	case "dry-run-format":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDryRunFormatSet, rv.cli.CderunDryRunFormat, rv.cli.DryRunFormatSet, rv.cli.DryRunFormat
+		fastPathUsed = true
 	case "diagnosis-format":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDiagnosisFormatSet, rv.cli.CderunDiagnosisFormat, rv.cli.DiagnosisFormatSet, rv.cli.DiagnosisFormat
-	default:
-		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
-			return err
+		fastPathUsed = true
+	}
+
+	if fastPathUsed {
+		def := OptionDef[string]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     opt.Default,
 		}
-		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
-		def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
 		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-		rv.resVal.Field(info.targetIdx).SetString(resolved)
+		switch opt.Name {
+		case "image":
+			rv.res.Image = resolved
+		case "network":
+			rv.res.Network = resolved
+		case "workdir":
+			rv.res.Workdir = resolved
+		case "runtime":
+			rv.res.Runtime = resolved
+		case "user":
+			rv.res.User = resolved
+		case "log-level":
+			rv.res.LogLevel = resolved
+		case "log-format":
+			rv.res.LogFormat = resolved
+		case "hostname":
+			rv.res.Hostname = resolved
+		case "pull":
+			rv.res.Pull = resolved
+		case "dry-run-format":
+			rv.res.DryRunFormat = resolved
+		case "diagnosis-format":
+			rv.res.DiagnosisFormat = resolved
+		}
 		return nil
 	}
 
-	def := OptionDef[string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-		Fallback:     opt.Default,
-	}
-
-	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	// Apply resolved value back to rv.res fields directly for fast-path options
-	switch opt.Name {
-	case "image":
-		rv.res.Image = resolved
-	case "network":
-		rv.res.Network = resolved
-	case "workdir":
-		rv.res.Workdir = resolved
-	case "runtime":
-		rv.res.Runtime = resolved
-	case "user":
-		rv.res.User = resolved
-	case "log-level":
-		rv.res.LogLevel = resolved
-	case "log-format":
-		rv.res.LogFormat = resolved
-	case "hostname":
-		rv.res.Hostname = resolved
-	case "pull":
-		rv.res.Pull = resolved
-	case "dry-run-format":
-		rv.res.DryRunFormat = resolved
-	case "diagnosis-format":
-		rv.res.DiagnosisFormat = resolved
-	}
-
+	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	p1Val, p2Val = p1v.String(), p2v.String()
+	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
+	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.resVal.Field(info.targetIdx).SetString(resolved)
 	return nil
 }
 
 func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	if _, ok := fieldInfo[opt.Name]; !ok {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
 		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	var p1Set, p2Set bool
 	var p1Val, p2Val bool
+	var fastPathUsed bool
 
-	// Fast-path for common options
+	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
 	case "tty":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunTTYSet, rv.cli.CderunTTY, rv.cli.TTYSet, rv.cli.TTY
+		fastPathUsed = true
 	case "interactive":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunInteractiveSet, rv.cli.CderunInteractive, rv.cli.InteractiveSet, rv.cli.Interactive
+		fastPathUsed = true
 	case "remove":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRemoveSet, rv.cli.CderunRemove, rv.cli.RemoveSet, rv.cli.Remove
+		fastPathUsed = true
 	case "diagnosis":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDiagnosisSet, rv.cli.CderunDiagnosis, rv.cli.DiagnosisSet, rv.cli.Diagnosis
+		fastPathUsed = true
 	case "strict-env":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunStrictEnvSet, rv.cli.CderunStrictEnv, rv.cli.StrictEnvSet, rv.cli.StrictEnv
+		fastPathUsed = true
 	case "privileged":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPrivilegedSet, rv.cli.CderunPrivileged, rv.cli.PrivilegedSet, rv.cli.Privileged
+		fastPathUsed = true
 	case "publish-all":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPublishAllSet, rv.cli.CderunPublishAll, rv.cli.PublishAllSet, rv.cli.PublishAll
+		fastPathUsed = true
 	case "log-timestamp":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogTimestampSet, rv.cli.CderunLogTimestamp, rv.cli.LogTimestampSet, rv.cli.LogTimestamp
+		fastPathUsed = true
 	case "mount-socket":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
+		fastPathUsed = true
 	case "mount-cderun":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
+		fastPathUsed = true
 	case "mount-all-tools":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
+		fastPathUsed = true
 	case "dry-run":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDryRunSet, rv.cli.CderunDryRun, rv.cli.DryRunSet, rv.cli.DryRun
-	default:
-		info, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
-			return err
+		fastPathUsed = true
+	}
+
+	if fastPathUsed {
+		def := OptionDef[*bool]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
 		}
-		p1Set, p1Val, p2Set, p2Val = s1, v1.Bool(), s2, v2.Bool()
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-		rv.resVal.Field(info.targetIdx).SetBool(resolved)
+		switch opt.Name {
+		case "tty":
+			rv.res.TTY = resolved
+		case "interactive":
+			rv.res.Interactive = resolved
+		case "remove":
+			rv.res.Remove = resolved
+		case "diagnosis":
+			rv.res.Diagnosis = resolved
+		case "strict-env":
+			rv.res.StrictEnv = resolved
+		case "privileged":
+			rv.res.Privileged = resolved
+		case "publish-all":
+			rv.res.PublishAll = resolved
+		case "log-timestamp":
+			rv.res.LogTimestamp = resolved
+		case "mount-socket":
+			rv.res.MountSocket = resolved
+		case "mount-cderun":
+			rv.res.MountCderun = resolved
+		case "mount-all-tools":
+			rv.res.MountAllTools = resolved
+		case "dry-run":
+			rv.res.DryRun = resolved
+		}
 		return nil
 	}
 
-	def := OptionDef[*bool]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
-	}
-
-	resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-	switch opt.Name {
-	case "tty":
-		rv.res.TTY = resolved
-	case "interactive":
-		rv.res.Interactive = resolved
-	case "remove":
-		rv.res.Remove = resolved
-	case "diagnosis":
-		rv.res.Diagnosis = resolved
-	case "strict-env":
-		rv.res.StrictEnv = resolved
-	case "privileged":
-		rv.res.Privileged = resolved
-	case "publish-all":
-		rv.res.PublishAll = resolved
-	case "log-timestamp":
-		rv.res.LogTimestamp = resolved
-	case "mount-socket":
-		rv.res.MountSocket = resolved
-	case "mount-cderun":
-		rv.res.MountCderun = resolved
-	case "mount-all-tools":
-		rv.res.MountAllTools = resolved
-	case "dry-run":
-		rv.res.DryRun = resolved
-	}
+	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	p1Val, p2Val = p1v.Bool(), p2v.Bool()
+	def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
+	resolved := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+	rv.resVal.Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
 
@@ -598,17 +621,27 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
 		p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
 		fastPathUsed = true
-	} else {
-		var s1, s2 bool
-		var v1, v2 reflect.Value
-		var err error
-		info, s1, v1, s2, v2, err = fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
-			return err
-		}
-		p1Int, p1Set = rv.extractIntValue(v1, s1)
-		p2Int, p2Set = rv.extractIntValue(v2, s2)
 	}
+
+	if fastPathUsed {
+		def := OptionDef[*int]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     &opt.Default,
+		}
+		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+		switch opt.Name {
+		case "pull-max-retries":
+			rv.res.PullMaxRetries = resolved
+		}
+		return nil
+	}
+
+	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	p1Int, p1Set = rv.extractIntValue(p1v, s1)
+	p2Int, p2Set = rv.extractIntValue(p2v, s2)
 
 	def := OptionDef[*int]{
 		EnvKey:       opt.EnvKey,
@@ -618,11 +651,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	}
 
 	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-	if fastPathUsed {
-		rv.res.PullMaxRetries = resolved
-	} else {
-		rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
-	}
+	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
 
@@ -642,17 +671,27 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		cliType.Field(info.p2ValIdx).Name == "CPUs" {
 		p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
 		fastPathUsed = true
-	} else {
-		var s1, s2 bool
-		var v1, v2 reflect.Value
-		var err error
-		info, s1, v1, s2, v2, err = fetchFieldAndParams(opt.Name, rv.cliVal)
-		if err != nil {
-			return err
-		}
-		p1Float, p1Set = rv.extractFloatValue(v1, s1)
-		p2Float, p2Set = rv.extractFloatValue(v2, s2)
 	}
+
+	if fastPathUsed {
+		def := OptionDef[*float64]{
+			EnvKey:       opt.EnvKey,
+			ToolGetter:   opt.ToolGetter,
+			GlobalGetter: opt.GlobalGetter,
+			Fallback:     &opt.Default,
+		}
+		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+		switch opt.Name {
+		case "cpus":
+			rv.res.CPUs = resolved
+		}
+		return nil
+	}
+
+	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	p1Float, p1Set = rv.extractFloatValue(p1v, s1)
+	p2Float, p2Set = rv.extractFloatValue(p2v, s2)
 
 	def := OptionDef[*float64]{
 		EnvKey:       opt.EnvKey,
@@ -662,11 +701,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	}
 
 	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-	if fastPathUsed {
-		rv.res.CPUs = resolved
-	} else {
-		rv.resVal.Field(info.targetIdx).SetFloat(resolved)
-	}
+	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
 
@@ -816,14 +851,21 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 func (rv *resolver) resolveEarly() error {
 	// Early resolution (Diagnosis & StrictEnv)
-	for _, name := range []string{"diagnosis", "strict-env"} {
-		opt, ok := GetBoolOption(name)
-		if !ok {
-			return fmt.Errorf("registry mismatch: early boolean option %q not found", name)
-		}
+	// We call applyBoolOption directly which uses fast-paths and fieldInfo.
+	if opt, ok := GetBoolOption("diagnosis"); ok {
 		if err := rv.applyBoolOption(opt); err != nil {
 			return err
 		}
+	} else {
+		return fmt.Errorf("registry mismatch: early boolean option \"diagnosis\" not found")
+	}
+
+	if opt, ok := GetBoolOption("strict-env"); ok {
+		if err := rv.applyBoolOption(opt); err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("registry mismatch: early boolean option \"strict-env\" not found")
 	}
 
 	// Sensitive Env Resolution (needed for masking in debug logs during further resolution)
@@ -832,12 +874,13 @@ func (rv *resolver) resolveEarly() error {
 		if !ok {
 			return fmt.Errorf("registry mismatch: early string slice option %q not found", "sensitive-env")
 		}
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("sensitive-env", rv.cliVal)
-		if err != nil {
-			return err
+		info, ok := fieldInfo["sensitive-env"]
+		if !ok {
+			return fmt.Errorf("registry mismatch: info for option \"sensitive-env\" not found")
 		}
-		p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
-		p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
+
+		_, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
+		_, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
@@ -845,7 +888,7 @@ func (rv *resolver) resolveEarly() error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", p1v.Interface().([]string), p2v.Interface().([]string), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	}
 	return nil
 }
@@ -1008,23 +1051,17 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	// Resolve mount-all-tools (transitive trigger)
 	{
 		opt, _ := GetBoolOption("mount-all-tools")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-all-tools", rv.cliVal)
-		if err != nil {
-			return err
-		}
+		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+		rv.res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 	}
 
 	var mountCderunSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-cderun")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-cderun", rv.cliVal)
-		if err != nil {
-			return err
-		}
+		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+		rv.res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 	}
 	if !mountCderunSpecified {
 		rv.res.MountCderun = len(rv.res.MountTools) > 0 || rv.res.MountAllTools
@@ -1047,12 +1084,9 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	var mountSocketSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-socket")
-		_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket", rv.cliVal)
-		if err != nil {
-			return err
-		}
+		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val.Bool(), p2Set, p2Val.Bool(), rv.subcommand, rv.tools, rv.global, rv.fs)
+		rv.res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 	}
 	if !mountSocketSpecified {
 		rv.res.MountSocket = rv.res.MountCderun
