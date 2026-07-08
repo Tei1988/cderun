@@ -4,11 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 // MockFileSystem is a mock implementation of FileSystem for testing.
 type MockFileSystem struct {
+	mu           sync.RWMutex
 	Files        map[string][]byte
 	Dirs         map[string]bool
 	WD           string
@@ -45,7 +47,12 @@ func (m *mockFileInfo) IsDir() bool        { return m.isDir }
 func (m *mockFileInfo) Sys() any           { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
+	m.mu.Lock()
 	m.StatCalls = append(m.StatCalls, name)
+	m.mu.Unlock()
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}
@@ -60,6 +67,8 @@ func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 }
 
 func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.ReadFileErr != nil {
 		return nil, m.ReadFileErr
 	}
@@ -77,6 +86,8 @@ func (m *MockFileSystem) UserHomeDir() (string, error) {
 }
 
 func (m *MockFileSystem) Executable() (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.ExecErr != nil {
 		return "", m.ExecErr
 	}
@@ -84,6 +95,8 @@ func (m *MockFileSystem) Executable() (string, error) {
 }
 
 func (m *MockFileSystem) Getenv(key string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.Env == nil {
 		return ""
 	}
@@ -91,6 +104,8 @@ func (m *MockFileSystem) Getenv(key string) string {
 }
 
 func (m *MockFileSystem) LookupEnv(key string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.Env == nil {
 		return "", false
 	}
@@ -106,6 +121,8 @@ func (m *MockFileSystem) TempDir() string {
 }
 
 func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.MkdirAllErr != nil {
 		return m.MkdirAllErr
 	}
@@ -121,6 +138,8 @@ func (m *MockFileSystem) MkdirAll(path string, perm os.FileMode) error {
 }
 
 func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.WriteFileErr != nil {
 		return m.WriteFileErr
 	}
@@ -136,6 +155,8 @@ func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMod
 }
 
 func (m *MockFileSystem) RemoveAll(path string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.RemoveAllErr != nil {
 		return m.RemoveAllErr
 	}
