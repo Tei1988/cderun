@@ -352,18 +352,12 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 		if permsRegex.MatchString(perms) {
 			permissions = perms
 			containerPath = remainder[:lastColon]
-			// If there are still colons in the container path, it's malformed or ambiguous.
+			// If there's another colon, it's malformed (we only support host:container:perms).
 			if strings.Contains(containerPath, ":") {
 				return DeviceConfig{}, false
 			}
 		} else {
-			// If not a valid permission string, the entire remainder might be the container path,
-			// or it might be a malformed permission string.
-			// Docker style: host:container:perms. If the last part is not perms, it's just host:container.
-			// But wait, SplitHostRemainder already split once.
-			// If there's another colon, and it's not perms, it's ambiguous but usually means the container path contains a colon (unlikely for devices but possible in some runtimes)
-			// or it's just invalid permissions.
-			// Let's be strict: if there is a second colon, it MUST be permissions.
+			// If a second colon exists, the remainder must be a valid permissions suffix.
 			return DeviceConfig{}, false
 		}
 	} else {
@@ -747,18 +741,18 @@ func ValidateUserName(s string) error {
 	return nil
 }
 
-func validatePortNumber(s string, allowZero bool) error {
+func validatePortNumber(s string, allowZero bool) (int, error) {
 	p, err := strconv.Atoi(s)
 	if err != nil {
-		return fmt.Errorf("invalid port: %q", s)
+		return 0, fmt.Errorf("invalid port: %q", s)
 	}
 	if p < 0 || p > 65535 {
-		return fmt.Errorf("port out of range: %d", p)
+		return 0, fmt.Errorf("port out of range: %d", p)
 	}
 	if p == 0 && !allowZero {
-		return fmt.Errorf("port cannot be zero: %d", p)
+		return 0, fmt.Errorf("port cannot be zero: %d", p)
 	}
-	return nil
+	return p, nil
 }
 
 // ValidatePort ensures the port mapping is valid.
@@ -785,16 +779,16 @@ func ValidatePort(s string) error {
 	switch len(parts) {
 	case 1:
 		// containerPort
-		if err := validatePortNumber(parts[0], false); err != nil {
+		if _, err := validatePortNumber(parts[0], false); err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 	case 2:
 		// hostPort:containerPort OR ip:containerPort
-		if err := validatePortNumber(parts[1], false); err != nil {
+		if _, err := validatePortNumber(parts[1], false); err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 		// Try parsing as port first
-		if err := validatePortNumber(parts[0], true); err != nil {
+		if _, err := validatePortNumber(parts[0], true); err != nil {
 			// If not a valid port, must be an IP
 			if net.ParseIP(parts[0]) == nil {
 				return fmt.Errorf("invalid host port or IP: %q", parts[0])
@@ -802,11 +796,11 @@ func ValidatePort(s string) error {
 		}
 	case 3:
 		// ip:hostPort:containerPort
-		if err := validatePortNumber(parts[2], false); err != nil {
+		if _, err := validatePortNumber(parts[2], false); err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 		if parts[1] != "" {
-			if err := validatePortNumber(parts[1], true); err != nil {
+			if _, err := validatePortNumber(parts[1], true); err != nil {
 				return fmt.Errorf("invalid host port: %w", err)
 			}
 		}
@@ -905,18 +899,18 @@ func ValidateExposePort(s string) error {
 	}
 
 	if parts := strings.SplitN(remainder, "-", 2); len(parts) == 2 {
-		if err := validatePortNumber(parts[0], false); err != nil {
+		start, err := validatePortNumber(parts[0], false)
+		if err != nil {
 			return fmt.Errorf("invalid start port in range: %w", err)
 		}
-		if err := validatePortNumber(parts[1], false); err != nil {
+		end, err := validatePortNumber(parts[1], false)
+		if err != nil {
 			return fmt.Errorf("invalid end port in range: %w", err)
 		}
-		start, _ := strconv.Atoi(parts[0])
-		end, _ := strconv.Atoi(parts[1])
 		if start > end {
 			return fmt.Errorf("invalid port range: %d > %d", start, end)
 		}
-	} else if err := validatePortNumber(remainder, false); err != nil {
+	} else if _, err := validatePortNumber(remainder, false); err != nil {
 		return fmt.Errorf("invalid port: %w", err)
 	}
 
