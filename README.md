@@ -124,7 +124,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--env`, `-e`: Set environment variables (`KEY=VALUE` or `KEY` for host passthrough).
 - `--strict-env`: Require all passed environment variables to be present on the host. (Default: `false`)
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
-- `--pull-max-retries`: Maximum number of retries for image pull. (Default: `3`)
+- `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
