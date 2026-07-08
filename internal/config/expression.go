@@ -367,8 +367,8 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
-	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) {
-		return "", fmt.Errorf("absolute paths and parent directory references are not allowed in file directive: %q", filename)
+	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) || strings.ContainsAny(filename, "/\\") {
+		return "", fmt.Errorf("only a single file name is allowed in file directive: %q", filename)
 	}
 
 	if r.shared == nil {

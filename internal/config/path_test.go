@@ -460,6 +460,16 @@ func TestUnit_Path_ParseDeviceConfig_Errors(t *testing.T) {
 		_, ok := ParseDeviceConfig(":")
 		assert.False(t, ok)
 	})
+
+	t.Run("invalid permissions", func(t *testing.T) {
+		_, ok := ParseDeviceConfig("/dev/sda:/dev/sda:rx")
+		assert.False(t, ok)
+	})
+
+	t.Run("malformed with second colon", func(t *testing.T) {
+		_, ok := ParseDeviceConfig("/dev/sda:/dev/sda:extra:rwm")
+		assert.False(t, ok)
+	})
 }
 
 func TestUnit_Path_Resolve_Errors(t *testing.T) {
@@ -659,7 +669,7 @@ destination: /dev/fuse
 		// Invalid (String - invalid permissions)
 		err = yaml.Unmarshal([]byte("/dev/host:/dev/cont:rx"), &dc)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid device permissions")
+		assert.Contains(t, err.Error(), "invalid device config")
 
 		// Invalid (Object - missing source)
 		yamlStr = `
@@ -840,6 +850,10 @@ func TestUnit_Config_ValidateExposePort(t *testing.T) {
 		{"Empty port", "", false},
 		{"Invalid protocol", "80/http", true},
 		{"Invalid range", "80-extra", true},
+		{"Port zero", "0", true},
+		{"Port out of range", "65536", true},
+		{"Invalid range order", "90-80", true},
+		{"Range with zero", "0-80", true},
 	}
 
 	for _, tt := range tests {
