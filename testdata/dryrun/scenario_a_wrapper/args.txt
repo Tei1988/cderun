@@ -1,1 +1,1 @@
-cderun --dry-run --dry-run-format=json node app.js --tty
+["cderun", "--dry-run", "--dry-run-format=json", "node", "app.js", "--tty"]

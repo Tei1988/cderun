@@ -1,1 +1,1 @@
-node --cderun-dry-run --cderun-dry-run-format=json --cderun-image=alpine:latest --version
+["node", "--cderun-dry-run", "--cderun-dry-run-format=json", "--cderun-image=alpine:latest", "--version"]

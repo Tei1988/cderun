@@ -4,9 +4,9 @@
     "./..."
   ],
   "env": [
-    "PROJECT_ROOT=[REDACTED]"
+    "PROJECT_ROOT={{PWD}}"
   ],
-  "image": "golang:1.21.0",
+  "image": "alpine:1.21.0",
   "interactive": false,
   "mounts": [],
   "network": "bridge",

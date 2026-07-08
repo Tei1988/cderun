@@ -8,7 +8,7 @@
   "interactive": false,
   "mounts": [
     {
-      "source": "/",
+      "source": "{{PWD}}",
       "target": "/app",
       "type": "bind"
     }

@@ -47,8 +47,12 @@ func runGoldenTest(t *testing.T, dir string) {
 	argsFile := filepath.Join(dir, "args.txt")
 	argsData, err := os.ReadFile(argsFile)
 	require.NoError(t, err)
-	argsLine := strings.TrimSpace(string(argsData))
-	args := strings.Fields(argsLine)
+
+	var args []string
+	if err := json.Unmarshal(argsData, &args); err != nil {
+		// Fallback to Fields for legacy/simple cases
+		args = strings.Fields(strings.TrimSpace(string(argsData)))
+	}
 
 	mfs := &config.MockFileSystem{
 		WD:       "/project",
@@ -56,7 +60,7 @@ func runGoldenTest(t *testing.T, dir string) {
 		ExecPath: "/usr/local/bin/cderun",
 		Env:      make(map[string]string),
 		Files:    make(map[string][]byte),
-		Dirs:    map[string]bool{"/project": true, "/home/user": true},
+		Dirs:     map[string]bool{"/project": true, "/home/user": true},
 	}
 
 	// Load env if exists
@@ -75,28 +79,27 @@ func runGoldenTest(t *testing.T, dir string) {
 		}
 	}
 
-	// Load files if exists (e.g. .tools.yaml)
+	// Load files if exists (mapped to /project)
 	fsDir := filepath.Join(dir, "fs")
 	if info, err := os.Stat(fsDir); err == nil && info.IsDir() {
 		err := filepath.Walk(fsDir, func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
+			rel, _ := filepath.Rel(fsDir, p)
 			if info.IsDir() {
-				rel, _ := filepath.Rel(fsDir, p)
-				mockPath := path.Join("/", filepath.ToSlash(rel))
-				if mockPath != "/" {
+				mockPath := path.Join("/project", filepath.ToSlash(rel))
+				if mockPath != "/project" {
 					mfs.Dirs[mockPath] = true
 				}
 				return nil
 			}
-			rel, _ := filepath.Rel(fsDir, p)
 			content, _ := os.ReadFile(p)
-			// Ensure path uses forward slashes for the mock FS by using path.Join
-			mockPath := path.Join("/", filepath.ToSlash(rel))
+			// Map fixture files to /project/
+			mockPath := path.Join("/project", filepath.ToSlash(rel))
 			mfs.Files[mockPath] = content
 
-			// Also ensure parent dirs exist in mfs.Dirs
+			// Ensure parent dirs exist in mfs.Dirs
 			curr := mockPath
 			for {
 				curr = path.Dir(curr)
@@ -114,7 +117,6 @@ func runGoldenTest(t *testing.T, dir string) {
 	var stderr bytes.Buffer
 
 	ctx := context.Background()
-	// ExecuteContextWithOptions uses localOpts.logger which is initialized with cmd.ErrOrStderr()
 	err = ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
@@ -156,7 +158,7 @@ func runGoldenTest(t *testing.T, dir string) {
 }
 
 func normalizeGoldenOutput(s string) string {
-	// Simple normalization for now
+	// Simple normalization
 	s = strings.ReplaceAll(s, "/home/user", "{{HOME}}")
 	s = strings.ReplaceAll(s, "/project", "{{PWD}}")
 	s = strings.ReplaceAll(s, "/usr/local/bin/cderun", "{{BIN}}")
