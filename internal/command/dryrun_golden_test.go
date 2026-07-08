@@ -49,10 +49,7 @@ func runGoldenTest(t *testing.T, dir string) {
 	require.NoError(t, err)
 
 	var args []string
-	if err := json.Unmarshal(argsData, &args); err != nil {
-		// Fallback to Fields for legacy/simple cases
-		args = strings.Fields(strings.TrimSpace(string(argsData)))
-	}
+	require.NoError(t, json.Unmarshal(argsData, &args), "args.txt in %s must be a JSON array", dir)
 
 	mfs := &config.MockFileSystem{
 		WD:       "/project",
@@ -79,7 +76,7 @@ func runGoldenTest(t *testing.T, dir string) {
 		}
 	}
 
-	// Load files if exists (mapped to /project)
+	// Load files if exists (mapped to mfs.WD)
 	fsDir := filepath.Join(dir, "fs")
 	if info, err := os.Stat(fsDir); err == nil && info.IsDir() {
 		err := filepath.Walk(fsDir, func(p string, info os.FileInfo, err error) error {
@@ -87,16 +84,16 @@ func runGoldenTest(t *testing.T, dir string) {
 				return err
 			}
 			rel, _ := filepath.Rel(fsDir, p)
+			// Map fixture files to mfs.WD (/project/)
+			mockPath := path.Join(mfs.WD, filepath.ToSlash(rel))
+
 			if info.IsDir() {
-				mockPath := path.Join("/project", filepath.ToSlash(rel))
-				if mockPath != "/project" {
+				if mockPath != mfs.WD {
 					mfs.Dirs[mockPath] = true
 				}
 				return nil
 			}
 			content, _ := os.ReadFile(p)
-			// Map fixture files to /project/
-			mockPath := path.Join("/project", filepath.ToSlash(rel))
 			mfs.Files[mockPath] = content
 
 			// Ensure parent dirs exist in mfs.Dirs
@@ -111,6 +108,15 @@ func runGoldenTest(t *testing.T, dir string) {
 			return nil
 		})
 		require.NoError(t, err)
+	}
+
+	// Ensure binary name is present for ExecuteContextWithOptions if needed.
+	// If first arg is not cderun, node, or a path, prepend cderun.
+	if len(args) > 0 {
+		first := args[0]
+		if !strings.HasPrefix(first, "-") && !strings.Contains(first, "/") && first != "cderun" && first != "node" {
+			args = append([]string{"cderun"}, args...)
+		}
 	}
 
 	var stdout bytes.Buffer

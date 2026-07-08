@@ -1,1 +1,1 @@
-["cderun", "--dry-run", "--dry-run-format=json", "node", "app.js", "--tty"]
+["--dry-run", "--dry-run-format=json", "node", "app.js", "--tty"]

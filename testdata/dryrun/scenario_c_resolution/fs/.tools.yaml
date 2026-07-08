@@ -1,4 +1,4 @@
 go:
   image: alpine:{{file:.go-version}}
   env:
-    - PROJECT_ROOT={{find_dir:test-marker}}
+    - PROJECT_ROOT={{find_dir:tracked-git-dir}}
