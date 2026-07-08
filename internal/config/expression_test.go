@@ -550,30 +550,30 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 }
 
 func TestUnit_Expression_ExtraEdgeCases(t *testing.T) {
-	fs := &MockFileSystem{
-		Files: map[string][]byte{
-			"/project/l1.txt": []byte("l2.txt"),
-			"/project/l2.txt": []byte("l3.txt"),
-			"/project/l3.txt": []byte("final content"),
-		},
-		Dirs: map[string]bool{
-			"/project": true,
-		},
-		WD: "/project",
-	}
-
-	hostCtx := &HostContext{}
+	t.Parallel()
 
 	t.Run("triple nested expressions", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		t.Parallel()
+		fsEnv := &MockFileSystem{
+			Env: map[string]string{
+				"VAR1": "VAR2",
+				"VAR2": "VAR3",
+				"VAR3": "final value",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fsEnv)
 		require.NoError(t, err)
-		val := r.resolveString("{{ file:{{ file:{{ file:l1.txt }} }} }}")
+
+		// {{ env:{{ env:{{ env:VAR1 }} }} }} -> {{ env:VAR3 }} -> final value
+		val := r.resolveString("{{ env:{{ env:{{ env:VAR1 }} }} }}")
 		require.NoError(t, r.Error())
-		assert.Equal(t, "final content", val)
+		assert.Equal(t, "final value", val)
 	})
 
 	t.Run("magic word in the middle of a string", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		t.Parallel()
+		fs := &MockFileSystem{WD: "/project"}
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 		val := r.resolveString("Current path is {{PWD}} and it is good")
 		require.NoError(t, r.Error())
@@ -581,21 +581,21 @@ func TestUnit_Expression_ExtraEdgeCases(t *testing.T) {
 	})
 
 	t.Run("anchor boundary violation with nested resolution", func(t *testing.T) {
+		t.Parallel()
 		fsViolation := &MockFileSystem{
-			Files: map[string][]byte{
-				"/project/evil.txt": []byte("../../etc/passwd"),
+			WD: "/work",
+			Env: map[string]string{
+				"SAFE_DIR": "/work/safe",
 			},
-			Dirs: map[string]bool{
-				"/project": true,
-			},
-			WD: "/project",
 		}
-		r, err := NewExpressionResolverWithFS(hostCtx, fsViolation)
+		r, err := NewExpressionResolverWithFS(nil, fsViolation)
 		require.NoError(t, err)
-		// {{ file:evil.txt }} resolves to "../../etc/passwd"
-		// Then {{ file:../../etc/passwd }} should be blocked by anchor boundary validation
-		r.resolveString("{{ file:{{ file:evil.txt }} }}")
-		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "parent directory references are not allowed")
+
+		// {{env:SAFE_DIR}}/../../etc/passwd resolves to /etc/passwd
+		// Anchor {{env:SAFE_DIR}} is /work/safe.
+		// /etc/passwd escapes /work/safe.
+		_, err = ResolvePath("{{env:SAFE_DIR}}/../../etc/passwd", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "path traversal detected")
 	})
 }
