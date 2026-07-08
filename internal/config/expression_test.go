@@ -258,7 +258,7 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		r.resolveString("{{ file:../../etc/passwd }}")
 		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "parent directory references are not allowed")
+		assert.Contains(t, r.Error().Error(), "only a single file name is allowed")
 	})
 
 	t.Run("absolute path attempt in file", func(t *testing.T) {
@@ -266,8 +266,15 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		r.resolveString("{{ file:/etc/passwd }}")
 		require.Error(t, r.Error())
-		assert.Contains(t, r.Error().Error(), "absolute paths")
-		assert.Contains(t, r.Error().Error(), "are not allowed")
+		assert.Contains(t, r.Error().Error(), "only a single file name is allowed")
+	})
+
+	t.Run("subdirectory attempt in file", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+		require.NoError(t, err)
+		r.resolveString("{{ file:.ssh/id_rsa }}")
+		require.Error(t, r.Error())
+		assert.Contains(t, r.Error().Error(), "only a single file name is allowed")
 	})
 
 	t.Run("invalid directive (strict resolution)", func(t *testing.T) {
