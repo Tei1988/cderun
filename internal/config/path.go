@@ -523,7 +523,8 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
 func findAnchors(s string) []string {
-	ranges := scanAnchors(s)
+	var buf [8]anchorRange
+	ranges := scanAnchors(s, buf[:0])
 	if len(ranges) == 0 {
 		return nil
 	}
@@ -619,7 +620,8 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		if err != nil {
 			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
 		}
-		if unresolved := scanAnchors(anchorPath); len(unresolved) > 0 {
+		var checkBuf [4]anchorRange
+		if unresolved := scanAnchors(anchorPath, checkBuf[:0]); len(unresolved) > 0 {
 			return fmt.Errorf("unresolved expression in anchor %q: %q", anchor, anchorPath)
 		}
 		if err := processBoundary(anchor, anchorPath); err != nil {

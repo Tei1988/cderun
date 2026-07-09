@@ -149,10 +149,32 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	}
 
 	// Deduplicate within the winning source (last-one-wins for the same key)
-	// We use mergeEnv with nil/nil for other sources to leverage its deduplication logic.
-	merged := mergeEnv(nil, nil, envs)
+	var merged []string
+	if len(envs) > 0 {
+		merged = deduplicateEnv(envs)
+	}
 
 	return resolveEnvValues(merged, sensitivePatterns, strict, r, fs)
+}
+
+func deduplicateEnv(env []string) []string {
+	if len(env) <= 1 {
+		return env
+	}
+	m := make(map[string]string, len(env))
+	keys := make([]string, 0, len(env))
+	for _, e := range env {
+		key, _, _ := strings.Cut(e, "=")
+		if _, ok := m[key]; !ok {
+			keys = append(keys, key)
+		}
+		m[key] = e
+	}
+	res := make([]string, 0, len(keys))
+	for _, k := range keys {
+		res = append(res, m[k])
+	}
+	return res
 }
 
 func mergeEnv(base, p2, p1 []string) []string {
@@ -160,6 +182,17 @@ func mergeEnv(base, p2, p1 []string) []string {
 	if total == 0 {
 		return nil
 	}
+	// Optimization: if only one source is non-empty, use deduplicateEnv
+	if len(base) > 0 && len(p2) == 0 && len(p1) == 0 {
+		return deduplicateEnv(base)
+	}
+	if len(base) == 0 && len(p2) > 0 && len(p1) == 0 {
+		return deduplicateEnv(p2)
+	}
+	if len(base) == 0 && len(p2) == 0 && len(p1) > 0 {
+		return deduplicateEnv(p1)
+	}
+
 	m := make(map[string]string, total)
 	keys := make([]string, 0, total)
 
@@ -233,8 +266,11 @@ func validateImageRegistryMatch(cliImage, configImage string) error {
 }
 
 func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	res := make([]string, 0, len(env))
-	for _, e := range env {
+	if len(env) == 0 {
+		return nil, nil
+	}
+	var res []string
+	for i, e := range env {
 		resolvedE := r.resolveString(e)
 		if err := r.Error(); err != nil {
 			return nil, err
@@ -269,7 +305,17 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			logging.Debug("Resolved Env: %q=%q", key, MaskSensitiveEnv(key, val, sensitivePatterns))
 		}
 
-		res = append(res, final)
+		if res == nil && final != e {
+			// Allocation needed, copy previous unchanged entries
+			res = make([]string, 0, len(env))
+			res = append(res, env[:i]...)
+		}
+		if res != nil {
+			res = append(res, final)
+		}
+	}
+	if res == nil {
+		return env, nil
 	}
 	return res, nil
 }
@@ -298,6 +344,10 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(mcs) == 0 {
+		return nil, nil
 	}
 
 	res := make([]container.Mount, 0, len(mcs))
