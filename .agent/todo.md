@@ -48,7 +48,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | - |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
-| T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | - |
+| T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | - |
 | T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |

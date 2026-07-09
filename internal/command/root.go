@@ -1139,7 +1139,7 @@ intended for the subcommand.`,
 			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
 		}
 
-		if len(args) == 0 {
+		if subcommand == "" {
 			if resolved.DryRun {
 				return fmt.Errorf("--dry-run requires a subcommand")
 			}
