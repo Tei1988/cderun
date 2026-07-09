@@ -174,7 +174,7 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 				ImageSet: true,
 				Expose:   []string{"80-abc"},
 			},
-			wantErr: "security validation failed for expose[0]: invalid port range",
+			wantErr: "security validation failed for expose[0]: invalid end port in range",
 		},
 	}
 

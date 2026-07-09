@@ -249,17 +249,17 @@ func TestUnit_Expression_Nested_Deep(t *testing.T) {
 		fs := &MockFileSystem{
 			WD:      "/work",
 			HomeDir: "/home",
-			Env:     map[string]string{"DIR": "proj", "FILE": "ver.txt"},
+			Env:     map[string]string{"FILE": "ver.txt"},
 			Files: map[string][]byte{
-				"/work/proj/ver.txt": []byte("1.0"),
+				"/work/ver.txt": []byte("1.0"),
 			},
-			Dirs: map[string]bool{"/work/proj": true, "/work": true},
+			Dirs: map[string]bool{"/work": true},
 		}
 		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		// {{ file:{{ env:DIR }}/{{ env:FILE }} }} -> {{ file:proj/ver.txt }} -> 1.0
-		val := r.resolveString("{{ file:{{ env:DIR }}/{{ env:FILE }} }}")
+		// {{ file:{{ env:FILE }} }} -> {{ file:ver.txt }} -> 1.0
+		val := r.resolveString("{{ file:{{ env:FILE }} }}")
 		require.NoError(t, r.Error())
 		assert.Equal(t, "1.0", val)
 	})

@@ -188,6 +188,12 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 		{"Shell metacharacter ;", "80;rm", true},
 		{"Shell metacharacter |", "80|ls", true},
 		{"Shell metacharacter &", "80&", true},
+		{"Port zero (container)", "0", true},
+		{"Port zero (host)", "0:80", false},
+		{"Port out of range", "70000", true},
+		{"Port negative", "-1", true},
+		{"IP and port zero (container)", "127.0.0.1:0", true},
+		{"IP and port zero (host)", "127.0.0.1:0:80", false},
 	}
 
 	for _, tt := range tests {
