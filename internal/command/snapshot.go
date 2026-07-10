@@ -90,18 +90,22 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		logger.Debug("failed to get executable path for snapshot: %v", err)
 	}
 
-	pwd, err := fs.Getwd()
-	if err == nil {
-		hostCtx.WorkingDir = pwd
-	} else {
-		logger.Debug("failed to get working directory for snapshot: %v", err)
+	if hostCtx.WorkingDir == "" {
+		pwd, err := fs.Getwd()
+		if err == nil {
+			hostCtx.WorkingDir = pwd
+		} else {
+			logger.Debug("failed to get working directory for snapshot: %v", err)
+		}
 	}
 
-	home, err := fs.UserHomeDir()
-	if err == nil {
-		hostCtx.HomeDir = home
-	} else {
-		logger.Debug("failed to get home directory for snapshot: %v", err)
+	if hostCtx.HomeDir == "" {
+		home, err := fs.UserHomeDir()
+		if err == nil {
+			hostCtx.HomeDir = home
+		} else {
+			logger.Debug("failed to get home directory for snapshot: %v", err)
+		}
 	}
 
 	// Create a temporary config for marshaling to avoid side effects on the caller's config
