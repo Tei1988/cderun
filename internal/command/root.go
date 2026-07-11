@@ -10,10 +10,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/docker/go-units"
@@ -570,17 +570,9 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		})
 
 		// Auto-add socket GID so non-root users can access the mounted socket.
-		if info, err := o.fs.Stat(resolved.SocketPath); err == nil {
-			if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Gid != 0 {
-				socketGID := strconv.FormatUint(uint64(stat.Gid), 10)
-				alreadyPresent := false
-				for _, g := range containerConfig.GroupAdd {
-					if g == socketGID {
-						alreadyPresent = true
-						break
-					}
-				}
-				if !alreadyPresent {
+		if socketGID, err := getSocketGID(o.fs, resolved.SocketPath); err == nil {
+			if socketGID != "" {
+				if !slices.Contains(containerConfig.GroupAdd, socketGID) {
 					containerConfig.GroupAdd = append(containerConfig.GroupAdd, socketGID)
 					o.logger.Debug("Auto-added socket GID %s from %s", socketGID, resolved.SocketPath)
 				}
