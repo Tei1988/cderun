@@ -16,6 +16,7 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -189,6 +190,18 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		}
 	}
 
+	var validatedGids []uint32
+	if len(config.GroupAdd) > 0 {
+		validatedGids = make([]uint32, 0, len(config.GroupAdd))
+		for _, g := range config.GroupAdd {
+			gid64, err := strconv.ParseUint(g, 10, 32)
+			if err != nil {
+				return "", fmt.Errorf("containerd runtime: non-numeric GroupAdd GID %q is not supported: %w", g, err)
+			}
+			validatedGids = append(validatedGids, uint32(gid64))
+		}
+	}
+
 	img, err := r.client.GetImage(ctx, config.Image)
 	if err != nil {
 		return "", fmt.Errorf("failed to get image: %w", err)
@@ -282,6 +295,16 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
+	}
+
+	if len(config.GroupAdd) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Process == nil {
+				s.Process = &specs.Process{}
+			}
+			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, validatedGids...)
+			return nil
+		})
 	}
 
 	_, err = r.client.NewContainer(ctx, id,

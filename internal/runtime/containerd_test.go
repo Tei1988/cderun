@@ -172,6 +172,25 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		assert.Contains(t, err.Error(), "volume mount type is not supported")
 	})
 
+	t.Run("non-numeric GroupAdd", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			GroupAdd: []string{"nonexistent-group"},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "non-numeric GroupAdd GID")
+	})
+
+	t.Run("numeric GroupAdd passes validation", func(t *testing.T) {
+		conf := &container.ContainerConfig{
+			Image:    "alpine",
+			GroupAdd: []string{"1001", "1002"},
+		}
+		// Expect panic because rt.client is nil in this test context
+		assert.Panics(t, func() {
+			_, _ = rt.CreateContainer(context.Background(), conf)
+		})
+	})
+
 	t.Run("capabilities and tmpfs pass validation", func(t *testing.T) {
 		// These fields should not trigger an early error, and will instead proceed to client calls.
 		conf := &container.ContainerConfig{
