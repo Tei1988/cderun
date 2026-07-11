@@ -63,6 +63,7 @@ type ResolvedConfig struct {
 	CPUs            float64
 	Devices         []container.DeviceMapping
 	SensitiveEnv    []string
+	GroupAdd        []string
 }
 
 // CLIOptions represents values from CLI flags.
@@ -219,6 +220,8 @@ type CLIOptions struct {
 	CderunDevices            []string
 	SensitiveEnv             []string
 	CderunSensitiveEnv       []string
+	GroupAdd                 []string
+	CderunGroupAdd           []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.

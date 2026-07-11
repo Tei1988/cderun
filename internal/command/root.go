@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -117,6 +118,7 @@ type rootOptions struct {
 	memory                string
 	cpus                  float64
 	devices               []string
+	groupAdd              []string
 	cderunPorts           []string
 	cderunPublishAll      bool
 	cderunExpose          []string
@@ -127,6 +129,7 @@ type rootOptions struct {
 	cderunPrivileged      bool
 	cderunCapAdd          []string
 	cderunCapDrop         []string
+	cderunGroupAdd        []string
 	cderunEntrypoint      []string
 	cderunPull            string
 	cderunMemory          string
@@ -429,6 +432,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunDevices:            o.cderunDevices,
 		SensitiveEnv:             o.sensitiveEnv,
 		CderunSensitiveEnv:       o.cderunSensitiveEnv,
+		GroupAdd:                 o.groupAdd,
+		CderunGroupAdd:           o.cderunGroupAdd,
 	}
 
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
@@ -467,10 +472,11 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		CapAdd:     resolved.CapAdd,
 		CapDrop:    resolved.CapDrop,
 		Entrypoint: resolved.Entrypoint,
-		Pull:       resolved.Pull,
-		Memory:     resolved.Memory,
-		CPUs:       resolved.CPUs,
-		Devices:    resolved.Devices,
+		Pull:     resolved.Pull,
+		Memory:   resolved.Memory,
+		CPUs:     resolved.CPUs,
+		Devices:  resolved.Devices,
+		GroupAdd: resolved.GroupAdd,
 	}
 
 	// Handle mounting flags
@@ -562,6 +568,18 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 			Target:   resolved.MountSocketPath,
 			ReadOnly: false, // Socket needs to be writable
 		})
+
+		// Auto-add socket GID so non-root users can access the mounted socket.
+		if socketGID, err := getSocketGID(o.fs, resolved.SocketPath); err == nil {
+			if socketGID != "" {
+				if !slices.Contains(containerConfig.GroupAdd, socketGID) {
+					containerConfig.GroupAdd = append(containerConfig.GroupAdd, socketGID)
+					o.logger.Debug("Auto-added socket GID %s from %s", socketGID, resolved.SocketPath)
+				}
+			}
+		} else {
+			o.logger.Debug("Failed to stat socket for GID auto-detection: %v", err)
+		}
 	}
 
 	return containerConfig, nil
@@ -673,6 +691,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
 		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
 		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
+		_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(maskedContainerConfig.GroupAdd, ", "))
 
 		var devices []string
 		for _, d := range maskedContainerConfig.Devices {
