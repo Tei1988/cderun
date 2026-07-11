@@ -190,11 +190,15 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		}
 	}
 
+	var validatedGids []uint32
 	if len(config.GroupAdd) > 0 {
+		validatedGids = make([]uint32, 0, len(config.GroupAdd))
 		for _, g := range config.GroupAdd {
-			if _, err := strconv.ParseUint(g, 10, 32); err != nil {
+			gid64, err := strconv.ParseUint(g, 10, 32)
+			if err != nil {
 				return "", fmt.Errorf("containerd runtime: non-numeric GroupAdd GID %q is not supported: %w", g, err)
 			}
+			validatedGids = append(validatedGids, uint32(gid64))
 		}
 	}
 
@@ -294,16 +298,11 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 
 	if len(config.GroupAdd) > 0 {
-		var additionalGids []uint32
-		for _, g := range config.GroupAdd {
-			gid64, _ := strconv.ParseUint(g, 10, 32)
-			additionalGids = append(additionalGids, uint32(gid64))
-		}
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 			if s.Process == nil {
 				s.Process = &specs.Process{}
 			}
-			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, additionalGids...)
+			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, validatedGids...)
 			return nil
 		})
 	}
