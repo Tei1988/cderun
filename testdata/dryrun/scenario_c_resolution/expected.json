@@ -1,0 +1,18 @@
+{
+  "command": [
+    "test",
+    "./..."
+  ],
+  "env": [
+    "PROJECT_ROOT={{PWD}}"
+  ],
+  "image": "alpine:1.21.0",
+  "interactive": false,
+  "mounts": [],
+  "network": "bridge",
+  "pull": "missing",
+  "remove": true,
+  "tty": false,
+  "user": "",
+  "workdir": ""
+}

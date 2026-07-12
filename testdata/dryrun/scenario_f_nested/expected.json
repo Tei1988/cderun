@@ -1,0 +1,27 @@
+{
+  "command": [
+    "ls"
+  ],
+  "env": [],
+  "image": "node:20",
+  "interactive": false,
+  "mounts": [
+    {
+      "read_only": true,
+      "source": "{{BIN}}",
+      "target": "{{BIN}}",
+      "type": "bind"
+    },
+    {
+      "source": "/var/run/docker.sock",
+      "target": "/var/run/docker.sock",
+      "type": "bind"
+    }
+  ],
+  "network": "bridge",
+  "pull": "missing",
+  "remove": true,
+  "tty": false,
+  "user": "",
+  "workdir": ""
+}

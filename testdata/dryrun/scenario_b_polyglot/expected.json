@@ -1,0 +1,15 @@
+{
+  "command": [
+    "--version"
+  ],
+  "env": [],
+  "image": "alpine:latest",
+  "interactive": false,
+  "mounts": [],
+  "network": "bridge",
+  "pull": "missing",
+  "remove": true,
+  "tty": false,
+  "user": "",
+  "workdir": ""
+}
