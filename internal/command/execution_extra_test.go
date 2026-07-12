@@ -37,37 +37,35 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 		assert.Equal(t, 123, exitErr.Code)
 	})
 
-	t.Run("empty subcommand currently PANICS in dry-run (documenting T42)", func(t *testing.T) {
-		// cderun --dry-run ""
-		// preprocessArgs will return ["cderun", ""]
-		// args[0] is ""
+	panicTests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "empty subcommand currently PANICS in dry-run (documenting T42)",
+			args: []string{"cderun", "--dry-run", ""},
+		},
+		{
+			name: "empty subcommand currently PANICS in normal run (documenting T42)",
+			args: []string{"cderun", ""},
+		},
+	}
 
-		ctx := context.Background()
-		assert.Panics(t, func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--dry-run", ""}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-					return &runtime.MockRuntime{}, nil
-				}
-				o.exitFunc = func(code int) {}
-				cmd.SetOut(io.Discard)
-				cmd.SetErr(io.Discard)
+	for _, tt := range panicTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			assert.Panics(t, func() {
+				_ = ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
+					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+						return &runtime.MockRuntime{}, nil
+					}
+					o.exitFunc = func(code int) {}
+					cmd.SetOut(io.Discard)
+					cmd.SetErr(io.Discard)
+				})
 			})
 		})
-	})
-
-	t.Run("empty subcommand currently PANICS in normal run (documenting T42)", func(t *testing.T) {
-		ctx := context.Background()
-		assert.Panics(t, func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", ""}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-					return &runtime.MockRuntime{}, nil
-				}
-				o.exitFunc = func(code int) {}
-				cmd.SetOut(io.Discard)
-				cmd.SetErr(io.Discard)
-			})
-		})
-	})
+	}
 
 	t.Run("propagate internal error with 125 exit code", func(t *testing.T) {
 		mock := &runtime.MockRuntime{

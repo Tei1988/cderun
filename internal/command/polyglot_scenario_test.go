@@ -15,6 +15,19 @@ import (
 	"cderun/internal/runtime"
 )
 
+func runPolyglotTest(ctx context.Context, args []string, mfs *config.MockFileSystem, mock *runtime.MockRuntime) error {
+	return ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+}
+
 func TestScenario_Polyglot_Extra(t *testing.T) {
 	t.Run("detect tool from absolute path", func(t *testing.T) {
 		mock := &runtime.MockRuntime{}
@@ -28,16 +41,7 @@ func TestScenario_Polyglot_Extra(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		err := ExecuteContextWithOptions(ctx, []string{"/usr/local/bin/node", "--version"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-				return mock, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.fs = mfs
-			o.configLoader = config.NewConfigLoaderWithFS(mfs)
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
-		})
+		err := runPolyglotTest(ctx, []string{"/usr/local/bin/node", "--version"}, mfs, mock)
 
 		require.NoError(t, err)
 		cfg := mock.GetCreatedConfig()
@@ -59,17 +63,7 @@ func TestScenario_Polyglot_Extra(t *testing.T) {
 		defer cancel()
 
 		// node -v --cderun-image node:alpine --foo
-		// Note: --cderun-image must match registry of configured image (node)
-		err := ExecuteContextWithOptions(ctx, []string{"node", "-v", "--cderun-image", "node:alpine", "--foo"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-				return mock, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.fs = mfs
-			o.configLoader = config.NewConfigLoaderWithFS(mfs)
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
-		})
+		err := runPolyglotTest(ctx, []string{"node", "-v", "--cderun-image", "node:alpine", "--foo"}, mfs, mock)
 
 		require.NoError(t, err)
 		cfg := mock.GetCreatedConfig()
@@ -91,16 +85,7 @@ func TestScenario_Polyglot_Extra(t *testing.T) {
 		defer cancel()
 
 		// ./git status
-		err := ExecuteContextWithOptions(ctx, []string{"./git", "status"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-				return mock, nil
-			}
-			o.exitFunc = func(code int) {}
-			o.fs = mfs
-			o.configLoader = config.NewConfigLoaderWithFS(mfs)
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
-		})
+		err := runPolyglotTest(ctx, []string{"./git", "status"}, mfs, mock)
 
 		require.NoError(t, err)
 		cfg := mock.GetCreatedConfig()
