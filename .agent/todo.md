@@ -523,12 +523,12 @@ cderun --prune
 ### `registry.go` の `sensitive-env` 説明文の不整合
 
 - **内容**: `internal/config/registry.go` の `sensitive-env` オプションの `Usage` フィールドが `"default uses automatic keywords"` となっているが、現在の実際の実装（および他のドキュメント）では「未指定時はすべての環境変数をマスクする (Mask-all)」挙動となっている。
-- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。
+- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。 (Recorded by Jules)
 
 ### `registry.go` の `runtime` 説明文の不整合
 
 - **内容**: `internal/config/registry.go` の `runtime` オプションの `Usage` フィールドが `"Container runtime to use (docker/podman)"` となっているが、現在は `containerd` もサポートされている。
-- **対応**: `Usage` 文字列を `"Container runtime to use (docker/podman/containerd)"` に更新することを推奨。
+- **対応**: `Usage` 文字列を `"Container runtime to use (docker/podman/containerd)"` に更新することを推奨。 (Recorded by Jules)
 
 ### 記憶 (Memory) と実装の乖離：環境変数マスキング
 

@@ -251,6 +251,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **デフォルト**: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。いずれも見つからない場合は `docker` にフォールバック）
 - **環境変数**: `CDERUN_RUNTIME`
 - **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）
+- **補足**: `containerd` は現在実験的なサポート段階です。制限事項については [マルチランタイムサポート](./multi-runtime-support.md) を参照してください。
 
 ```bash
 cderun --runtime podman node app.js
@@ -420,7 +421,7 @@ cderun --entrypoint /bin/sh node -c "ls"
 - **型**: int
 - **デフォルト**: `3`
 - **環境変数**: `CDERUN_PULL_MAX_RETRIES`
-- **説明**: イメージプル失敗時の最大リトライ回数。
+- **説明**: イメージプル失敗時の最大リトライ回数（1以上の整数を指定）。
 
 ### `--pull-backoff-base`
 
