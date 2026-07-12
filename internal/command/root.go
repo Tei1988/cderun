@@ -1158,7 +1158,7 @@ intended for the subcommand.`,
 			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
 		}
 
-		if len(args) == 0 {
+		if subcommand == "" {
 			if resolved.DryRun {
 				return fmt.Errorf("--dry-run requires a subcommand")
 			}
@@ -1174,12 +1174,9 @@ intended for the subcommand.`,
 		o.logger.Debug("Logger initialized with level: %s", resolved.LogLevel)
 
 		// Build ContainerConfig
-		var containerConfig *container.ContainerConfig
-		if subcommand != "" {
-			containerConfig, err = o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
-			if err != nil {
-				return fmt.Errorf("container configuration error: %w", err)
-			}
+		containerConfig, err := o.buildContainerConfig(resolved, passthroughArgs, toolsCfg)
+		if err != nil {
+			return fmt.Errorf("container configuration error: %w", err)
 		}
 
 		if resolved.DryRun {
