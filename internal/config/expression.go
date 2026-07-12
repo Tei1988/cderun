@@ -137,9 +137,6 @@ func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 }
 
 func (r *ExpressionResolver) ensureFileCache() {
-	if r.shared.fileCache != nil {
-		return
-	}
 	r.shared.cacheOnce.Do(func() {
 		r.shared.fileCache = make(map[string]fileCacheEntry)
 		r.shared.statCache = make(map[string]statCacheEntry)

@@ -157,19 +157,24 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	return resolveEnvValues(merged, sensitivePatterns, strict, r, fs)
 }
 
+func addEnv(m map[string]string, keys *[]string, env []string) {
+	for _, e := range env {
+		key, _, _ := strings.Cut(e, "=")
+		if _, ok := m[key]; !ok {
+			*keys = append(*keys, key)
+		}
+		m[key] = e
+	}
+}
+
 func deduplicateEnv(env []string) []string {
 	if len(env) <= 1 {
 		return env
 	}
 	m := make(map[string]string, len(env))
 	keys := make([]string, 0, len(env))
-	for _, e := range env {
-		key, _, _ := strings.Cut(e, "=")
-		if _, ok := m[key]; !ok {
-			keys = append(keys, key)
-		}
-		m[key] = e
-	}
+	addEnv(m, &keys, env)
+
 	res := make([]string, 0, len(keys))
 	for _, k := range keys {
 		res = append(res, m[k])
@@ -196,19 +201,9 @@ func mergeEnv(base, p2, p1 []string) []string {
 	m := make(map[string]string, total)
 	keys := make([]string, 0, total)
 
-	add := func(env []string) {
-		for _, e := range env {
-			key, _, _ := strings.Cut(e, "=")
-			if _, ok := m[key]; !ok {
-				keys = append(keys, key)
-			}
-			m[key] = e
-		}
-	}
-
-	add(base)
-	add(p2)
-	add(p1)
+	addEnv(m, &keys, base)
+	addEnv(m, &keys, p2)
+	addEnv(m, &keys, p1)
 
 	res := make([]string, 0, len(keys))
 	for _, k := range keys {
@@ -267,7 +262,7 @@ func validateImageRegistryMatch(cliImage, configImage string) error {
 
 func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	if len(env) == 0 {
-		return nil, nil
+		return []string{}, nil
 	}
 	var res []string
 	for i, e := range env {
@@ -347,7 +342,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	}
 
 	if len(mcs) == 0 {
-		return nil, nil
+		return []container.Mount{}, nil
 	}
 
 	res := make([]container.Mount, 0, len(mcs))
