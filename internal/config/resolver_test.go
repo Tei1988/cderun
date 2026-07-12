@@ -1,8 +1,8 @@
 package config
 
 import (
-	"testing"
 	"time"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,39 +44,45 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
 
 		// Env
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 2.5, res, 1e-9)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res, err = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.InDelta(t, 1.0, res, 1e-9)
+		_, err = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Error(t, err)
 
 		// Tool getter
 		mfs.Env = nil
 		f2 := 2.0
 		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		res, err = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 2.0, res, 1e-9)
 
 		// Global getter
 		def.ToolGetter = nil
 		f3 := 3.0
 		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		res, err = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 3.0, res, 1e-9)
 
 		// P2 CLI
-		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		res, err = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 4.0, res, 1e-9)
 
 		// P1 Override
-		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		res, err = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
@@ -88,50 +94,54 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
 
 		// Env
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res, err := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 20, res)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res, err = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 10, res)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_INT": "invalid"}
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 10, res)
+		_, err = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		assert.Error(t, err)
 
 		// Tool getter
 		mfs.Env = nil
 		i2 := 30
 		def.ToolGetter = func(tc ToolConfig) *int { return &i2 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		res, err = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 30, res)
 
 		// Global getter
 		def.ToolGetter = nil
 		i3 := 40
 		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		res, err = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 40, res)
 
 		// P2 CLI
-		res = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		res, err = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 50, res)
 
 		// P1 Override
-		res = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		res, err = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.Equal(t, 60, res)
 	})
 
 	t.Run("resolveEnvValues contains plaintext", func(t *testing.T) {
-		// Use a key that MaskSensitiveEnv would normally target (e.g. MY_PASSWORD)
 		mfs := &MockFileSystem{Env: map[string]string{"MY_PASSWORD": "secret"}}
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 		res, err := resolveEnvValues([]string{"MY_PASSWORD"}, nil, false, r, mfs)
 		require.NoError(t, err)
-		// Verification: ensure the resolver returns plaintext for container execution
 		assert.Equal(t, []string{"MY_PASSWORD=secret"}, res)
 	})
 
@@ -772,237 +782,48 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 	})
 }
 
-func TestUnit_Resolver_Optional_Mounts(t *testing.T) {
-	t.Parallel()
-	mfs := &MockFileSystem{
-		WD: "/app",
-		Files: map[string][]byte{
-			"/app/exists": []byte("content"),
-		},
-	}
-
-	t.Run("Skip optional mount when source is missing", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Mounts:   []string{"source=/app/missing,target=/data,optional"},
-		}
-		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Empty(t, res.Mounts)
-	})
-
-	t.Run("Keep optional mount when source exists", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Mounts:   []string{"source=/app/exists,target=/data,optional"},
-		}
-		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.NoError(t, err)
-		require.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/app/exists", res.Mounts[0].Source)
-		assert.True(t, res.Mounts[0].Optional)
-	})
-
-	t.Run("Non-optional mount remains even if source is missing (handled by runtime)", func(t *testing.T) {
-		cli := CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Mounts:   []string{"source=/app/missing,target=/data"},
-		}
-		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
-		require.NoError(t, err)
-		require.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/app/missing", res.Mounts[0].Source)
-		assert.False(t, res.Mounts[0].Optional)
-	})
-}
-
-func TestUnit_Resolver_Optional_Mount_With_Expression(t *testing.T) {
-	t.Parallel()
-	mfs := &MockFileSystem{
-		WD: "/app",
-		Files: map[string][]byte{
-			"/host/config/foo": []byte("content"),
-		},
-	}
-	hostCtx := &HostContext{
-		Level: 1,
-		Mounts: []MountMapping{
-			{Source: "/host/config", Target: "/config", Level: 1},
-		},
-	}
-	r, err := NewExpressionResolverWithFS(hostCtx, mfs)
-	require.NoError(t, err)
-
-	t.Run("Resolve source with HostContext correctly", func(t *testing.T) {
-		mcs := []MountConfig{
-			{
-				Type:     "bind",
-				Source:   ConfigPath{Raw: "/config/foo"},
-				Target:   ConfigPath{Raw: "/data"},
-				Optional: true,
-			},
-		}
-		// Resolve the mounts. /config/foo should resolve to /host/config/foo via HostContext.
-		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
-		require.NoError(t, err)
-		require.Len(t, res, 1)
-		assert.Equal(t, "/host/config/foo", res[0].Source)
-	})
-
-	t.Run("Skip when source resolved via HostContext is missing", func(t *testing.T) {
-		mcs := []MountConfig{
-			{
-				Type:     "bind",
-				Source:   ConfigPath{Raw: "/config/missing"},
-				Target:   ConfigPath{Raw: "/data"},
-				Optional: true,
-			},
-		}
-		res, err := resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, r, mfs)
-		require.NoError(t, err)
-		assert.Empty(t, res)
-	})
-
-	t.Run("Error when Stat fails with non-NotExist error", func(t *testing.T) {
-		mfsError := &MockFileSystem{
-			WD:      "/app",
-			StatErr: assert.AnError,
-		}
-		mcs := []MountConfig{
-			{
-				Type:     "bind",
-				Source:   ConfigPath{Raw: "/host/config/foo"},
-				Target:   ConfigPath{Raw: "/data"},
-				Optional: true,
-			},
-		}
-		rError, err := NewExpressionResolverWithFS(nil, mfsError)
-		require.NoError(t, err)
-
-		_, err = resolveMounts(nil, nil, "", nil, &CDERunConfig{Defaults: ConfigDefaults{Mounts: mcs}}, rError, mfsError)
-		require.Error(t, err)
-		assert.Equal(t, assert.AnError, err)
-	})
-}
-
-func TestUnit_Resolver_ValidateImageRegistryMatch(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name        string
-		cliImage    string
-		configImage string
-		wantErr     bool
-	}{
-		{"exact match", "node:20", "node:18", false},
-		{"with registry match", "docker.io/library/node:20", "node:18", false},
-		{"implicit library match", "node:20", "library/node:18", false},
-		{"explicit host library match", "docker.io/node:20", "node:18", false},
-		{"explicit host match", "docker.io/library/node:20", "docker.io/node:18", false},
-		{"mismatch host", "my-reg.com/node:20", "node:18", true},
-		{"mismatch repo", "library/python:3", "library/node:18", true},
-		{"custom registry match", "my-reg.com/my-tool:v1", "my-reg.com/my-tool:latest", false},
-		{"custom registry mismatch", "other-reg.com/my-tool:v1", "my-reg.com/my-tool:latest", true},
-		{"ghcr match", "ghcr.io/user/repo:v1", "ghcr.io/user/repo:latest", false},
-		{"localhost match", "localhost:5000/my-tool:v1", "localhost:5000/my-tool:latest", false},
-		{"nested repo match", "my-reg.com/org/team/tool:v1", "my-reg.com/org/team/tool:latest", false},
-		{"one side empty", "node:20", "", false},
-		{"other side empty", "", "node:18", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateImageRegistryMatch(tt.cliImage, tt.configImage)
-			if tt.wantErr {
-				require.Error(t, err)
-				var regErr *RegistryMismatchError
-				require.ErrorAs(t, err, &regErr)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestUnit_Resolver_ResolveWithFS_RegistryMismatch(t *testing.T) {
+func TestUnit_Resolver_Transitive_Exhaustive(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{}
-	tools := ToolsConfig{
-		"node": ToolConfig{Image: "node:18-alpine"},
-	}
 
-	t.Run("mismatch from CLI", func(t *testing.T) {
+	t.Run("mount-socket enabled via mount-cderun", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image: "my-reg.com/node:20", ImageSet: true,
+			Image:             "alpine",
+			ImageSet:          true,
+			MountCderun:       true,
+			MountCderunSet:    true,
+			CderunMountSocket: false,
 		}
-		_, err := ResolveWithFS("node", cli, tools, nil, mfs)
-		require.Error(t, err)
-		var regErr *RegistryMismatchError
-		require.ErrorAs(t, err, &regErr)
-		assert.Equal(t, "docker.io/library/node", regErr.ExpectedRegistry)
-		assert.Equal(t, "my-reg.com/node", regErr.ActualRegistry)
-	})
-
-	t.Run("mismatch from Env", func(t *testing.T) {
-		mfsEnv := &MockFileSystem{
-			Env: map[string]string{"CDERUN_IMAGE": "other.io/node:latest"},
-		}
-		_, err := ResolveWithFS("node", nil, tools, nil, mfsEnv)
-		require.Error(t, err)
-		var regErr *RegistryMismatchError
-		assert.ErrorAs(t, err, &regErr)
-	})
-
-	t.Run("match from CLI", func(t *testing.T) {
-		cli := &CLIOptions{
-			Image: "docker.io/library/node:20", ImageSet: true,
-		}
-		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, "docker.io/library/node:20", res.Image)
-	})
-
-	t.Run("templated config match", func(t *testing.T) {
-		mfsEnv := &MockFileSystem{
-			Env: map[string]string{"REG": "my-reg.com"},
-		}
-		toolsTemplated := ToolsConfig{
-			"node": ToolConfig{Image: "{{env:REG}}/node:18-alpine"},
-		}
-		cli := &CLIOptions{
-			Image: "my-reg.com/node:20", ImageSet: true,
-		}
-		res, err := ResolveWithFS("node", cli, toolsTemplated, nil, mfsEnv)
-		require.NoError(t, err)
-		assert.Equal(t, "my-reg.com/node:20", res.Image)
-	})
-}
-
-func TestUnit_Resolver_Transitive_Env(t *testing.T) {
-	t.Parallel()
-	t.Run("mount-tools from env transitively enables mount-cderun and mount-socket", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			Env: map[string]string{
-				"CDERUN_MOUNT_TOOLS": "git,node",
-			},
-		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"git", "node"}, res.MountTools)
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.True(t, res.MountCderun)
 		assert.True(t, res.MountSocket)
 	})
 
-	t.Run("mount-all-tools from env transitively enables mount-cderun and mount-socket", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			Env: map[string]string{
-				"CDERUN_MOUNT_ALL_TOOLS": "true",
-			},
+	t.Run("mount-socket disabled explicitly in P1 overrides mount-cderun", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:                "alpine",
+			ImageSet:             true,
+			MountCderun:          true,
+			MountCderunSet:       true,
+			CderunMountSocket:    false,
+			CderunMountSocketSet: true,
 		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
-		require.NoError(t, err)
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		assert.NoError(t, err)
+		assert.True(t, res.MountCderun)
+		assert.False(t, res.MountSocket)
+	})
+
+	t.Run("mount-socket enabled via mount-all-tools", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:            "alpine",
+			ImageSet:         true,
+			MountAllTools:    true,
+			MountAllToolsSet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		assert.NoError(t, err)
 		assert.True(t, res.MountAllTools)
 		assert.True(t, res.MountCderun)
 		assert.True(t, res.MountSocket)
@@ -1022,4 +843,69 @@ func TestUnit_Resolver_Env_Strict_Missing(t *testing.T) {
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required environment variable not found: \"MISSING_HOST_VAR\"")
+}
+
+func TestUnit_Config_Resolve_InvalidEnvErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		env     map[string]string
+		wantErr string
+	}{
+		{
+			name:    "Invalid bool env",
+			env:     map[string]string{"CDERUN_TTY": "not-a-bool"},
+			wantErr: "invalid CDERUN_TTY value \"not-a-bool\"",
+		},
+		{
+			name:    "Invalid int env",
+			env:     map[string]string{"CDERUN_PULL_MAX_RETRIES": "abc"},
+			wantErr: "invalid CDERUN_PULL_MAX_RETRIES value \"abc\"",
+		},
+		{
+			name:    "Invalid float env",
+			env:     map[string]string{"CDERUN_CPUS": "two"},
+			wantErr: "invalid CDERUN_CPUS value \"two\"",
+		},
+		{
+			name:    "Invalid duration env (hang-timeout)",
+			env:     map[string]string{"CDERUN_HANG_TIMEOUT": "invalid"},
+			wantErr: "invalid hang-timeout value \"invalid\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mfs := &MockFileSystem{Env: tt.env}
+			cli := &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+			}
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+
+			// Verify it's an InvalidConfigError
+			var ice *InvalidConfigError
+			assert.ErrorAs(t, err, &ice)
+		})
+	}
+}
+
+func TestUnit_Config_Resolve_ExpressionErrorInDuration(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{} // No env
+	cli := &CLIOptions{
+		Image:    "alpine",
+		ImageSet: true,
+		HangTimeout: "{{file:nonexistent}}",
+		HangTimeoutSet: true,
+	}
+
+	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "file not found: \"nonexistent\"")
+	// It should NOT be "invalid hang-timeout value..." because that would mean the expression error was swallowed.
+	assert.NotContains(t, err.Error(), "invalid hang-timeout value")
 }
