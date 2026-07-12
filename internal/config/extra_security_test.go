@@ -20,161 +20,148 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 		{
 			name: "socket-path with control char",
 			cli: &CLIOptions{
-				Image:         "alpine",
-				ImageSet:      true,
-				SocketPath:    "/var/run/docker.sock\x01",
-				SocketPathSet: true,
+				Image: ptr("alpine"),
+
+				SocketPath: ptr("/var/run/docker.sock\x01"),
 			},
 			wantErr: "security validation failed for \"socket-path\"",
 		},
 		{
 			name: "mount-socket-path with control char",
 			cli: &CLIOptions{
-				Image:              "alpine",
-				ImageSet:           true,
-				MountSocketPath:    "/var/run/docker.sock\x02",
-				MountSocketPathSet: true,
+				Image: ptr("alpine"),
+
+				MountSocketPath: ptr("/var/run/docker.sock\x02"),
 			},
 			wantErr: "security validation failed for \"mount-socket-path\"",
 		},
 		{
 			name: "mount-cderun-path with control char",
 			cli: &CLIOptions{
-				Image:              "alpine",
-				ImageSet:           true,
-				MountCderunPath:    "/usr/local/bin/cderun\x03",
-				MountCderunPathSet: true,
+				Image: ptr("alpine"),
+
+				MountCderunPath: ptr("/usr/local/bin/cderun\x03"),
 			},
 			wantErr: "security validation failed for \"mount-cderun-path\"",
 		},
 		{
 			name: "invalid user format (too many colons)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				User:     "user:group:extra",
-				UserSet:  true,
+				Image: ptr("alpine"),
+
+				User: ptr("user:group:extra"),
 			},
 			wantErr: "security validation failed for \"user\": invalid user format",
 		},
 		{
 			name: "invalid user identifier (illegal char)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				User:     "user!",
-				UserSet:  true,
+				Image: ptr("alpine"),
+
+				User: ptr("user!"),
 			},
 			wantErr: "security validation failed for \"user\": invalid user or group identifier",
 		},
 		{
 			name: "unsupported runtime",
 			cli: &CLIOptions{
-				Image:      "alpine",
-				ImageSet:   true,
-				Runtime:    "rkt",
-				RuntimeSet: true,
+				Image: ptr("alpine"),
+
+				Runtime: ptr("rkt"),
 			},
 			wantErr: "security validation failed for \"runtime\": unsupported runtime: \"rkt\"",
 		},
 		{
 			name: "unsupported log level",
 			cli: &CLIOptions{
-				Image:       "alpine",
-				ImageSet:    true,
-				LogLevel:    "verbose",
-				LogLevelSet: true,
+				Image: ptr("alpine"),
+
+				LogLevel: ptr("verbose"),
 			},
 			wantErr: "security validation failed for \"log-level\": unsupported log level: \"verbose\"",
 		},
 		{
 			name: "unsupported log format",
 			cli: &CLIOptions{
-				Image:        "alpine",
-				ImageSet:     true,
-				LogFormat:    "xml",
-				LogFormatSet: true,
+				Image: ptr("alpine"),
+
+				LogFormat: ptr("xml"),
 			},
 			wantErr: "security validation failed for \"log-format\": unsupported log format: \"xml\"",
 		},
 		{
 			name: "unsupported dry-run format",
 			cli: &CLIOptions{
-				Image:           "alpine",
-				ImageSet:        true,
-				DryRunFormat:    "csv",
-				DryRunFormatSet: true,
+				Image: ptr("alpine"),
+
+				DryRunFormat: ptr("csv"),
 			},
 			wantErr: "security validation failed for \"dry-run-format\": unsupported dry-run format: \"csv\"",
 		},
 		{
 			name: "unsupported diagnosis format",
 			cli: &CLIOptions{
-				Image:              "alpine",
-				ImageSet:           true,
-				Diagnosis:          true,
-				DiagnosisSet:       true,
-				DiagnosisFormat:    "pdf",
-				DiagnosisFormatSet: true,
+				Image: ptr("alpine"),
+
+				Diagnosis: ptr(true),
+
+				DiagnosisFormat: ptr("pdf"),
 			},
 			wantErr: "security validation failed for \"diagnosis-format\": unsupported diagnosis format: \"pdf\"",
 		},
 		{
 			name: "hostname too long",
 			cli: &CLIOptions{
-				Image:       "alpine",
-				ImageSet:    true,
-				Hostname:    strings.Repeat("a", 254),
-				HostnameSet: true,
+				Image: ptr("alpine"),
+
+				Hostname: ptr(strings.Repeat("a", 254)),
 			},
 			wantErr: "security validation failed for \"hostname\": hostname too long",
 		},
 		{
 			name: "invalid hostname (starts with hyphen)",
 			cli: &CLIOptions{
-				Image:       "alpine",
-				ImageSet:    true,
-				Hostname:    "-host",
-				HostnameSet: true,
+				Image: ptr("alpine"),
+
+				Hostname: ptr("-host"),
 			},
 			wantErr: "security validation failed for \"hostname\": invalid hostname",
 		},
 		{
 			name: "invalid network name (illegal char)",
 			cli: &CLIOptions{
-				Image:      "alpine",
-				ImageSet:   true,
-				Network:    "net!",
-				NetworkSet: true,
+				Image: ptr("alpine"),
+
+				Network: ptr("net!"),
 			},
 			wantErr: "security validation failed for \"network\": invalid network name",
 		},
 		{
 			name: "invalid port mapping (illegal char)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Ports:    []string{"80:80/tcp!"},
+				Image: ptr("alpine"),
+
+				Ports: []string{"80:80/tcp!"},
 			},
 			wantErr: "security validation failed for ports[0]: invalid protocol",
 		},
 		{
 			name: "invalid expose port (invalid protocol)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Expose:   []string{"80/http"},
+				Image: ptr("alpine"),
+
+				Expose: []string{"80/http"},
 			},
 			wantErr: "security validation failed for expose[0]: invalid protocol",
 		},
 		{
 			name: "invalid expose port range (non-numeric)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Expose:   []string{"80-abc"},
+				Image: ptr("alpine"),
+
+				Expose: []string{"80-abc"},
 			},
-			wantErr: "security validation failed for expose[0]: invalid port range",
+			wantErr: "security validation failed for expose[0]: invalid end port in range",
 		},
 	}
 

@@ -6,11 +6,11 @@ import (
 
 func BenchmarkResolveWithFS(b *testing.B) {
 	cli := CLIOptions{
-		Image:    "node:20",
-		ImageSet: true,
-		TTY:      true,
-		TTYSet:   true,
-		Env:      []string{"VAR1=VAL1", "VAR2=VAL2"},
+		Image: ptr("node:20"),
+
+		TTY: ptr(true),
+
+		Env: []string{"VAR1=VAL1", "VAR2=VAL2"},
 	}
 	tools := ToolsConfig{
 		"node": ToolConfig{

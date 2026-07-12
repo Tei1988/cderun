@@ -46,98 +46,7 @@ func (e *ExitCodeError) Unwrap() error {
 }
 
 type rootOptions struct {
-	tty                   bool
-	interactive           bool
-	network               string
-	socketPath            string
-	mountSocket           bool
-	mountSocketPath       string
-	mountCderun           bool
-	mountCderunPath       string
-	image                 string
-	remove                bool
-	cderunTTY             bool
-	cderunInteractive     bool
-	cderunImage           string
-	cderunNetwork         string
-	cderunRemove          bool
-	cderunRuntime         string
-	cderunSocketPath      string
-	cderunMountSocket     bool
-	cderunMountSocketPath string
-	cderunWorkdir         string
-	cderunMounts          []string
-	cderunMountCderun     bool
-	cderunMountCderunPath string
-	cderunMountTools      string
-	cderunMountAllTools   bool
-	runtimeName           string
-	env                   []string
-	cderunEnv             []string
-	workdir               string
-	mounts                []string
-	mountTools            string
-	mountAllTools         bool
-	configPath            string
-	cderunConfigPath      string
-	toolConfigPath        string
-	cderunToolConfigPath  string
-	dryRun                bool
-	dryRunFormat          string
-	cderunDryRun          bool
-	cderunDryRunFormat    string
-	diagnosis             bool
-	diagnosisFormat       string
-	cderunDiagnosis       bool
-	cderunDiagnosisFormat string
-	logLevel              string
-	logFormat             string
-	logTimestamp          bool
-	strictEnv             bool
-	cderunStrictEnv       bool
-	cderunLogLevel        string
-	cderunLogFormat       string
-	cderunLogTimestamp    bool
-	hangTimeout           string
-	cderunHangTimeout     string
-
-	// Docker-compatible flags
-	ports                 []string
-	publishAll            bool
-	expose                []string
-	hostname              string
-	dns                   []string
-	addHosts              []string
-	user                  string
-	privileged            bool
-	capAdd                []string
-	capDrop               []string
-	entrypoint            []string
-	pull                  string
-	memory                string
-	cpus                  float64
-	devices               []string
-	cderunPorts           []string
-	cderunPublishAll      bool
-	cderunExpose          []string
-	cderunHostname        string
-	cderunDNS             []string
-	cderunAddHosts        []string
-	cderunUser            string
-	cderunPrivileged      bool
-	cderunCapAdd          []string
-	cderunCapDrop         []string
-	cderunEntrypoint      []string
-	cderunPull            string
-	cderunMemory          string
-	cderunCPUs            float64
-	cderunDevices         []string
-	sensitiveEnv          []string
-	cderunSensitiveEnv    []string
-	pullMaxRetries        int
-	cderunPullMaxRetries  int
-	pullBackoffBase       string
-	cderunPullBackoffBase string
+	flagOptions
 
 	// Dependencies
 	fs           config.FileSystem
@@ -218,9 +127,9 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 	// Determine CDERun config path
 	cderunPath := ""
 	if cmd.Flags().Changed("cderun-config") {
-		cderunPath = o.cderunConfigPath
+		cderunPath = o.CderunConfig
 	} else if cmd.Flags().Changed("config") {
-		cderunPath = o.configPath
+		cderunPath = o.Config
 	} else if env := o.fs.Getenv("CDERUN_CONFIG"); env != "" {
 		cderunPath = env
 	}
@@ -243,9 +152,9 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 	// Determine Tools config path
 	toolsPath := ""
 	if cmd.Flags().Changed("cderun-tool-config") {
-		toolsPath = o.cderunToolConfigPath
+		toolsPath = o.CderunToolConfig
 	} else if cmd.Flags().Changed("tool-config") {
-		toolsPath = o.toolConfigPath
+		toolsPath = o.ToolConfig
 	} else if env := o.fs.Getenv("CDERUN_TOOL_CONFIG"); env != "" {
 		toolsPath = env
 	}
@@ -276,164 +185,9 @@ func (o *rootOptions) ensureHooks() {
 }
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
-	cliOpts := config.CLIOptions{
-		Image:                    o.image,
-		ImageSet:                 cmd.Flags().Changed("image"),
-		TTY:                      o.tty,
-		TTYSet:                   cmd.Flags().Changed("tty"),
-		Interactive:              o.interactive,
-		InteractiveSet:           cmd.Flags().Changed("interactive"),
-		Network:                  o.network,
-		NetworkSet:               cmd.Flags().Changed("network"),
-		CderunNetwork:            o.cderunNetwork,
-		CderunNetworkSet:         cmd.Flags().Changed("cderun-network"),
-		Remove:                   o.remove,
-		RemoveSet:                cmd.Flags().Changed("remove"),
-		CderunRemove:             o.cderunRemove,
-		CderunRemoveSet:          cmd.Flags().Changed("cderun-remove"),
-		CderunTTY:                o.cderunTTY,
-		CderunTTYSet:             cmd.Flags().Changed("cderun-tty"),
-		CderunInteractive:        o.cderunInteractive,
-		CderunInteractiveSet:     cmd.Flags().Changed("cderun-interactive"),
-		CderunImage:              o.cderunImage,
-		CderunImageSet:           cmd.Flags().Changed("cderun-image"),
-		Runtime:                  o.runtimeName,
-		RuntimeSet:               cmd.Flags().Changed("runtime"),
-		CderunRuntime:            o.cderunRuntime,
-		CderunRuntimeSet:         cmd.Flags().Changed("cderun-runtime"),
-		SocketPath:               o.socketPath,
-		SocketPathSet:            cmd.Flags().Changed("socket-path"),
-		CderunSocketPath:         o.cderunSocketPath,
-		CderunSocketPathSet:      cmd.Flags().Changed("cderun-socket-path"),
-		MountSocket:              o.mountSocket,
-		MountSocketSet:           cmd.Flags().Changed("mount-socket"),
-		CderunMountSocket:        o.cderunMountSocket,
-		CderunMountSocketSet:     cmd.Flags().Changed("cderun-mount-socket"),
-		MountSocketPath:          o.mountSocketPath,
-		MountSocketPathSet:       cmd.Flags().Changed("mount-socket-path"),
-		CderunMountSocketPath:    o.cderunMountSocketPath,
-		CderunMountSocketPathSet: cmd.Flags().Changed("cderun-mount-socket-path"),
-		Env:                      o.env,
-		CderunEnv:                o.cderunEnv,
-		Workdir:                  o.workdir,
-		WorkdirSet:               cmd.Flags().Changed("workdir"),
-		CderunWorkdir:            o.cderunWorkdir,
-		CderunWorkdirSet:         cmd.Flags().Changed("cderun-workdir"),
-		Mounts:                   o.mounts,
-		CderunMounts:             o.cderunMounts,
-		MountCderun:              o.mountCderun,
-		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
-		CderunMountCderun:        o.cderunMountCderun,
-		CderunMountCderunSet:     cmd.Flags().Changed("cderun-mount-cderun"),
-		MountCderunPath:          o.mountCderunPath,
-		MountCderunPathSet:       cmd.Flags().Changed("mount-cderun-path"),
-		CderunMountCderunPath:    o.cderunMountCderunPath,
-		CderunMountCderunPathSet: cmd.Flags().Changed("cderun-mount-cderun-path"),
-		MountTools:               o.mountTools,
-		MountToolsSet:            cmd.Flags().Changed("mount-tools"),
-		CderunMountTools:         o.cderunMountTools,
-		CderunMountToolsSet:      cmd.Flags().Changed("cderun-mount-tools"),
-		MountAllTools:            o.mountAllTools,
-		MountAllToolsSet:         cmd.Flags().Changed("mount-all-tools"),
-		CderunMountAllTools:      o.cderunMountAllTools,
-		CderunMountAllToolsSet:   cmd.Flags().Changed("cderun-mount-all-tools"),
-		DryRun:                   o.dryRun,
-		DryRunSet:                cmd.Flags().Changed("dry-run"),
-		CderunDryRun:             o.cderunDryRun,
-		CderunDryRunSet:          cmd.Flags().Changed("cderun-dry-run"),
-		DryRunFormat:             o.dryRunFormat,
-		DryRunFormatSet:          cmd.Flags().Changed("dry-run-format"),
-		CderunDryRunFormat:       o.cderunDryRunFormat,
-		CderunDryRunFormatSet:    cmd.Flags().Changed("cderun-dry-run-format"),
-		Diagnosis:                o.diagnosis,
-		DiagnosisSet:             cmd.Flags().Changed("diagnosis"),
-		CderunDiagnosis:          o.cderunDiagnosis,
-		CderunDiagnosisSet:       cmd.Flags().Changed("cderun-diagnosis"),
-		DiagnosisFormat:          o.diagnosisFormat,
-		DiagnosisFormatSet:       cmd.Flags().Changed("diagnosis-format"),
-		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
-		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
-		LogLevel:                 o.logLevel,
-		LogLevelSet:              cmd.Flags().Changed("log-level"),
-		LogFormat:                o.logFormat,
-		LogFormatSet:             cmd.Flags().Changed("log-format"),
-		LogTimestamp:             o.logTimestamp,
-		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
-		CderunLogLevel:           o.cderunLogLevel,
-		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
-		CderunLogFormat:          o.cderunLogFormat,
-		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
-		CderunLogTimestamp:       o.cderunLogTimestamp,
-		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
-		StrictEnv:                o.strictEnv,
-		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
-		CderunStrictEnv:          o.cderunStrictEnv,
-		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
-		HangTimeout:              o.hangTimeout,
-		HangTimeoutSet:           cmd.Flags().Changed("hang-timeout"),
-		CderunHangTimeout:        o.cderunHangTimeout,
-		CderunHangTimeoutSet:     cmd.Flags().Changed("cderun-hang-timeout"),
-
-		// Docker-compatible flags
-		Ports:                    o.ports,
-		CderunPorts:              o.cderunPorts,
-		PublishAll:               o.publishAll,
-		PublishAllSet:            cmd.Flags().Changed("publish-all"),
-		CderunPublishAll:         o.cderunPublishAll,
-		CderunPublishAllSet:      cmd.Flags().Changed("cderun-publish-all"),
-		Expose:                   o.expose,
-		CderunExpose:             o.cderunExpose,
-		Hostname:                 o.hostname,
-		HostnameSet:              cmd.Flags().Changed("hostname"),
-		CderunHostname:           o.cderunHostname,
-		CderunHostnameSet:        cmd.Flags().Changed("cderun-hostname"),
-		DNS:                      o.dns,
-		CderunDNS:                o.cderunDNS,
-		AddHosts:                 o.addHosts,
-		CderunAddHosts:           o.cderunAddHosts,
-		User:                     o.user,
-		UserSet:                  cmd.Flags().Changed("user"),
-		CderunUser:               o.cderunUser,
-		CderunUserSet:            cmd.Flags().Changed("cderun-user"),
-		Privileged:               o.privileged,
-		PrivilegedSet:            cmd.Flags().Changed("privileged"),
-		CderunPrivileged:         o.cderunPrivileged,
-		CderunPrivilegedSet:      cmd.Flags().Changed("cderun-privileged"),
-		CapAdd:                   o.capAdd,
-		CderunCapAdd:             o.cderunCapAdd,
-		CapDrop:                  o.capDrop,
-		CderunCapDrop:            o.cderunCapDrop,
-		Entrypoint:               o.entrypoint,
-		CderunEntrypoint:         o.cderunEntrypoint,
-		Pull:                     o.pull,
-		PullSet:                  cmd.Flags().Changed("pull"),
-		CderunPull:               o.cderunPull,
-		CderunPullSet:            cmd.Flags().Changed("cderun-pull"),
-		PullMaxRetries:           o.pullMaxRetries,
-		PullMaxRetriesSet:        cmd.Flags().Changed("pull-max-retries"),
-		CderunPullMaxRetries:     o.cderunPullMaxRetries,
-		CderunPullMaxRetriesSet:  cmd.Flags().Changed("cderun-pull-max-retries"),
-		PullBackoffBase:          o.pullBackoffBase,
-		PullBackoffBaseSet:       cmd.Flags().Changed("pull-backoff-base"),
-		CderunPullBackoffBase:    o.cderunPullBackoffBase,
-		CderunPullBackoffBaseSet: cmd.Flags().Changed("cderun-pull-backoff-base"),
-		Memory:                   o.memory,
-		MemorySet:                cmd.Flags().Changed("memory"),
-		CderunMemory:             o.cderunMemory,
-		CderunMemorySet:          cmd.Flags().Changed("cderun-memory"),
-		CPUs:                     o.cpus,
-		CPUsSet:                  cmd.Flags().Changed("cpus"),
-		CderunCPUs:               o.cderunCPUs,
-		CderunCPUsSet:            cmd.Flags().Changed("cderun-cpus"),
-		Devices:                  o.devices,
-		CderunDevices:            o.cderunDevices,
-		SensitiveEnv:             o.sensitiveEnv,
-		CderunSensitiveEnv:       o.cderunSensitiveEnv,
-	}
-
+	cliOpts := o.buildCLIOptions(cmd)
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
 }
-
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.
@@ -1100,11 +854,11 @@ intended for the subcommand.`,
 		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
 			initialLevel = env
 		}
-		if o.logLevel != "" {
-			initialLevel = o.logLevel
+		if o.LogLevel != "" {
+			initialLevel = o.LogLevel
 		}
-		if o.cderunLogLevel != "" {
-			initialLevel = o.cderunLogLevel
+		if o.CderunLogLevel != "" {
+			initialLevel = o.CderunLogLevel
 		}
 		_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
 
@@ -1215,7 +969,7 @@ intended for the subcommand.`,
 		return nil
 	}
 
-	registerFlags(cmd, o)
+	o.registerFlags(cmd)
 
 	cmd.Flags().SetInterspersed(false)
 	return cmd

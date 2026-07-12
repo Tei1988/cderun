@@ -188,6 +188,12 @@ func TestUnit_Config_ValidatePort(t *testing.T) {
 		{"Shell metacharacter ;", "80;rm", true},
 		{"Shell metacharacter |", "80|ls", true},
 		{"Shell metacharacter &", "80&", true},
+		{"Port zero (container)", "0", true},
+		{"Port zero (host)", "0:80", false},
+		{"Port out of range", "70000", true},
+		{"Port negative", "-1", true},
+		{"IP and port zero (container)", "127.0.0.1:0", true},
+		{"IP and port zero (host)", "127.0.0.1:0:80", false},
 	}
 
 	for _, tt := range tests {
@@ -411,54 +417,52 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 		{
 			name: "Invalid control char in LogFormat",
 			cli: &CLIOptions{
-				Image:        "alpine",
-				ImageSet:     true,
-				LogFormat:    "text\t",
-				LogFormatSet: true,
+				Image: ptr("alpine"),
+
+				LogFormat: ptr("text\t"),
 			},
 			wantErr: "security validation failed for \"log-format\"",
 		},
 		{
 			name: "Invalid control char in Env key",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
+				Image: ptr("alpine"),
+
+				Env: []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
 			},
 			wantErr: "invalid environment variable key",
 		},
 		{
 			name: "Multiline Env value (PEM) is allowed",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
+				Image: ptr("alpine"),
+
+				Env: []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
 			},
 			wantErr: "", // No error expected
 		},
 		{
 			name: "Invalid control char in Ports element",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Ports:    []string{"8080:80\r"},
+				Image: ptr("alpine"),
+
+				Ports: []string{"8080:80\r"},
 			},
 			wantErr: "security validation failed for ports[0]",
 		},
 		{
 			name: "Invalid ImageName in ResolveWithFS",
 			cli: &CLIOptions{
-				Image:    "alpine;rm -rf /",
-				ImageSet: true,
+				Image: ptr("alpine;rm -rf /"),
 			},
 			wantErr: "security validation failed for \"image\"",
 		},
 		{
 			name: "Invalid EnvKey in ResolveWithFS (CLI)",
 			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Env:      []string{"INVALID-KEY=VALUE"},
+				Image: ptr("alpine"),
+
+				Env: []string{"INVALID-KEY=VALUE"},
 			},
 			wantErr: "invalid environment variable key",
 		},

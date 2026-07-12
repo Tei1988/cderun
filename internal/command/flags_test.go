@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"cderun/internal/config"
@@ -13,6 +14,90 @@ import (
 
 	"cderun/internal/runtime"
 )
+
+func getFieldPointers(o *rootOptions, name string, typ string) (any, any) {
+	var fieldName string
+	switch typ {
+	case "string":
+		opt, ok := config.GetStringOption(name)
+		if !ok {
+			return nil, nil
+		}
+		fieldName = opt.FieldName
+	case "bool":
+		opt, ok := config.GetBoolOption(name)
+		if !ok {
+			return nil, nil
+		}
+		fieldName = opt.FieldName
+	case "int":
+		opt, ok := config.GetIntOption(name)
+		if !ok {
+			return nil, nil
+		}
+		fieldName = opt.FieldName
+	case "float64":
+		opt, ok := config.GetFloat64Option(name)
+		if !ok {
+			return nil, nil
+		}
+		fieldName = opt.FieldName
+	case "[]string":
+		opt, ok := config.GetStringSliceOption(name)
+		if !ok {
+			return nil, nil
+		}
+		fieldName = opt.FieldName
+	}
+
+	v := reflect.ValueOf(o).Elem()
+	f := v.FieldByName(fieldName)
+	cf := v.FieldByName("Cderun" + fieldName)
+	if !f.IsValid() || !cf.IsValid() {
+		return nil, nil
+	}
+	return f.Addr().Interface(), cf.Addr().Interface()
+}
+
+func getStringPointers(o *rootOptions, name string) (*string, *string) {
+	p2, p1 := getFieldPointers(o, name, "string")
+	if p2 == nil {
+		return nil, nil
+	}
+	return p2.(*string), p1.(*string)
+}
+
+func getBoolPointers(o *rootOptions, name string) (*bool, *bool) {
+	p2, p1 := getFieldPointers(o, name, "bool")
+	if p2 == nil {
+		return nil, nil
+	}
+	return p2.(*bool), p1.(*bool)
+}
+
+func getIntPointers(o *rootOptions, name string) (*int, *int) {
+	p2, p1 := getFieldPointers(o, name, "int")
+	if p2 == nil {
+		return nil, nil
+	}
+	return p2.(*int), p1.(*int)
+}
+
+func getFloat64Pointers(o *rootOptions, name string) (*float64, *float64) {
+	p2, p1 := getFieldPointers(o, name, "float64")
+	if p2 == nil {
+		return nil, nil
+	}
+	return p2.(*float64), p1.(*float64)
+}
+
+func getStringSlicePointers(o *rootOptions, name string) (*[]string, *[]string) {
+	p2, p1 := getFieldPointers(o, name, "[]string")
+	if p2 == nil {
+		return nil, nil
+	}
+	return p2.(*[]string), p1.(*[]string)
+}
 
 func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 	t.Run("basic and complex Docker flags", func(t *testing.T) {
@@ -108,6 +193,48 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 	})
 }
 
+func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("P1 flag before subcommand is an error", func(t *testing.T) {
+		args := []string{"cderun", "--cderun-tty", "node", "--version"}
+		cmd := newRootCmd(&rootOptions{})
+		_, err := preprocessArgs(cmd, args)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand")
+	})
+
+	t.Run("Hoisting complex P1 flags with values", func(t *testing.T) {
+		// cderun node app.js --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL
+		args := []string{"cderun", "node", "app.js", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+
+		// Expected: cderun --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL node app.js
+		expected := []string{"cderun", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL", "node", "app.js"}
+		assert.Equal(t, expected, processed)
+	})
+
+	t.Run("P1 flag with equals sign (no skip next)", func(t *testing.T) {
+		args := []string{"cderun", "node", "--cderun-image=alpine", "ls"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"cderun", "--cderun-image=alpine", "node", "ls"}, processed)
+	})
+
+	t.Run("shorthand group with value", func(t *testing.T) {
+		// actually -p 80:80 node. 'p' takes arg.
+		args := []string{"cderun", "-p", "80:80", "node", "ls"}
+		cmd := newRootCmd(&rootOptions{})
+		processed, err := preprocessArgs(cmd, args)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cderun", "-p", "80:80", "node", "ls"}, processed)
+	})
+}
+
 func TestUnit_Flags_GetStringPointers_Coverage(t *testing.T) {
 	o := &rootOptions{}
 	for _, opt := range config.StringOptions {
@@ -181,46 +308,4 @@ func TestUnit_Flags_GetStringSlicePointers_Coverage(t *testing.T) {
 	p2, p1 := getStringSlicePointers(o, "unknown")
 	assert.Nil(t, p2)
 	assert.Nil(t, p1)
-}
-
-func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {
-	t.Parallel()
-
-	t.Run("P1 flag before subcommand is an error", func(t *testing.T) {
-		args := []string{"cderun", "--cderun-tty", "node", "--version"}
-		cmd := newRootCmd(&rootOptions{})
-		_, err := preprocessArgs(cmd, args)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand")
-	})
-
-	t.Run("Hoisting complex P1 flags with values", func(t *testing.T) {
-		// cderun node app.js --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL
-		args := []string{"cderun", "node", "app.js", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL"}
-		cmd := newRootCmd(&rootOptions{})
-		processed, err := preprocessArgs(cmd, args)
-		require.NoError(t, err)
-
-		// Expected: cderun --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL node app.js
-		expected := []string{"cderun", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL", "node", "app.js"}
-		assert.Equal(t, expected, processed)
-	})
-
-	t.Run("P1 flag with equals sign (no skip next)", func(t *testing.T) {
-		args := []string{"cderun", "node", "--cderun-image=alpine", "ls"}
-		cmd := newRootCmd(&rootOptions{})
-		processed, err := preprocessArgs(cmd, args)
-		require.NoError(t, err)
-
-		assert.Equal(t, []string{"cderun", "--cderun-image=alpine", "node", "ls"}, processed)
-	})
-
-	t.Run("shorthand group with value", func(t *testing.T) {
-		// actually -p 80:80 node. 'p' takes arg.
-		args := []string{"cderun", "-p", "80:80", "node", "ls"}
-		cmd := newRootCmd(&rootOptions{})
-		processed, err := preprocessArgs(cmd, args)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"cderun", "-p", "80:80", "node", "ls"}, processed)
-	})
 }

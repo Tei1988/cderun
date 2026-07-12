@@ -1,3 +1,4 @@
+//go:generate go run ../../scripts/genflags.go
 package config
 
 import (
