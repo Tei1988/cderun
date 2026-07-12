@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+func ptr[T any](v T) *T {
+	return &v
+}
+
 // OptionDef defines a single resolvable option with its full P1-P5 resolution chain.
 // T is the value type (string, bool, []string, float64).
 // For bool options, ToolGetter and GlobalGetter return *bool to distinguish unset from false.

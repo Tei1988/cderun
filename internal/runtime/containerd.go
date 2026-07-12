@@ -151,6 +151,11 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	// CONTRACT: Runtimes MUST validate and convert fields from container.ContainerConfig
+	// to their specific API/spec format. They MUST return an error for fields they
+	// cannot support — never pass a value through unconverted or ignore it silently
+	// if it would result in a behavior mismatch with the user's request.
+
 	if config.Memory < 0 {
 		return "", fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
