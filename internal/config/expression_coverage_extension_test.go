@@ -221,16 +221,18 @@ func TestUnit_Expression_ScanAnchors_Coverage(t *testing.T) {
 		// Inner: {{HOME}} at [2, 10)
 		// Outer: {{...}} at [0, 12)
 		// scanAnchors should return [0, 12)
-		res := scanAnchors(s)
+		var buf [8]anchorRange
+		res := scanAnchors(s, buf[:0])
 		require.Len(t, res, 1)
 		assert.Equal(t, 0, res[0].start)
 		assert.Equal(t, 12, res[0].end)
 	})
 
 	t.Run("Unmatched braces", func(t *testing.T) {
-		assert.Nil(t, scanAnchors("{{PWD}"))
-		assert.Nil(t, scanAnchors("{PWD}}"))
-		assert.Nil(t, scanAnchors("PWD"))
+		var buf [8]anchorRange
+		assert.Nil(t, scanAnchors("{{PWD}", buf[:0]))
+		assert.Nil(t, scanAnchors("{PWD}}", buf[:0]))
+		assert.Nil(t, scanAnchors("PWD", buf[:0]))
 	})
 }
 

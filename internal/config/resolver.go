@@ -270,16 +270,21 @@ func initFieldInfo() {
 			p2ValIdx:  -1,
 		}
 
-		if f, ok := cliType.FieldByName("Cderun" + fieldName + "Set"); ok {
+		p1SetName := "Cderun" + fieldName + "Set"
+		p1ValName := "Cderun" + fieldName
+		p2SetName := fieldName + "Set"
+		p2ValName := fieldName
+
+		if f, ok := cliType.FieldByName(p1SetName); ok {
 			info.p1SetIdx = f.Index[0]
 		}
-		if f, ok := cliType.FieldByName("Cderun" + fieldName); ok {
+		if f, ok := cliType.FieldByName(p1ValName); ok {
 			info.p1ValIdx = f.Index[0]
 		}
-		if f, ok := cliType.FieldByName(fieldName + "Set"); ok {
+		if f, ok := cliType.FieldByName(p2SetName); ok {
 			info.p2SetIdx = f.Index[0]
 		}
-		if f, ok := cliType.FieldByName(fieldName); ok {
+		if f, ok := cliType.FieldByName(p2ValName); ok {
 			info.p2ValIdx = f.Index[0]
 		}
 
@@ -618,12 +623,12 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	var p1Int, p2Int int
 	var fastPathUsed bool
 
-	if opt.Name == "pull-max-retries" &&
-		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
-		cliType.Field(info.p1ValIdx).Name == "CderunPullMaxRetries" &&
-		cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
+	if opt.Name == "pull-max-retries" && info.p1ValIdx != -1 && info.p2ValIdx != -1 {
 		p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
-		fastPathUsed = true
+		if cliType.Field(info.p1ValIdx).Name == "CderunPullMaxRetries" &&
+			cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
+			fastPathUsed = true
+		}
 	}
 
 	if fastPathUsed {
@@ -668,12 +673,12 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	var p1Float, p2Float float64
 	var fastPathUsed bool
 
-	if opt.Name == "cpus" &&
-		info.p1ValIdx != -1 && info.p2ValIdx != -1 &&
-		cliType.Field(info.p1ValIdx).Name == "CderunCPUs" &&
-		cliType.Field(info.p2ValIdx).Name == "CPUs" {
+	if opt.Name == "cpus" && info.p1ValIdx != -1 && info.p2ValIdx != -1 {
 		p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
-		fastPathUsed = true
+		if cliType.Field(info.p1ValIdx).Name == "CderunCPUs" &&
+			cliType.Field(info.p2ValIdx).Name == "CPUs" {
+			fastPathUsed = true
+		}
 	}
 
 	if fastPathUsed {
@@ -855,7 +860,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 func (rv *resolver) resolveEarly() error {
 	// Early resolution (Diagnosis & StrictEnv)
-	// We call applyBoolOption directly which uses fast-paths and fieldInfo.
+	// We call applyBoolOption directly which uses fast-paths.
 	if opt, ok := GetBoolOption("diagnosis"); ok {
 		if err := rv.applyBoolOption(opt); err != nil {
 			return err
@@ -878,13 +883,6 @@ func (rv *resolver) resolveEarly() error {
 		if !ok {
 			return fmt.Errorf("registry mismatch: early string slice option %q not found", "sensitive-env")
 		}
-		info, ok := fieldInfo["sensitive-env"]
-		if !ok {
-			return fmt.Errorf("registry mismatch: info for option \"sensitive-env\" not found")
-		}
-
-		_, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
-		_, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
 
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
@@ -892,7 +890,7 @@ func (rv *resolver) resolveEarly() error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", p1v.Interface().([]string), p2v.Interface().([]string), rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	}
 	return nil
 }
