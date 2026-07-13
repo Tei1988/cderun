@@ -615,7 +615,8 @@ func TestUnit_Coverage_Option_Float64Opt_Fallback(t *testing.T) {
 
 func TestUnit_Coverage_Option_BoolOpt_EnvKeyEmpty(t *testing.T) {
 	def := OptionDef[*bool]{EnvKey: ""}
-	val, spec, _ := resolveBoolOptInfo(def, false, false, false, false, "s", nil, nil, &MockFileSystem{})
+	val, spec, err := resolveBoolOptInfo(def, false, false, false, false, "s", nil, nil, &MockFileSystem{})
+	require.NoError(t, err)
 	assert.False(t, spec)
 	assert.False(t, val)
 }

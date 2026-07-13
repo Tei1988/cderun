@@ -56,7 +56,6 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
 		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
-		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Tool getter
 		mfs.Env = nil
@@ -101,7 +100,6 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs.Env = map[string]string{"TEST_INT": "invalid"}
 		_, err := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
-		assert.Equal(t, 10, res)
 
 		// Tool getter
 		mfs.Env = nil
