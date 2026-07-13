@@ -82,6 +82,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | - |
 | T74 | containerd がLinux専用であることをドキュメントに明記 | ドキュメント | 低 | 小 | - | - |
 | T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
+| T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
+| T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
 
 依存関係・統合の注意:
 
@@ -2018,3 +2020,129 @@ Mac環境でNested Execution（cderunコンテナ内からさらにcderunを実�
 
 - `USAGE.md` がリポジトリルートに作成されており、Mac環境でのNested Executionに必要な設定が英語で記載されている
 - `README.md` に `USAGE.md` へのリンクが追加されている
+
+## T76: T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新
+
+- 種別: バグ
+- 優先度: 高
+- 対象: `internal/command/execution_extra_test.go`
+- 仕様変更: なし
+
+### 背景
+
+T42（空文字サブコマンドでnil panic）の修正で `subcommand == ""` の早期リターンが追加されたが、
+`execution_extra_test.go` の対応テストが `assert.Panics` のままになっており、`go test ./...` で失敗する。
+
+```
+execution_extra_test.go:57: func should panic
+    Panic value: <nil>
+```
+
+### 作業内容
+
+`execution_extra_test.go` の以下2テストを修正する：
+
+- `"empty subcommand currently PANICS in dry-run (documenting T42)"`
+- `"empty subcommand currently PANICS in normal run (documenting T42)"`
+
+`assert.Panics` → `assert.NotPanics` に変更し、代わりにエラーが返されることを検証するか、
+修正済みとして動作を明示する新しいテスト名に変更する。
+
+### 完了条件
+
+- `go test ./internal/command/...` がパスする
+- 挙動変更なし（テストのみ修正）
+
+## T77: OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正
+
+- 種別: バグ
+- 優先度: 高
+- 対象:
+  - `internal/command/root_test.go`
+  - `internal/command/integration_test.go`
+  - `internal/command/flags_test.go`
+  - `internal/command/snapshot.go`（`discoverOverlayUpperDir` のテスト差し替え方法）
+
+### 背景
+
+cderunコンテナ内でテストを実行すると以下の理由で複数のテストが失敗する：
+
+1. **OverlayFS検出の干渉**: `discoverOverlayUpperDir` が実環境の `/proc/self/mountinfo` を読み、
+   OverlayFS の upperdir をホストパスとして登録する。その結果、単体テストでも `/h` → `/var/lib/docker/.../fs/h` のようにパスが変換される。
+   - `TestUnit_Root_Flags_MountingAndDevices`: マウントが1件のはずが2件になる
+   - `TestUnit_Flags_DockerCompatibilityMapping`: 同様
+
+2. **GroupAdd 102 の自動付与**: `getSocketGID` が実環境の `docker.sock` の GID（102）を検出し、
+   `GroupAdd: 102` が自動付与される。インテグレーションテストの期待値がずれる。
+   - `TestIntegration_Execution_AlpineEcho/mount-cderun-path`
+
+### 作業内容
+
+**Problem 1（OverlayFS）と Problem 2（GroupAdd）の両方を `rootOptions` への依存性注入で統一して対応する。**
+
+#### Problem 1: OverlayFS検出の注入
+
+`rootOptions` に `mountInfoReader` フィールドを追加し、`createSnapshot` に渡す：
+
+```go
+// internal/command/root.go
+type rootOptions struct {
+    ...
+    mountInfoReader mountInfoReader  // nil のとき defaultMountInfoReader を使う
+}
+```
+
+`createSnapshot` のシグネチャを変更し、`mountInfoReader` を受け取る：
+
+```go
+// internal/command/snapshot.go
+func createSnapshot(logger, fs, globalCfg, toolsCfg, currentMounts, reader mountInfoReader) (...)
+```
+
+`reader` が nil の場合は `defaultMountInfoReader` にフォールバック。
+
+テストでは `ExecuteContextWithOptions` のオプション関数内で空データを返すスタブを設定：
+
+```go
+o.mountInfoReader = &stubMountInfoReader{}  // ReadMountInfo returns []byte{}, nil
+```
+
+#### Problem 2: GroupAdd GID 取得の注入
+
+`rootOptions` に `socketGIDGetter` フィールドを追加：
+
+```go
+// internal/command/root.go
+type rootOptions struct {
+    ...
+    socketGIDGetter func(fs config.FileSystem, path string) (string, error)
+}
+```
+
+`buildContainerConfig` 内でデフォルトを補完して使用：
+
+```go
+getter := o.socketGIDGetter
+if getter == nil {
+    getter = getSocketGID
+}
+```
+
+テストでは `""` を返すスタブを設定：
+
+```go
+o.socketGIDGetter = func(_ config.FileSystem, _ string) (string, error) { return "", nil }
+```
+
+#### 修正が必要なテストファイル
+
+- `internal/command/root_test.go`
+- `internal/command/flags_test.go`
+- `internal/command/integration_test.go`
+- `internal/command/dryrun_golden_test.go`（同様に注入が必要な場合）
+
+### 完了条件
+
+- `go test ./...` がコンテナ内外どちらでも通過する
+- グローバル変数の差し替えや並列テストへの影響なし
+- 挙動変更なし（プロダクションコードのデフォルト動作は維持）
