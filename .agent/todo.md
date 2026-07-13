@@ -74,7 +74,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
-| T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | - |
+| T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
+| T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | - |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
 | T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
@@ -93,7 +94,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
 - **T69 は T05/T06 と統合実装を強く推奨**（registry メタデータからテストを生成するため、single source of truth 化と同じ作業）
 - **T70 は T20 と統合実装を推奨**（CI の実ランタイムジョブをコンフォーマンススイートの器として作る）。T40/T45/T51 の再現ケースを必ず含めること
-- **テスト系タスク（T68〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T68 → T69 → T70 → T71 → T72
+- **テスト系タスク（T69〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T79 → T69 → T70 → T71 → T72（T68 は実装済み）
+- **T79 は T53 修正後にゴールデンを更新すること**（T53 未修正の状態で `--` ケースを追加し、T53 修正時に `-update` フラグで更新する）
 
 ---
 
@@ -1252,27 +1254,25 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 ---
 
-## T64: CLI help / Makefile の文字列修正（containerd・mask-all 反映）
+## T64: `--help` の Usage 文字列を実装と一致させる
 
 - 種別: クリーンアップ
 - 優先度: 低
-- 対象: `internal/config/registry.go:210, 277`、`Makefile:16`
+- 対象: `internal/config/registry.go`
 
-### 問題
+### 背景
 
-1. `registry.go:210` の `--sensitive-env` Usage が "(default uses automatic keywords)" — 実装（`masking.go:18-21`）は未指定時に全値マスクであり、キーワードベースのマスキングはコードに存在しない
-2. `registry.go:277` の `--runtime` Usage が "(docker/podman)" — containerd がサポート済み（`resolver.go:1180-1185`）。※ T31 のリネームが先に着手される場合はそちらに折り込む
-3. `Makefile:16` の `test-runtime` の echo も "(Docker/Podman)" のまま
+`docs/features/command-line-options.md` の説明文は別途更新済み。`registry.go` の `Usage` フィールド（`--help` に出力される文字列）だけが実装と乖離したまま残っている。
 
-### 方針
+### 残作業
 
-- `--sensitive-env`: "(unset: all values masked; empty: masking disabled)" 等、実挙動に合わせる
-- `--runtime`: "(docker/podman/containerd)" にする
-- Makefile の echo に containerd を追記
+1. **`--sensitive-env` Usage**（`registry.go` の `sensitive-env` エントリ）: `"default uses automatic keywords"` → `"unset: all values masked; empty string: masking disabled"` 等、実挙動に合わせる
+2. **`--runtime` Usage**（`registry.go` の `runtime` エントリ）: `"Container runtime to use (docker/podman)"` → `"Container runtime to use (docker/podman/containerd)"` ※ T31 のリネームが先に着手される場合はそちらに折り込む
 
 ### 完了条件
 
-- 3 箇所の文字列が実装と一致し、help のスナップショットテスト（あれば）が更新されている
+- `cderun --help` の出力が実装と一致している
+- 挙動変更なし
 
 ---
 
@@ -1340,30 +1340,31 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 ---
 
-## T68: dry-run ゴールデンテスト基盤（L2）
+## T79: ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ）
 
-- 種別: テスト基盤
-- 優先度: 高
-- 対象: `internal/command/`（または専用の `test/golden/` ディレクトリ）、`docs/testing/strategy.md` 第3節 L2
-- 前提: `docs/testing/strategy.md` を必ず読むこと
+- 種別: テスト
+- 優先度: 中
+- 対象: `testdata/dryrun/`（ケース追加のみ）
+- 前提: T68 でフレームワーク（`dryrun_golden_test.go`）は実装済み。`testdata/dryrun/` にディレクトリを追加するだけでケースが増える
 
-### 目的
+### 背景
 
-「CLI 呼び出し + 設定ファイル」の組み合わせコーパスに対して `--dry-run --dry-run-format json` の出力をスナップショットとして固定し、引数解析 → ホイスト → P1〜P6 解決 → `ContainerConfig` 構築のパイプライン全体の回帰をひとつの仕組みで検知する。デーモン不要・高速・hermetic。
+T68 実装時（Jules）にフレームワークと6シナリオ（scenario_a〜f）が追加されたが、T68 仕様の「必須ケース」が未追加のまま。
 
-### 方針
+### 追加するケース
 
-- コーパスは「1 ケース = 1 ディレクトリ」（`args.txt` + `.cderun.yaml` + `.tools.yaml` + `env.txt` + `expected.json`）等の宣言的な構造にし、ケース追加をデータ追加だけで行えるようにする
-- スナップショット更新は明示フラグ（例: `-update`）でのみ許可
-- 出力の環境依存部分（ホームディレクトリ、PWD 等）は正規化してから比較する
-- **必須ケース**: T44 の判別ケース（`cderun --image alpine --cderun-tty sh` → エラー）、`--` エスケープ（T53）、ネスト実行のスナップショット設定、明示的な空リストによる上書き、`{{...}}` 式の解決
-- 秘匿値マスキング（デフォルト mask-all）が dry-run 出力に効いていることもゴールデンで固定する
+1. **T44 判別ケース**: `cderun --image alpine --cderun-tty sh` → `--cderun-tty` がサブコマンド前に置かれているためエラーになることを確認
+   - `args.txt`: `["cderun", "--image", "alpine", "--cderun-tty", "sh"]`
+   - `expected.json`: エラー出力
+
+2. **T53 `--` エスケープ**: `cderun echo -- --cderun-tty` において `--cderun-tty` がホイストされる現状挙動を固定
+   - 現状（T53 未修正）では `--cderun-tty` がホイストされてしまう
+   - T53 修正時にゴールデンを更新することで回帰を検知できる
 
 ### 完了条件
 
-- コーパス実行の共通ハーネスが存在し、`go test ./...` で毎 PR 実行される
-- 主要機能（引数解析 / 優先順位 / マウント / env / 式解決）を各 1 ケース以上カバー
-- ケース追加手順が `docs/testing/strategy.md` または専用 README に記載されている
+- `testdata/dryrun/` に上記2ケースが追加されており `go test ./...` でパスする
+- 挙動変更なし（フレームワーク側は触らない）
 
 ---
 
@@ -1475,25 +1476,28 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 種別: クリーンアップ
 - 優先度: 中
-- 対象: `internal/runtime/containerd_test.go`、`internal/container/config.go`、その他 Go ソース全域
+- 対象:
+  - `internal/runtime/containerd_test.go:225-226`（日本語コメント残存）
+  - `internal/command/root_test.go:1940-1941`（日本語コメント残存）
+  - `internal/container/config.go`（変換契約コメント追加）
 - 前提: `AGENTS.md` の「English in Source Code」および「Runtime Adapter Conversion Contract」原則を参照
 
 ### 背景
 
-本プロジェクトは public な OSS のため、ソースコード内のコメントは英語で統一する（`AGENTS.md` にルール化済み）。また、containerd で capability が `CAP_` プレフィックスなしのまま OCI spec に渡っていたバグの再発防止として、「Docker は暗黙に正規化するが OCI spec 直組み立てのランタイムでは変換責務がアダプタ側にある」という契約を `ContainerConfig` の doc comment として明文化する。
+プロダクションコードの日本語はすでに英語化済み。テストファイルに2箇所残存しており、`ContainerConfig` の変換契約コメントもまだ追加されていない。
 
 ### 作業内容
 
-1. **日本語コメントの英語化**: `internal/runtime/containerd_test.go` の `TestUnit_Containerd_NormalizeCapabilities` 直前のコメント（206-207 行付近）を英語化する。英訳案:
+1. **`containerd_test.go:225-226` の英語化**（`TestUnit_Containerd_NormalizeCapabilities` 直前のコメント）:
 
    ```go
    // docs/features/command-line-options.md: --cap-add / --cap-drop accept Docker-compatible
    // short names (e.g. SYS_ADMIN); the OCI spec requires the CAP_-prefixed form.
    ```
 
-2. **残存する日本語コメントの掃引**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で全 Go ソースを確認し、コメント・エラーメッセージ・ログメッセージ内の日本語を英語化する。
-   **注意**: `internal/config/edge_cases_test.go:78` 付近の `ユーザー_TOKEN` は Unicode キーのマスキング検証用の**意図的なテストデータ**であり、対象外（変更しないこと）。
-3. **`ContainerConfig` の契約コメント追加**: `internal/container/config.go` の `ContainerConfig` struct の doc comment に変換契約を追記する。ドラフト:
+2. **`root_test.go:1940-1941` の英語化**（`ExitCodeError` 伝搬に関するコメント）。英訳は内容に合わせて作成すること。
+
+3. **`ContainerConfig` の契約コメント追加**（`internal/container/config.go`）:
 
    ```go
    // ContainerConfig represents the intermediate representation of a container execution request.
@@ -1507,9 +1511,11 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
    // drop it silently.
    ```
 
+4. **最終確認**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で残存がないことを確認する。`internal/config/edge_cases_test.go:78` の `ユーザー_TOKEN` は意図的なテストデータのため**対象外**。
+
 ### 完了条件
 
-- Go ソース内のコメント・エラーメッセージ・ログメッセージから日本語が消えている（意図的なテストデータを除く）
+- 上記3ファイルの修正が完了し、`grep` で日本語残存なし（テストデータ除く）
 - `ContainerConfig` の doc comment に変換契約が記載されている
 - 挙動変更なし（既存テストが全パス）
 
