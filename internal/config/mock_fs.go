@@ -50,11 +50,8 @@ func (m *mockFileInfo) Sys() any           { return nil }
 
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.StatCalls = append(m.StatCalls, name)
-	m.mu.Unlock()
-
-	m.mu.RLock()
-	defer m.mu.RUnlock()
 	if m.StatErr != nil {
 		return nil, m.StatErr
 	}
