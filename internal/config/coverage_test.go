@@ -44,13 +44,13 @@ func TestUnit_Coverage_Option_ParsingErrors(t *testing.T) {
 		"B": "bad",
 	}}
 	_, err := resolveIntOpt(OptionDef[*int]{EnvKey: "I", Fallback: ptr(5)}, false, 0, false, 0, "s", nil, nil, mfs)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, errF := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "F", Fallback: ptr(1.1)}, false, 0, false, 0, "s", nil, nil, mfs)
-	assert.Error(t, errF)
+	require.Error(t, errF)
 
 	_, _, errB := resolveBoolOptInfo(OptionDef[*bool]{EnvKey: "B"}, false, false, false, false, "s", nil, nil, mfs)
-	assert.Error(t, errB)
+	require.Error(t, errB)
 }
 
 func TestUnit_Coverage_Config_FindConfigs_AbsError(t *testing.T) {
@@ -120,22 +120,22 @@ func TestUnit_Coverage_Config_LoadConfigs_NoPaths(t *testing.T) {
 func TestUnit_Coverage_Option_IntOpt_Fallback(t *testing.T) {
 	def := OptionDef[*int]{Fallback: ptr(42)}
 	res, err := resolveIntOpt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 42, res)
 	def.Fallback = nil
 	res, err = resolveIntOpt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 0, res)
 }
 
 func TestUnit_Coverage_Option_Float64Opt_Fallback(t *testing.T) {
 	def := OptionDef[*float64]{Fallback: ptr(3.14)}
 	res, err := resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.InDelta(t, 3.14, res, 1e-9)
 	def.Fallback = nil
 	res, err = resolveFloat64Opt(def, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.0, res, 1e-9)
 }
 

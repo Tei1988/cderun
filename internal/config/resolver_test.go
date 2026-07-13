@@ -1,6 +1,7 @@
 package config
 
 import (
+	"time"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -424,9 +425,9 @@ func TestUnit_Resolver_Misc_Exhaustive(t *testing.T) {
 			HangTimeout:    "5s",
 			HangTimeoutSet: true,
 		}
-		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
-		// HangTimeout is time.Duration
+		assert.Equal(t, 5*time.Second, res.HangTimeout)
 	})
 
 	t.Run("Memory string parsing", func(t *testing.T) {
