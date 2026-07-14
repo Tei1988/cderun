@@ -163,6 +163,18 @@ var StringSliceOptions = []StringSliceOption{
 		},
 	},
 	{
+		Name:      "group-add",
+		FieldName: "GroupAdd",
+		EnvKey:    "CDERUN_GROUP_ADD",
+		Usage:     "Add supplementary groups to the container (name or GID)",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.GroupAdd
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.GroupAdd
+		},
+	},
+	{
 		Name:      "cap-add",
 		FieldName: "CapAdd",
 		EnvKey:    "CDERUN_CAP_ADD",
