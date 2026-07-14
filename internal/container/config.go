@@ -47,6 +47,9 @@ type ContainerConfig struct {
 
 	// Storage and Devices
 	Devices []DeviceMapping `json:"devices,omitempty" yaml:"devices,omitempty"`
+
+	// Supplementary groups
+	GroupAdd []string `json:"group_add,omitempty" yaml:"group_add,omitempty"`
 }
 
 // Mount represents a mount point in the container (bind, volume, or tmpfs).

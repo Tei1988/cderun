@@ -555,3 +555,54 @@ func TestUnit_Expression_FindDir_Nested(t *testing.T) {
 	})
 
 }
+
+func TestUnit_Expression_ExtraEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("triple nested expressions", func(t *testing.T) {
+		t.Parallel()
+		fsEnv := &MockFileSystem{
+			Env: map[string]string{
+				"VAR1": "VAR2",
+				"VAR2": "VAR3",
+				"VAR3": "final value",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fsEnv)
+		require.NoError(t, err)
+
+		// {{ env:{{ env:{{ env:VAR1 }} }} }} -> {{ env:VAR3 }} -> final value
+		val := r.resolveString("{{ env:{{ env:{{ env:VAR1 }} }} }}")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "final value", val)
+	})
+
+	t.Run("magic word in the middle of a string", func(t *testing.T) {
+		t.Parallel()
+		fs := &MockFileSystem{WD: "/project"}
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+		val := r.resolveString("Current path is {{PWD}} and it is good")
+		require.NoError(t, r.Error())
+		assert.Equal(t, "Current path is /project and it is good", val)
+	})
+
+	t.Run("anchor boundary violation with nested resolution", func(t *testing.T) {
+		t.Parallel()
+		fsViolation := &MockFileSystem{
+			WD: "/work",
+			Env: map[string]string{
+				"SAFE_DIR": "/work/safe",
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, fsViolation)
+		require.NoError(t, err)
+
+		// {{env:SAFE_DIR}}/../../etc/passwd resolves to /etc/passwd
+		// Anchor {{env:SAFE_DIR}} is /work/safe.
+		// /etc/passwd escapes /work/safe.
+		_, err = ResolvePath("{{env:SAFE_DIR}}/../../etc/passwd", "/work", r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "path traversal detected")
+	})
+}

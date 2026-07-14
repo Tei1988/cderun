@@ -243,6 +243,8 @@ func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
 		return &o.dns, &o.cderunDNS
 	case "add-host":
 		return &o.addHosts, &o.cderunAddHosts
+	case "group-add":
+		return &o.groupAdd, &o.cderunGroupAdd
 	case "cap-add":
 		return &o.capAdd, &o.cderunCapAdd
 	case "cap-drop":

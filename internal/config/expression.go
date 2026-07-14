@@ -28,7 +28,7 @@ type anchorRange struct {
 // scanAnchors finds all top-level matched {{...}} expression ranges in a string.
 // It handles nested braces and treats unmatched openers as literal text.
 // It performs a single-pass scan to ensure O(n) complexity.
-func scanAnchors(s string) []anchorRange {
+func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	if !strings.Contains(s, "{{") {
 		return nil
 	}
@@ -58,8 +58,7 @@ func scanAnchors(s string) []anchorRange {
 
 	// Since allPairs are collected in order of their closing braces, we can
 	// identify top-level (outermost) ranges in a single backward pass.
-	var resBuf [8]anchorRange
-	res := resBuf[:0]
+	res := buf[:0]
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
 		p := allPairs[i]
@@ -69,15 +68,12 @@ func scanAnchors(s string) []anchorRange {
 		}
 	}
 
-	finalRes := make([]anchorRange, len(res))
-	copy(finalRes, res)
-
 	// Reverse to maintain original order
-	for i, j := 0, len(finalRes)-1; i < j; i, j = i+1, j-1 {
-		finalRes[i], finalRes[j] = finalRes[j], finalRes[i]
+	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
+		res[i], res[j] = res[j], res[i]
 	}
 
-	return finalRes
+	return res
 }
 
 // ExpressionResolver handles resolution of {{...}} expressions and tilde expansion in config values.
@@ -142,12 +138,8 @@ func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 
 func (r *ExpressionResolver) ensureFileCache() {
 	r.shared.cacheOnce.Do(func() {
-		if r.shared.fileCache == nil {
-			r.shared.fileCache = make(map[string]fileCacheEntry)
-		}
-		if r.shared.statCache == nil {
-			r.shared.statCache = make(map[string]statCacheEntry)
-		}
+		r.shared.fileCache = make(map[string]fileCacheEntry)
+		r.shared.statCache = make(map[string]statCacheEntry)
 	})
 }
 
@@ -245,7 +237,8 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		if hasExpr {
-			ranges := scanAnchors(s)
+			var anchorBuf [8]anchorRange
+			ranges := scanAnchors(s, anchorBuf[:0])
 			if len(ranges) > 0 {
 				var sb strings.Builder
 				last := 0
@@ -257,13 +250,6 @@ func (r *ExpressionResolver) resolveString(s string) string {
 							sb.WriteString(s[rng.start:rng.end])
 						}
 					} else {
-						if !sbInitialized {
-							sb.Grow(len(s))
-							sb.WriteString(s[:rng.start])
-							sbInitialized = true
-						} else {
-							sb.WriteString(s[last:rng.start])
-						}
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
 
 						var res string
@@ -283,8 +269,18 @@ func (r *ExpressionResolver) resolveString(s string) string {
 
 						if err != nil {
 							r.setError(err)
-							sb.WriteString(s[rng.start:rng.end])
+							if sbInitialized {
+								sb.WriteString(s[last:rng.start])
+								sb.WriteString(s[rng.start:rng.end])
+							}
 						} else {
+							if !sbInitialized {
+								sb.Grow(len(s))
+								sb.WriteString(s[:rng.start])
+								sbInitialized = true
+							} else {
+								sb.WriteString(s[last:rng.start])
+							}
 							sb.WriteString(res)
 						}
 					}

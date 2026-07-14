@@ -1,0 +1,4 @@
+sh:
+  image: alpine
+  env:
+    - TOKEN={{env:SECRET_TOKEN}}

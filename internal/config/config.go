@@ -88,6 +88,7 @@ type ConfigDefaults struct {
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
 	SensitiveEnv    []string       `yaml:"sensitiveEnv,omitempty"`
+	GroupAdd        []string       `yaml:"groupAdd,omitempty"`
 }
 
 func (d ConfigDefaults) DeepCopy() ConfigDefaults {
@@ -116,6 +117,7 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.Entrypoint = copyStringSlice(d.Entrypoint)
 	res.Env = copyStringSlice(d.Env)
 	res.SensitiveEnv = copyStringSlice(d.SensitiveEnv)
+	res.GroupAdd = copyStringSlice(d.GroupAdd)
 
 	if d.Devices != nil {
 		res.Devices = make([]DeviceConfig, len(d.Devices))
@@ -221,6 +223,7 @@ type ToolConfig struct {
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
 	SensitiveEnv    []string       `yaml:"sensitiveEnv,omitempty"`
+	GroupAdd        []string       `yaml:"groupAdd,omitempty"`
 }
 
 func (t ToolConfig) DeepCopy() ToolConfig {
@@ -250,6 +253,7 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.Entrypoint = copyStringSlice(t.Entrypoint)
 	res.Env = copyStringSlice(t.Env)
 	res.SensitiveEnv = copyStringSlice(t.SensitiveEnv)
+	res.GroupAdd = copyStringSlice(t.GroupAdd)
 
 	if t.Devices != nil {
 		res.Devices = make([]DeviceConfig, len(t.Devices))

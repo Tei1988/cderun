@@ -29,7 +29,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
-| T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
@@ -48,7 +48,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | - |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
-| T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | - |
+| T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | - |
 | T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
@@ -80,6 +80,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | - |
+| T74 | containerd がLinux専用であることをドキュメントに明記 | ドキュメント | 低 | 小 | - | - |
+| T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -521,12 +523,12 @@ cderun --prune
 ### `registry.go` の `sensitive-env` 説明文の不整合
 
 - **内容**: `internal/config/registry.go` の `sensitive-env` オプションの `Usage` フィールドが `"default uses automatic keywords"` となっているが、現在の実際の実装（および他のドキュメント）では「未指定時はすべての環境変数をマスクする (Mask-all)」挙動となっている。
-- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。
+- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。 (Recorded by Jules)
 
 ### `registry.go` の `runtime` 説明文の不整合
 
 - **内容**: `internal/config/registry.go` の `runtime` オプションの `Usage` フィールドが `"Container runtime to use (docker/podman)"` となっているが、現在は `containerd` もサポートされている。
-- **対応**: `Usage` 文字列を `"Container runtime to use (docker/podman/containerd)"` に更新することを推奨。
+- **対応**: `Usage` 文字列を `"Container runtime to use (docker/podman/containerd)"` に更新することを推奨。 (Recorded by Jules)
 
 ### 記憶 (Memory) と実装の乖離：環境変数マスキング
 
@@ -1954,3 +1956,65 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - Go ソース内のコメント・エラーメッセージ・ログメッセージから日本語が消えている（意図的なテストデータを除く）
 - `ContainerConfig` の doc comment に変換契約が記載されている
 - 挙動変更なし（既存テストが全パス）
+
+## T74: containerd がLinux専用であることをドキュメントに明記
+
+- 種別: ドキュメント
+- 優先度: 低
+- 対象:
+  - `docs/features/multi-runtime-support.md`
+  - `README.md`（存在する場合）
+- 仕様変更: なし
+
+### 背景
+
+`internal/runtime/containerd.go` には `//go:build linux` ビルドタグが付いており、containerd ランタイムは Linux 専用である。これは containerd が Linux カーネル機能（namespaces、cgroups等）に直接依存しているためであり、macOS・Windows では docker/podman 経由でのみ利用可能。現状のドキュメントにこの制約が明記されていないため、ユーザーが混乱する可能性がある。
+
+### 作業内容
+
+1. `docs/features/multi-runtime-support.md` の containerd セクションに「Linux 専用」の注記を追加する
+2. README にランタイムのプラットフォーム対応表がある場合は同様に追記する
+
+### 完了条件
+
+- `docs/features/multi-runtime-support.md` に containerd が Linux 専用であることが明記されている
+- 挙動変更なし
+
+## T75: Mac環境でのNested Execution セットアップガイドの作成
+
+- 種別: ドキュメント
+- 優先度: 中
+- 対象: リポジトリルートに `USAGE.md` を新規作成、`README.md` からリンクを追加
+- 仕様変更: なし
+- 言語: **英語**（README と同様）
+
+### 背景
+
+Mac環境でNested Execution（cderunコンテナ内からさらにcderunを実行する構成）を行う場合、READMEや既存ドキュメントでは説明されていない複数の設定が必要になる。これをまとめたセットアップガイドがあると、ユーザーが迷わずに設定できる。
+
+### 作業内容
+
+以下の内容を含むガイドを作成する:
+
+1. **Linux バイナリパスの指定**
+   - macOS上でNested Executionを行う場合、コンテナ内で動くバイナリは `cderun_linux_arm64`（Apple Silicon）または `cderun_linux_amd64`（Intel）が必要
+   - `.cderun.yaml` の `mountCderunPath` または `--mount-cderun-path` で明示的に指定する方法
+
+2. **docker.sock へのアクセス設定**
+   - macOS上では `docker.sock` のホスト側GIDが0のため、自動付与が効かない
+   - `.cderun.yaml` の `defaults.groupAdd: ["102"]` で設定する方法
+   - またはコマンドライン: `--cderun-group-add 102`
+
+3. **完全な設定例**
+   ```yaml
+   # .cderun.yaml
+   defaults:
+     mountSocket: true
+     groupAdd:
+       - "102"
+   ```
+
+### 完了条件
+
+- `USAGE.md` がリポジトリルートに作成されており、Mac環境でのNested Executionに必要な設定が英語で記載されている
+- `README.md` に `USAGE.md` へのリンクが追加されている

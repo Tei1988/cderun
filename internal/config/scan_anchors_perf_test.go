@@ -12,7 +12,8 @@ func TestScanAnchorsComplexity(t *testing.T) {
 	input := strings.Repeat("{{", n)
 
 	start := time.Now()
-	scanAnchors(input)
+	var buf [8]anchorRange
+	scanAnchors(input, buf[:0])
 	duration := time.Since(start)
 
 	// If it's O(n), it should be very fast (typically < 1ms)
@@ -40,7 +41,8 @@ func TestScanAnchorsCorrectnessWithUnmatched(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res := scanAnchors(tt.input)
+		var buf [8]anchorRange
+		res := scanAnchors(tt.input, buf[:0])
 		if len(res) != len(tt.expected) {
 			t.Errorf("scanAnchors(%q) = %d ranges, expected %d", tt.input, len(res), len(tt.expected))
 			continue
