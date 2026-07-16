@@ -86,6 +86,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
 | T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
 | T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | - |
+| T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -1758,3 +1759,40 @@ func (o *rootOptions) buildContainerConfig(...) (*container.ContainerConfig, err
 - `buildContainerConfig` 本体が50行以内に収まる
 - 既存テストが全パス（挙動変更なし）
 - `applyToolMounts` / `applySocketMount` に個別の単体テストを追加する（任意だが推奨）
+
+---
+
+## T80: コンテナ作成前に ContainerConfig をデバッグログ出力
+
+**種別**: 改善 | **優先度**: 低 | **規模**: 小
+
+### 背景
+
+`--cderun-log-level debug` 実行時、コンテナに渡すマウント構成・イメージ・ユーザー等が
+ログに出力されないため、パス解決の問題（OverlayFS 誤マップ・dubious ownership 等）の
+診断が困難。成功時と失敗時のログが同一に見え、原因の特定ができない。
+
+### 対象ファイル
+
+- `internal/command/root.go` の `buildContainerConfig` 末尾またはコンテナ作成直前の呼び出し箇所
+
+### 出力すべき情報
+
+```
+[DEBUG] ContainerConfig:
+  Image:      alpine/git:v2.52.0
+  Command:    [status]
+  Entrypoint: []
+  Mounts:
+    - bind /Users/.../master -> /Users/.../master
+    - bind /run/cderun/snap-xxx -> /run/cderun/snap-xxx
+  Env:        [MASKED_KEY=***]
+  User:       (empty)
+```
+
+Env はセンシティブ値をマスク済みの状態で出力すること。
+
+### 完了条件
+
+- `--cderun-log-level debug` 時にマウント一覧を含む ContainerConfig がログ出力される
+- 既存テストが全パス
