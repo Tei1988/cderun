@@ -37,33 +37,43 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 		assert.Equal(t, 123, exitErr.Code)
 	})
 
-	panicTests := []struct {
-		name string
-		args []string
+	emptySubcmdTests := []struct {
+		name        string
+		args        []string
+		expectError bool
 	}{
 		{
-			name: "empty subcommand currently PANICS in dry-run (documenting T42)",
-			args: []string{"cderun", "--dry-run", ""},
+			name:        "empty subcommand returns error in dry-run (T42 regression)",
+			args:        []string{"cderun", "--dry-run", ""},
+			expectError: true,
 		},
 		{
-			name: "empty subcommand currently PANICS in normal run (documenting T42)",
-			args: []string{"cderun", ""},
+			name:        "empty subcommand does not panic in normal run (T42 regression)",
+			args:        []string{"cderun", ""},
+			expectError: false,
 		},
 	}
 
-	for _, tt := range panicTests {
+	for _, tt := range emptySubcmdTests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			assert.Panics(t, func() {
-				_ = ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
+			var runErr error
+			assert.NotPanics(t, func() {
+				runErr = ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
 					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 						return &runtime.MockRuntime{}, nil
 					}
 					o.exitFunc = func(code int) {}
+					o.isTerminal = func(fd int) bool { return false }
 					cmd.SetOut(io.Discard)
 					cmd.SetErr(io.Discard)
 				})
 			})
+			if tt.expectError {
+				assert.Error(t, runErr)
+			} else {
+				assert.NoError(t, runErr)
+			}
 		})
 	}
 
