@@ -40,17 +40,16 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 	emptySubcmdTests := []struct {
 		name        string
 		args        []string
-		expectError bool
+		wantErrMsg  string
 	}{
 		{
-			name:        "empty subcommand returns error in dry-run (T42 regression)",
-			args:        []string{"cderun", "--dry-run", ""},
-			expectError: true,
+			name:       "empty subcommand returns error in dry-run (T42 regression)",
+			args:       []string{"cderun", "--dry-run", ""},
+			wantErrMsg: "--dry-run requires a subcommand",
 		},
 		{
-			name:        "empty subcommand does not panic in normal run (T42 regression)",
-			args:        []string{"cderun", ""},
-			expectError: false,
+			name: "empty subcommand does not panic in normal run (T42 regression)",
+			args: []string{"cderun", ""},
 		},
 	}
 
@@ -69,8 +68,8 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 					cmd.SetErr(io.Discard)
 				})
 			})
-			if tt.expectError {
-				assert.Error(t, runErr)
+			if tt.wantErrMsg != "" {
+				assert.ErrorContains(t, runErr, tt.wantErrMsg)
 			} else {
 				assert.NoError(t, runErr)
 			}
