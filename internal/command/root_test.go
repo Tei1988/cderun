@@ -1937,8 +1937,8 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 		cmd.SetErr(&logBuf)
 	})
 
-	// docs/features/hang-timeout.md: 強制終了（SIGKILL）されたコンテナの exit code (137) は
-	// ExitCodeError として必ず呼び出し元へ伝搬される。err == nil はこの伝搬の回帰を意味する。
+	// docs/features/hang-timeout.md: The exit code (137) of a container forced to terminate (SIGKILL) is
+	// always propagated to the caller as an ExitCodeError. err == nil would mean a regression of this propagation.
 	var exitErr *ExitCodeError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 137, exitErr.Code)
