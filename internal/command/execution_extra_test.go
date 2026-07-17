@@ -57,7 +57,7 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			var runErr error
-			assert.NotPanics(t, func() {
+			require.NotPanics(t, func() {
 				runErr = ExecuteContextWithOptions(ctx, tt.args, func(o *rootOptions, cmd *cobra.Command) {
 					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 						return &runtime.MockRuntime{}, nil
