@@ -31,6 +31,8 @@ type MockFileSystem struct {
 }
 
 func (m *MockFileSystem) Getwd() (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.WD, nil
 }
 
@@ -79,6 +81,8 @@ func (m *MockFileSystem) ReadFile(name string) ([]byte, error) {
 }
 
 func (m *MockFileSystem) UserHomeDir() (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.HomeDirErr != nil {
 		return "", m.HomeDirErr
 	}
@@ -114,6 +118,8 @@ func (m *MockFileSystem) LookupEnv(key string) (string, bool) {
 }
 
 func (m *MockFileSystem) TempDir() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.TempDirValue != "" {
 		return m.TempDirValue
 	}
@@ -177,6 +183,8 @@ func (m *MockFileSystem) RemoveAll(path string) error {
 }
 
 func (m *MockFileSystem) Abs(path string) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.AbsErr != nil {
 		return "", m.AbsErr
 	}

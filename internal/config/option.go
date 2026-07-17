@@ -62,12 +62,15 @@ func resolveBoolOpt(
 	p2Set bool, p2Val bool,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
-) bool {
-	val, specified := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
-	if specified {
-		return val
+) (bool, error) {
+	val, specified, err := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
+	if err != nil {
+		return false, err
 	}
-	return fallback
+	if specified {
+		return val, nil
+	}
+	return fallback, nil
 }
 
 // resolveBoolOptInfo resolves a bool option and reports whether a value was found.
@@ -77,33 +80,35 @@ func resolveBoolOptInfo(
 	p2Set bool, p2Val bool,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
-) (bool, bool) {
+) (bool, bool, error) {
 	if p1Set {
-		return p1Val, true
+		return p1Val, true, nil
 	}
 	if p2Set {
-		return p2Val, true
+		return p2Val, true, nil
 	}
 	if def.EnvKey != "" {
 		if env := fs.Getenv(def.EnvKey); env != "" {
-			if b, err := strconv.ParseBool(env); err == nil {
-				return b, true
+			b, err := strconv.ParseBool(env)
+			if err != nil {
+				return false, false, &InvalidConfigError{Field: def.EnvKey, Value: env, Err: err}
 			}
+			return b, true, nil
 		}
 	}
 	if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			if b := def.ToolGetter(tool); b != nil {
-				return *b, true
+				return *b, true, nil
 			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
 		if b := def.GlobalGetter(*global); b != nil {
-			return *b, true
+			return *b, true, nil
 		}
 	}
-	return false, false
+	return false, false, nil
 }
 
 // resolveStringSliceOpt resolves a []string option through P1-P6.
@@ -198,36 +203,38 @@ func resolveFloat64Opt(
 	p2Set bool, p2Val float64,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
-) float64 {
+) (float64, error) {
 	if p1Set {
-		return p1Val
+		return p1Val, nil
 	}
 	if p2Set {
-		return p2Val
+		return p2Val, nil
 	}
 	if def.EnvKey != "" {
 		if env := fs.Getenv(def.EnvKey); env != "" {
-			if f, err := strconv.ParseFloat(env, 64); err == nil {
-				return f
+			f, err := strconv.ParseFloat(env, 64)
+			if err != nil {
+				return 0, &InvalidConfigError{Field: def.EnvKey, Value: env, Err: err}
 			}
+			return f, nil
 		}
 	}
 	if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			if f := def.ToolGetter(tool); f != nil {
-				return *f
+				return *f, nil
 			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
 		if f := def.GlobalGetter(*global); f != nil {
-			return *f
+			return *f, nil
 		}
 	}
 	if def.Fallback != nil {
-		return *def.Fallback
+		return *def.Fallback, nil
 	}
-	return 0
+	return 0, nil
 }
 
 // resolveIntOpt resolves an int option through P1-P6.
@@ -237,34 +244,36 @@ func resolveIntOpt(
 	p2Set bool, p2Val int,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
-) int {
+) (int, error) {
 	if p1Set {
-		return p1Val
+		return p1Val, nil
 	}
 	if p2Set {
-		return p2Val
+		return p2Val, nil
 	}
 	if def.EnvKey != "" {
 		if env := fs.Getenv(def.EnvKey); env != "" {
-			if i, err := strconv.Atoi(env); err == nil {
-				return i
+			i, err := strconv.Atoi(env)
+			if err != nil {
+				return 0, &InvalidConfigError{Field: def.EnvKey, Value: env, Err: err}
 			}
+			return i, nil
 		}
 	}
 	if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
 			if i := def.ToolGetter(tool); i != nil {
-				return *i
+				return *i, nil
 			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
 		if i := def.GlobalGetter(*global); i != nil {
-			return *i
+			return *i, nil
 		}
 	}
 	if def.Fallback != nil {
-		return *def.Fallback
+		return *def.Fallback, nil
 	}
-	return 0
+	return 0, nil
 }

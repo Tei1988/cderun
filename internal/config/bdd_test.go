@@ -459,8 +459,8 @@ func TestUnit_Config_Resolver_Errors_Exhaustive(t *testing.T) {
 
 	t.Run("resolveFloat64Opt invalid", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "invalid"}}
-		val := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, "", nil, nil, mfs)
-		assert.InDelta(t, 0.0, val, 1e-9)
+		_, err := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "CDERUN_CPUS"}, false, 0.0, false, 0.0, "", nil, nil, mfs)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath volume resolution", func(t *testing.T) {

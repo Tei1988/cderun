@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Config_ValidatePort_Malformed(t *testing.T) {
@@ -94,8 +95,8 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			Fallback: ptr(10),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 10, res)
+		_, err := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveFloat64Opt with invalid env", func(t *testing.T) {
@@ -104,8 +105,8 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			Fallback: ptr(1.5),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.InDelta(t, 1.5, res, 1e-9)
+		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveIntOpt with invalid env but valid ToolGetter", func(t *testing.T) {
@@ -118,8 +119,8 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		tools := ToolsConfig{"sub": ToolConfig{}}
 		// Env is invalid, so it should proceed to ToolGetter (P4) which is valid.
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", tools, nil, mfs)
-		assert.Equal(t, 42, res)
+		_, err := resolveIntOpt(def, false, 0, false, 0, "node", tools, nil, mfs)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveFloat64Opt with invalid env but valid GlobalGetter", func(t *testing.T) {
@@ -130,8 +131,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			Fallback:     ptr(1.5),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		// Env is invalid, ToolGetter is nil, so it should proceed to GlobalGetter (P5) which is valid.
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
-		assert.InDelta(t, 3.14, res, 1e-9)
+		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
+		require.Error(t, err)
 	})
 }

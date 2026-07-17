@@ -574,7 +574,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
-		resolved := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		resolved, err := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 		switch opt.Name {
 		case "tty":
 			rv.res.TTY = resolved
@@ -608,7 +611,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
 	p1Val, p2Val = p1v.Bool(), p2v.Bool()
 	def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-	resolved := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved, err := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
 	rv.resVal.Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
@@ -638,7 +644,10 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     &opt.Default,
 		}
-		resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+		resolved, err := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 		switch opt.Name {
 		case "pull-max-retries":
 			rv.res.PullMaxRetries = resolved
@@ -658,7 +667,10 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		Fallback:     &opt.Default,
 	}
 
-	resolved := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved, err := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
 	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
@@ -688,7 +700,10 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     &opt.Default,
 		}
-		resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+		resolved, err := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 		switch opt.Name {
 		case "cpus":
 			rv.res.CPUs = resolved
@@ -708,7 +723,10 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		Fallback:     &opt.Default,
 	}
 
-	resolved := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved, err := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
 	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
@@ -737,6 +755,9 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	}
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if err := rv.r.Error(); err != nil {
+		return err
+	}
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
@@ -1055,7 +1076,11 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-all-tools")
 		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountAllTools = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		var err error
+		rv.res.MountAllTools, err = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 	}
 
 	var mountCderunSpecified bool
@@ -1063,7 +1088,11 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-cderun")
 		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountCderun, mountCderunSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		var err error
+		rv.res.MountCderun, mountCderunSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 	}
 	if !mountCderunSpecified {
 		rv.res.MountCderun = len(rv.res.MountTools) > 0 || rv.res.MountAllTools
@@ -1088,7 +1117,11 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		opt, _ := GetBoolOption("mount-socket")
 		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		rv.res.MountSocket, mountSocketSpecified = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		var err error
+		rv.res.MountSocket, mountSocketSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+		if err != nil {
+			return err
+		}
 	}
 	if !mountSocketSpecified {
 		rv.res.MountSocket = rv.res.MountCderun

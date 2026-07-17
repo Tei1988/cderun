@@ -44,39 +44,39 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
 
 		// Env
-		res := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := must(resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs))
 		assert.InDelta(t, 2.5, res, 1e-9)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = must(resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs))
 		assert.InDelta(t, 1.0, res, 1e-9)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_FLOAT": "invalid"}
-		res = resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.InDelta(t, 1.0, res, 1e-9)
+		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		require.Error(t, err)
 
 		// Tool getter
 		mfs.Env = nil
 		f2 := 2.0
 		def.ToolGetter = func(tc ToolConfig) *float64 { return &f2 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		res = must(resolveFloat64Opt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs))
 		assert.InDelta(t, 2.0, res, 1e-9)
 
 		// Global getter
 		def.ToolGetter = nil
 		f3 := 3.0
 		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
-		res = resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		res = must(resolveFloat64Opt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs))
 		assert.InDelta(t, 3.0, res, 1e-9)
 
 		// P2 CLI
-		res = resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs)
+		res = must(resolveFloat64Opt(def, false, 0, true, 4.0, "node", nil, nil, mfs))
 		assert.InDelta(t, 4.0, res, 1e-9)
 
 		// P1 Override
-		res = resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs)
+		res = must(resolveFloat64Opt(def, true, 5.0, false, 0, "node", nil, nil, mfs))
 		assert.InDelta(t, 5.0, res, 1e-9)
 	})
 
@@ -88,39 +88,39 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
 
 		// Env
-		res := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res := must(resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs))
 		assert.Equal(t, 20, res)
 
 		// Fallback
 		mfs.Env = nil
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		res = must(resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs))
 		assert.Equal(t, 10, res)
 
 		// Invalid env
 		mfs.Env = map[string]string{"TEST_INT": "invalid"}
-		res = resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
-		assert.Equal(t, 10, res)
+		_, err := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		require.Error(t, err)
 
 		// Tool getter
 		mfs.Env = nil
 		i2 := 30
 		def.ToolGetter = func(tc ToolConfig) *int { return &i2 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs)
+		res = must(resolveIntOpt(def, false, 0, false, 0, "node", ToolsConfig{"node": ToolConfig{}}, nil, mfs))
 		assert.Equal(t, 30, res)
 
 		// Global getter
 		def.ToolGetter = nil
 		i3 := 40
 		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
-		res = resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs)
+		res = must(resolveIntOpt(def, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs))
 		assert.Equal(t, 40, res)
 
 		// P2 CLI
-		res = resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs)
+		res = must(resolveIntOpt(def, false, 0, true, 50, "node", nil, nil, mfs))
 		assert.Equal(t, 50, res)
 
 		// P1 Override
-		res = resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs)
+		res = must(resolveIntOpt(def, true, 60, false, 0, "node", nil, nil, mfs))
 		assert.Equal(t, 60, res)
 	})
 
@@ -1022,4 +1022,24 @@ func TestUnit_Resolver_Env_Strict_Missing(t *testing.T) {
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required environment variable not found: \"MISSING_HOST_VAR\"")
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func TestUnit_Config_Resolve_ExpressionErrorInDuration(t *testing.T) {
+	mfs := &MockFileSystem{}
+	cli := &CLIOptions{
+		Image:    "alpine",
+		ImageSet: true,
+		HangTimeout: "{{file:nonexistent}}",
+		HangTimeoutSet: true,
+	}
+	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "file not found")
 }
