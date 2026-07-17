@@ -219,7 +219,8 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 // RemoveContainer removes a container.
 func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	err := d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
-		Force: true,
+		Force:         true,
+		RemoveVolumes: true,
 	})
 	if err != nil {
 		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
