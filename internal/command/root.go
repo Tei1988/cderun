@@ -840,7 +840,43 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
 }
 
+func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *container.ContainerConfig) {
+	if o.logger == nil || !o.logger.DebugEnabled() {
+		return
+	}
+	if cc == nil {
+		return
+	}
+	var mounts []string
+	for _, m := range cc.Mounts {
+		mounts = append(mounts, fmt.Sprintf("    - %s %s -> %s", m.Type, m.Source, m.Target))
+	}
+	mountsStr := ""
+	if len(mounts) > 0 {
+		mountsStr = "\n" + strings.Join(mounts, "\n")
+	}
+
+	var maskedEnv []string
+	if cc.Env != nil {
+		var sensitivePatterns []string
+		if resolved != nil {
+			sensitivePatterns = resolved.SensitiveEnv
+		}
+		maskedEnv = config.MaskSensitiveEnvList(cc.Env, sensitivePatterns)
+	}
+	userStr := cc.User
+	if userStr == "" {
+		userStr = "(empty)"
+	}
+
+	o.logger.Debug("ContainerConfig:\n  Image:      %s\n  Command:    %v\n  Entrypoint: %v\n  Mounts:%s\n  Env:        %v\n  User:       %s",
+		cc.Image, cc.Command, cc.Entrypoint, mountsStr, maskedEnv, userStr)
+}
+
 func (o *rootOptions) initContainer(ctx context.Context, resolved *config.ResolvedConfig, cc *container.ContainerConfig) (rt runtime.ContainerRuntime, containerID string, cleanup func(), err error) {
+	// Log ContainerConfig at debug level
+	o.logContainerConfig(resolved, cc)
+
 	// Initialize Runtime
 	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
 	if err != nil {
