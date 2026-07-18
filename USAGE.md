@@ -52,14 +52,54 @@ To execute container commands recursively, the inner `cderun` needs access to th
 
 On macOS, since the socket is managed by a lightweight Linux VM (such as Docker Desktop or Podman), the automatic GID lookup on the host may not resolve correctly or match the VM's permissions.
 
-To grant the necessary permissions, add the appropriate GID (e.g. `102` for Docker Desktop on Mac) explicitly to the supplementary groups via the `groupAdd` configuration or `--cderun-group-add` CLI flag.
+To grant the necessary permissions, you must add the correct socket GID explicitly to the supplementary groups via the `groupAdd` configuration or the `--cderun-group-add` CLI flag.
+
+> **Important**: The value `102` shown below is merely an **example**. The actual GID depends on your specific container runtime installation and environment on your machine. You must determine and configure the correct GID for your system.
+
+### 1. Determine the Socket GID on Your System
+
+To find the numeric GID of the socket as seen inside the container environment, run `cderun` with root user privileges to list the socket's file details:
+
+```bash
+cderun --mount-socket --user root alpine ls -ln /var/run/docker.sock
+```
+
+The output will look similar to this:
+
+```text
+srw-rw---- 1 0 102 0 Jun 15 10:00 /var/run/docker.sock
+```
+
+In this output, the third column (`0`) is the owner UID (root), and the fourth column (`102`) is the owner GID. This GID (`102` in this example) is the value you must use.
+
+### 2. Configure the GID (Numeric Only)
+
+You must ensure that the value passed to `groupAdd` or `--cderun-group-add` is **numeric** (e.g. `"102"`), not a group name (e.g. `"docker"`). Numeric values are required because container runtime adapters (such as `containerd`) resolve permissions directly inside the container using GIDs and do not perform group name lookups.
+
+Add the determined numeric GID to your configuration:
 
 ```yaml
 # .cderun.yaml
 defaults:
   groupAdd:
-    - "102"
+    - "102" # Replace with your actual socket GID determined in Step 2.1
 ```
+
+Or pass it as a CLI option when running the command:
+
+```bash
+cderun node app.js --cderun-group-add 102
+```
+
+### 3. Verify Socket Access
+
+To verify that socket access has been successfully configured, execute a command as a non-root user inside a container and verify that `cderun` can communicate with the runtime socket without permission errors:
+
+```bash
+cderun --mount-socket --user 1000 alpine sh -c "cderun --diagnosis"
+```
+
+If the configuration is correct, the nested diagnosis will complete successfully and display the container runtime status instead of returning a `permission denied` error.
 
 ---
 
