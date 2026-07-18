@@ -92,20 +92,18 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 	t.Run("resolveIntOpt with invalid env", func(t *testing.T) {
 		def := OptionDef[*int]{
 			EnvKey:   "TEST_INT",
-			Fallback: ptr(10),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
-		_, err := resolveIntOpt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		_, err := resolveIntOpt(def, 10, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveFloat64Opt with invalid env", func(t *testing.T) {
 		def := OptionDef[*float64]{
 			EnvKey:   "TEST_FLOAT",
-			Fallback: ptr(1.5),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, nil, mfs)
+		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -114,12 +112,11 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		def := OptionDef[*int]{
 			EnvKey:     "TEST_INT",
 			ToolGetter: func(tc ToolConfig) *int { return &toolVal },
-			Fallback:   ptr(10),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		tools := ToolsConfig{"sub": ToolConfig{}}
 		// Env is invalid, so it should proceed to ToolGetter (P4) which is valid.
-		_, err := resolveIntOpt(def, false, 0, false, 0, "node", tools, nil, mfs)
+		_, err := resolveIntOpt(def, 10, false, 0, false, 0, "node", tools, nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -128,10 +125,9 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		def := OptionDef[*float64]{
 			EnvKey:       "TEST_FLOAT",
 			GlobalGetter: func(c CDERunConfig) *float64 { return &globalVal },
-			Fallback:     ptr(1.5),
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		_, err := resolveFloat64Opt(def, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
+		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
 		require.Error(t, err)
 	})
 }

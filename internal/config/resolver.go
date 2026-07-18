@@ -642,9 +642,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
-			Fallback:     &opt.Default,
 		}
-		resolved, err := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+		resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 		if err != nil {
 			return err
 		}
@@ -664,10 +663,9 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
 	}
 
-	resolved, err := resolveIntOpt(def, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -698,9 +696,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
-			Fallback:     &opt.Default,
 		}
-		resolved, err := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+		resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 		if err != nil {
 			return err
 		}
@@ -720,10 +717,9 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
-		Fallback:     &opt.Default,
 	}
 
-	resolved, err := resolveFloat64Opt(def, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+	resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -1026,13 +1022,13 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 				rv.res.Runtime = "docker"
 			}
 		} else {
-			if _, err := rv.r.Stat("/var/run/docker.sock"); err == nil {
+			if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
 				rv.res.Runtime = "docker"
 				rv.res.SocketPath = "/var/run/docker.sock"
-			} else if _, err := rv.r.Stat("/run/containerd/containerd.sock"); err == nil {
+			} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
 				rv.res.Runtime = "containerd"
 				rv.res.SocketPath = "/run/containerd/containerd.sock"
-			} else if _, err := rv.r.Stat("/run/podman/podman.sock"); err == nil {
+			} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
 				rv.res.Runtime = "podman"
 				rv.res.SocketPath = "/run/podman/podman.sock"
 			} else {
