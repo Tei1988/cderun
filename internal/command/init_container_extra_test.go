@@ -59,7 +59,7 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 	})
 }
 
-func TestUnit_Command_InitContainer_DebugLogging_WithMasking(t *testing.T) {
+func TestUnit_Root_InitContainer_DebugLogging_WithMasking(t *testing.T) {
 	t.Parallel()
 
 	mock := &runtime.MockRuntime{}
