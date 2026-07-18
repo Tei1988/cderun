@@ -108,13 +108,20 @@ If the configuration is correct, the nested diagnosis will complete successfully
 To achieve seamless nested execution on macOS, create a global configuration file (e.g., `.cderun.yaml` in your project root or `~/.config/cderun/.cderun.yaml`):
 
 ```yaml
-runtime: docker
+runtime: docker # Configured for Docker Desktop; change to "podman" if using Podman on macOS
 defaults:
   mountCderun: true
-  mountCderunPath: "./cderun_linux_arm64"
+  mountCderunPath: "./cderun_linux_arm64" # Use the binary built for your host CPU architecture (use "./cderun_linux_amd64" for Intel-based Macs)
   mountSocket: true
   groupAdd:
-    - "102"
+    - "102" # Replace with your actual socket GID determined in Step 2.1
 ```
+
+> **Usage Notes on Complete Configuration**:
+>
+> 1. **Engine Selection**: The `runtime` parameter is configured as `docker` specifically for Docker Desktop on macOS. If you are running Podman or another engine on your Mac, update this to `podman` or your appropriate engine runtime.
+> 2. **CPU Architecture**: Replace `mountCderunPath` with the path to the `cderun` binary matching your Mac's host CPU architecture:
+>    - For Apple Silicon Macs (M1/M2/M3/M4): Use `./cderun_linux_arm64`
+>    - For Intel-based Macs: Use `./cderun_linux_amd64`
 
 Once configured, any recursive invocation of `cderun` (such as mounting tools defined in `.tools.yaml`) will run reliably inside your ephemeral containers on macOS.
