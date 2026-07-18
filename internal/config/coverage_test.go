@@ -821,6 +821,19 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/tmp/docker.sock", res.SocketPath)
+
+	// Case 6: Parent directory contains podman or containerd but filename is docker.sock (should detect docker) - T58
+	cli = CLIOptions{Image: "a", ImageSet: true, SocketPath: "/home/podman-migration/docker.sock", SocketPathSet: true}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "/home/podman-migration/docker.sock", res.SocketPath)
+
+	cli = CLIOptions{Image: "a", ImageSet: true, SocketPath: "/home/containerd-test/docker.sock", SocketPathSet: true}
+	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "/home/containerd-test/docker.sock", res.SocketPath)
 }
 
 func saveAndReplaceBoolOptionsMap(t *testing.T, newMap map[string]BoolOption) {
