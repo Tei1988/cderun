@@ -130,8 +130,9 @@ type mockDockerClient struct {
 	waitResp   dockercontainer.WaitResponse
 	waitErrOut error
 
-	removeID  string
-	removeErr error
+	removeID   string
+	removeOpts dockercontainer.RemoveOptions
+	removeErr  error
 
 	resizeID   string
 	resizeOpts dockercontainer.ResizeOptions
@@ -202,6 +203,7 @@ func (m *mockDockerClient) ContainerWait(ctx context.Context, containerID string
 
 func (m *mockDockerClient) ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error {
 	m.removeID = containerID
+	m.removeOpts = options
 	return m.removeErr
 }
 
@@ -591,6 +593,18 @@ func TestUnit_Docker_AttachMultiplexed(t *testing.T) {
 		err := runtime.AttachContainer(context.Background(), "id", false, nil, nil, nil, nil)
 		require.Error(t, err)
 	})
+}
+
+func TestUnit_Docker_RemoveContainer_RemoveVolumes(t *testing.T) {
+	ctx := context.Background()
+	mock := &mockDockerClient{}
+	runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+	err := runtime.RemoveContainer(ctx, "test-container-id")
+	require.NoError(t, err)
+	assert.Equal(t, "test-container-id", mock.removeID)
+	assert.True(t, mock.removeOpts.Force)
+	assert.True(t, mock.removeOpts.RemoveVolumes)
 }
 
 type mockConn struct {
