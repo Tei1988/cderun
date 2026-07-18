@@ -222,8 +222,8 @@ func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {
 	})
 }
 
-// docs/features/command-line-options.md: --cap-add / --cap-drop は Docker 互換の
-// 短縮名（例: SYS_ADMIN）を受け付ける。OCI spec には CAP_ プレフィックス形式で渡す必要がある。
+// docs/features/command-line-options.md: --cap-add / --cap-drop accept Docker-compatible
+// short names (e.g. SYS_ADMIN); the OCI spec requires the CAP_-prefixed form.
 func TestUnit_Containerd_NormalizeCapabilities(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

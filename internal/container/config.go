@@ -1,6 +1,14 @@
 package container
 
 // ContainerConfig represents the intermediate representation of a container execution request.
+//
+// Field values hold Docker-CLI-compatible notation as entered by the user
+// (e.g. CapAdd: "SYS_ADMIN", not "CAP_SYS_ADMIN"). The Docker daemon normalizes
+// such notation implicitly, but runtimes that build an OCI spec directly
+// (containerd) do NOT: each runtime adapter is responsible for converting every
+// field it consumes into its native representation, and for returning an explicit
+// error for fields it cannot support — never pass a value through unconverted or
+// drop it silently.
 type ContainerConfig struct {
 	// Basic settings
 	Image   string   `json:"image" yaml:"image"`
