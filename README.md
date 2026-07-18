@@ -251,6 +251,7 @@ support.
 
 **containerd limitations**:
 
+- **Platform Restriction**: Direct containerd execution is **Linux-only** (built with Go `//go:build linux` build tag). It cannot run natively on macOS or Windows without virtualized container engines like Docker Desktop or Podman.
 - Only the `host` network is supported (default `bridge` network is not supported).
 - Port mapping/exposure (`--publish`, `--publish-all`, `--expose`) is not supported.
 - Custom DNS settings (`--dns`) and host mappings (`--add-host`) are not supported.
@@ -282,6 +283,7 @@ support.
 - Automatically propagates host context and settings via snapshots.
 - **Reverse Path Resolution**: Translates container-local paths back to host paths for nested mounts, ensuring the host-side Docker/Podman daemon can resolve volume sources.
 - **OverlayFS Detection**: Automatically detects the root filesystem's `upperdir` to map container files back to the host.
+- **macOS Setup**: For configuring nested execution in macOS environments, see [Advanced Usage: Nested Execution on macOS](USAGE.md).
 
 ### Sensitive Data Masking
 

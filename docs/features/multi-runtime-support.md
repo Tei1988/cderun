@@ -31,6 +31,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
     - **マウント**: `volume` タイプ（名前付きボリューム等）のマウントは未サポートです（`bind` または `tmpfs` を使用してください）。
     - **ケーパビリティ**: `--cap-add`, `--cap-drop` による Linux ケーパビリティの制御はサポートされています。
     - **ENTRYPOINTの継承**: イメージに `ENTRYPOINT` が定義されている場合、コマンド指定時にそれらが無視される既知の制限があります（修正予定。詳細は [Backlog T40](../../.agent/todo.md) 参照）。
+    - **プラットフォーム制限**: **Linux専用**です（`//go:build linux` ビルドタグ付き）。macOSやWindowsでは、DockerやPodmanのように仮想マシン内で動作するエンジンを経由せずに直接ローカルの containerd に接続することはできません。
 - **nerdctl (Backlog)**:
   containerd の CLI である `nerdctl` をラップして実行する方式の検討。
 

@@ -74,22 +74,29 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
-| T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | - |
+| T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
+| T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | - |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
 | T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
-| T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | - |
+| T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | DONE |
 | T74 | containerd がLinux専用であることをドキュメントに明記 | ドキュメント | 低 | 小 | - | - |
 | T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
+| T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
+| T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
+| T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | - |
+| T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | - |
 
 依存関係・統合の注意:
 
+- **T77 と T78 は同時着手を推奨**（T78 で `applySocketMount` / `applyToolMounts` を切り出してから T77 の DI を実装するとスムーズ。逆順だとコンフリクトしやすい）
 - **T05 と T06 は統合可能**（`registry.go` のメタデータを single source of truth にすれば両方解決する）。別々に着手する場合は T05 → T06 の順
 - **T22 は「ラベル付与」を先行サブタスクとして切り出し可能**（移行問題の縮小）
 - **T69 は T05/T06 と統合実装を強く推奨**（registry メタデータからテストを生成するため、single source of truth 化と同じ作業）
 - **T70 は T20 と統合実装を推奨**（CI の実ランタイムジョブをコンフォーマンススイートの器として作る）。T40/T45/T51 の再現ケースを必ず含めること
-- **テスト系タスク（T68〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T68 → T69 → T70 → T71 → T72
+- **テスト系タスク（T69〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T79 → T69 → T70 → T71 → T72（T68 は実装済み）
+- **T79 は T53 修正後にゴールデンを更新すること**（T53 未修正の状態で `--` ケースを追加し、T53 修正時に `-update` フラグで更新する）
 
 ---
 
@@ -215,128 +222,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
-
----
-
-## T09: `AttachContainer`（Docker）の stdin エラー握りつぶし修正
-
-- 種別: バグ修正
-- 対象: `internal/runtime/docker.go:318-347`
-
-### 問題
-
-stdout が先に終了した場合、stdin エラーは `stdinDone` がすでに閉じているときだけチェックされる（`select` に `default:` があるため競合次第でスキップ）。stdin 側でエラーが発生してもほとんどの場合に握りつぶされる。
-
-### 実装上の注意
-
-- stdin の `io.Copy` はユーザー端末からの Read で永久にブロックし得るため、「outputDone 後に stdinDone を待つ」修正は **不可（ハングする）**
-- `stdinErr` を mutex か atomic で保持し、**待たずに読むだけ** の形にするのが安全
-- `context.Canceled` は正常系（明示キャンセル）なのでエラー扱いから除外すること
-
-### 完了条件
-
-- stdin エラーが競合に依存せず報告される
-- TTY セッションが従来どおりハングせず終了する（既存テストの回帰確認）
-
----
-
-## T11: 未知の `{{...}}` ディレクティブをエラーにする
-
-- 種別: 挙動変更
-- 対象: `internal/config/expression.go:270`
-- 仕様変更: あり → `docs/features/value-resolution.md` の更新必須
-
-### 問題
-
-`{{HOM}}` のようなタイポでも無音で文字列がそのまま通り、コンテナに `{{HOM}}` を含むパスが渡ってしまう。
-
-```go
-// 現状（expression.go:270）
-return "{{" + content + "}}", nil // Keep as is if unknown
-
-// 改善案
-return "", fmt.Errorf("unknown directive: %q", content)
-```
-
-### 実装上の注意（単純にエラー化すると 2 つ壊れる）
-
-1. `resolveString` の単一式最適化パス（`expression.go:181-189`）は「結果が `{{` で始まったままか」（185 行目の `!strings.HasPrefix(res, "{{")`）で解決失敗を判定して全体スキャンへフォールバックしており、この分岐の書き換えが必要
-2. 設定値にリテラルの `{{...}}` を書くユースケース（Go template / Helm テンプレートを env 値や entrypoint に渡す等）が即エラーになる
-
-対策として、エラー化の対象を「既知ディレクティブに似たもの」（大文字英字のみ、または `env:` / `file:` / `find_dir:` 風の prefix）に限定するか、`{{{{` のようなエスケープ記法を導入する。
-
-### 完了条件
-
-- タイポ（`{{HOM}}` 等）が起動前にエラーになる
-- リテラル `{{...}}` を通すための仕様（限定エラー化 or エスケープ記法）が決定され、`docs/features/value-resolution.md` に明記されている
-- ネスト式（`{{env:{{VAR}}}}` 等）の回帰テストが通る
-
-### 完了確認（2026-07-03）
-
-実装済みを確認。`expression.go:352-366` で ALL_UPPER 候補と `:` を含む未知ディレクティブがエラーになり、`{{{{...}}}}` エスケープ（`expression.go:273-274`）と `docs/features/value-resolution.md` の仕様記載も存在する。
-
----
-
-## T12: `IsRetryablePullError` を型付きエラー判定に移行
-
-- 種別: 改善（堅牢性）
-- 対象: `internal/runtime/common.go:12-52`
-
-### 問題
-
-エラーメッセージの文字列でリトライ可否を判定しており、ライブラリ側のメッセージ変更で気づかず壊れるリスクがある。また `"no such host"` は DNS 解決失敗（≒ほぼ設定ミス）であり一時的なエラーではないため、リトライするとユーザーが原因究明に詰まる。
-
-### 方針
-
-- `errdefs` の型付きエラー（`IsUnavailable`、`IsDeadlineExceeded` 等）を優先的に使う（`common.go:18-25` で既に部分使用済み）
-- string マッチングは最小限に絞り、`"no such host"` は対象から外す
-- HTTP ステータスコードで判定できるケース（429 Rate Limit、503 Unavailable）はそちらを使う
-
-### 型付き判定の追加材料
-
-- `"no such host"` は `*net.DNSError` として `errors.As` で取れる。`IsNotFound` フィールドで「ドメイン不存在 = 設定ミス」と「DNS サーバ不達 = 一時障害」を区別できるので、全部リトライ外しではなく後者だけ残す選択肢もある
-- `"toomanyrequests"` はレジストリの errcode（`TOOMANYREQUESTS`）由来なので docker/distribution の errcode 型でマッチ可能
-- `"i/o timeout"` 系は `net.Error` の `Timeout()` で取れる
-
-### 完了条件
-
-- string マッチが型付き判定に置き換わっている（残す場合は理由をコメントで明記）
-- 「リトライすべき/すべきでない」の代表ケースについてテーブルドリブンテストがある
-
-### 残作業メモ（2026-07-03 検証）
-
-型付き判定（`errdefs`、`*net.DNSError` の `IsNotFound` 区別、`net.Error.Timeout()`）とテーブルドリブンテストは実装済み。ただし `common.go:49-63` の 13 エントリの string リストには「残す理由」のコメントがなく、`"timeout"` / `"rate limit"` のような広い substring が残存、`"toomanyrequests"` の errcode 型移行も未実施。小規模フォローアップとして T65 に含めず単独で対応してもよい。
-
----
-
-## T14: `Phase N` コメントの整理
-
-- 種別: クリーンアップ
-- 対象: `internal/config/registry.go`、`internal/config/resolver.go`
-
-### 問題
-
-`// Phase 4: Complex resolution` 等のコメントは実装時のタスク分解の名残。フェーズ番号自体はもはや意味をなしておらず、`SkipResolution: true` の理由（なぜスキップするのか）だけをコメントに残す形に整理したい。
-
-```go
-// 現状
-SkipResolution: true, // Phase 4: Complex resolution
-
-// 改善案
-SkipResolution: true, // resolved separately in ResolveWithFS (requires merge logic)
-```
-
-### 補足
-
-Phase コメントは `registry.go` と `resolver.go` の両方に散在する（Phase 1〜8 を確認済み）。`grep -n 'Phase [0-9]'` で両ファイルまとめて洗い出して整理すること。
-
-### 完了条件
-
-- `Phase N` 形式のコメントが消え、各 `SkipResolution` に実質的な理由コメントが付いている（挙動変更なし）
-
-### 完了確認（2026-07-03）
-
-実装済みを確認。`internal/config/` の非テストファイルに `Phase [0-9]` 形式のコメントは残っておらず、`registry.go` の `SkipResolution` には実質的な理由コメントが付いている。
 
 ---
 
@@ -534,96 +419,6 @@ cderun --prune
 
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
-
----
-
-## T23: `--group-add` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象:
-  - `internal/container/config.go`（`ContainerConfig`）
-  - `internal/config/registry.go`（`StringSliceOptions`）
-  - `internal/config/resolver.go`（`CLIOptions`, `ResolvedConfig`）
-  - `internal/config/config.go`（`ConfigDefaults`, `ToolConfig`）
-  - `internal/command/root.go`（`rootOptions`, `resolveSettings`, `buildContainerConfig`, `handleDryRun`）
-  - `internal/command/flags.go`（`getStringSlicePointers`）
-  - `internal/runtime/docker_adapter.go`（`HostConfig.GroupAdd`）
-  - `internal/runtime/containerd.go`（OCI spec `Process.User.AdditionalGids`）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`--mount-tools` や `--mount-socket` 使用時に、コンテナ内のプロセスが Docker ソケットにアクセスするには、ソケットファイルの所有グループ（Mac Docker Desktop では GID 102 等）に所属している必要がある。現状、supplementary group を追加する手段がないため、非 root ユーザーのイメージでは `permission denied` で失敗する。
-
-**実運用での報告（2026-07、要再検証）**: ネスト実行 + `--mount-tools` でツールが `/var/run/docker.sock` の権限不足により実行できない事象が報告されている。ただし当該環境ではソケット自体がマウントされていなかった可能性があり、原因が「GID 不足（EACCES）」か「ソケット未マウント（ENOENT）」かは切り分けが必要。着手時はまず再現環境で `ls -la /var/run/docker.sock` と `id` を確認し、エラー種別を特定してから対応すること。
-
-### 追加検討: ソケット GID の自動付与
-
-GID（102 等）を環境ごとに手で調べて設定するのは UX が悪く、環境間でポータブルでもない。`--mount-socket` 有効時に、ホスト側でソケットファイルを `stat` して所有 GID を自動的に supplementary group へ追加するモードを検討する:
-
-- 案 A: `--group-add auto` の特殊値でソケット GID を解決する
-- 案 B: `--mount-socket` 時はデフォルトで自動付与し、opt-out を用意する（挙動変更になるため要仕様判断。ただし「ソケットをマウントしたのにアクセスできない」状態に価値はほぼない）
-- いずれの場合もソケットの `stat` 失敗時（リモートデーモン等）は警告のみで続行する
-- ネスト実行時は、コンテナ内から見えるソケットの GID とホスト側の GID が一致するとは限らないため、スナップショット経由でホスト側の情報を伝搬する必要がある点に注意
-
-### 仕様
-
-#### フラグ
-
-| フラグ | 短縮形 | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- | --- |
-| `--group-add` | (なし) | stringArray | (なし) | `CDERUN_GROUP_ADD` |
-| `--cderun-group-add` | (なし) | stringArray | - | - |
-
-- Docker の `--group-add` と同じ形式: グループ名（例: `docker`）またはGID（例: `102`）
-- 環境変数 `CDERUN_GROUP_ADD` はカンマ区切り（例: `102,docker`）
-
-#### 設定ファイル
-
-```yaml
-# .cderun.yaml
-defaults:
-  groupAdd:
-    - "102"
-
-# .tools.yaml
-git:
-  image: alpine/git
-  groupAdd:
-    - "102"
-```
-
-#### ランタイム別の変換
-
-- **Docker / Podman**: `HostConfig.GroupAdd []string` にそのまま渡す
-- **containerd**: OCI spec の `Process.User.AdditionalGids []uint32` に変換（数値のみ。名前解決はコンテナの `/etc/group` に依存するため、containerd では数値GIDのみサポート。名前が渡された場合はエラーとする）
-
-#### dry-run simple 出力
-
-```text
-GroupAdd: 102, docker
-```
-
-#### 優先順位
-
-既存の P1 > P2 > P3 > P4 > P5 > P6 に従う（StringSliceOption 標準パターン）。
-
-### 実装上の注意
-
-- `registry.go` の `StringSliceOptions` に追加する際、`EnvSep` はカンマ（`,`）を使用（`cap-add` と同一パターン）
-- `config.go` の `ConfigDefaults` / `ToolConfig` に `GroupAdd []string` を追加し、`DeepCopy` / `SetBaseDir` を適切に更新（`[]string` なので `DeepCopy` に `copyStringSlice` 追加が必要）
-- containerd で名前→GID変換を行わない設計判断は、コンテナイメージ内の `/etc/group` をマウント前に読むことが困難なため
-
-### 完了条件
-
-- [ ] 全経路チェックリスト（`docs/guidelines/working-guide.md` Section 3）を満たす
-- [ ] `docs/features/command-line-options.md` に `### --group-add` セクションが追加されている
-- [ ] Docker: `HostConfig.GroupAdd` に正しく渡されるユニットテスト
-- [ ] containerd: 数値GIDが `AdditionalGids` に変換されるユニットテスト
-- [ ] containerd: 非数値が渡された場合にエラーになるユニットテスト
-- [ ] dry-run simple format に `GroupAdd` が含まれるテスト
-- [ ] 既存テストが全パス
 
 ---
 
@@ -1184,50 +979,6 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 
 ---
 
-## T41: snapshot 一時ディレクトリが `os.Exit` によりリークする
-
-- 種別: バグ修正（リーク）
-- 優先度: 高
-- 対象: `internal/command/root.go:1157-1178`（cleanup defer と `o.exitFunc(exitCode)`）、`root.go:1205`（`localOpts.exitFunc = os.Exit`）、`internal/command/snapshot.go:54-132`
-
-### 問題
-
-`RunE` 内で snapshot クリーンアップが `defer` 登録されているが、同じクロージャが最後に `o.exitFunc(exitCode)`（本番では `os.Exit`）を呼ぶため defer が実行されず、`--mount-cderun` / `--mount-tools` / `--mount-all-tools`（または `HostContext` あり）の全実行で `TempDir()` に `cderun-snap-<uuid>` ディレクトリ（シリアライズ済み `.cderun.yaml` / `.tools.yaml` を含む）がリークする。テストは `exitFunc` を差し替えているため検出できない。
-
-また `createSnapshot` 自身のエラーパス（`snapshot.go:63-73, 107-122`）でも `MkdirAll` 済みディレクトリが `RemoveAll` されない。
-
-### 方針
-
-- `exitFunc` 呼び出しの前に明示的にクリーンアップを呼ぶ、または exit code を typed エラー（例: `ExitCodeError`）で `RunE` から返し、`os.Exit` は `cmd.ExecuteContext` の完了後（`main` 側）でのみ呼ぶ構造にする（T47 と同じ構造変更で解決できるため統合推奨）
-- `createSnapshot` 内にエラー時 `defer os.RemoveAll` を追加
-
-### 完了条件
-
-- 本番経路（`exitFunc = os.Exit`）で snapshot ディレクトリが削除されることを検証するテスト（`exitFunc` をフックして defer 実行を確認する等）
-- `createSnapshot` のエラーパスでディレクトリが残らないテスト
-
----
-
-## T42: 空文字サブコマンドで nil panic
-
-- 種別: バグ修正
-- 優先度: 高
-- 対象: `internal/command/root.go:1087-1092`（subcommand 抽出）、`root.go:619` / `root.go:720` / `root.go:1149`（nil deref 箇所）
-
-### 問題
-
-`len(args) > 0` かつ `args[0] == ""` の場合、`subcommand == ""` となり `containerConfig` が nil のまま処理が進む。`cderun --dry-run ""` は `handleDryRun` で、`cderun "" foo` は `execute`（`root.go:720`）または snapshot ブロック（`root.go:1149`）で nil deref panic する。resolver の image ガード（`resolver.go:865`）も `subcommand != ""` 条件のため素通りする。シェルで空の変数を quote して渡す（`cderun "$TOOL" ...`）と実際に発生し得る。
-
-### 方針
-
-`root.go:1089` で `args[0] == ""` を「サブコマンドなし」として扱い、help 表示または明示エラーにする。
-
-### 完了条件
-
-- `cderun ""`、`cderun --dry-run ""`、`cderun "" foo` が panic せず明示的なエラー（または help）になるテスト
-
----
-
 ## T43: attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる
 
 - 種別: バグ修正
@@ -1270,29 +1021,6 @@ cobra は persistent flag を `Flags()` に遅延マージする（`ParseFlags`/
 
 ---
 
-## T45: containerd: cap-add / cap-drop / dns / add-host が黙って無視される
-
-- 種別: セキュリティ / バグ修正
-- 優先度: 高
-- 対象: `internal/runtime/containerd.go:153-269`（マッピング欠落）、対比: `internal/runtime/docker_adapter.go:56-59`
-
-### 問題
-
-containerd の `CreateContainer` は `Network` / ports を明示的に拒否する（`containerd.go:171-176`）一方、`config.CapAdd` / `CapDrop` / `DNS` / `AddHosts` は黙って捨てている。`--cap-drop ALL` が成功したように見えてコンテナはデフォルト capability のまま動く「見せかけのハードニング」になり、セキュリティ上危険。
-
-### 方針
-
-- CapAdd / CapDrop は `oci.WithAddedCapabilities` / `oci.WithCapabilities` でマッピングする
-- DNS / AddHosts は実装するか、network/ports と同じ「not supported yet」の明示エラーにする
-- T16（事前バリデーション）の対象リストに capability / DNS / AddHosts を明記して連携する
-
-### 完了条件
-
-- containerd で `--cap-add` / `--cap-drop` が OCI spec に反映されるユニットテスト
-- DNS / AddHosts が「反映される」か「明示エラーになる」かのどちらかであるテスト（黙殺の排除）
-
----
-
 ## T46: 設定レイヤーのマージで `BaseDir` が汚染される
 
 - 種別: バグ修正
@@ -1310,30 +1038,6 @@ containerd の `CreateContainer` は `Network` / ports を明示的に拒否す�
 ### 完了条件
 
 - 「下位レイヤーで相対 `mountCderunPath` を指定 + 上位レイヤーで未指定」の合成テストで、下位レイヤーのディレクトリ基準で解決されること
-
----
-
-## T47: エラー時にコンテナの exit code が破棄される
-
-- 種別: 改善（堅牢性）
-- 優先度: 中
-- 対象: `internal/command/root.go:1174-1177`、`main.go:11-14`
-- 仕様変更: あり → exit code の仕様を `docs/features/`（該当ドキュメント）に明記
-
-### 問題
-
-`waitForCompletion` は attach 失敗・タイムアウト時にもコンテナの exit code を収集して返す（`root.go:972, 994, 1020`）が、`RunE` は `err != nil` の時点で exit code を捨てて error だけ返し、`main` は一律 exit 1 で終了する。CI で最も重要な「フレーキーな attach でも実コマンドの exit status を返す」ケースが失われる。
-
-### 方針
-
-- exit code を保持する typed エラー（例: `ExitCodeError{Code int}`）を導入し、`main` 側で判別して exit する
-- cderun 内部エラーには docker CLI 互換の 125/126/127 系の採用を検討し、採用する場合は仕様化する
-- T41（`os.Exit` による defer スキップ）と同じ構造変更なので **統合実装を推奨**
-
-### 完了条件
-
-- attach エラー + 非 0 exit code のケースで実 exit code がプロセスの終了コードになるテスト
-- exit code 仕様がドキュメント化されている
 
 ---
 
@@ -1474,71 +1178,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T55: CLI `--device` が不正な perms を黙認する
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/config/path.go:345-384`（`ParseDeviceConfig`）、`path.go:199-210`（YAML 側の重複検証）、`internal/config/resolver_helpers.go:85-99`
-
-### 問題
-
-`ParseDeviceConfig("/dev/x:/dev/y:bogus")` は `bogus` が `permsRegex` に不一致でも黙ってコンテナパスに折り込む（`Destination = "/dev/y:bogus"`、perms は `rwm`）。YAML 経路の `UnmarshalYAML` は明示的な perms 検証でエラーにするため、CLI / `CDERUN_DEVICE` 経路とで挙動が非対称。
-
-### 方針
-
-perms 検証を `ParseDeviceConfig` 側に移し（最終セグメントが `^[rwm]+$` 不一致かつ残りが有効ペアなら `ok=false`）、`UnmarshalYAML` の重複検証を削除する。
-
-### 完了条件
-
-- CLI / env / YAML の 3 経路で不正 perms が同一のエラーになるテスト
-
----
-
-## T56: ポート番号の範囲検証（0 / 負数 / 65535 超）
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/config/path.go:753-809`（`ValidatePort`）、`path.go:876-906`（`ValidateExposePort`）
-
-### 問題
-
-数値チェックが素の `strconv.Atoi` のみで、`-1`、`+80`、`0`、`70000` を受理する。`-p 70000:80` や `--expose -5` が「セキュリティ検証」を通過し、ランタイム層で不明瞭に失敗する。
-
-### 方針
-
-共通の `validatePortNumber(s string, allowZero bool)` で 1〜65535 を強制（host port の 0 =ランダム割当のみ許可）。`expose` の範囲指定には開始 ≤ 終了のチェックも追加。
-
-### 完了条件
-
-- 境界値（0 / 1 / 65535 / 65536 / 負数 / `+80`）のテーブルドリブンテスト
-
----
-
-## T57: `{{file:...}}` のサブパス許可と設定ファイルの信頼境界
-
-- 種別: セキュリティ（設計判断が必要）
-- 優先度: 中
-- 対象: `internal/config/expression.go:369-371`（絶対パス・`..` のみ拒否）、対比: `expression.go:439`（`find_dir` は `/` `\` を全面拒否）、`internal/config/config.go:440-486`（`FindConfigs` の上方探索）
-- 仕様変更: あり → `docs/features/value-resolution.md` に脅威モデルを明記
-
-### 問題
-
-`resolveFile` は `.ssh/id_rsa` のような相対サブパスを受理し、`FindConfigs` は cwd から `/` まで祖先ディレクトリを探索して設定を自動ロードする。クローンしたリポジトリの `.tools.yaml` に `env: ["X={{file:.ssh/id_rsa}}"]` が仕込まれていた場合、`$HOME` 配下の cwd で `cderun <tool>` を実行するだけで `~/.ssh/id_rsa` が読まれ、ネットワークアクセスし得るコンテナへ注入される。`find_dir` がパス区切りを全面拒否しているのと非対称。
-
-### 方針（いずれかを設計判断）
-
-1. `file:` を `find_dir` と同様に単一ファイル名に制限する
-2. プロジェクトサブツリー内の dotfile 風の名前に制限する
-3. direnv 流の trust プロンプト（所有者が異なる設定の初回確認）を導入する
-4. 最低限、現状の脅威モデルを `value-resolution.md` に明記する
-
-### 完了条件
-
-- 採用した方針が実装され、`docs/features/value-resolution.md` に脅威モデルとともに記載されている
-- 祖先ディレクトリの機密ファイル読み出しシナリオのテスト（採用方針に応じて「拒否される」or「明示 opt-in が必要」）
-
----
-
 ## T58: ランタイム自動検出が substring マッチで誤検出し得る
 
 - 種別: 改善（堅牢性）
@@ -1642,61 +1281,25 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 ---
 
-## T63: CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消
-
-- 種別: CI / ドキュメント
-- 優先度: 中
-- 対象: `.github/workflows/ci.yaml`、`docs/testing/coverage.md`、`docs/testing/runtime-tests.md`、`codecov.yml`
-
-### 問題
-
-`docs/testing/coverage.md`（Codecov 自動アップロード、unit ジョブの 86.5% fast-fail、Docker 20.10/25.0/29.0 の E2E マトリクス + カバレッジマージ）と `docs/testing/runtime-tests.md` の「CI 構成」（docker:dind マトリクス、Build-artifact ジョブ、`TEST_HOST_TMP_DIR`）が記述するパイプラインは、実際の `ci.yaml`（`go test -v ./...` + containerd 統合ジョブのみ）に存在しない。`codecov.yml` は `after_n_builds: 4` を期待するが CI は一度もアップロードしない。containerd ジョブは逆にドキュメント側に記載がない。
-
-### 方針（設計判断が必要）
-
-1. ドキュメントどおりのパイプラインを復元する（T20 の Docker/Podman ジョブ追加と統合可能）
-2. または現状の CI に合わせて両ドキュメントと `codecov.yml` を書き直す
-
-どちらを選ぶか判断し、選ばなかった側の記述を残さないこと。
-
-### 完了条件
-
-- `ci.yaml` と `docs/testing/` の記述が完全に一致している
-- `codecov.yml` の期待値が実際のアップロード数と一致している（または Codecov を廃止）
-
-### 完了確認（2026-07-06）
-
-「現実を正としつつ理想像の価値ある部分を段階的に取り込む」方針で解消済み:
-
-- `ci.yaml`: unit ジョブに `-coverprofile` + Codecov アップロード（`unit` フラグ）を追加
-- `codecov.yml`: `after_n_builds: 4 → 1` に修正。project ステータスの 86.5% ハード閾値を `informational` に変更（`docs/testing/strategy.md` 第6節と整合）
-- `docs/testing/coverage.md`: CI 節を実態（unit アップロードのみ + containerd ジョブ）に書き換え。runtime フラグは T20 で追加と明記
-- `docs/testing/runtime-tests.md`: 実在しない DinD マトリクス / Build-artifact ジョブの記述を削除し、実在する containerd ジョブを記載。Docker 3 バージョンマトリクスは不採用と判断を明記
-- 残タスク: T20 実装時に `runtime` フラグのアップロード追加と `after_n_builds` の更新（T20 に記載済みの完了条件と合わせて対応）
-
----
-
-## T64: CLI help / Makefile の文字列修正（containerd・mask-all 反映）
+## T64: `--help` の Usage 文字列を実装と一致させる
 
 - 種別: クリーンアップ
 - 優先度: 低
-- 対象: `internal/config/registry.go:210, 277`、`Makefile:16`
+- 対象: `internal/config/registry.go`
 
-### 問題
+### 背景
 
-1. `registry.go:210` の `--sensitive-env` Usage が "(default uses automatic keywords)" — 実装（`masking.go:18-21`）は未指定時に全値マスクであり、キーワードベースのマスキングはコードに存在しない
-2. `registry.go:277` の `--runtime` Usage が "(docker/podman)" — containerd がサポート済み（`resolver.go:1180-1185`）。※ T31 のリネームが先に着手される場合はそちらに折り込む
-3. `Makefile:16` の `test-runtime` の echo も "(Docker/Podman)" のまま
+`docs/features/command-line-options.md` の説明文は別途更新済み。`registry.go` の `Usage` フィールド（`--help` に出力される文字列）だけが実装と乖離したまま残っている。
 
-### 方針
+### 残作業
 
-- `--sensitive-env`: "(unset: all values masked; empty: masking disabled)" 等、実挙動に合わせる
-- `--runtime`: "(docker/podman/containerd)" にする
-- Makefile の echo に containerd を追記
+1. **`--sensitive-env` Usage**（`registry.go` の `sensitive-env` エントリ）: `"default uses automatic keywords"` → `"unset: all values masked; empty string: masking disabled"` 等、実挙動に合わせる
+2. **`--runtime` Usage**（`registry.go` の `runtime` エントリ）: `"Container runtime to use (docker/podman)"` → `"Container runtime to use (docker/podman/containerd)"` ※ T31 のリネームが先に着手される場合はそちらに折り込む
 
 ### 完了条件
 
-- 3 箇所の文字列が実装と一致し、help のスナップショットテスト（あれば）が更新されている
+- `cderun --help` の出力が実装と一致している
+- 挙動変更なし
 
 ---
 
@@ -1764,30 +1367,31 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 ---
 
-## T68: dry-run ゴールデンテスト基盤（L2）
+## T79: ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ）
 
-- 種別: テスト基盤
-- 優先度: 高
-- 対象: `internal/command/`（または専用の `test/golden/` ディレクトリ）、`docs/testing/strategy.md` 第3節 L2
-- 前提: `docs/testing/strategy.md` を必ず読むこと
+- 種別: テスト
+- 優先度: 中
+- 対象: `testdata/dryrun/`（ケース追加のみ）
+- 前提: T68 でフレームワーク（`dryrun_golden_test.go`）は実装済み。`testdata/dryrun/` にディレクトリを追加するだけでケースが増える
 
-### 目的
+### 背景
 
-「CLI 呼び出し + 設定ファイル」の組み合わせコーパスに対して `--dry-run --dry-run-format json` の出力をスナップショットとして固定し、引数解析 → ホイスト → P1〜P6 解決 → `ContainerConfig` 構築のパイプライン全体の回帰をひとつの仕組みで検知する。デーモン不要・高速・hermetic。
+T68 実装時（Jules）にフレームワークと6シナリオ（scenario_a〜f）が追加されたが、T68 仕様の「必須ケース」が未追加のまま。
 
-### 方針
+### 追加するケース
 
-- コーパスは「1 ケース = 1 ディレクトリ」（`args.txt` + `.cderun.yaml` + `.tools.yaml` + `env.txt` + `expected.json`）等の宣言的な構造にし、ケース追加をデータ追加だけで行えるようにする
-- スナップショット更新は明示フラグ（例: `-update`）でのみ許可
-- 出力の環境依存部分（ホームディレクトリ、PWD 等）は正規化してから比較する
-- **必須ケース**: T44 の判別ケース（`cderun --image alpine --cderun-tty sh` → エラー）、`--` エスケープ（T53）、ネスト実行のスナップショット設定、明示的な空リストによる上書き、`{{...}}` 式の解決
-- 秘匿値マスキング（デフォルト mask-all）が dry-run 出力に効いていることもゴールデンで固定する
+1. **T44 判別ケース**: `cderun --image alpine --cderun-tty sh` → `--cderun-tty` がサブコマンド前に置かれているためエラーになることを確認
+   - `args.txt`: `["cderun", "--image", "alpine", "--cderun-tty", "sh"]`
+   - `expected.json`: エラー出力
+
+2. **T53 `--` エスケープ**: `cderun echo -- --cderun-tty` において `--cderun-tty` がホイストされる現状挙動を固定
+   - 現状（T53 未修正）では `--cderun-tty` がホイストされてしまう
+   - T53 修正時にゴールデンを更新することで回帰を検知できる
 
 ### 完了条件
 
-- コーパス実行の共通ハーネスが存在し、`go test ./...` で毎 PR 実行される
-- 主要機能（引数解析 / 優先順位 / マウント / env / 式解決）を各 1 ケース以上カバー
-- ケース追加手順が `docs/testing/strategy.md` または専用 README に記載されている
+- `testdata/dryrun/` に上記2ケースが追加されており `go test ./...` でパスする
+- 挙動変更なし（フレームワーク側は触らない）
 
 ---
 
@@ -1899,25 +1503,28 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 種別: クリーンアップ
 - 優先度: 中
-- 対象: `internal/runtime/containerd_test.go`、`internal/container/config.go`、その他 Go ソース全域
+- 対象:
+  - `internal/runtime/containerd_test.go:225-226`（日本語コメント残存）
+  - `internal/command/root_test.go:1940-1941`（日本語コメント残存）
+  - `internal/container/config.go`（変換契約コメント追加）
 - 前提: `AGENTS.md` の「English in Source Code」および「Runtime Adapter Conversion Contract」原則を参照
 
 ### 背景
 
-本プロジェクトは public な OSS のため、ソースコード内のコメントは英語で統一する（`AGENTS.md` にルール化済み）。また、containerd で capability が `CAP_` プレフィックスなしのまま OCI spec に渡っていたバグの再発防止として、「Docker は暗黙に正規化するが OCI spec 直組み立てのランタイムでは変換責務がアダプタ側にある」という契約を `ContainerConfig` の doc comment として明文化する。
+プロダクションコードの日本語はすでに英語化済み。テストファイルに2箇所残存しており、`ContainerConfig` の変換契約コメントもまだ追加されていない。
 
 ### 作業内容
 
-1. **日本語コメントの英語化**: `internal/runtime/containerd_test.go` の `TestUnit_Containerd_NormalizeCapabilities` 直前のコメント（206-207 行付近）を英語化する。英訳案:
+1. **`containerd_test.go:225-226` の英語化**（`TestUnit_Containerd_NormalizeCapabilities` 直前のコメント）:
 
    ```go
    // docs/features/command-line-options.md: --cap-add / --cap-drop accept Docker-compatible
    // short names (e.g. SYS_ADMIN); the OCI spec requires the CAP_-prefixed form.
    ```
 
-2. **残存する日本語コメントの掃引**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で全 Go ソースを確認し、コメント・エラーメッセージ・ログメッセージ内の日本語を英語化する。
-   **注意**: `internal/config/edge_cases_test.go:78` 付近の `ユーザー_TOKEN` は Unicode キーのマスキング検証用の**意図的なテストデータ**であり、対象外（変更しないこと）。
-3. **`ContainerConfig` の契約コメント追加**: `internal/container/config.go` の `ContainerConfig` struct の doc comment に変換契約を追記する。ドラフト:
+2. **`root_test.go:1940-1941` の英語化**（`ExitCodeError` 伝搬に関するコメント）。英訳は内容に合わせて作成すること。
+
+3. **`ContainerConfig` の契約コメント追加**（`internal/container/config.go`）:
 
    ```go
    // ContainerConfig represents the intermediate representation of a container execution request.
@@ -1931,9 +1538,11 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
    // drop it silently.
    ```
 
+4. **最終確認**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で残存がないことを確認する。`internal/config/edge_cases_test.go:78` の `ユーザー_TOKEN` は意図的なテストデータのため**対象外**。
+
 ### 完了条件
 
-- Go ソース内のコメント・エラーメッセージ・ログメッセージから日本語が消えている（意図的なテストデータを除く）
+- 上記3ファイルの修正が完了し、`grep` で日本語残存なし（テストデータ除く）
 - `ContainerConfig` の doc comment に変換契約が記載されている
 - 挙動変更なし（既存テストが全パス）
 
@@ -1998,3 +1607,218 @@ Mac環境でNested Execution（cderunコンテナ内からさらにcderunを実�
 
 - `USAGE.md` がリポジトリルートに作成されており、Mac環境でのNested Executionに必要な設定が英語で記載されている
 - `README.md` に `USAGE.md` へのリンクが追加されている
+
+## T76: T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新
+
+- 種別: バグ
+- 優先度: 高
+- 対象: `internal/command/execution_extra_test.go`
+- 仕様変更: なし
+
+### 背景
+
+T42（空文字サブコマンドでnil panic）の修正で `subcommand == ""` の早期リターンが追加されたが、
+`execution_extra_test.go` の対応テストが `assert.Panics` のままになっており、`go test ./...` で失敗する。
+
+```
+execution_extra_test.go:57: func should panic
+    Panic value: <nil>
+```
+
+### 作業内容
+
+`execution_extra_test.go` の以下2テストを修正する：
+
+- `"empty subcommand currently PANICS in dry-run (documenting T42)"`
+- `"empty subcommand currently PANICS in normal run (documenting T42)"`
+
+`assert.Panics` → `assert.NotPanics` に変更し、代わりにエラーが返されることを検証するか、
+修正済みとして動作を明示する新しいテスト名に変更する。
+
+### 完了条件
+
+- `go test ./internal/command/...` がパスする
+- 挙動変更なし（テストのみ修正）
+
+## T77: OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正
+
+- 種別: バグ
+- 優先度: 高
+- 対象:
+  - `internal/command/root_test.go`
+  - `internal/command/integration_test.go`
+  - `internal/command/flags_test.go`
+  - `internal/command/snapshot.go`（`discoverOverlayUpperDir` のテスト差し替え方法）
+
+### 背景
+
+cderunコンテナ内でテストを実行すると以下の理由で複数のテストが失敗する：
+
+1. **OverlayFS検出の干渉**: `discoverOverlayUpperDir` が実環境の `/proc/self/mountinfo` を読み、
+   OverlayFS の upperdir をホストパスとして登録する。その結果、単体テストでも `/h` → `/var/lib/docker/.../fs/h` のようにパスが変換される。
+   - `TestUnit_Root_Flags_MountingAndDevices`: マウントが1件のはずが2件になる
+   - `TestUnit_Flags_DockerCompatibilityMapping`: 同様
+
+2. **GroupAdd 102 の自動付与**: `getSocketGID` が実環境の `docker.sock` の GID（102）を検出し、
+   `GroupAdd: 102` が自動付与される。インテグレーションテストの期待値がずれる。
+   - `TestIntegration_Execution_AlpineEcho/mount-cderun-path`
+
+### 作業内容
+
+**Problem 1（OverlayFS）と Problem 2（GroupAdd）の両方を `rootOptions` への依存性注入で統一して対応する。**
+
+#### Problem 1: OverlayFS検出の注入
+
+`rootOptions` に `mountInfoReader` フィールドを追加し、`createSnapshot` に渡す：
+
+```go
+// internal/command/root.go
+type rootOptions struct {
+    ...
+    mountInfoReader mountInfoReader  // nil のとき defaultMountInfoReader を使う
+}
+```
+
+`createSnapshot` のシグネチャを変更し、`mountInfoReader` を受け取る：
+
+```go
+// internal/command/snapshot.go
+func createSnapshot(logger, fs, globalCfg, toolsCfg, currentMounts, reader mountInfoReader) (...)
+```
+
+`reader` が nil の場合は `defaultMountInfoReader` にフォールバック。
+
+テストでは `ExecuteContextWithOptions` のオプション関数内で空データを返すスタブを設定：
+
+```go
+o.mountInfoReader = &stubMountInfoReader{}  // ReadMountInfo returns []byte{}, nil
+```
+
+#### Problem 2: GroupAdd GID 取得の注入
+
+`rootOptions` に `socketGIDGetter` フィールドを追加：
+
+```go
+// internal/command/root.go
+type rootOptions struct {
+    ...
+    socketGIDGetter func(fs config.FileSystem, path string) (string, error)
+}
+```
+
+`buildContainerConfig` 内でデフォルトを補完して使用：
+
+```go
+getter := o.socketGIDGetter
+if getter == nil {
+    getter = getSocketGID
+}
+```
+
+テストでは `""` を返すスタブを設定：
+
+```go
+o.socketGIDGetter = func(_ config.FileSystem, _ string) (string, error) { return "", nil }
+```
+
+#### 修正が必要なテストファイル
+
+- `internal/command/root_test.go`
+- `internal/command/flags_test.go`
+- `internal/command/integration_test.go`
+- `internal/command/dryrun_golden_test.go`（同様に注入が必要な場合）
+
+### 完了条件
+
+- `go test ./...` がコンテナ内外どちらでも通過する
+- グローバル変数の差し替えや並列テストへの影響なし
+- 挙動変更なし（プロダクションコードのデフォルト動作は維持）
+
+## T78: `buildContainerConfig` をマウント処理ごとにサブ関数へ分割
+
+- 種別: リファクタ
+- 優先度: 中
+- 対象: `internal/command/root.go`
+- 仕様変更: なし
+
+### 背景
+
+`buildContainerConfig`（約145行）が複数の責務を持ち、T77（`socketGIDGetter` 注入）実装後はさらに長くなる。
+マウント系の機能追加のたびにコンフリクトも発生しやすい。
+
+### 現在の構造
+
+```
+buildContainerConfig
+  ├── ベースの ContainerConfig 組み立て
+  ├── MountCderun / MountTools / MountAllTools 処理
+  │     └── ネスト実行時の exePath 逆解決
+  └── MountSocket 処理 + GID 自動付与
+```
+
+### 作業内容
+
+以下の3つのサブ関数に切り出す：
+
+```go
+// cderun バイナリのマウントと MountTools/MountAllTools のマウントを追加する
+func (o *rootOptions) applyToolMounts(
+    cfg *container.ContainerConfig,
+    resolved *config.ResolvedConfig,
+    toolsCfg config.ToolsConfig,
+) error
+
+// ソケットマウントと GID 自動付与を適用する
+func (o *rootOptions) applySocketMount(
+    cfg *container.ContainerConfig,
+    resolved *config.ResolvedConfig,
+) error
+
+// buildContainerConfig はベース設定を組み立て、上記2関数を呼び出す
+func (o *rootOptions) buildContainerConfig(...) (*container.ContainerConfig, error)
+```
+
+`applyToolMounts` は T77 の `mountInfoReader`、`applySocketMount` は T77 の `socketGIDGetter` をそれぞれ自然に受け取れるため、T77 と組み合わせるとよい。
+
+### 完了条件
+
+- `buildContainerConfig` 本体が50行以内に収まる
+- 既存テストが全パス（挙動変更なし）
+- `applyToolMounts` / `applySocketMount` に個別の単体テストを追加する（任意だが推奨）
+
+---
+
+## T80: コンテナ作成前に ContainerConfig をデバッグログ出力
+
+**種別**: 改善 | **優先度**: 低 | **規模**: 小
+
+### 背景
+
+`--cderun-log-level debug` 実行時、コンテナに渡すマウント構成・イメージ・ユーザー等が
+ログに出力されないため、パス解決の問題（OverlayFS 誤マップ・dubious ownership 等）の
+診断が困難。成功時と失敗時のログが同一に見え、原因の特定ができない。
+
+### 対象ファイル
+
+- `internal/command/root.go` の `buildContainerConfig` 末尾またはコンテナ作成直前の呼び出し箇所
+
+### 出力すべき情報
+
+```
+[DEBUG] ContainerConfig:
+  Image:      alpine/git:v2.52.0
+  Command:    [status]
+  Entrypoint: []
+  Mounts:
+    - bind /Users/.../master -> /Users/.../master
+    - bind /run/cderun/snap-xxx -> /run/cderun/snap-xxx
+  Env:        [MASKED_KEY=***]
+  User:       (empty)
+```
+
+Env はセンシティブ値をマスク済みの状態で出力すること。
+
+### 完了条件
+
+- `--cderun-log-level debug` 時にマウント一覧を含む ContainerConfig がログ出力される
+- 既存テストが全パス
