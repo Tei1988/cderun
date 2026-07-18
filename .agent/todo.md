@@ -49,7 +49,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | - |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
-| T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | - |
+| T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | DONE |
 | T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
 | T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
@@ -70,7 +70,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
 | T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
-| T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | - |
+| T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
@@ -81,9 +81,9 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | DONE |
-| T74 | containerd がLinux専用であることをドキュメントに明記 | ドキュメント | 低 | 小 | - | - |
-| T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
-| T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
+| T74 | containerd がLinux専用であることをドキュメントに明記 | ドキュメント | 低 | 小 | - | DONE |
+| T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | DONE |
+| T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | DONE |
 | T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
 | T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | DONE |
 | T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | DONE |
@@ -979,27 +979,6 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 
 ---
 
-## T43: attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる
-
-- 種別: バグ修正
-- 優先度: 高
-- 対象: `internal/command/root.go:982-994`（attach エラー分岐の `time.After(effectiveHangTimeout)`）、`internal/command/root_termination.go:12-24`（`getHangTimeout`）
-
-### 問題
-
-`AttachContainer` がコンテナ終了前に失敗した場合の分岐で `case <-time.After(effectiveHangTimeout)` を使っているが、TTY+interactive セッション（`getHangTimeout` が 0 を返す）やユーザー指定の `--hang-timeout 0` では `time.After(0)` がほぼ即時発火し、待たずに exit code 0 のまま返る。ドキュメント（`docs/features/hang-timeout.md`）の「`0` = 無期限に待機」と真逆の挙動。同関数内の正常分岐（`root.go:1000, 1023-1031`）は `if effectiveHangTimeout > 0` で正しく分岐している。
-
-### 方針
-
-正常分岐と同じ `effectiveHangTimeout > 0` の構造をエラー分岐にも適用する。
-
-### 完了条件
-
-- hang-timeout 0 + attach エラー時に `waitDone` を無期限に待つことのテスト
-- 既存の hang-timeout テストの回帰確認
-
----
-
 ## T44: `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する
 
 - 種別: バグ修正
@@ -1281,28 +1260,6 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 ---
 
-## T64: `--help` の Usage 文字列を実装と一致させる
-
-- 種別: クリーンアップ
-- 優先度: 低
-- 対象: `internal/config/registry.go`
-
-### 背景
-
-`docs/features/command-line-options.md` の説明文は別途更新済み。`registry.go` の `Usage` フィールド（`--help` に出力される文字列）だけが実装と乖離したまま残っている。
-
-### 残作業
-
-1. **`--sensitive-env` Usage**（`registry.go` の `sensitive-env` エントリ）: `"default uses automatic keywords"` → `"unset: all values masked; empty string: masking disabled"` 等、実挙動に合わせる
-2. **`--runtime` Usage**（`registry.go` の `runtime` エントリ）: `"Container runtime to use (docker/podman)"` → `"Container runtime to use (docker/podman/containerd)"` ※ T31 のリネームが先に着手される場合はそちらに折り込む
-
-### 完了条件
-
-- `cderun --help` の出力が実装と一致している
-- 挙動変更なし
-
----
-
 ## T65: dead code 削除・小規模クリーンアップ一括
 
 - 種別: クリーンアップ
@@ -1545,100 +1502,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - 上記3ファイルの修正が完了し、`grep` で日本語残存なし（テストデータ除く）
 - `ContainerConfig` の doc comment に変換契約が記載されている
 - 挙動変更なし（既存テストが全パス）
-
-## T74: containerd がLinux専用であることをドキュメントに明記
-
-- 種別: ドキュメント
-- 優先度: 低
-- 対象:
-  - `docs/features/multi-runtime-support.md`
-  - `README.md`（存在する場合）
-- 仕様変更: なし
-
-### 背景
-
-`internal/runtime/containerd.go` には `//go:build linux` ビルドタグが付いており、containerd ランタイムは Linux 専用である。これは containerd が Linux カーネル機能（namespaces、cgroups等）に直接依存しているためであり、macOS・Windows では docker/podman 経由でのみ利用可能。現状のドキュメントにこの制約が明記されていないため、ユーザーが混乱する可能性がある。
-
-### 作業内容
-
-1. `docs/features/multi-runtime-support.md` の containerd セクションに「Linux 専用」の注記を追加する
-2. README にランタイムのプラットフォーム対応表がある場合は同様に追記する
-
-### 完了条件
-
-- `docs/features/multi-runtime-support.md` に containerd が Linux 専用であることが明記されている
-- 挙動変更なし
-
-## T75: Mac環境でのNested Execution セットアップガイドの作成
-
-- 種別: ドキュメント
-- 優先度: 中
-- 対象: リポジトリルートに `USAGE.md` を新規作成、`README.md` からリンクを追加
-- 仕様変更: なし
-- 言語: **英語**（README と同様）
-
-### 背景
-
-Mac環境でNested Execution（cderunコンテナ内からさらにcderunを実行する構成）を行う場合、READMEや既存ドキュメントでは説明されていない複数の設定が必要になる。これをまとめたセットアップガイドがあると、ユーザーが迷わずに設定できる。
-
-### 作業内容
-
-以下の内容を含むガイドを作成する:
-
-1. **Linux バイナリパスの指定**
-   - macOS上でNested Executionを行う場合、コンテナ内で動くバイナリは `cderun_linux_arm64`（Apple Silicon）または `cderun_linux_amd64`（Intel）が必要
-   - `.cderun.yaml` の `mountCderunPath` または `--mount-cderun-path` で明示的に指定する方法
-
-2. **docker.sock へのアクセス設定**
-   - macOS上では `docker.sock` のホスト側GIDが0のため、自動付与が効かない
-   - `.cderun.yaml` の `defaults.groupAdd: ["102"]` で設定する方法
-   - またはコマンドライン: `--cderun-group-add 102`
-
-3. **完全な設定例**
-   ```yaml
-   # .cderun.yaml
-   defaults:
-     mountSocket: true
-     groupAdd:
-       - "102"
-   ```
-
-### 完了条件
-
-- `USAGE.md` がリポジトリルートに作成されており、Mac環境でのNested Executionに必要な設定が英語で記載されている
-- `README.md` に `USAGE.md` へのリンクが追加されている
-
-## T76: T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新
-
-- 種別: バグ
-- 優先度: 高
-- 対象: `internal/command/execution_extra_test.go`
-- 仕様変更: なし
-
-### 背景
-
-T42（空文字サブコマンドでnil panic）の修正で `subcommand == ""` の早期リターンが追加されたが、
-`execution_extra_test.go` の対応テストが `assert.Panics` のままになっており、`go test ./...` で失敗する。
-
-```
-execution_extra_test.go:57: func should panic
-    Panic value: <nil>
-```
-
-### 作業内容
-
-`execution_extra_test.go` の以下2テストを修正する：
-
-- `"empty subcommand currently PANICS in dry-run (documenting T42)"`
-- `"empty subcommand currently PANICS in normal run (documenting T42)"`
-
-`assert.Panics` → `assert.NotPanics` に変更し、代わりにエラーが返されることを検証するか、
-修正済みとして動作を明示する新しいテスト名に変更する。
-
-### 完了条件
-
-- `go test ./internal/command/...` がパスする
-- 挙動変更なし（テストのみ修正）
 
 ## T77: OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正
 
