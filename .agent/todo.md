@@ -85,7 +85,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
 | T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
 | T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
-| T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | - |
+| T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | DONE |
 | T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | - |
 
 依存関係・統合の注意:
@@ -1734,59 +1734,6 @@ o.socketGIDGetter = func(_ config.FileSystem, _ string) (string, error) { return
 - グローバル変数の差し替えや並列テストへの影響なし
 - 挙動変更なし（プロダクションコードのデフォルト動作は維持）
 
-## T78: `buildContainerConfig` をマウント処理ごとにサブ関数へ分割
-
-- 種別: リファクタ
-- 優先度: 中
-- 対象: `internal/command/root.go`
-- 仕様変更: なし
-
-### 背景
-
-`buildContainerConfig`（約145行）が複数の責務を持ち、T77（`socketGIDGetter` 注入）実装後はさらに長くなる。
-マウント系の機能追加のたびにコンフリクトも発生しやすい。
-
-### 現在の構造
-
-```
-buildContainerConfig
-  ├── ベースの ContainerConfig 組み立て
-  ├── MountCderun / MountTools / MountAllTools 処理
-  │     └── ネスト実行時の exePath 逆解決
-  └── MountSocket 処理 + GID 自動付与
-```
-
-### 作業内容
-
-以下の3つのサブ関数に切り出す：
-
-```go
-// cderun バイナリのマウントと MountTools/MountAllTools のマウントを追加する
-func (o *rootOptions) applyToolMounts(
-    cfg *container.ContainerConfig,
-    resolved *config.ResolvedConfig,
-    toolsCfg config.ToolsConfig,
-) error
-
-// ソケットマウントと GID 自動付与を適用する
-func (o *rootOptions) applySocketMount(
-    cfg *container.ContainerConfig,
-    resolved *config.ResolvedConfig,
-) error
-
-// buildContainerConfig はベース設定を組み立て、上記2関数を呼び出す
-func (o *rootOptions) buildContainerConfig(...) (*container.ContainerConfig, error)
-```
-
-`applyToolMounts` は T77 の `mountInfoReader`、`applySocketMount` は T77 の `socketGIDGetter` をそれぞれ自然に受け取れるため、T77 と組み合わせるとよい。
-
-### 完了条件
-
-- `buildContainerConfig` 本体が50行以内に収まる
-- 既存テストが全パス（挙動変更なし）
-- `applyToolMounts` / `applySocketMount` に個別の単体テストを追加する（任意だが推奨）
-
----
 
 ## T80: コンテナ作成前に ContainerConfig をデバッグログ出力
 

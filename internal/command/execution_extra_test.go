@@ -38,9 +38,9 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 	})
 
 	emptySubcmdTests := []struct {
-		name        string
-		args        []string
-		wantErrMsg  string
+		name       string
+		args       []string
+		wantErrMsg string
 	}{
 		{
 			name:       "empty subcommand returns error in dry-run (T42 regression)",

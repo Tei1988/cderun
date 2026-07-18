@@ -33,8 +33,8 @@ func (e *unavailableErr) Unavailable()  {}
 
 type deadlineExceededErr struct{}
 
-func (e *deadlineExceededErr) Error() string { return "deadline exceeded" }
-func (e *deadlineExceededErr) DeadlineExceeded()  {}
+func (e *deadlineExceededErr) Error() string     { return "deadline exceeded" }
+func (e *deadlineExceededErr) DeadlineExceeded() {}
 
 func TestUnit_Common_IsTemporaryAuthError(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {

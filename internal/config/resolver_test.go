@@ -1034,9 +1034,9 @@ func must[T any](v T, err error) T {
 func TestUnit_Config_Resolve_ExpressionErrorInDuration(t *testing.T) {
 	mfs := &MockFileSystem{}
 	cli := &CLIOptions{
-		Image:    "alpine",
-		ImageSet: true,
-		HangTimeout: "{{file:nonexistent}}",
+		Image:          "alpine",
+		ImageSet:       true,
+		HangTimeout:    "{{file:nonexistent}}",
 		HangTimeoutSet: true,
 	}
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
