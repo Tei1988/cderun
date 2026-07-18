@@ -58,3 +58,44 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 		assert.Contains(t, logBuf.String(), "failed to close runtime on init failure: close failed")
 	})
 }
+
+func TestUnit_Command_InitContainer_DebugLogging_WithMasking(t *testing.T) {
+	t.Parallel()
+
+	mock := &runtime.MockRuntime{}
+	var logBuf bytes.Buffer
+	logger := logging.NewLogger()
+	logger.Init("debug", "text", false)
+	logger.SetOutput(&logBuf)
+
+	opts := &rootOptions{
+		runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		},
+		logger: logger,
+	}
+
+	resolved := &config.ResolvedConfig{
+		SensitiveEnv: []string{"PASSWORD"},
+	}
+	cc := &container.ContainerConfig{
+		Image:   "alpine/git:v2.52.0",
+		Command: []string{"status"},
+		Mounts: []container.Mount{
+			{Type: "bind", Source: "/Users/user/master", Target: "/Users/user/master"},
+		},
+		Env: []string{"USER=jules", "PASSWORD=supersecret"},
+	}
+
+	_, _, _, err := opts.initContainer(context.Background(), resolved, cc)
+	require.NoError(t, err)
+
+	logOutput := logBuf.String()
+	assert.Contains(t, logOutput, "ContainerConfig:")
+	assert.Contains(t, logOutput, "Image:      alpine/git:v2.52.0")
+	assert.Contains(t, logOutput, "Command:    [status]")
+	assert.Contains(t, logOutput, "bind /Users/user/master -> /Users/user/master")
+	assert.Contains(t, logOutput, "USER=jules")
+	assert.Contains(t, logOutput, "PASSWORD=[REDACTED]")
+	assert.NotContains(t, logOutput, "supersecret")
+}
