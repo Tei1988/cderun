@@ -1090,11 +1090,16 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 			// Wait for container to finish (best effort)
 			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
 			// until it finishes, the timeout expires, or a second signal is received.
-			select {
-			case res := <-waitDone:
+			if effectiveHangTimeout > 0 {
+				select {
+				case res := <-waitDone:
+					exitCode = res.code
+				case <-time.After(effectiveHangTimeout):
+					o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+				}
+			} else {
+				res := <-waitDone
 				exitCode = res.code
-			case <-time.After(effectiveHangTimeout):
-				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
 			}
 			code := exitCode
 			if code == 0 {
