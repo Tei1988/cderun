@@ -199,6 +199,7 @@ func resolveStringSliceCommaOpt(
 // resolveFloat64Opt resolves a float64 option through P1-P6.
 func resolveFloat64Opt(
 	def OptionDef[*float64],
+	fallback float64,
 	p1Set bool, p1Val float64,
 	p2Set bool, p2Val float64,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
@@ -231,15 +232,13 @@ func resolveFloat64Opt(
 			return *f, nil
 		}
 	}
-	if def.Fallback != nil {
-		return *def.Fallback, nil
-	}
-	return 0, nil
+	return fallback, nil
 }
 
 // resolveIntOpt resolves an int option through P1-P6.
 func resolveIntOpt(
 	def OptionDef[*int],
+	fallback int,
 	p1Set bool, p1Val int,
 	p2Set bool, p2Val int,
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
@@ -272,8 +271,5 @@ func resolveIntOpt(
 			return *i, nil
 		}
 	}
-	if def.Fallback != nil {
-		return *def.Fallback, nil
-	}
-	return 0, nil
+	return fallback, nil
 }
