@@ -65,6 +65,7 @@ func TestUnit_Command_SymlinkMode_AbsoluteAndRelativePaths(t *testing.T) {
 
 	// 1. Relative path `./python`
 	t.Run("relative path tool execution", func(t *testing.T) {
+		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{}
 		mfs := &config.MockFileSystem{
 			WD: "/workspace",
@@ -99,6 +100,7 @@ func TestUnit_Command_SymlinkMode_AbsoluteAndRelativePaths(t *testing.T) {
 
 	// 2. Absolute path `/usr/bin/python3`
 	t.Run("absolute path tool execution", func(t *testing.T) {
+		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{}
 		mfs := &config.MockFileSystem{
 			WD: "/workspace",
@@ -248,6 +250,7 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 
 	// Scenario A: Container exits with non-zero exit status (e.g. 127)
 	t.Run("non-zero exit code propagation", func(t *testing.T) {
+		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{
 			CreatedContainerID: "test-cont-127",
 			ExitCode:           127,
@@ -271,6 +274,7 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 
 	// Scenario B: Runtime creation fails completely, throwing standard 125 internal error code
 	t.Run("container creation failure propagates 125 error code", func(t *testing.T) {
+		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{
 			CreateErr: errors.New("low-level OCI spec creation failure"),
 		}
