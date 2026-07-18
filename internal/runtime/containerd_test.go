@@ -243,7 +243,6 @@ func TestUnit_Containerd_NormalizeCapabilities(t *testing.T) {
 	}
 }
 
-
 func TestUnit_Runtime_Common_IsRetryablePullError(t *testing.T) {
 	tests := []struct {
 		err  error

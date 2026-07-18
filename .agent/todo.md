@@ -55,7 +55,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | DONE |
 | T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | - |
-| T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | - |
+| T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | DONE |
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
 | T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
@@ -85,7 +85,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T75 | Mac環境でのNested Execution セットアップガイドの作成 | ドキュメント | 中 | 小 | - | - |
 | T76 | T42修正後のパニックテストを `assert.NotPanics` + エラー検証に更新 | バグ | 高 | 小 | - | - |
 | T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | - |
-| T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | - |
+| T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | DONE |
 | T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | DONE |
 
 依存関係・統合の注意:
@@ -1062,23 +1062,49 @@ cobra は persistent flag を `Flags()` に遅延マージする（`ParseFlags`/
 
 ---
 
-## T49: Docker 明示 Remove で匿名ボリュームがリークする
+## T50: pull ポリシーの未知値が `always` として動作する
 
-- 種別: バグ修正（リーク）
+- 種別: 改善（堅牢性）
 - 優先度: 中
-- 対象: `internal/runtime/docker.go:220-230`
+- 対象: `internal/runtime/docker.go:125-157`、`internal/runtime/containerd.go:106-137`、`internal/config/`（検証の追加先）
 
 ### 問題
 
-`RemoveContainer` の `RemoveOptions{Force: true}` に `RemoveVolumes: true` がない。`VOLUME` を宣言するイメージでは、明示 remove 経路（`root.go:812` のクリーンアップが AutoRemove に勝った場合等）を通るたびに匿名ボリュームが残る。デーモン側の auto-remove は匿名ボリュームを削除するため、明示経路だけの問題。エフェメラルコンテナツールとしては一行で直せるリーク。
+両ランタイムの `PullImage` は `== "never"` / `== "missing"` のみチェックし、それ以外の値（タイポ `nevr`、大文字 `Never`、k8s 流儀の `IfNotPresent` 等）はすべて無条件 pull にフォールスルーする。どこにもポリシー値のバリデーションがない。
 
 ### 方針
 
-`RemoveVolumes: true` を追加する（containerd 側は既に `WithSnapshotCleanup` 使用済み）。
+設定解決段階（single choke point）で `always` / `missing` / `never` 以外を `InvalidConfigError` にする。ランタイム側にも防御的な `fmt.Errorf("unknown pull policy %q", ...)` を置いてよい。
 
 ### 完了条件
 
-- `RemoveOptions` に `RemoveVolumes: true` が渡ることのユニットテスト
+- 不正なポリシー値が起動前にエラーになるテスト（CLI / env / YAML 各経路）
+
+### 完了確認（2026-07 マージ後）
+
+main 側で choke point のバリデーションが実装済みを確認（`internal/command/root.go:1100-1106` で `always` / `missing` / `never` 以外を起動前にエラー化）。ランタイム側の防御的チェック（`docker.go` / `containerd.go` の `PullImage` は依然フォールスルー）は任意項目のため未実施だが、通常の CLI 経路では未知値がランタイムに到達しなくなったため DONE とする。
+
+---
+
+## T51: containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる
+
+- 種別: バグ修正
+- 優先度: 中
+- 対象: `internal/runtime/containerd.go:213-235`、対比: `internal/runtime/docker_adapter.go:88-107`
+
+### 問題
+
+マウントループが `m.Type` をそのまま OCI spec に渡している。`volume` は OCI のマウントタイプではなく runc がタスク起動時に不明瞭なエラーで失敗する。`tmpfs` は `Source` が空のまま `rw`/`ro` オプションのみで出力され、runc に拒否される（source は `"tmpfs"` であるべき）。Docker 経路は 3 タイプすべて正しく処理している。
+
+### 方針
+
+- `volume` は network/ports と同じ「not supported by containerd runtime」の明示エラーにする
+- `tmpfs` は `Type: "tmpfs", Source: "tmpfs"` + 適切なオプションで正しく構築する
+
+### 完了条件
+
+- containerd + `type=volume` が明示エラーになるテスト
+- containerd + `type=tmpfs` が有効な OCI マウントになるテスト
 
 ---
 
@@ -1708,57 +1734,4 @@ o.socketGIDGetter = func(_ config.FileSystem, _ string) (string, error) { return
 - グローバル変数の差し替えや並列テストへの影響なし
 - 挙動変更なし（プロダクションコードのデフォルト動作は維持）
 
-## T78: `buildContainerConfig` をマウント処理ごとにサブ関数へ分割
-
-- 種別: リファクタ
-- 優先度: 中
-- 対象: `internal/command/root.go`
-- 仕様変更: なし
-
-### 背景
-
-`buildContainerConfig`（約145行）が複数の責務を持ち、T77（`socketGIDGetter` 注入）実装後はさらに長くなる。
-マウント系の機能追加のたびにコンフリクトも発生しやすい。
-
-### 現在の構造
-
-```
-buildContainerConfig
-  ├── ベースの ContainerConfig 組み立て
-  ├── MountCderun / MountTools / MountAllTools 処理
-  │     └── ネスト実行時の exePath 逆解決
-  └── MountSocket 処理 + GID 自動付与
-```
-
-### 作業内容
-
-以下の3つのサブ関数に切り出す：
-
-```go
-// cderun バイナリのマウントと MountTools/MountAllTools のマウントを追加する
-func (o *rootOptions) applyToolMounts(
-    cfg *container.ContainerConfig,
-    resolved *config.ResolvedConfig,
-    toolsCfg config.ToolsConfig,
-) error
-
-// ソケットマウントと GID 自動付与を適用する
-func (o *rootOptions) applySocketMount(
-    cfg *container.ContainerConfig,
-    resolved *config.ResolvedConfig,
-) error
-
-// buildContainerConfig はベース設定を組み立て、上記2関数を呼び出す
-func (o *rootOptions) buildContainerConfig(...) (*container.ContainerConfig, error)
-```
-
-`applyToolMounts` は T77 の `mountInfoReader`、`applySocketMount` は T77 の `socketGIDGetter` をそれぞれ自然に受け取れるため、T77 と組み合わせるとよい。
-
-### 完了条件
-
-- `buildContainerConfig` 本体が50行以内に収まる
-- 既存テストが全パス（挙動変更なし）
-- `applyToolMounts` / `applySocketMount` に個別の単体テストを追加する（任意だが推奨）
-
----
 

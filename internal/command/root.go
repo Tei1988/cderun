@@ -439,6 +439,129 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
 }
 
+// applyToolMounts applies cderun binary mount and MountTools/MountAllTools mounts.
+func (o *rootOptions) applyToolMounts(
+	cfg *container.ContainerConfig,
+	resolved *config.ResolvedConfig,
+	toolsCfg config.ToolsConfig,
+) error {
+	if !resolved.MountCderun && !resolved.MountAllTools && len(resolved.MountTools) == 0 {
+		return nil
+	}
+
+	exePath := resolved.MountCderunPath
+	if exePath == "" {
+		var err error
+		exePath, err = o.fs.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get executable path: %w", err)
+		}
+	}
+
+	// Translate exePath for nested execution if it was determined from os.Executable()
+	// (MountCderunPath is already resolved during resolution if it came from config/flags)
+	if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
+		r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
+		if err != nil {
+			o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
+		} else {
+			resolvedPath, err := config.ResolvePath(exePath, "", r)
+			if err != nil {
+				o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
+			} else {
+				exePath = resolvedPath
+			}
+		}
+	}
+
+	// Add binary mount
+	cfg.Mounts = append(cfg.Mounts, container.Mount{
+		Type:     "bind",
+		Source:   exePath,
+		Target:   "/usr/local/bin/cderun",
+		ReadOnly: true,
+	})
+
+	// Handle MountTools / MountAllTools
+	if resolved.MountAllTools {
+		if len(toolsCfg) == 0 {
+			o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
+		}
+		// Sort tool names to ensure deterministic mount order
+		toolNames := make([]string, 0, len(toolsCfg))
+		for name := range toolsCfg {
+			toolNames = append(toolNames, name)
+		}
+		sort.Strings(toolNames)
+
+		for _, toolName := range toolNames {
+			if err := config.ValidateToolName(toolName); err != nil {
+				return fmt.Errorf("invalid tool name in tools configuration %q: %w", toolName, err)
+			}
+			cfg.Mounts = append(cfg.Mounts, container.Mount{
+				Type:     "bind",
+				Source:   exePath,
+				Target:   "/usr/local/bin/" + toolName,
+				ReadOnly: true,
+			})
+		}
+	} else if len(resolved.MountTools) > 0 {
+		for _, toolName := range resolved.MountTools {
+			if err := config.ValidateToolName(toolName); err != nil {
+				return fmt.Errorf("invalid tool name in mount-tools %q: %w", toolName, err)
+			}
+			if _, ok := toolsCfg[toolName]; !ok {
+				available := make([]string, 0, len(toolsCfg))
+				for k := range toolsCfg {
+					available = append(available, k)
+				}
+				sort.Strings(available)
+				return fmt.Errorf("tool %q not found in .tools.yaml\navailable tools: %s", toolName, strings.Join(available, ", "))
+			}
+			cfg.Mounts = append(cfg.Mounts, container.Mount{
+				Type:     "bind",
+				Source:   exePath,
+				Target:   "/usr/local/bin/" + toolName,
+				ReadOnly: true,
+			})
+		}
+	}
+
+	return nil
+}
+
+// applySocketMount applies socket mount and GID auto-detection.
+func (o *rootOptions) applySocketMount(
+	cfg *container.ContainerConfig,
+	resolved *config.ResolvedConfig,
+) error {
+	if !resolved.MountSocket {
+		return nil
+	}
+
+	// Add socket mount
+	cfg.Mounts = append(cfg.Mounts, container.Mount{
+		Type:     "bind",
+		Source:   resolved.SocketPath,
+		Target:   resolved.MountSocketPath,
+		ReadOnly: false, // Socket needs to be writable
+	})
+
+	// Auto-add socket GID so non-root users can access the mounted socket.
+	if socketGID, err := getSocketGID(o.fs, resolved.SocketPath); err == nil {
+		if socketGID != "" {
+			if !slices.Contains(cfg.GroupAdd, socketGID) {
+				cfg.GroupAdd = append(cfg.GroupAdd, socketGID)
+				o.logger.Debug("Auto-added socket GID %s from %s", socketGID, resolved.SocketPath)
+			}
+		}
+	} else {
+		o.logger.Debug("Failed to stat socket for GID auto-detection: %v", err)
+	}
+
+	return nil
+}
+
 func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.
@@ -472,114 +595,19 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		CapAdd:     resolved.CapAdd,
 		CapDrop:    resolved.CapDrop,
 		Entrypoint: resolved.Entrypoint,
-		Pull:     resolved.Pull,
-		Memory:   resolved.Memory,
-		CPUs:     resolved.CPUs,
-		Devices:  resolved.Devices,
-		GroupAdd: resolved.GroupAdd,
+		Pull:       resolved.Pull,
+		Memory:     resolved.Memory,
+		CPUs:       resolved.CPUs,
+		Devices:    resolved.Devices,
+		GroupAdd:   resolved.GroupAdd,
 	}
 
-	// Handle mounting flags
-	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
-		exePath := resolved.MountCderunPath
-		if exePath == "" {
-			var err error
-			exePath, err = o.fs.Executable()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get executable path: %w", err)
-			}
-		}
-
-		// Translate exePath for nested execution if it was determined from os.Executable()
-		// (MountCderunPath is already resolved during resolution if it came from config/flags)
-		if resolved.MountCderunPath == "" && resolved.HostContext != nil && resolved.HostContext.Level > 0 {
-			r, err := config.NewExpressionResolverWithFS(resolved.HostContext, o.fs)
-			if err != nil {
-				o.logger.Debug("Failed to create expression resolver for nested execution (best-effort): %v. HostContext: %+v, exePath: %q", err, resolved.HostContext, exePath)
-			} else {
-				resolvedPath, err := config.ResolvePath(exePath, "", r)
-				if err != nil {
-					o.logger.Debug("Failed to resolve exePath for nested execution (best-effort): %v. exePath: %q, HostContext: %+v", err, exePath, resolved.HostContext)
-				} else {
-					exePath = resolvedPath
-				}
-			}
-		}
-
-		// Add binary mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-			Type:     "bind",
-			Source:   exePath,
-			Target:   "/usr/local/bin/cderun",
-			ReadOnly: true,
-		})
-
-		// Handle MountTools / MountAllTools
-		if resolved.MountAllTools {
-			if len(toolsCfg) == 0 {
-				o.logger.Warn("--mount-all-tools specified but no tools defined in .tools.yaml")
-			}
-			// Sort tool names to ensure deterministic mount order
-			toolNames := make([]string, 0, len(toolsCfg))
-			for name := range toolsCfg {
-				toolNames = append(toolNames, name)
-			}
-			sort.Strings(toolNames)
-
-			for _, toolName := range toolNames {
-				if err := config.ValidateToolName(toolName); err != nil {
-					return nil, fmt.Errorf("invalid tool name in tools configuration %q: %w", toolName, err)
-				}
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
-			}
-		} else if len(resolved.MountTools) > 0 {
-			for _, toolName := range resolved.MountTools {
-				if err := config.ValidateToolName(toolName); err != nil {
-					return nil, fmt.Errorf("invalid tool name in mount-tools %q: %w", toolName, err)
-				}
-				if _, ok := toolsCfg[toolName]; !ok {
-					available := make([]string, 0, len(toolsCfg))
-					for k := range toolsCfg {
-						available = append(available, k)
-					}
-					sort.Strings(available)
-					return nil, fmt.Errorf("tool %q not found in .tools.yaml\navailable tools: %s", toolName, strings.Join(available, ", "))
-				}
-				containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-					Type:     "bind",
-					Source:   exePath,
-					Target:   "/usr/local/bin/" + toolName,
-					ReadOnly: true,
-				})
-			}
-		}
+	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
+		return nil, err
 	}
 
-	if resolved.MountSocket {
-		// Add socket mount
-		containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
-			Type:     "bind",
-			Source:   resolved.SocketPath,
-			Target:   resolved.MountSocketPath,
-			ReadOnly: false, // Socket needs to be writable
-		})
-
-		// Auto-add socket GID so non-root users can access the mounted socket.
-		if socketGID, err := getSocketGID(o.fs, resolved.SocketPath); err == nil {
-			if socketGID != "" {
-				if !slices.Contains(containerConfig.GroupAdd, socketGID) {
-					containerConfig.GroupAdd = append(containerConfig.GroupAdd, socketGID)
-					o.logger.Debug("Auto-added socket GID %s from %s", socketGID, resolved.SocketPath)
-				}
-			}
-		} else {
-			o.logger.Debug("Failed to stat socket for GID auto-detection: %v", err)
-		}
+	if err := o.applySocketMount(containerConfig, resolved); err != nil {
+		return nil, err
 	}
 
 	return containerConfig, nil

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cderun/internal/config"
+	"cderun/internal/container"
 	"cderun/internal/logging"
 
 	"github.com/spf13/cobra"
@@ -225,4 +226,161 @@ func TestUnit_Command_GetFd_Boundary(t *testing.T) {
 	fd, ok = getFd("not a file")
 	assert.False(t, ok)
 	assert.Equal(t, -1, fd)
+}
+
+type mockFileInfoWithSys struct {
+	os.FileInfo
+	sys any
+}
+
+func (m *mockFileInfoWithSys) Sys() any {
+	return m.sys
+}
+
+type mockSocketFS struct {
+	config.FileSystem
+	statFileInfo os.FileInfo
+	statErr      error
+}
+
+func (m *mockSocketFS) Stat(name string) (os.FileInfo, error) {
+	if m.statErr != nil {
+		return nil, m.statErr
+	}
+	return m.statFileInfo, nil
+}
+
+func TestUnit_Command_ApplyToolMounts(t *testing.T) {
+	t.Parallel()
+
+	mfs := &config.MockFileSystem{
+		ExecPath: "/bin/cderun",
+	}
+	o := defaultOptions()
+	o.fs = mfs
+	o.logger = logging.NewLogger()
+
+	toolsCfg := config.ToolsConfig{
+		"node":   config.ToolConfig{Image: "node:20"},
+		"python": config.ToolConfig{Image: "python:3.11"},
+	}
+
+	t.Run("no mounting flags resolved", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Mounts)
+	})
+
+	t.Run("error getting executable path", func(t *testing.T) {
+		mfsErr := &config.MockFileSystem{
+			ExecErr: assert.AnError,
+		}
+		oErr := defaultOptions()
+		oErr.fs = mfsErr
+		oErr.logger = logging.NewLogger()
+
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{MountCderun: true}
+		err := oErr.applyToolMounts(cfg, resolved, toolsCfg)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("MountCderun success with MountCderunPath", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountCderun:     true,
+			MountCderunPath: "/custom/cderun",
+		}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.NoError(t, err)
+		require.Len(t, cfg.Mounts, 1)
+		assert.Equal(t, "/custom/cderun", cfg.Mounts[0].Source)
+		assert.Equal(t, "/usr/local/bin/cderun", cfg.Mounts[0].Target)
+	})
+
+	t.Run("MountAllTools success", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountAllTools: true,
+		}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.NoError(t, err)
+
+		// cderun mount, node mount, python mount
+		require.Len(t, cfg.Mounts, 3)
+		assert.Equal(t, "/usr/local/bin/cderun", cfg.Mounts[0].Target)
+		assert.Equal(t, "/usr/local/bin/node", cfg.Mounts[1].Target)
+		assert.Equal(t, "/usr/local/bin/python", cfg.Mounts[2].Target)
+	})
+
+	t.Run("MountTools success", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"node"},
+		}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.NoError(t, err)
+
+		require.Len(t, cfg.Mounts, 2)
+		assert.Equal(t, "/usr/local/bin/cderun", cfg.Mounts[0].Target)
+		assert.Equal(t, "/usr/local/bin/node", cfg.Mounts[1].Target)
+	})
+
+	t.Run("MountTools error on nonexistent tool", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"ruby"},
+		}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tool \"ruby\" not found")
+	})
+
+	t.Run("MountTools error on invalid tool name", func(t *testing.T) {
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountTools: []string{"../invalid"},
+		}
+		err := o.applyToolMounts(cfg, resolved, toolsCfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid tool name")
+	})
+}
+
+func TestUnit_Command_ApplySocketMount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no socket mount", func(t *testing.T) {
+		o := defaultOptions()
+		o.fs = &config.MockFileSystem{}
+		o.logger = logging.NewLogger()
+
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{MountSocket: false}
+		err := o.applySocketMount(cfg, resolved)
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Mounts)
+	})
+
+	t.Run("socket mount enabled with stat error does not fail", func(t *testing.T) {
+		o := defaultOptions()
+		o.fs = &config.MockFileSystem{StatErr: assert.AnError}
+		o.logger = logging.NewLogger()
+
+		cfg := &container.ContainerConfig{}
+		resolved := &config.ResolvedConfig{
+			MountSocket:     true,
+			SocketPath:      "/var/run/docker.sock",
+			MountSocketPath: "/var/run/docker.sock",
+		}
+		err := o.applySocketMount(cfg, resolved)
+		require.NoError(t, err)
+		require.Len(t, cfg.Mounts, 1)
+		assert.Equal(t, "/var/run/docker.sock", cfg.Mounts[0].Source)
+		assert.Equal(t, "/var/run/docker.sock", cfg.Mounts[0].Target)
+	})
+
 }
