@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -97,4 +98,88 @@ func TestUnit_Root_Execution_Extra(t *testing.T) {
 		assert.Equal(t, 125, exitErr.Code)
 		assert.Contains(t, exitErr.Error(), "runtime error")
 	})
+}
+
+func TestUnit_Command_Execution_AttachError_HangTimeoutZero(t *testing.T) {
+	mock := &runtime.MockRuntime{
+		CreatedContainerID: "c1",
+	}
+
+	// Attach fails before container exit
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New("attach failed prematurely")
+	}
+
+	// WaitContainer has some latency to verify we don't immediately return
+	mock.WaitFunc = func(ctx context.Context, containerID string) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+			return 42, nil
+		}
+	}
+
+	ctx := context.Background()
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "0", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return false }
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+
+	var exitErr *ExitCodeError
+	require.ErrorAs(t, err, &exitErr)
+	// Even though attach failed, it should wait for container exit code (42),
+	// and propagate 42 (non-zero).
+	assert.Equal(t, 42, exitErr.Code)
+	assert.Contains(t, exitErr.Error(), "failed to attach to container")
+}
+
+func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T) {
+	mock := &runtime.MockRuntime{
+		CreatedContainerID: "c1",
+	}
+
+	// Attach fails before container exit
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New("attach failed prematurely")
+	}
+
+	// WaitContainer has long latency (larger than hang timeout)
+	mock.WaitFunc = func(ctx context.Context, containerID string) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(1 * time.Second):
+			return 42, nil
+		}
+	}
+
+	ctx := context.Background()
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return false }
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+
+	var exitErr *ExitCodeError
+	require.ErrorAs(t, err, &exitErr)
+	// Because 50ms hang timeout fired before 1s container exit, exitCode remains 0 initially,
+	// so the error code falls back to 125.
+	assert.Equal(t, 125, exitErr.Code)
+	assert.Contains(t, exitErr.Error(), "failed to attach to container")
 }
