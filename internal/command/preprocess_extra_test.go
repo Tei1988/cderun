@@ -57,9 +57,9 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "node", "--version"},
 		},
 		{
-			name:     "double dash -- currently does NOT stop hoisting (documenting T53)",
+			name:     "double dash -- stops hoisting (T53)",
 			args:     []string{"cderun", "echo", "--", "--cderun-tty"},
-			expected: []string{"cderun", "--cderun-tty", "echo", "--"},
+			expected: []string{"cderun", "echo", "--", "--cderun-tty"},
 		},
 		{
 			name:     "no subcommand but has flags",
@@ -67,9 +67,9 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--diagnosis", "--log-level", "debug"},
 		},
 		{
-			name:     "complex interleaving (double dash behavior)",
+			name:     "complex interleaving (double dash stops hoisting)",
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--", "--cderun-literal"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "--cderun-literal", "-t", "sh", "-c", "ls", "--"},
+			expected: []string{"cderun", "--cderun-image", "alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
 		},
 	}
 
