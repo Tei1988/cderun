@@ -1403,6 +1403,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	var overrides []string
 	var others []string
+	doubleDashFound := false
 
 	// Scan all arguments after the executable name
 	// In polyglot mode, everything after index 0 is after the subcommand.
@@ -1411,6 +1412,9 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	if !isPolyglot && subcmdIdx != -1 {
 		// Standard mode: hoist only from after the subcommand
 		for i := 1; i <= subcmdIdx; i++ {
+			if args[i] == "--" {
+				doubleDashFound = true
+			}
 			others = append(others, args[i])
 		}
 		startIdx = subcmdIdx + 1
@@ -1418,9 +1422,12 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	for i := startIdx; i < len(args); i++ {
 		arg := args[i]
-		shouldHoist := false
+		if arg == "--" {
+			doubleDashFound = true
+		}
 
-		if strings.HasPrefix(arg, "--cderun-") {
+		shouldHoist := false
+		if !doubleDashFound && strings.HasPrefix(arg, "--cderun-") {
 			shouldHoist = true
 		}
 
