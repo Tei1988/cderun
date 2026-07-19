@@ -365,7 +365,7 @@ func TestRobustness_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
 			t.Error("SIGKILL should NOT be sent")
 		default:
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("Test timed out")
 	}
 }

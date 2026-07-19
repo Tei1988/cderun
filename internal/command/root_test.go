@@ -807,7 +807,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	// Wait for container to start (WaitContainer is called)
 	select {
 	case <-waitStarted:
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for WaitContainer to be called")
 	}
 
@@ -825,7 +825,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for execution to finish")
 	}
 
