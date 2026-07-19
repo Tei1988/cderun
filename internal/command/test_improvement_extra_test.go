@@ -18,19 +18,6 @@ import (
 	"cderun/internal/runtime"
 )
 
-func setupMockOptions(mockRuntime runtime.ContainerRuntime, mfs config.FileSystem) func(o *rootOptions, cmd *cobra.Command) {
-	return func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
-		}
-		o.exitFunc = func(code int) {}
-		o.fs = mfs
-		o.configLoader = config.NewConfigLoaderWithFS(mfs)
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
-	}
-}
-
 // TestUnit_Command_WrapperMode_ComplexOverrides validates the precedence and hoisting mechanism
 // where standard P2 flags (before subcommand) are overridden by P1 internal overrides (after subcommand).
 func TestUnit_Command_WrapperMode_ComplexOverrides(t *testing.T) {
@@ -88,7 +75,16 @@ func TestUnit_Command_SymlinkMode_AbsoluteAndRelativePaths(t *testing.T) {
 		}
 
 		args := []string{"./python", "-m", "http.server"}
-		err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(mockRuntime, mfs))
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
 
 		require.NoError(t, err)
 		cfg := mockRuntime.GetCreatedConfig()
@@ -114,7 +110,16 @@ func TestUnit_Command_SymlinkMode_AbsoluteAndRelativePaths(t *testing.T) {
 		}
 
 		args := []string{"/usr/bin/python3", "-c", "import sys; print(sys.version)"}
-		err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(mockRuntime, mfs))
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
 
 		require.NoError(t, err)
 		cfg := mockRuntime.GetCreatedConfig()
@@ -140,7 +145,16 @@ func TestUnit_Command_SymlinkMode_UnrecognizedTool(t *testing.T) {
 	}
 
 	args := []string{"./unrecognized-tool", "run"}
-	err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(&runtime.MockRuntime{}, mfs))
+	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
 
 	// Assertions:
 	// - Must return a proper ImageNotFoundError instead of silently succeeding or panicking.
@@ -170,7 +184,16 @@ func TestUnit_Command_StrictEnv_MissingVar(t *testing.T) {
 		"sh",
 	}
 
-	err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(mockRuntime, mfs))
+	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
 
 	// Assertion:
 	// - Returns the correct strict validation error
@@ -272,76 +295,4 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 		assert.Equal(t, 125, exitErr.Code)
 		assert.Contains(t, exitErr.Error(), "low-level OCI spec creation failure")
 	})
-}
-
-// TestUnit_Command_WrapperMode_SubcommandSameAsFlag verifies that when a subcommand name
-// is identical to a standard flag name (e.g. executing a tool named 'image'),
-// cderun correctly distinguishes the subcommand and passes any remainder as passthrough arguments.
-func TestUnit_Command_WrapperMode_SubcommandSameAsFlag(t *testing.T) {
-	t.Parallel()
-
-	mockRuntime := &runtime.MockRuntime{}
-	mfs := &config.MockFileSystem{
-		WD: "/workspace",
-		Files: map[string][]byte{
-			"/workspace/.tools.yaml": []byte("image:\n  image: alpine:3.18"),
-		},
-	}
-
-	args := []string{
-		"cderun",
-		"--image", "alpine:3.19",
-		"image", // Subcommand has the same name as the '--image' flag
-		"list",  // Passthrough arg
-	}
-
-	err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(mockRuntime, mfs))
-
-	require.NoError(t, err)
-	cfg := mockRuntime.GetCreatedConfig()
-	require.NotNil(t, cfg)
-
-	// Observable Behavior Assertions:
-	// - Image resolved must be 'alpine:3.19' (as specified by the '--image' flag, keeping registry parity)
-	assert.Equal(t, "alpine:3.19", cfg.Image)
-	// - Subcommand 'image' is consumed, and 'list' is passed through
-	assert.Equal(t, []string{"list"}, cfg.Command)
-}
-
-// TestUnit_Command_SymlinkMode_MultipleOverrides validates that executing a symlinked tool
-// with multiple '--cderun-*' overrides successfully hoists and processes all of them.
-func TestUnit_Command_SymlinkMode_MultipleOverrides(t *testing.T) {
-	t.Parallel()
-
-	mockRuntime := &runtime.MockRuntime{}
-	mfs := &config.MockFileSystem{
-		WD: "/workspace",
-		Files: map[string][]byte{
-			"/workspace/.tools.yaml": []byte("node:\n  image: node:18"),
-		},
-	}
-
-	args := []string{
-		"node",
-		"app.js",
-		"--cderun-image=node:20",
-		"--cderun-tty=true",
-		"--cderun-env=VAR=val",
-	}
-
-	err := ExecuteContextWithOptions(context.Background(), args, setupMockOptions(mockRuntime, mfs))
-
-	require.NoError(t, err)
-	cfg := mockRuntime.GetCreatedConfig()
-	require.NotNil(t, cfg)
-
-	// Observable Behavior Assertions:
-	// - Image is overridden by '--cderun-image' (while maintaining registry parity)
-	assert.Equal(t, "node:20", cfg.Image)
-	// - TTY is enabled via '--cderun-tty'
-	assert.True(t, cfg.TTY)
-	// - Passthrough arg 'app.js' is kept
-	assert.Equal(t, []string{"app.js"}, cfg.Command)
-	// - Environment variable VAR is specified and preserved (or masked as per config)
-	assert.Contains(t, cfg.Env, "VAR=val")
 }

@@ -1013,9 +1013,10 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 	if rv.res.Runtime == "" {
 		if rv.res.SocketPath != "" {
-			if strings.Contains(rv.res.SocketPath, "podman") {
+			base := path.Base(rv.res.SocketPath)
+			if strings.Contains(base, "podman") {
 				rv.res.Runtime = "podman"
-			} else if strings.Contains(rv.res.SocketPath, "containerd") {
+			} else if strings.Contains(base, "containerd") {
 				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"
