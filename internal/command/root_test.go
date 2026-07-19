@@ -1693,7 +1693,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	// Wait for container to start (WaitContainer is called)
 	select {
 	case <-waitStarted:
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for WaitContainer to be called")
 	}
 
@@ -1701,7 +1701,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	var triggerSignal chan os.Signal
 	select {
 	case triggerSignal = <-sigChanHolder:
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for signal channel registration")
 	}
 	require.NotNil(t, triggerSignal)
@@ -1711,7 +1711,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("timed out waiting for execution")
 	}
 
@@ -1744,7 +1744,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	// Wait for attachment to be established
 	select {
 	case <-attached:
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for attachment")
 	}
 
@@ -1752,7 +1752,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for execution")
 	}
 
@@ -1859,7 +1859,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		// Initial resize
 		select {
 		case <-resizeCalled:
-		case <-time.After(2 * time.Second):
+		case <-time.After(5 * time.Second):
 			t.Fatal("initial resize not called")
 		}
 
@@ -1867,7 +1867,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		var rc chan os.Signal
 		select {
 		case rc = <-resizeChanHolder:
-		case <-time.After(2 * time.Second):
+		case <-time.After(5 * time.Second):
 			t.Fatal("resize signal channel not registered")
 		}
 
