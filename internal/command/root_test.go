@@ -275,7 +275,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "sh", "--cderun-tty=false"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
@@ -1732,7 +1732,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
@@ -1843,7 +1843,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return true }
 				o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }

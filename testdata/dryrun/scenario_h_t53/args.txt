@@ -1,0 +1,7 @@
+[
+  "--dry-run",
+  "--dry-run-format=json",
+  "echo",
+  "--",
+  "--cderun-tty"
+]
