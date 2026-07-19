@@ -1,0 +1,9 @@
+[
+  "cderun",
+  "--dry-run",
+  "--dry-run-format=json",
+  "--image",
+  "alpine",
+  "--cderun-tty",
+  "sh"
+]

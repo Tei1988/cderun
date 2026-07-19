@@ -296,3 +296,137 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 		assert.Contains(t, exitErr.Error(), "low-level OCI spec creation failure")
 	})
 }
+
+// TestUnit_Command_StrictEnv_Validation verifies env validation rules on key format and strict lookup behavior.
+func TestUnit_Command_StrictEnv_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid key format in strict env", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{
+				"VALID_VAR": "hello_value",
+			},
+		}
+
+		args := []string{
+			"cderun",
+			"--image", "alpine",
+			"--strict-env",
+			"--env", "VALID_VAR",
+			"sh",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		// For actual runtime, env contains raw, unmasked values.
+		assert.Contains(t, cfg.Env, "VALID_VAR=hello_value")
+	})
+
+	t.Run("invalid env key starting with a digit", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{}
+
+		args := []string{
+			"cderun",
+			"--image", "alpine",
+			"--strict-env",
+			"--env", "1_INVALID_KEY=value",
+			"sh",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid environment variable key: \"1_INVALID_KEY\"")
+	})
+}
+
+// TestUnit_Command_GroupAdd_Explicit verifies CLI overrides behavior for supplementary groups.
+func TestUnit_Command_GroupAdd_Explicit(t *testing.T) {
+	t.Parallel()
+
+	t.Run("basic group-add is populated", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{}
+
+		args := []string{
+			"cderun",
+			"--image", "alpine",
+			"--group-add", "1001",
+			"--group-add", "1002",
+			"sh",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, []string{"1001", "1002"}, cfg.GroupAdd)
+	})
+
+	t.Run("P1 overrides P2 group-add option", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{}
+
+		args := []string{
+			"cderun",
+			"--image", "alpine",
+			"--group-add", "1001",
+			"sh",
+			"--cderun-group-add", "2001",
+			"--cderun-group-add", "2002",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, []string{"2001", "2002"}, cfg.GroupAdd)
+	})
+}
