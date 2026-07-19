@@ -1426,10 +1426,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 			doubleDashFound = true
 		}
 
-		shouldHoist := false
-		if !doubleDashFound && strings.HasPrefix(arg, "--cderun-") {
-			shouldHoist = true
-		}
+		shouldHoist := !doubleDashFound && strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
 			overrides = append(overrides, arg)
