@@ -150,7 +150,17 @@ func runGoldenTest(t *testing.T, dir string) {
 	// Normalize output (replace dynamic paths)
 	normalized := normalizeGoldenOutput(output)
 
-	goldenFile := filepath.Join(dir, "expected.json")
+	ext := ".json"
+	if _, err := os.Stat(filepath.Join(dir, "expected.txt")); err == nil {
+		ext = ".txt"
+	} else if *update {
+		isJSON := json.Unmarshal([]byte(normalized), &json.RawMessage{}) == nil
+		if !isJSON {
+			ext = ".txt"
+		}
+	}
+
+	goldenFile := filepath.Join(dir, "expected"+ext)
 	if *update {
 		err := os.MkdirAll(filepath.Dir(goldenFile), 0755)
 		require.NoError(t, err)
