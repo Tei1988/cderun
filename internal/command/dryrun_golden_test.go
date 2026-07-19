@@ -173,8 +173,16 @@ func normalizeGoldenOutput(s string) string {
 	var j interface{}
 	if err := json.Unmarshal([]byte(s), &j); err == nil {
 		if b, err := json.MarshalIndent(j, "", "  "); err == nil {
-			return string(b) + "\n"
+			s = string(b) + "\n"
 		}
 	}
+
+	// Trim trailing spaces from each line to be immune to git/editor whitespace trimming
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " \t\r")
+	}
+	s = strings.Join(lines, "\n")
+
 	return s
 }
