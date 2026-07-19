@@ -913,6 +913,8 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		ready := make(chan struct{})
 		go func() {
 			<-started
+			// Sleep a tiny bit to allow the stdin copy goroutine to record the error and finish
+			time.Sleep(10 * time.Millisecond)
 			_ = pw.Close()
 		}()
 
