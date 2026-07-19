@@ -154,7 +154,7 @@ func runGoldenTest(t *testing.T, dir string) {
 	if _, err := os.Stat(filepath.Join(dir, "expected.txt")); err == nil {
 		ext = ".txt"
 	} else if *update {
-		isJSON := json.Unmarshal([]byte(normalized), &json.RawMessage{}) == nil
+		isJSON := json.Valid([]byte(normalized))
 		if !isJSON {
 			ext = ".txt"
 		}
