@@ -380,10 +380,7 @@ var (
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 
 	hostnameRegex  = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
-	networkRegex   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 	userPartRegex  = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
-	imageRegex     = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
-	envKeyRegex    = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 	capRegex       = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 	groupPartRegex = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_-]*[$]?|[0-9]+)$`)
 )
