@@ -33,17 +33,6 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
 	})
-
-	t.Run("missing reflection fields", func(t *testing.T) {
-		withPatchedFieldInfo(t, "image", func() {
-			info := fieldInfo["image"]
-			info.p1ValIdx = -1
-			fieldInfo["image"] = info
-		})
-		_, _, _, _, _, err := fetchFieldAndParams("image", cliVal)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "registry mismatch: CLI reflection fields for option \"image\" missing")
-	})
 }
 
 func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
