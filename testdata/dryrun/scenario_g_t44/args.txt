@@ -1,0 +1,7 @@
+[
+  "cderun",
+  "--image",
+  "alpine",
+  "--cderun-tty",
+  "sh"
+]

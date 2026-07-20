@@ -1369,7 +1369,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
 			if strings.HasPrefix(arg, "--") {
 				name := strings.SplitN(arg[2:], "=", 2)[0]
-				if f := cmd.Flags().Lookup(name); f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+				f := cmd.PersistentFlags().Lookup(name)
+				if f == nil {
+					f = cmd.Flags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
 					// Flag exists, takes an argument, and no '=' used, so skip next argument.
 					i++
 				}
@@ -1377,7 +1381,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 				// Shorthand(s), e.g., -i, -it, -p 80:80
 				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
 				lastChar := string(arg[len(arg)-1])
-				if f := cmd.Flags().ShorthandLookup(lastChar); f != nil && f.NoOptDefVal == "" {
+				f := cmd.PersistentFlags().ShorthandLookup(lastChar)
+				if f == nil {
+					f = cmd.Flags().ShorthandLookup(lastChar)
+				}
+				if f != nil && f.NoOptDefVal == "" {
 					// Last shorthand takes an argument, skip next argument.
 					i++
 				}
