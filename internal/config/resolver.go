@@ -229,10 +229,6 @@ func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDER
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 var (
 	cliType   = reflect.TypeFor[CLIOptions]()
 	resType   = reflect.TypeFor[ResolvedConfig]()
