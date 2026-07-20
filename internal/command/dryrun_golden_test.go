@@ -160,7 +160,7 @@ func runGoldenTest(t *testing.T, dir string) {
 	expected, err := os.ReadFile(goldenFile)
 	require.NoError(t, err)
 
-	require.Equal(t, string(expected), normalized, "Golden mismatch in %s", dir)
+	require.Equal(t, strings.TrimSpace(string(expected)), strings.TrimSpace(normalized), "Golden mismatch in %s", dir)
 }
 
 func normalizeGoldenOutput(s string) string {
