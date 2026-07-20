@@ -66,6 +66,16 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--", "--cderun-literal"},
 			expected: []string{"cderun", "--cderun-image", "alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
 		},
+		{
+			name:    "T44: P1 override before subcommand with known P2 flag with value",
+			args:    []string{"cderun", "--image", "alpine", "--cderun-tty", "sh"},
+			wantErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
+		},
+		{
+			name:    "T44: P1 override before subcommand with known P2 shorthand flag with value",
+			args:    []string{"cderun", "-e", "3", "--cderun-tty", "sh"},
+			wantErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
+		},
 	}
 
 	for _, tt := range tests {
