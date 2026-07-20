@@ -16,29 +16,35 @@
 スクリプトは `python3` で動作します。
 
 ### 1. タスクの一覧表示
+
 ```bash
 python3 .agent/manage_task.py list
 ```
 
 ### 2. タスク詳細の表示
+
 ```bash
 python3 .agent/manage_task.py show T58
 ```
 
 ### 3. タスクの完了（ステータス更新と詳細セクションの削除）
+
 ```bash
 python3 .agent/manage_task.py done T58
 ```
 
 ### 4. タスクの新規追加（詳細手順付き）
+
 ```bash
 python3 .agent/manage_task.py add T99 "新しい機能の追加" "機能" "中" "小" "これは新しい機能の詳しい実装要件です。"
 ```
 
 ### 5. 詳細手順セクションのみの削除
+
 ```bash
 python3 .agent/manage_task.py delete-details T58
 ```
 
 ## 再現性向上のための設計
+
 このツールは、正規表現ベースでMarkdownテーブルおよびMarkdown見出しを安全にパースするため、セクション間にある他のテキストを破壊することなく正確に変更を適用します。これにより、誰が実行しても同じ品質でタスクの追加やクリーンアップが行えます。

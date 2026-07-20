@@ -58,7 +58,7 @@ def show_task(task_id):
     print("-" * 40)
 
     # Extract detailed description
-    target_pattern = re.compile(rf'^##\s+{task_id}\b', re.IGNORECASE)
+    target_pattern = re.compile(rf'^##\s+{re.escape(task_id)}\b', re.IGNORECASE)
     any_task_pattern = re.compile(r'^##\s+T\d+\b')
     in_section = False
     details = []
@@ -82,13 +82,13 @@ def remove_details_only(task_id):
 
     new_lines = []
     in_section = False
-    target_pattern = re.compile(rf'^##\s+{task_id}\b', re.IGNORECASE)
+    target_pattern = re.compile(rf'^##\s+{re.escape(task_id)}\b', re.IGNORECASE)
     any_task_pattern = re.compile(r'^##\s+T\d+\b')
     removed = False
 
     # Detect the blank line before the header if any, to remove excess space
     skip_prev_hr = False
-    for i, line in enumerate(lines):
+    for line in lines:
         if target_pattern.match(line):
             in_section = True
             removed = True
