@@ -64,7 +64,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
 | T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | DONE |
 | T57 | `{{file:...}}` のサブパス許可と設定ファイルの信頼境界 | セキュリティ | 中 | 中 | あり | DONE |
-| T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | - |
+| T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | DONE |
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | - |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | - |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
@@ -1132,26 +1132,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 ### 完了条件
 
 - 不正な bool/int/float 環境変数がエラー（または警告）になるテーブルドリブンテスト
-
----
-
-## T58: ランタイム自動検出が substring マッチで誤検出し得る
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/config/resolver.go:953-961`
-
-### 問題
-
-`strings.Contains(SocketPath, "podman")` のようなパス全体への substring マッチのため、`/home/podman-migration/docker.sock` が podman と誤検出される等、親ディレクトリ名の影響を受ける。
-
-### 方針
-
-パスの basename（`docker.sock` / `podman.sock` / `containerd.sock`）でマッチし、不一致は docker フォールバックにする。
-
-### 完了条件
-
-- 紛らわしいパス（親ディレクトリにランタイム名を含む等）での検出結果のテーブルドリブンテスト
 
 ---
 
