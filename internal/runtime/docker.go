@@ -49,6 +49,7 @@ type DockerRuntime struct {
 	attachCloseWriteGrace time.Duration
 	closeOnce             sync.Once
 	closeErr              error
+	testStdinCopyDone     chan struct{} // Test hook to synchronize stdin copy completion
 }
 
 // DockerRuntimeOption defines a functional option for DockerRuntime.
@@ -293,8 +294,14 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 					stdinErr = err
 					stdinMu.Unlock()
 				}
+				if d.testStdinCopyDone != nil {
+					close(d.testStdinCopyDone)
+				}
 				d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, err)
 			} else {
+				if d.testStdinCopyDone != nil {
+					close(d.testStdinCopyDone)
+				}
 				d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
 				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
 					d.logger.Trace("Calling CloseWrite on container %s connection", containerID)

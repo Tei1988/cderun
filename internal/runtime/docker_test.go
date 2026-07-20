@@ -907,14 +907,20 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 				Reader: bufio.NewReader(pr),
 			},
 		}
-		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		testStdinCopyDone := make(chan struct{})
+		runtime := &DockerRuntime{
+			logger:            logging.GetGlobalLogger(),
+			client:            mock,
+			sleepFunc:         noopSleepFunc,
+			testStdinCopyDone: testStdinCopyDone,
+		}
 
 		started := make(chan struct{})
 		ready := make(chan struct{})
 		go func() {
 			<-started
-			// Sleep a tiny bit to allow the stdin copy goroutine to record the error and finish
-			time.Sleep(10 * time.Millisecond)
+			// Wait for the stdin copy goroutine to record the error and complete
+			<-testStdinCopyDone
 			_ = pw.Close()
 		}()
 
