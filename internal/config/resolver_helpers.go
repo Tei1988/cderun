@@ -167,32 +167,37 @@ func addEnv(m map[string]string, keys *[]string, env []string) {
 	}
 }
 
+type envKV struct {
+	key string
+	val string
+}
+
+func addEnvSmall(arr *[8]envKV, size *int, env []string) {
+	for _, e := range env {
+		key, _, _ := strings.Cut(e, "=")
+		found := false
+		for i := 0; i < *size; i++ {
+			if arr[i].key == key {
+				arr[i].val = e
+				found = true
+				break
+			}
+		}
+		if !found {
+			arr[*size] = envKV{key: key, val: e}
+			(*size)++
+		}
+	}
+}
+
 func deduplicateEnv(env []string) []string {
 	if len(env) <= 1 {
 		return env
 	}
 	if len(env) <= 8 {
-		type kv struct {
-			key string
-			val string
-		}
-		var arr [8]kv
+		var arr [8]envKV
 		size := 0
-		for _, e := range env {
-			key, _, _ := strings.Cut(e, "=")
-			found := false
-			for i := 0; i < size; i++ {
-				if arr[i].key == key {
-					arr[i].val = e
-					found = true
-					break
-				}
-			}
-			if !found {
-				arr[size] = kv{key: key, val: e}
-				size++
-			}
-		}
+		addEnvSmall(&arr, &size, env)
 		res := make([]string, size)
 		for i := 0; i < size; i++ {
 			res[i] = arr[i].val
@@ -228,32 +233,11 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 
 	if total <= 8 {
-		type kv struct {
-			key string
-			val string
-		}
-		var arr [8]kv
+		var arr [8]envKV
 		size := 0
-		add := func(env []string) {
-			for _, e := range env {
-				key, _, _ := strings.Cut(e, "=")
-				found := false
-				for i := 0; i < size; i++ {
-					if arr[i].key == key {
-						arr[i].val = e
-						found = true
-						break
-					}
-				}
-				if !found {
-					arr[size] = kv{key: key, val: e}
-					size++
-				}
-			}
-		}
-		add(base)
-		add(p2)
-		add(p1)
+		addEnvSmall(&arr, &size, base)
+		addEnvSmall(&arr, &size, p2)
+		addEnvSmall(&arr, &size, p1)
 		res := make([]string, size)
 		for i := 0; i < size; i++ {
 			res[i] = arr[i].val
