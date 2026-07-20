@@ -350,6 +350,21 @@ cderun --add-host my-server:192.168.1.10 alpine ping my-server
 cderun -u 1000:1000 alpine whoami
 ```
 
+### `--group-add`
+
+- **型**: stringArray
+- **環境変数**: `CDERUN_GROUP_ADD`
+- **説明**: コンテナに追加する補助グループ（グループ名またはGID）を設定
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します（例: `--group-add 1000 --group-add 1001`）。
+  - 環境変数 `CDERUN_GROUP_ADD` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
+  - P1/P2/P3 のいずれかで**明示的に空のリスト**（YAMLでの `[]` や環境変数での空文字列）を指定した場合、それは意図的な「空の設定」とみなされ、下位レベルの設定を上書き（無効化）します。
+  - **containerd ランタイムにおける制限**: containerd ランタイムでは、ユーザーやグループの解決機能が限定されているため、**数値（GID）のみ**がサポートされています。グループ名（例: `docker`）を指定するとエラーになります。
+
+```bash
+cderun --group-add 1000 --group-add 1001 alpine id
+```
+
 ### `--privileged`
 
 - **型**: bool
@@ -584,7 +599,7 @@ cderun --log-timestamp=false node app.js
 
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
-    `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
+    `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-privileged`,
     `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`,
     `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`,
     `--cderun-cap-drop`, `--cderun-hang-timeout`

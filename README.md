@@ -120,6 +120,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--image`: Container image to use.
 - `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
 - `--user`, `-u`: Username or UID (format: `<name|uid>[:<group|gid>]`).
+- `--group-add`: Add supplementary groups to the container (name or GID).
 - `--workdir`, `-w`: Working directory inside the container.
 - `--env`, `-e`: Set environment variables (`KEY=VALUE` or `KEY` for host passthrough).
 - `--strict-env`: Require all passed environment variables to be present on the host. (Default: `false`)
@@ -205,7 +206,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
-  - **Comma (`,`)**: All other list-type variables, including `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`, `CDERUN_GROUP_ADD`
 
 ## Configuration
 
