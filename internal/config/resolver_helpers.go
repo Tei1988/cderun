@@ -195,9 +195,7 @@ func deduplicateEnv(env []string) []string {
 		}
 
 		res := make([]string, size)
-		for j := 0; j < size; j++ {
-			res[j] = vals[j]
-		}
+		copy(res, vals[:size])
 		return res
 	}
 
@@ -258,9 +256,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 		add(p1)
 
 		res := make([]string, size)
-		for j := 0; j < size; j++ {
-			res[j] = vals[j]
-		}
+		copy(res, vals[:size])
 		return res
 	}
 
