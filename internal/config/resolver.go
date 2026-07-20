@@ -323,10 +323,6 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
 	}
 
-	if info.p1ValIdx == -1 || info.p2ValIdx == -1 {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
-	}
-
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
 	p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 	return info, p1Set, p1Val, p2Set, p2Val, nil
