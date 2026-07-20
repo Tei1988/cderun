@@ -37,7 +37,7 @@ type dockerClient interface {
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
 }
 
-var signalRegex = regexp.MustCompile(`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`)
+var signalRegex = regexp.MustCompile(`^(?i)[A-Z0-9]+$`)
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
 type DockerRuntime struct {
