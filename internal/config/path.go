@@ -379,12 +379,13 @@ var (
 	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
 	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
 
-	hostnameRegex = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
-	networkRegex  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
-	userPartRegex = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
-	imageRegex    = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
-	envKeyRegex   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-	capRegex      = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+	hostnameRegex  = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
+	networkRegex   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+	userPartRegex  = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
+	imageRegex     = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$`)
+	envKeyRegex    = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	capRegex       = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+	groupPartRegex = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_-]*[$]?|[0-9]+)$`)
 )
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
@@ -542,6 +543,17 @@ func validatePathChars(s string) error {
 		if c <= 31 || c == 127 {
 			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", c, i)
 		}
+	}
+	return nil
+}
+
+// ValidateGroupAdd ensures the supplementary group name or GID is safe.
+func ValidateGroupAdd(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !groupPartRegex.MatchString(s) {
+		return fmt.Errorf("invalid supplementary group name or GID: %q", s)
 	}
 	return nil
 }
