@@ -227,8 +227,8 @@ Paths starting with `~` or `~/` are expanded to the home directory. Relative pat
 
 To maintain strict security boundaries, any path resolved via expressions or tildes undergoes **Anchor Boundary Validation**.
 
-- **Rule**: The finalized absolute path must remain within the boundary directory defined by the expression's anchor (e.g. `{{HOME}}` or `{{PWD}}`).
-- **Directory Traversal Defense**: Traversal attempts like `{{HOME}}/../../etc/passwd` that escape the anchor's boundary directory will trigger an immediate validation error. Absolute paths and parent directory traversals (`..`) are strictly forbidden inside local subpaths for safety.
+- **Rule**: The finalized absolute path must remain within the boundary directory defined by the expression's anchor (e.g., `{{HOME}}` or `{{PWD}}`).
+- **Directory Traversal Defense**: Parent traversals using `..` (such as `../`) are allowed within anchor-based path resolution, provided that the normalized final absolute path remains within the anchor's boundary directory (e.g., `{{HOME}}/Documents/..` resolves to `{{HOME}}` and is permitted). However, any traversals that escape the anchor's boundary directory (such as `{{HOME}}/..` or `{{HOME}}/../../etc/passwd`) will trigger an immediate validation error. Absolute paths are strictly forbidden inside local subpaths for safety.
 
 ### 4. "Sticky Error" Pattern
 
