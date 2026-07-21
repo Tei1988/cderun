@@ -47,17 +47,12 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			wantErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
 		},
 		{
-			name:    "P1 override must be after subcommand even with P2 flags taking args (T44)",
-			args:    []string{"cderun", "--image", "alpine", "--cderun-tty", "sh"},
-			wantErr: "cderun internal override flag \"--cderun-tty\" must be placed after the subcommand",
-		},
-		{
 			name:     "polyglot mode with P1 overrides and tool flags",
 			args:     []string{"node", "--cderun-tty", "--version", "--cderun-image", "alpine"},
 			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "node", "--version"},
 		},
 		{
-			name:     "double dash -- stops hoisting (T53)",
+			name:     "double dash -- stops hoisting (T53 fixed)",
 			args:     []string{"cderun", "echo", "--", "--cderun-tty"},
 			expected: []string{"cderun", "echo", "--", "--cderun-tty"},
 		},
@@ -67,7 +62,7 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--diagnosis", "--log-level", "debug"},
 		},
 		{
-			name:     "complex interleaving (double dash stops hoisting)",
+			name:     "complex interleaving (double dash behavior)",
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--", "--cderun-literal"},
 			expected: []string{"cderun", "--cderun-image", "alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
 		},

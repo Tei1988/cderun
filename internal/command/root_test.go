@@ -275,7 +275,7 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 
 	t.Run("P1 override takes priority over P2 CLI", func(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{}
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "sh", "--cderun-tty=false"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty=true", "--cderun-tty=false", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
@@ -807,7 +807,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	// Wait for container to start (WaitContainer is called)
 	select {
 	case <-waitStarted:
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Fatal("timed out waiting for WaitContainer to be called")
 	}
 
@@ -825,7 +825,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Fatal("timed out waiting for execution to finish")
 	}
 
@@ -1693,7 +1693,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	// Wait for container to start (WaitContainer is called)
 	select {
 	case <-waitStarted:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for WaitContainer to be called")
 	}
 
@@ -1701,7 +1701,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	var triggerSignal chan os.Signal
 	select {
 	case triggerSignal = <-sigChanHolder:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for signal channel registration")
 	}
 	require.NotNil(t, triggerSignal)
@@ -1711,7 +1711,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for execution")
 	}
 
@@ -1732,7 +1732,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
@@ -1744,7 +1744,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	// Wait for attachment to be established
 	select {
 	case <-attached:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for attachment")
 	}
 
@@ -1752,7 +1752,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 	select {
 	case err := <-errCh:
 		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for execution")
 	}
 
@@ -1843,7 +1843,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "--cderun-log-level", "debug", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return true }
 				o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }
@@ -1859,7 +1859,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		// Initial resize
 		select {
 		case <-resizeCalled:
-		case <-time.After(5 * time.Second):
+		case <-time.After(2 * time.Second):
 			t.Fatal("initial resize not called")
 		}
 
@@ -1867,7 +1867,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 		var rc chan os.Signal
 		select {
 		case rc = <-resizeChanHolder:
-		case <-time.After(5 * time.Second):
+		case <-time.After(2 * time.Second):
 			t.Fatal("resize signal channel not registered")
 		}
 

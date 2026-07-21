@@ -298,7 +298,7 @@ func TestRobustness_HangRecovery_AutoTerminationNonTTY(t *testing.T) {
 	var capturedExitCode int
 	done := make(chan error, 1)
 	go func() {
-		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout=100ms"}, func(o *rootOptions, cmd *cobra.Command) {
+		done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "--cderun-hang-timeout=100ms", "cat"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
@@ -365,7 +365,7 @@ func TestRobustness_HangRecovery_AutoTerminationTTYNoKill(t *testing.T) {
 			t.Error("SIGKILL should NOT be sent")
 		default:
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("Test timed out")
 	}
 }
