@@ -150,7 +150,17 @@ func runGoldenTest(t *testing.T, dir string) {
 	// Normalize output (replace dynamic paths)
 	normalized := normalizeGoldenOutput(output)
 
-	goldenFile := filepath.Join(dir, "expected.json")
+	ext := ".json"
+	if _, err := os.Stat(filepath.Join(dir, "expected.txt")); err == nil {
+		ext = ".txt"
+	} else if *update {
+		isJSON := json.Valid([]byte(normalized))
+		if !isJSON {
+			ext = ".txt"
+		}
+	}
+
+	goldenFile := filepath.Join(dir, "expected"+ext)
 	if *update {
 		err := os.MkdirAll(filepath.Dir(goldenFile), 0755)
 		require.NoError(t, err)
@@ -173,8 +183,16 @@ func normalizeGoldenOutput(s string) string {
 	var j interface{}
 	if err := json.Unmarshal([]byte(s), &j); err == nil {
 		if b, err := json.MarshalIndent(j, "", "  "); err == nil {
-			return string(b) + "\n"
+			s = string(b) + "\n"
 		}
 	}
+
+	// Trim trailing spaces from each line to be immune to git/editor whitespace trimming
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " \t\r")
+	}
+	s = strings.Join(lines, "\n")
+
 	return s
 }

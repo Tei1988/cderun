@@ -50,7 +50,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | DONE |
-| T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | - |
+| T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | DONE |
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
 | T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | DONE |
@@ -64,7 +64,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
 | T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | DONE |
 | T57 | `{{file:...}}` のサブパス許可と設定ファイルの信頼境界 | セキュリティ | 中 | 中 | あり | DONE |
-| T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | - |
+| T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | DONE |
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | - |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | - |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
@@ -75,7 +75,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
-| T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | - |
+| T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | DONE |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
 | T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
@@ -977,28 +977,6 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 - ENTRYPOINT を持つイメージ + passthrough-args の組み合わせで Docker と containerd の実行コマンドが一致する
 - Entrypoint 明示指定 / Command のみ / 両方空 の各ケースのユニットテスト
 
----
-
-## T44: `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する
-
-- 種別: バグ修正
-- 優先度: 高
-- 対象: `internal/command/root.go:1252, 1260`（`cmd.Flags().Lookup` / `ShorthandLookup`）、対比: `root.go:1313-1316`（第 2 ループは `PersistentFlags()` フォールバックあり）、`internal/command/flags.go:140`（全フラグは `PersistentFlags()` に登録）
-
-### 問題
-
-cobra は persistent flag を `Flags()` に遅延マージする（`ParseFlags`/`execute` 時）ため、`cmd.ExecuteContext` より前に走る `preprocessArgs` の時点では `cmd.Flags().Lookup` が常に nil を返し、値付きフラグの値スキップが一切行われていない。結果、`cderun --image alpine --cderun-tty sh` では `alpine` がサブコマンドと誤認され、仕様上のエラー `"cderun internal override flag %q must be placed after the subcommand"` が発生せず P1 フラグが黙って受理される。既存テストはこの 2 挙動を区別できるケースを含まない（検証済み）。
-
-### 方針
-
-第 2 ループと同じ `PersistentFlags().Lookup` フォールバックを第 1 ループにも適用する（または先に `cmd.LocalFlags()` を一度呼んでマージを強制する）。T07 のリライトを行う場合はその中で解消してもよいが、判別テストケースは必ず追加する。
-
-### 完了条件
-
-- `cderun --image alpine --cderun-tty sh` が仕様どおりエラーになるテスト
-- 値付き P2 フラグ + サブコマンドの組み合わせでサブコマンド検出が正しいことのテスト
-
----
 
 ## T46: 設定レイヤーのマージで `BaseDir` が汚染される
 
@@ -1157,26 +1135,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T58: ランタイム自動検出が substring マッチで誤検出し得る
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/config/resolver.go:953-961`
-
-### 問題
-
-`strings.Contains(SocketPath, "podman")` のようなパス全体への substring マッチのため、`/home/podman-migration/docker.sock` が podman と誤検出される等、親ディレクトリ名の影響を受ける。
-
-### 方針
-
-パスの basename（`docker.sock` / `podman.sock` / `containerd.sock`）でマッチし、不一致は docker フォールバックにする。
-
-### 完了条件
-
-- 紛らわしいパス（親ディレクトリにランタイム名を含む等）での検出結果のテーブルドリブンテスト
-
----
-
 ## T59: クリーンアップ用 `RemoveContainer` にタイムアウトがない
 
 - 種別: 改善（堅牢性）
@@ -1322,35 +1280,6 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 - 早期ログが指定フォーマットで出力されるテスト
 - 不正な log-level が設定ロード前にエラーになるテスト
 
----
-
-## T79: ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ）
-
-- 種別: テスト
-- 優先度: 中
-- 対象: `testdata/dryrun/`（ケース追加のみ）
-- 前提: T68 でフレームワーク（`dryrun_golden_test.go`）は実装済み。`testdata/dryrun/` にディレクトリを追加するだけでケースが増える
-
-### 背景
-
-T68 実装時（Jules）にフレームワークと6シナリオ（scenario_a〜f）が追加されたが、T68 仕様の「必須ケース」が未追加のまま。
-
-### 追加するケース
-
-1. **T44 判別ケース**: `cderun --image alpine --cderun-tty sh` → `--cderun-tty` がサブコマンド前に置かれているためエラーになることを確認
-   - `args.txt`: `["cderun", "--image", "alpine", "--cderun-tty", "sh"]`
-   - `expected.json`: エラー出力
-
-2. **T53 `--` エスケープ**: `cderun echo -- --cderun-tty` において `--cderun-tty` がホイストされる現状挙動を固定
-   - 現状（T53 未修正）では `--cderun-tty` がホイストされてしまう
-   - T53 修正時にゴールデンを更新することで回帰を検知できる
-
-### 完了条件
-
-- `testdata/dryrun/` に上記2ケースが追加されており `go test ./...` でパスする
-- 挙動変更なし（フレームワーク側は触らない）
-
----
 
 ## T69: registry 駆動の優先順位マトリクステスト生成（L1）
 
