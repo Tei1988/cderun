@@ -1033,10 +1033,6 @@ func must[T any](v T, err error) T {
 	return v
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func TestUnit_Config_Resolve_ExpressionErrorInDuration(t *testing.T) {
 	mfs := &MockFileSystem{}
 	cli := &CLIOptions{
