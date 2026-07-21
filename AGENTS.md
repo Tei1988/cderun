@@ -34,13 +34,15 @@ make link-check     # ドキュメント内リンクの検証
 
 ## 3. タスクの進め方
 
-バックログは [.agent/todo.md](./.agent/todo.md) にあります。
+バックログは [.agent/todo.md](./.agent/todo.md) にあります。また、タスクを安全かつ再現性高く操作するための自動化スクリプトが `.agent/manage_task.py` に用意されています。
+**エージェントは、タスクの確認、完了時のステータス更新や詳細手順のクリーンアップに、必ずこのスクリプトを最優先で活用してください。**
 
 1. 着手前に本ファイル → `.agent/todo.md` → `docs/guidelines/working-guide.md` を必ず読む
-2. 原則 **1 タスク = 1 PR**。タスクの「完了条件」をすべて満たすこと
-3. タスク内の file:line は記録時点のもの。ズレていたら grep で再特定する
-4. **Spec-First**: 「仕様変更あり」のタスクは、対応する `docs/features/*.md` の更新が完了条件に含まれる
-5. タスク完了時は `.agent/todo.md` のサマリテーブルのステータスを `DONE` に更新する
+2. タスク一覧の確認には `python3 .agent/manage_task.py list` を使用する。詳細手順の抽出には `python3 .agent/manage_task.py show <ID>` を使用する
+3. 原則 **1 タスク = 1 PR**。タスクの「完了条件」をすべて満たすこと
+4. タスク内の file:line は記録時点のもの。ズレていたら grep で再特定する
+5. **Spec-First**: 「仕様変更あり」のタスクは、対応する `docs/features/*.md` の更新が完了条件に含まれる
+6. タスク完了時は `python3 .agent/manage_task.py done <ID>` を実行し、サマリテーブルの更新と詳細手順の削除を自動で行う
 
 ## 4. ナレッジベース（必読ドキュメント）
 

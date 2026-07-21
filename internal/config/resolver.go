@@ -229,10 +229,6 @@ func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDER
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 var (
 	cliType   = reflect.TypeFor[CLIOptions]()
 	resType   = reflect.TypeFor[ResolvedConfig]()
@@ -325,10 +321,6 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 	info, ok := fieldInfo[key]
 	if !ok {
 		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
-	}
-
-	if info.p1ValIdx == -1 || info.p2ValIdx == -1 {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: CLI reflection fields for option %q missing in CLIOptions", key)
 	}
 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
