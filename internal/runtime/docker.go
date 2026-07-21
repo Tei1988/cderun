@@ -7,6 +7,7 @@ import (
 	"github.com/containerd/errdefs"
 	"io"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,6 +50,8 @@ type DockerRuntime struct {
 	attachCloseWriteGrace time.Duration
 	closeOnce             sync.Once
 	closeErr              error
+	mu                    sync.Mutex
+	removeOnExit          map[string]bool
 }
 
 // DockerRuntimeOption defines a functional option for DockerRuntime.
@@ -100,6 +103,7 @@ func NewDockerRuntimeWithOptions(socket string, name string, clientOpts []client
 		name:                  name,
 		attachCloseWriteGrace: 100 * time.Millisecond,
 		sleepFunc:             SleepFunc,
+		removeOnExit:          make(map[string]bool),
 	}
 
 	for _, opt := range rtOpts {
@@ -194,6 +198,13 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 		return "", err
 	}
 
+	d.mu.Lock()
+	if d.removeOnExit == nil {
+		d.removeOnExit = make(map[string]bool)
+	}
+	d.removeOnExit[resp.ID] = config.Remove
+	d.mu.Unlock()
+
 	return resp.ID, nil
 }
 
@@ -205,10 +216,27 @@ func (d *DockerRuntime) StartContainer(ctx context.Context, containerID string) 
 // WaitContainer waits for a container to exit and returns its exit code.
 func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	d.logger.Trace("Waiting for container %s to stop...", containerID)
-	resultC, errC := d.client.ContainerWait(ctx, containerID, dockercontainer.WaitConditionNotRunning)
+
+	d.mu.Lock()
+	remove := false
+	if d.removeOnExit != nil {
+		remove = d.removeOnExit[containerID]
+	}
+	d.mu.Unlock()
+
+	condition := dockercontainer.WaitConditionNotRunning
+	if remove {
+		condition = dockercontainer.WaitConditionRemoved
+	}
+
+	resultC, errC := d.client.ContainerWait(ctx, containerID, condition)
 	select {
 	case err := <-errC:
 		d.logger.Trace("ContainerWait for %s returned error: %v", containerID, err)
+		if errdefs.IsNotFound(err) || client.IsErrNotFound(err) || strings.Contains(err.Error(), "No such container") {
+			d.logger.Debug("Container %s not found during wait (possibly already exited and auto-removed), returning 0", containerID)
+			return 0, nil
+		}
 		return 0, err
 	case result := <-resultC:
 		d.logger.Trace("ContainerWait for %s returned status: %d", containerID, result.StatusCode)
@@ -218,6 +246,12 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 
 // RemoveContainer removes a container.
 func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string) error {
+	d.mu.Lock()
+	if d.removeOnExit != nil {
+		delete(d.removeOnExit, containerID)
+	}
+	d.mu.Unlock()
+
 	err := d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
 		Force:         true,
 		RemoveVolumes: true,
