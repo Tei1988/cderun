@@ -350,6 +350,27 @@ cderun --add-host my-server:192.168.1.10 alpine ping my-server
 cderun -u 1000:1000 alpine whoami
 ```
 
+### `--group-add`
+
+- **型**: stringArray
+- **環境変数**: `CDERUN_GROUP_ADD`
+- **説明**: コンテナ起動時、実行ユーザーに追加の補助グループ（Supplementary Groups）を付与します。
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数の追加グループを設定したい場合、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_GROUP_ADD` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
+  - **初期バリデーション**: 制御文字の混入や不適切なパラメータインジェクション攻撃を防ぐため、UNIXグループ名および数値型GIDパターンに準拠しているか、正規表現による厳密な検証が実行されます。
+  - **ランタイムによる制限 (重要)**:
+    - **DockerおよびPodman**: グループ名（例: `docker`）と数値GID（例: `1001`）の両方がサポートされます。
+    - **containerd**: 直接 containerd 実行を行う場合、コンテナエンジン内部での名前解決が行われない仕様（変換契約）に基づき、**数値GIDのみ**（例: `"1001"`, `"102"`, `"1002"`, etc.）がサポートされます。非数値のグループ名を指定するとエラーとなります。
+
+```bash
+# 複数グループを数値GIDで追加して実行 (Docker / containerd)
+cderun --group-add 1001 --group-add 1002 alpine id
+
+# グループ名で追加して実行 (Docker / Podman のみ)
+cderun --group-add adm --group-add sudo alpine id
+```
+
 ### `--privileged`
 
 - **型**: bool
@@ -584,7 +605,7 @@ cderun --log-timestamp=false node app.js
 
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
-    `--cderun-workdir`, `--cderun-user`, `--cderun-privileged`,
+    `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-privileged`,
     `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`,
     `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`,
     `--cderun-cap-drop`, `--cderun-hang-timeout`
