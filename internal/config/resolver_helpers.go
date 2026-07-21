@@ -168,11 +168,40 @@ func addEnv(m map[string]string, keys *[]string, env []string) {
 }
 
 func deduplicateEnv(env []string) []string {
-	if len(env) <= 1 {
+	n := len(env)
+	if n <= 1 {
 		return env
 	}
-	m := make(map[string]string, len(env))
-	keys := make([]string, 0, len(env))
+	if n <= 8 {
+		var keys [8]string
+		var vals [8]string
+		size := 0
+
+		for _, e := range env {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for i := 0; i < size; i++ {
+				if keys[i] == key {
+					foundIdx = i
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
+
+		res := make([]string, size)
+		copy(res, vals[:size])
+		return res
+	}
+
+	m := make(map[string]string, n)
+	keys := make([]string, 0, n)
 	addEnv(m, &keys, env)
 
 	res := make([]string, 0, len(keys))
@@ -196,6 +225,70 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 	if len(base) == 0 && len(p2) == 0 && len(p1) > 0 {
 		return deduplicateEnv(p1)
+	}
+
+	if total <= 8 {
+		var keys [8]string
+		var vals [8]string
+		size := 0
+
+		for _, e := range base {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for i := 0; i < size; i++ {
+				if keys[i] == key {
+					foundIdx = i
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
+
+		for _, e := range p2 {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for i := 0; i < size; i++ {
+				if keys[i] == key {
+					foundIdx = i
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
+
+		for _, e := range p1 {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for i := 0; i < size; i++ {
+				if keys[i] == key {
+					foundIdx = i
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
+
+		res := make([]string, size)
+		copy(res, vals[:size])
+		return res
 	}
 
 	m := make(map[string]string, total)

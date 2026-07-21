@@ -229,11 +229,17 @@ func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDER
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
 }
 
+type expectedIndices struct {
+	p1ValIdx int
+	p2ValIdx int
+}
+
 var (
-	cliType   = reflect.TypeFor[CLIOptions]()
-	resType   = reflect.TypeFor[ResolvedConfig]()
-	fieldInfo map[string]optionFields
-	fieldOnce sync.Once
+	cliType              = reflect.TypeFor[CLIOptions]()
+	resType              = reflect.TypeFor[ResolvedConfig]()
+	fieldInfo            map[string]optionFields
+	expectedFieldIndices map[string]expectedIndices
+	fieldOnce            sync.Once
 )
 
 type optionFields struct {
@@ -246,6 +252,7 @@ type optionFields struct {
 
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
+	expectedFieldIndices = make(map[string]expectedIndices)
 
 	process := func(name, fieldName string) {
 		if fieldName == "" {
@@ -270,21 +277,26 @@ func initFieldInfo() {
 		p2SetName := fieldName + "Set"
 		p2ValName := fieldName
 
+		exp := expectedIndices{p1ValIdx: -1, p2ValIdx: -1}
+
 		if f, ok := cliType.FieldByName(p1SetName); ok {
 			info.p1SetIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(p1ValName); ok {
 			info.p1ValIdx = f.Index[0]
+			exp.p1ValIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(p2SetName); ok {
 			info.p2SetIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(p2ValName); ok {
 			info.p2ValIdx = f.Index[0]
+			exp.p2ValIdx = f.Index[0]
 		}
 
 		if info.p1ValIdx != -1 && info.p2ValIdx != -1 {
 			fieldInfo[name] = info
+			expectedFieldIndices[name] = exp
 		}
 	}
 
@@ -326,6 +338,14 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
 	p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 	return info, p1Set, p1Val, p2Set, p2Val, nil
+}
+
+func isFastPathAllowed(name, fieldName string, info optionFields) bool {
+	exp, ok := expectedFieldIndices[name]
+	if !ok {
+		return false
+	}
+	return info.p1ValIdx == exp.p1ValIdx && info.p2ValIdx == exp.p2ValIdx
 }
 
 type resolver struct {
@@ -373,7 +393,53 @@ func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string
 }
 
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.cliVal)
+	info, ok := fieldInfo[name]
+	if !ok {
+		return "", fmt.Errorf("registry mismatch: info for option %q not found", name)
+	}
+
+	if isFastPathAllowed(name, "", info) {
+		var p1Set, p2Set bool
+		var p1Val, p2Val string
+		var fastPathUsed bool
+		switch name {
+		case "socket-path":
+			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunSocketPathSet, rv.cli.CderunSocketPath, rv.cli.SocketPathSet, rv.cli.SocketPath
+			fastPathUsed = true
+		case "mount-socket-path":
+			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountSocketPathSet, rv.cli.CderunMountSocketPath, rv.cli.MountSocketPathSet, rv.cli.MountSocketPath
+			fastPathUsed = true
+		case "mount-cderun-path":
+			p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountCderunPathSet, rv.cli.CderunMountCderunPath, rv.cli.MountCderunPathSet, rv.cli.MountCderunPath
+			fastPathUsed = true
+		}
+
+		if fastPathUsed {
+			var tools ToolsConfig
+			var subcommand string
+			if tGetter != nil {
+				tools = rv.tools
+				subcommand = rv.subcommand
+			}
+			return resolveConfigPath(
+				p1Set, p1Val,
+				p2Set, p2Val,
+				envKey,
+				subcommand, tools, tGetter,
+				rv.global, gGetter,
+				fallback,
+				rv.r,
+				"path",
+				rv.fs,
+			)
+		}
+	}
+
+	if !rv.cliVal.IsValid() {
+		rv.cliVal = reflect.ValueOf(rv.cli).Elem()
+	}
+
+	_, p1SetRef, p1ValRef, p2SetRef, p2ValRef, err := fetchFieldAndParams(name, rv.cliVal)
 	if err != nil {
 		return "", err
 	}
@@ -386,8 +452,8 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 	}
 
 	return resolveConfigPath(
-		p1Set, p1Val.String(),
-		p2Set, p2Val.String(),
+		p1SetRef, p1ValRef.String(),
+		p2SetRef, p2ValRef.String(),
 		envKey,
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
@@ -399,13 +465,85 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 }
 
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	if isFastPathAllowed(opt.Name, opt.FieldName, info) {
+		var p1Val, p2Val []string
+		var fastPathUsed bool
+
+		switch opt.Name {
+		case "publish":
+			p1Val, p2Val = rv.cli.CderunPorts, rv.cli.Ports
+			fastPathUsed = true
+		case "expose":
+			p1Val, p2Val = rv.cli.CderunExpose, rv.cli.Expose
+			fastPathUsed = true
+		case "dns":
+			p1Val, p2Val = rv.cli.CderunDNS, rv.cli.DNS
+			fastPathUsed = true
+		case "add-host":
+			p1Val, p2Val = rv.cli.CderunAddHosts, rv.cli.AddHosts
+			fastPathUsed = true
+		case "group-add":
+			p1Val, p2Val = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
+			fastPathUsed = true
+		case "cap-add":
+			p1Val, p2Val = rv.cli.CderunCapAdd, rv.cli.CapAdd
+			fastPathUsed = true
+		case "cap-drop":
+			p1Val, p2Val = rv.cli.CderunCapDrop, rv.cli.CapDrop
+			fastPathUsed = true
+		case "entrypoint":
+			p1Val, p2Val = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
+			fastPathUsed = true
+		}
+
+		if fastPathUsed {
+			def := OptionDef[[]string]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+			}
+			resolved := resolveStringSliceOpt(def, ",", p1Val, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+			switch opt.Name {
+			case "publish":
+				rv.res.Ports = resolved
+			case "expose":
+				rv.res.Expose = resolved
+			case "dns":
+				rv.res.DNS = resolved
+			case "add-host":
+				rv.res.AddHosts = resolved
+			case "group-add":
+				rv.res.GroupAdd = resolved
+			case "cap-add":
+				rv.res.CapAdd = resolved
+			case "cap-drop":
+				rv.res.CapDrop = resolved
+			case "entrypoint":
+				rv.res.Entrypoint = resolved
+			}
+			return nil
+		}
+	}
+
+	if !rv.cliVal.IsValid() {
+		rv.cliVal = reflect.ValueOf(rv.cli).Elem()
+	}
+	if !rv.resVal.IsValid() {
+		rv.resVal = reflect.ValueOf(rv.res).Elem()
+	}
+
+	_, s1, p1ValRef, s2, p2ValRef, err := fetchFieldAndParams(opt.Name, rv.cliVal)
 	if err != nil {
 		return err
 	}
 
-	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
-	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
+	p1v, _ := rv.extractStringSliceValue(p1ValRef, s1)
+	p2v, _ := rv.extractStringSliceValue(p2ValRef, s2)
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,

@@ -338,13 +338,32 @@ type FileSystem interface {
 	Abs(path string) (string, error)
 }
 
+var (
+	realWDOnce    sync.Once
+	realWDValue   string
+	realWDErr     error
+	realHomeOnce  sync.Once
+	realHomeValue string
+	realHomeErr   error
+)
+
 // RealFileSystem implements FileSystem using standard os and filepath.
 type RealFileSystem struct{}
 
-func (RealFileSystem) Getwd() (string, error)                { return os.Getwd() }
+func (RealFileSystem) Getwd() (string, error) {
+	realWDOnce.Do(func() {
+		realWDValue, realWDErr = os.Getwd()
+	})
+	return realWDValue, realWDErr
+}
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } //nolint:gosec
-func (RealFileSystem) UserHomeDir() (string, error)          { return os.UserHomeDir() }
+func (RealFileSystem) UserHomeDir() (string, error) {
+	realHomeOnce.Do(func() {
+		realHomeValue, realHomeErr = os.UserHomeDir()
+	})
+	return realHomeValue, realHomeErr
+}
 func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
 func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
 func (RealFileSystem) LookupEnv(key string) (string, bool)   { return os.LookupEnv(key) }
