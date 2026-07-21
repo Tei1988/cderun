@@ -144,9 +144,9 @@ func TestUnit_Command_Robustness_NullTimeoutBlocksIndefinitely(t *testing.T) {
 	}
 }
 
-// TestUnit_Command_Robustness_SignalForwardingAllUnixSignals validates warning handling
-// and error logging for various UNIX signals (SIGHUP, SIGQUIT, etc.) forwarding.
-func TestUnit_Command_Robustness_SignalForwardingAllUnixSignals(t *testing.T) {
+// TestUnit_Command_Robustness_SignalKillForceTermination validates container inspection and
+// SIGKILL force-termination behavior, exercising warning/error handling when SIGKILL fails or succeeds.
+func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	t.Parallel()
 
 	o := &rootOptions{logger: &logging.Logger{}}
@@ -157,10 +157,10 @@ func TestUnit_Command_Robustness_SignalForwardingAllUnixSignals(t *testing.T) {
 			IsRunning:   true,
 		}
 
-		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-sighup")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to force terminate container: signal failure warning")
-		assert.Equal(t, "cont-sighup", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "cont-force-kill-fail", mockRuntime.SignaledContainerID)
 	})
 
 	t.Run("Signal succeeds without error", func(t *testing.T) {
@@ -169,9 +169,9 @@ func TestUnit_Command_Robustness_SignalForwardingAllUnixSignals(t *testing.T) {
 			IsRunning:   true,
 		}
 
-		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-sigterm")
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-success")
 		require.NoError(t, err)
-		assert.Equal(t, "cont-sigterm", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "cont-force-kill-success", mockRuntime.SignaledContainerID)
 	})
 }
 
