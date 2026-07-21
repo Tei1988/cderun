@@ -198,12 +198,11 @@ func (d *DockerRuntime) CreateContainer(ctx context.Context, config *container.C
 		return "", err
 	}
 
-	d.mu.Lock()
-	if d.removeOnExit == nil {
-		d.removeOnExit = make(map[string]bool)
+	if config.Remove {
+		d.mu.Lock()
+		d.removeOnExit[resp.ID] = true
+		d.mu.Unlock()
 	}
-	d.removeOnExit[resp.ID] = config.Remove
-	d.mu.Unlock()
 
 	return resp.ID, nil
 }
@@ -218,10 +217,7 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 	d.logger.Trace("Waiting for container %s to stop...", containerID)
 
 	d.mu.Lock()
-	remove := false
-	if d.removeOnExit != nil {
-		remove = d.removeOnExit[containerID]
-	}
+	remove := d.removeOnExit[containerID]
 	d.mu.Unlock()
 
 	condition := dockercontainer.WaitConditionNotRunning
@@ -233,7 +229,7 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 	select {
 	case err := <-errC:
 		d.logger.Trace("ContainerWait for %s returned error: %v", containerID, err)
-		if errdefs.IsNotFound(err) || client.IsErrNotFound(err) || strings.Contains(err.Error(), "No such container") {
+		if errdefs.IsNotFound(err) || strings.Contains(err.Error(), "No such container") {
 			d.logger.Debug("Container %s not found during wait (possibly already exited and auto-removed), returning 0", containerID)
 			return 0, nil
 		}
@@ -247,9 +243,7 @@ func (d *DockerRuntime) WaitContainer(ctx context.Context, containerID string) (
 // RemoveContainer removes a container.
 func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	d.mu.Lock()
-	if d.removeOnExit != nil {
-		delete(d.removeOnExit, containerID)
-	}
+	delete(d.removeOnExit, containerID)
 	d.mu.Unlock()
 
 	err := d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
