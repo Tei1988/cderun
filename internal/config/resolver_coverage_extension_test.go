@@ -25,6 +25,8 @@ func withPatchedFieldInfo(t *testing.T, key string, mutation func()) {
 	mutation()
 }
 
+// Commented out as the defensive branch in fetchFieldAndParams has been commented out (Item 3 of T65)
+/*
 func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 	cliVal := reflect.ValueOf(&CLIOptions{}).Elem()
 
@@ -34,6 +36,7 @@ func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
 	})
 }
+*/
 
 func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	type testStruct struct {
@@ -97,6 +100,8 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	// Not Parallel because it mutates global fieldInfo or global logger level
 
+	// Commented out as the unreachable defensive branch in fetchFieldAndParams is removed (Item 3 of T65)
+	/*
 	t.Run("registry mismatch for early boolean option", func(t *testing.T) {
 		withPatchedFieldInfo(t, "diagnosis", func() {
 			delete(fieldInfo, "diagnosis")
@@ -116,6 +121,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"image\" not found")
 	})
+	*/
 
 	t.Run("registry mismatch validation with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{
@@ -614,6 +620,8 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
 	})
 
+	// Commented out as the unreachable defensive branch in fetchFieldAndParams is removed (Item 3 of T65)
+	/*
 	t.Run("resolveStandardOptions registry mismatch on bool option", func(t *testing.T) {
 		withPatchedFieldInfo(t, "tty", func() {
 			delete(fieldInfo, "tty")
@@ -657,6 +665,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch: info for option \"dns\" not found")
 	})
+	*/
 
 	t.Run("validateSecurity exhaustive critical fields", func(t *testing.T) {
 		testCases := []struct {
