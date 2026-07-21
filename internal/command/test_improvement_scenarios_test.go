@@ -307,9 +307,10 @@ func TestScenario_Command_UnixSignalWarningsAndHandling(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		var execErr error
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -349,6 +350,9 @@ func TestScenario_Command_UnixSignalWarningsAndHandling(t *testing.T) {
 		// End execution
 		waitChan <- 0
 		<-done
+
+		// Assert ExecuteContextWithOptions executed successfully and returned nil
+		assert.NoError(t, execErr)
 	})
 
 	t.Run("handles forwarding error gracefully", func(t *testing.T) {
@@ -367,9 +371,10 @@ func TestScenario_Command_UnixSignalWarningsAndHandling(t *testing.T) {
 		defer cancel()
 
 		var buf bytes.Buffer
+		var execErr error
 		done := make(chan struct{})
 		go func() {
-			_ = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
@@ -408,6 +413,9 @@ func TestScenario_Command_UnixSignalWarningsAndHandling(t *testing.T) {
 
 		// Verify error was logged as warning
 		assert.Contains(t, buf.String(), "failed to forward signal")
+
+		// Assert ExecuteContextWithOptions executed successfully and returned nil
+		assert.NoError(t, execErr)
 	})
 }
 
