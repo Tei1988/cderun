@@ -148,6 +148,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
+- `--group-add`: Add supplementary groups to the container (group name or GID). Note: containerd only supports numeric GIDs.
 
 #### Mounting & Nested Execution
 
@@ -205,7 +206,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
-  - **Comma (`,`)**: All other list-type variables, including `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
 
 ## Configuration
 

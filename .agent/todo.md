@@ -420,6 +420,11 @@ cderun --prune
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
 
+### `internal/config/resolver_test.go` 内の `ptr` 関数の重複定義によるコンパイルエラー
+
+- **内容**: `internal/config/resolver_test.go` において、`ptr` ヘルパー関数が 11 行目と 1035 行目に二重に定義されており、テストコンパイル時にエラー (`ptr redeclared in this block`) が発生する状態になっている。
+- **対応**: 1035 行目の重複する `ptr` 関数定義を削除することを推奨。 (Recorded by Jules)
+
 ---
 
 ## T24: `--shm-size` フラグの追加
