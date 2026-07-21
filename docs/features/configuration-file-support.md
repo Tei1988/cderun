@@ -99,7 +99,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 #### `defaults` ブロックでサポートされるフィールド
 
-- `tty`, `interactive`, `remove`, `strictEnv` (bool)
+- `readOnly`, `tty`, `interactive`, `remove`, `strictEnv` (bool)
 - `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout` (string)
 - `cpus` (float64)
 - `pullMaxRetries` (int)

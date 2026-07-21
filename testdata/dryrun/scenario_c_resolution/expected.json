@@ -11,6 +11,7 @@
   "mounts": [],
   "network": "bridge",
   "pull": "missing",
+  "read_only": false,
   "remove": true,
   "tty": false,
   "user": "",

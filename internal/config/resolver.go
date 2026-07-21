@@ -19,6 +19,7 @@ import (
 type ResolvedConfig struct {
 	HostContext     *HostContext
 	Image           string
+	ReadOnly        bool
 	TTY             bool
 	Interactive     bool
 	Network         string
@@ -68,6 +69,8 @@ type ResolvedConfig struct {
 
 // CLIOptions represents values from CLI flags.
 type CLIOptions struct {
+	ReadOnly                 bool
+	ReadOnlySet              bool
 	Image                    string
 	ImageSet                 bool
 	TTY                      bool
@@ -78,6 +81,8 @@ type CLIOptions struct {
 	NetworkSet               bool
 	Remove                   bool
 	RemoveSet                bool
+	CderunReadOnly           bool
+	CderunReadOnlySet        bool
 	CderunTTY                bool
 	CderunTTYSet             bool
 	CderunInteractive        bool

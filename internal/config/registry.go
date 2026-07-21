@@ -455,6 +455,19 @@ var StringOptions = []StringOption{
 
 var BoolOptions = []BoolOption{
 	{
+		Name:      "read-only",
+		FieldName: "ReadOnly",
+		EnvKey:    "CDERUN_READ_ONLY",
+		Usage:     "Mount the container's root filesystem as read-only",
+		Default:   false,
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.ReadOnly
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.ReadOnly
+		},
+	},
+	{
 		Name:      "tty",
 		Shorthand: "t",
 		EnvKey:    "CDERUN_TTY",

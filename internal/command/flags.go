@@ -182,6 +182,8 @@ func registerFlags(cmd *cobra.Command, o *rootOptions) {
 
 func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 	switch name {
+	case "read-only":
+		return &o.readOnly, &o.cderunReadOnly
 	case "tty":
 		return &o.tty, &o.cderunTTY
 	case "interactive":

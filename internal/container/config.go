@@ -15,6 +15,7 @@ type ContainerConfig struct {
 	Command []string `json:"command" yaml:"command"`
 
 	// Execution options
+	ReadOnly    bool `json:"read_only" yaml:"read_only"`
 	TTY         bool `json:"tty" yaml:"tty"`
 	Interactive bool `json:"interactive" yaml:"interactive"`
 	Remove      bool `json:"remove" yaml:"remove"`

@@ -408,9 +408,10 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
 		config := &container.ContainerConfig{
-			Image:   "test-image",
-			Command: []string{"ls", "-l"},
-			Env:     []string{"K=V"},
+			Image:    "test-image",
+			ReadOnly: true,
+			Command:  []string{"ls", "-l"},
+			Env:      []string{"K=V"},
 			Expose:  []string{"80/tcp", "53/udp"},
 			Ports:   []string{"8080:80", "5353:53/udp"},
 			Mounts: []container.Mount{
@@ -434,6 +435,7 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		assert.Equal(t, []string{"K=V"}, mock.createConfig.Env)
 		assert.Equal(t, int64(0.5*1e9), mock.createHostConfig.NanoCPUs)
 		assert.Equal(t, int64(1024*1024), mock.createHostConfig.Memory)
+		assert.True(t, mock.createHostConfig.ReadonlyRootfs)
 		assert.Len(t, mock.createHostConfig.Mounts, 4)
 		assert.Len(t, mock.createHostConfig.Devices, 1)
 		assert.NotNil(t, mock.createConfig.ExposedPorts)

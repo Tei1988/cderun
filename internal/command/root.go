@@ -47,6 +47,7 @@ func (e *ExitCodeError) Unwrap() error {
 }
 
 type rootOptions struct {
+	readOnly              bool
 	tty                   bool
 	interactive           bool
 	network               string
@@ -57,6 +58,7 @@ type rootOptions struct {
 	mountCderunPath       string
 	image                 string
 	remove                bool
+	cderunReadOnly        bool
 	cderunTTY             bool
 	cderunInteractive     bool
 	cderunImage           string
@@ -280,6 +282,10 @@ func (o *rootOptions) ensureHooks() {
 
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
 	cliOpts := config.CLIOptions{
+		ReadOnly:                 o.readOnly,
+		ReadOnlySet:              cmd.Flags().Changed("read-only"),
+		CderunReadOnly:           o.cderunReadOnly,
+		CderunReadOnlySet:        cmd.Flags().Changed("cderun-read-only"),
 		Image:                    o.image,
 		ImageSet:                 cmd.Flags().Changed("image"),
 		TTY:                      o.tty,
@@ -575,6 +581,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	containerConfig := &container.ContainerConfig{
 		Image:       resolved.Image,
 		Command:     fullCommand,
+		ReadOnly:    resolved.ReadOnly,
 		TTY:         resolved.TTY,
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,

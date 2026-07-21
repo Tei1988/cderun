@@ -51,6 +51,7 @@ func (c *CDERunConfig) SetBaseDir(baseDir string) error {
 }
 
 type ConfigDefaults struct {
+	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
 	TTY             *bool          `yaml:"tty,omitempty"`
 	Interactive     *bool          `yaml:"interactive,omitempty"`
 	Network         string         `yaml:"network,omitempty"`
@@ -93,6 +94,7 @@ type ConfigDefaults struct {
 
 func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res := d
+	res.ReadOnly = copyBoolPtr(d.ReadOnly)
 	res.TTY = copyBoolPtr(d.TTY)
 	res.Interactive = copyBoolPtr(d.Interactive)
 	res.Remove = copyBoolPtr(d.Remove)
@@ -183,6 +185,7 @@ type MountMapping struct {
 
 type ToolConfig struct {
 	Image           string         `yaml:"image"`
+	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
 	TTY             *bool          `yaml:"tty,omitempty"`
 	Interactive     *bool          `yaml:"interactive,omitempty"`
 	Network         string         `yaml:"network,omitempty"`
@@ -228,6 +231,7 @@ type ToolConfig struct {
 
 func (t ToolConfig) DeepCopy() ToolConfig {
 	res := t
+	res.ReadOnly = copyBoolPtr(t.ReadOnly)
 	res.TTY = copyBoolPtr(t.TTY)
 	res.Interactive = copyBoolPtr(t.Interactive)
 	res.Remove = copyBoolPtr(t.Remove)

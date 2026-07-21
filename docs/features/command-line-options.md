@@ -268,6 +268,17 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js  # コンテナを残す
 ```
 
+### `--read-only`
+
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_READ_ONLY`
+- **説明**: コンテナのルートファイルシステムを読み取り専用としてマウントする
+
+```bash
+cderun --read-only node app.js
+```
+
 ### `--publish`, `-p`
 
 - **型**: stringArray
