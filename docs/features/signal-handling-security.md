@@ -7,18 +7,15 @@ cderun provides secure mechanisms for signaling containers, ensuring that signal
 All signals sent via the `SignalContainer` method (available in both Docker and Mock runtimes) are validated against a case-insensitive regular expression:
 `^(?i)[A-Z0-9]+$`
 
-This regex pattern ensures that:
+This regex pattern ensures that only alphanumeric characters are accepted, preventing any shell metacharacters, whitespace, or control characters from being passed to the runtime. This effectively blocks command injection into the underlying shell or container runtime.
 
-- Standard signal names (e.g., `TERM`, `KILL`, `HUP`) are accepted.
-- Signal names with the `SIG` prefix (e.g., `SIGTERM`, `SIGINT`) are accepted.
-- Numeric signal values (e.g., `9`, `15`) are accepted.
-- Any string containing shell metacharacters, whitespace, or control characters is rejected.
+Note that this validation acts as a character whitelist rather than a static signal allowlist; unknown alphanumeric signals are passed to the engine, which will subsequently handle any unsupported signal errors natively.
 
 ## Runtime Isolation
 
-Signal validation is implemented at the runtime abstraction layer. This prevents malicious subcommands or environment-based overrides from injecting arbitrary commands into the runtime's signal delivery path (e.g., `SIGTERM; rm -rf /`).
+Signal validation is implemented at the runtime abstraction layer. This prevents malicious subcommands or environment-based overrides from injecting arbitrary commands or metacharacters into the runtime's signal delivery path (e.g., `SIGTERM; rm -rf /`).
 
-If an invalid signal is provided, the runtime returns an error immediately without making any calls to the underlying engine (e.g., the Docker API).
+If a signal containing restricted characters is provided, the validation fails immediately, preventing potential injection vulnerabilities before any calls are made to the underlying engine.
 
 ## Error Handling
 
