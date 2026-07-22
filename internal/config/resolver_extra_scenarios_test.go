@@ -1,8 +1,11 @@
 package config
 
 import (
+	"bytes"
 	"path"
 	"testing"
+
+	"cderun/internal/logging"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -189,4 +192,115 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 		assert.Equal(t, "docker.sock", path.Base("/var/run/docker.sock"))
 		assert.Equal(t, "podman.sock", path.Base("/run/podman/podman.sock"))
 	})
+}
+
+// TestUnit_Config_Resolver_CPUsAndMemorySecurityValidation validates CPUs and Memory non-negative constraints.
+func TestUnit_Config_Resolver_CPUsAndMemorySecurityValidation(t *testing.T) {
+	t.Parallel()
+
+	mfs := &MockFileSystem{}
+
+	t.Run("negative cpus is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CPUs:     -1.5,
+			CPUsSet:  true,
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for \"cpus\": must be non-negative")
+	})
+
+	t.Run("valid zero cpus is accepted", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CPUs:     0.0,
+			CPUsSet:  true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, 0.0, res.CPUs)
+	})
+
+	t.Run("valid positive cpus is accepted", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CPUs:     2.5,
+			CPUsSet:  true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, 2.5, res.CPUs)
+	})
+}
+
+// TestUnit_Config_Resolver_HighlyPrivilegedCapabilitiesWarning validates warnings are logged for dangerous capabilities.
+func TestUnit_Config_Resolver_HighlyPrivilegedCapabilitiesWarning(t *testing.T) {
+	// Not running parallel because we manipulate the global logger output and level
+	mfs := &MockFileSystem{}
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+	defer func() {
+		logging.SetOutput(origWriter)
+		logging.GetGlobalLogger().SetLevel(origLevel)
+	}()
+
+	tests := []struct {
+		name       string
+		capAdd     []string
+		wantWarn   bool
+		warnSearch string
+	}{
+		{
+			name:       "SYS_ADMIN capability warns",
+			capAdd:     []string{"SYS_ADMIN"},
+			wantWarn:   true,
+			warnSearch: "Container is running with highly privileged capability \"SYS_ADMIN\"",
+		},
+		{
+			name:       "CAP_NET_ADMIN capability warns (with CAP_ prefix)",
+			capAdd:     []string{"CAP_NET_ADMIN"},
+			wantWarn:   true,
+			warnSearch: "Container is running with highly privileged capability \"CAP_NET_ADMIN\"",
+		},
+		{
+			name:       "ALL capability warns",
+			capAdd:     []string{"ALL"},
+			wantWarn:   true,
+			warnSearch: "Container is running with highly privileged capability \"ALL\"",
+		},
+		{
+			name:       "Safe capability (SYS_CHROOT) does not warn",
+			capAdd:     []string{"SYS_CHROOT"},
+			wantWarn:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logging.SetOutput(&buf)
+
+			cli := &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				CapAdd:   tt.capAdd,
+			}
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.NoError(t, err)
+
+			output := buf.String()
+			if tt.wantWarn {
+				assert.Contains(t, output, "[WARN]")
+				assert.Contains(t, output, tt.warnSearch)
+			} else {
+				assert.NotContains(t, output, "[WARN]")
+			}
+		})
+	}
 }

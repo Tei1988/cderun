@@ -1220,6 +1220,15 @@ func (rv *resolver) validateSecurity() error {
 			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 		}
 	}
+	for _, cap := range rv.res.CapAdd {
+		upperCap := strings.ToUpper(cap)
+		cleanCap := strings.TrimPrefix(upperCap, "CAP_")
+		if cleanCap == "ALL" || cleanCap == "SYS_ADMIN" || cleanCap == "NET_ADMIN" || cleanCap == "SYS_RAWIO" || cleanCap == "SYS_PTRACE" || cleanCap == "SYS_MODULE" {
+			if logging.Enabled(logging.WarnLevel) {
+				logging.Warn("Container is running with highly privileged capability %q. This reduces container isolation and may pose security risks.", cap)
+			}
+		}
+	}
 	return nil
 }
 
@@ -1286,6 +1295,12 @@ func (rv *resolver) validateCriticalFields() error {
 				return fmt.Errorf("security validation failed for %q: %w", f.name, err)
 			}
 		}
+	}
+	if rv.res.CPUs < 0 {
+		return fmt.Errorf("security validation failed for %q: must be non-negative: %f", "cpus", rv.res.CPUs)
+	}
+	if rv.res.Memory < 0 {
+		return fmt.Errorf("security validation failed for %q: must be non-negative: %d", "memory", rv.res.Memory)
 	}
 	return nil
 }
