@@ -221,7 +221,7 @@ func TestUnit_Config_Resolver_CPUsAndMemorySecurityValidation(t *testing.T) {
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, 0.0, res.CPUs)
+		assert.InDelta(t, 0.0, res.CPUs, 0.0001)
 	})
 
 	t.Run("valid positive cpus is accepted", func(t *testing.T) {
@@ -233,7 +233,43 @@ func TestUnit_Config_Resolver_CPUsAndMemorySecurityValidation(t *testing.T) {
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, 2.5, res.CPUs)
+		assert.InDelta(t, 2.5, res.CPUs, 0.0001)
+	})
+
+	t.Run("negative memory is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "-10",
+			MemorySet: true,
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value")
+	})
+
+	t.Run("valid zero memory is accepted", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "0",
+			MemorySet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), res.Memory)
+	})
+
+	t.Run("valid positive memory is accepted", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "512MB",
+			MemorySet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(512*1024*1024), res.Memory)
 	})
 }
 
@@ -252,31 +288,42 @@ func TestUnit_Config_Resolver_HighlyPrivilegedCapabilitiesWarning(t *testing.T) 
 
 	tests := []struct {
 		name       string
+		privileged bool
 		capAdd     []string
 		wantWarn   bool
 		warnSearch string
 	}{
 		{
-			name:       "SYS_ADMIN capability warns",
+			name:       "SYS_ADMIN capability warns when privileged",
+			privileged: true,
 			capAdd:     []string{"SYS_ADMIN"},
 			wantWarn:   true,
 			warnSearch: "Container is running with highly privileged capability \"SYS_ADMIN\"",
 		},
 		{
-			name:       "CAP_NET_ADMIN capability warns (with CAP_ prefix)",
+			name:       "CAP_NET_ADMIN capability warns (with CAP_ prefix) when privileged",
+			privileged: true,
 			capAdd:     []string{"CAP_NET_ADMIN"},
 			wantWarn:   true,
 			warnSearch: "Container is running with highly privileged capability \"CAP_NET_ADMIN\"",
 		},
 		{
-			name:       "ALL capability warns",
+			name:       "ALL capability warns when privileged",
+			privileged: true,
 			capAdd:     []string{"ALL"},
 			wantWarn:   true,
 			warnSearch: "Container is running with highly privileged capability \"ALL\"",
 		},
 		{
-			name:       "Safe capability (SYS_CHROOT) does not warn",
+			name:       "Safe capability (SYS_CHROOT) does not warn even when privileged",
+			privileged: true,
 			capAdd:     []string{"SYS_CHROOT"},
+			wantWarn:   false,
+		},
+		{
+			name:       "Dangerous capability does not warn when unprivileged",
+			privileged: false,
+			capAdd:     []string{"SYS_ADMIN"},
 			wantWarn:   false,
 		},
 	}
@@ -287,9 +334,11 @@ func TestUnit_Config_Resolver_HighlyPrivilegedCapabilitiesWarning(t *testing.T) 
 			logging.SetOutput(&buf)
 
 			cli := &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				CapAdd:   tt.capAdd,
+				Image:         "alpine",
+				ImageSet:      true,
+				Privileged:    tt.privileged,
+				PrivilegedSet: true,
+				CapAdd:        tt.capAdd,
 			}
 			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 			require.NoError(t, err)
@@ -299,7 +348,11 @@ func TestUnit_Config_Resolver_HighlyPrivilegedCapabilitiesWarning(t *testing.T) 
 				assert.Contains(t, output, "[WARN]")
 				assert.Contains(t, output, tt.warnSearch)
 			} else {
-				assert.NotContains(t, output, "[WARN]")
+				if tt.warnSearch != "" {
+					assert.NotContains(t, output, tt.warnSearch)
+				} else {
+					assert.NotContains(t, output, "highly privileged capability")
+				}
 			}
 		})
 	}

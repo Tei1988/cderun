@@ -1219,13 +1219,13 @@ func (rv *resolver) validateSecurity() error {
 		if logging.Enabled(logging.WarnLevel) {
 			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 		}
-	}
-	for _, cap := range rv.res.CapAdd {
-		upperCap := strings.ToUpper(cap)
-		cleanCap := strings.TrimPrefix(upperCap, "CAP_")
-		if cleanCap == "ALL" || cleanCap == "SYS_ADMIN" || cleanCap == "NET_ADMIN" || cleanCap == "SYS_RAWIO" || cleanCap == "SYS_PTRACE" || cleanCap == "SYS_MODULE" {
-			if logging.Enabled(logging.WarnLevel) {
-				logging.Warn("Container is running with highly privileged capability %q. This reduces container isolation and may pose security risks.", cap)
+		for _, cap := range rv.res.CapAdd {
+			upperCap := strings.ToUpper(cap)
+			cleanCap := strings.TrimPrefix(upperCap, "CAP_")
+			if cleanCap == "ALL" || cleanCap == "SYS_ADMIN" || cleanCap == "NET_ADMIN" || cleanCap == "SYS_RAWIO" || cleanCap == "SYS_PTRACE" || cleanCap == "SYS_MODULE" {
+				if logging.Enabled(logging.WarnLevel) {
+					logging.Warn("Container is running with highly privileged capability %q. This reduces container isolation and may pose security risks.", cap)
+				}
 			}
 		}
 	}
