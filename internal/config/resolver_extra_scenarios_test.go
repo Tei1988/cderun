@@ -190,3 +190,63 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 		assert.Equal(t, "podman.sock", path.Base("/run/podman/podman.sock"))
 	})
 }
+
+// TestUnit_Config_Resolver_InvalidEnvValues verifies that invalid bool, int, and float64
+// values supplied via environment variables correctly trigger an InvalidConfigError during resolution.
+func TestUnit_Config_Resolver_InvalidEnvValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		envKey        string
+		envVal        string
+		expectedField string
+	}{
+		{
+			name:          "invalid boolean value for CDERUN_TTY",
+			envKey:        "CDERUN_TTY",
+			envVal:        "yes",
+			expectedField: "CDERUN_TTY",
+		},
+		{
+			name:          "invalid boolean value for CDERUN_INTERACTIVE",
+			envKey:        "CDERUN_INTERACTIVE",
+			envVal:        "invalid",
+			expectedField: "CDERUN_INTERACTIVE",
+		},
+		{
+			name:          "invalid integer value for CDERUN_PULL_MAX_RETRIES",
+			envKey:        "CDERUN_PULL_MAX_RETRIES",
+			envVal:        "abc",
+			expectedField: "CDERUN_PULL_MAX_RETRIES",
+		},
+		{
+			name:          "invalid float value for CDERUN_CPUS",
+			envKey:        "CDERUN_CPUS",
+			envVal:        "two",
+			expectedField: "CDERUN_CPUS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mfs := &MockFileSystem{
+				Env: map[string]string{
+					tt.envKey: tt.envVal,
+				},
+			}
+			cli := &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.Error(t, err)
+
+			var cfgErr *InvalidConfigError
+			require.ErrorAs(t, err, &cfgErr)
+			assert.Equal(t, tt.expectedField, cfgErr.Field)
+			assert.Equal(t, tt.envVal, cfgErr.Value)
+		})
+	}
+}
