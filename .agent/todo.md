@@ -70,8 +70,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
 | T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
-| T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
-| T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
+| T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンア
+| T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | DONE |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | DONE |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
@@ -1199,27 +1199,6 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 
 - attach 中に Remove しても notify が失われないテスト
 - インターフェースコメントと warn ログの追加
-
----
-
-## T65: dead code 削除・小規模クリーンアップ一括
-
-- 種別: クリーンアップ
-- 優先度: 低
-- 対象: 下記の各箇所（挙動変更なし）
-
-### 内容
-
-1. `internal/config/resolver.go:229-232` — 未使用の `ptr[T]` ヘルパー。`// ResolveWithFS combines...` の doc コメントが誤ってこの関数に付いている。関数を削除し、コメントを本来の `ResolveWithFS`（`resolver.go:748`）に移す
-2. `internal/config/path.go:389` — `magicWordPreRegex` はコンパイルされるが全リポジトリで未参照。削除
-3. `internal/config/resolver.go:323-325` — `initFieldInfo`（`resolver.go:283-285`）の挿入条件により到達不能な防御分岐。削除またはコメント化
-4. `internal/runtime/docker_adapter.go:61` — `Tmpfs: make(map[string]string)` は生成後一切書き込まれない dead フィールド初期化（tmpfs は `Mounts` 経由で処理済み）。削除
-5. `internal/runtime/docker.go:40` — `signalRegex` の第 2 選択肢が第 1・第 3 を包含しており実質 `^(?i)[A-Z0-9]+$`。containerd の `parseSignal`（`containerd.go:486-514`）流の検証に揃えるか正規表現を簡潔化
-6. `internal/config/registry.go:208-217` — `sensitive-env` が `resolveEarly`（`resolver.go:830-849`）と `resolveCustomParsing`（`resolver.go:1086-1094`）で二重解決されている。registry エントリに `SkipResolution: true // resolved early in resolveEarly (needed for masking during resolution)` を付ける
-
-### 完了条件
-
-- 全項目適用後、既存テストが全パス（挙動変更なしの確認）
 
 ---
 

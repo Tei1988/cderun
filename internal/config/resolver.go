@@ -318,11 +318,7 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
 }
 
 func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
-	info, ok := fieldInfo[key]
-	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
-	}
-
+	info := fieldInfo[key]
 	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
 	p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
 	return info, p1Set, p1Val, p2Set, p2Val, nil
