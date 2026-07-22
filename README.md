@@ -7,6 +7,18 @@
 > or `git` on demand using container runtimes (Docker/Podman). It keeps your
 > host clean and ensures reproducible environments defined in a single YAML file.
 
+```text
+Host Environment                 Ephemeral Container
+┌─────────────────────────┐      ┌─────────────────────────┐
+│  $ node app.js          │ ───> │  [cderun]               │
+│                         │      │  Running node:20-alpine │
+│  (No Node.js installed  │      │  Mounts: . -> /app      │
+│   on host machine)      │      │  I/O: Synchronized      │
+└─────────────────────────┘      └─────────────────────────┘
+```
+
+---
+
 ## Usage
 
 `cderun` supports four primary modes of operation:
@@ -55,6 +67,8 @@ and available tools. This mode does not require a subcommand.
 cderun --diagnosis
 ```
 
+---
+
 ## Argument Parsing & Flags
 
 `cderun` uses a strict boundary for argument parsing. The first non-flag argument is considered the **subcommand**. This subcommand acts as a lookup key for configuration.
@@ -76,7 +90,7 @@ cderun --tty docker --tty
   +---------------------- cderun command
 ```
 
-### P1 Internal Overrides
+### P1 Internal Overrides & Hoisting Mechanics
 
 Flags prefixed with `--cderun-` are **"Internal Overrides" (P1)**. They have the highest priority in the resolution hierarchy.
 
@@ -99,17 +113,24 @@ cderun node app.js --cderun-image node:20-alpine
 cderun --cderun-image node:20-alpine node app.js
 ```
 
-#### Hoisting Mechanics
+#### Detailed Hoisting Mechanics
 
 Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
 
-1. **Detection**: `cderun` scans for the **subcommand** boundary.
+1. **Boundary Detection**: `cderun` scans for the subcommand boundary. It robustly identifies standard and persistent flags that take arguments (such as `--image`) to avoid misidentifying values as subcommands.
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
 3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
 
 This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
-**Note on Diagnosis Mode**: In `--diagnosis` mode, since no subcommand boundary exists, P1 flags can be placed anywhere.
+#### Double-Dash (`--`) Delimiter Support
+
+To prevent recursive hoisting for literal arguments, `cderun` respects the `--` (double-dash) delimiter. Any arguments appearing after `--` are treated as literal strings and are **not** hoisted, even if they are prefixed with `--cderun-`.
+
+```bash
+# The '--cderun-tty' after '--' is passed literally to 'echo'
+cderun echo -- --cderun-tty
+```
 
 ### Available Flags
 
@@ -148,6 +169,7 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
+- `--group-add`: Add supplementary groups to the container (group name or GID). Note: containerd only supports numeric GIDs.
 
 #### Mounting & Nested Execution
 
@@ -175,9 +197,115 @@ This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**
 
 *(All flags have a corresponding `--cderun-` prefixed P1 override counterpart.)*
 
+---
+
+## Value Resolution & Expression Engine
+
+`cderun` features a unified dynamic value resolution engine (`ExpressionResolver`) that evaluates string inputs, slices, and maps recursively in configuration files and CLI flags.
+
+### 1. Expressions (`{{...}}`)
+
+Expressions can be used to inject host-context or dynamic values into options like `--image`, `--env`, and `--mount`:
+
+- **Magic Words**:
+  - `{{HOME}}`: Resolves to the user's home directory path.
+  - `{{PWD}}`: Resolves to the current working directory of the execution host.
+  - `{{BASE_HOME}}`: Path to the home directory on the *base host* (Level 0 physical machine/VM), ensuring correct referencing even when executing recursively inside a nested container.
+  - `{{BASE_PWD}}`: Path to the working directory on the *base host*.
+- **Directives**:
+  - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`).
+  - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`).
+  - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
+
+### 2. Tilde Expansion & Relative Path Resolution
+
+Paths starting with `~` or `~/` are expanded to the home directory. Relative paths starting with `./` or `../` are automatically resolved to absolute paths relative to:
+
+- The configuration file's parent directory (for YAML properties).
+- The current working directory (`{{PWD}}`) (for CLI flags).
+
+### 3. Anchor Boundary Validation & Directory Traversal Prevention
+
+To maintain strict security boundaries, any path resolved via expressions or tildes undergoes **Anchor Boundary Validation**.
+
+- **Rule**: The finalized absolute path must remain within the boundary directory defined by the expression's anchor (e.g., `{{HOME}}` or `{{PWD}}`).
+- **Directory Traversal Defense**: Parent traversals using `..` (such as `../`) are allowed within anchor-based path resolution, provided that the normalized final absolute path remains within the anchor's boundary directory (e.g., `{{HOME}}/Documents/..` resolves to `{{HOME}}` and is permitted). However, any traversals that escape the anchor's boundary directory (such as `{{HOME}}/..` or `{{HOME}}/../../etc/passwd`) will trigger an immediate validation error. Absolute paths are strictly forbidden inside local subpaths for safety.
+
+### 4. "Sticky Error" Pattern
+
+The value resolution engine implements a **Sticky Error** pattern. The very first validation or resolution error encountered is stored internally. Subsequent resolution attempts gracefully return the original raw (unresolved) string to avoid compounding errors, and the final execution is securely aborted by propagating the retained error.
+
+---
+
+## Nested Execution Support
+
+`cderun` supports running itself inside a container recursively. This enables nested environments where tools within containers can call other containerized tools seamlessly.
+
+### 1. Snapshotting & Context Propagation
+
+When nested execution is triggered (via `--mount-cderun`, `--mount-tools`, etc., or when executing inside a Level 1+ container), `cderun` creates a safe execution snapshot:
+
+- Generates a directory `/tmp/cderun-snap-<uuid>/` with `0700` permission.
+- Writes `.cderun.yaml` and `.tools.yaml` with `0600` permission containing merged configurations.
+- Appends `hostContext` metadata indicating `binPath`, `snapshotDir`, `workingDir`, `level`, and active host-container mount mappings.
+
+### 2. Reverse Path Resolution
+
+Because container runtimes (Docker/Podman) run on the base host, any nested mount requests must specify a host-accessible path. `cderun` translates container-local paths back to host paths using `hostContext.mounts` mapping.
+
+- **Matching Rule**: Matches target paths using a **longest-match** prefix-matching heuristic, falling back to the deepest nesting level to ensure correct base-host mapping.
+
+### 3. macOS Setup Constraints
+
+Nested execution on macOS requires special consideration because containers run inside a Linux VM:
+
+- **Architecture**: A Linux-compiled binary of `cderun` (e.g., `cderun_linux_arm64` or `cderun_linux_amd64`) must be mounted instead of the macOS binary. Specify this with `--mount-cderun-path`.
+- **Socket Permissions**: You must specify the VM's numeric socket Group ID explicitly via the `--cderun-group-add` CLI flag or `groupAdd` array (e.g. `"102"`) so the container user is granted access.
+
+- See [Advanced Usage: Nested Execution on macOS](USAGE.md) for detailed step-by-step instructions.
+
+---
+
+## Sensitive Data Masking
+
+`cderun` enforces a "Secure by Default" posture to protect your secrets.
+
+- **Default Masking (Mask-all)**: If `--sensitive-env` is unset, **all** environment variable values are automatically masked as `[REDACTED]` in dry-run outputs and debug logs.
+- **Pattern Matching**: Specify a list of glob patterns (e.g., `DB_*`, `*_PASSWORD`) in `--sensitive-env` to selectively mask matching keys while leaving other keys plaintext.
+- **Disabling Masking**: Pass an explicit empty value (e.g. `--sensitive-env=""` or `sensitiveEnv: []` in YAML) to disable masking.
+- **Hardening**: Error messages, dry-run values, and log records are securely quoted and validated to prevent log injection or terminal disruption.
+
+---
+
+## Multi-Runtime Support & Auto-detection
+
+`cderun` integrates natively with standard container engines and supports **Docker**, **Podman**, and experimental **containerd**.
+
+### 1. Auto-detection Socket Sequence
+
+If no engine is explicitly specified, `cderun` checks for socket files in the following priority order:
+
+1. `/var/run/docker.sock` (Docker)
+2. `/run/containerd/containerd.sock` (containerd)
+3. `/run/podman/podman.sock` (Podman)
+
+Matches are isolated to the path's base name to avoid misdetection in nested paths. If no socket is found, it defaults to `docker` at `/var/run/docker.sock`.
+
+### 2. containerd Runtime Limitations
+
+Direct containerd integration operates natively via the containerd gRPC API. Please note the following constraints:
+
+- **Platform**: direct containerd is **Linux-only** (`//go:build linux`).
+- **Networking**: Only `host` networking is supported; default `bridge` network is not supported.
+- **Ports & DNS**: Port mapping (`--publish`), exposure (`--expose`), custom DNS (`--dns`), and host mapping (`--add-host`) are not supported.
+- **Mounts**: Named volume-type mounts are not supported (use `bind` or `tmpfs` mounts).
+- **Adaptation Contract**: The containerd adapter enforces a strict contract to validate and convert Docker-compatible fields (e.g. mapping capabilities like `SYS_ADMIN` to `CAP_SYS_ADMIN`), returning explicit errors for unsupported fields rather than passing them through silently.
+
+---
+
 ## Environment Variables
 
-`cderun` can be configured using environment variables. Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variable (e.g., `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_REMOVE`).
+Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variable (e.g., `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_REMOVE`).
 
 Key variables include:
 
@@ -205,7 +333,9 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
-  - **Comma (`,`)**: All other list-type variables, including `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+
+---
 
 ## Configuration
 
@@ -242,73 +372,7 @@ python:
   image: python:3.11-slim
 ```
 
-## Features
-
-### Multi-Runtime Support & Auto-detection
-
-`cderun` supports **Docker** and **Podman**, plus experimental **containerd**
-support.
-
-**containerd limitations**:
-
-- **Platform Restriction**: Direct containerd execution is **Linux-only** (built with Go `//go:build linux` build tag). It cannot run natively on macOS or Windows without virtualized container engines like Docker Desktop or Podman.
-- Only the `host` network is supported (default `bridge` network is not supported).
-- Port mapping/exposure (`--publish`, `--publish-all`, `--expose`) is not supported.
-- Custom DNS settings (`--dns`) and host mappings (`--add-host`) are not supported.
-- `volume` type mounts are not supported (use `bind` or `tmpfs`).
-
-`cderun` can automatically detect the available runtime by checking for common Unix socket paths, in the order docker → containerd → podman.
-
-### Intelligent Argument Parsing
-
-- Strict boundary parsing separates `cderun` flags from subcommand arguments.
-- Prevents flag conflicts between `cderun` and wrapped commands.
-- Supports complex command structures with P1 internal overrides.
-
-### Polyglot Entry Point
-
-- Single binary can act as multiple tools via symlinks.
-- Automatic tool detection from executable name.
-- Seamless integration with existing workflows.
-
-### Advanced Tool Mounting
-
-- Mount the `cderun` binary and other defined tools into the container.
-- Enables recursive container execution without installing tools
-  in the container image.
-
-### Nested Execution Support
-
-- Transparently handles `cderun` execution inside a `cderun`-managed container.
-- Automatically propagates host context and settings via snapshots.
-- **Reverse Path Resolution**: Translates container-local paths back to host paths for nested mounts, ensuring the host-side Docker/Podman daemon can resolve volume sources.
-- **OverlayFS Detection**: Automatically detects the root filesystem's `upperdir` to map container files back to the host.
-- **macOS Setup**: For configuring nested execution in macOS environments, see [Advanced Usage: Nested Execution on macOS](USAGE.md).
-
-### Sensitive Data Masking
-
-`cderun` protects your secrets. By default, **all** environment variable values are masked (`[REDACTED]`) in:
-
-- Dry-run output (`--dry-run`)
-- Debug logs (`--log-level debug`)
-
-This "Secure by Default" approach ensures that no credentials are accidentally leaked. You can customize this behavior using the `--sensitive-env` flag to only mask specific patterns (e.g., `*_PASSWORD`, `API_*`).
-
-### Unified Value Resolution
-
-cderun dynamically resolves values in both configuration files and CLI flags.
-
-- **Expressions**: Use `{{...}}` syntax to inject dynamic values.
-  - **Magic Words**: `{{HOME}}`, `{{PWD}}`, `{{BASE_HOME}}`, `{{BASE_PWD}}`
-  - **Directives**:
-    - `{{file:name}}`: Read content from a file (e.g., `{{file:.go-version}}`).
-    - `{{find_dir:name}}`: Find a file/dir and return its absolute directory path (e.g., `{{find_dir:.git}}`).
-    - `{{env:KEY:-default}}`: Inject environment variables with optional default value.
-- **Tilde Expansion**: `~` and `~/` paths at the beginning of a string are expanded to the user's home directory.
-- **Relative Path Handling**: Paths like `./src` are resolved to absolute paths based on the context (e.g., the directory containing the `.tools.yaml` file).
-- **Security**: All resolved paths undergo **Anchor Boundary Validation** to prevent directory traversal. Paths cannot escape their defined anchor (like `{{HOME}}` or `{{PWD}}`).
-
-See [Value Resolution](docs/features/value-resolution.md) for detailed specifications and security constraints.
+---
 
 ## Best Practices
 
@@ -344,6 +408,8 @@ Leverage environment variables with default values to switch between different i
 # Uses NODE_VERSION env var if set, otherwise falls back to 20-alpine
 cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 ```
+
+---
 
 ## Development & Testing
 
