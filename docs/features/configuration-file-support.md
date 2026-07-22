@@ -76,7 +76,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 #### マージのルール
 
 - 検索された順序（優先順位の高い順）で設定ファイルの内容が読み込まれ、マージされます。
-- **リスト型の設定（`mounts`, `env`, `ports`, `groupAdd`, `devices`, `sensitiveEnv` など）について**:
+- **リスト型の設定（`mounts`, `env`, `ports`, `devices`, `sensitiveEnv` など）について**:
   これらの設定は、**「上書き（完全置き換え）」**となります。優先順位の高いファイルに定義があれば、低いファイルの内容はすべて無視されます。マージ（追加）はされません。
 
 ## 設定スキーマ
@@ -105,7 +105,7 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 - `pullMaxRetries` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
 - `mountCderunPath`, `mountSocketPath` (ConfigPath object/string)
-- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
+- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)

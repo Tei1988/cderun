@@ -171,34 +171,6 @@ func deduplicateEnv(env []string) []string {
 	if len(env) <= 1 {
 		return env
 	}
-	if len(env) <= 8 {
-		var keys [8]string
-		var vals [8]string
-		size := 0
-
-		for _, e := range env {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx != -1 {
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
-
-		res := make([]string, size)
-		copy(res, vals[:size])
-		return res
-	}
-
 	m := make(map[string]string, len(env))
 	keys := make([]string, 0, len(env))
 	addEnv(m, &keys, env)
@@ -224,40 +196,6 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 	if len(base) == 0 && len(p2) == 0 && len(p1) > 0 {
 		return deduplicateEnv(p1)
-	}
-
-	if total <= 8 {
-		var keys [8]string
-		var vals [8]string
-		size := 0
-
-		add := func(env []string) {
-			for _, e := range env {
-				key, _, _ := strings.Cut(e, "=")
-				foundIdx := -1
-				for j := 0; j < size; j++ {
-					if keys[j] == key {
-						foundIdx = j
-						break
-					}
-				}
-				if foundIdx != -1 {
-					vals[foundIdx] = e
-				} else {
-					keys[size] = key
-					vals[size] = e
-					size++
-				}
-			}
-		}
-
-		add(base)
-		add(p2)
-		add(p1)
-
-		res := make([]string, size)
-		copy(res, vals[:size])
-		return res
 	}
 
 	m := make(map[string]string, total)

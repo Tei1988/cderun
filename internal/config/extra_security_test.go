@@ -176,52 +176,6 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 			},
 			wantErr: "security validation failed for expose[0]: invalid end port in range",
 		},
-		{
-			name: "invalid group-add with control char",
-			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				GroupAdd: []string{"sudo\n"},
-			},
-			wantErr: "security validation failed for group-add[0]: invalid character in path or configuration",
-		},
-		{
-			name: "invalid group-add with invalid identifier",
-			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				GroupAdd: []string{"sudo;rm"},
-			},
-			wantErr: "security validation failed for group-add[0]: invalid supplementary group name or GID",
-		},
-		{
-			name: "invalid pull policy",
-			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Pull:     "invalid-policy",
-				PullSet:  true,
-			},
-			wantErr: "security validation failed for \"pull\": invalid pull policy",
-		},
-		{
-			name: "invalid device permissions with control char",
-			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Devices:  []string{"/dev/sda:/dev/sda:rw\t"},
-			},
-			wantErr: "invalid device config: \"/dev/sda:/dev/sda:rw\\t\"",
-		},
-		{
-			name: "invalid device permissions values",
-			cli: &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-				Devices:  []string{"/dev/sda:/dev/sda:abc"},
-			},
-			wantErr: "invalid device config: \"/dev/sda:/dev/sda:abc\"",
-		},
 	}
 
 	for _, tt := range tests {

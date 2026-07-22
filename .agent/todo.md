@@ -54,7 +54,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
 | T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | DONE |
-| T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | DONE |
+| T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | - |
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | DONE |
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
@@ -419,11 +419,6 @@ cderun --prune
 
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
-
-### `internal/config/resolver_test.go` 内の `ptr` 関数の重複定義によるコンパイルエラー
-
-- **内容**: `internal/config/resolver_test.go` において、`ptr` ヘルパー関数が 11 行目と 1035 行目に二重に定義されており、テストコンパイル時にエラー (`ptr redeclared in this block`) が発生する状態になっている。
-- **対応**: 1035 行目の重複する `ptr` 関数定義を削除することを推奨。 (Recorded by Jules)
 
 ---
 
@@ -972,6 +967,27 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 ### 完了条件
 
 - 「下位レイヤーで相対 `mountCderunPath` を指定 + 上位レイヤーで未指定」の合成テストで、下位レイヤーのディレクトリ基準で解決されること
+
+---
+
+## T48: Docker AutoRemove と `WaitContainer` の競合で exit code が失われる
+
+- 種別: バグ修正（競合）
+- 優先度: 中
+- 対象: `internal/runtime/docker.go:206-217`（`WaitContainer`）、`internal/runtime/docker_adapter.go:53`（`AutoRemove = config.Remove`）、`internal/command/root.go:767, 951`
+
+### 問題
+
+`HostConfig.AutoRemove = config.Remove`（デフォルト true）の状態で、`StartContainer` 後に `ContainerWait(..., WaitConditionNotRunning)` を発行している。コンテナが即終了してデーモンが auto-remove を完了した後に wait が登録されると `errC` が "No such container" となり、実 exit code が失われて "failed to wait for container" になる。Docker CLI は auto-remove 時に `WaitConditionRemoved` を使い、start 前に wait を登録することでこれを回避している。
+
+### 方針
+
+- `config.Remove` に応じて wait condition を `WaitConditionRemoved` に切り替える（`WaitContainer` に Remove を渡すか、Create 時に記憶する）
+- 加えて NotFound エラー時は失敗ではなくグレースフルにフォールバックする
+
+### 完了条件
+
+- 即終了コンテナ（例: `true` コマンド）+ `--remove` で exit code が正しく取得できるテスト（フレーク検証のため繰り返し実行）
 
 ---
 

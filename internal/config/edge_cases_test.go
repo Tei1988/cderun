@@ -91,7 +91,7 @@ func TestUnit_Config_Masking_Advanced(t *testing.T) {
 func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 	t.Run("resolveIntOpt with invalid env", func(t *testing.T) {
 		def := OptionDef[*int]{
-			EnvKey: "TEST_INT",
+			EnvKey:   "TEST_INT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		_, err := resolveIntOpt(def, 10, false, 0, false, 0, "sub", nil, nil, mfs)
@@ -100,7 +100,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 
 	t.Run("resolveFloat64Opt with invalid env", func(t *testing.T) {
 		def := OptionDef[*float64]{
-			EnvKey: "TEST_FLOAT",
+			EnvKey:   "TEST_FLOAT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
 		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, nil, mfs)

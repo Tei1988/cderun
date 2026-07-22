@@ -126,10 +126,9 @@ type mockDockerClient struct {
 	startID  string
 	startErr error
 
-	waitID        string
-	waitCondition dockercontainer.WaitCondition
-	waitResp      dockercontainer.WaitResponse
-	waitErrOut    error
+	waitID     string
+	waitResp   dockercontainer.WaitResponse
+	waitErrOut error
 
 	removeID   string
 	removeOpts dockercontainer.RemoveOptions
@@ -192,7 +191,6 @@ func (m *mockDockerClient) ContainerStart(ctx context.Context, containerID strin
 
 func (m *mockDockerClient) ContainerWait(ctx context.Context, containerID string, condition dockercontainer.WaitCondition) (<-chan dockercontainer.WaitResponse, <-chan error) {
 	m.waitID = containerID
-	m.waitCondition = condition
 	respC := make(chan dockercontainer.WaitResponse, 1)
 	errC := make(chan error, 1)
 	if m.waitErrOut != nil {
@@ -1100,66 +1098,5 @@ func TestUnit_Docker_Close(t *testing.T) {
 		require.ErrorIs(t, err, expectedErr)
 		// Should still be 1 because it's idempotent
 		assert.Equal(t, 1, mock.closeCount)
-	})
-}
-
-func TestUnit_Docker_WaitContainer_AutoRemove(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("with Remove=true", func(t *testing.T) {
-		mock := &mockDockerClient{
-			waitResp: dockercontainer.WaitResponse{StatusCode: 0},
-		}
-		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc, removeOnExit: make(map[string]bool)}
-
-		// 1. Create a container with Remove: true
-		config := &container.ContainerConfig{
-			Image:  "alpine",
-			Remove: true,
-		}
-		mock.createResp = dockercontainer.CreateResponse{ID: "c1"}
-		id, err := runtime.CreateContainer(ctx, config)
-		require.NoError(t, err)
-		assert.Equal(t, "c1", id)
-
-		// 2. Wait for it, should use WaitConditionRemoved
-		code, err := runtime.WaitContainer(ctx, id)
-		require.NoError(t, err)
-		assert.Equal(t, 0, code)
-		assert.Equal(t, dockercontainer.WaitConditionRemoved, mock.waitCondition)
-	})
-
-	t.Run("with Remove=false", func(t *testing.T) {
-		mock := &mockDockerClient{
-			waitResp: dockercontainer.WaitResponse{StatusCode: 0},
-		}
-		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc, removeOnExit: make(map[string]bool)}
-
-		// 1. Create a container with Remove: false
-		config := &container.ContainerConfig{
-			Image:  "alpine",
-			Remove: false,
-		}
-		mock.createResp = dockercontainer.CreateResponse{ID: "c2"}
-		id, err := runtime.CreateContainer(ctx, config)
-		require.NoError(t, err)
-		assert.Equal(t, "c2", id)
-
-		// 2. Wait for it, should use WaitConditionNotRunning
-		code, err := runtime.WaitContainer(ctx, id)
-		require.NoError(t, err)
-		assert.Equal(t, 0, code)
-		assert.Equal(t, dockercontainer.WaitConditionNotRunning, mock.waitCondition)
-	})
-
-	t.Run("with NotFound error fallback", func(t *testing.T) {
-		mock := &mockDockerClient{
-			waitErrOut: errNotFound{errors.New("No such container")},
-		}
-		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc, removeOnExit: make(map[string]bool)}
-
-		code, err := runtime.WaitContainer(ctx, "c3")
-		require.NoError(t, err)
-		assert.Equal(t, 0, code)
 	})
 }

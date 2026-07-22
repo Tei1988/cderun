@@ -42,7 +42,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
 		def := OptionDef[*float64]{
-			EnvKey: "TEST_FLOAT",
+			EnvKey:   "TEST_FLOAT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "2.5"}}
 
@@ -85,7 +85,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 	t.Run("resolveIntOpt", func(t *testing.T) {
 		def := OptionDef[*int]{
-			EnvKey: "TEST_INT",
+			EnvKey:   "TEST_INT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "20"}}
 
