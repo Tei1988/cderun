@@ -72,7 +72,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | - |
-| T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | - |
+| T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | DONE |
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | DONE |
@@ -1220,28 +1220,6 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 ### 完了条件
 
 - 全項目適用後、既存テストが全パス（挙動変更なしの確認）
-
----
-
-## T66: テスト専用ヘルパーを `_test.go` に移動
-
-- 種別: クリーンアップ（保守性）
-- 優先度: 低
-- 対象: `internal/command/testhelpers.go`（`TerminationMockRuntime`, `RootErrorFS`）、`internal/command/run_helpers.go`（`runCderun`, `runCderunCore`）、`internal/command/runtime_helper.go`
-
-### 問題
-
-これらのシンボルは `*_test.go`（および相互）からしか参照されていない（grep 検証済み）のに通常ビルドに含まれ、`runtime.MockRuntime` / `config.MockFileSystem` を本番コンパイル単位に引き込んでいる。
-
-### 方針
-
-- `*_test.go` にリネームする（`runtime_helper.go` は `//go:build runtime` タグを `_test.go` ファイル内に維持）
-- ついでに `findCderunBinary`（`runtime_helper.go:61-86`）が「`cderun` という名前のディレクトリ」を誤ってバイナリとして返す問題を `!info.IsDir()` チェックで修正する
-
-### 完了条件
-
-- 非テストビルドに mock 型が含まれない（`go build ./...` 後のシンボル確認 or ファイル構成レビュー）
-- 既存テストが全パス
 
 ---
 
