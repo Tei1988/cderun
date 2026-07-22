@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 )
 
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
@@ -84,7 +83,7 @@ type ExpressionResolver struct {
 	Home        string
 	Pwd         string
 	HostContext *HostContext
-	shared      *resolverSharedState
+	shared      atomic.Pointer[resolverSharedState]
 	err         error
 }
 
@@ -115,7 +114,6 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		shared:      nil,
 	}, nil
 }
 
@@ -129,20 +127,21 @@ func (r *ExpressionResolver) Error() error {
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 	r.ensureShared()
-	return &ExpressionResolver{
+	res := &ExpressionResolver{
 		fs:          r.fs,
 		Home:        r.Home,
 		Pwd:         r.Pwd,
 		HostContext: nil,
-		shared:      r.shared,
 		err:         r.err,
 	}
+	res.shared.Store(r.shared.Load())
+	return res
 }
 
 func (r *ExpressionResolver) ensureShared() {
-	if atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared))) == nil {
+	if r.shared.Load() == nil {
 		ns := &resolverSharedState{}
-		if !atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared)), nil, unsafe.Pointer(ns)) {
+		if !r.shared.CompareAndSwap(nil, ns) {
 			// lost race, another goroutine initialized it first, which is fine
 		}
 	}
@@ -153,7 +152,7 @@ func (r *ExpressionResolver) getShared() *resolverSharedState {
 		return nil
 	}
 	r.ensureShared()
-	return (*resolverSharedState)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared))))
+	return r.shared.Load()
 }
 
 func (r *ExpressionResolver) ensureFileCache() {

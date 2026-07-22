@@ -92,7 +92,7 @@ func TestUnit_ExpressionResolver_ResolveFile_StatError(t *testing.T) {
 
 	// Ensure FindConfigs works by temporarily disabling the error
 	fs.failStatPath = ""
-	_ = r.shared.loader.FindConfigs("err.txt")
+	_ = r.getShared().loader.FindConfigs("err.txt")
 
 	// Now enable the error for direct Stat call in resolveFile
 	fs.failStatPath = "/work/err.txt"
@@ -248,7 +248,7 @@ func TestUnit_Expression_ResolveFile_SharedState_Required(t *testing.T) {
 	val, err := r.resolveFile("test.txt")
 	require.NoError(t, err)
 	assert.Equal(t, "content", val)
-	assert.NotNil(t, r.shared)
+	assert.NotNil(t, r.shared.Load())
 }
 
 func TestUnit_Expression_Nested_Deep(t *testing.T) {

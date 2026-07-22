@@ -623,8 +623,8 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 			Home:        r.Home,
 			Pwd:         r.Pwd,
 			HostContext: r.HostContext,
-			shared:      r.shared,
 		}
+		cleanR.shared.Store(r.shared.Load())
 		anchorPath, err := cleanR.ResolveString(anchor)
 		if err != nil {
 			return fmt.Errorf("failed to resolve anchor %q: %w", anchor, err)
