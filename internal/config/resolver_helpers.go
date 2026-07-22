@@ -175,6 +175,7 @@ func deduplicateEnv(env []string) []string {
 		var keys [8]string
 		var vals [8]string
 		size := 0
+		hasDuplicates := false
 
 		for _, e := range env {
 			key, _, _ := strings.Cut(e, "=")
@@ -187,11 +188,16 @@ func deduplicateEnv(env []string) []string {
 			}
 			if foundIdx != -1 {
 				vals[foundIdx] = e
+				hasDuplicates = true
 			} else {
 				keys[size] = key
 				vals[size] = e
 				size++
 			}
+		}
+
+		if !hasDuplicates {
+			return env
 		}
 
 		res := make([]string, size)
@@ -202,6 +208,10 @@ func deduplicateEnv(env []string) []string {
 	m := make(map[string]string, len(env))
 	keys := make([]string, 0, len(env))
 	addEnv(m, &keys, env)
+
+	if len(keys) == len(env) {
+		return env
+	}
 
 	res := make([]string, 0, len(keys))
 	for _, k := range keys {

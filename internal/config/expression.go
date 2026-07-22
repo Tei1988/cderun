@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 const MaxDirectiveFileSize = 1024 * 1024 // 1MB
@@ -113,7 +115,7 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 		Home:        home,
 		Pwd:         pwd,
 		HostContext: hostCtx,
-		shared:      &resolverSharedState{},
+		shared:      nil,
 	}, nil
 }
 
@@ -126,6 +128,7 @@ func (r *ExpressionResolver) Error() error {
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
+	r.ensureShared()
 	return &ExpressionResolver{
 		fs:          r.fs,
 		Home:        r.Home,
@@ -136,17 +139,36 @@ func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 	}
 }
 
+func (r *ExpressionResolver) ensureShared() {
+	if atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared))) == nil {
+		ns := &resolverSharedState{}
+		if !atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared)), nil, unsafe.Pointer(ns)) {
+			// lost race, another goroutine initialized it first, which is fine
+		}
+	}
+}
+
+func (r *ExpressionResolver) getShared() *resolverSharedState {
+	if r == nil {
+		return nil
+	}
+	r.ensureShared()
+	return (*resolverSharedState)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&r.shared))))
+}
+
 func (r *ExpressionResolver) ensureFileCache() {
-	r.shared.cacheOnce.Do(func() {
-		r.shared.fileCache = make(map[string]fileCacheEntry)
-		r.shared.statCache = make(map[string]statCacheEntry)
+	shared := r.getShared()
+	shared.cacheOnce.Do(func() {
+		shared.fileCache = make(map[string]fileCacheEntry)
+		shared.statCache = make(map[string]statCacheEntry)
 	})
 }
 
 func (r *ExpressionResolver) ensureLoader() {
-	r.shared.loaderOnce.Do(func() {
-		if r.shared.loader == nil {
-			r.shared.loader = NewConfigLoaderWithFS(r.fs)
+	shared := r.getShared()
+	shared.loaderOnce.Do(func() {
+		if shared.loader == nil {
+			shared.loader = NewConfigLoaderWithFS(r.fs)
 		}
 	})
 }
@@ -158,23 +180,21 @@ func (r *ExpressionResolver) setError(err error) {
 }
 
 func (r *ExpressionResolver) Stat(name string) (os.FileInfo, error) {
-	if r.shared == nil {
-		return r.fs.Stat(name)
-	}
 	r.ensureFileCache()
+	shared := r.getShared()
 
-	r.shared.mu.RLock()
-	cached, ok := r.shared.statCache[name]
-	r.shared.mu.RUnlock()
+	shared.mu.RLock()
+	cached, ok := shared.statCache[name]
+	shared.mu.RUnlock()
 	if ok {
 		return cached.info, cached.err
 	}
 
 	info, err := r.fs.Stat(name)
 
-	r.shared.mu.Lock()
-	r.shared.statCache[name] = statCacheEntry{info: info, err: err}
-	r.shared.mu.Unlock()
+	shared.mu.Lock()
+	shared.statCache[name] = statCacheEntry{info: info, err: err}
+	shared.mu.Unlock()
 
 	return info, err
 }
@@ -367,67 +387,64 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		return "", fmt.Errorf("only a single file name is allowed in file directive: %q", filename)
 	}
 
-	if r.shared == nil {
-		// Fallback for file directive requires shared loader state
-		return "", fmt.Errorf("file directive resolution requires a resolver with shared state")
-	}
-
 	r.ensureFileCache()
-	r.shared.mu.RLock()
-	cached, ok := r.shared.fileCache[filename]
-	r.shared.mu.RUnlock()
+	shared := r.getShared()
+	shared.mu.RLock()
+	cached, ok := shared.fileCache[filename]
+	shared.mu.RUnlock()
 	if ok {
 		return cached.content, cached.err
 	}
 
 	r.ensureLoader()
-	paths := r.shared.loader.FindConfigs(filename)
+	shared = r.getShared()
+	paths := shared.loader.FindConfigs(filename)
 	if len(paths) == 0 {
 		err := fmt.Errorf("file not found: %q", filename)
-		r.shared.mu.Lock()
-		r.shared.fileCache[filename] = fileCacheEntry{err: err}
-		r.shared.mu.Unlock()
+		shared.mu.Lock()
+		shared.fileCache[filename] = fileCacheEntry{err: err}
+		shared.mu.Unlock()
 		return "", err
 	}
 
 	info, err := r.Stat(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to stat file %q: %w", paths[0], err)
-		r.shared.mu.Lock()
-		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
-		r.shared.mu.Unlock()
+		shared.mu.Lock()
+		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		shared.mu.Unlock()
 		return "", wrappedErr
 	}
 
 	if info.Size() > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], info.Size(), MaxDirectiveFileSize)
-		r.shared.mu.Lock()
-		r.shared.fileCache[filename] = fileCacheEntry{err: err}
-		r.shared.mu.Unlock()
+		shared.mu.Lock()
+		shared.fileCache[filename] = fileCacheEntry{err: err}
+		shared.mu.Unlock()
 		return "", err
 	}
 
 	data, err := r.fs.ReadFile(paths[0])
 	if err != nil {
 		wrappedErr := fmt.Errorf("failed to read file %q: %w", paths[0], err)
-		r.shared.mu.Lock()
-		r.shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
-		r.shared.mu.Unlock()
+		shared.mu.Lock()
+		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
+		shared.mu.Unlock()
 		return "", wrappedErr
 	}
 
 	if int64(len(data)) > MaxDirectiveFileSize {
 		err := fmt.Errorf("file %q is too large (%d bytes, max %d)", paths[0], len(data), MaxDirectiveFileSize)
-		r.shared.mu.Lock()
-		r.shared.fileCache[filename] = fileCacheEntry{err: err}
-		r.shared.mu.Unlock()
+		shared.mu.Lock()
+		shared.fileCache[filename] = fileCacheEntry{err: err}
+		shared.mu.Unlock()
 		return "", err
 	}
 
 	result := strings.TrimSpace(string(data))
-	r.shared.mu.Lock()
-	r.shared.fileCache[filename] = fileCacheEntry{content: result}
-	r.shared.mu.Unlock()
+	shared.mu.Lock()
+	shared.fileCache[filename] = fileCacheEntry{content: result}
+	shared.mu.Unlock()
 	return result, nil
 }
 
@@ -437,7 +454,8 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	}
 
 	r.ensureLoader()
-	paths := r.shared.loader.FindConfigs(name)
+	shared := r.getShared()
+	paths := shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
 		return "", fmt.Errorf("item not found for find_dir: %q", name)
 	}

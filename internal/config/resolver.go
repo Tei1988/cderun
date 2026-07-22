@@ -340,6 +340,20 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
+func (rv *resolver) getCliVal() reflect.Value {
+	if !rv.cliVal.IsValid() {
+		rv.cliVal = reflect.ValueOf(rv.cli).Elem()
+	}
+	return rv.cliVal
+}
+
+func (rv *resolver) getResVal() reflect.Value {
+	if !rv.resVal.IsValid() {
+		rv.resVal = reflect.ValueOf(rv.res).Elem()
+	}
+	return rv.resVal
+}
+
 func (rv *resolver) extractIntValue(v reflect.Value, set bool) (int, bool) {
 	if !set || !v.IsValid() {
 		return 0, false
@@ -373,7 +387,7 @@ func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string
 }
 
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.cliVal)
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.getCliVal())
 	if err != nil {
 		return "", err
 	}
@@ -399,7 +413,7 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 }
 
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 	if err != nil {
 		return err
 	}
@@ -414,7 +428,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	}
 
 	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.Field(info.targetIdx).Set(reflect.ValueOf(resolved))
+	rv.getResVal().Field(info.targetIdx).Set(reflect.ValueOf(resolved))
 	return nil
 }
 
@@ -500,12 +514,12 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
 	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
 	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	rv.resVal.Field(info.targetIdx).SetString(resolved)
+	rv.getResVal().Field(info.targetIdx).SetString(resolved)
 	return nil
 }
 
@@ -598,15 +612,15 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
 	p1Val, p2Val = p1v.Bool(), p2v.Bool()
 	def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 	resolved, err := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
-	rv.resVal.Field(info.targetIdx).SetBool(resolved)
+	rv.getResVal().Field(info.targetIdx).SetBool(resolved)
 	return nil
 }
 
@@ -645,8 +659,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
 	p1Int, p1Set = rv.extractIntValue(p1v, s1)
 	p2Int, p2Set = rv.extractIntValue(p2v, s2)
 
@@ -660,7 +674,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	if err != nil {
 		return err
 	}
-	rv.resVal.Field(info.targetIdx).SetInt(int64(resolved))
+	rv.getResVal().Field(info.targetIdx).SetInt(int64(resolved))
 	return nil
 }
 
@@ -699,8 +713,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.cliVal, info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.cliVal, info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
 	p1Float, p1Set = rv.extractFloatValue(p1v, s1)
 	p2Float, p2Set = rv.extractFloatValue(p2v, s2)
 
@@ -714,7 +728,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	if err != nil {
 		return err
 	}
-	rv.resVal.Field(info.targetIdx).SetFloat(resolved)
+	rv.getResVal().Field(info.targetIdx).SetFloat(resolved)
 	return nil
 }
 
@@ -734,7 +748,7 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	case "pull-backoff-base":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPullBackoffBaseSet, rv.cli.CderunPullBackoffBase, rv.cli.PullBackoffBaseSet, rv.cli.PullBackoffBase
 	default:
-		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 		if err != nil {
 			return err
 		}
@@ -775,7 +789,7 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	case "memory":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMemorySet, rv.cli.CderunMemory, rv.cli.MemorySet, rv.cli.Memory
 	default:
-		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.cliVal)
+		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 		if err != nil {
 			return err
 		}
@@ -831,8 +845,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		fs:         fs,
 		r:          r,
 		res:        res,
-		cliVal:     reflect.ValueOf(cli).Elem(),
-		resVal:     reflect.ValueOf(res).Elem(),
 	}
 
 	if err := rv.resolveEarly(); err != nil {
