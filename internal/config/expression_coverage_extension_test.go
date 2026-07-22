@@ -92,7 +92,7 @@ func TestUnit_ExpressionResolver_ResolveFile_StatError(t *testing.T) {
 
 	// Ensure FindConfigs works by temporarily disabling the error
 	fs.failStatPath = ""
-	_ = r.shared.loader.FindConfigs("err.txt")
+	_ = r.getShared().loader.FindConfigs("err.txt")
 
 	// Now enable the error for direct Stat call in resolveFile
 	fs.failStatPath = "/work/err.txt"
@@ -238,12 +238,17 @@ func TestUnit_Expression_ScanAnchors_Coverage(t *testing.T) {
 
 func TestUnit_Expression_ResolveFile_SharedState_Required(t *testing.T) {
 	r := &ExpressionResolver{
-		fs: &MockFileSystem{},
+		fs: &MockFileSystem{
+			WD:    "/work",
+			Files: map[string][]byte{"/work/test.txt": []byte("content")},
+			Dirs:  map[string]bool{"/work": true},
+		},
 	}
-	// r.shared is nil
-	_, err := r.resolveFile("test.txt")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "requires a resolver with shared state")
+	// r.shared is nil, but should be lazily initialized
+	val, err := r.resolveFile("test.txt")
+	require.NoError(t, err)
+	assert.Equal(t, "content", val)
+	assert.NotNil(t, r.shared.Load())
 }
 
 func TestUnit_Expression_Nested_Deep(t *testing.T) {
