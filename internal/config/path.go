@@ -611,10 +611,14 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 		}
 	}
 
-	for _, anchor := range exprAnchors {
+	if len(exprAnchors) > 0 {
 		if r == nil {
 			return fmt.Errorf("expression resolver required for anchor validation")
 		}
+		r.ensureShared()
+	}
+
+	for _, anchor := range exprAnchors {
 		// Use a fresh resolver instance for each anchor to ensure that a sticky error
 		// from one anchor resolution doesn't skip subsequent anchor resolutions.
 		// Reusing Home and Pwd from current resolver to avoid redundant syscalls.

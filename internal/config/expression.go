@@ -141,9 +141,7 @@ func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
 func (r *ExpressionResolver) ensureShared() {
 	if r.shared.Load() == nil {
 		ns := &resolverSharedState{}
-		if !r.shared.CompareAndSwap(nil, ns) {
-			// lost race, another goroutine initialized it first, which is fine
-		}
+		r.shared.CompareAndSwap(nil, ns)
 	}
 }
 
