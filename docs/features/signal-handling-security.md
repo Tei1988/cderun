@@ -5,7 +5,7 @@ cderun provides secure mechanisms for signaling containers, ensuring that signal
 ## Signal Name Validation
 
 All signals sent via the `SignalContainer` method (available in both Docker and Mock runtimes) are validated against a case-insensitive regular expression:
-`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`
+`^(?i)[A-Z0-9]+$`
 
 This regex pattern ensures that:
 

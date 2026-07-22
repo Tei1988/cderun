@@ -89,6 +89,25 @@ Hello, World!
 2026-02-28 10:30:46 [DEBUG] Container exited with code: 0
 ```
 
+#### ContainerConfig 構造体のデバッグログ出力と機密情報のマスキング
+
+`cderun` はコンテナを生成する直前に、構築された `ContainerConfig`（コンテナイメージ名、実行コマンド、エントリーポイント、マウント情報、環境変数リスト、実行ユーザー等）の情報を `DEBUG` レベルで詳細に出力します。
+
+このデバッグ出力では、セキュリティを担保するため、`config.MaskSensitiveEnvList` が適用されます。環境変数に登録されている機密情報（`sensitive-env` フィルタに一致、または未指定時のデフォルト全マスク等）は `[REDACTED]` でマスクされた状態でログ出力されるため、デバッグログ経由での秘密鍵やパスワードなどの機密情報の漏洩を防ぎます。
+
+デバッグログ出力例：
+
+```text
+2026-02-28 10:30:45 [DEBUG] ContainerConfig:
+  Image:      node:20-alpine
+  Command:    [app.js]
+  Entrypoint: []
+  Mounts:
+    - bind /home/user/project -> /app
+  Env:        [NODE_ENV=production DB_PASSWORD=[REDACTED] API_TOKEN=[REDACTED]]
+  User:       1000:1000
+```
+
 ### TRACE レベル
 
 ```bash
