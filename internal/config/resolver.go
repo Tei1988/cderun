@@ -1245,6 +1245,12 @@ func (rv *resolver) validateCriticalFields() error {
 			}
 			return nil
 		}},
+		{"pull", rv.res.Pull, func(s string) error {
+			if s != "" && s != "always" && s != "missing" && s != "never" {
+				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", s)
+			}
+			return nil
+		}},
 		{"socket-path", rv.res.SocketPath, nil},
 		{"mount-socket-path", rv.res.MountSocketPath, nil},
 		{"mount-cderun-path", rv.res.MountCderunPath, nil},
@@ -1302,6 +1308,7 @@ func (rv *resolver) validateSlices() error {
 		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
 		{"cap-add", rv.res.CapAdd, ValidateCapability},
 		{"cap-drop", rv.res.CapDrop, ValidateCapability},
+		{"group-add", rv.res.GroupAdd, ValidateGroupAdd},
 		{"sensitive-env", rv.res.SensitiveEnv, func(s string) error {
 			_, err := path.Match(s, "TEST")
 			if err != nil {
@@ -1357,6 +1364,14 @@ func (rv *resolver) validateDeviceSecurity() error {
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
+		}
+		if d.CgroupPermissions != "" {
+			if err := validatePathChars(d.CgroupPermissions); err != nil {
+				return fmt.Errorf("security validation failed for devices[%d] (permissions): %w", i, err)
+			}
+			if !permsRegex.MatchString(d.CgroupPermissions) {
+				return fmt.Errorf("security validation failed for devices[%d] (permissions): invalid cgroup permissions %q", i, d.CgroupPermissions)
+			}
 		}
 	}
 	return nil

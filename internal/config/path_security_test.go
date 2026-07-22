@@ -39,6 +39,37 @@ func TestUnit_Config_ValidateImageName(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ValidateGroupAdd(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Basic numeric GID", "1000", false},
+		{"Zero GID", "0", false},
+		{"Standard group name", "sudo", false},
+		{"Uppercase letters", "MyGroup", false},
+		{"Underscores and hyphens", "my-group_name", false},
+		{"Trailing dollar sign (NIS/Samba compat)", "domain-users$", false},
+		{"Empty group name", "", false}, // Allowed (handled in resolver)
+		{"Too long or weird control char", "sudo\n", true},
+		{"Command injection attempt", "sudo;rm -rf /", true},
+		{"Pipe shell character", "sudo|ls", true},
+		{"Backslash path character", "sudo\\group", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateGroupAdd(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidateEnvKey(t *testing.T) {
 	tests := []struct {
 		name    string
