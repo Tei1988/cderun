@@ -9,6 +9,7 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -275,4 +276,108 @@ func TestUnit_Runtime_Common_SleepFunc(t *testing.T) {
 		err := SleepFunc(ctx, 1*time.Second)
 		require.ErrorIs(t, err, context.Canceled)
 	})
+}
+
+func TestUnit_Containerd_ResolveProcessArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *container.ContainerConfig
+		getSpec     func(context.Context) (ocispec.Image, error)
+		wantArgs    []string
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name: "Entrypoint explicit, Command explicit",
+			config: &container.ContainerConfig{
+				Entrypoint: []string{"custom-entrypoint"},
+				Command:    []string{"arg1", "arg2"},
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				panic("should not be called")
+			},
+			wantArgs: []string{"custom-entrypoint", "arg1", "arg2"},
+		},
+		{
+			name: "Entrypoint explicit, Command empty",
+			config: &container.ContainerConfig{
+				Entrypoint: []string{"custom-entrypoint"},
+				Command:    nil,
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				panic("should not be called")
+			},
+			wantArgs: []string{"custom-entrypoint"},
+		},
+		{
+			name: "Both empty",
+			config: &container.ContainerConfig{
+				Entrypoint: nil,
+				Command:    nil,
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				panic("should not be called")
+			},
+			wantArgs: nil,
+		},
+		{
+			name: "Command only, image has Entrypoint",
+			config: &container.ContainerConfig{
+				Entrypoint: nil,
+				Command:    []string{"arg1", "arg2"},
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				return ocispec.Image{
+					Config: ocispec.ImageConfig{
+						Entrypoint: []string{"image-entrypoint"},
+					},
+				}, nil
+			},
+			wantArgs: []string{"image-entrypoint", "arg1", "arg2"},
+		},
+		{
+			name: "Command only, image has no Entrypoint",
+			config: &container.ContainerConfig{
+				Entrypoint: nil,
+				Command:    []string{"arg1", "arg2"},
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				return ocispec.Image{
+					Config: ocispec.ImageConfig{
+						Entrypoint: nil,
+					},
+				}, nil
+			},
+			wantArgs: []string{"arg1", "arg2"},
+		},
+		{
+			name: "Command only, getSpec returns error",
+			config: &container.ContainerConfig{
+				Entrypoint: nil,
+				Command:    []string{"arg1", "arg2"},
+			},
+			getSpec: func(ctx context.Context) (ocispec.Image, error) {
+				return ocispec.Image{}, fmt.Errorf("some spec error")
+			},
+			expectErr:   true,
+			errContains: "failed to get image spec: some spec error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, err := resolveProcessArgs(context.Background(), tt.config, tt.getSpec)
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantArgs, args)
+			}
+		})
+	}
 }

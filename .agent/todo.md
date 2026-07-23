@@ -46,7 +46,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
-| T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | - |
+| T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | DONE |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | DONE |
@@ -960,28 +960,6 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 - [ ] containerd: 未サポートエラーのテスト
 
 ---
-
-## T40: containerd: コマンド指定時にイメージの ENTRYPOINT が消失する
-
-- 種別: バグ修正
-- 優先度: 高
-- 対象: `internal/runtime/containerd.go:184-199`
-
-### 問題
-
-`config.Entrypoint` が空で `config.Command` が非空の場合、`args = config.Command` を `oci.WithProcessArgs(args...)` で渡している。`WithProcessArgs` は `Process.Args` を丸ごと置き換えるため、`oci.WithImageConfig(img)` が設定したイメージの ENTRYPOINT が破棄される。Docker 経路（`docker_adapter.go:25,33`）は `Cmd` のみ設定しデーモンが ENTRYPOINT を前置するため、挙動が食い違う。
-
-例: `ENTRYPOINT ["git"]` のイメージを `cderun git status` で実行すると、Docker では `git status`、containerd では素の `status` を exec しようとして失敗する。
-
-### 方針
-
-`config.Entrypoint` が空の場合はイメージの OCI config を読み（`img.Spec(ctx)` / `images.Config` + unmarshal）、その Entrypoint を `config.Command` の前に連結してから `WithProcessArgs` に渡す。両方空の場合のみスキップ。
-
-### 完了条件
-
-- ENTRYPOINT を持つイメージ + passthrough-args の組み合わせで Docker と containerd の実行コマンドが一致する
-- Entrypoint 明示指定 / Command のみ / 両方空 の各ケースのユニットテスト
-
 
 ## T50: pull ポリシーの未知値が `always` として動作する
 
