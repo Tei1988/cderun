@@ -230,10 +230,15 @@ func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDER
 }
 
 var (
-	cliType   = reflect.TypeFor[CLIOptions]()
-	resType   = reflect.TypeFor[ResolvedConfig]()
-	fieldInfo map[string]optionFields
-	fieldOnce sync.Once
+	cliType              = reflect.TypeFor[CLIOptions]()
+	resType              = reflect.TypeFor[ResolvedConfig]()
+	fieldInfo            map[string]optionFields
+	expectedFieldIndices map[string]optionFields
+	fieldOnce            sync.Once
+
+	autoDetectOnce         sync.Once
+	autoDetectedRuntime    string
+	autoDetectedSocketPath string
 )
 
 type optionFields struct {
@@ -246,6 +251,7 @@ type optionFields struct {
 
 func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
+	expectedFieldIndices = make(map[string]optionFields)
 
 	process := func(name, fieldName string) {
 		if fieldName == "" {
@@ -285,6 +291,7 @@ func initFieldInfo() {
 
 		if info.p1ValIdx != -1 && info.p2ValIdx != -1 {
 			fieldInfo[name] = info
+			expectedFieldIndices[name] = info
 		}
 	}
 
@@ -630,10 +637,11 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	var p1Int, p2Int int
 	var fastPathUsed bool
 
-	if opt.Name == "pull-max-retries" && info.p1ValIdx != -1 && info.p2ValIdx != -1 {
-		p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
-		if cliType.Field(info.p1ValIdx).Name == "CderunPullMaxRetries" &&
-			cliType.Field(info.p2ValIdx).Name == "PullMaxRetries" {
+	if opt.Name == "pull-max-retries" {
+		expected := expectedFieldIndices["pull-max-retries"]
+		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
+			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+			p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
 			fastPathUsed = true
 		}
 	}
@@ -684,10 +692,11 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	var p1Float, p2Float float64
 	var fastPathUsed bool
 
-	if opt.Name == "cpus" && info.p1ValIdx != -1 && info.p2ValIdx != -1 {
-		p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
-		if cliType.Field(info.p1ValIdx).Name == "CderunCPUs" &&
-			cliType.Field(info.p2ValIdx).Name == "CPUs" {
+	if opt.Name == "cpus" {
+		expected := expectedFieldIndices["cpus"]
+		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
+			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+			p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
 			fastPathUsed = true
 		}
 	}
@@ -1022,18 +1031,38 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 				rv.res.Runtime = "docker"
 			}
 		} else {
-			if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-				rv.res.Runtime = "docker"
-				rv.res.SocketPath = "/var/run/docker.sock"
-			} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-				rv.res.Runtime = "containerd"
-				rv.res.SocketPath = "/run/containerd/containerd.sock"
-			} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-				rv.res.Runtime = "podman"
-				rv.res.SocketPath = "/run/podman/podman.sock"
+			if _, isReal := rv.fs.(RealFileSystem); isReal {
+				autoDetectOnce.Do(func() {
+					if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
+						autoDetectedRuntime = "docker"
+						autoDetectedSocketPath = "/var/run/docker.sock"
+					} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+						autoDetectedRuntime = "containerd"
+						autoDetectedSocketPath = "/run/containerd/containerd.sock"
+					} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
+						autoDetectedRuntime = "podman"
+						autoDetectedSocketPath = "/run/podman/podman.sock"
+					} else {
+						autoDetectedRuntime = "docker"
+						autoDetectedSocketPath = "/var/run/docker.sock"
+					}
+				})
+				rv.res.Runtime = autoDetectedRuntime
+				rv.res.SocketPath = autoDetectedSocketPath
 			} else {
-				rv.res.Runtime = "docker"
-				rv.res.SocketPath = "/var/run/docker.sock"
+				if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
+					rv.res.Runtime = "docker"
+					rv.res.SocketPath = "/var/run/docker.sock"
+				} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+					rv.res.Runtime = "containerd"
+					rv.res.SocketPath = "/run/containerd/containerd.sock"
+				} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
+					rv.res.Runtime = "podman"
+					rv.res.SocketPath = "/run/podman/podman.sock"
+				} else {
+					rv.res.Runtime = "docker"
+					rv.res.SocketPath = "/var/run/docker.sock"
+				}
 			}
 		}
 	}

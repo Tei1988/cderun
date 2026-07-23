@@ -250,3 +250,16 @@ func TestUnit_Config_Resolver_InvalidEnvValues(t *testing.T) {
 		})
 	}
 }
+
+// TestUnit_Config_Resolver_RealFileSystemCaching verifies that the auto-detected
+// container runtime and socket path are successfully cached on RealFileSystem.
+func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
+	cli := &CLIOptions{Image: "alpine", ImageSet: true}
+	res, err := ResolveWithFS("sh", cli, nil, nil, RealFileSystem{})
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, autoDetectedRuntime)
+	assert.NotEmpty(t, autoDetectedSocketPath)
+	assert.Equal(t, autoDetectedRuntime, res.Runtime)
+	assert.Equal(t, autoDetectedSocketPath, res.SocketPath)
+}
