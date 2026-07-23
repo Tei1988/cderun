@@ -52,7 +52,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T43 | attach エラー分岐で hang-timeout 0 が「即時タイムアウト」になる | バグ | 高 | 小 | - | DONE |
 | T44 | `preprocessArgs` のフラグ lookup が機能せずサブコマンドを誤認する | バグ | 高 | 小 | - | DONE |
 | T45 | containerd: cap-add / cap-drop / dns / add-host が黙って無視される | セキュリティ | 高 | 中 | - | DONE |
-| T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | - |
+| T46 | 設定レイヤーのマージで `BaseDir` が汚染される | バグ | 中 | 小 | - | DONE |
 | T47 | エラー時にコンテナの exit code が破棄される | 改善 | 中 | 中 | あり | DONE |
 | T48 | Docker AutoRemove と `WaitContainer` の競合で exit code が失われる | バグ | 中 | 中 | - | DONE |
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | DONE |
@@ -982,26 +982,6 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 - ENTRYPOINT を持つイメージ + passthrough-args の組み合わせで Docker と containerd の実行コマンドが一致する
 - Entrypoint 明示指定 / Command のみ / 両方空 の各ケースのユニットテスト
 
-
-## T46: 設定レイヤーのマージで `BaseDir` が汚染される
-
-- 種別: バグ修正
-- 優先度: 中
-- 対象: `internal/config/config.go:135-144`（`ConfigDefaults.SetBaseDir`）、`config.go:269-278`（`ToolConfig.SetBaseDir`）、マージ箇所 `config.go:530, 575`
-
-### 問題
-
-`ConfigDefaults.SetBaseDir` / `ToolConfig.SetBaseDir` は `MountCderunPath.BaseDir` / `MountSocketPath.BaseDir` を **`Raw == ""` でも無条件に** 設定する。`mergo.Merge(..., WithOverride)` はフィールド単位で上書きするため、上位レイヤーが `mountCderunPath` を設定していなくても非空の `BaseDir` だけが下位レイヤーの値を上書きし、`Raw` は下位レイヤーのものが残る。結果、例えば `~/.config/cderun/.cderun.yaml` に書いた相対 `mountCderunPath` がプロジェクトディレクトリ基準で解決される。`CDERunConfig.SetBaseDir`（`config.go:37-39`）や `MountConfig` / `DeviceConfig`（`path.go:132-139, 263-270`）は `Raw != ""` ガードで正しく実装されている。
-
-### 方針
-
-両 `SetBaseDir` の `BaseDir` 代入を `Raw != ""` でガードする（既存の正しい実装に揃える）。
-
-### 完了条件
-
-- 「下位レイヤーで相対 `mountCderunPath` を指定 + 上位レイヤーで未指定」の合成テストで、下位レイヤーのディレクトリ基準で解決されること
-
----
 
 ## T50: pull ポリシーの未知値が `always` として動作する
 
