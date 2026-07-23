@@ -43,14 +43,33 @@ This prevents tool names from being used for path traversal (e.g., `../../etc/sh
 ## Signal Validation
 
 When signaling containers via `SignalContainer`, signal names are validated against a strict regular expression:
-`^(?i)(SIG[A-Z0-9]+|[A-Z0-9]+|[0-9]+)$`
+`^(?i)[A-Z0-9]+$`
 
-This allows:
+This regex validation is designed to restrict allowed characters strictly to alphanumeric symbols to prevent command/argument injection attacks into the underlying runtime.
 
-- Standard signal names with or without the SIG prefix (e.g., `TERM`, `SIGKILL`)
-- Numeric signal values (e.g., `9`, `15`)
+While it restricts characters to a safe set, it does not validate against a hardcoded static signal allowlist; signals that do not contain injection characters but are otherwise unknown to the host OS are processed through standard runtime error propagation.
 
-Invalid signals are rejected to prevent command injection into the underlying runtime.
+## Device Cgroup Permissions Validation
+
+To enforce secure device mounting, cgroup permissions for any device specified via `--device` (or corresponding configurations) are validated against a strict regular expression (`permsRegex`):
+`^[rwm]+$`
+
+This ensures that only valid permission flags (read `r`, write `w`, and mknod `m`) are specified, preventing any parameter injection or malformed input.
+
+## Resource Settings Validation
+
+To prevent invalid or unsafe resource configurations:
+
+- **CPU and Memory Limits**:
+  - Memory setting strings (e.g., `-500MB`) are processed via standard RAM parsing which inherently rejects negative values.
+  - The direct `containerd` adapter explicitly validates that resource settings (`CPUs` and `Memory`) are non-negative, rejecting any negative values with clear validation errors before container execution.
+
+## Privileged Mode & Capability Warnings
+
+When a container is configured to run in privileged mode (`--privileged` or `privileged: true` in config files), `cderun` performs deep scanning on highly privileged Linux capabilities supplied via both the `--cap-add` option (including corresponding environment variables and P1/P2 overrides) and supported configuration files (such as `.cderun.yaml` or `.tools.yaml`).
+
+- Highly privileged capabilities scanned include: `ALL`, `SYS_ADMIN`, `NET_ADMIN`, `SYS_RAWIO`, `SYS_PTRACE`, `SYS_MODULE` (with or without the `CAP_` prefix).
+- If any of these are detected, a visible security warning at the `Warn` log level is emitted, encouraging privilege minimization.
 
 ## Registry Mismatch Validation
 

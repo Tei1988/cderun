@@ -4,6 +4,28 @@
 
 `cderun`のすべてのコマンドラインオプションのリファレンス。
 
+### リスト型（配列型）オプションと環境変数のセパレータ規則
+
+複数の値をとるリスト型オプション（`stringArray`）を環境変数（P3）で指定する場合、オプションごとに使用する区切り文字（セパレータ）が異なります。
+
+- **セミコロン（`;`）をセパレータとして使用する環境変数**:
+  - `CDERUN_ENV` (例: `export CDERUN_ENV="KEY1=val1;KEY2=val2"`)
+  - `CDERUN_MOUNT` (例: `export CDERUN_MOUNT="type=bind,source=./src,target=/app;type=tmpfs,target=/tmp"`)
+- **カンマ（`,`）をセパレータとして使用する環境変数**:
+  - `CDERUN_GROUP_ADD`
+  - `CDERUN_MOUNT_TOOLS`
+  - `CDERUN_DEVICE`
+  - `CDERUN_PUBLISH`
+  - `CDERUN_EXPOSE`
+  - `CDERUN_DNS`
+  - `CDERUN_ADD_HOST`
+  - `CDERUN_CAP_ADD`
+  - `CDERUN_CAP_DROP`
+  - `CDERUN_ENTRYPOINT`
+  - `CDERUN_SENSITIVE_ENV`
+
+*(CLIフラグ（P1/P2）で指定する場合は、セパレータではなく、`--env A=1 --env B=2` や `--dns 8.8.8.8 --dns 1.1.1.1` のようにフラグ自体を繰り返して指定する必要があります。)*
+
 ## 基本構文
 
 ```bash
@@ -553,9 +575,10 @@ cderun --diagnosis --diagnosis-format json
 - **デフォルト**: `10s`
 - **環境変数**: `CDERUN_HANG_TIMEOUT`
 - **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間。
-- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）。
+- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0` または負の値）。
 - **補足**:
-  - `0` を指定すると、コンテナが自然に終了するまで無期限に待機します。
+  - `0` または負の値を指定すると、コンテナが自然に終了するまで無期限に待機（ブロック）します。
+  - **アタッチ失敗時の堅牢な待機**: 実行エンジンが起動中にコンテナの exit 前に premature（予期せぬ早期の）アタッチ失敗を検出した場合、hang-timeout が `0`（または `<= 0`）に設定されていると、即座のタイムアウトをトリガーすることなく、コンテナが安全に終了する（または `waitDone` チャネルが受信される）まで同期ブロックし、無期限に終了待機を行います。
   - ホストの標準入力が端末であり、かつインタラクティブモード（`--interactive` / `-i`）が有効な場合は、この設定に関わらず無期限に待機します。
 - **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
