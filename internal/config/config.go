@@ -135,8 +135,12 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 }
 
 func (d *ConfigDefaults) SetBaseDir(baseDir string) {
-	d.MountCderunPath.BaseDir = baseDir
-	d.MountSocketPath.BaseDir = baseDir
+	if d.MountCderunPath.Raw != "" {
+		d.MountCderunPath.BaseDir = baseDir
+	}
+	if d.MountSocketPath.Raw != "" {
+		d.MountSocketPath.BaseDir = baseDir
+	}
 	for i := range d.Mounts {
 		d.Mounts[i].SetBaseDir(baseDir)
 	}
@@ -271,8 +275,12 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 }
 
 func (t *ToolConfig) SetBaseDir(baseDir string) {
-	t.MountCderunPath.BaseDir = baseDir
-	t.MountSocketPath.BaseDir = baseDir
+	if t.MountCderunPath.Raw != "" {
+		t.MountCderunPath.BaseDir = baseDir
+	}
+	if t.MountSocketPath.Raw != "" {
+		t.MountSocketPath.BaseDir = baseDir
+	}
 	for i := range t.Mounts {
 		t.Mounts[i].SetBaseDir(baseDir)
 	}

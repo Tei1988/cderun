@@ -190,6 +190,40 @@ hostContext:
 		require.Len(t, cfg.HostContext.Mounts, 1)
 		assert.Equal(t, "/host", cfg.HostContext.Mounts[0].Source)
 	})
+
+	t.Run("BaseDir pollution check on merge", func(t *testing.T) {
+		globalContent := `
+defaults:
+  mountCderunPath: cderun
+  mountSocketPath: socket
+`
+		projectContent := `
+runtime: docker
+`
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/home/user/.config/cderun/.cderun.yaml": []byte(globalContent),
+				"/project/.cderun.yaml":                  []byte(projectContent),
+			},
+			Dirs: map[string]bool{
+				"/project": true,
+			},
+			WD:      "/project",
+			HomeDir: "/home/user",
+		}
+		loader := &ConfigLoader{fs: mfs, systemConfigDir: "/etc/cderun", runConfigDir: "/run/cderun"}
+		cfg, _, err := loader.LoadCDERunConfig()
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// Check mountCderunPath
+		assert.Equal(t, "cderun", cfg.Defaults.MountCderunPath.Raw)
+		assert.Equal(t, "/home/user/.config/cderun", cfg.Defaults.MountCderunPath.BaseDir)
+
+		// Check mountSocketPath
+		assert.Equal(t, "socket", cfg.Defaults.MountSocketPath.Raw)
+		assert.Equal(t, "/home/user/.config/cderun", cfg.Defaults.MountSocketPath.BaseDir)
+	})
 }
 
 func TestUnit_Config_LoadTools(t *testing.T) {
