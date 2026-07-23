@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"cderun/internal/config"
 )
 
 func runCderun(args ...string) (stdout, stderr string, exitCode int, err error) {
@@ -24,6 +26,10 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		o.exitFunc = func(code int) {
 			capturedExitCode = code
 		}
+		o.mountInfoReader = &stubMountInfoReader{}
+		o.socketGIDGetter = func(fs config.FileSystem, path string) (string, error) {
+			return "", nil
+		}
 		if stdin != nil {
 			cmd.SetIn(stdin)
 		}
@@ -32,4 +38,10 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 	})
 
 	return outBuf.String(), errBuf.String(), capturedExitCode, execErr
+}
+
+type stubMountInfoReader struct{}
+
+func (stubMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
+	return []byte{}, nil
 }

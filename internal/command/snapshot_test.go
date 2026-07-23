@@ -16,17 +16,13 @@ import (
 	"cderun/internal/logging"
 )
 
-// NOTE: Tests in this file do NOT use t.Parallel() because they modify
-// or indirectly rely on the global defaultMountInfoReader variable.
-
 func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
-	oldReader := defaultMountInfoReader
-	t.Cleanup(func() { defaultMountInfoReader = oldReader })
 
 	// Simulate OverlayFS: container / maps to host /var/lib/docker/overlay2/abc/diff
 	mountinfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/var/lib/docker/overlay2/abc/diff,workdir=/w\n"
-	defaultMountInfoReader = &mockMountInfoReader{Content: []byte(mountinfo)}
+	reader := &mockMountInfoReader{Content: []byte(mountinfo)}
 
 	globalCfg := &config.CDERunConfig{
 		HostContext: &config.HostContext{
@@ -34,7 +30,7 @@ func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 		},
 	}
 
-	containerDir, hostDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, config.ToolsConfig{}, nil)
+	containerDir, hostDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, config.ToolsConfig{}, nil, reader)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -45,6 +41,7 @@ func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 }
 
 func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -65,7 +62,7 @@ func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -78,6 +75,7 @@ func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
 }
 
 func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{
 		Runtime: "docker",
@@ -87,7 +85,7 @@ func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -98,12 +96,13 @@ func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
 }
 
 func TestUnit_Snapshot_DirectoryAndFilePermissions(t *testing.T) {
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	globalCfg := &config.CDERunConfig{}
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts)
+	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -127,6 +126,7 @@ func (m *mockMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error
 }
 
 func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		mountinfo string
@@ -166,12 +166,9 @@ func TestUnit_Snapshot_OverlayFSDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			old := defaultMountInfoReader
-			t.Cleanup(func() { defaultMountInfoReader = old })
-
 			mfs := &config.MockFileSystem{}
-			defaultMountInfoReader = &mockMountInfoReader{Content: []byte(tt.mountinfo)}
-			upperdir, err := discoverOverlayUpperDir(mfs)
+			reader := &mockMountInfoReader{Content: []byte(tt.mountinfo)}
+			upperdir, err := discoverOverlayUpperDir(mfs, reader)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, upperdir)
 		})
@@ -204,12 +201,13 @@ func (f *errorFS) WriteFile(path string, data []byte, perm os.FileMode) error {
 }
 
 func TestUnit_Snapshot_Errors(t *testing.T) {
+	t.Parallel()
 	t.Run("MkdirAll fails", func(t *testing.T) {
 		mfs := &errorFS{
 			MockFileSystem: &config.MockFileSystem{},
 			mkdirErr:       os.ErrPermission,
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil)
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create snapshot directory")
 	})
@@ -219,7 +217,7 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 			MockFileSystem: &config.MockFileSystem{},
 			writeErr:       os.ErrPermission,
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil)
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot")
 	})
@@ -233,6 +231,7 @@ func TestUnit_Snapshot_Cleanup_Errors(t *testing.T) {
 }
 
 func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
+	t.Parallel()
 	mfs := &errorFS{
 		MockFileSystem: &config.MockFileSystem{},
 	}
@@ -243,12 +242,13 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 		return mfs.MockFileSystem.WriteFile(path, data, perm)
 	}
 
-	_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, config.ToolsConfig{"node": {}}, nil)
+	_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, config.ToolsConfig{"node": {}}, nil, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to write .tools.yaml to snapshot")
 }
 
 func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
+	t.Parallel()
 	t.Run("ResolvePath failure when Level > 1", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			// ResolvePath calls r.ResolveString which uses mfs.Getenv for {{env:...}}
@@ -260,7 +260,7 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 				Level: 1, // Will be incremented to 2
 			},
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil)
+		_, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
 	})
@@ -270,19 +270,18 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 }
 
 func TestUnit_Snapshot_ReadMountInfo_Error(t *testing.T) {
-	oldReader := defaultMountInfoReader
-	t.Cleanup(func() { defaultMountInfoReader = oldReader })
-
+	t.Parallel()
 	mfs := &config.MockFileSystem{}
 	sentinel := errors.New("read mountinfo failed")
-	defaultMountInfoReader = &mockMountInfoReader{Err: sentinel}
+	reader := &mockMountInfoReader{Err: sentinel}
 
-	upperdir, err := discoverOverlayUpperDir(mfs)
+	upperdir, err := discoverOverlayUpperDir(mfs, reader)
 	require.ErrorIs(t, err, sentinel)
 	assert.Empty(t, upperdir)
 }
 
 func TestUnit_Snapshot_Log_Failures(t *testing.T) {
+	t.Parallel()
 	mfs := &snapshotMockFS{
 		MockFileSystem: &config.MockFileSystem{
 			ExecErr: errors.New("exec error"),
@@ -295,7 +294,7 @@ func TestUnit_Snapshot_Log_Failures(t *testing.T) {
 	logger.Init("debug", "text", false)
 	logger.SetOutput(&logBuf)
 
-	containerDir, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
+	containerDir, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })

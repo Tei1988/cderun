@@ -278,7 +278,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 			MockFileSystem: &config.MockFileSystem{},
 			MkdirErr:       errors.New("mkdir failed"),
 		}
-		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
+		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create snapshot directory: mkdir failed")
 	})
@@ -293,7 +293,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 				return nil
 			},
 		}
-		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
+		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot: write cderun failed")
 	})
@@ -308,7 +308,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 				return nil
 			},
 		}
-		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil)
+		_, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write .tools.yaml to snapshot: write tools failed")
 	})
@@ -326,7 +326,7 @@ func TestUnit_Root_CreateSnapshot(t *testing.T) {
 		// and we use an invalid expression.
 		mfs.TempDirValue = "/tmp/{{file:..}}"
 
-		_, _, err := createSnapshot(logger, mfs, globalCfg, nil, nil)
+		_, _, err := createSnapshot(logger, mfs, globalCfg, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory to host path")
 	})
