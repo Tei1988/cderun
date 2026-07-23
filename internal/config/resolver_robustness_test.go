@@ -322,9 +322,9 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("device with control characters raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:   "alpine",
+			Image:    "alpine",
 			ImageSet: true,
-			Devices: []string{"/dev/null\x01"},
+			Devices:  []string{"/dev/null\x01"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -335,7 +335,7 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("programmatic invalid permissions raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:   "alpine",
+			Image:    "alpine",
 			ImageSet: true,
 		}
 		tools := ToolsConfig{
