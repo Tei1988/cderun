@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/google/uuid"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -208,12 +209,11 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 
 	id := uuid.New().String()
-	var args []string
-	if len(config.Entrypoint) > 0 {
-		args = append([]string{}, config.Entrypoint...)
-		args = append(args, config.Command...)
-	} else {
-		args = config.Command
+	args, err := resolveProcessArgs(ctx, config, func(ctx context.Context) (ocispec.Image, error) {
+		return img.Spec(ctx)
+	})
+	if err != nil {
+		return "", err
 	}
 
 	opts := []oci.SpecOpts{
@@ -575,4 +575,20 @@ func parseSignal(sig string) (syscall.Signal, error) {
 		return s, nil
 	}
 	return 0, fmt.Errorf("unsupported signal: %q", sig)
+}
+
+func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, getSpec func(context.Context) (ocispec.Image, error)) ([]string, error) {
+	var args []string
+	if len(config.Entrypoint) > 0 {
+		args = append([]string{}, config.Entrypoint...)
+		args = append(args, config.Command...)
+	} else if len(config.Command) > 0 {
+		imageSpec, err := getSpec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get image spec: %w", err)
+		}
+		args = append([]string{}, imageSpec.Config.Entrypoint...)
+		args = append(args, config.Command...)
+	}
+	return args, nil
 }
