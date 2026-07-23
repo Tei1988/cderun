@@ -370,12 +370,12 @@ func TestUnit_Containerd_ResolveProcessArgs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args, err := resolveProcessArgs(context.Background(), tt.config, tt.getSpec)
 			if tt.expectErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.wantArgs, args)
 			}
 		})
