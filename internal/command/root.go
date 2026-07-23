@@ -160,6 +160,9 @@ type rootOptions struct {
 	jsonMarshalIndent  func(v any, prefix, indent string) ([]byte, error)
 	yamlMarshal        func(v any) ([]byte, error)
 
+	mountInfoReader mountInfoReader
+	socketGIDGetter func(fs config.FileSystem, path string) (string, error)
+
 	attachGracePeriod time.Duration
 }
 
@@ -548,7 +551,11 @@ func (o *rootOptions) applySocketMount(
 	})
 
 	// Auto-add socket GID so non-root users can access the mounted socket.
-	if socketGID, err := getSocketGID(o.fs, resolved.SocketPath); err == nil {
+	getter := o.socketGIDGetter
+	if getter == nil {
+		getter = getSocketGID
+	}
+	if socketGID, err := getter(o.fs, resolved.SocketPath); err == nil {
 		if socketGID != "" {
 			if !slices.Contains(cfg.GroupAdd, socketGID) {
 				cfg.GroupAdd = append(cfg.GroupAdd, socketGID)
@@ -1261,7 +1268,7 @@ intended for the subcommand.`,
 			if globalCfg == nil {
 				globalCfg = &config.CDERunConfig{}
 			}
-			sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts)
+			sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts, o.mountInfoReader)
 			if err != nil {
 				if explicitNested {
 					return fmt.Errorf("failed to create snapshot for nested execution: %w", err)
