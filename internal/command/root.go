@@ -164,6 +164,7 @@ type rootOptions struct {
 	socketGIDGetter func(fs config.FileSystem, path string) (string, error)
 
 	attachGracePeriod time.Duration
+	cleanupTimeout    time.Duration
 }
 
 const (
@@ -200,6 +201,7 @@ func defaultOptions() rootOptions {
 			signal.Stop(sigChan)
 		},
 		attachGracePeriod: attachGracePeriod,
+		cleanupTimeout:    30 * time.Second,
 		logger:            logging.GetGlobalLogger(),
 		runtimeFactory: func(name string, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			switch name {
@@ -914,8 +916,9 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 
 	cleanup = func() {}
 	if cc.Remove {
-		cleanupCtx := context.WithoutCancel(ctx)
 		cleanup = func() {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), o.cleanupTimeout)
+			defer cancel()
 			o.logger.Trace("Removing container: %s", containerID)
 			if err := rt.RemoveContainer(cleanupCtx, containerID); err != nil {
 				o.logger.Warn("failed to remove container (defer): %v", err)
@@ -1195,13 +1198,58 @@ intended for the subcommand.`,
 		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
 			initialLevel = env
 		}
-		if o.logLevel != "" {
+		if cmd.Flags().Changed("log-level") {
 			initialLevel = o.logLevel
 		}
-		if o.cderunLogLevel != "" {
+		if cmd.Flags().Changed("cderun-log-level") {
 			initialLevel = o.cderunLogLevel
 		}
-		_ = o.logger.Init(initialLevel, "text", true) //nolint:errcheck
+
+		// Validate initial log level
+		{
+			lvl := strings.ToLower(initialLevel)
+			if lvl != "error" && lvl != "warn" && lvl != "warning" && lvl != "info" && lvl != "debug" && lvl != "trace" {
+				return fmt.Errorf("unsupported log level: %q", initialLevel)
+			}
+		}
+
+		initialFormat := "text"
+		if env := o.fs.Getenv("CDERUN_LOG_FORMAT"); env != "" {
+			initialFormat = env
+		}
+		if cmd.Flags().Changed("log-format") {
+			initialFormat = o.logFormat
+		}
+		if cmd.Flags().Changed("cderun-log-format") {
+			initialFormat = o.cderunLogFormat
+		}
+
+		// Validate initial log format
+		{
+			fmtStr := strings.ToLower(initialFormat)
+			if fmtStr != "text" && fmtStr != "json" {
+				return fmt.Errorf("unsupported log format: %q", initialFormat)
+			}
+		}
+
+		initialTimestamp := true
+		if env := o.fs.Getenv("CDERUN_LOG_TIMESTAMP"); env != "" {
+			b, err := strconv.ParseBool(env)
+			if err != nil {
+				return fmt.Errorf("invalid boolean value for log-timestamp: %q", env)
+			}
+			initialTimestamp = b
+		}
+		if cmd.Flags().Changed("log-timestamp") {
+			initialTimestamp = o.logTimestamp
+		}
+		if cmd.Flags().Changed("cderun-log-timestamp") {
+			initialTimestamp = o.cderunLogTimestamp
+		}
+
+		if err := o.logger.Init(initialLevel, initialFormat, initialTimestamp); err != nil {
+			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
 
 		// Load configurations
 		toolsCfg, globalCfg, globalPaths, toolsPaths, err := o.loadConfigs(cmd)

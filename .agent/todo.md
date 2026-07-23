@@ -65,15 +65,15 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | DONE |
 | T57 | `{{file:...}}` のサブパス許可と設定ファイルの信頼境界 | セキュリティ | 中 | 中 | あり | DONE |
 | T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | DONE |
-| T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | - |
-| T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | - |
+| T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | DONE |
+| T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | DONE |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
 | T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンア
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | DONE |
 | T66 | テスト専用ヘルパーを `_test.go` に移動 | クリーンアップ | 低 | 小 | - | DONE |
-| T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | - |
+| T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | DONE |
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別・T53 `--` エスケープ） | テスト | 中 | 小 | - | DONE |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
@@ -1079,46 +1079,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T59: クリーンアップ用 `RemoveContainer` にタイムアウトがない
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/command/root.go:808-816`
-
-### 問題
-
-deferred cleanup は `context.WithoutCancel(ctx)` を使っており（ユーザーキャンセルを生き延びる意図は正しい）、上限がないためデーモンソケットが詰まるとワークロード完了後に cderun が永久にハングする。
-
-### 方針
-
-`context.WithTimeout`（例: 30s）でラップし、期限切れ時はログを出して諦める。
-
-### 完了条件
-
-- ハングする mock ランタイムで cleanup がタイムアウト後に返るテスト
-
----
-
-## T60: duration オプションが式解決エラーを握りつぶす
-
-- 種別: 改善（堅牢性）
-- 優先度: 低
-- 対象: `internal/config/resolver.go:696-709`（`applyDurationOption`）、対比: `resolver.go:734-744`（`applyMemoryOption` は正しい）
-
-### 問題
-
-`hang-timeout` / `pull-backoff-base` 内の `{{...}}` 式が失敗すると、未解決文字列が `time.ParseDuration` に渡り `invalid hang-timeout value "{{env:...}}"` という誤解を招くエラーになる。`applyMemoryOption` は先に `rv.r.Error()` をチェックして本来のディレクティブエラーを返している。
-
-### 方針
-
-`applyDurationOption` にも `if exprErr := rv.r.Error(); exprErr != nil { return exprErr }` を追加する（`resolver.go:699` 付近）。
-
-### 完了条件
-
-- 式解決に失敗する duration 値で、ディレクティブ本来のエラーが返るテスト
-
----
-
 ## T61: Docker attach: stdin エラー時に出力を drain せず切断する
 
 - 種別: 改善
@@ -1161,26 +1121,6 @@ stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パター�
 - インターフェースコメントと warn ログの追加
 
 ---
-
-## T67: 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する
-
-- 種別: 改善（UX）
-- 優先度: 低
-- 対象: `internal/command/root.go:1069-1079`（`_ = o.logger.Init(initialLevel, "text", true)`）、`root.go:1120`（2 回目の Init）
-
-### 問題
-
-設定ロード中の早期ロガーは `CDERUN_LOG_FORMAT` / `--log-format` / `--log-timestamp` を無視して常に `text` + timestamp で出力し、不正な `--log-level` / `CDERUN_LOG_LEVEL` は黙って warn にフォールバックして 2 回目の Init まで報告されない。早期の debug ログを JSON で機械処理できず、レベルのタイポのエラーが遅れて出る。
-
-### 方針
-
-早期 Init でも CLI / env のフォーマット・タイムスタンプ指定を反映し、不正レベルは即時エラーにする。
-
-### 完了条件
-
-- 早期ログが指定フォーマットで出力されるテスト
-- 不正な log-level が設定ロード前にエラーになるテスト
-
 
 ## T69: registry 駆動の優先順位マトリクステスト生成（L1）
 
