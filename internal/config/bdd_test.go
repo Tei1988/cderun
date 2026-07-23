@@ -25,10 +25,8 @@ func TestScenario_ConfigResolution_ComplexOverrides(t *testing.T) {
 		}
 
 		cli := CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true, // P1
-			TTY:          false,
-			TTYSet:       true, // P2
+			CderunTTY: ptr(true),
+			TTY:       ptr(false),
 		}
 
 		tools := ToolsConfig{
@@ -228,28 +226,28 @@ func TestUnit_Config_Resolver_Exhaustive_Coverage(t *testing.T) {
 
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_MOUNT_TOOLS": "t1,t2"}}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"t1", "t2"}, res.MountTools)
 	})
 
 	t.Run("resolveFloat64Opt", func(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"CDERUN_CPUS": "0.5"}}
-		res, err := ResolveWithFS("node", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("node", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.InDelta(t, 0.5, res.CPUs, 0.0001)
 	})
 
 	t.Run("resolveEnvValues with strict error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
-		cli := CLIOptions{Image: "alpine", ImageSet: true, Env: []string{"MISSING"}, StrictEnv: true, StrictEnvSet: true}
+		cli := CLIOptions{Image: ptr("alpine"), Env: []string{"MISSING"}, StrictEnv: ptr(true)}
 		_, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.Error(t, err)
 	})
 
 	t.Run("resolveConfigPath with fallback and expression", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
-		cli := CLIOptions{Image: "alpine", ImageSet: true, SocketPath: "{{PWD}}/docker.sock", SocketPathSet: true}
+		cli := CLIOptions{Image: ptr("alpine"), SocketPath: ptr("{{PWD}}/docker.sock")}
 		res, err := ResolveWithFS("node", &cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "/work/docker.sock", res.SocketPath)
