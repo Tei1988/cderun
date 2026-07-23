@@ -236,7 +236,7 @@ var (
 	expectedFieldIndices map[string]optionFields
 	fieldOnce            sync.Once
 
-	autoDetectOnce         sync.Once
+	autoDetectMu           sync.RWMutex
 	autoDetectedRuntime    string
 	autoDetectedSocketPath string
 )
@@ -1032,23 +1032,43 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 			}
 		} else {
 			if _, isReal := rv.fs.(RealFileSystem); isReal {
-				autoDetectOnce.Do(func() {
-					if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-						autoDetectedRuntime = "docker"
-						autoDetectedSocketPath = "/var/run/docker.sock"
-					} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-						autoDetectedRuntime = "containerd"
-						autoDetectedSocketPath = "/run/containerd/containerd.sock"
-					} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-						autoDetectedRuntime = "podman"
-						autoDetectedSocketPath = "/run/podman/podman.sock"
+				autoDetectMu.RLock()
+				cachedRuntime := autoDetectedRuntime
+				cachedSocketPath := autoDetectedSocketPath
+				autoDetectMu.RUnlock()
+
+				if cachedRuntime != "" {
+					rv.res.Runtime = cachedRuntime
+					rv.res.SocketPath = cachedSocketPath
+				} else {
+					autoDetectMu.Lock()
+					if autoDetectedRuntime != "" {
+						rv.res.Runtime = autoDetectedRuntime
+						rv.res.SocketPath = autoDetectedSocketPath
 					} else {
-						autoDetectedRuntime = "docker"
-						autoDetectedSocketPath = "/var/run/docker.sock"
+						var detectedRuntime string
+						var detectedSocketPath string
+
+						if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
+							detectedRuntime = "docker"
+							detectedSocketPath = "/var/run/docker.sock"
+						} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
+							detectedRuntime = "containerd"
+							detectedSocketPath = "/run/containerd/containerd.sock"
+						} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
+							detectedRuntime = "podman"
+							detectedSocketPath = "/run/podman/podman.sock"
+						}
+
+						if detectedRuntime != "" {
+							autoDetectedRuntime = detectedRuntime
+							autoDetectedSocketPath = detectedSocketPath
+							rv.res.Runtime = detectedRuntime
+							rv.res.SocketPath = detectedSocketPath
+						}
 					}
-				})
-				rv.res.Runtime = autoDetectedRuntime
-				rv.res.SocketPath = autoDetectedSocketPath
+					autoDetectMu.Unlock()
+				}
 			} else {
 				if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
 					rv.res.Runtime = "docker"
@@ -1059,10 +1079,12 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 				} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
 					rv.res.Runtime = "podman"
 					rv.res.SocketPath = "/run/podman/podman.sock"
-				} else {
-					rv.res.Runtime = "docker"
-					rv.res.SocketPath = "/var/run/docker.sock"
 				}
+			}
+
+			if rv.res.Runtime == "" {
+				rv.res.Runtime = "docker"
+				rv.res.SocketPath = "/var/run/docker.sock"
 			}
 		}
 	}

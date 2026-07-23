@@ -346,32 +346,19 @@ type FileSystem interface {
 	Abs(path string) (string, error)
 }
 
-var (
-	realWD       string
-	realWDErr    error
-	realWDOnce   sync.Once
-	realHome     string
-	realHomeErr  error
-	realHomeOnce sync.Once
-)
-
 // RealFileSystem implements FileSystem using standard os and filepath.
 type RealFileSystem struct{}
 
-func (RealFileSystem) Getwd() (string, error) {
-	realWDOnce.Do(func() {
-		realWD, realWDErr = os.Getwd()
-	})
-	return realWD, realWDErr
-}
+// Getwd retrieves the current working directory on each call without process-lifetime caching,
+// ensuring that changes made by os.Chdir are accurately reflected in subsequent relative path resolutions.
+func (RealFileSystem) Getwd() (string, error) { return os.Getwd() }
+
 func (RealFileSystem) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) } //nolint:gosec
-func (RealFileSystem) UserHomeDir() (string, error) {
-	realHomeOnce.Do(func() {
-		realHome, realHomeErr = os.UserHomeDir()
-	})
-	return realHome, realHomeErr
-}
+
+// UserHomeDir retrieves the user home directory on each call, avoiding process-lifetime caching
+// so that transient environment changes or errors are not permanently retained.
+func (RealFileSystem) UserHomeDir() (string, error) { return os.UserHomeDir() }
 func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
 func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
 func (RealFileSystem) LookupEnv(key string) (string, bool)   { return os.LookupEnv(key) }
