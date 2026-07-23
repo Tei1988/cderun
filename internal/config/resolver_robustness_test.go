@@ -572,13 +572,13 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 		cli := &CLIOptions{
 			Image:     "alpine",
 			ImageSet:  true,
-			Memory:    "-50MB",
+			Memory:    "9223372036854775808", // Large value that causes overflow to negative int64
 			MemorySet: true,
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value \"-50MB\"")
+		assert.Contains(t, err.Error(), "invalid memory value \"-9223372036854775808\"")
 	})
 
 	t.Run("negative CPUs in CLI options is rejected", func(t *testing.T) {
@@ -597,12 +597,18 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 }
 
 func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
-	// Not Parallel because it manipulates global logger output
+	// Not Parallel because it manipulates global logger output and level
 	mfs := &MockFileSystem{}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 	t.Run("privileged mode with standard caps does not trigger additional cap warning", func(t *testing.T) {
 		var buf bytes.Buffer
-		origWriter := logging.GetGlobalLogger().GetWriter()
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
 		logging.GetGlobalLogger().SetOutput(&buf)
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
@@ -626,7 +632,7 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 
 	t.Run("privileged mode with highly privileged caps triggers cap warning", func(t *testing.T) {
 		var buf bytes.Buffer
-		origWriter := logging.GetGlobalLogger().GetWriter()
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
 		logging.GetGlobalLogger().SetOutput(&buf)
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
@@ -652,7 +658,7 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 
 	t.Run("non-privileged mode with highly privileged caps does not trigger warning", func(t *testing.T) {
 		var buf bytes.Buffer
-		origWriter := logging.GetGlobalLogger().GetWriter()
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
 		logging.GetGlobalLogger().SetOutput(&buf)
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
