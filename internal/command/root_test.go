@@ -2170,9 +2170,14 @@ func TestUnit_Root_EarlyLogger_Validation(t *testing.T) {
 	})
 
 	t.Run("valid early log timestamp true", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_LOG_TIMESTAMP": "false"},
+		}
 		var capturedLogger *logging.Logger
 		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--log-timestamp=true", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
 			capturedLogger = o.logger
 		})
 		require.NoError(t, err)
