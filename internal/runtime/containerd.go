@@ -38,9 +38,10 @@ type ContainerdRuntime struct {
 	logger    *logging.Logger
 	sleepFunc func(context.Context, time.Duration) error
 
-	mu     sync.RWMutex
-	ioMap  map[string]cio.Creator
-	ioWait map[string]chan error
+	mu        sync.RWMutex
+	ioMap     map[string]cio.Creator
+	ioWait    map[string]chan error
+	taskReady map[string]chan struct{}
 
 	closeOnce sync.Once
 	closeErr  error
@@ -70,6 +71,7 @@ func NewContainerdRuntime(socket string, opts ...ContainerdRuntimeOption) (*Cont
 		sleepFunc: SleepFunc,
 		ioMap:     make(map[string]cio.Creator),
 		ioWait:    make(map[string]chan error),
+		taskReady: make(map[string]chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -93,6 +95,20 @@ func (r *ContainerdRuntime) notifyWait(containerID string, err error) {
 		case waitC <- err:
 		default:
 		}
+	}
+}
+
+func (r *ContainerdRuntime) notifyTaskReady(containerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if readyC, ok := r.taskReady[containerID]; ok {
+		select {
+		case <-readyC:
+			// Already closed
+		default:
+			close(readyC)
+		}
+		delete(r.taskReady, containerID)
 	}
 }
 
@@ -340,6 +356,8 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 		return fmt.Errorf("failed to create task: %w", err)
 	}
 
+	r.notifyTaskReady(containerID)
+
 	started := false
 	defer func() {
 		if !started {
@@ -454,44 +472,58 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 	r.mu.Lock()
 	r.ioMap[containerID] = creator
 	r.ioWait[containerID] = waitC
+	if r.taskReady == nil {
+		r.taskReady = make(map[string]chan struct{})
+	}
+	readyC, ok := r.taskReady[containerID]
+	if !ok {
+		readyC = make(chan struct{})
+		r.taskReady[containerID] = readyC
+	}
 	r.mu.Unlock()
 
-	go func() {
-		for {
-			container, err := r.client.LoadContainer(ctx, containerID)
-			if err != nil {
-				if !errdefs.IsNotFound(err) {
-					r.notifyWait(containerID, err)
-					return
-				}
-			} else {
-				task, err := container.Task(ctx, nil)
-				if err != nil {
-					if !errdefs.IsNotFound(err) {
-						r.notifyWait(containerID, err)
-						return
-					}
-				} else {
-					exitStatusC, err := task.Wait(ctx)
-					if err != nil {
-						r.notifyWait(containerID, err)
-						return
-					}
-					select {
-					case status := <-exitStatusC:
-						r.notifyWait(containerID, status.Error())
-						return
-					case <-ctx.Done():
-						return
-					}
-				}
-			}
+	// Check if task is already ready (e.g., if StartContainer was called first)
+	taskAlreadyReady := false
+	if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
+		if _, err := container.Task(ctx, nil); err == nil {
+			taskAlreadyReady = true
+		}
+	}
 
+	go func() {
+		if !taskAlreadyReady {
 			select {
-			case <-time.After(100 * time.Millisecond):
+			case <-readyC:
 			case <-ctx.Done():
 				return
 			}
+		}
+
+		container, err := r.client.LoadContainer(ctx, containerID)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				r.notifyWait(containerID, err)
+			}
+			return
+		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				r.notifyWait(containerID, err)
+			}
+			return
+		}
+		exitStatusC, err := task.Wait(ctx)
+		if err != nil {
+			r.notifyWait(containerID, err)
+			return
+		}
+		select {
+		case status := <-exitStatusC:
+			r.notifyWait(containerID, status.Error())
+			return
+		case <-ctx.Done():
+			return
 		}
 	}()
 
@@ -499,6 +531,15 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		r.mu.Lock()
 		delete(r.ioMap, containerID)
 		delete(r.ioWait, containerID)
+		if readyC, ok := r.taskReady[containerID]; ok {
+			select {
+			case <-readyC:
+				// Already closed
+			default:
+				close(readyC)
+			}
+			delete(r.taskReady, containerID)
+		}
 		r.mu.Unlock()
 	}()
 
