@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -277,7 +276,7 @@ func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
 		{"Multiple hyphens host", "a-b-c-d", false},
 		{"IP-like hostname", "192.168.1.1", false},
 		{"Hostname with dot but starts with dot", ".web-server", true},
-		{"Hostname too long", fmt.Sprintf("web-%s", string(make([]byte, 256))), true},
+		{"Hostname too long", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567", true},
 	}
 
 	for _, tt := range tests {

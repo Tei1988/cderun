@@ -25,19 +25,6 @@ func withPatchedFieldInfo(t *testing.T, key string, mutation func()) {
 	mutation()
 }
 
-// Commented out as the defensive branch in fetchFieldAndParams has been commented out (Item 3 of T65)
-/*
-func TestUnit_Config_FieldInfo_ErrorPaths(t *testing.T) {
-	cliVal := reflect.ValueOf(&CLIOptions{}).Elem()
-
-	t.Run("missing registry info", func(t *testing.T) {
-		_, _, _, _, _, err := fetchFieldAndParams("nonexistent", cliVal)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "registry mismatch: info for option \"nonexistent\" not found")
-	})
-}
-*/
-
 func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	type testStruct struct {
 		Ptr       *string
@@ -99,29 +86,6 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 
 func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 	// Not Parallel because it mutates global fieldInfo or global logger level
-
-	// Commented out as the unreachable defensive branch in fetchFieldAndParams is removed (Item 3 of T65)
-	/*
-		t.Run("registry mismatch for early boolean option", func(t *testing.T) {
-			withPatchedFieldInfo(t, "diagnosis", func() {
-				delete(fieldInfo, "diagnosis")
-			})
-
-			_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"diagnosis\" not found")
-		})
-
-		t.Run("registry mismatch for string option in phase 2", func(t *testing.T) {
-			withPatchedFieldInfo(t, "image", func() {
-				delete(fieldInfo, "image")
-			})
-
-			_, err := ResolveWithFS("", nil, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"image\" not found")
-		})
-	*/
 
 	t.Run("registry mismatch validation with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{
@@ -619,53 +583,6 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed for env[0] (key)")
 	})
-
-	// Commented out as the unreachable defensive branch in fetchFieldAndParams is removed (Item 3 of T65)
-	/*
-		t.Run("resolveStandardOptions registry mismatch on bool option", func(t *testing.T) {
-			withPatchedFieldInfo(t, "tty", func() {
-				delete(fieldInfo, "tty")
-			})
-
-			cli := &CLIOptions{Image: "alpine", ImageSet: true}
-			_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"tty\" not found")
-		})
-
-		t.Run("applyIntOption registry mismatch", func(t *testing.T) {
-			withPatchedFieldInfo(t, "pull-max-retries", func() {
-				delete(fieldInfo, "pull-max-retries")
-			})
-
-			cli := &CLIOptions{Image: "alpine", ImageSet: true}
-			_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"pull-max-retries\" not found")
-		})
-
-		t.Run("applyFloat64Option registry mismatch", func(t *testing.T) {
-			withPatchedFieldInfo(t, "cpus", func() {
-				delete(fieldInfo, "cpus")
-			})
-
-			cli := &CLIOptions{Image: "alpine", ImageSet: true}
-			_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"cpus\" not found")
-		})
-
-		t.Run("applyStringSliceOption registry mismatch", func(t *testing.T) {
-			withPatchedFieldInfo(t, "dns", func() {
-				delete(fieldInfo, "dns")
-			})
-
-			cli := &CLIOptions{Image: "alpine", ImageSet: true}
-			_, err := ResolveWithFS("node", cli, nil, nil, &MockFileSystem{})
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "registry mismatch: info for option \"dns\" not found")
-		})
-	*/
 
 	t.Run("validateSecurity exhaustive critical fields", func(t *testing.T) {
 		testCases := []struct {
