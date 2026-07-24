@@ -17,6 +17,52 @@ Host Environment                 Ephemeral Container
 └─────────────────────────┘      └─────────────────────────┘
 ```
 
+### Core Architecture Overview
+
+When you invoke `cderun`, the execution flows through a unified pipeline to translate user commands into secure, ephemeral containers. Below is the high-level architecture of `cderun`:
+
+```text
+ ┌─────────────────────────────────────────────────────────┐
+ │                      User Command                       │
+ │      e.g., cderun node app.js --cderun-image node:20     │
+ └───────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │             1. Argument Preprocessing                   │
+ │   - Detect subcommand boundaries                        │
+ │   - Extract and hoist "--cderun-*" P1 override flags    │
+ └───────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │             2. Configuration Merging                    │
+ │   - Load config layers from P1 down to P6 defaults      │
+ │   - Unify CLI flags, environment variables, and YAMLs   │
+ └───────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │              3. Value Resolution Engine                 │
+ │   - Parse expressions like {{HOME}} or {{file:...}}      │
+ │   - Perform strict anchor boundary security validation  │
+ └───────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │             4. Runtime Adapter Selection                │
+ │   - Probe active sockets (Docker / containerd / Podman) │
+ │   - Enforce runtime capability validations              │
+ └───────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │             5. Container Life Cycle & I/O               │
+ │   - Perform safe image pulls with exponential backoffs  │
+ │   - Synchronize STDIN & capture exit codes gracefully   │
+ └─────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Usage
@@ -116,6 +162,20 @@ cderun --cderun-image node:20-alpine node app.js
 #### Detailed Hoisting Mechanics
 
 Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
+
+```text
+                                  [Hoisting Process]
+  Initial Input:
+  ┌─────────────────────────────────────────────────────────────┐
+  │ cderun  │  --tty  │  node  │  app.js  │ --cderun-image=node │
+  └─────────────────────────────────┬───────────────────────────┘
+                                    │
+                                    ▼ [Extract --cderun-*]
+  Hoisted Input:
+  ┌─────────────────────────────────────────────────────────────┐
+  │ cderun  │ --cderun-image=node │  --tty  │  node  │  app.js  │
+  └─────────────────────────────────────────────────────────────┘
+```
 
 1. **Boundary Detection**: `cderun` scans for the subcommand boundary. It robustly identifies standard and persistent flags that take arguments (such as `--image`) to avoid misidentifying values as subcommands.
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
@@ -258,6 +318,20 @@ Because container runtimes (Docker/Podman) run on the base host, any nested moun
 ### 3. macOS Setup Constraints
 
 Nested execution on macOS requires special consideration because containers run inside a Linux VM:
+
+```text
+  macOS Host (Darwin)                   Linux VM (Docker / Podman)
+ ┌─────────────────────────┐           ┌─────────────────────────────┐
+ │ Compile linux binary:   │           │ Container Environment       │
+ │ GOOS=linux GOARCH=arm64 │ ────────> │                             │
+ │   -mountCderunPath      │           │ Runs: cderun (Linux)        │
+ │                         │           │ Writes: /tmp/cderun-snap-...│
+ │                         │           │                             │
+ │ Socket:                 │           │ Socket Mounted:             │
+ │ /var/run/docker.sock    │ ────────> │ /var/run/docker.sock        │
+ │ (GID may differ on host)│           │ (Requires GID 102/groupAdd) │
+ └─────────────────────────┘           └─────────────────────────────┘
+```
 
 - **Architecture**: A Linux-compiled binary of `cderun` (e.g., `cderun_linux_arm64` or `cderun_linux_amd64`) must be mounted instead of the macOS binary. Specify this with `--mount-cderun-path`.
 - **Socket Permissions**: You must specify the VM's numeric socket Group ID explicitly via the `--cderun-group-add` CLI flag or `groupAdd` array (e.g. `"102"`) so the container user is granted access.
