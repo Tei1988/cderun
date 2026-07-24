@@ -2056,3 +2056,166 @@ func TestUnit_Root_DryRun_Safety(t *testing.T) {
 		assert.Contains(t, output, "Entrypoint: \"/usr/bin/env\" \"bash\"")
 	})
 }
+
+type hangingMockRuntime struct {
+	*runtime.MockRuntime
+	started chan struct{}
+}
+
+func (m *hangingMockRuntime) RemoveContainer(ctx context.Context, containerID string) error {
+	close(m.started)
+	<-ctx.Done() // Block until context is cancelled (via timeout)
+	return ctx.Err()
+}
+
+// Reference: docs/features/command-line-options.md (deferred cleanup option '--remove')
+// Verifies that deferred container removal cleanup is bounded by a timeout when the runtime hangs.
+func TestUnit_Root_Cleanup_Timeout(t *testing.T) {
+	t.Parallel()
+	t.Run("cleanup terminates within timeout when RemoveContainer hangs", func(t *testing.T) {
+		started := make(chan struct{})
+		mockRuntime := &hangingMockRuntime{
+			MockRuntime: &runtime.MockRuntime{},
+			started:     started,
+		}
+
+		var stderrBuf bytes.Buffer
+		start := time.Now()
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			o.cleanupTimeout = 50 * time.Millisecond
+			cmd.SetErr(&stderrBuf)
+		})
+		elapsed := time.Since(start)
+		require.NoError(t, err)
+
+		// Verify that RemoveContainer was actually invoked
+		select {
+		case <-started:
+		default:
+			t.Fatal("expected RemoveContainer to be called")
+		}
+
+		// Ensure it returned after the configured cleanupTimeout but within a short upper bound
+		assert.GreaterOrEqual(t, elapsed, 50 * time.Millisecond)
+		assert.Less(t, elapsed, 500 * time.Millisecond)
+	})
+}
+
+// Reference: docs/features/command-line-options.md (logging options: '--log-level', '--log-format', '--log-timestamp')
+// Verifies that early logger initialization correctly resolves, validates and errors out on invalid formats or levels.
+func TestUnit_Root_EarlyLogger_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid early log level", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "invalid-level", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log level: \"invalid-level\"")
+	})
+
+	t.Run("invalid early cderun log level", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-level", "invalid-level"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log level: \"invalid-level\"")
+	})
+
+	t.Run("invalid early log format", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-format", "invalid-format", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log format: \"invalid-format\"")
+	})
+
+	t.Run("invalid early cderun log format", func(t *testing.T) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-format", "invalid-format"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log format: \"invalid-format\"")
+	})
+
+	t.Run("invalid environment log level", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_LOG_LEVEL": "invalid-env-level"},
+		}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported log level: \"invalid-env-level\"")
+	})
+
+	t.Run("invalid environment log timestamp", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_LOG_TIMESTAMP": "not-a-bool"},
+		}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid boolean value for log-timestamp: \"not-a-bool\"")
+	})
+
+	t.Run("valid early log timestamp true", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_LOG_TIMESTAMP": "false"},
+		}
+		var capturedLogger *logging.Logger
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--log-timestamp=true", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			capturedLogger = o.logger
+		})
+		require.NoError(t, err)
+		assert.True(t, capturedLogger.GetTimestamp())
+	})
+
+	t.Run("valid early log timestamp false", func(t *testing.T) {
+		var capturedLogger *logging.Logger
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--log-timestamp=false", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			capturedLogger = o.logger
+		})
+		require.NoError(t, err)
+		assert.False(t, capturedLogger.GetTimestamp())
+	})
+
+	t.Run("valid early cderun log timestamp false", func(t *testing.T) {
+		var capturedLogger *logging.Logger
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--dry-run", "sh", "--cderun-log-timestamp=false"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			capturedLogger = o.logger
+		})
+		require.NoError(t, err)
+		assert.False(t, capturedLogger.GetTimestamp())
+	})
+
+	t.Run("valid environment log timestamp false", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_LOG_TIMESTAMP": "false"},
+		}
+		var capturedLogger *logging.Logger
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--dry-run", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			capturedLogger = o.logger
+		})
+		require.NoError(t, err)
+		assert.False(t, capturedLogger.GetTimestamp())
+	})
+}
