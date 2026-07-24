@@ -323,13 +323,13 @@ Nested execution on macOS requires special consideration because containers run 
   macOS Host (Darwin)                   Linux VM (Docker / Podman)
  ┌─────────────────────────┐           ┌─────────────────────────────┐
  │ Compile linux binary:   │           │ Container Environment       │
- │ GOOS=linux GOARCH=arm64 │ ────────> │                             │
- │   -mountCderunPath      │           │ Runs: cderun (Linux)        │
- │                         │           │ Writes: /tmp/cderun-snap-...│
+ │ GOOS=linux GOARCH=<arch>│ ────────> │                             │
+ │  --mount-cderun-path    │           │ Runs: cderun (Linux)        │
+ │ (e.g. arm64 or amd64)   │           │ Writes: /tmp/cderun-snap-...│
  │                         │           │                             │
  │ Socket:                 │           │ Socket Mounted:             │
  │ /var/run/docker.sock    │ ────────> │ /var/run/docker.sock        │
- │ (GID may differ on host)│           │ (Requires GID 102/groupAdd) │
+ │ (GID may differ on host)│           │ (Requires <VM_GID>/groupAdd)│
  └─────────────────────────┘           └─────────────────────────────┘
 ```
 
