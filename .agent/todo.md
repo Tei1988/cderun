@@ -17,7 +17,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - | - |
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - | - |
-| T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | - |
+| T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | DONE |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - | DONE |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | DONE |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | DONE |
@@ -59,7 +59,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
 | T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
-| T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
+| T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | DONE |
 | T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | DONE |
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
 | T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | DONE |
@@ -179,49 +179,6 @@ func opt[T any] (changed bool, v T) *T {
 - registry のメタデータ 1 箇所を変更すれば新オプションが追加できる状態になっている
 - 生成コードと手書きコードの境界が明確（生成ファイルにヘッダコメント）
 - `docs/guidelines/working-guide.md` のチェックリストを新手順に合わせて更新
-
----
-
-## T07: `preprocessArgs` の引数ホイスト簡略化
-
-- 種別: リファクタリング
-- 対象: `internal/command/root.go:1220`（`preprocessArgs`）
-- 仕様変更: あり → `docs/features/argument-parsing.md` の更新必須
-
-### 問題
-
-`preprocessArgs` はフラグパーサーを手書きで再実装しており、フラグが値を取るかの判定が壊れやすい。`--cderun-*` フラグだけを先に抽出する薄いフィルターに限定し、残りは cobra に委ねる構造にすることでロバスト性が上がる。
-
-```go
-func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
-    for i := 0; i < len(args); i++ {
-        if strings.HasPrefix(args[i], "--cderun-") {
-            cderunFlags = append(cderunFlags, args[i])
-            if !strings.Contains(args[i], "=") && i+1 < len(args) {
-                cderunFlags = append(cderunFlags, args[i+1])
-                i++
-            }
-        } else {
-            rest = append(rest, args[i])
-        }
-    }
-    return
-}
-```
-
-### 実装上の注意（仕様差分が 2 つある）
-
-上記スケッチは現行仕様と差分があるため、そのまま採用しないこと:
-
-1. 現状はサブコマンド「前」の `--cderun-*` をエラーにしている（`root.go:1261-1264`、エラーメッセージ `"cderun internal override flag %q must be placed after the subcommand"`）。スケッチは位置を区別しない
-2. `--cderun-foo value` 形式で次引数を値として取るかどうかは、本来フラグ定義を引かないと判定できない（bool フラグの直後の引数を誤って食う）
-
-簡略化する場合も「`--cderun-*` は `=` 形式のみ許可する」と仕様を縛れば判定不要になり、最も安全.
-
-### 完了条件
-
-- 採用した仕様が `docs/features/argument-parsing.md` に反映されている
-- サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
 
 ---
 
@@ -1032,28 +989,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 - pull/create 中のシグナルで orphan コンテナが残らないテスト
 - 起動直前のシグナルが失われず、起動後に転送されるかプロセスが安全に中断されるテスト
 - SIGHUP の扱いが実装とドキュメントで一致している
-
----
-
-## T53: 引数ホイストの `--` エスケープ対応
-
-- 種別: 挙動変更
-- 優先度: 中
-- 対象: `internal/command/root.go:1299-1325`（ホイストループ）
-- 仕様変更: あり → `docs/features/argument-parsing.md` の更新必須
-
-### 問題
-
-ホイストはサブコマンド後の全引数を走査し `--` (end-of-flags) を認識しないため、`cderun echo -- --cderun-tty` でもホイストされてしまい、リテラルの `--cderun-*` 文字列をコンテナコマンドに渡す手段が存在しない。
-
-### 方針
-
-リテラル `--` 以降はホイスト対象外とする。`--` 自体を strip するか残すかを仕様として決定し `argument-parsing.md` に明記する。T07 のリライトと同時に実装するのが効率的。
-
-### 完了条件
-
-- `--` 以降の `--cderun-*` がコンテナに素通しされるテスト
-- 仕様が `docs/features/argument-parsing.md` に記載されている
 
 ---
 

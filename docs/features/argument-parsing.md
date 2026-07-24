@@ -64,19 +64,19 @@ cderun go --version
 flowchart TD
     Start([引数リストの入力]) --> DetectSubcmd[1. サブコマンドの特定<br/>最初の非フラグ引数を探す]
     DetectSubcmd --> ScanP1[2. P1フラグのスキャン<br/>サブコマンド以降の --cderun-* を収集]
-    ScanP1 --> HandleValues[3. 値のハンドリング<br/>フラグに続く引数もセットで抽出]
+    ScanP1 --> HandleValues[3. 値のハンドリング<br/>イコール形式での指定確認]
     HandleValues --> Reconstruct[4. 引数リストの再構成<br/>P1フラグをサブコマンドの前へ移動]
     Reconstruct --> End([Cobra パーサーへ渡す準備完了])
 
     subgraph WRAPPER ["Hoisting 実例 (Wrapper Mode)"]
-    ExampleInput["cderun --tty node app.js --cderun-image node:20"]
-    ExampleOutput["cderun --cderun-image node:20 --tty node app.js"]
+    ExampleInput["cderun --tty node app.js --cderun-image=node:20"]
+    ExampleOutput["cderun --cderun-image=node:20 --tty node app.js"]
     ExampleInput -- 前処理 --> ExampleOutput
     end
 
     subgraph SYMLINK ["Hoisting 実例 (Symlink Mode)"]
-    SymlinkInput["node app.js --cderun-image node:20"]
-    SymlinkOutput["cderun --cderun-image node:20 node app.js"]
+    SymlinkInput["node app.js --cderun-image=node:20"]
+    SymlinkOutput["cderun --cderun-image=node:20 node app.js"]
     SymlinkInput -- 前処理 --> SymlinkOutput
     end
 ```
@@ -84,23 +84,23 @@ flowchart TD
 #### 解析ロジックの詳細
 
 1. **サブコマンドの特定 (Boundary Detection)**: `cderun` は引数リストの先頭から順にスキャンを行い、フラグ（およびその引数値）をスキップしながら、最初の「非フラグ引数」を探します。
-   - **フラグの認識**: スキャン中、`cderun` は Cobra に登録された既存のフラグ定義を参照します。フラグが値を必要とする型（String, Int 等）で、かつ `=` を含まない場合（例: `--image alpine`）、次の引数もフラグの一部としてスキップします。
+   - **フラグ of cderun の認識**: スキャン中、`cderun` は Cobra に登録された既存のフラグ定義を参照します。フラグが値を必要とする型（String, Int 等）で、かつ `=` を含まない場合（例: `--image alpine`）、次の引数もフラグの一部としてスキップします。
    - **短縮形 (Shorthand)**: `-it` のような複数の短縮形の組み合わせや、`-p 80:80` のように値を必要とする短縮形も正しく考慮されます。
    - **サブコマンド**: このプロセスで最初に見つかった「フラグではない文字列」がサブコマンド（Lookup Key）となります。
 
 2. **P1フラグの収集 (Extraction)**: サブコマンドの境界より後ろにある引数リストをスキャンし、`--cderun-` で始まるフラグをすべて抽出します。
 
-3. **引数値のハンドリング (Value Hoisting)**: 抽出対象の `--cderun-` フラグが値を必要とする場合（例: `--cderun-image node:20-alpine`）、フラグ定義を参照して次の引数もセットで抽出・移動対象とします。これにより、値がパススルー引数として残ってしまうのを防ぎます。
+3. **引数値のハンドリング (Value Hoisting)**: すべての `--cderun-` 内部オーバーライドフラグ（P1）において、引数値を伴う場合は必ず `--cderun-<option>=<value>` のように `=` 形式（イコール繋ぎ）で指定する必要があります。空白区切りによる引数値の指定（例：`--cderun-image node:20-alpine`）はサポートされません。イコール繋ぎに限定されることで、ホイスト時のフラグ解析が極めてシンプルかつロバストになり、後続の引数への誤った誤認を完全に防ぎます。
 
 4. **再構成 (Reconstruction)**: 抽出された P1 フラグ群を引数リストの先頭（`cderun` コマンドの直後）に移動し、残りのパススルー引数をサブコマンドの後に配置します。
 
 ```bash
 # 実行時の入力
-cderun node app.js --cderun-tty --cderun-image node:20-alpine
+cderun node app.js --cderun-tty --cderun-image=node:20-alpine
 
 # 前処理（ホイスト）後の内部的な引数状態
 # これが Cobra パーサーに渡される
-cderun --cderun-tty --cderun-image node:20-alpine node app.js
+cderun --cderun-tty --cderun-image=node:20-alpine node app.js
 ```
 
 このメカニズムにより、コンテナ内で実行されるコマンドが自身のフラグ（例: `node --version`）を持っていても、`cderun` の設定と曖昧さなく区別することが可能になります。
@@ -116,11 +116,11 @@ cderun --cderun-tty --cderun-image node:20-alpine node app.js
 ```bash
 # node が cderun へのシンボリックリンクの場合
 # ホスト環境で実行：
-node --env DEBUG=app app.js --cderun-env NODE_ENV=production
+node --env DEBUG=app app.js --cderun-env=NODE_ENV=production
 
 # 内部的な解釈：
 # 1. 'node' をサブコマンド（キー）として特定
-# 2. '--cderun-env NODE_ENV=production' を検出し、前方に移動
+# 2. '--cderun-env=NODE_ENV=production' を検出し、前方に移動
 # 3. 残りの '--env DEBUG=app app.js' は node への引数（パススルー）として保持
 # 4. 最終的に Alpine/Node コンテナ内で 'node --env DEBUG=app app.js' を実行
 ```
@@ -128,7 +128,7 @@ node --env DEBUG=app app.js --cderun-env NODE_ENV=production
 この例では：
 
 1. `--env DEBUG=app` は `cderun` の標準フラグ（P2）と同じ名前ですが、サブコマンドの後ろにあるためホイストの対象にならず、`node`（コンテナ内の実行コマンド）にそのまま渡されます。
-2. `--cderun-env NODE_ENV=production` は P1 内部オーバーライドとしてホイストされ、`cderun` 自体の環境変数設定（P1）として、YAML 設定や P3 環境変数を上書きして適用されます。
+2. `--cderun-env=NODE_ENV=production` は P1 内部オーバーライドとしてホイストされ、`cderun` 自体の環境変数設定（P1）として、YAML 設定や P3 環境変数を上書きして適用されます。
 
 詳細は [polyglot-entry.md](./polyglot-entry.md) を参照してください。
 
@@ -138,6 +138,8 @@ node --env DEBUG=app app.js --cderun-env NODE_ENV=production
 引数リスト内（標準モードの場合はサブコマンドの後ろ、ポリグロットモードの場合は実行ファイル名の後ろ）に `--` が出現した場合、それ以降に出現する引数は、たとえ `--cderun-` プレフィックスを持っていたとしても**ホイストの対象外（リテラル引数）**として扱われ、そのままコンテナ内のコマンドにパススルーされます。
 
 これにより、コンテナ内で実行されるコマンドに対して、`--cderun-` から始まる名前のオプションや引数を安全かつ確実に引き渡すことが可能になります。
+
+なお、`--` デリミタ自体は取り除かれず、そのままコンテナ内のコマンドにパススルーされます。
 
 ```bash
 # `--` 以降の `--cderun-tty` はホイストされず、そのまま echo の引数として渡される
