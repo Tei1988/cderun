@@ -490,30 +490,32 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		}
 	}
 
+	attachCtx, cancelAttach := context.WithCancel(ctx)
+
 	go func() {
 		if !taskAlreadyReady {
 			select {
 			case <-readyC:
-			case <-ctx.Done():
+			case <-attachCtx.Done():
 				return
 			}
 		}
 
-		container, err := r.client.LoadContainer(ctx, containerID)
+		container, err := r.client.LoadContainer(attachCtx, containerID)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				r.notifyWait(containerID, err)
 			}
 			return
 		}
-		task, err := container.Task(ctx, nil)
+		task, err := container.Task(attachCtx, nil)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				r.notifyWait(containerID, err)
 			}
 			return
 		}
-		exitStatusC, err := task.Wait(ctx)
+		exitStatusC, err := task.Wait(attachCtx)
 		if err != nil {
 			r.notifyWait(containerID, err)
 			return
@@ -522,12 +524,13 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		case status := <-exitStatusC:
 			r.notifyWait(containerID, status.Error())
 			return
-		case <-ctx.Done():
+		case <-attachCtx.Done():
 			return
 		}
 	}()
 
 	defer func() {
+		cancelAttach()
 		r.mu.Lock()
 		delete(r.ioMap, containerID)
 		delete(r.ioWait, containerID)
