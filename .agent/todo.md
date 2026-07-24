@@ -58,7 +58,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | DONE |
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
-| T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
+| T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | DONE |
 | T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
 | T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | DONE |
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
@@ -1004,34 +1004,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 - containerd + `type=volume` が明示エラーになるテスト
 - containerd + `type=tmpfs` が有効な OCI マウントになるテスト
-
----
-
-## T52: コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む）
-
-- 種別: 改善（堅牢性）
-- 優先度: 中
-- 対象: `internal/command/root.go:735, 757, 767, 836-864`、`internal/command/signals_unix.go:12-14`
-- 仕様変更: あり → `docs/features/signal-handling-security.md` の更新
-
-### 問題
-
-1. `signal.Notify` はコンテナ start 直前（`root.go:757`）まで設置されないため、`PullImage` / `CreateContainer` 中の SIGINT/SIGTERM はデフォルト動作でプロセスを即死させる。`CreateContainer` 完了後〜Notify 前に受けると deferred remove が走らず orphan コンテナになる
-2. forwarder 開始（757）〜 `StartContainer`（767）の間に受けたシグナルは「未起動コンテナへの転送失敗（warn のみ）」で消費され、その後コンテナは何事もなく起動する — CI の SIGTERM が黙って握りつぶされる
-3. `sigChan` のバッファが 1 のため、`SignalContainer` ブロック中の連続シグナルが落ちる
-4. SIGHUP を Notify していないため、ターミナルクローズで即死し orphan コンテナが残る（T22 の `--prune` は事後対策であり予防にならない）
-
-### 方針
-
-- `initContainer` より前に `signal.Notify` を設置し、コンテナ起動まではシグナルをキューイングするか context キャンセルで作成を中断する
-- チャネルバッファを増やす（例: 4）
-- SIGHUP（必要なら SIGQUIT も）を転送対象に加える。意図的に除外する場合はその設計判断を `signal-handling-security.md` に明記する
-
-### 完了条件
-
-- pull/create 中のシグナルで orphan コンテナが残らないテスト
-- 起動直前のシグナルが失われず、起動後に転送されるかプロセスが安全に中断されるテスト
-- SIGHUP の扱いが実装とドキュメントで一致している
 
 ---
 

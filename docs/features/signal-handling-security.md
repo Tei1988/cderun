@@ -11,6 +11,28 @@ This regex pattern ensures that only alphanumeric characters are accepted, preve
 
 Note that this validation acts as a character whitelist rather than a static signal allowlist; unknown alphanumeric signals are passed to the engine, which will subsequently handle any unsupported signal errors natively.
 
+## Zero-Gap Early Signal Registration & Safe Cleanup
+
+To prevent the creation of orphan containers, `cderun` registers standard signals (`SIGINT`, `SIGTERM`, `SIGHUP`, `SIGQUIT`) at the very beginning of the command execution lifecycle, prior to image pulling or container creation.
+
+If a termination signal is received *before* the container is fully started:
+
+- The execution is safely cancelled via context cancellation (`ctxG`).
+- Ongoing image pulling or container creation operations are immediately aborted.
+- Any partially created containers are guaranteed to be cleaned up via deferred functions (which run with an uncancelled base context to ensure removal execution).
+- The container is prevented from starting if cancellation is triggered before the start phase.
+
+Once the container has successfully started, signals are forwarded to the container runtime.
+
+## SIGHUP and SIGQUIT Support & Buffer Optimization
+
+In addition to `SIGINT` and `SIGTERM`, `cderun` listens to and handles:
+
+- **SIGHUP**: Sent when the controlling terminal is closed. Handling SIGHUP ensures that terminal closure does not leak orphan containers on the host.
+- **SIGQUIT**: Sent via terminal quit character.
+
+To guarantee that rapidly repeated or consecutive signals are not dropped, the internal signal channel is constructed with a buffer size of 4.
+
 ## Runtime Isolation
 
 Signal validation is implemented at the runtime abstraction layer. This prevents malicious subcommands or environment-based overrides from injecting arbitrary commands or metacharacters into the runtime's signal delivery path (e.g., `SIGTERM; rm -rf /`).
