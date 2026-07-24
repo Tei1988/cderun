@@ -602,18 +602,28 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 	return merged, loadedPaths, nil
 }
 
-// LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
-func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
+// resolveAbsolutePath resolves the provided path, expanding the home directory symbol (~) if present
+// and converting it to an absolute path.
+func (l *ConfigLoader) resolveAbsolutePath(path string) (string, error) {
 	if strings.HasPrefix(path, "~") {
 		home, err := l.fs.UserHomeDir()
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+			return "", fmt.Errorf("failed to get home directory: %w", err)
 		}
 		path = expandHome(path, home)
 	}
 	absPath, err := l.fs.Abs(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
+		return "", fmt.Errorf("failed to get absolute path for %q: %w", path, err)
+	}
+	return absPath, nil
+}
+
+// LoadCDERunConfigFromPath loads .cderun.yaml from a specific path.
+func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []string, error) {
+	absPath, err := l.resolveAbsolutePath(path)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	data, err := l.fs.ReadFile(absPath)
@@ -636,16 +646,9 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 
 // LoadToolsConfigFromPath loads .tools.yaml from a specific path.
 func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []string, error) {
-	if strings.HasPrefix(path, "~") {
-		home, err := l.fs.UserHomeDir()
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		path = expandHome(path, home)
-	}
-	absPath, err := l.fs.Abs(path)
+	absPath, err := l.resolveAbsolutePath(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
+		return nil, nil, err
 	}
 
 	data, err := l.fs.ReadFile(absPath)

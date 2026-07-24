@@ -10,6 +10,25 @@ import (
 	"cderun/internal/logging"
 )
 
+// parseSlice parses a slice of string configs into type T using the provided parser.
+func parseSlice[T any](slice []string, sourceLabel string, parser func(string, string) (T, error)) ([]T, error) {
+	if parser == nil {
+		if res, ok := any(slice).([]T); ok {
+			return res, nil
+		}
+		return nil, errors.New("parser required for non-string types")
+	}
+	res := make([]T, len(slice))
+	for i, s := range slice {
+		v, err := parser(s, sourceLabel)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = v
+	}
+	return res, nil
+}
+
 func pickConfigs[T any](
 	p1 []string,
 	p2 []string,
@@ -24,38 +43,10 @@ func pickConfigs[T any](
 	fs FileSystem,
 ) ([]T, error) {
 	if p1 != nil {
-		if parser == nil {
-			if res, ok := any(p1).([]T); ok {
-				return res, nil
-			}
-			return nil, errors.New("parser required for non-string types")
-		}
-		res := make([]T, len(p1))
-		for i, s := range p1 {
-			v, err := parser(s, "override")
-			if err != nil {
-				return nil, err
-			}
-			res[i] = v
-		}
-		return res, nil
+		return parseSlice(p1, "override", parser)
 	}
 	if p2 != nil {
-		if parser == nil {
-			if res, ok := any(p2).([]T); ok {
-				return res, nil
-			}
-			return nil, errors.New("parser required for non-string types")
-		}
-		res := make([]T, len(p2))
-		for i, s := range p2 {
-			v, err := parser(s, "")
-			if err != nil {
-				return nil, err
-			}
-			res[i] = v
-		}
-		return res, nil
+		return parseSlice(p2, "", parser)
 	}
 	if envKey != "" {
 		if env, ok := fs.LookupEnv(envKey); ok {
