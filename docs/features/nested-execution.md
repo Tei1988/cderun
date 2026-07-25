@@ -134,7 +134,7 @@ hostContext:
 
 ## 自動ルート検出 (OverlayFS)
 
-`cderun` が OverlayFS ルートファイルシステムを持つコンテナ内で実行されていることを検出した場合、`/proc/self/mountinfo` を解析してホスト側の `upperdir` を自動的に発見します。そして、`hostContext` に `/` のベースマッピング（`source: upperdir, target: /`）を追加します。
+`cderun` が OverlayFS ルートファイルシステムを持つコンテナ内で実行されていることを検出した場合、`/proc/self/mountinfo` を解析してホスト側の `upperdir` を自動的に発見します。そして、 `hostContext` に `/` のベースマッピング（`source: upperdir, target: /`）を追加します。
 
 ### OverlayFS 検出のメリット
 
@@ -169,6 +169,38 @@ hostContext:
 6. **P6: ハードコードされたデフォルト値**
 
 ※ `/run/cderun/` は「真のデフォルト」として機能し、ユーザーがコンテナ内で明示的に用意した設定ファイルがある場合はそちらが優先されます。
+
+## macOS 実行環境におけるネスト制約
+
+macOS ホスト環境におけるコンテナランタイムは、通常バックグラウンドの Linux 仮想マシン（VM）上で動作しているため、ネスト実行を設定する際には以下のような特有の考慮事項と制約があります。
+
+### 1. 動作概念と構成図
+
+```text
+  macOS Host (Darwin)                   Linux VM (Docker / Podman)
+ ┌─────────────────────────┐           ┌─────────────────────────────┐
+ │ Compile linux binary:   │           │ Container Environment       │
+ │ GOOS=linux GOARCH=<arch>│ ────────> │                             │
+ │  --mount-cderun-path    │           │ Runs: cderun (Linux)        │
+ │ (e.g. arm64 or amd64)   │           │ Writes: /tmp/cderun-snap-...│
+ │                         │           │                             │
+ │ Socket:                 │           │ Socket Mounted:             │
+ │ /var/run/docker.sock    │ ────────> │ /var/run/docker.sock        │
+ │ (GID may differ on host)│           │ (Requires <VM_GID>/groupAdd)│
+ └─────────────────────────┘           └─────────────────────────────┘
+```
+
+### 2. マウントされるバイナリのアーキテクチャ
+
+macOS 自体は Darwin OS であるため、ホスト上の `cderun` バイナリ（Darwin 版）をそのまま Linux コンテナ内へマウントして実行することはできません。
+
+- **解決策**: 事前に Linux 向けにコンパイルした `cderun` バイナリ（例: `GOOS=linux GOARCH=<arch>`、`<arch>` 部分は `amd64` または `arm64` などの環境依存のアーキテクチャ）を用意し、それを `--mount-cderun-path` オプションでホスト側のマウント元として明示的に指定します。
+
+### 3. ランタイムソケットのパーミッションと補助グループの指定
+
+macOS の Docker / Podman 実行環境では、ホスト側ソケットを VM 上でマウントする際の Group ID (GID) が macOS ホスト上の一般グループと一致しないケースがあります。
+
+- **解決策**: VM 上でのソケット所有 GID（例: `<VM_GID>`）を特定し、それを `--cderun-group-add` CLI フラグまたは設定ファイルの `groupAdd` フィールドを用いて数値 GID で指定します。これにより、コンテナ内ユーザーがマウントされたソケットに安全にアクセスできます。
 
 ## ライフサイクル管理
 
