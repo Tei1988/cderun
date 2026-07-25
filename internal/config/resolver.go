@@ -389,10 +389,102 @@ func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string
 	return nil, false
 }
 
+func (rv *resolver) getR() (*ExpressionResolver, error) {
+	if rv.r == nil {
+		var hostCtx *HostContext
+		if rv.global != nil {
+			hostCtx = rv.global.HostContext
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, rv.fs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+		}
+		rv.r = r
+	}
+	return rv.r, nil
+}
+
+func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) bool {
+	if p1Set {
+		return p1Val != ""
+	}
+	if p2Set {
+		return p2Val != ""
+	}
+	if envKey != "" {
+		if env := rv.fs.Getenv(envKey); env != "" {
+			return true
+		}
+	}
+	if rv.tools != nil && tGetter != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			if t := tGetter(tool); !t.IsEmpty() {
+				return true
+			}
+		}
+	}
+	if rv.global != nil && gGetter != nil {
+		if g := gGetter(*rv.global); !g.IsEmpty() {
+			return true
+		}
+	}
+	return fallback != ""
+}
+
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
 	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.getCliVal())
 	if err != nil {
 		return "", err
+	}
+
+	p1ValStr := p1Val.String()
+	p2ValStr := p2Val.String()
+
+	if !rv.hasPathToResolve(p1Set, p1ValStr, p2Set, p2ValStr, envKey, tGetter, gGetter, fallback) {
+		return "", nil
+	}
+
+	// Find the winning raw path
+	var raw string
+	if p1Set {
+		raw = p1ValStr
+	} else if p2Set {
+		raw = p2ValStr
+	} else if env := rv.fs.Getenv(envKey); env != "" {
+		raw = env
+	} else {
+		found := false
+		if rv.tools != nil && tGetter != nil {
+			if tool, ok := rv.tools[rv.subcommand]; ok {
+				if t := tGetter(tool); !t.IsEmpty() {
+					raw = t.Raw
+					found = true
+				}
+			}
+		}
+		if !found && rv.global != nil && gGetter != nil {
+			if g := gGetter(*rv.global); !g.IsEmpty() {
+				raw = g.Raw
+				found = true
+			}
+		}
+		if !found {
+			raw = fallback
+		}
+	}
+
+	var r *ExpressionResolver
+	needResolver := strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~")
+	if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needResolver = true
+	}
+
+	if needResolver {
+		var err error
+		r, err = rv.getR()
+		if err != nil {
+			return "", err
+		}
 	}
 
 	var tools ToolsConfig
@@ -403,32 +495,94 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 	}
 
 	return resolveConfigPath(
-		p1Set, p1Val.String(),
-		p2Set, p2Val.String(),
+		p1Set, p1ValStr,
+		p2Set, p2ValStr,
 		envKey,
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
 		fallback,
-		rv.r,
+		r,
 		"path",
 		rv.fs,
 	)
 }
 
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
-	if err != nil {
-		return err
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
-	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
-	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
+	var p1v, p2v []string
+	var fastPathUsed bool
+
+	expected := expectedFieldIndices[opt.Name]
+	if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
+		info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+		switch opt.Name {
+		case "publish":
+			p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
+			fastPathUsed = true
+		case "expose":
+			p1v, p2v = rv.cli.CderunExpose, rv.cli.Expose
+			fastPathUsed = true
+		case "dns":
+			p1v, p2v = rv.cli.CderunDNS, rv.cli.DNS
+			fastPathUsed = true
+		case "add-host":
+			p1v, p2v = rv.cli.CderunAddHosts, rv.cli.AddHosts
+			fastPathUsed = true
+		case "group-add":
+			p1v, p2v = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
+			fastPathUsed = true
+		case "cap-add":
+			p1v, p2v = rv.cli.CderunCapAdd, rv.cli.CapAdd
+			fastPathUsed = true
+		case "cap-drop":
+			p1v, p2v = rv.cli.CderunCapDrop, rv.cli.CapDrop
+			fastPathUsed = true
+		case "entrypoint":
+			p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
+			fastPathUsed = true
+		}
+	}
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
 	}
+
+	if fastPathUsed {
+		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		switch opt.Name {
+		case "publish":
+			rv.res.Ports = resolved
+		case "expose":
+			rv.res.Expose = resolved
+		case "dns":
+			rv.res.DNS = resolved
+		case "add-host":
+			rv.res.AddHosts = resolved
+		case "group-add":
+			rv.res.GroupAdd = resolved
+		case "cap-add":
+			rv.res.CapAdd = resolved
+		case "cap-drop":
+			rv.res.CapDrop = resolved
+		case "entrypoint":
+			rv.res.Entrypoint = resolved
+		}
+		return nil
+	}
+
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
+	if err != nil {
+		return err
+	}
+
+	p1v, _ = rv.extractStringSliceValue(p1Val, p1Set)
+	p2v, _ = rv.extractStringSliceValue(p2Val, p2Set)
 
 	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	rv.getResVal().Field(info.targetIdx).Set(reflect.ValueOf(resolved))
@@ -490,6 +644,13 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			Fallback:     opt.Default,
 		}
 		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+			r, err := rv.getR()
+			if err != nil {
+				return err
+			}
+			resolved = r.resolveString(resolved)
+		}
 		switch opt.Name {
 		case "image":
 			rv.res.Image = resolved
@@ -522,6 +683,13 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
 	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		resolved = r.resolveString(resolved)
+	}
 	rv.getResVal().Field(info.targetIdx).SetString(resolved)
 	return nil
 }
@@ -761,9 +929,21 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	}
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if err := rv.r.Error(); err != nil {
-		return err
+	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		valStr = r.resolveString(valStr)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	} else if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return err
+		}
 	}
+
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
@@ -802,11 +982,24 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	}
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		valStr = r.resolveString(valStr)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	}
+
 	if valStr != "" {
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
-			if exprErr := rv.r.Error(); exprErr != nil {
-				return exprErr
+			if rv.r != nil {
+				if exprErr := rv.r.Error(); exprErr != nil {
+					return exprErr
+				}
 			}
 			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
 		}
@@ -829,14 +1022,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		logging.Trace("Resolving configurations for tool: %s", subcommand)
 	}
 
-	var hostCtx *HostContext
-	if global != nil {
-		hostCtx = global.HostContext
+	if _, err := fs.UserHomeDir(); err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-
-	r, err := NewExpressionResolverWithFS(hostCtx, fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+	if _, err := fs.Getwd(); err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	fieldOnce.Do(initFieldInfo)
@@ -848,7 +1038,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		tools:      tools,
 		global:     global,
 		fs:         fs,
-		r:          r,
+		r:          nil, // Lazily initialized
 		res:        res,
 	}
 
@@ -955,8 +1145,25 @@ func (rv *resolver) resolveStandardOptions() error {
 				}
 
 				if cliImage != "" {
-					resolvedCLIImage, errCLI := rv.r.ResolveString(cliImage)
-					resolvedCfgImage, errCfg := rv.r.ResolveString(tool.Image)
+					var errCLI, errCfg error
+					resolvedCLIImage := cliImage
+					resolvedCfgImage := tool.Image
+
+					if strings.Contains(cliImage, "{{") || strings.HasPrefix(cliImage, "~") {
+						r, err := rv.getR()
+						if err != nil {
+							return err
+						}
+						resolvedCLIImage, errCLI = r.ResolveString(cliImage)
+					}
+					if strings.Contains(tool.Image, "{{") || strings.HasPrefix(tool.Image, "~") {
+						r, err := rv.getR()
+						if err != nil {
+							return err
+						}
+						resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
+					}
+
 					if errCLI == nil && errCfg == nil {
 						if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
 							return err
@@ -991,13 +1198,67 @@ func (rv *resolver) resolveStandardOptions() error {
 
 func (rv *resolver) resolveComplexOptions() error {
 	var err error
+	var rForMounts *ExpressionResolver
+	hasMounts := len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != ""
+	if !hasMounts && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
+			hasMounts = true
+		}
+	}
+	if !hasMounts && rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
+		hasMounts = true
+	}
+
+	if hasMounts {
+		var err error
+		rForMounts, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Complex types (Mounts, Env)
-	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rForMounts, rv.fs)
 	if err != nil {
 		return err
 	}
 
-	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.SensitiveEnv, rv.res.StrictEnv, rv.r, rv.fs)
+	var rForEnv *ExpressionResolver
+	// Check if there are any environment variables
+	var envs []string
+	envs, err = pickConfigs(
+		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Env },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	hasEnvWithExpr := false
+	for _, e := range envs {
+		if strings.Contains(e, "{{") || strings.HasPrefix(e, "~") {
+			hasEnvWithExpr = true
+			break
+		}
+	}
+	if hasEnvWithExpr {
+		var err error
+		rForEnv, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Deduplicate within the winning source (last-one-wins for the same key)
+	var merged []string
+	if len(envs) > 0 {
+		merged = deduplicateEnv(envs)
+	}
+
+	rv.res.Env, err = resolveEnvValues(merged, rv.res.SensitiveEnv, rv.res.StrictEnv, rForEnv, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -1227,8 +1488,28 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
+	var rForDevices *ExpressionResolver
+	// Check if there are any devices to resolve
+	hasDevices := len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != ""
+	if !hasDevices && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
+			hasDevices = true
+		}
+	}
+	if !hasDevices && rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
+		hasDevices = true
+	}
+
+	if hasDevices {
+		var err error
+		rForDevices, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
 	var errDevices error
-	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rForDevices, rv.fs)
 	if errDevices != nil {
 		return errDevices
 	}
@@ -1252,8 +1533,10 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 	rv.res.HostContext = hostCtx
 
-	if err := rv.r.Error(); err != nil {
-		return err
+	if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1474,12 +1757,19 @@ func (rv *resolver) validateDeviceSecurity() error {
 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
+	var baseDir string
+	if r != nil {
+		baseDir = r.Pwd
+	} else {
+		baseDir, _ = fs.Getwd()
+	}
+
 	if p1Set {
-		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: p1Val, BaseDir: baseDir}
 	} else if cliSet {
-		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: cliVal, BaseDir: baseDir}
 	} else if env := fs.Getenv(envKey); env != "" {
-		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: env, BaseDir: baseDir}
 	} else {
 		found := false
 		if tools != nil {
@@ -1497,7 +1787,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 			}
 		}
 		if !found {
-			cp = ConfigPath{Raw: fallback, BaseDir: r.Pwd}
+			cp = ConfigPath{Raw: fallback, BaseDir: baseDir}
 		}
 	}
 

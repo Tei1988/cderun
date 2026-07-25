@@ -27,30 +27,32 @@ func resolveStringOpt(
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) string {
+	var s string
 	if p1Set {
-		return r.resolveString(p1Val)
-	}
-	if p2Set {
-		return r.resolveString(p2Val)
-	}
-	if def.EnvKey != "" {
+		s = p1Val
+	} else if p2Set {
+		s = p2Val
+	} else if def.EnvKey != "" {
 		if env := fs.Getenv(def.EnvKey); env != "" {
-			return r.resolveString(env)
+			s = env
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if s == "" && def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			if s := def.ToolGetter(tool); s != "" {
-				return r.resolveString(s)
-			}
+			s = def.ToolGetter(tool)
 		}
 	}
-	if def.GlobalGetter != nil && global != nil {
-		if s := def.GlobalGetter(*global); s != "" {
-			return r.resolveString(s)
-		}
+	if s == "" && def.GlobalGetter != nil && global != nil {
+		s = def.GlobalGetter(*global)
 	}
-	return r.resolveString(def.Fallback)
+	if s == "" {
+		s = def.Fallback
+	}
+
+	if r == nil || (!strings.Contains(s, "{{") && !strings.HasPrefix(s, "~")) {
+		return s
+	}
+	return r.resolveString(s)
 }
 
 // resolveBoolOpt resolves a bool option through P1-P6.
@@ -148,9 +150,13 @@ func resolveStringSliceOpt(
 	}
 	var res []string
 	if vals != nil {
-		res = []string{}
+		res = make([]string, 0, len(vals))
 		for _, v := range vals {
-			res = append(res, r.resolveString(v))
+			if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+				res = append(res, v)
+			} else {
+				res = append(res, r.resolveString(v))
+			}
 		}
 	}
 	return res
@@ -185,11 +191,15 @@ func resolveStringSliceCommaOpt(
 	}
 	var res []string
 	if vals != nil {
-		res = []string{}
+		res = make([]string, 0, len(vals))
 		for _, v := range vals {
 			v = strings.TrimSpace(v)
 			if v != "" {
-				res = append(res, r.resolveString(v))
+				if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+					res = append(res, v)
+				} else {
+					res = append(res, r.resolveString(v))
+				}
 			}
 		}
 	}
