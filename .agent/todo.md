@@ -33,7 +33,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -87,6 +87,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T77 | OverlayFS/GroupAdd 自動付与がコンテナ内テスト実行に干渉する問題の修正 | バグ | 高 | 中 | - | DONE |
 | T78 | `buildContainerConfig` をマウント処理ごとにサブ関数へ分割 | リファクタ | 中 | 小 | - | DONE |
 | T80 | コンテナ作成前に ContainerConfig をデバッグログ出力 | 改善 | 低 | 小 | - | DONE |
+| T81 | `docs/features/command-line-options.md` に `--read-only` を追記 | ドキュメント | 低 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -510,34 +511,6 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 - 値: `host` または空文字列
 - Docker: `HostConfig.PidMode`
 - containerd: OCI spec の Linux namespaces で `pid` の `path` を設定
-
-### 完了条件
-
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
-
----
-
-## T27: `--read-only` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-ルートファイルシステムを読み取り専用にすることで、セキュリティ強化・コンテナ内の不正な書き込み防止が可能。CI 環境で特に有用。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--read-only` | bool | `false` | `CDERUN_READ_ONLY` |
-
-- Docker: `HostConfig.ReadonlyRootfs`
-- containerd: OCI spec の `Root.Readonly`
 
 ### 完了条件
 

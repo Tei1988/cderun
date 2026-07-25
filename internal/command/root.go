@@ -111,6 +111,7 @@ type rootOptions struct {
 	addHosts              []string
 	user                  string
 	privileged            bool
+	readOnly              bool
 	capAdd                []string
 	capDrop               []string
 	entrypoint            []string
@@ -127,6 +128,7 @@ type rootOptions struct {
 	cderunAddHosts        []string
 	cderunUser            string
 	cderunPrivileged      bool
+	cderunReadOnly        bool
 	cderunCapAdd          []string
 	cderunCapDrop         []string
 	cderunGroupAdd        []string
@@ -407,6 +409,10 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		PrivilegedSet:            cmd.Flags().Changed("privileged"),
 		CderunPrivileged:         o.cderunPrivileged,
 		CderunPrivilegedSet:      cmd.Flags().Changed("cderun-privileged"),
+		ReadOnly:                 o.readOnly,
+		ReadOnlySet:              cmd.Flags().Changed("read-only"),
+		CderunReadOnly:           o.cderunReadOnly,
+		CderunReadOnlySet:        cmd.Flags().Changed("cderun-read-only"),
 		CapAdd:                   o.capAdd,
 		CderunCapAdd:             o.cderunCapAdd,
 		CapDrop:                  o.capDrop,
@@ -601,6 +607,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		DNS:        resolved.DNS,
 		AddHosts:   resolved.AddHosts,
 		Privileged: resolved.Privileged,
+		ReadOnly:   resolved.ReadOnly,
 		CapAdd:     resolved.CapAdd,
 		CapDrop:    resolved.CapDrop,
 		Entrypoint: resolved.Entrypoint,
@@ -726,6 +733,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(maskedContainerConfig.DNS, ", "))
 		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(maskedContainerConfig.AddHosts, ", "))
 		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
+		_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", maskedContainerConfig.ReadOnly)
 		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
 		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
 		_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(maskedContainerConfig.GroupAdd, ", "))

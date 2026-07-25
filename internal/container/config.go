@@ -42,6 +42,7 @@ type ContainerConfig struct {
 
 	// Permissions and entrypoint
 	Privileged bool     `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	ReadOnly   bool     `json:"read_only,omitempty" yaml:"read_only,omitempty"`
 	CapAdd     []string `json:"cap_add,omitempty" yaml:"cap_add,omitempty"`
 	CapDrop    []string `json:"cap_drop,omitempty" yaml:"cap_drop,omitempty"`
 	Entrypoint []string `json:"entrypoint,omitempty" yaml:"entrypoint,omitempty"`

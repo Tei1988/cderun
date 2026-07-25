@@ -250,3 +250,81 @@ func TestUnit_Config_Resolver_InvalidEnvValues(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Config_Resolver_ReadOnly(t *testing.T) {
+	t.Run("resolved via CLI flag", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:       "alpine",
+			ImageSet:    true,
+			ReadOnly:    true,
+			ReadOnlySet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	t.Run("resolved via Cderun CLI flag (priority)", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:             "alpine",
+			ImageSet:          true,
+			ReadOnly:          false,
+			ReadOnlySet:       true,
+			CderunReadOnly:    true,
+			CderunReadOnlySet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	t.Run("resolved via environment variable", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_READ_ONLY": "true",
+			},
+		}
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	t.Run("resolved via global defaults", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+		}
+		global := &CDERunConfig{}
+		trueVal := true
+		global.Defaults.ReadOnly = &trueVal
+
+		res, err := ResolveWithFS("sh", cli, nil, global, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	t.Run("resolved via tool config", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+		}
+		trueVal := true
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				ReadOnly: &trueVal,
+			},
+		}
+
+		res, err := ResolveWithFS("sh", cli, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+}

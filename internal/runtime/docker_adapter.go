@@ -53,6 +53,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		AutoRemove:      config.Remove,
 		NetworkMode:     dockercontainer.NetworkMode(config.Network),
 		Privileged:      config.Privileged,
+		ReadonlyRootfs:  config.ReadOnly,
 		CapAdd:          config.CapAdd,
 		CapDrop:         config.CapDrop,
 		DNS:             config.DNS,

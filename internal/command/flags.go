@@ -198,6 +198,8 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 		return &o.publishAll, &o.cderunPublishAll
 	case "privileged":
 		return &o.privileged, &o.cderunPrivileged
+	case "read-only":
+		return &o.readOnly, &o.cderunReadOnly
 	case "strict-env":
 		return &o.strictEnv, &o.cderunStrictEnv
 	case "dry-run":

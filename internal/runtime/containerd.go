@@ -307,6 +307,16 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		})
 	}
 
+	if config.ReadOnly {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Root == nil {
+				s.Root = &specs.Root{}
+			}
+			s.Root.Readonly = true
+			return nil
+		})
+	}
+
 	_, err = r.client.NewContainer(ctx, id,
 		client.WithImage(img),
 		client.WithNewSnapshot(id, img),

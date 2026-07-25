@@ -441,6 +441,19 @@ func TestUnit_Docker_CreateContainer(t *testing.T) {
 		assert.NotNil(t, mock.createConfig.ExposedPorts)
 	})
 
+	t.Run("with read-only root fs", func(t *testing.T) {
+		mock := &mockDockerClient{
+			createResp: dockercontainer.CreateResponse{ID: "created-id"},
+		}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{
+			Image:    "test-image",
+			ReadOnly: true,
+		})
+		require.NoError(t, err)
+		assert.True(t, mock.createHostConfig.ReadonlyRootfs)
+	})
+
 	t.Run("invalid port spec", func(t *testing.T) {
 		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: &mockDockerClient{}, sleepFunc: noopSleepFunc}
 		_, err := runtime.CreateContainer(context.Background(), &container.ContainerConfig{

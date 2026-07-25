@@ -549,6 +549,17 @@ var BoolOptions = []BoolOption{
 		},
 	},
 	{
+		Name:   "read-only",
+		EnvKey: "CDERUN_READ_ONLY",
+		Usage:  "Mount the container's root filesystem as read-only",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.ReadOnly
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.ReadOnly
+		},
+	},
+	{
 		Name:   "strict-env",
 		EnvKey: "CDERUN_STRICT_ENV",
 		Usage:  "Require all environment variables to be present on the host",

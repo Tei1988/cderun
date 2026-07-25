@@ -53,6 +53,7 @@ type ResolvedConfig struct {
 	DNS             []string
 	AddHosts        []string
 	Privileged      bool
+	ReadOnly        bool
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string
@@ -190,6 +191,10 @@ type CLIOptions struct {
 	PrivilegedSet            bool
 	CderunPrivileged         bool
 	CderunPrivilegedSet      bool
+	ReadOnly                 bool
+	ReadOnlySet              bool
+	CderunReadOnly           bool
+	CderunReadOnlySet        bool
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
@@ -549,6 +554,9 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	case "privileged":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPrivilegedSet, rv.cli.CderunPrivileged, rv.cli.PrivilegedSet, rv.cli.Privileged
 		fastPathUsed = true
+	case "read-only":
+		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunReadOnlySet, rv.cli.CderunReadOnly, rv.cli.ReadOnlySet, rv.cli.ReadOnly
+		fastPathUsed = true
 	case "publish-all":
 		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPublishAllSet, rv.cli.CderunPublishAll, rv.cli.PublishAllSet, rv.cli.PublishAll
 		fastPathUsed = true
@@ -592,6 +600,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.StrictEnv = resolved
 		case "privileged":
 			rv.res.Privileged = resolved
+		case "read-only":
+			rv.res.ReadOnly = resolved
 		case "publish-all":
 			rv.res.PublishAll = resolved
 		case "log-timestamp":

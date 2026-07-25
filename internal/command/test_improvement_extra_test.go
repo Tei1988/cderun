@@ -296,3 +296,73 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 		assert.Contains(t, exitErr.Error(), "low-level OCI spec creation failure")
 	})
 }
+
+// TestUnit_Command_ReadOnly_RootFS validates that the --read-only flag is resolved,
+// mapped to ContainerConfig, displayed in dry-run format, and passed down to runtime adapters.
+func TestUnit_Command_ReadOnly_RootFS(t *testing.T) {
+	t.Parallel()
+
+	t.Run("buildContainerConfig translates ReadOnly correctly", func(t *testing.T) {
+		t.Parallel()
+		o := &rootOptions{
+			fs:     &config.MockFileSystem{},
+			logger: logging.NewLogger(),
+		}
+		resolved := &config.ResolvedConfig{
+			Image:    "alpine",
+			ReadOnly: true,
+		}
+		cfg, err := o.buildContainerConfig(resolved, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, cfg.ReadOnly)
+	})
+
+	t.Run("dry-run shows ReadOnly setting", func(t *testing.T) {
+		t.Parallel()
+		var outBuf bytes.Buffer
+		cmd := &cobra.Command{}
+		cmd.SetOut(&outBuf)
+
+		o := &rootOptions{
+			fs:     &config.MockFileSystem{},
+			logger: logging.NewLogger(),
+		}
+		o.ensureHooks()
+
+		containerConfig := &container.ContainerConfig{
+			Image:    "alpine",
+			ReadOnly: true,
+		}
+		resolved := &config.ResolvedConfig{
+			ReadOnly:     true,
+			DryRunFormat: "simple",
+		}
+
+		err := o.handleDryRun(cmd, containerConfig, resolved)
+		require.NoError(t, err)
+		assert.Contains(t, outBuf.String(), "ReadOnly: true")
+	})
+
+	t.Run("CLI flag parsed and applied in ExecuteContextWithOptions", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{
+			CreatedContainerID: "test-id",
+		}
+		args := []string{"cderun", "--image", "alpine", "--read-only", "sh"}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		capturedConfig := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, capturedConfig)
+		assert.True(t, capturedConfig.ReadOnly)
+	})
+}
