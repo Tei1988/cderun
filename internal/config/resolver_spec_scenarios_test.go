@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestUnit_Config_Resolver_MultipleAnchorsConcurrency implements the "複数アンカーの取り扱い (Handling Multiple Anchors)"
+// TestUnit_Config_Resolver_MultipleAnchorsBoundaryValidation implements the "Handling Multiple Anchors"
 // specification from docs/features/value-resolution.md.
 // If multiple curly-brace expressions (anchors) appear in a single path, they all act as independent boundaries.
 // The resolved path must simultaneously satisfy the boundary conditions of all anchor directories.
-func TestUnit_Config_Resolver_MultipleAnchorsConcurrency(t *testing.T) {
+func TestUnit_Config_Resolver_MultipleAnchorsBoundaryValidation(t *testing.T) {
 	t.Parallel()
 
 	home := "/home/user"
@@ -34,8 +34,8 @@ func TestUnit_Config_Resolver_MultipleAnchorsConcurrency(t *testing.T) {
 	assert.Contains(t, err.Error(), "path traversal detected")
 }
 
-// TestUnit_Config_Resolver_NestedExpressionErrors validates the "ネストされた式 (Nested Expressions)" and
-// "セキュリティ制約 (Security Restraints)" specifications under deep/triple nested expressions with errors
+// TestUnit_Config_Resolver_NestedExpressionErrors validates the "Nested Expressions" and
+// "Security Restraints" specifications under deep/triple nested expressions with errors
 // in sub-evaluations, assuring proper error propagation and safety boundaries.
 func TestUnit_Config_Resolver_NestedExpressionErrors(t *testing.T) {
 	t.Parallel()
@@ -69,7 +69,7 @@ func TestUnit_Config_Resolver_NestedExpressionErrors(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_Resolver_StickyErrorPropagation verifies the "スティッキーエラー (Sticky Error) パターン"
+// TestUnit_Config_Resolver_StickyErrorPropagation verifies the "Sticky Error Pattern"
 // specification. Once the ExpressionResolver encounters an error, it transitions into a sticky error state.
 // All subsequent calls to resolveString must immediately return the unresolved input, preserving the original error.
 func TestUnit_Config_Resolver_StickyErrorPropagation(t *testing.T) {
@@ -96,7 +96,7 @@ func TestUnit_Config_Resolver_StickyErrorPropagation(t *testing.T) {
 	assert.Same(t, firstErr, r.Error())
 }
 
-// TestUnit_Config_Resolver_EscapingComplex verifies the "エスケープ記法 (Escaping)" specification.
+// TestUnit_Config_Resolver_EscapingComplex verifies the "Escaping" specification.
 // Validates that outer triple braces and complex nested double-brace escaping preserves correct literal results.
 func TestUnit_Config_Resolver_EscapingComplex(t *testing.T) {
 	t.Parallel()
@@ -121,7 +121,7 @@ func TestUnit_Config_Resolver_EscapingComplex(t *testing.T) {
 	assert.Equal(t, "Literal {{env:VAR:-{{ {{PWD}} }} }} text", val2)
 }
 
-// TestUnit_Config_Resolver_FileLimitExactly verifies "ファイルサイズの制限" of exactly 1MB
+// TestUnit_Config_Resolver_FileLimitExactly verifies "File Size Limits" of exactly 1MB
 // (MaxDirectiveFileSize) vs 1MB + 1 byte, assuring precise bounds and dynamic file checks.
 func TestUnit_Config_Resolver_FileLimitExactly(t *testing.T) {
 	t.Parallel()

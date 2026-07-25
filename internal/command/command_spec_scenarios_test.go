@@ -92,6 +92,8 @@ func TestUnit_Command_HostVsNestedContextPriority(t *testing.T) {
 			"--dry-run",
 			"--dry-run-format=json",
 			"--workdir={{BASE_PWD}}/nested",
+			"--env=MY_HOME={{BASE_HOME}}",
+			"--sensitive-env=NONE",
 			"sh",
 		}
 
@@ -107,6 +109,7 @@ func TestUnit_Command_HostVsNestedContextPriority(t *testing.T) {
 		require.NoError(t, err)
 		output := buf.String()
 		assert.Contains(t, output, `"/local/work/nested"`)
+		assert.Contains(t, output, `"MY_HOME=/local/home"`)
 	})
 
 	t.Run("Level 1 - BASE_HOME and BASE_PWD evaluate to host values", func(t *testing.T) {
@@ -136,6 +139,8 @@ hostContext:
 			"--dry-run",
 			"--dry-run-format=json",
 			"--workdir={{BASE_PWD}}/nested",
+			"--env=MY_HOME={{BASE_HOME}}",
+			"--sensitive-env=NONE",
 			"sh",
 		}
 
@@ -152,6 +157,8 @@ hostContext:
 		output := buf.String()
 		// Since level is 1, BASE_PWD resolves to host working dir /host/work
 		assert.Contains(t, output, `"/host/work/nested"`)
+		// BASE_HOME resolves to host home dir /host/home
+		assert.Contains(t, output, `"MY_HOME=/host/home"`)
 	})
 }
 
