@@ -458,7 +458,24 @@ type signalAbortMockRuntime struct {
 	StartContainerCalled  bool
 	RemoveContainerCalled bool
 
+	signals []string
+
 	mu sync.Mutex
+}
+
+func (m *signalAbortMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
+	m.signals = append(m.signals, sig)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *signalAbortMockRuntime) getSignals() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sigs := make([]string, len(m.signals))
+	copy(sigs, m.signals)
+	return sigs
 }
 
 func (m *signalAbortMockRuntime) PullImage(ctx context.Context, image string, policy string, maxRetries int, backoff time.Duration) error {
@@ -803,8 +820,16 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 		capturedSigChan <- syscall.SIGINT
 		sigChanMu.Unlock()
 
-		// Wait a small moment to ensure the signal is processed and deferred
-		time.Sleep(100 * time.Millisecond)
+		// Wait deterministically for the signal to be processed and deferred/recorded by the mock
+		assert.Eventually(t, func() bool {
+			sigs := mock.getSignals()
+			for _, s := range sigs {
+				if s == "SIGINT" {
+					return true
+				}
+			}
+			return false
+		}, 2*time.Second, 10*time.Millisecond)
 
 		// Unblock StartContainer so startup completes
 		close(startChan)
@@ -814,66 +839,141 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 
 		// Since StartContainer was in-flight, the signal was deferred and forwarded rather than cancelling,
 		// so execute should have run successfully and returned nil (assuming mock WaitContainer returned 0).
-		assert.NoError(t, execErr)
+		require.NoError(t, execErr)
 		assert.True(t, mock.isStartContainerCalled())
 	})
 
 	t.Run("Forward SIGHUP and SIGQUIT successfully to container", func(t *testing.T) {
 		t.Parallel()
-		waitChan := make(chan int)
-		mock := &signalCapturingMockRuntime{
-			waitChan: waitChan,
-		}
-		mock.CreatedContainerID = "sighup-sigquit-test"
 
-		var capturedSigChan chan os.Signal
-		var sigChanMu sync.Mutex
+		// 1. SIGHUP Verification
+		t.Run("SIGHUP", func(t *testing.T) {
+			waitChan := make(chan int)
+			mock := &signalCapturingMockRuntime{
+				waitChan: waitChan,
+			}
+			mock.CreatedContainerID = "sighup-test"
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+			var capturedSigChan chan os.Signal
+			var sigChanMu sync.Mutex
 
-		var execErr error
-		done := make(chan struct{})
-		go func() {
-			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-					return mock, nil
-				}
-				o.exitFunc = func(code int) {}
-				o.isTerminal = func(fd int) bool { return false }
-				o.setupSignals = func(sigChan chan os.Signal) {
-					sigChanMu.Lock()
-					capturedSigChan = sigChan
-					sigChanMu.Unlock()
-				}
-				o.stopSignalHandling = func(sigChan chan os.Signal) {}
-				cmd.SetOut(io.Discard)
-				cmd.SetErr(io.Discard)
-			})
-			close(done)
-		}()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
 
-		assert.Eventually(t, func() bool {
+			var execErr error
+			done := make(chan struct{})
+			go func() {
+				execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+						return mock, nil
+					}
+					o.exitFunc = func(code int) {}
+					o.isTerminal = func(fd int) bool { return false }
+					o.setupSignals = func(sigChan chan os.Signal) {
+						sigChanMu.Lock()
+						capturedSigChan = sigChan
+						sigChanMu.Unlock()
+					}
+					o.stopSignalHandling = func(sigChan chan os.Signal) {}
+					cmd.SetOut(io.Discard)
+					cmd.SetErr(io.Discard)
+				})
+				close(done)
+			}()
+
+			assert.Eventually(t, func() bool {
+				sigChanMu.Lock()
+				defer sigChanMu.Unlock()
+				return capturedSigChan != nil
+			}, 2*time.Second, 10*time.Millisecond)
+
+			// Send simulated SIGHUP
 			sigChanMu.Lock()
-			defer sigChanMu.Unlock()
-			return capturedSigChan != nil
-		}, 2*time.Second, 10*time.Millisecond)
+			capturedSigChan <- syscall.SIGHUP
+			sigChanMu.Unlock()
 
-		// Send simulated SIGHUP
-		sigChanMu.Lock()
-		capturedSigChan <- syscall.SIGHUP
-		sigChanMu.Unlock()
+			// Verify SIGHUP was forwarded
+			assert.Eventually(t, func() bool {
+				sigs := mock.getSignals()
+				for _, s := range sigs {
+					if s == "SIGHUP" {
+						return true
+					}
+				}
+				return false
+			}, 2*time.Second, 10*time.Millisecond)
 
-		// Verify SIGHUP was forwarded
-		assert.Eventually(t, func() bool {
-			return len(mock.getSignals()) > 0
-		}, 2*time.Second, 10*time.Millisecond)
+			assert.Contains(t, mock.getSignals(), "SIGHUP")
 
-		assert.Contains(t, mock.getSignals(), "SIGHUP")
+			// End execution
+			waitChan <- 0
+			<-done
+			require.NoError(t, execErr)
+		})
 
-		// End execution
-		waitChan <- 0
-		<-done
-		assert.NoError(t, execErr)
+		// 2. SIGQUIT Verification
+		t.Run("SIGQUIT", func(t *testing.T) {
+			waitChan := make(chan int)
+			mock := &signalCapturingMockRuntime{
+				waitChan: waitChan,
+			}
+			mock.CreatedContainerID = "sigquit-test"
+
+			var capturedSigChan chan os.Signal
+			var sigChanMu sync.Mutex
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			var execErr error
+			done := make(chan struct{})
+			go func() {
+				execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+						return mock, nil
+					}
+					o.exitFunc = func(code int) {}
+					o.isTerminal = func(fd int) bool { return false }
+					o.setupSignals = func(sigChan chan os.Signal) {
+						sigChanMu.Lock()
+						capturedSigChan = sigChan
+						sigChanMu.Unlock()
+					}
+					o.stopSignalHandling = func(sigChan chan os.Signal) {}
+					cmd.SetOut(io.Discard)
+					cmd.SetErr(io.Discard)
+				})
+				close(done)
+			}()
+
+			assert.Eventually(t, func() bool {
+				sigChanMu.Lock()
+				defer sigChanMu.Unlock()
+				return capturedSigChan != nil
+			}, 2*time.Second, 10*time.Millisecond)
+
+			// Send simulated SIGQUIT
+			sigChanMu.Lock()
+			capturedSigChan <- syscall.SIGQUIT
+			sigChanMu.Unlock()
+
+			// Verify SIGQUIT was forwarded
+			assert.Eventually(t, func() bool {
+				sigs := mock.getSignals()
+				for _, s := range sigs {
+					if s == "SIGQUIT" {
+						return true
+					}
+				}
+				return false
+			}, 2*time.Second, 10*time.Millisecond)
+
+			assert.Contains(t, mock.getSignals(), "SIGQUIT")
+
+			// End execution
+			waitChan <- 0
+			<-done
+			require.NoError(t, execErr)
+		})
 	})
 }
