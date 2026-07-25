@@ -91,4 +91,24 @@ func TestUnit_Config_EnvHelpers_Boundaries(t *testing.T) {
 		expected := []string{"A=9", "B=2", "C=3", "D=10", "E=5", "F=6", "G=7", "H=8"}
 		assert.Equal(t, expected, res)
 	})
+
+	t.Run("mergeEnv exact cutover limit 8 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3"}
+		p2 := []string{"D=4", "E=5", "F=6"}
+		p1 := []string{"A=7", "D=8"}
+		// Total strings = 8 (<= 8)
+		res := mergeEnv(base, p2, p1)
+		expected := []string{"A=7", "B=2", "C=3", "D=8", "E=5", "F=6"}
+		assert.Equal(t, expected, res)
+	})
+
+	t.Run("mergeEnv exact cutover limit 9 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3"}
+		p2 := []string{"D=4", "E=5", "F=6"}
+		p1 := []string{"A=7", "D=8", "G=9"}
+		// Total strings = 9 (> 8)
+		res := mergeEnv(base, p2, p1)
+		expected := []string{"A=7", "B=2", "C=3", "D=8", "E=5", "F=6", "G=9"}
+		assert.Equal(t, expected, res)
+	})
 }
