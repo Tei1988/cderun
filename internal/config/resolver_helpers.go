@@ -232,29 +232,59 @@ func mergeEnv(base, p2, p1 []string) []string {
 		var vals [8]string
 		size := 0
 
-		add := func(env []string) {
-			for _, e := range env {
-				key, _, _ := strings.Cut(e, "=")
-				foundIdx := -1
-				for j := 0; j < size; j++ {
-					if keys[j] == key {
-						foundIdx = j
-						break
-					}
+		for _, e := range base {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for j := 0; j < size; j++ {
+				if keys[j] == key {
+					foundIdx = j
+					break
 				}
-				if foundIdx != -1 {
-					vals[foundIdx] = e
-				} else {
-					keys[size] = key
-					vals[size] = e
-					size++
-				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
 			}
 		}
 
-		add(base)
-		add(p2)
-		add(p1)
+		for _, e := range p2 {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for j := 0; j < size; j++ {
+				if keys[j] == key {
+					foundIdx = j
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
+
+		for _, e := range p1 {
+			key, _, _ := strings.Cut(e, "=")
+			foundIdx := -1
+			for j := 0; j < size; j++ {
+				if keys[j] == key {
+					foundIdx = j
+					break
+				}
+			}
+			if foundIdx != -1 {
+				vals[foundIdx] = e
+			} else {
+				keys[size] = key
+				vals[size] = e
+				size++
+			}
+		}
 
 		res := make([]string, size)
 		copy(res, vals[:size])

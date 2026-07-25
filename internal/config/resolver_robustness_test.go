@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"testing"
+
+	"cderun/internal/logging"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -322,9 +325,9 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("device with control characters raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:   "alpine",
+			Image:    "alpine",
 			ImageSet: true,
-			Devices: []string{"/dev/null\x01"},
+			Devices:  []string{"/dev/null\x01"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -335,7 +338,7 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("programmatic invalid permissions raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:   "alpine",
+			Image:    "alpine",
 			ImageSet: true,
 		}
 		tools := ToolsConfig{
@@ -558,5 +561,117 @@ func TestUnit_Config_Resolver_PrecedenceRegistryMatching_Robustness(t *testing.T
 		err = rv.applyFloat64Option(opt)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "registry mismatch")
+	})
+}
+
+func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
+	t.Parallel()
+
+	t.Run("negative memory in CLI options is rejected", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:     "alpine",
+			ImageSet:  true,
+			Memory:    "9223372036854775808", // Large value that causes overflow to negative int64
+			MemorySet: true,
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid memory value \"-9223372036854775808\"")
+	})
+
+	t.Run("negative CPUs in CLI options is rejected", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CPUs:     -2.5,
+			CPUsSet:  true,
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "CPU limit cannot be negative")
+	})
+}
+
+func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
+	// Not Parallel because it manipulates global logger output and level
+	mfs := &MockFileSystem{}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	t.Run("privileged mode with standard caps does not trigger additional cap warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:         "alpine",
+			ImageSet:      true,
+			Privileged:    true,
+			PrivilegedSet: true,
+			CapAdd:        []string{"CHOWN", "DAC_OVERRIDE"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		// Should have standard privileged warning
+		assert.Contains(t, logOutput, "Container is running in privileged mode")
+		// Should NOT have highly privileged caps warning
+		assert.NotContains(t, logOutput, "Highly privileged capability")
+	})
+
+	t.Run("privileged mode with highly privileged caps triggers cap warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:         "alpine",
+			ImageSet:      true,
+			Privileged:    true,
+			PrivilegedSet: true,
+			CapAdd:        []string{"SYS_ADMIN", "NET_ADMIN"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		// Should have standard privileged warning
+		assert.Contains(t, logOutput, "Container is running in privileged mode")
+		// Should have highly privileged caps warning
+		assert.Contains(t, logOutput, "Highly privileged capability")
+		assert.Contains(t, logOutput, "SYS_ADMIN")
+		assert.Contains(t, logOutput, "NET_ADMIN")
+	})
+
+	t.Run("non-privileged mode with highly privileged caps does not trigger warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:    "alpine",
+			ImageSet: true,
+			CapAdd:   []string{"SYS_ADMIN", "NET_ADMIN"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.Empty(t, logOutput)
 	})
 }

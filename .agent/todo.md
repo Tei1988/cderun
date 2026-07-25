@@ -22,7 +22,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | DONE |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | DONE |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | DONE |
-| T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | - |
+| T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | DONE |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | - |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | - |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | - |
@@ -223,27 +223,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
-
----
-
-## T15: containerd `AttachContainer` のポーリング排除
-
-- 種別: 改善（堅牢性）
-- 対象: `internal/runtime/containerd.go:420` 付近
-
-### 問題
-
-containerd は IO をタスク作成時に渡す必要があるため、`AttachContainer` 内で goroutine が 100ms ごとにタスクの出現を待つポーリングになっている。Docker のネイティブ attach と比べてアーキテクチャ上の回避策であり、コンテナが瞬時に終了した場合などエッジケースで動作が不安定になる可能性がある。
-
-### 方針（2 案、(b) 推奨）
-
-1. (a) containerd の events API（`client.Subscribe`）で TaskStart イベントを待つ — 汎用的だがイベント購読のエラー処理が増える
-2. (b) 既存の `ioMap`（`containerd.go:37-38`）と同様に `taskReady map[string]chan struct{}` を持ち、`StartContainer` がタスク生成完了時に通知する — 外部依存なし・変更量小。cderun は自分で起動したコンテナにしか attach しないため十分
-
-### 完了条件
-
-- 100ms ポーリングが同期プリミティブによる通知に置き換わっている
-- コンテナが即終了するケースでハング・リークしないことのテストがある（`docs/testing/` のリーク防止指針を参照）
 
 ---
 

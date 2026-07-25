@@ -328,3 +328,75 @@ func TestUnit_Config_Resolver_ReadOnly(t *testing.T) {
 		assert.True(t, res.ReadOnly)
 	})
 }
+
+// TestUnit_Config_Resolver_RealFileSystemCaching verifies that the auto-detected
+// container runtime and socket path are successfully cached on RealFileSystem.
+func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
+	// 1. Save existing cache globals to restore them after the test
+	origRuntime := autoDetectedRuntime
+	origSocketPath := autoDetectedSocketPath
+
+	t.Cleanup(func() {
+		autoDetectMu.Lock()
+		autoDetectedRuntime = origRuntime
+		autoDetectedSocketPath = origSocketPath
+		autoDetectMu.Unlock()
+	})
+
+	// 2. Clear relevant CDERUN_SOCKET_PATH and runtime override environment variables
+	t.Setenv("CDERUN_SOCKET_PATH", "")
+	t.Setenv("CDERUN_RUNTIME", "")
+
+	// 3. Ensure the cache is reset before ResolveWithFS runs
+	autoDetectMu.Lock()
+	autoDetectedRuntime = ""
+	autoDetectedSocketPath = ""
+	autoDetectMu.Unlock()
+
+	cli := &CLIOptions{Image: "alpine", ImageSet: true}
+	res, err := ResolveWithFS("sh", cli, nil, nil, RealFileSystem{})
+	require.NoError(t, err)
+
+	autoDetectMu.RLock()
+	cachedRuntime := autoDetectedRuntime
+	cachedSocketPath := autoDetectedSocketPath
+	autoDetectMu.RUnlock()
+
+	// 4. Check standard sockets using RealFileSystem to verify the correctness of the single observation.
+	var socketExists bool
+	var firstExistingRuntime string
+	var firstExistingSocketPath string
+	var rfs RealFileSystem
+
+	for _, p := range []string{"/var/run/docker.sock", "/run/containerd/containerd.sock", "/run/podman/podman.sock"} {
+		if _, err := rfs.Stat(p); err == nil {
+			socketExists = true
+			switch p {
+			case "/var/run/docker.sock":
+				firstExistingRuntime = "docker"
+			case "/run/containerd/containerd.sock":
+				firstExistingRuntime = "containerd"
+			default:
+				firstExistingRuntime = "podman"
+			}
+			firstExistingSocketPath = p
+			break
+		}
+	}
+
+	if socketExists {
+		// Assert that ResolveWithFS successfully initialized both cache globals matching the host state.
+		assert.NotEmpty(t, cachedRuntime, "Cache globals should be initialized since a socket exists")
+		assert.NotEmpty(t, cachedSocketPath, "Cache globals should be initialized since a socket exists")
+		assert.Equal(t, firstExistingRuntime, cachedRuntime, "Cached runtime should match first existing container socket")
+		assert.Equal(t, firstExistingSocketPath, cachedSocketPath, "Cached socket path should match first existing container socket")
+		assert.Equal(t, cachedRuntime, res.Runtime, "Resolved runtime should match cached runtime")
+		assert.Equal(t, cachedSocketPath, res.SocketPath, "Resolved socket path should match cached socket path")
+	} else {
+		// Assert that cache remains empty if no socket exists, avoiding flaky failures in clean runner environments.
+		assert.Empty(t, cachedRuntime, "Cache globals should remain empty if no socket exists")
+		assert.Empty(t, cachedSocketPath, "Cache globals should remain empty if no socket exists")
+		assert.Equal(t, "docker", res.Runtime, "Fell back to default runtime")
+		assert.Equal(t, "/var/run/docker.sock", res.SocketPath, "Fell back to default socket path")
+	}
+}
