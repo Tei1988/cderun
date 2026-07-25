@@ -1277,6 +1277,31 @@ func (rv *resolver) validateSecurity() error {
 	if rv.res.Privileged {
 		if logging.Enabled(logging.WarnLevel) {
 			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+
+			highlyPrivileged := map[string]bool{
+				"ALL":            true,
+				"SYS_ADMIN":      true,
+				"NET_ADMIN":      true,
+				"SYS_RAWIO":      true,
+				"SYS_PTRACE":     true,
+				"SYS_MODULE":     true,
+				"CAP_ALL":        true,
+				"CAP_SYS_ADMIN":  true,
+				"CAP_NET_ADMIN":  true,
+				"CAP_SYS_RAWIO":  true,
+				"CAP_SYS_PTRACE": true,
+				"CAP_SYS_MODULE": true,
+			}
+			var found []string
+			for _, capName := range rv.res.CapAdd {
+				upperCap := strings.ToUpper(strings.TrimSpace(capName))
+				if highlyPrivileged[upperCap] {
+					found = append(found, capName)
+				}
+			}
+			if len(found) > 0 {
+				logging.Warn("Highly privileged capability %v detected in CapAdd while running in privileged mode. Please consider minimizing privileges.", found)
+			}
 		}
 	}
 	return nil
@@ -1346,6 +1371,22 @@ func (rv *resolver) validateCriticalFields() error {
 			}
 		}
 	}
+
+	if rv.res.Memory < 0 {
+		return &InvalidConfigError{
+			Field: "memory",
+			Value: fmt.Sprintf("%d", rv.res.Memory),
+			Err:   errors.New("memory limit cannot be negative"),
+		}
+	}
+	if rv.res.CPUs < 0 {
+		return &InvalidConfigError{
+			Field: "cpus",
+			Value: fmt.Sprintf("%g", rv.res.CPUs),
+			Err:   errors.New("CPU limit cannot be negative"),
+		}
+	}
+
 	return nil
 }
 
