@@ -788,6 +788,77 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 	}
 }
 
+type executionState struct {
+	mu               sync.Mutex
+	rt               runtime.ContainerRuntime
+	containerID      string
+	startupBegun     bool
+	containerRunning bool
+	firstSignal      bool
+	deferredSignals  []string
+}
+
+func newExecutionState() *executionState {
+	return &executionState{
+		firstSignal: true,
+	}
+}
+
+func (s *executionState) SetRuntimeAndID(rt runtime.ContainerRuntime, containerID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rt = rt
+	s.containerID = containerID
+}
+
+func (s *executionState) MarkStartupBegun() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startupBegun = true
+}
+
+func (s *executionState) MarkRunning() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.containerRunning = true
+	deferred := s.deferredSignals
+	s.deferredSignals = nil
+	return deferred
+}
+
+func (s *executionState) CloseRuntime(logger *logging.Logger) {
+	s.mu.Lock()
+	activeRt := s.rt
+	s.mu.Unlock()
+	if activeRt != nil {
+		if closeErr := activeRt.Close(); closeErr != nil {
+			logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}
+}
+
+func (s *executionState) HandleSignal(sigName string) (cancelCtx bool, forwardImmediate bool, activeRt runtime.ContainerRuntime, activeID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// If startup has not begun yet, this is true pre-start.
+	if !s.startupBegun {
+		return true, false, nil, ""
+	}
+
+	// Startup has begun (StartContainer in flight or already completed)
+	if s.firstSignal {
+		s.firstSignal = false
+		if s.containerRunning {
+			return false, true, s.rt, s.containerID
+		}
+		s.deferredSignals = append(s.deferredSignals, sigName)
+		return false, true, s.rt, s.containerID
+	}
+
+	return true, false, nil, ""
+}
+
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
@@ -810,45 +881,28 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	o.setupSignals(sigChan)
 	defer o.stopSignalHandling(sigChan)
 
-	var mu sync.Mutex
-	var rt runtime.ContainerRuntime
-	var containerID string
-	var containerRunning bool
-	var firstSignal = true
+	state := newExecutionState()
 
 	go func() {
 		for {
 			select {
 			case sig := <-sigChan:
 				sigName := getSignalName(sig)
+				cancelCtx, forwardImmediate, activeRt, activeID := state.HandleSignal(sigName)
 
-				mu.Lock()
-				running := containerRunning
-				currentRt := rt
-				currentID := containerID
-				isFirst := firstSignal
-				if running && isFirst {
-					firstSignal = false
-				}
-				mu.Unlock()
-
-				if running {
-					if isFirst {
-						o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
-						if err := currentRt.SignalContainer(ctx, currentID, sigName); err != nil {
-							o.logger.Warn("failed to forward signal %v: %v", sig, err)
-						} else {
-							o.logger.Debug("Successfully forwarded signal %v to container", sig)
-						}
-					} else {
-						o.logger.Info("Received second signal, terminating...")
-						cancel()
-						return
-					}
-				} else {
-					o.logger.Debug("Received signal %v (%s) before container started, cancelling execution", sig, sigName)
+				if cancelCtx {
+					o.logger.Debug("Cancelling execution on signal %v (%s)", sig, sigName)
 					cancel()
 					return
+				}
+
+				if forwardImmediate && activeRt != nil {
+					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
+					if err := activeRt.SignalContainer(ctx, activeID, sigName); err != nil {
+						o.logger.Warn("failed to forward signal %v: %v", sig, err)
+					} else {
+						o.logger.Debug("Successfully forwarded signal %v to container %s", sig, activeID)
+					}
 				}
 			case <-ctxG.Done():
 				return
@@ -860,22 +914,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: err}
 	}
-	defer func() {
-		mu.Lock()
-		activeRt := rt
-		mu.Unlock()
-		if activeRt != nil {
-			if closeErr := activeRt.Close(); closeErr != nil {
-				o.logger.Debug("failed to close runtime: %v", closeErr)
-			}
-		}
-	}()
+	defer state.CloseRuntime(o.logger)
 	defer cleanup()
 
-	mu.Lock()
-	rt = rtVal
-	containerID = containerIDVal
-	mu.Unlock()
+	state.SetRuntimeAndID(rtVal, containerIDVal)
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
@@ -897,15 +939,23 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("cancelled before starting container: %w", err)}
 	}
 
+	// Mark startup as begun so signals received during StartContainer startup phase are forwarded or deferred instead of cancelling.
+	state.MarkStartupBegun()
+
 	o.logger.Trace("Starting container: %s", containerIDVal)
 	if err := rtVal.StartContainer(ctxG, containerIDVal); err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to start container: %w", err)}
 	}
 	close(att.startSignal) // Signal stdin to start reading
 
-	mu.Lock()
-	containerRunning = true
-	mu.Unlock()
+	// Mark as running and forward any signals that were received during StartContainer startup phase.
+	deferredSigs := state.MarkRunning()
+	for _, sigName := range deferredSigs {
+		o.logger.Debug("Forwarding deferred startup signal %s to container %s", sigName, containerIDVal)
+		if err := rtVal.SignalContainer(ctx, containerIDVal, sigName); err != nil {
+			o.logger.Warn("failed to forward deferred signal %s: %v", sigName, err)
+		}
+	}
 
 	stopResize := o.startResizeHandler(ctxG, cmd, rtVal, containerIDVal, containerConfig)
 	defer stopResize()

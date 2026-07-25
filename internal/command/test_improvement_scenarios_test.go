@@ -605,7 +605,7 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 		<-done
 
 		require.Error(t, execErr)
-		assert.ErrorIs(t, execErr, context.Canceled)
+		require.ErrorIs(t, execErr, context.Canceled)
 		assert.True(t, mock.isPullImageCalled())
 		assert.False(t, mock.isCreateContainerCalled())
 		assert.False(t, mock.isRemoveContainerCalled())
@@ -670,7 +670,7 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 		<-done
 
 		require.Error(t, execErr)
-		assert.ErrorIs(t, execErr, context.Canceled)
+		require.ErrorIs(t, execErr, context.Canceled)
 		assert.True(t, mock.isPullImageCalled())
 		assert.True(t, mock.isCreateContainerCalled())
 		assert.False(t, mock.isStartContainerCalled())
@@ -740,11 +740,82 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 		<-done
 
 		require.Error(t, execErr)
-		assert.ErrorIs(t, execErr, context.Canceled)
+		require.ErrorIs(t, execErr, context.Canceled)
 		assert.True(t, mock.isPullImageCalled())
 		assert.True(t, mock.isCreateContainerCalled())
 		assert.False(t, mock.isStartContainerCalled())
 		assert.True(t, mock.isRemoveContainerCalled())
+	})
+
+	t.Run("Signal received during StartContainer is deferred and forwarded after startup completes", func(t *testing.T) {
+		t.Parallel()
+		startBlocked := make(chan struct{}, 1)
+		startChan := make(chan struct{})
+		mock := &signalAbortMockRuntime{
+			StartBlocked: startBlocked,
+			StartChan:    startChan,
+		}
+		mock.CreatedContainerID = "test-inflight-forward"
+
+		var capturedSigChan chan os.Signal
+		var sigChanMu sync.Mutex
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var execErr error
+		done := make(chan struct{})
+		go func() {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return false }
+				o.setupSignals = func(sigChan chan os.Signal) {
+					sigChanMu.Lock()
+					capturedSigChan = sigChan
+					sigChanMu.Unlock()
+				}
+				o.stopSignalHandling = func(sigChan chan os.Signal) {}
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
+			})
+			close(done)
+		}()
+
+		// Wait until execution is blocked inside StartContainer
+		select {
+		case <-startBlocked:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Execution did not reach StartContainer")
+		}
+
+		// Verify signal channel is captured
+		assert.Eventually(t, func() bool {
+			sigChanMu.Lock()
+			defer sigChanMu.Unlock()
+			return capturedSigChan != nil
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Send simulated SIGINT during StartContainer startup phase
+		sigChanMu.Lock()
+		capturedSigChan <- syscall.SIGINT
+		sigChanMu.Unlock()
+
+		// Wait a small moment to ensure the signal is processed and deferred
+		time.Sleep(100 * time.Millisecond)
+
+		// Unblock StartContainer so startup completes
+		close(startChan)
+
+		// Wait for execution to finish
+		<-done
+
+		// Since StartContainer was in-flight, the signal was deferred and forwarded rather than cancelling,
+		// so execute should have run successfully and returned nil (assuming mock WaitContainer returned 0).
+		assert.NoError(t, execErr)
+		assert.True(t, mock.isStartContainerCalled())
 	})
 
 	t.Run("Forward SIGHUP and SIGQUIT successfully to container", func(t *testing.T) {
