@@ -368,9 +368,6 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 		if k, v, found := strings.Cut(resolvedE, "="); found {
 			key = k
 			val = v
-			if err := ValidateEnvKey(key); err != nil {
-				return nil, err
-			}
 		} else {
 			v, found := fs.LookupEnv(resolvedE)
 			if !found && strict {
@@ -378,6 +375,10 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			}
 			key = resolvedE
 			val = v
+		}
+
+		if err := ValidateEnvKey(key); err != nil {
+			return nil, fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.

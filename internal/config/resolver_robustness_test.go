@@ -675,3 +675,107 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		assert.Empty(t, logOutput)
 	})
 }
+
+func TestUnit_Config_Resolver_EnvKeyValidation_Robustness(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	tests := []struct {
+		name      string
+		env       []string
+		strict    bool
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name:      "Valid key-value environment variable",
+			env:       []string{"VALID_KEY=value"},
+			strict:    false,
+			wantErr:   false,
+		},
+		{
+			name:      "Valid passthrough environment variable",
+			env:       []string{"VALID_KEY"},
+			strict:    false,
+			wantErr:   false,
+		},
+		{
+			name:      "Invalid environment key with prefix number",
+			env:       []string{"123_INVALID=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with prefix number",
+			env:       []string{"123_INVALID"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid environment key with control char in key-value",
+			env:       []string{"BAD\nKEY=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with control char",
+			env:       []string{"BAD\nKEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid environment key with hyphen in key-value",
+			env:       []string{"INVALID-KEY=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with hyphen",
+			env:       []string{"INVALID-KEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Empty environment variable string",
+			env:       []string{""},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Valid key and invalid key combined",
+			env:       []string{"VALID_KEY=value", "INVALID-KEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[1] (key)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := &CLIOptions{
+				Image:    "alpine",
+				ImageSet: true,
+				Env:      tt.env,
+			}
+			if tt.strict {
+				cli.StrictEnv = true
+				cli.StrictEnvSet = true
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errSubstr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
