@@ -358,11 +358,11 @@ func (RealFileSystem) ReadFile(name string) ([]byte, error)  { return os.ReadFil
 
 // UserHomeDir retrieves the user home directory on each call, avoiding process-lifetime caching
 // so that transient environment changes or errors are not permanently retained.
-func (RealFileSystem) UserHomeDir() (string, error) { return os.UserHomeDir() }
-func (RealFileSystem) Executable() (string, error)           { return os.Executable() }
-func (RealFileSystem) Getenv(key string) string              { return os.Getenv(key) }
-func (RealFileSystem) LookupEnv(key string) (string, bool)   { return os.LookupEnv(key) }
-func (RealFileSystem) TempDir() string                       { return os.TempDir() }
+func (RealFileSystem) UserHomeDir() (string, error)        { return os.UserHomeDir() }
+func (RealFileSystem) Executable() (string, error)         { return os.Executable() }
+func (RealFileSystem) Getenv(key string) string            { return os.Getenv(key) }
+func (RealFileSystem) LookupEnv(key string) (string, bool) { return os.LookupEnv(key) }
+func (RealFileSystem) TempDir() string                     { return os.TempDir() }
 func (RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }

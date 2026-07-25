@@ -325,9 +325,8 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("device with control characters raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Devices:  []string{"/dev/null\x01"},
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/null\x01"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -338,8 +337,7 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("programmatic invalid permissions raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 		}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
@@ -365,8 +363,7 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("empty options and nil config defaults to standard values", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -381,10 +378,8 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid pull policy raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Pull:     "invalid_policy",
-			PullSet:  true,
+			Image: ptr("alpine"),
+			Pull:  ptr("invalid_policy"),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -395,10 +390,8 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid log level raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:       "alpine",
-			ImageSet:    true,
-			LogLevel:    "VERBOSE",
-			LogLevelSet: true,
+			Image:    ptr("alpine"),
+			LogLevel: ptr("VERBOSE"),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -409,10 +402,8 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid log format raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:        "alpine",
-			ImageSet:     true,
-			LogFormat:    "yaml",
-			LogFormatSet: true,
+			Image:     ptr("alpine"),
+			LogFormat: ptr("yaml"),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -431,9 +422,8 @@ func TestUnit_Config_Resolver_DoubleBracesEscaping_Robustness(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Env:      []string{"MY_VAL={{ {{env:MY_VAR}} }}"},
+			Image: ptr("alpine"),
+			Env:   []string{"MY_VAL={{ {{env:MY_VAR}} }}"},
 		}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -449,10 +439,8 @@ func TestUnit_Config_Resolver_NegativeDurationErrors_Robustness(t *testing.T) {
 	t.Run("negative pull-backoff-base raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:              "alpine",
-			ImageSet:           true,
-			PullBackoffBase:    "-10s",
-			PullBackoffBaseSet: true,
+			Image:           ptr("alpine"),
+			PullBackoffBase: ptr("-10s"),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -465,10 +453,8 @@ func TestUnit_Config_Resolver_NegativeDurationErrors_Robustness(t *testing.T) {
 	t.Run("negative hang-timeout raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			HangTimeout:    "-5s",
-			HangTimeoutSet: true,
+			Image:       ptr("alpine"),
+			HangTimeout: ptr("-5s"),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -485,8 +471,7 @@ func TestUnit_Config_Resolver_PrecedenceRegistryMatching_Robustness(t *testing.T
 	t.Run("registry check mismatches on option fetching returns mismatch error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 		}
 
 		// Mock a registry mismatch error by calling inner resolver's applyStringOption with unknown options.
@@ -570,10 +555,8 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 	t.Run("negative memory in CLI options is rejected", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "9223372036854775808", // Large value that causes overflow to negative int64
-			MemorySet: true,
+			Image:  ptr("alpine"),
+			Memory: ptr("9223372036854775808"), // Large value that causes overflow to negative int64
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -584,10 +567,8 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 	t.Run("negative CPUs in CLI options is rejected", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			CPUs:     -2.5,
-			CPUsSet:  true,
+			Image: ptr("alpine"),
+			CPUs:  ptr(-2.5),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -613,11 +594,9 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			Privileged:    true,
-			PrivilegedSet: true,
-			CapAdd:        []string{"CHOWN", "DAC_OVERRIDE"},
+			Image:      ptr("alpine"),
+			Privileged: ptr(true),
+			CapAdd:     []string{"CHOWN", "DAC_OVERRIDE"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -637,11 +616,9 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			Privileged:    true,
-			PrivilegedSet: true,
-			CapAdd:        []string{"SYS_ADMIN", "NET_ADMIN"},
+			Image:      ptr("alpine"),
+			Privileged: ptr(true),
+			CapAdd:     []string{"SYS_ADMIN", "NET_ADMIN"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -663,9 +640,8 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			CapAdd:   []string{"SYS_ADMIN", "NET_ADMIN"},
+			Image:  ptr("alpine"),
+			CapAdd: []string{"SYS_ADMIN", "NET_ADMIN"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
