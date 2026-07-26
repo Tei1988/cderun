@@ -123,6 +123,54 @@ func (r *ContainerdRuntime) Name() string {
 	return "containerd"
 }
 
+// ValidateConfig validates that the runtime supports the given container configuration.
+func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	if config.Memory < 0 {
+		return fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
+	}
+	if config.CPUs < 0 {
+		return fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
+	}
+
+	if config.CPUs > 0 {
+		period := uint64(100000)
+		quota := int64(config.CPUs * float64(period))
+		if quota <= 0 {
+			return fmt.Errorf("containerd runtime: CPU quota %d derived from CPUs %f is too small", quota, config.CPUs)
+		}
+	}
+
+	if config.Network != "" && config.Network != "host" {
+		return fmt.Errorf("containerd runtime: Network %q is not supported yet (only \"host\" is supported for containerd)", config.Network)
+	}
+	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
+		return fmt.Errorf("containerd runtime: port mapping is not supported yet")
+	}
+	if len(config.DNS) > 0 {
+		return fmt.Errorf("containerd runtime: DNS setting is not supported yet")
+	}
+	if len(config.AddHosts) > 0 {
+		return fmt.Errorf("containerd runtime: add-host is not supported yet")
+	}
+
+	for _, m := range config.Mounts {
+		if m.Type == "volume" {
+			return fmt.Errorf("containerd runtime: volume mount type is not supported")
+		}
+	}
+
+	if len(config.GroupAdd) > 0 {
+		for _, g := range config.GroupAdd {
+			_, err := strconv.ParseUint(g, 10, 32)
+			if err != nil {
+				return fmt.Errorf("containerd runtime: non-numeric GroupAdd GID %q is not supported: %w", g, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if maxRetries < 0 {
 		maxRetries = 0
@@ -171,11 +219,8 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 }
 
 func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	if config.Memory < 0 {
-		return "", fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
-	}
-	if config.CPUs < 0 {
-		return "", fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
+	if err := r.ValidateConfig(config); err != nil {
+		return "", err
 	}
 
 	var quota int64
@@ -183,38 +228,13 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.CPUs > 0 {
 		period = 100000
 		quota = int64(config.CPUs * float64(period))
-		if quota <= 0 {
-			return "", fmt.Errorf("containerd runtime: CPU quota %d derived from CPUs %f is too small", quota, config.CPUs)
-		}
-	}
-
-	if config.Network != "" && config.Network != "host" {
-		return "", fmt.Errorf("containerd runtime: Network %q is not supported yet (only \"host\" is supported for containerd)", config.Network)
-	}
-	if len(config.Ports) > 0 || config.PublishAll || len(config.Expose) > 0 {
-		return "", fmt.Errorf("containerd runtime: port mapping is not supported yet")
-	}
-	if len(config.DNS) > 0 {
-		return "", fmt.Errorf("containerd runtime: DNS setting is not supported yet")
-	}
-	if len(config.AddHosts) > 0 {
-		return "", fmt.Errorf("containerd runtime: add-host is not supported yet")
-	}
-
-	for _, m := range config.Mounts {
-		if m.Type == "volume" {
-			return "", fmt.Errorf("containerd runtime: volume mount type is not supported")
-		}
 	}
 
 	var validatedGids []uint32
 	if len(config.GroupAdd) > 0 {
 		validatedGids = make([]uint32, 0, len(config.GroupAdd))
 		for _, g := range config.GroupAdd {
-			gid64, err := strconv.ParseUint(g, 10, 32)
-			if err != nil {
-				return "", fmt.Errorf("containerd runtime: non-numeric GroupAdd GID %q is not supported: %w", g, err)
-			}
+			gid64, _ := strconv.ParseUint(g, 10, 32)
 			validatedGids = append(validatedGids, uint32(gid64))
 		}
 	}

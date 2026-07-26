@@ -57,6 +57,31 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 		// Verify that the close failure was logged
 		assert.Contains(t, logBuf.String(), "failed to close runtime on init failure: close failed")
 	})
+
+	t.Run("early validation failure stops execution before image pull", func(t *testing.T) {
+		mock := &runtime.MockRuntime{
+			ValidateErr: errors.New("invalid container configuration"),
+			PullErr:     errors.New("should not be called"),
+		}
+
+		opts := &rootOptions{
+			runtimeFactory: func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			},
+			logger: logging.GetGlobalLogger(),
+		}
+
+		resolved := &config.ResolvedConfig{}
+		_, _, _, err := opts.initContainer(context.Background(), resolved, &container.ContainerConfig{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "configuration validation failed")
+		assert.Contains(t, err.Error(), "invalid container configuration")
+
+		// Assert that pull was never attempted because validation failed early
+		mock.WithLockedMock(func(m *runtime.MockRuntime) {
+			assert.Empty(t, m.PulledImage, "PullImage should not have been called")
+		})
+	})
 }
 
 func TestUnit_Root_InitContainer_DebugLogging_WithMasking(t *testing.T) {

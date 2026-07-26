@@ -902,6 +902,12 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		}
 	}()
 
+	// Validate configuration against runtime capabilities before pulling image or creating container
+	if err = rt.ValidateConfig(cc); err != nil {
+		err = fmt.Errorf("configuration validation failed: %w", err)
+		return
+	}
+
 	o.logger.Trace("Creating container...")
 	if err = rt.PullImage(ctx, cc.Image, cc.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase); err != nil {
 		err = fmt.Errorf("failed to pull image: %w", err)

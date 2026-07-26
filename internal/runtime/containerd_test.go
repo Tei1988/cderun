@@ -88,6 +88,128 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+func TestUnit_Containerd_ValidateConfig(t *testing.T) {
+	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
+
+	tests := []struct {
+		name        string
+		cfg         *container.ContainerConfig
+		errContains string
+	}{
+		{
+			name: "negative memory",
+			cfg: &container.ContainerConfig{
+				Memory: -1,
+			},
+			errContains: "negative memory limit",
+		},
+		{
+			name: "negative CPU limit",
+			cfg: &container.ContainerConfig{
+				CPUs: -1.0,
+			},
+			errContains: "negative CPU limit",
+		},
+		{
+			name: "CPU limit too small",
+			cfg: &container.ContainerConfig{
+				CPUs: 0.000001,
+			},
+			errContains: "derived from CPUs 0.000001 is too small",
+		},
+		{
+			name: "unsupported network",
+			cfg: &container.ContainerConfig{
+				Network: "bridge",
+			},
+			errContains: "Network \"bridge\" is not supported yet",
+		},
+		{
+			name: "unsupported ports",
+			cfg: &container.ContainerConfig{
+				Ports: []string{"8080:80"},
+			},
+			errContains: "port mapping is not supported yet",
+		},
+		{
+			name: "publish all",
+			cfg: &container.ContainerConfig{
+				PublishAll: true,
+			},
+			errContains: "port mapping is not supported yet",
+		},
+		{
+			name: "expose ports",
+			cfg: &container.ContainerConfig{
+				Expose: []string{"80"},
+			},
+			errContains: "port mapping is not supported yet",
+		},
+		{
+			name: "DNS setting",
+			cfg: &container.ContainerConfig{
+				DNS: []string{"8.8.8.8"},
+			},
+			errContains: "DNS setting is not supported yet",
+		},
+		{
+			name: "add hosts",
+			cfg: &container.ContainerConfig{
+				AddHosts: []string{"host:ip"},
+			},
+			errContains: "add-host is not supported yet",
+		},
+		{
+			name: "volume mount",
+			cfg: &container.ContainerConfig{
+				Mounts: []container.Mount{
+					{Type: "volume", Target: "/path"},
+				},
+			},
+			errContains: "volume mount type is not supported",
+		},
+		{
+			name: "non-numeric group add",
+			cfg: &container.ContainerConfig{
+				GroupAdd: []string{"admin"},
+			},
+			errContains: "non-numeric GroupAdd GID",
+		},
+		{
+			name: "valid host network",
+			cfg: &container.ContainerConfig{
+				Network: "host",
+			},
+		},
+		{
+			name: "valid bind mount",
+			cfg: &container.ContainerConfig{
+				Mounts: []container.Mount{
+					{Type: "bind", Source: "/src", Target: "/dst"},
+				},
+			},
+		},
+		{
+			name: "valid numeric group add",
+			cfg: &container.ContainerConfig{
+				GroupAdd: []string{"1000"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rt.ValidateConfig(tt.cfg)
+			if tt.errContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 

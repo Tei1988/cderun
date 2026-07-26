@@ -125,6 +125,12 @@ func (d *DockerRuntime) Close() error {
 	return d.closeErr
 }
 
+// ValidateConfig validates that the runtime supports the given container configuration.
+// Docker runtime natively supports all existing features, so this is a no-op.
+func (d *DockerRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	return nil
+}
+
 // PullImage pulls the specified image based on the pull policy.
 func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
 	if maxRetries < 0 {
