@@ -334,11 +334,11 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		assert.NoError(t, ValidatePort("127.0.0.1:80:80/udp"))
 
 		// Invalid protocols
-		assert.Error(t, ValidatePort("80/http"))
+		require.Error(t, ValidatePort("80/http"))
 		// Port out of range
-		assert.Error(t, ValidatePort("70000"))
+		require.Error(t, ValidatePort("70000"))
 		// Invalid formats
-		assert.Error(t, ValidatePort("127.0.0.1:80:80:80"))
+		require.Error(t, ValidatePort("127.0.0.1:80:80:80"))
 	})
 
 	t.Run("ValidateGroupAdd anomalies", func(t *testing.T) {
@@ -348,9 +348,9 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateGroupAdd("admin-group"))
 
 		// Invalid group-adds
-		assert.Error(t, ValidateGroupAdd("-group"))
-		assert.Error(t, ValidateGroupAdd("group$name"))
-		assert.Error(t, ValidateGroupAdd("group name"))
+		require.Error(t, ValidateGroupAdd("-group"))
+		require.Error(t, ValidateGroupAdd("group$name"))
+		require.Error(t, ValidateGroupAdd("group name"))
 	})
 
 	t.Run("ValidateToolName constraints", func(t *testing.T) {
@@ -359,13 +359,13 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateToolName("v1.2"))
 
 		// Rejects empty, dot, dot-dot
-		assert.Error(t, ValidateToolName(""))
-		assert.Error(t, ValidateToolName("."))
-		assert.Error(t, ValidateToolName(".."))
+		require.Error(t, ValidateToolName(""))
+		require.Error(t, ValidateToolName("."))
+		require.Error(t, ValidateToolName(".."))
 		// Rejects absolute path and directories
-		assert.Error(t, ValidateToolName("/usr/bin/python"))
-		assert.Error(t, ValidateToolName("tools/python"))
+		require.Error(t, ValidateToolName("/usr/bin/python"))
+		require.Error(t, ValidateToolName("tools/python"))
 		// Rejects unicode or special chars
-		assert.Error(t, ValidateToolName("pythön"))
+		require.Error(t, ValidateToolName("pythön"))
 	})
 }
