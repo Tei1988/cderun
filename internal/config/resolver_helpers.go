@@ -365,20 +365,24 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 		}
 
 		var key, val string
-		if k, v, found := strings.Cut(resolvedE, "="); found {
+		k, v, found := strings.Cut(resolvedE, "=")
+		if found {
 			key = k
 			val = v
 		} else {
-			v, found := fs.LookupEnv(resolvedE)
-			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
-			}
 			key = resolvedE
-			val = v
 		}
 
 		if err := ValidateEnvKey(key); err != nil {
 			return nil, fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+
+		if !found {
+			v, envFound := fs.LookupEnv(key)
+			if !envFound && strict {
+				return nil, fmt.Errorf("required environment variable not found: %q", key)
+			}
+			val = v
 		}
 
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.

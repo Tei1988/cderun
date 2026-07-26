@@ -755,6 +755,13 @@ func TestUnit_Config_Resolver_EnvKeyValidation_Robustness(t *testing.T) {
 			wantErr:   true,
 			errSubstr: "security validation failed for env[1] (key)",
 		},
+		{
+			name:      "Strict mode: invalid passthrough key asserts security-validation takes precedence over missing variable",
+			env:       []string{"INVALID-KEY"},
+			strict:    true,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
 	}
 
 	for _, tt := range tests {
