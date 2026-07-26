@@ -78,6 +78,34 @@ func BenchmarkMaskSensitiveEnv(b *testing.B) {
 	}
 }
 
+func BenchmarkMaskSensitiveEnv_WithPatterns(b *testing.B) {
+	key := "DB_PASSWORD_SECRET_TOKEN"
+	val := "my-secret-password"
+	patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = MaskSensitiveEnv(key, val, patterns)
+	}
+}
+
+func BenchmarkMaskSensitiveEnvList_WithPatterns(b *testing.B) {
+	env := []string{
+		"DB_PASSWORD_SECRET_TOKEN=my-secret-password",
+		"DB_USER_SECRET_KEY=admin",
+		"NORMAL_VAR=value",
+		"ANOTHER_NORMAL_VAR=another-value",
+		"PORT=8080",
+		"HOST=localhost",
+	}
+	patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = MaskSensitiveEnvList(env, patterns)
+	}
+}
+
 func BenchmarkExpressionResolver_ResolveString_NoExpr(b *testing.B) {
 	mfs := &MockFileSystem{
 		HomeDir: "/home/user",
