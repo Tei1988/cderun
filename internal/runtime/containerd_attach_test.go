@@ -51,14 +51,12 @@ func TestUnit_Containerd_TaskReady_Concurrent(t *testing.T) {
 	readyC := make(chan struct{})
 	rt.taskReady[containerID] = readyC
 
-	var wg sync.WaitGroup
+	var wg WaitGroup
 	// Spin up multiple goroutines waiting for taskReady
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			<-readyC
-		}()
+		})
 	}
 
 	// Trigger notification
@@ -77,4 +75,16 @@ func TestUnit_Containerd_TaskReady_Concurrent(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for concurrent waiters to unblock")
 	}
+}
+
+type WaitGroup struct {
+	sync.WaitGroup
+}
+
+func (wg *WaitGroup) Go(fn func()) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fn()
+	}()
 }

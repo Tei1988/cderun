@@ -578,7 +578,8 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid memory value \"-9223372036854775808\"")
+		assert.Contains(t, err.Error(), "invalid memory value \"9223372036854775808\"")
+		assert.Contains(t, err.Error(), "memory limit is out of range of int64")
 	})
 
 	t.Run("negative CPUs in CLI options is rejected", func(t *testing.T) {

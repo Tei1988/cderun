@@ -122,7 +122,7 @@ cderun --cderun-tty --cderun-image node:20-alpine node app.js
 cderun echo -- --cderun-tty
 ```
 
-ホイスト処理は `--` を見つけた時点でホイスト動作を停止するため、この時の実際のコンテナ実行は `echo --cderun-tty` となります。
+ホイスト処理は `--` を見つけた時点でホイスト動作を停止するため、この時の実際のコンテナ実行は `echo -- --cderun-tty` となります。
 
 ---
 

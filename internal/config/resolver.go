@@ -3,11 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"path"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
@@ -813,6 +815,54 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if valStr != "" {
+		// Pre-validate memory string ranges using math/big to prevent overflow/architecture-specific issues
+		s := strings.TrimSpace(valStr)
+		var numericPart string
+		var unitPart string
+		for i, r := range s {
+			if !unicode.IsDigit(r) && r != '.' && r != '-' && r != '+' {
+				numericPart = s[:i]
+				unitPart = s[i:]
+				break
+			}
+		}
+		if numericPart == "" {
+			numericPart = s
+		}
+		numericPart = strings.TrimSpace(numericPart)
+		unitPart = strings.TrimSpace(unitPart)
+
+		if numericPart != "" {
+			bf, _, err := big.ParseFloat(numericPart, 10, 256, big.ToZero)
+			if err == nil {
+				multiplier := big.NewInt(1)
+				u := strings.ToLower(unitPart)
+				switch {
+				case u == "b" || u == "":
+					// 1
+				case u == "k" || u == "kb" || u == "kib":
+					multiplier.SetInt64(1024)
+				case u == "m" || u == "mb" || u == "mib":
+					multiplier.SetInt64(1024 * 1024)
+				case u == "g" || u == "gb" || u == "gib":
+					multiplier.SetInt64(1024 * 1024 * 1024)
+				case u == "t" || u == "tb" || u == "tib":
+					multiplier.SetInt64(1024 * 1024 * 1024 * 1024)
+				case u == "p" || u == "pb" || u == "pib":
+					multiplier.SetInt64(1024 * 1024 * 1024 * 1024 * 1024)
+				}
+				bmf := new(big.Float).SetInt(multiplier)
+				result := new(big.Float).Mul(bf, bmf)
+				if result.Sign() < 0 {
+					return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("memory limit cannot be negative")}
+				}
+				maxInt64 := new(big.Float).SetInt(big.NewInt(9223372036854775807))
+				if result.Cmp(maxInt64) > 0 {
+					return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: errors.New("memory limit is out of range of int64")}
+				}
+			}
+		}
+
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
 			if exprErr := rv.r.Error(); exprErr != nil {
@@ -1056,20 +1106,7 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 						rv.res.Runtime = autoDetectedRuntime
 						rv.res.SocketPath = autoDetectedSocketPath
 					} else {
-						var detectedRuntime string
-						var detectedSocketPath string
-
-						if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-							detectedRuntime = "docker"
-							detectedSocketPath = "/var/run/docker.sock"
-						} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-							detectedRuntime = "containerd"
-							detectedSocketPath = "/run/containerd/containerd.sock"
-						} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-							detectedRuntime = "podman"
-							detectedSocketPath = "/run/podman/podman.sock"
-						}
-
+						detectedRuntime, detectedSocketPath := detectRuntimeSocket(rv.fs)
 						if detectedRuntime != "" {
 							autoDetectedRuntime = detectedRuntime
 							autoDetectedSocketPath = detectedSocketPath
@@ -1080,15 +1117,10 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 					autoDetectMu.Unlock()
 				}
 			} else {
-				if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-					rv.res.Runtime = "docker"
-					rv.res.SocketPath = "/var/run/docker.sock"
-				} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-					rv.res.Runtime = "containerd"
-					rv.res.SocketPath = "/run/containerd/containerd.sock"
-				} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-					rv.res.Runtime = "podman"
-					rv.res.SocketPath = "/run/podman/podman.sock"
+				detectedRuntime, detectedSocketPath := detectRuntimeSocket(rv.fs)
+				if detectedRuntime != "" {
+					rv.res.Runtime = detectedRuntime
+					rv.res.SocketPath = detectedSocketPath
 				}
 			}
 
@@ -1519,4 +1551,15 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	default:
 		return cp.Resolve(r)
 	}
+}
+
+func detectRuntimeSocket(fs FileSystem) (string, string) {
+	if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
+		return "docker", "/var/run/docker.sock"
+	} else if _, err := fs.Stat("/run/containerd/containerd.sock"); err == nil {
+		return "containerd", "/run/containerd/containerd.sock"
+	} else if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
+		return "podman", "/run/podman/podman.sock"
+	}
+	return "", ""
 }

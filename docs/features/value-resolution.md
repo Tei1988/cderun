@@ -228,7 +228,7 @@ cderun は、多数の設定項目や再帰的な解決を効率的に行うた�
 # .go-version の内容（例: 1.22.1）をタグに使用
 cderun --image="golang:{{file:.go-version}}" go version
 
-# .nvmrc の内容を node イメージ의 タグに使用
+# .nvmrc の内容を node イメージのタグに使用
 cderun --image="node:{{file:.nvmrc}}-alpine" node --version
 ```
 

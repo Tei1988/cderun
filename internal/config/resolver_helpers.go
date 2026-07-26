@@ -232,59 +232,9 @@ func mergeEnv(base, p2, p1 []string) []string {
 		var vals [8]string
 		size := 0
 
-		for _, e := range base {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx != -1 {
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
-
-		for _, e := range p2 {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx != -1 {
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
-
-		for _, e := range p1 {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx != -1 {
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
+		size = insertEnvEntriesFast(&keys, &vals, size, base)
+		size = insertEnvEntriesFast(&keys, &vals, size, p2)
+		size = insertEnvEntriesFast(&keys, &vals, size, p1)
 
 		res := make([]string, size)
 		copy(res, vals[:size])
@@ -303,6 +253,27 @@ func mergeEnv(base, p2, p1 []string) []string {
 		res = append(res, m[k])
 	}
 	return res
+}
+
+func insertEnvEntriesFast(keys *[8]string, vals *[8]string, size int, src []string) int {
+	for _, e := range src {
+		key, _, _ := strings.Cut(e, "=")
+		foundIdx := -1
+		for j := 0; j < size; j++ {
+			if keys[j] == key {
+				foundIdx = j
+				break
+			}
+		}
+		if foundIdx != -1 {
+			vals[foundIdx] = e
+		} else {
+			keys[size] = key
+			vals[size] = e
+			size++
+		}
+	}
+	return size
 }
 
 func validateImageRegistryMatch(cliImage, configImage string) error {
