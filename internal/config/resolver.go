@@ -253,7 +253,7 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
 		return val.Field(setIdx).Bool(), val.Field(valIdx)
 	}
 	v := val.Field(valIdx)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return false, reflect.Zero(v.Type().Elem())
 		}
