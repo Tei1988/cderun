@@ -99,13 +99,16 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	if env == nil {
 		return nil
 	}
-	var upperPatterns []string
+	upperPatterns := patterns
 	if len(patterns) > 0 {
-		upperPatterns = make([]string, len(patterns))
+		var copied []string
 		for i, p := range patterns {
-			if isUpper(p) {
-				upperPatterns[i] = p
-			} else {
+			if !isUpper(p) {
+				if copied == nil {
+					copied = make([]string, len(patterns))
+					copy(copied, patterns)
+					upperPatterns = copied
+				}
 				upperPatterns[i] = strings.ToUpper(p)
 			}
 		}

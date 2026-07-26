@@ -79,31 +79,63 @@ func BenchmarkMaskSensitiveEnv(b *testing.B) {
 }
 
 func BenchmarkMaskSensitiveEnv_WithPatterns(b *testing.B) {
-	key := "DB_PASSWORD_SECRET_TOKEN"
-	val := "my-secret-password"
-	patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+	b.Run("UppercaseFastPath", func(b *testing.B) {
+		b.ReportAllocs()
+		key := "DB_PASSWORD_SECRET_TOKEN"
+		val := "my-secret-password"
+		patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnv(key, val, patterns)
+		}
+	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = MaskSensitiveEnv(key, val, patterns)
-	}
+	b.Run("MixedLowercaseConversion", func(b *testing.B) {
+		b.ReportAllocs()
+		key := "db_password_secret_token"
+		val := "my-secret-password"
+		patterns := []string{"*_token", "*_key", "*_password"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnv(key, val, patterns)
+		}
+	})
 }
 
 func BenchmarkMaskSensitiveEnvList_WithPatterns(b *testing.B) {
-	env := []string{
-		"DB_PASSWORD_SECRET_TOKEN=my-secret-password",
-		"DB_USER_SECRET_KEY=admin",
-		"NORMAL_VAR=value",
-		"ANOTHER_NORMAL_VAR=another-value",
-		"PORT=8080",
-		"HOST=localhost",
-	}
-	patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+	b.Run("UppercaseFastPath", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"DB_PASSWORD_SECRET_TOKEN=my-secret-password",
+			"DB_USER_SECRET_KEY=admin",
+			"NORMAL_VAR=value",
+			"ANOTHER_NORMAL_VAR=another-value",
+			"PORT=8080",
+			"HOST=localhost",
+		}
+		patterns := []string{"*_TOKEN", "*_KEY", "*_PASSWORD"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, patterns)
+		}
+	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = MaskSensitiveEnvList(env, patterns)
-	}
+	b.Run("MixedLowercaseConversion", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"db_password_secret_token=my-secret-password",
+			"db_user_secret_key=admin",
+			"normal_var=value",
+			"another_normal_var=another-value",
+			"port=8080",
+			"host=localhost",
+		}
+		patterns := []string{"*_token", "*_key", "*_password"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, patterns)
+		}
+	})
 }
 
 func BenchmarkExpressionResolver_ResolveString_NoExpr(b *testing.B) {
