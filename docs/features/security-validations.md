@@ -31,7 +31,7 @@ Any string containing unsafe characters will cause an immediate resolution failu
 
 ## Working Directory Validation
 
-The working directory validation function (`ValidateWorkdir`) strictly rejects any path containing parent directory traversal references (`..` segments). Working directories must be valid, safe absolute paths to prevent path obfuscation and directory traversal attacks within container configurations.
+The working directory validation function (`ValidateWorkdir`) strictly rejects any path containing parent directory traversal references (`..` segments) to prevent path obfuscation and directory traversal attacks within container configurations. Note that this validation and its safe absolute-path requirement apply only when a working directory is specified (non-empty); when provided, the path must be a valid absolute path and is subject to the strict traversal restrictions.
 
 ## Tool Name Safety
 

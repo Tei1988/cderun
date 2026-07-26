@@ -56,7 +56,7 @@ To grant the necessary permissions, you must add the correct socket GID explicit
 
 > ⚠️ **Security Warning on Socket Sharing**: Sharing the container runtime socket (e.g., `/var/run/docker.sock`) and granting access via supplementary numeric GID is a highly privileged operation. It allows any process within the container to control the container daemon, which is equivalent to granting full root-level access on the host system. Consequently, this setup must only be used in trusted, secure environments and should be explicitly flagged/warned in production designs.
 >
-> For setups where security isolation is a priority, consider using rootless Podman configurations. In rootless configurations, socket access is securely scoped to the rootless daemon rather than a rootful system-wide daemon, preventing system-wide privilege escalation and container escape risks.
+> When considering alternatives, rootless Podman configurations reduce the blast radius compared with a rootful daemon because processes run as a non-root user on the host. However, please note that shared socket access still grants the owning user broad Podman control, including the ability to create containers and mount host volumes, which could still lead to host-level impact if abused.
 >
 > **Important**: The value `102` shown below is merely an **example**. The actual GID depends on your specific container runtime installation and environment on your machine. You must determine and configure the correct GID for your system.
 
