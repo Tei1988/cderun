@@ -30,7 +30,7 @@ Docker以外のコンテナランタイム（Podman等）をサポートする�
     - **DNS/ホスト**: カスタムDNSサーバの設定（`--dns`）およびホストマッピングの追加（`--add-host`）は未サポートです。
     - **マウント**: `volume` タイプ（名前付きボリューム等）のマウントは未サポートです（`bind` または `tmpfs` を使用してください）。
     - **ケーパビリティ**: `--cap-add`, `--cap-drop` による Linux ケーパビリティの制御はサポートされています。
-    - **ENTRYPOINTの継承**: イメージに `ENTRYPOINT` が定義されている場合、コマンド指定時にそれらが無視される既知の制限があります（修正予定。詳細は [Backlog T40](../../.agent/todo.md) 参照）。
+    - **ENTRYPOINTの継承**: イメージに `ENTRYPOINT` が定義されている場合、コマンド指定時にもデフォルトの `ENTRYPOINT` が自動的に前置して適用されるようになり、Docker ランタイムと同様の挙動が保証されています。
     - **プラットフォーム制限**: **Linux専用**です（`//go:build linux` ビルドタグ付き）。macOSやWindowsでは、DockerやPodmanのように仮想マシン内で動作するエンジンを経由せずに直接ローカルの containerd に接続することはできません。
 - **nerdctl (Backlog)**:
   containerd の CLI である `nerdctl` をラップして実行する方式の検討。
