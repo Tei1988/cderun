@@ -333,6 +333,8 @@ func TestUnit_Config_ValidateWorkdir(t *testing.T) {
 		{"Relative", "app", true},
 		{"Home tilde", "~/app", true},
 		{"Injection attempt", "/app; rm -rf /", true},
+		{"Path traversal containing dotdot", "/app/../etc", true},
+		{"Path traversal ending in dotdot", "/app/..", true},
 	}
 
 	for _, tt := range tests {

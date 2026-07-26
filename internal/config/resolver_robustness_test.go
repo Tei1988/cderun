@@ -237,6 +237,9 @@ func TestUnit_Config_ValidateWorkdir_Robustness(t *testing.T) {
 		{"relative path", "app", true},
 		{"space in path", "/app space", true},
 		{"special character in path", "/app!", true},
+		{"path with parent traversal", "/app/../etc", true},
+		{"path ending with parent traversal", "/usr/..", true},
+		{"path starting with parent traversal", "/../usr", true},
 	}
 
 	for _, tt := range tests {

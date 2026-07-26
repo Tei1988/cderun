@@ -891,6 +891,11 @@ func ValidateWorkdir(s string) error {
 	if !workdirRegex.MatchString(s) {
 		return fmt.Errorf("invalid characters in working directory: %q", s)
 	}
+	for _, part := range strings.Split(s, "/") {
+		if part == ".." {
+			return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
+		}
+	}
 	return nil
 }
 
