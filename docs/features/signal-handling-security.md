@@ -20,3 +20,12 @@ If a signal containing restricted characters is provided, the validation fails i
 ## Error Handling
 
 The runtime abstraction suppresses "not found" or "conflict" errors (e.g., if the container has already exited) to ensure that signaling is idempotent and does not cause unexpected CLI failures during cleanup or shutdown sequences.
+
+## Signal Forwarding and Lifecycle Synchronization
+
+During command execution, `cderun` registers standard OS signals (`SIGINT` and `SIGTERM` on Unix-like systems, or `os.Interrupt` on Windows) using a buffered signal channel of size 1. This size-1 buffer reduces the risk of signal loss or burst blocking.
+
+The signal forwarding routine (`startSignalForwarder`) operates as follows:
+
+- **First Registered Signal (SIGINT/SIGTERM or os.Interrupt)**: The signal is directly forwarded to the running container via the runtime's signaling mechanism to manage graceful termination within the container itself.
+- **Second Signal**: If a second interrupt or termination signal is received by the host process, the execution context is cancelled immediately to abort execution on the host and trigger deferred cleanup tasks.
