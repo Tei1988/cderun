@@ -125,6 +125,10 @@ func (r *ContainerdRuntime) Name() string {
 
 // ValidateConfig validates that the runtime supports the given container configuration.
 func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
+		return fmt.Errorf("containerd runtime: non-finite CPU limit %f is not supported", config.CPUs)
+	}
+
 	if config.Memory < 0 {
 		return fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
@@ -156,6 +160,9 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 	for _, m := range config.Mounts {
 		if m.Type == "volume" {
 			return fmt.Errorf("containerd runtime: volume mount type is not supported")
+		}
+		if m.Type != "" && m.Type != "bind" && m.Type != "tmpfs" {
+			return fmt.Errorf("containerd runtime: unsupported mount type %q", m.Type)
 		}
 	}
 

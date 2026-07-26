@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -96,6 +97,36 @@ func TestUnit_Containerd_ValidateConfig(t *testing.T) {
 		cfg         *container.ContainerConfig
 		errContains string
 	}{
+		{
+			name: "NaN CPU limit",
+			cfg: &container.ContainerConfig{
+				CPUs: math.NaN(),
+			},
+			errContains: "non-finite CPU limit",
+		},
+		{
+			name: "positive infinity CPU limit",
+			cfg: &container.ContainerConfig{
+				CPUs: math.Inf(1),
+			},
+			errContains: "non-finite CPU limit",
+		},
+		{
+			name: "negative infinity CPU limit",
+			cfg: &container.ContainerConfig{
+				CPUs: math.Inf(-1),
+			},
+			errContains: "non-finite CPU limit",
+		},
+		{
+			name: "unsupported mount type",
+			cfg: &container.ContainerConfig{
+				Mounts: []container.Mount{
+					{Type: "unknown", Source: "/src", Target: "/dst"},
+				},
+			},
+			errContains: "unsupported mount type \"unknown\"",
+		},
 		{
 			name: "negative memory",
 			cfg: &container.ContainerConfig{
