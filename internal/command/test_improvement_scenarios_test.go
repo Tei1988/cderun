@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"sync"
 	"syscall"
 	"testing"
@@ -822,13 +823,7 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 
 		// Wait deterministically for the signal to be processed and deferred/recorded by the mock
 		assert.Eventually(t, func() bool {
-			sigs := mock.getSignals()
-			for _, s := range sigs {
-				if s == "SIGINT" {
-					return true
-				}
-			}
-			return false
+			return slices.Contains(mock.getSignals(), "SIGINT")
 		}, 2*time.Second, 10*time.Millisecond)
 
 		// Unblock StartContainer so startup completes
@@ -894,13 +889,7 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 
 			// Verify SIGHUP was forwarded
 			assert.Eventually(t, func() bool {
-				sigs := mock.getSignals()
-				for _, s := range sigs {
-					if s == "SIGHUP" {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(mock.getSignals(), "SIGHUP")
 			}, 2*time.Second, 10*time.Millisecond)
 
 			assert.Contains(t, mock.getSignals(), "SIGHUP")
@@ -959,13 +948,7 @@ func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
 
 			// Verify SIGQUIT was forwarded
 			assert.Eventually(t, func() bool {
-				sigs := mock.getSignals()
-				for _, s := range sigs {
-					if s == "SIGQUIT" {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(mock.getSignals(), "SIGQUIT")
 			}, 2*time.Second, 10*time.Millisecond)
 
 			assert.Contains(t, mock.getSignals(), "SIGQUIT")

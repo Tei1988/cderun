@@ -811,6 +811,18 @@ func (s *executionState) SetRuntimeAndID(rt runtime.ContainerRuntime, containerI
 	s.containerID = containerID
 }
 
+func (s *executionState) GetRuntime() runtime.ContainerRuntime {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rt
+}
+
+func (s *executionState) GetContainerID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.containerID
+}
+
 func (s *executionState) MarkStartupBegun() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -910,14 +922,14 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 		}
 	}()
 
-	rtVal, containerIDVal, cleanup, err := o.initContainer(ctxG, resolved, containerConfig)
+	rt, containerID, cleanup, err := o.initContainer(ctxG, resolved, containerConfig)
 	if err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: err}
 	}
 	defer state.CloseRuntime(o.logger)
 	defer cleanup()
 
-	state.SetRuntimeAndID(rtVal, containerIDVal)
+	state.SetRuntimeAndID(rt, containerID)
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
@@ -928,7 +940,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	restoreTerminal := o.setupTerminal(stdinFd, isHostStdinTerminal, containerConfig)
 	defer restoreTerminal()
 
-	att, err := o.attachContainer(ctxG, cmd, rtVal, containerIDVal, containerConfig)
+	att, err := o.attachContainer(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	if err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: err}
 	}
@@ -942,8 +954,8 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Mark startup as begun so signals received during StartContainer startup phase are forwarded or deferred instead of cancelling.
 	state.MarkStartupBegun()
 
-	o.logger.Trace("Starting container: %s", containerIDVal)
-	if err := rtVal.StartContainer(ctxG, containerIDVal); err != nil {
+	o.logger.Trace("Starting container: %s", state.GetContainerID())
+	if err := state.GetRuntime().StartContainer(ctxG, state.GetContainerID()); err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to start container: %w", err)}
 	}
 	close(att.startSignal) // Signal stdin to start reading
@@ -951,16 +963,16 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	// Mark as running and forward any signals that were received during StartContainer startup phase.
 	deferredSigs := state.MarkRunning()
 	for _, sigName := range deferredSigs {
-		o.logger.Debug("Forwarding deferred startup signal %s to container %s", sigName, containerIDVal)
-		if err := rtVal.SignalContainer(ctx, containerIDVal, sigName); err != nil {
+		o.logger.Debug("Forwarding deferred startup signal %s to container %s", sigName, state.GetContainerID())
+		if err := state.GetRuntime().SignalContainer(ctx, state.GetContainerID(), sigName); err != nil {
 			o.logger.Warn("failed to forward deferred signal %s: %v", sigName, err)
 		}
 	}
 
-	stopResize := o.startResizeHandler(ctxG, cmd, rtVal, containerIDVal, containerConfig)
+	stopResize := o.startResizeHandler(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	defer stopResize()
 
-	return o.waitForCompletion(ctxG, cmd, rtVal, containerIDVal, containerConfig, resolved, isHostStdinTerminal, att)
+	return o.waitForCompletion(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig, resolved, isHostStdinTerminal, att)
 }
 
 func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *container.ContainerConfig) {
