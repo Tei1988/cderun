@@ -68,154 +68,90 @@ type ResolvedConfig struct {
 
 // CLIOptions represents values from CLI flags.
 type CLIOptions struct {
-	Image                    string
-	ImageSet                 bool
-	TTY                      bool
-	TTYSet                   bool
-	Interactive              bool
-	InteractiveSet           bool
-	Network                  string
-	NetworkSet               bool
-	Remove                   bool
-	RemoveSet                bool
-	CderunTTY                bool
-	CderunTTYSet             bool
-	CderunInteractive        bool
-	CderunInteractiveSet     bool
-	CderunImage              string
-	CderunImageSet           bool
-	CderunNetwork            string
-	CderunNetworkSet         bool
-	CderunRemove             bool
-	CderunRemoveSet          bool
-	Runtime                  string
-	RuntimeSet               bool
-	CderunRuntime            string
-	CderunRuntimeSet         bool
-	SocketPath               string
-	SocketPathSet            bool
-	CderunSocketPath         string
-	CderunSocketPathSet      bool
-	MountSocket              bool
-	MountSocketSet           bool
-	CderunMountSocket        bool
-	CderunMountSocketSet     bool
-	MountSocketPath          string
-	MountSocketPathSet       bool
-	CderunMountSocketPath    string
-	CderunMountSocketPathSet bool
+	Image                    *string
+	TTY                      *bool
+	Interactive              *bool
+	Network                  *string
+	Remove                   *bool
+	CderunTTY                *bool
+	CderunInteractive        *bool
+	CderunImage              *string
+	CderunNetwork            *string
+	CderunRemove             *bool
+	Runtime                  *string
+	CderunRuntime            *string
+	SocketPath               *string
+	CderunSocketPath         *string
+	MountSocket              *bool
+	CderunMountSocket        *bool
+	MountSocketPath          *string
+	CderunMountSocketPath    *string
 	Env                      []string
 	CderunEnv                []string
-	Workdir                  string
-	WorkdirSet               bool
-	CderunWorkdir            string
-	CderunWorkdirSet         bool
+	Workdir                  *string
+	CderunWorkdir            *string
 	Mounts                   []string
 	CderunMounts             []string
-	MountCderun              bool
-	MountCderunSet           bool
-	CderunMountCderun        bool
-	CderunMountCderunSet     bool
-	MountCderunPath          string
-	MountCderunPathSet       bool
-	CderunMountCderunPath    string
-	CderunMountCderunPathSet bool
-	MountTools               string
-	MountToolsSet            bool
-	CderunMountTools         string
-	CderunMountToolsSet      bool
-	MountAllTools            bool
-	MountAllToolsSet         bool
-	CderunMountAllTools      bool
-	CderunMountAllToolsSet   bool
-	DryRun                   bool
-	DryRunSet                bool
-	CderunDryRun             bool
-	CderunDryRunSet          bool
-	DryRunFormat             string
-	DryRunFormatSet          bool
-	CderunDryRunFormat       string
-	CderunDryRunFormatSet    bool
-	Diagnosis                bool
-	DiagnosisSet             bool
-	CderunDiagnosis          bool
-	CderunDiagnosisSet       bool
-	DiagnosisFormat          string
-	DiagnosisFormatSet       bool
-	CderunDiagnosisFormat    string
-	CderunDiagnosisFormatSet bool
-	LogLevel                 string
-	LogLevelSet              bool
-	LogFormat                string
-	LogFormatSet             bool
-	LogTimestampSet          bool
-	LogTimestamp             bool
-	StrictEnv                bool
-	StrictEnvSet             bool
-	CderunStrictEnv          bool
-	CderunStrictEnvSet       bool
-	CderunLogLevel           string
-	CderunLogLevelSet        bool
-	CderunLogFormat          string
-	CderunLogFormatSet       bool
-	CderunLogTimestamp       bool
-	CderunLogTimestampSet    bool
-	HangTimeout              string
-	HangTimeoutSet           bool
-	CderunHangTimeout        string
-	CderunHangTimeoutSet     bool
+	MountCderun              *bool
+	CderunMountCderun        *bool
+	MountCderunPath          *string
+	CderunMountCderunPath    *string
+	MountTools               *string
+	CderunMountTools         *string
+	MountAllTools            *bool
+	CderunMountAllTools      *bool
+	DryRun                   *bool
+	CderunDryRun             *bool
+	DryRunFormat             *string
+	CderunDryRunFormat       *string
+	Diagnosis                *bool
+	CderunDiagnosis          *bool
+	DiagnosisFormat          *string
+	CderunDiagnosisFormat    *string
+	LogLevel                 *string
+	LogFormat                *string
+	LogTimestamp             *bool
+	StrictEnv                *bool
+	CderunStrictEnv          *bool
+	CderunLogLevel           *string
+	CderunLogFormat          *string
+	CderunLogTimestamp       *bool
+	HangTimeout              *string
+	CderunHangTimeout        *string
 
 	// Docker-compatible flags
 	Ports                    []string
 	CderunPorts              []string
-	PublishAll               bool
-	PublishAllSet            bool
-	CderunPublishAll         bool
-	CderunPublishAllSet      bool
+	PublishAll               *bool
+	CderunPublishAll         *bool
 	Expose                   []string
 	CderunExpose             []string
-	Hostname                 string
-	HostnameSet              bool
-	CderunHostname           string
-	CderunHostnameSet        bool
+	Hostname                 *string
+	CderunHostname           *string
 	DNS                      []string
 	CderunDNS                []string
 	AddHosts                 []string
 	CderunAddHosts           []string
-	User                     string
-	UserSet                  bool
-	CderunUser               string
-	CderunUserSet            bool
-	Privileged               bool
-	PrivilegedSet            bool
-	CderunPrivileged         bool
-	CderunPrivilegedSet      bool
+	User                     *string
+	CderunUser               *string
+	Privileged               *bool
+	CderunPrivileged         *bool
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
 	CderunCapDrop            []string
 	Entrypoint               []string
 	CderunEntrypoint         []string
-	Pull                     string
-	PullSet                  bool
-	CderunPull               string
-	CderunPullSet            bool
-	PullMaxRetries           int
-	PullMaxRetriesSet        bool
-	CderunPullMaxRetries     int
-	CderunPullMaxRetriesSet  bool
-	PullBackoffBase          string
-	PullBackoffBaseSet       bool
-	CderunPullBackoffBase    string
-	CderunPullBackoffBaseSet bool
-	Memory                   string
-	MemorySet                bool
-	CderunMemory             string
-	CderunMemorySet          bool
-	CPUs                     float64
-	CPUsSet                  bool
-	CderunCPUs               float64
-	CderunCPUsSet            bool
+	Pull                     *string
+	CderunPull               *string
+	PullMaxRetries           *int
+	CderunPullMaxRetries     *int
+	PullBackoffBase          *string
+	CderunPullBackoffBase    *string
+	Memory                   *string
+	CderunMemory             *string
+	CPUs                     *float64
+	CderunCPUs               *float64
 	Devices                  []string
 	CderunDevices            []string
 	SensitiveEnv             []string
