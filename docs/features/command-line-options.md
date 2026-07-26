@@ -437,6 +437,7 @@ cderun --cap-add SYS_ADMIN alpine mount ...
   - 未指定の場合、セキュリティのため**すべての環境変数**がマスクされます（Secure by Default）。
   - 明示的に空を指定した場合（例: `--sensitive-env=""`）、マスクは無効化されます。
   - `*` ワイルドカードを使用した glob パターンが使用可能です（例: `DB_*`, `*_PASSWORD`）。
+  - **空値の保持**: なお、マスキング処理（Secure by DefaultおよびFail-Closed時）では、**値が空ではない（non-empty）環境変数のみ**が `[REDACTED]` にマスクされ、値が空の環境変数（`KEY=` など）はそのまま保持されます。
 
 ### `--entrypoint`
 
