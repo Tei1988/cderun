@@ -20,13 +20,10 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:            "alpine",
-			ImageSet:         true,
-			Network:          "p2-net", // P2
-			NetworkSet:       true,
-			CderunNetwork:    "p1-net", // P1
-			CderunNetworkSet: true,
-		}
+			Image: ptr("alpine"),
+			Network: ptr("p2-net"), // P2
+			CderunNetwork: ptr("p1-net"), // P1
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -51,11 +48,9 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:      "alpine",
-			ImageSet:   true,
-			Network:    "p2-net", // P2
-			NetworkSet: true,
-		}
+			Image: ptr("alpine"),
+			Network: ptr("p2-net"), // P2
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -80,9 +75,8 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -103,9 +97,8 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 	t.Run("P4 (tool-specific config) wins over global and hardcoded defaults", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -126,9 +119,8 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 	t.Run("P5 (global defaults config) wins over P6 (hardcoded default)", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
 				Network: "p5-net", // P5
@@ -144,9 +136,8 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 	t.Run("P6 (hardcoded default) resolves when no layer overrides it", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)

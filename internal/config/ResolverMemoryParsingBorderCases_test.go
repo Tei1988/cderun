@@ -16,11 +16,9 @@ func TestUnit_Config_Resolver_MemoryParsingBorderCases(t *testing.T) {
 
 	t.Run("1024TiB represents 1PiB and parses successfully", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "1024TiB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("1024TiB"),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		// 1024 TiB = 1024 * 1024^4 = 1125899906842624 bytes
@@ -29,11 +27,9 @@ func TestUnit_Config_Resolver_MemoryParsingBorderCases(t *testing.T) {
 
 	t.Run("1EiB is rejected due to units.RAMInBytes limitations", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "1EiB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("1EiB"),
+			}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError

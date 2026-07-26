@@ -13,11 +13,9 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 
 	t.Run("mount-tools enables mount-cderun and mount-socket", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			MountTools:    "node",
-			MountToolsSet: true,
-		}
+			Image: ptr("alpine"),
+			MountTools: ptr("node"),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, fs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
@@ -27,11 +25,9 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 
 	t.Run("mount-all-tools enables mount-cderun and mount-socket", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:            "alpine",
-			ImageSet:         true,
-			MountAllTools:    true,
-			MountAllToolsSet: true,
-		}
+			Image: ptr("alpine"),
+			MountAllTools: ptr(true),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, fs)
 		require.NoError(t, err)
 		assert.True(t, res.MountAllTools)
@@ -41,11 +37,9 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 
 	t.Run("mount-cderun enables mount-socket but not tools", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    true,
-			MountCderunSet: true,
-		}
+			Image: ptr("alpine"),
+			MountCderun: ptr(true),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, fs)
 		require.NoError(t, err)
 		assert.Empty(t, res.MountTools)
@@ -56,13 +50,10 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 
 	t.Run("explicit mount-cderun=false overrides mount-tools trigger", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountTools:     "node",
-			MountToolsSet:  true,
-			MountCderun:    false,
-			MountCderunSet: true,
-		}
+			Image: ptr("alpine"),
+			MountTools: ptr("node"),
+			MountCderun: ptr(false),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, fs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
@@ -74,13 +65,10 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 
 	t.Run("explicit mount-socket=false overrides mount-cderun trigger", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    true,
-			MountCderunSet: true,
-			MountSocket:    false,
-			MountSocketSet: true,
-		}
+			Image: ptr("alpine"),
+			MountCderun: ptr(true),
+			MountSocket: ptr(false),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, fs)
 		require.NoError(t, err)
 		assert.True(t, res.MountCderun)
@@ -92,7 +80,7 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 			Env: map[string]string{"CDERUN_MOUNT_TOOLS": "node"},
 			WD:  "/work",
 		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, nil, mfs)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), }, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
 		assert.True(t, res.MountCderun)
@@ -105,7 +93,7 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 				MountTools: []string{"node"},
 			},
 		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, fs)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), }, nil, global, fs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
 		assert.True(t, res.MountCderun)
@@ -118,7 +106,7 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 				MountTools: []string{"node"},
 			},
 		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, tools, nil, fs)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), }, tools, nil, fs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
 		assert.True(t, res.MountCderun)
@@ -132,11 +120,9 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountCderun:    false,
-			MountCderunSet: true,
-		}
+			Image: ptr("alpine"),
+			MountCderun: ptr(false),
+			}
 		res, err := ResolveWithFS("sh", cli, tools, nil, fs)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"node"}, res.MountTools)
@@ -155,7 +141,7 @@ func TestUnit_Config_TransitiveOptions_Exhaustive(t *testing.T) {
 				MountSocket: ptr(false),
 			},
 		}
-		res, err := ResolveWithFS("sh", &CLIOptions{Image: "alpine", ImageSet: true}, nil, global, mfs)
+		res, err := ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), }, nil, global, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.MountAllTools)
 		assert.True(t, res.MountCderun)
