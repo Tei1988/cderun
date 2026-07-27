@@ -1106,6 +1106,14 @@ func (rv *resolver) resolveEarly() error {
 				}
 			}
 		}
+		if vals == nil && opt.ToolGetter != nil && rv.tools != nil {
+			if tool, ok := rv.tools[rv.subcommand]; ok {
+				vals = opt.ToolGetter(tool)
+			}
+		}
+		if vals == nil && opt.GlobalGetter != nil && rv.global != nil {
+			vals = opt.GlobalGetter(*rv.global)
+		}
 
 		needsR := false
 		for _, v := range vals {
@@ -1183,21 +1191,13 @@ func (rv *resolver) resolveStandardOptions() error {
 							return err
 						}
 					}
-					resolvedCLIImage := cliImage
-					if r != nil {
-						var errCLI error
-						resolvedCLIImage, errCLI = r.ResolveString(cliImage)
-						if errCLI != nil {
-							return errCLI
-						}
+					resolvedCLIImage, err := r.ResolveString(cliImage)
+					if err != nil {
+						return err
 					}
-					resolvedCfgImage := tool.Image
-					if r != nil {
-						var errCfg error
-						resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
-						if errCfg != nil {
-							return errCfg
-						}
+					resolvedCfgImage, err := r.ResolveString(tool.Image)
+					if err != nil {
+						return err
 					}
 					if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
 						return err
@@ -1236,11 +1236,13 @@ func (rv *resolver) resolveComplexOptions() error {
 	var needsR bool
 	if len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != "" {
 		needsR = true
-	} else if rv.tools != nil {
+	}
+	if !needsR && rv.tools != nil {
 		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
 			needsR = true
 		}
-	} else if rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
+	}
+	if !needsR && rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
 		needsR = true
 	}
 	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
@@ -1563,11 +1565,13 @@ func (rv *resolver) resolveCustomParsing() error {
 	var needsRDevices bool
 	if len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != "" {
 		needsRDevices = true
-	} else if rv.tools != nil {
+	}
+	if !needsRDevices && rv.tools != nil {
 		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
 			needsRDevices = true
 		}
-	} else if rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
+	}
+	if !needsRDevices && rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
 		needsRDevices = true
 	}
 	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
