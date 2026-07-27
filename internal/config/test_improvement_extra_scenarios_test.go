@@ -316,7 +316,7 @@ func TestUnit_Config_ValidateImageRegistryMatch_Table(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateImageRegistryMatch(tt.cliImage, tt.configImage)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				var registryErr *RegistryMismatchError
 				assert.ErrorAs(t, err, &registryErr)
 			} else {
