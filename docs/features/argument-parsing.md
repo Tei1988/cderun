@@ -87,17 +87,23 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 ### 2. ホイストの仕組み
 
-前処理（`preprocessArgs`）において、サブコマンドより後ろにある引数の中から `--cderun-` で始まるフラグ群をすべてスキャンし、それらの値を伴ってサブコマンドの**前**へと移動（ホイスト）させます。
+前処理（`preprocessArgs`）において、サブコマンドより後ろにある引数の中から `--cderun-` で始まるフラグ群をすべてスキャンし、サブコマンドの**前**へと移動（ホイスト）させます。
 これにより、後ろに置かれた `cderun` 用の引数が、コンテナ内コマンドへのパススルー引数として誤って扱われるのを防ぎます。
+
+#### 値を持つフラグの書式制限 (Equals-Sign Format Requirement)
+
+堅牢かつシンプルな引数解析を実現するため、値を必要とする `--cderun-` フラグ（例：`--cderun-image`）を指定する場合は、**必ずイコール記号 `=` を使用した書式**（例：`--cderun-image=alpine`）で指定する必要があります。
+
+スペース区切りの書式（例：`--cderun-image alpine`）はホイストの対象とならず、後続の引数（`alpine`）がコンテナコマンドへのパススルー引数として扱われるか、解析エラーとなります。また、`--cderun-tty` などの boolean フラグの後続引数が誤って値として消費されることもありません。
 
 #### ホイスト前後の引数状態の変遷
 
 ```text
 【実行時の入力】
-cderun node app.js --cderun-tty --cderun-image node:20-alpine
+cderun node app.js --cderun-tty --cderun-image=node:20-alpine
 
 【前処理（ホイスト）後】
-cderun --cderun-tty --cderun-image node:20-alpine node app.js
+cderun --cderun-tty --cderun-image=node:20-alpine node app.js
 ```
 
 これにより、Cobra パーサーが実行される時点では、すべての `cderun` 関連フラグが前方に集約され、サブコマンド以降は純粋なパススルー引数のみになります。

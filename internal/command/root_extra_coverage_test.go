@@ -42,14 +42,14 @@ func TestUnit_Root_PreprocessArgs_ExtraCoverage(t *testing.T) {
 			expected: []string{"cderun", "--cderun-image=alpine", "node"},
 		},
 		{
-			name:     "hoisting - P1 flag that is known to take an argument",
-			args:     []string{"cderun", "node", "--cderun-image", "alpine", "app.js"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "app.js"},
+			name:     "hoisting - P1 flag that takes an argument (equals-sign format required)",
+			args:     []string{"cderun", "node", "--cderun-image=alpine", "app.js"},
+			expected: []string{"cderun", "--cderun-image=alpine", "node", "app.js"},
 		},
 		{
-			name:     "hoisting - unknown P1 flag stays as is (one arg)",
-			args:     []string{"cderun", "node", "--cderun-unknown", "val"},
-			expected: []string{"cderun", "--cderun-unknown", "node", "val"},
+			name:     "hoisting - unknown P1 flag stays as is (one arg, value not hoisted)",
+			args:     []string{"cderun", "node", "--cderun-unknown=val"},
+			expected: []string{"cderun", "--cderun-unknown=val", "node"},
 		},
 	}
 

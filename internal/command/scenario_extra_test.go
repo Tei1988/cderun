@@ -33,7 +33,7 @@ func TestUnit_Polyglot_ExtraScenarios(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		err := ExecuteContextWithOptions(ctx, []string{"node", "--cderun-tty", "-v", "--cderun-image", "node:alpine", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, []string{"node", "--cderun-tty", "-v", "--cderun-image=node:alpine", "app.js"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
@@ -110,7 +110,7 @@ func TestUnit_Wrapper_P1Positions(t *testing.T) {
 		},
 		{
 			name: "Multiple P1 flags",
-			args: []string{"cderun", "node", "--cderun-tty", "-v", "--cderun-image", "node:alpine"},
+			args: []string{"cderun", "node", "--cderun-tty", "-v", "--cderun-image=node:alpine"},
 		},
 	}
 

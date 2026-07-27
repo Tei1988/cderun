@@ -1493,19 +1493,6 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 		if shouldHoist {
 			overrides = append(overrides, arg)
-			// Handle flags that take arguments (skip next arg if it's the value)
-			// Note: only --cderun- flags are hoisted here.
-			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
-				name := arg[2:]
-				f := cmd.PersistentFlags().Lookup(name)
-				if f == nil {
-					f = cmd.Flags().Lookup(name)
-				}
-				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
-				}
-			}
 		} else {
 			others = append(others, arg)
 		}
