@@ -1304,6 +1304,15 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+	if rv.res.MountSocket {
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+
+			if ContainsNumericGID(rv.res.GroupAdd) {
+				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
+			}
+		}
+	}
 	return nil
 }
 
@@ -1448,6 +1457,9 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
+		if HasParentTraversal(m.Target) {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
+		}
 	}
 	return nil
 }
@@ -1459,6 +1471,9 @@ func (rv *resolver) validateDeviceSecurity() error {
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
+		}
+		if HasParentTraversal(d.PathInContainer) {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
 		}
 		if d.CgroupPermissions != "" {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {

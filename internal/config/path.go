@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -138,6 +139,11 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	}
 }
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
+	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
+	if HasParentTraversal(mc.Target.Raw) {
+		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", mc.Target.Raw)
+	}
+
 	source := ""
 	if mc.Type == "bind" {
 		s, err := mc.Source.Resolve(r)
@@ -256,6 +262,11 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	}
 }
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
+	// Prevent parent directory references in device destination raw inputs to avoid obfuscation/traversal
+	if HasParentTraversal(dc.Destination.Raw) {
+		return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", dc.Destination.Raw)
+	}
+
 	host, err := dc.Source.Resolve(r)
 	if err != nil {
 		return container.DeviceMapping{}, err
@@ -531,6 +542,31 @@ func findAnchors(s string) []string {
 		res[i] = s[r.start:r.end]
 	}
 	return res
+}
+
+// ContainsNumericGID returns true if any element in the given slice is a completely numeric string.
+func ContainsNumericGID(groups []string) bool {
+	for _, gid := range groups {
+		isNum := len(gid) > 0
+		for i := 0; i < len(gid); i++ {
+			if gid[i] < '0' || gid[i] > '9' {
+				isNum = false
+				break
+			}
+		}
+		if isNum {
+			return true
+		}
+	}
+	return false
+}
+
+// HasParentTraversal checks if a path contains parent directory traversal ("..") segments.
+func HasParentTraversal(s string) bool {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+	return slices.Contains(parts, "..")
 }
 
 // validatePathChars ensures the string does not contain ASCII control characters.
