@@ -364,19 +364,15 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			return nil, err
 		}
 
-		var key, val string
-		if k, v, found := strings.Cut(resolvedE, "="); found {
-			key = k
-			val = v
-			if err := ValidateEnvKey(key); err != nil {
-				return nil, err
-			}
-		} else {
-			v, found := fs.LookupEnv(resolvedE)
+		key, val, hasValue := strings.Cut(resolvedE, "=")
+		if err := ValidateEnvKey(key); err != nil {
+			return nil, fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+		if !hasValue {
+			v, found := fs.LookupEnv(key)
 			if !found && strict {
-				return nil, fmt.Errorf("required environment variable not found: %q", resolvedE)
+				return nil, fmt.Errorf("required environment variable not found: %q", key)
 			}
-			key = resolvedE
 			val = v
 		}
 
