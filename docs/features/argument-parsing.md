@@ -94,7 +94,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 堅牢かつシンプルな引数解析を実現するため、値を必要とする `--cderun-` フラグ（例：`--cderun-image`）を指定する場合は、**必ずイコール記号 `=` を使用した書式**（例：`--cderun-image=alpine`）で指定する必要があります。
 
-スペース区切りの書式（例：`--cderun-image alpine`）はホイストの対象とならず、後続の引数（`alpine`）がコンテナコマンドへのパススルー引数として扱われるか、解析エラーとなります。また、`--cderun-tty` などの boolean フラグの後続引数が誤って値として消費されることもありません。
+値をとる内部オーバーライドフラグ（例：`--cderun-image`）をスペース区切りの書式（例：`--cderun-image alpine`）で指定した場合、前方のフラグが単独でホイストされて下流の解析器が誤動作するのを防ぐため、前処理の段階でエラー（例：`cderun internal override flag "--cderun-image" must use '=' format to specify its value`）として厳格に排除されます。これにより、意図しない引数の消失や誤解析が未然に防止されます。また、`--cderun-tty` などの boolean フラグの後続引数が誤って値として消費されることもありません。
 
 #### ホイスト前後の引数状態の変遷
 

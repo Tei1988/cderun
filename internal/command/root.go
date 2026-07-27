@@ -1492,6 +1492,16 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		shouldHoist := !doubleDashFound && strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
+			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
+				name := arg[2:]
+				f := cmd.PersistentFlags().Lookup(name)
+				if f == nil {
+					f = cmd.Flags().Lookup(name)
+				}
+				if f != nil && f.NoOptDefVal == "" {
+					return nil, fmt.Errorf("cderun internal override flag %q must use '=' format to specify its value", arg)
+				}
+			}
 			overrides = append(overrides, arg)
 		} else {
 			others = append(others, arg)
