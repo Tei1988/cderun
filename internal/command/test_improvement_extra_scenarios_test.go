@@ -193,3 +193,73 @@ func TestUnit_Command_DryRun_EmptySubcommandError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 }
+
+// TestUnit_Command_InvalidConfigValidation validates that invalid configurations (like invalid ports or group-adds)
+// are strictly caught and rejected under ExecuteContextWithOptions command execution.
+func TestUnit_Command_InvalidConfigValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid ports are rejected", func(t *testing.T) {
+		args := []string{"cderun", "--image", "alpine", "--expose", "invalid-port", "sh"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return &runtime.MockRuntime{}, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for expose")
+	})
+
+	t.Run("invalid group-add is rejected", func(t *testing.T) {
+		args := []string{"cderun", "--image", "alpine", "--group-add", "wheel-admin!", "sh"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return &runtime.MockRuntime{}, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for group-add")
+	})
+}
+
+// TestUnit_Command_EnvVarResolution verifies that environment variables containing resolution expressions
+// are fully resolved before being passed to the container creation configuration.
+func TestUnit_Command_EnvVarResolution(t *testing.T) {
+	t.Parallel()
+
+	mockRuntime := &runtime.MockRuntime{}
+	mfs := &config.MockFileSystem{
+		WD: "/my-workspace",
+	}
+
+	args := []string{
+		"cderun",
+		"--image", "alpine",
+		"--env", "WORKSPACE_PATH={{PWD}}",
+		"sh",
+	}
+
+	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mockRuntime, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.fs = mfs
+		o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+
+	require.NoError(t, err)
+	cfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, cfg)
+
+	// Verify that {{PWD}} expression was resolved to the WD of mfs "/my-workspace"
+	assert.Contains(t, cfg.Env, "WORKSPACE_PATH=/my-workspace")
+}

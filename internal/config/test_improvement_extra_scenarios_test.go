@@ -290,3 +290,77 @@ func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Config_ValidateImageRegistryMatch_Table(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		cliImage    string
+		configImage string
+		wantErr     bool
+	}{
+		{"empty CLI image always matches", "", "ubuntu:latest", false},
+		{"empty config image always matches", "ubuntu:latest", "", false},
+		{"exact match", "ubuntu:20.04", "ubuntu:20.04", false},
+		{"same registry different tags", "ubuntu:20.04", "ubuntu:22.04", false},
+		{"same registry with digest vs tag", "ubuntu@sha256:45134f03f11a0519074a867cf3e911a0519074a867cf3e911a0519074a867cf3e911", "ubuntu:latest", false},
+		{"implicit registry library match", "alpine:latest", "docker.io/library/alpine:v1", false},
+		{"explicit library prefix match", "library/alpine:latest", "docker.io/library/alpine:3.18", false},
+		{"custom registry host match", "gcr.io/my-proj/app:v1", "gcr.io/my-proj/app@sha256:72143414341434", false},
+		{"custom registry host mismatch", "ghcr.io/my-proj/app:v1", "gcr.io/my-proj/app:v1", true},
+		{"custom repository mismatch", "gcr.io/my-proj/app:v1", "gcr.io/other-proj/app:v1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateImageRegistryMatch(tt.cliImage, tt.configImage)
+			if tt.wantErr {
+				assert.Error(t, err)
+				var registryErr *RegistryMismatchError
+				assert.ErrorAs(t, err, &registryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_ResolveMounts_Optional(t *testing.T) {
+	t.Parallel()
+
+	t.Run("optional bind mount skipped when source does not exist", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/work",
+			Dirs: map[string]bool{
+				"/work": true,
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		p1 := []string{"type=bind,source=./nonexistent,target=/app,optional=true"}
+		mounts, err := resolveMounts(p1, nil, "sh", nil, nil, r, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, mounts)
+	})
+
+	t.Run("optional bind mount included when source exists", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/work",
+			Dirs: map[string]bool{
+				"/work":            true,
+				"/work/exists-dir": true,
+			},
+		}
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		p1 := []string{"type=bind,source=./exists-dir,target=/app,optional=true"}
+		mounts, err := resolveMounts(p1, nil, "sh", nil, nil, r, mfs)
+		require.NoError(t, err)
+		require.Len(t, mounts, 1)
+		assert.Equal(t, "/work/exists-dir", mounts[0].Source)
+		assert.Equal(t, "/app", mounts[0].Target)
+	})
+}
