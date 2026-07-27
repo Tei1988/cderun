@@ -138,6 +138,13 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	}
 }
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
+	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
+	for _, part := range strings.FieldsFunc(mc.Target.Raw, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", mc.Target.Raw)
+		}
+	}
+
 	source := ""
 	if mc.Type == "bind" {
 		s, err := mc.Source.Resolve(r)
@@ -256,6 +263,13 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	}
 }
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
+	// Prevent parent directory references in device destination raw inputs to avoid obfuscation/traversal
+	for _, part := range strings.FieldsFunc(dc.Destination.Raw, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", dc.Destination.Raw)
+		}
+	}
+
 	host, err := dc.Source.Resolve(r)
 	if err != nil {
 		return container.DeviceMapping{}, err
