@@ -1308,21 +1308,7 @@ func (rv *resolver) validateSecurity() error {
 		if logging.Enabled(logging.WarnLevel) {
 			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
 
-			hasNumericGID := false
-			for _, gid := range rv.res.GroupAdd {
-				isNum := len(gid) > 0
-				for i := 0; i < len(gid); i++ {
-					if gid[i] < '0' || gid[i] > '9' {
-						isNum = false
-						break
-					}
-				}
-				if isNum {
-					hasNumericGID = true
-					break
-				}
-			}
-			if hasNumericGID {
+			if ContainsNumericGID(rv.res.GroupAdd) {
 				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 			}
 		}
@@ -1471,10 +1457,8 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
-		for _, part := range strings.FieldsFunc(m.Target, func(r rune) bool { return r == '/' || r == '\\' }) {
-			if part == ".." {
-				return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
-			}
+		if HasParentTraversal(m.Target) {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
 		}
 	}
 	return nil
@@ -1488,10 +1472,8 @@ func (rv *resolver) validateDeviceSecurity() error {
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
 		}
-		for _, part := range strings.FieldsFunc(d.PathInContainer, func(r rune) bool { return r == '/' || r == '\\' }) {
-			if part == ".." {
-				return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
-			}
+		if HasParentTraversal(d.PathInContainer) {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
 		}
 		if d.CgroupPermissions != "" {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
