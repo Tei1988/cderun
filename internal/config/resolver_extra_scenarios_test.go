@@ -15,11 +15,9 @@ func TestUnit_Config_Resolver_AdvancedDurationResolutionErrors(t *testing.T) {
 
 	mfs := &MockFileSystem{}
 	cli := &CLIOptions{
-		Image:          "alpine",
-		ImageSet:       true,
-		HangTimeout:    "{{file:nonexistent}}",
-		HangTimeoutSet: true,
-	}
+		Image: ptr("alpine"),
+		HangTimeout: ptr("{{file:nonexistent}}"),
+		}
 
 	_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 	require.Error(t, err)
@@ -35,11 +33,9 @@ func TestUnit_Config_Resolver_MemoryQuotingAndParsingBorderCases(t *testing.T) {
 
 	t.Run("valid extremely large memory limit 128TiB", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "128TiB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("128TiB"),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, int64(128*1024*1024*1024*1024), res.Memory)
@@ -47,11 +43,9 @@ func TestUnit_Config_Resolver_MemoryQuotingAndParsingBorderCases(t *testing.T) {
 
 	t.Run("invalid memory format negative value", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "-500MB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("-500MB"),
+			}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
@@ -61,11 +55,9 @@ func TestUnit_Config_Resolver_MemoryQuotingAndParsingBorderCases(t *testing.T) {
 
 	t.Run("invalid memory format unrecognized unit", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "500invalid",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("500invalid"),
+			}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
@@ -75,11 +67,9 @@ func TestUnit_Config_Resolver_MemoryQuotingAndParsingBorderCases(t *testing.T) {
 
 	t.Run("zero memory limit", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "0",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("0"),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), res.Memory)
@@ -155,11 +145,9 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 			Files: map[string][]byte{"/my-podman-dir/docker.sock": {}},
 		}
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			SocketPath:    "/my-podman-dir/docker.sock",
-			SocketPathSet: true,
-		}
+			Image: ptr("alpine"),
+			SocketPath: ptr("/my-podman-dir/docker.sock"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -173,11 +161,9 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 			Files: map[string][]byte{"/my-docker-dir/podman.sock": {}},
 		}
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			SocketPath:    "/my-docker-dir/podman.sock",
-			SocketPathSet: true,
-		}
+			Image: ptr("alpine"),
+			SocketPath: ptr("/my-docker-dir/podman.sock"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -236,9 +222,8 @@ func TestUnit_Config_Resolver_InvalidEnvValues(t *testing.T) {
 				},
 			}
 			cli := &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
-			}
+				Image: ptr("alpine"),
+				}
 
 			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 			require.Error(t, err)
@@ -275,7 +260,7 @@ func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
 	autoDetectedSocketPath = ""
 	autoDetectMu.Unlock()
 
-	cli := &CLIOptions{Image: "alpine", ImageSet: true}
+	cli := &CLIOptions{Image: ptr("alpine"), }
 	res, err := ResolveWithFS("sh", cli, nil, nil, RealFileSystem{})
 	require.NoError(t, err)
 

@@ -153,11 +153,9 @@ func TestUnit_Config_Resolver_WrapperMode_Precedence(t *testing.T) {
 	// 1. P1 overrides takes precedence over everything
 	t.Run("P1 takes absolute priority", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine:cli",
-			ImageSet:       true,
-			CderunImage:    "alpine:override",
-			CderunImageSet: true,
-		}
+			Image: ptr("alpine:cli"),
+			CderunImage: ptr("alpine:override"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -167,9 +165,8 @@ func TestUnit_Config_Resolver_WrapperMode_Precedence(t *testing.T) {
 	// 2. P2 (CLI) takes precedence over P3 (Env), P4 (Tool), P5 (Global), P6 (Default)
 	t.Run("P2 takes priority over P3 and lower", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "node:cli",
-			ImageSet: true,
-		}
+			Image: ptr("node:cli"),
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Image: "node:tool",
@@ -235,11 +232,9 @@ func TestUnit_Config_Resolver_NegativeMemoryParserBorderCases(t *testing.T) {
 	t.Run("extremely large valid memory limit 1024TiB", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "1024TiB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("1024TiB"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -249,11 +244,9 @@ func TestUnit_Config_Resolver_NegativeMemoryParserBorderCases(t *testing.T) {
 	t.Run("malformed memory values", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "abcG",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("abcG"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
