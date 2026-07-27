@@ -1520,12 +1520,12 @@ func TestUnit_Signals_Unix_AllSignals(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
 	assert.Equal(t, "SIGTERM", getSignalName(syscall.SIGTERM))
+	assert.Equal(t, "SIGHUP", getSignalName(syscall.SIGHUP))
+	assert.Equal(t, "SIGQUIT", getSignalName(syscall.SIGQUIT))
 
 	// Just ensure they are consistent with what syscall returns on this platform
 	killName := syscall.SIGKILL.String()
-	quitName := syscall.SIGQUIT.String()
 	assert.Equal(t, killName, getSignalName(syscall.SIGKILL))
-	assert.Equal(t, quitName, getSignalName(syscall.SIGQUIT))
 }
 
 func TestUnit_RunCderunCore_PreprocessError(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -789,6 +790,89 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 	}
 }
 
+type executionState struct {
+	mu               sync.Mutex
+	rt               runtime.ContainerRuntime
+	containerID      string
+	startupBegun     bool
+	containerRunning bool
+	firstSignal      bool
+	deferredSignals  []string
+}
+
+func newExecutionState() *executionState {
+	return &executionState{
+		firstSignal: true,
+	}
+}
+
+func (s *executionState) SetRuntimeAndID(rt runtime.ContainerRuntime, containerID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rt = rt
+	s.containerID = containerID
+}
+
+func (s *executionState) GetRuntime() runtime.ContainerRuntime {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rt
+}
+
+func (s *executionState) GetContainerID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.containerID
+}
+
+func (s *executionState) MarkStartupBegun() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startupBegun = true
+}
+
+func (s *executionState) MarkRunning() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.containerRunning = true
+	deferred := s.deferredSignals
+	s.deferredSignals = nil
+	return deferred
+}
+
+func (s *executionState) CloseRuntime(logger *logging.Logger) {
+	s.mu.Lock()
+	activeRt := s.rt
+	s.mu.Unlock()
+	if activeRt != nil {
+		if closeErr := activeRt.Close(); closeErr != nil {
+			logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}
+}
+
+func (s *executionState) HandleSignal(sigName string) (cancelCtx bool, forwardImmediate bool, activeRt runtime.ContainerRuntime, activeID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// If startup has not begun yet, this is true pre-start.
+	if !s.startupBegun {
+		return true, false, nil, ""
+	}
+
+	// Startup has begun (StartContainer in flight or already completed)
+	if s.firstSignal {
+		s.firstSignal = false
+		if s.containerRunning {
+			return false, true, s.rt, s.containerID
+		}
+		s.deferredSignals = append(s.deferredSignals, sigName)
+		return false, true, s.rt, s.containerID
+	}
+
+	return true, false, nil, ""
+}
+
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
@@ -806,18 +890,48 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	rt, containerID, cleanup, err := o.initContainer(ctx, resolved, containerConfig)
-	if err != nil {
-		return 0, &ExitCodeError{Code: 125, Err: err}
-	}
-	defer func() {
-		if rt != nil {
-			if closeErr := rt.Close(); closeErr != nil {
-				o.logger.Debug("failed to close runtime: %v", closeErr)
+	// Start signal handler early with a buffer of 4 to prevent dropping rapid signals.
+	sigChan := make(chan os.Signal, 4)
+	o.setupSignals(sigChan)
+	defer o.stopSignalHandling(sigChan)
+
+	state := newExecutionState()
+
+	go func() {
+		for {
+			select {
+			case sig := <-sigChan:
+				sigName := getSignalName(sig)
+				cancelCtx, forwardImmediate, activeRt, activeID := state.HandleSignal(sigName)
+
+				if cancelCtx {
+					o.logger.Debug("Cancelling execution on signal %v (%s)", sig, sigName)
+					cancel()
+					return
+				}
+
+				if forwardImmediate && activeRt != nil {
+					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
+					if err := activeRt.SignalContainer(ctx, activeID, sigName); err != nil {
+						o.logger.Warn("failed to forward signal %v: %v", sig, err)
+					} else {
+						o.logger.Debug("Successfully forwarded signal %v to container %s", sig, activeID)
+					}
+				}
+			case <-ctxG.Done():
+				return
 			}
 		}
 	}()
+
+	rt, containerID, cleanup, err := o.initContainer(ctxG, resolved, containerConfig)
+	if err != nil {
+		return 0, &ExitCodeError{Code: 125, Err: err}
+	}
+	defer state.CloseRuntime(o.logger)
 	defer cleanup()
+
+	state.SetRuntimeAndID(rt, containerID)
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
@@ -828,25 +942,39 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	restoreTerminal := o.setupTerminal(stdinFd, isHostStdinTerminal, containerConfig)
 	defer restoreTerminal()
 
-	stopSignals := o.startSignalForwarder(ctxG, cancel, rt, containerID)
-	defer stopSignals()
-
-	att, err := o.attachContainer(ctxG, cmd, rt, containerID, containerConfig)
+	att, err := o.attachContainer(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	if err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: err}
 	}
 	defer att.cancelAttach()
 
-	o.logger.Trace("Starting container: %s", containerID)
-	if err := rt.StartContainer(ctx, containerID); err != nil {
+	// Verify if the execution context has been cancelled before starting the container
+	if err := ctxG.Err(); err != nil {
+		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("cancelled before starting container: %w", err)}
+	}
+
+	// Mark startup as begun so signals received during StartContainer startup phase are forwarded or deferred instead of cancelling.
+	state.MarkStartupBegun()
+
+	o.logger.Trace("Starting container: %s", state.GetContainerID())
+	if err := state.GetRuntime().StartContainer(ctxG, state.GetContainerID()); err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to start container: %w", err)}
 	}
 	close(att.startSignal) // Signal stdin to start reading
 
-	stopResize := o.startResizeHandler(ctxG, cmd, rt, containerID, containerConfig)
+	// Mark as running and forward any signals that were received during StartContainer startup phase.
+	deferredSigs := state.MarkRunning()
+	for _, sigName := range deferredSigs {
+		o.logger.Debug("Forwarding deferred startup signal %s to container %s", sigName, state.GetContainerID())
+		if err := state.GetRuntime().SignalContainer(ctx, state.GetContainerID(), sigName); err != nil {
+			o.logger.Warn("failed to forward deferred signal %s: %v", sigName, err)
+		}
+	}
+
+	stopResize := o.startResizeHandler(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	defer stopResize()
 
-	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
+	return o.waitForCompletion(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig, resolved, isHostStdinTerminal, att)
 }
 
 func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *container.ContainerConfig) {
@@ -942,36 +1070,6 @@ func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *c
 		}
 	}
 	return func() {}
-}
-
-func (o *rootOptions) startSignalForwarder(ctx context.Context, cancel context.CancelFunc, rt runtime.ContainerRuntime, containerID string) func() {
-	sigChan := make(chan os.Signal, 1)
-	o.setupSignals(sigChan)
-	go func() {
-		firstSignal := true
-		for {
-			select {
-			case sig := <-sigChan:
-				if firstSignal {
-					sigName := getSignalName(sig)
-					o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
-					if err := rt.SignalContainer(ctx, containerID, sigName); err != nil {
-						o.logger.Warn("failed to forward signal %v: %v", sig, err)
-					} else {
-						o.logger.Debug("Successfully forwarded signal %v to container", sig)
-					}
-					firstSignal = false
-				} else {
-					o.logger.Info("Received second signal, terminating...")
-					cancel()
-					return
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return func() { o.stopSignalHandling(sigChan) }
 }
 
 func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) (*attachResult, error) {

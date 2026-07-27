@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"sync"
 	"syscall"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cderun/internal/config"
+	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
 )
@@ -441,4 +443,520 @@ func TestScenario_Command_MissingSubcommandDryRunFailure(t *testing.T) {
 	// Assertion:
 	// - Must return an error regarding missing image or subcommand
 	require.Error(t, err)
+}
+
+type signalAbortMockRuntime struct {
+	runtime.MockRuntime
+	PullChan      chan struct{}
+	PullBlocked   chan struct{}
+	CreateChan    chan struct{}
+	CreateBlocked chan struct{}
+	StartChan     chan struct{}
+	StartBlocked  chan struct{}
+
+	PullImageCalled       bool
+	CreateContainerCalled bool
+	StartContainerCalled  bool
+	RemoveContainerCalled bool
+
+	signals []string
+
+	mu sync.Mutex
+}
+
+func (m *signalAbortMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
+	m.signals = append(m.signals, sig)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *signalAbortMockRuntime) getSignals() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sigs := make([]string, len(m.signals))
+	copy(sigs, m.signals)
+	return sigs
+}
+
+func (m *signalAbortMockRuntime) PullImage(ctx context.Context, image string, policy string, maxRetries int, backoff time.Duration) error {
+	m.mu.Lock()
+	m.PullImageCalled = true
+	m.mu.Unlock()
+	if m.PullBlocked != nil {
+		m.PullBlocked <- struct{}{}
+	}
+	if m.PullChan != nil {
+		select {
+		case <-m.PullChan:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+func (m *signalAbortMockRuntime) CreateContainer(ctx context.Context, cc *container.ContainerConfig) (string, error) {
+	m.mu.Lock()
+	m.CreateContainerCalled = true
+	m.mu.Unlock()
+	if m.CreateBlocked != nil {
+		m.CreateBlocked <- struct{}{}
+	}
+	if m.CreateChan != nil {
+		select {
+		case <-m.CreateChan:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	return "test-abort-id", nil
+}
+
+func (m *signalAbortMockRuntime) StartContainer(ctx context.Context, id string) error {
+	m.mu.Lock()
+	m.StartContainerCalled = true
+	m.mu.Unlock()
+	if m.StartBlocked != nil {
+		m.StartBlocked <- struct{}{}
+	}
+	if m.StartChan != nil {
+		select {
+		case <-m.StartChan:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+func (m *signalAbortMockRuntime) RemoveContainer(ctx context.Context, id string) error {
+	m.mu.Lock()
+	m.RemoveContainerCalled = true
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *signalAbortMockRuntime) isPullImageCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.PullImageCalled
+}
+
+func (m *signalAbortMockRuntime) isCreateContainerCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.CreateContainerCalled
+}
+
+func (m *signalAbortMockRuntime) isStartContainerCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.StartContainerCalled
+}
+
+func (m *signalAbortMockRuntime) isRemoveContainerCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.RemoveContainerCalled
+}
+
+func TestScenario_Command_EarlySignalHandlingAndGaps(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Signal received during PullImage cancels execution without container creation", func(t *testing.T) {
+		t.Parallel()
+		pullChan := make(chan struct{})
+		pullBlocked := make(chan struct{}, 1)
+		mock := &signalAbortMockRuntime{
+			PullChan:    pullChan,
+			PullBlocked: pullBlocked,
+		}
+
+		var capturedSigChan chan os.Signal
+		var sigChanMu sync.Mutex
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var execErr error
+		done := make(chan struct{})
+		go func() {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return false }
+				o.setupSignals = func(sigChan chan os.Signal) {
+					sigChanMu.Lock()
+					capturedSigChan = sigChan
+					sigChanMu.Unlock()
+				}
+				o.stopSignalHandling = func(sigChan chan os.Signal) {}
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
+			})
+			close(done)
+		}()
+
+		// Wait until execution is blocked in PullImage
+		select {
+		case <-pullBlocked:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Execution did not reach PullImage")
+		}
+
+		// Verify signal channel is captured
+		assert.Eventually(t, func() bool {
+			sigChanMu.Lock()
+			defer sigChanMu.Unlock()
+			return capturedSigChan != nil
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Send simulated SIGINT
+		sigChanMu.Lock()
+		capturedSigChan <- syscall.SIGINT
+		sigChanMu.Unlock()
+
+		// Wait for execution to finish
+		<-done
+
+		require.Error(t, execErr)
+		require.ErrorIs(t, execErr, context.Canceled)
+		assert.True(t, mock.isPullImageCalled())
+		assert.False(t, mock.isCreateContainerCalled())
+		assert.False(t, mock.isRemoveContainerCalled())
+	})
+
+	t.Run("Signal received during CreateContainer cancels execution without starting", func(t *testing.T) {
+		t.Parallel()
+		createChan := make(chan struct{})
+		createBlocked := make(chan struct{}, 1)
+		mock := &signalAbortMockRuntime{
+			CreateChan:    createChan,
+			CreateBlocked: createBlocked,
+		}
+
+		var capturedSigChan chan os.Signal
+		var sigChanMu sync.Mutex
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var execErr error
+		done := make(chan struct{})
+		go func() {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return false }
+				o.setupSignals = func(sigChan chan os.Signal) {
+					sigChanMu.Lock()
+					capturedSigChan = sigChan
+					sigChanMu.Unlock()
+				}
+				o.stopSignalHandling = func(sigChan chan os.Signal) {}
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
+			})
+			close(done)
+		}()
+
+		// Wait until execution is blocked in CreateContainer
+		select {
+		case <-createBlocked:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Execution did not reach CreateContainer")
+		}
+
+		// Verify signal channel is captured
+		assert.Eventually(t, func() bool {
+			sigChanMu.Lock()
+			defer sigChanMu.Unlock()
+			return capturedSigChan != nil
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Send simulated SIGINT
+		sigChanMu.Lock()
+		capturedSigChan <- syscall.SIGINT
+		sigChanMu.Unlock()
+
+		// Wait for execution to finish
+		<-done
+
+		require.Error(t, execErr)
+		require.ErrorIs(t, execErr, context.Canceled)
+		assert.True(t, mock.isPullImageCalled())
+		assert.True(t, mock.isCreateContainerCalled())
+		assert.False(t, mock.isStartContainerCalled())
+		// Since CreateContainer aborted/failed to complete normally, container was not created successfully
+		assert.False(t, mock.isRemoveContainerCalled())
+	})
+
+	t.Run("Signal received after CreateContainer but before StartContainer halts starting and cleans up", func(t *testing.T) {
+		t.Parallel()
+		attachBlocked := make(chan struct{}, 1)
+		mock := &signalAbortMockRuntime{}
+		mock.CreatedContainerID = "test-halt-cleanup"
+		mock.AttachFunc = func(ctx context.Context, id string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+			attachBlocked <- struct{}{}
+			// Block until ctx (which is attachCtx/ctxG) is cancelled by the signal
+			<-ctx.Done()
+			return ctx.Err()
+		}
+
+		var capturedSigChan chan os.Signal
+		var sigChanMu sync.Mutex
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var execErr error
+		done := make(chan struct{})
+		go func() {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return false }
+				o.setupSignals = func(sigChan chan os.Signal) {
+					sigChanMu.Lock()
+					capturedSigChan = sigChan
+					sigChanMu.Unlock()
+				}
+				o.stopSignalHandling = func(sigChan chan os.Signal) {}
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
+			})
+			close(done)
+		}()
+
+		// Wait until execution is blocked inside AttachContainer
+		select {
+		case <-attachBlocked:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Execution did not reach AttachContainer")
+		}
+
+		// Verify signal channel is captured
+		assert.Eventually(t, func() bool {
+			sigChanMu.Lock()
+			defer sigChanMu.Unlock()
+			return capturedSigChan != nil
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Send simulated SIGINT
+		sigChanMu.Lock()
+		capturedSigChan <- syscall.SIGINT
+		sigChanMu.Unlock()
+
+		// Wait for execution to finish
+		<-done
+
+		require.Error(t, execErr)
+		require.ErrorIs(t, execErr, context.Canceled)
+		assert.True(t, mock.isPullImageCalled())
+		assert.True(t, mock.isCreateContainerCalled())
+		assert.False(t, mock.isStartContainerCalled())
+		assert.True(t, mock.isRemoveContainerCalled())
+	})
+
+	t.Run("Signal received during StartContainer is deferred and forwarded after startup completes", func(t *testing.T) {
+		t.Parallel()
+		startBlocked := make(chan struct{}, 1)
+		startChan := make(chan struct{})
+		mock := &signalAbortMockRuntime{
+			StartBlocked: startBlocked,
+			StartChan:    startChan,
+		}
+		mock.CreatedContainerID = "test-inflight-forward"
+
+		var capturedSigChan chan os.Signal
+		var sigChanMu sync.Mutex
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var execErr error
+		done := make(chan struct{})
+		go func() {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+					return mock, nil
+				}
+				o.exitFunc = func(code int) {}
+				o.isTerminal = func(fd int) bool { return false }
+				o.setupSignals = func(sigChan chan os.Signal) {
+					sigChanMu.Lock()
+					capturedSigChan = sigChan
+					sigChanMu.Unlock()
+				}
+				o.stopSignalHandling = func(sigChan chan os.Signal) {}
+				cmd.SetOut(io.Discard)
+				cmd.SetErr(io.Discard)
+			})
+			close(done)
+		}()
+
+		// Wait until execution is blocked inside StartContainer
+		select {
+		case <-startBlocked:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Execution did not reach StartContainer")
+		}
+
+		// Verify signal channel is captured
+		assert.Eventually(t, func() bool {
+			sigChanMu.Lock()
+			defer sigChanMu.Unlock()
+			return capturedSigChan != nil
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Send simulated SIGINT during StartContainer startup phase
+		sigChanMu.Lock()
+		capturedSigChan <- syscall.SIGINT
+		sigChanMu.Unlock()
+
+		// Wait deterministically for the signal to be processed and deferred/recorded by the mock
+		assert.Eventually(t, func() bool {
+			return slices.Contains(mock.getSignals(), "SIGINT")
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// Unblock StartContainer so startup completes
+		close(startChan)
+
+		// Wait for execution to finish
+		<-done
+
+		// Since StartContainer was in-flight, the signal was deferred and forwarded rather than cancelling,
+		// so execute should have run successfully and returned nil (assuming mock WaitContainer returned 0).
+		require.NoError(t, execErr)
+		assert.True(t, mock.isStartContainerCalled())
+	})
+
+	t.Run("Forward SIGHUP and SIGQUIT successfully to container", func(t *testing.T) {
+		t.Parallel()
+
+		// 1. SIGHUP Verification
+		t.Run("SIGHUP", func(t *testing.T) {
+			waitChan := make(chan int)
+			mock := &signalCapturingMockRuntime{
+				waitChan: waitChan,
+			}
+			mock.CreatedContainerID = "sighup-test"
+
+			var capturedSigChan chan os.Signal
+			var sigChanMu sync.Mutex
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			var execErr error
+			done := make(chan struct{})
+			go func() {
+				execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+						return mock, nil
+					}
+					o.exitFunc = func(code int) {}
+					o.isTerminal = func(fd int) bool { return false }
+					o.setupSignals = func(sigChan chan os.Signal) {
+						sigChanMu.Lock()
+						capturedSigChan = sigChan
+						sigChanMu.Unlock()
+					}
+					o.stopSignalHandling = func(sigChan chan os.Signal) {}
+					cmd.SetOut(io.Discard)
+					cmd.SetErr(io.Discard)
+				})
+				close(done)
+			}()
+
+			assert.Eventually(t, func() bool {
+				sigChanMu.Lock()
+				defer sigChanMu.Unlock()
+				return capturedSigChan != nil
+			}, 2*time.Second, 10*time.Millisecond)
+
+			// Send simulated SIGHUP
+			sigChanMu.Lock()
+			capturedSigChan <- syscall.SIGHUP
+			sigChanMu.Unlock()
+
+			// Verify SIGHUP was forwarded
+			assert.Eventually(t, func() bool {
+				return slices.Contains(mock.getSignals(), "SIGHUP")
+			}, 2*time.Second, 10*time.Millisecond)
+
+			assert.Contains(t, mock.getSignals(), "SIGHUP")
+
+			// End execution
+			waitChan <- 0
+			<-done
+			require.NoError(t, execErr)
+		})
+
+		// 2. SIGQUIT Verification
+		t.Run("SIGQUIT", func(t *testing.T) {
+			waitChan := make(chan int)
+			mock := &signalCapturingMockRuntime{
+				waitChan: waitChan,
+			}
+			mock.CreatedContainerID = "sigquit-test"
+
+			var capturedSigChan chan os.Signal
+			var sigChanMu sync.Mutex
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			var execErr error
+			done := make(chan struct{})
+			go func() {
+				execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+					o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+						return mock, nil
+					}
+					o.exitFunc = func(code int) {}
+					o.isTerminal = func(fd int) bool { return false }
+					o.setupSignals = func(sigChan chan os.Signal) {
+						sigChanMu.Lock()
+						capturedSigChan = sigChan
+						sigChanMu.Unlock()
+					}
+					o.stopSignalHandling = func(sigChan chan os.Signal) {}
+					cmd.SetOut(io.Discard)
+					cmd.SetErr(io.Discard)
+				})
+				close(done)
+			}()
+
+			assert.Eventually(t, func() bool {
+				sigChanMu.Lock()
+				defer sigChanMu.Unlock()
+				return capturedSigChan != nil
+			}, 2*time.Second, 10*time.Millisecond)
+
+			// Send simulated SIGQUIT
+			sigChanMu.Lock()
+			capturedSigChan <- syscall.SIGQUIT
+			sigChanMu.Unlock()
+
+			// Verify SIGQUIT was forwarded
+			assert.Eventually(t, func() bool {
+				return slices.Contains(mock.getSignals(), "SIGQUIT")
+			}, 2*time.Second, 10*time.Millisecond)
+
+			assert.Contains(t, mock.getSignals(), "SIGQUIT")
+
+			// End execution
+			waitChan <- 0
+			<-done
+			require.NoError(t, execErr)
+		})
+	})
 }
