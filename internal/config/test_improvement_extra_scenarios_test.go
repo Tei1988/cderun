@@ -283,3 +283,82 @@ func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Config_ValidateWorkdir_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// docs/features/security-validations.md or ValidateWorkdir tests
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"empty string", "", false},
+		{"valid simple absolute path", "/app", false},
+		{"valid nested path", "/var/log/app_name-123.tmp", false},
+		{"invalid relative path without slash", "app", true},
+		{"invalid trailing dot dot", "/app/..", true},
+		{"invalid nested dot dot", "/app/../bin", true},
+		{"invalid illegal characters", "/app$bin", true},
+		{"invalid backslashes", "/app\\bin", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWorkdir(tt.path)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidatePort mapping anomalies", func(t *testing.T) {
+		// Valid ports
+		assert.NoError(t, ValidatePort("8080"))
+		assert.NoError(t, ValidatePort("80:80"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80:80"))
+		assert.NoError(t, ValidatePort("80/tcp"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80:80/udp"))
+
+		// Invalid protocols
+		require.Error(t, ValidatePort("80/http"))
+		// Port out of range
+		require.Error(t, ValidatePort("70000"))
+		// Invalid formats
+		require.Error(t, ValidatePort("127.0.0.1:80:80:80"))
+	})
+
+	t.Run("ValidateGroupAdd anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateGroupAdd(""))
+		assert.NoError(t, ValidateGroupAdd("sudo"))
+		assert.NoError(t, ValidateGroupAdd("1000"))
+		assert.NoError(t, ValidateGroupAdd("admin-group"))
+
+		// Invalid group-adds
+		require.Error(t, ValidateGroupAdd("-group"))
+		require.Error(t, ValidateGroupAdd("group$name"))
+		require.Error(t, ValidateGroupAdd("group name"))
+	})
+
+	t.Run("ValidateToolName constraints", func(t *testing.T) {
+		assert.NoError(t, ValidateToolName("python"))
+		assert.NoError(t, ValidateToolName("node-js"))
+		assert.NoError(t, ValidateToolName("v1.2"))
+
+		// Rejects empty, dot, dot-dot
+		require.Error(t, ValidateToolName(""))
+		require.Error(t, ValidateToolName("."))
+		require.Error(t, ValidateToolName(".."))
+		// Rejects absolute path and directories
+		require.Error(t, ValidateToolName("/usr/bin/python"))
+		require.Error(t, ValidateToolName("tools/python"))
+		// Rejects unicode or special chars
+		require.Error(t, ValidateToolName("pythön"))
+	})
+}
