@@ -24,8 +24,8 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | DONE |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | DONE |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | - |
-| T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | - |
-| T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | - |
+| T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
+| T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
@@ -243,51 +243,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - containerd + `--network` / `--publish` がコンテナ作成前にエラーになる
 - エラーメッセージに「どのランタイムが何を未対応か」が含まれる
-
----
-
-## T18: `ci.yaml` のアクションをコミットハッシュ固定
-
-- 種別: CI / セキュリティ
-- 対象: `.github/workflows/ci.yaml`
-
-### 問題
-
-`release.yaml` ではコミットハッシュ固定済みだが、`ci.yaml` はタグ指定のまま（`actions/checkout@v4`, `actions/setup-go@v5` 等）。タグは書き換え可能なためサプライチェーン攻撃のリスクがある。
-
-### 方針
-
-`pinact` で自動置換する（**LLM による手書き置換は幻覚のリスクがあるため不可**）。
-
-```bash
-pinact run .github/workflows/ci.yaml
-```
-
-`pinact run` は引数なしで `.github/workflows/` 全体を処理できる。`pinact run -u` でピン済みハッシュの更新も可能なので、定期的なメンテにも使える。
-
-### 完了条件
-
-- `ci.yaml` の全アクションがコミットハッシュ + バージョンコメント形式になっている
-- ハッシュは pinact の出力そのまま（手書き改変なし）
-
----
-
-## T19: CI の Go バージョン指定を `go.mod` に一本化
-
-- 種別: CI / メンテナンス性
-- 対象: `.github/workflows/ci.yaml`
-
-### 問題
-
-`ci.yaml` は `go-version: '1.25.0'` とハードコードされているが、`release.yaml` は `go-version-file: go.mod` を使っている。方針を統一し `ci.yaml` も `go-version-file: go.mod` にする。
-
-### 補足（検証済み）
-
-`go.mod` の go directive は `go 1.25.0` であり、ci.yaml のハードコードは現状 go.mod と一致している。したがってこの変更は挙動を変えず「バージョン管理箇所を go.mod に一本化する」だけの安全な変更。最新（1.26.x）へ上げたい場合は go.mod 側を更新すれば CI も追従する形になる。
-
-### 完了条件
-
-- `ci.yaml` の全ジョブが `go-version-file: go.mod` を使用し、CI がグリーン
 
 ---
 
