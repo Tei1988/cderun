@@ -117,8 +117,25 @@ func NewExpressionResolverWithFS(hostCtx *HostContext, fs FileSystem) (*Expressi
 	}, nil
 }
 
+func (r *ExpressionResolver) GetHome() string {
+	if r == nil {
+		return ""
+	}
+	return r.Home
+}
+
+func (r *ExpressionResolver) GetPwd() string {
+	if r == nil {
+		return ""
+	}
+	return r.Pwd
+}
+
 // Error returns the first error encountered during expression resolution.
 func (r *ExpressionResolver) Error() error {
+	if r == nil {
+		return nil
+	}
 	return r.err
 }
 
@@ -126,6 +143,9 @@ func (r *ExpressionResolver) Error() error {
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
+	if r == nil {
+		return nil
+	}
 	r.ensureShared()
 	res := &ExpressionResolver{
 		fs:          r.fs,
@@ -221,11 +241,17 @@ func (r *ExpressionResolver) Resolve(v any) any {
 
 // ResolveString resolves expressions and tilde expansion in a string.
 func (r *ExpressionResolver) ResolveString(s string) (string, error) {
+	if r == nil {
+		return s, nil
+	}
 	res := r.resolveString(s)
 	return res, r.err
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
+	if r == nil {
+		return s
+	}
 	if r.err != nil || s == "" {
 		return s
 	}

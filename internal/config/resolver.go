@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -343,6 +344,28 @@ type resolver struct {
 	resVal     reflect.Value
 }
 
+func (rv *resolver) getR() (*ExpressionResolver, error) {
+	if rv.r == nil {
+		var hostCtx *HostContext
+		if rv.global != nil {
+			hostCtx = rv.global.HostContext
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, rv.fs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+		}
+		rv.r = r
+	}
+	return rv.r, nil
+}
+
+func (rv *resolver) getRForString(s string) (*ExpressionResolver, error) {
+	if strings.Contains(s, "{{") || strings.HasPrefix(s, "~") || (rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0) {
+		return rv.getR()
+	}
+	return rv.r, nil
+}
+
 func (rv *resolver) getCliVal() reflect.Value {
 	if !rv.cliVal.IsValid() {
 		rv.cliVal = reflect.ValueOf(rv.cli).Elem()
@@ -402,6 +425,42 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		subcommand = rv.subcommand
 	}
 
+	rawVal := ""
+	if p1Set {
+		rawVal = p1Val.String()
+	} else if p2Set {
+		rawVal = p2Val.String()
+	} else if envKey != "" {
+		rawVal = rv.fs.Getenv(envKey)
+	}
+	if rawVal == "" && tGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			rawVal = tGetter(tool).Raw
+		}
+	}
+	if rawVal == "" && gGetter != nil && rv.global != nil {
+		rawVal = gGetter(*rv.global).Raw
+	}
+	if rawVal == "" {
+		rawVal = fallback
+	}
+
+	if rawVal == "" {
+		return "", nil
+	}
+
+	// Initialize r only if we need it (expressions, tilde, or relative paths)
+	var r *ExpressionResolver
+	isNested := rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0
+	hasExpr := strings.Contains(rawVal, "{{") || strings.HasPrefix(rawVal, "~")
+	isRelative := rawVal != "" && !filepath.IsAbs(rawVal)
+	if isNested || hasExpr || isRelative {
+		r, err = rv.getR()
+		if err != nil {
+			return "", err
+		}
+	}
+
 	return resolveConfigPath(
 		p1Set, p1Val.String(),
 		p2Set, p2Val.String(),
@@ -409,7 +468,7 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
 		fallback,
-		rv.r,
+		r,
 		"path",
 		rv.fs,
 	)
@@ -424,13 +483,55 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
 	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
 
+	// Determine winning raw values
+	var vals []string
+	if p1v != nil {
+		vals = p1v
+	} else if p2v != nil {
+		vals = p2v
+	} else if opt.EnvKey != "" {
+		if env, ok := rv.fs.LookupEnv(opt.EnvKey); ok {
+			for s := range strings.SplitSeq(env, ",") {
+				vals = append(vals, strings.TrimSpace(s))
+			}
+		}
+	}
+	if vals == nil && opt.ToolGetter != nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			vals = opt.ToolGetter(tool)
+		}
+	}
+	if vals == nil && opt.GlobalGetter != nil && rv.global != nil {
+		vals = opt.GlobalGetter(*rv.global)
+	}
+
+	// Check if any of the winning values has expression/tilde
+	needsR := false
+	for _, v := range vals {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+			needsR = true
+			break
+		}
+	}
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needsR = true
+	}
+
+	var r *ExpressionResolver
+	if needsR {
+		r, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 	rv.getResVal().Field(info.targetIdx).Set(reflect.ValueOf(resolved))
 	return nil
 }
@@ -482,6 +583,39 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		fastPathUsed = true
 	}
 
+	if !fastPathUsed {
+		s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
+		s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
+		p1Set, p2Set = s1, s2
+		p1Val, p2Val = p1v.String(), p2v.String()
+	}
+
+	// Determine winning raw value to lazily instantiate r
+	rawVal := ""
+	if p1Set {
+		rawVal = p1Val
+	} else if p2Set {
+		rawVal = p2Val
+	} else if opt.EnvKey != "" {
+		rawVal = rv.fs.Getenv(opt.EnvKey)
+	}
+	if rawVal == "" && opt.ToolGetter != nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			rawVal = opt.ToolGetter(tool)
+		}
+	}
+	if rawVal == "" && opt.GlobalGetter != nil && rv.global != nil {
+		rawVal = opt.GlobalGetter(*rv.global)
+	}
+	if rawVal == "" {
+		rawVal = opt.Default
+	}
+
+	r, err := rv.getRForString(rawVal)
+	if err != nil {
+		return err
+	}
+
 	if fastPathUsed {
 		def := OptionDef[string]{
 			EnvKey:       opt.EnvKey,
@@ -489,7 +623,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 		switch opt.Name {
 		case "image":
 			rv.res.Image = resolved
@@ -517,11 +651,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
-	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
-	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 	rv.getResVal().Field(info.targetIdx).SetString(resolved)
 	return nil
 }
@@ -760,9 +891,37 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if err := rv.r.Error(); err != nil {
+	// Determine winning raw value to lazily instantiate r
+	rawVal := ""
+	if p1Set {
+		rawVal = p1Val
+	} else if p2Set {
+		rawVal = p2Val
+	} else if opt.EnvKey != "" {
+		rawVal = rv.fs.Getenv(opt.EnvKey)
+	}
+	if rawVal == "" && opt.ToolGetter != nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			rawVal = opt.ToolGetter(tool)
+		}
+	}
+	if rawVal == "" && opt.GlobalGetter != nil && rv.global != nil {
+		rawVal = opt.GlobalGetter(*rv.global)
+	}
+	if rawVal == "" {
+		rawVal = opt.Default
+	}
+
+	r, err := rv.getRForString(rawVal)
+	if err != nil {
 		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, r, rv.fs)
+	if r != nil {
+		if err := r.Error(); err != nil {
+			return err
+		}
 	}
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
@@ -801,12 +960,40 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	// Determine winning raw value to lazily instantiate r
+	rawVal := ""
+	if p1Set {
+		rawVal = p1Val
+	} else if p2Set {
+		rawVal = p2Val
+	} else if opt.EnvKey != "" {
+		rawVal = rv.fs.Getenv(opt.EnvKey)
+	}
+	if rawVal == "" && opt.ToolGetter != nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			rawVal = opt.ToolGetter(tool)
+		}
+	}
+	if rawVal == "" && opt.GlobalGetter != nil && rv.global != nil {
+		rawVal = opt.GlobalGetter(*rv.global)
+	}
+	if rawVal == "" {
+		rawVal = opt.Default
+	}
+
+	r, err := rv.getRForString(rawVal)
+	if err != nil {
+		return err
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 	if valStr != "" {
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
-			if exprErr := rv.r.Error(); exprErr != nil {
-				return exprErr
+			if r != nil {
+				if exprErr := r.Error(); exprErr != nil {
+					return exprErr
+				}
 			}
 			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
 		}
@@ -829,14 +1016,12 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		logging.Trace("Resolving configurations for tool: %s", subcommand)
 	}
 
-	var hostCtx *HostContext
-	if global != nil {
-		hostCtx = global.HostContext
+	// For compatibility and error-propagation testing, check directory access immediately
+	if _, err := fs.UserHomeDir(); err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-
-	r, err := NewExpressionResolverWithFS(hostCtx, fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+	if _, err := fs.Getwd(); err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	fieldOnce.Do(initFieldInfo)
@@ -848,7 +1033,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		tools:      tools,
 		global:     global,
 		fs:         fs,
-		r:          r,
 		res:        res,
 	}
 
@@ -909,13 +1093,47 @@ func (rv *resolver) resolveEarly() error {
 			return fmt.Errorf("registry mismatch: early string slice option %q not found", "sensitive-env")
 		}
 
+		// Determine winning raw values for sensitive-env
+		var vals []string
+		if rv.cli.CderunSensitiveEnv != nil {
+			vals = rv.cli.CderunSensitiveEnv
+		} else if rv.cli.SensitiveEnv != nil {
+			vals = rv.cli.SensitiveEnv
+		} else if opt.EnvKey != "" {
+			if env, ok := rv.fs.LookupEnv(opt.EnvKey); ok {
+				for s := range strings.SplitSeq(env, ",") {
+					vals = append(vals, strings.TrimSpace(s))
+				}
+			}
+		}
+
+		needsR := false
+		for _, v := range vals {
+			if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+				needsR = true
+				break
+			}
+		}
+		if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+			needsR = true
+		}
+
+		var r *ExpressionResolver
+		if needsR {
+			var err error
+			r, err = rv.getR()
+			if err != nil {
+				return err
+			}
+		}
+
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 	}
 	return nil
 }
@@ -955,12 +1173,34 @@ func (rv *resolver) resolveStandardOptions() error {
 				}
 
 				if cliImage != "" {
-					resolvedCLIImage, errCLI := rv.r.ResolveString(cliImage)
-					resolvedCfgImage, errCfg := rv.r.ResolveString(tool.Image)
-					if errCLI == nil && errCfg == nil {
-						if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
+					r, err := rv.getRForString(cliImage)
+					if err != nil {
+						return err
+					}
+					if r == nil {
+						r, err = rv.getRForString(tool.Image)
+						if err != nil {
 							return err
 						}
+					}
+					resolvedCLIImage := cliImage
+					if r != nil {
+						var errCLI error
+						resolvedCLIImage, errCLI = r.ResolveString(cliImage)
+						if errCLI != nil {
+							return errCLI
+						}
+					}
+					resolvedCfgImage := tool.Image
+					if r != nil {
+						var errCfg error
+						resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
+						if errCfg != nil {
+							return errCfg
+						}
+					}
+					if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
+						return err
 					}
 				}
 			}
@@ -992,12 +1232,67 @@ func (rv *resolver) resolveStandardOptions() error {
 func (rv *resolver) resolveComplexOptions() error {
 	var err error
 	// Complex types (Mounts, Env)
-	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	// For mounts, since we need r.Pwd to SetBaseDir, let's ensure rv.r is initialized if we have mounts.
+	var needsR bool
+	if len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != "" {
+		needsR = true
+	} else if rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
+			needsR = true
+		}
+	} else if rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
+		needsR = true
+	}
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needsR = true
+	}
+
+	var r *ExpressionResolver
+	if needsR {
+		var errR error
+		r, errR = rv.getR()
+		if errR != nil {
+			return errR
+		}
+	}
+
+	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, r, rv.fs)
 	if err != nil {
 		return err
 	}
 
-	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.SensitiveEnv, rv.res.StrictEnv, rv.r, rv.fs)
+	// For Env, check if any env entry has expression/tilde
+	envs, err := pickConfigs(
+		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Env },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	needsREnv := false
+	for _, e := range envs {
+		if strings.Contains(e, "{{") || strings.HasPrefix(e, "~") {
+			needsREnv = true
+			break
+		}
+	}
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needsREnv = true
+	}
+
+	var rEnv *ExpressionResolver
+	if needsREnv {
+		rEnv, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.SensitiveEnv, rv.res.StrictEnv, rEnv, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -1104,13 +1399,51 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 func (rv *resolver) resolveTransitiveOptions() error {
 	// Transitive options (MountTools -> MountCderun -> MountSocket)
+	// Determine winning raw values for mount-tools
+	var mountToolsVals []string
+	if rv.cli.CderunMountToolsSet {
+		mountToolsVals = strings.Split(rv.cli.CderunMountTools, ",")
+	} else if rv.cli.MountToolsSet {
+		mountToolsVals = strings.Split(rv.cli.MountTools, ",")
+	} else if env, ok := rv.fs.LookupEnv("CDERUN_MOUNT_TOOLS"); ok {
+		mountToolsVals = strings.Split(env, ",")
+	}
+	if mountToolsVals == nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			mountToolsVals = tool.MountTools
+		}
+	}
+	if mountToolsVals == nil && rv.global != nil {
+		mountToolsVals = rv.global.Defaults.MountTools
+	}
+
+	needsRMountTools := false
+	for _, v := range mountToolsVals {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+			needsRMountTools = true
+			break
+		}
+	}
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needsRMountTools = true
+	}
+
+	var rMountTools *ExpressionResolver
+	if needsRMountTools {
+		var errR error
+		rMountTools, errR = rv.getR()
+		if errR != nil {
+			return errR
+		}
+	}
+
 	rv.res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
 			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
 			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
 		rv.cli.CderunMountToolsSet, rv.cli.CderunMountTools,
 		rv.cli.MountToolsSet, rv.cli.MountTools,
-		rv.subcommand, rv.tools, rv.global, rv.r, rv.fs,
+		rv.subcommand, rv.tools, rv.global, rMountTools, rv.fs,
 	)
 	for _, tool := range rv.res.MountTools {
 		if err := ValidateToolName(tool); err != nil {
@@ -1227,8 +1560,31 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
+	var needsRDevices bool
+	if len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != "" {
+		needsRDevices = true
+	} else if rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
+			needsRDevices = true
+		}
+	} else if rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
+		needsRDevices = true
+	}
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needsRDevices = true
+	}
+
+	var rDev *ExpressionResolver
+	if needsRDevices {
+		var errR error
+		rDev, errR = rv.getR()
+		if errR != nil {
+			return errR
+		}
+	}
+
 	var errDevices error
-	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rDev, rv.fs)
 	if errDevices != nil {
 		return errDevices
 	}
@@ -1252,8 +1608,10 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 	rv.res.HostContext = hostCtx
 
-	if err := rv.r.Error(); err != nil {
-		return err
+	if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1475,11 +1833,11 @@ func (rv *resolver) validateDeviceSecurity() error {
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
 	if p1Set {
-		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: p1Val, BaseDir: r.GetPwd()}
 	} else if cliSet {
-		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: cliVal, BaseDir: r.GetPwd()}
 	} else if env := fs.Getenv(envKey); env != "" {
-		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: env, BaseDir: r.GetPwd()}
 	} else {
 		found := false
 		if tools != nil {
@@ -1497,7 +1855,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 			}
 		}
 		if !found {
-			cp = ConfigPath{Raw: fallback, BaseDir: r.Pwd}
+			cp = ConfigPath{Raw: fallback, BaseDir: r.GetPwd()}
 		}
 	}
 
