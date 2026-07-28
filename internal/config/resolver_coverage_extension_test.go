@@ -82,6 +82,42 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 		set, _ := getFieldInfo(valNil, 2)
 		assert.False(t, set)
 	})
+
+	t.Run("Non-nil pointers to zero/empty values and empty collections", func(t *testing.T) {
+		type testStructExtended struct {
+			PtrEmptyStr *string
+			PtrFalse    *bool
+			PtrZeroInt  *int
+			EmptyMap    map[string]string
+			EmptySlice  []string
+		}
+		emptyStr := ""
+		fVal := false
+		zeroInt := 0
+		tse := testStructExtended{
+			PtrEmptyStr: &emptyStr,
+			PtrFalse:    &fVal,
+			PtrZeroInt:  &zeroInt,
+			EmptyMap:    make(map[string]string),
+			EmptySlice:  make([]string, 0),
+		}
+		valExt := reflect.ValueOf(tse)
+
+		set, _ := getFieldInfo(valExt, 0) // PtrEmptyStr
+		assert.True(t, set)
+
+		set, _ = getFieldInfo(valExt, 1) // PtrFalse
+		assert.True(t, set)
+
+		set, _ = getFieldInfo(valExt, 2) // PtrZeroInt
+		assert.True(t, set)
+
+		set, _ = getFieldInfo(valExt, 3) // EmptyMap
+		assert.True(t, set)
+
+		set, _ = getFieldInfo(valExt, 4) // EmptySlice
+		assert.True(t, set)
+	})
 }
 
 func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
