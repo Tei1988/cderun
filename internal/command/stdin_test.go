@@ -300,7 +300,7 @@ func TestUnit_Stdin_QuickExitWithPipedInput(t *testing.T) {
 		defer cancel()
 
 		start := time.Now()
-		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout", "2s"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout=2s"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
@@ -359,7 +359,7 @@ func TestUnit_Stdin_NonInteractiveQuickExitBehavior(t *testing.T) {
 		defer cancel()
 
 		start := time.Now()
-		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat", "--cderun-hang-timeout", "2s"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "cat", "--cderun-hang-timeout=2s"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mock, nil
 			}
@@ -408,7 +408,7 @@ func TestUnit_Stdin_PipedContinuousLogOutput(t *testing.T) {
 		block := make(chan struct{})
 		done := make(chan error, 1)
 		go func() {
-			done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout", "2s"}, func(o *rootOptions, cmd *cobra.Command) {
+			done <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "-i", "cat", "--cderun-hang-timeout=2s"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}

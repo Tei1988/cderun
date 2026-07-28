@@ -80,12 +80,12 @@ func TestUnit_Flags_DockerCompatibilityMapping(t *testing.T) {
 			"--cpus", "1.0",
 			"--image", "alpine",
 			"alpine",
-			"--cderun-publish", "9090:90",
-			"--cderun-user", "override-user",
+			"--cderun-publish=9090:90",
+			"--cderun-user=override-user",
 			"--cderun-privileged=false",
-			"--cderun-pull", "always",
-			"--cderun-memory", "2g",
-			"--cderun-cpus", "2.0",
+			"--cderun-pull=always",
+			"--cderun-memory=2g",
+			"--cderun-cpus=2.0",
 			"ls", "-l"}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
@@ -195,14 +195,14 @@ func TestUnit_Command_PreprocessArgs_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Hoisting complex P1 flags with values", func(t *testing.T) {
-		// cderun node app.js --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL
-		args := []string{"cderun", "node", "app.js", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL"}
+		// cderun node app.js --cderun-image=node:20-alpine --cderun-tty --cderun-env=KEY=VAL
+		args := []string{"cderun", "node", "app.js", "--cderun-image=node:20-alpine", "--cderun-tty", "--cderun-env=KEY=VAL"}
 		cmd := newRootCmd(&rootOptions{})
 		processed, err := preprocessArgs(cmd, args)
 		require.NoError(t, err)
 
-		// Expected: cderun --cderun-image node:20-alpine --cderun-tty --cderun-env KEY=VAL node app.js
-		expected := []string{"cderun", "--cderun-image", "node:20-alpine", "--cderun-tty", "--cderun-env", "KEY=VAL", "node", "app.js"}
+		// Expected: cderun --cderun-image=node:20-alpine --cderun-tty --cderun-env=KEY=VAL node app.js
+		expected := []string{"cderun", "--cderun-image=node:20-alpine", "--cderun-tty", "--cderun-env=KEY=VAL", "node", "app.js"}
 		assert.Equal(t, expected, processed)
 	})
 

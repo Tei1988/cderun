@@ -28,8 +28,8 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 		},
 		{
 			name:     "multiple P1 overrides after subcommand",
-			args:     []string{"cderun", "node", "--cderun-tty", "--cderun-image", "node:20-alpine", "app.js"},
-			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "node:20-alpine", "node", "app.js"},
+			args:     []string{"cderun", "node", "--cderun-tty", "--cderun-image=node:20-alpine", "app.js"},
+			expected: []string{"cderun", "--cderun-tty", "--cderun-image=node:20-alpine", "node", "app.js"},
 		},
 		{
 			name:     "P1 override with equals sign",
@@ -37,9 +37,14 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--cderun-image=node:20-alpine", "node", "app.js"},
 		},
 		{
-			name:     "P1 override with value in next arg",
-			args:     []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
-			expected: []string{"cderun", "--cderun-image", "node:20-alpine", "node", "app.js"},
+			name:    "P1 override with value in next arg (must use equals sign)",
+			args:    []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
+			wantErr: "cderun internal override flag \"--cderun-image\" must use '=' format to specify its value",
+		},
+		{
+			name:     "boolean P1 flag followed by string arg (does not consume next arg)",
+			args:     []string{"cderun", "node", "--cderun-tty", "app.js"},
+			expected: []string{"cderun", "--cderun-tty", "node", "app.js"},
 		},
 		{
 			name:    "P1 override must be after subcommand in standard mode",
@@ -53,8 +58,8 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 		},
 		{
 			name:     "polyglot mode with P1 overrides and tool flags",
-			args:     []string{"node", "--cderun-tty", "--version", "--cderun-image", "alpine"},
-			expected: []string{"cderun", "--cderun-tty", "--cderun-image", "alpine", "node", "--version"},
+			args:     []string{"node", "--cderun-tty", "--version", "--cderun-image=alpine"},
+			expected: []string{"cderun", "--cderun-tty", "--cderun-image=alpine", "node", "--version"},
 		},
 		{
 			name:     "double dash -- stops hoisting (T53)",
@@ -68,8 +73,8 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 		},
 		{
 			name:     "complex interleaving (double dash stops hoisting)",
-			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--", "--cderun-literal"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
+			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image=alpine", "--", "--cderun-literal"},
+			expected: []string{"cderun", "--cderun-image=alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
 		},
 	}
 

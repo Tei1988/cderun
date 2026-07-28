@@ -1533,20 +1533,17 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		shouldHoist := !doubleDashFound && strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
-			overrides = append(overrides, arg)
-			// Handle flags that take arguments (skip next arg if it's the value)
-			// Note: only --cderun- flags are hoisted here.
 			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
 				name := arg[2:]
 				f := cmd.PersistentFlags().Lookup(name)
 				if f == nil {
 					f = cmd.Flags().Lookup(name)
 				}
-				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
+				if f != nil && f.NoOptDefVal == "" {
+					return nil, fmt.Errorf("cderun internal override flag %q must use '=' format to specify its value", arg)
 				}
 			}
+			overrides = append(overrides, arg)
 		} else {
 			others = append(others, arg)
 		}
