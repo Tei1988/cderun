@@ -16,8 +16,7 @@ func TestUnit_Config_Resolver_MountTargetTraversalSecurity(t *testing.T) {
 
 	t.Run("Mount target with traversal segments is rejected", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Mounts:   []string{"type=bind,source=/src,target=/app/../etc"},
 		}
 
@@ -28,8 +27,7 @@ func TestUnit_Config_Resolver_MountTargetTraversalSecurity(t *testing.T) {
 
 	t.Run("Mount target with Windows-style traversal segments is rejected", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Mounts:   []string{"type=bind,source=/src,target=/app\\..\\etc"},
 		}
 
@@ -40,8 +38,7 @@ func TestUnit_Config_Resolver_MountTargetTraversalSecurity(t *testing.T) {
 
 	t.Run("Mount target without traversal segments is accepted", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Mounts:   []string{"type=bind,source=/src,target=/app/etc"},
 		}
 
@@ -56,8 +53,7 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 
 	t.Run("Device destination with traversal segments is rejected", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Devices:  []string{"/dev/sda:/dev/../sda"},
 		}
 
@@ -68,8 +64,7 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 
 	t.Run("Device destination with Windows-style traversal segments is rejected", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Devices:  []string{"/dev/sda:\\dev\\..\\sda"},
 		}
 
@@ -80,8 +75,7 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 
 	t.Run("Device destination without traversal segments is accepted", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image:    ptr("alpine"),
 			Devices:  []string{"/dev/sda:/dev/sda"},
 		}
 
@@ -107,10 +101,8 @@ func TestUnit_Config_Resolver_SocketMountWarnings(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountSocket:    true,
-			MountSocketSet: true,
+			Image:          ptr("alpine"),
+			MountSocket:    ptr(true),
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -128,10 +120,8 @@ func TestUnit_Config_Resolver_SocketMountWarnings(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountSocket:    true,
-			MountSocketSet: true,
+			Image:          ptr("alpine"),
+			MountSocket:    ptr(true),
 			GroupAdd:       []string{"1001"},
 		}
 
@@ -150,10 +140,8 @@ func TestUnit_Config_Resolver_SocketMountWarnings(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			MountSocket:    true,
-			MountSocketSet: true,
+			Image:          ptr("alpine"),
+			MountSocket:    ptr(true),
 			GroupAdd:       []string{"docker"},
 		}
 

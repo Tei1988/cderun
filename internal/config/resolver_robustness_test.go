@@ -746,13 +746,11 @@ func TestUnit_Config_Resolver_EnvKeyValidation_Robustness(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cli := &CLIOptions{
-				Image:    "alpine",
-				ImageSet: true,
+				Image:    ptr("alpine"),
 				Env:      tt.env,
 			}
 			if tt.strict {
-				cli.StrictEnv = true
-				cli.StrictEnvSet = true
+				cli.StrictEnv = ptr(true)
 			}
 
 			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
