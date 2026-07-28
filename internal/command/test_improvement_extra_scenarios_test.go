@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -22,35 +25,90 @@ import (
 func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 	t.Parallel()
 
-	mockRuntime := &runtime.MockRuntime{}
-	args := []string{
-		"cderun",
-		"--image", "alpine",
-		"echo",
-		"--",
-		"--cderun-tty",
-		"--cderun-image=node:20",
-	}
-
-	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
+	t.Run("basic double-dash literal args after subcommand", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		args := []string{
+			"cderun",
+			"--image", "alpine",
+			"echo",
+			"--",
+			"--cderun-tty",
+			"--cderun-image=node:20",
 		}
-		o.exitFunc = func(code int) {}
-		o.isTerminal = func(fd int) bool { return true }
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return true }
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+
+		// Image should NOT be overridden to node:20 because it was after `--`
+		assert.Equal(t, "alpine", cfg.Image)
+
+		// Command should preserve `--` and all subsequent arguments literally
+		assert.Equal(t, []string{"--", "--cderun-tty", "--cderun-image=node:20"}, cfg.Command)
+	})
+}
+
+// TestUnit_Command_WrapperMode_HoistingWithEquals verifies hoisting logic and constraints on equals-sign flag overrides.
+func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid hoisting with equals", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		args := []string{
+			"cderun",
+			"sh",
+			"--cderun-image=alpine:latest",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "alpine:latest", cfg.Image)
 	})
 
-	require.NoError(t, err)
-	cfg := mockRuntime.GetCreatedConfig()
-	require.NotNil(t, cfg)
+	t.Run("strict rejection of hoisting value-taking flags without equals", func(t *testing.T) {
+		t.Parallel()
+		args := []string{
+			"cderun",
+			"sh",
+			"--cderun-image", "alpine:latest",
+		}
 
-	// Image should NOT be overridden to node:20 because it was after `--`
-	assert.Equal(t, "alpine", cfg.Image)
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return &runtime.MockRuntime{}, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
 
-	// Command should preserve `--` and all subsequent arguments literally
-	assert.Equal(t, []string{"--", "--cderun-tty", "--cderun-image=node:20"}, cfg.Command)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must use '=' format")
+	})
 }
 
 // TestUnit_Command_SymlinkMode_WithSpecialCharactersAndUnicode validates that polyglot/symlink mode
@@ -58,32 +116,64 @@ func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 func TestUnit_Command_SymlinkMode_WithSpecialCharactersAndUnicode(t *testing.T) {
 	t.Parallel()
 
-	mockRuntime := &runtime.MockRuntime{}
-	mfs := &config.MockFileSystem{
-		WD: "/workspace",
-		Files: map[string][]byte{
-			"/workspace/.tools.yaml": []byte("python:\n  image: python:3.11-slim"),
-		},
-	}
-
-	args := []string{"./python", "-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}
-	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
-		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-			return mockRuntime, nil
+	t.Run("symlink arguments with special characters and emojis", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{
+			WD: "/workspace",
+			Files: map[string][]byte{
+				"/workspace/.tools.yaml": []byte("python:\n  image: python:3.11-slim"),
+			},
 		}
-		o.exitFunc = func(code int) {}
-		o.fs = mfs
-		o.configLoader = config.NewConfigLoaderWithFS(mfs)
-		cmd.SetOut(io.Discard)
-		cmd.SetErr(io.Discard)
+
+		args := []string{"./python", "-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+
+		assert.Equal(t, "python:3.11-slim", cfg.Image)
+		assert.Equal(t, []string{"-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}, cfg.Command)
 	})
 
-	require.NoError(t, err)
-	cfg := mockRuntime.GetCreatedConfig()
-	require.NotNil(t, cfg)
+	t.Run("symlink file resolution with trailing slash and cleaning", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		mfs := &config.MockFileSystem{
+			WD: "/workspace",
+			Files: map[string][]byte{
+				"/workspace/.tools.yaml": []byte("python:\n  image: python:3.11-alpine"),
+			},
+		}
 
-	assert.Equal(t, "python:3.11-slim", cfg.Image)
-	assert.Equal(t, []string{"-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}, cfg.Command)
+		args := []string{"./python/", "-V"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "python:3.11-alpine", cfg.Image)
+		assert.Equal(t, []string{"-V"}, cfg.Command)
+	})
 }
 
 // TestUnit_Command_Robustness_NullTimeoutBlocksIndefinitely validates that
@@ -94,15 +184,10 @@ func TestUnit_Command_Robustness_NullTimeoutBlocksIndefinitely(t *testing.T) {
 
 	waitStarted := make(chan struct{})
 	waitUnblock := make(chan struct{})
-	mockRuntime := &hangTimeoutMockRuntime{
+	mockRuntime := &testImprovementHangTimeoutMockRuntime{
 		MockRuntime: runtime.NewMockRuntime(),
 		waitStarted: waitStarted,
-		isRunning:   true,
-	}
-	mockRuntime.WaitFunc = func(ctx context.Context, id string) (int, error) {
-		close(waitStarted)
-		<-waitUnblock
-		return 0, nil
+		waitUnblock: waitUnblock,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -152,27 +237,105 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	o := &rootOptions{logger: &logging.Logger{}}
 
 	t.Run("Signal fails and returns structured exit code error", func(t *testing.T) {
-		mockRuntime := &TerminationMockRuntime{
+		mockRuntime := &testImprovementTerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failure warning")},
-			IsRunning:   true,
+			isRunning:   true,
 		}
 
 		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to force terminate container: signal failure warning")
-		assert.Equal(t, "cont-force-kill-fail", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "cont-force-kill-fail", mockRuntime.signaledID)
 	})
 
 	t.Run("Signal succeeds without error", func(t *testing.T) {
-		mockRuntime := &TerminationMockRuntime{
+		mockRuntime := &testImprovementTerminationMockRuntime{
 			MockRuntime: runtime.NewMockRuntime(),
-			IsRunning:   true,
+			isRunning:   true,
 		}
 
 		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-success")
 		require.NoError(t, err)
-		assert.Equal(t, "cont-force-kill-success", mockRuntime.SignaledContainerID)
+		assert.Equal(t, "cont-force-kill-success", mockRuntime.signaledID)
 	})
+}
+
+// TestUnit_Command_Robustness_MultipleRapidSignals simulates receiving rapid signals
+// during active container execution to verify that subsequent signals cause host execution context cancellation.
+func TestUnit_Command_Robustness_MultipleRapidSignals(t *testing.T) {
+	t.Parallel()
+
+	waitChan := make(chan int)
+	mockRuntime := &testImprovementWaitBlockedMockRuntime{
+		MockRuntime: runtime.NewMockRuntime(),
+		waitChan:    waitChan,
+	}
+	mockRuntime.CreatedContainerID = "rapid-signal-test"
+
+	var capturedSigChan chan os.Signal
+	var sigChanMu sync.Mutex
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var execErr error
+	done := make(chan struct{})
+	go func() {
+		execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			o.setupSignals = func(sigChan chan os.Signal) {
+				sigChanMu.Lock()
+				capturedSigChan = sigChan
+				sigChanMu.Unlock()
+			}
+			o.stopSignalHandling = func(sigChan chan os.Signal) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+		close(done)
+	}()
+
+	// Wait until signal channel is captured
+	assert.Eventually(t, func() bool {
+		sigChanMu.Lock()
+		defer sigChanMu.Unlock()
+		return capturedSigChan != nil
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Send first SIGINT - should be forwarded (firstSignal is consumed)
+	sigChanMu.Lock()
+	capturedSigChan <- syscall.SIGINT
+	sigChanMu.Unlock()
+
+	// Verify it was forwarded to container
+	assert.Eventually(t, func() bool {
+		mockRuntime.mu.Lock()
+		defer mockRuntime.mu.Unlock()
+		return len(mockRuntime.signals) > 0
+	}, 2*time.Second, 10*time.Millisecond)
+
+	mockRuntime.mu.Lock()
+	assert.Contains(t, mockRuntime.signals, "SIGINT")
+	mockRuntime.mu.Unlock()
+
+	// Send second SIGINT - should trigger host context cancellation via HandleSignal
+	sigChanMu.Lock()
+	capturedSigChan <- syscall.SIGINT
+	sigChanMu.Unlock()
+
+	// Wait for execution to finish
+	select {
+	case <-done:
+		// Succeeded in cancelling context
+		require.Error(t, execErr)
+		assert.Contains(t, execErr.Error(), context.Canceled.Error())
+	case <-time.After(2 * time.Second):
+		t.Fatal("Second rapid signal did not cancel the host context")
+	}
 }
 
 // TestUnit_Command_DryRun_EmptySubcommandError validates that dry-run returns an error
@@ -192,4 +355,60 @@ func TestUnit_Command_DryRun_EmptySubcommandError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
+}
+
+// Unique helper types to avoid redeclaration collisions
+
+type testImprovementHangTimeoutMockRuntime struct {
+	*runtime.MockRuntime
+	waitStarted chan struct{}
+	waitUnblock chan struct{}
+}
+
+func (m *testImprovementHangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (int, error) {
+	close(m.waitStarted)
+	select {
+	case <-m.waitUnblock:
+		return 0, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+}
+
+type testImprovementTerminationMockRuntime struct {
+	*runtime.MockRuntime
+	isRunning  bool
+	signaledID string
+}
+
+func (m *testImprovementTerminationMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
+	return m.isRunning, 0, nil
+}
+
+func (m *testImprovementTerminationMockRuntime) SignalContainer(ctx context.Context, id string, sig string) error {
+	m.signaledID = id
+	return m.MockRuntime.SignalContainer(ctx, id, sig)
+}
+
+type testImprovementWaitBlockedMockRuntime struct {
+	*runtime.MockRuntime
+	waitChan chan int
+	signals  []string
+	mu       sync.Mutex
+}
+
+func (m *testImprovementWaitBlockedMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
+	m.signals = append(m.signals, sig)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *testImprovementWaitBlockedMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	select {
+	case code := <-m.waitChan:
+		return code, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
