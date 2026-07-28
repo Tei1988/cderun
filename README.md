@@ -340,7 +340,7 @@ Nested execution on macOS requires special consideration because containers run 
 
 ---
 
-## Sensitive Data Masking
+## Sensitive Data Masking & Secure Logging
 
 `cderun` enforces a "Secure by Default" posture to protect your secrets.
 
@@ -348,6 +348,7 @@ Nested execution on macOS requires special consideration because containers run 
 - **Pattern Matching**: Specify a list of glob patterns (e.g., `DB_*`, `*_PASSWORD`) in `--sensitive-env` to selectively mask matching keys while leaving other keys plaintext.
 - **Disabling Masking**: Pass an explicit empty value (e.g. `--sensitive-env=""` or `sensitiveEnv: []` in YAML) to disable masking.
 - **Hardening**: Error messages, dry-run values, and log records are securely quoted and validated to prevent log injection or terminal disruption.
+- **Secure ContainerConfig Logging**: Before container creation, `container.ContainerConfig` is logged at the debug level for safe diagnostics. Sensitive environment variables are fully masked prior to being logged to prevent accidental exposure of credentials in standard or diagnostic logging output.
 
 ---
 

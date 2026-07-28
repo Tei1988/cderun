@@ -1,6 +1,6 @@
 # Sensitive Data Protection
 
-cderun protects sensitive information from being accidentally leaked into logs or terminal output during dry-run and diagnosis modes.
+cderun protects sensitive information from being accidentally leaked into logs or terminal output during dry-run, diagnosis modes, and internal execution logs.
 
 ## Environment Variable Masking
 
@@ -46,3 +46,10 @@ All error messages referencing paths, tool identifiers, or user-provided input u
 ### Secure Logging
 
 Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure. Masking is also applied to debug logs when environment variables are resolved.
+
+#### ContainerConfig Debug Logging
+
+Before a container is actually created, `container.ContainerConfig` is securely logged at the debug level to aid in troubleshooting without compromising security.
+
+- **Process**: The logging function `logContainerConfig` sanitizes and formats the config structure.
+- **Masking Integration**: All environment variables defined in the configuration are passed through `MaskSensitiveEnvList` using the active masking patterns (or default mask-all behavior) before they are written to the debug logs. This ensures that even when verbose debug logs are active, credentials never appear in plaintext in the log output.
