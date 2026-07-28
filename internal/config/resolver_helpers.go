@@ -359,9 +359,12 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 	}
 	var res []string
 	for i, e := range env {
-		resolvedE := r.resolveString(e)
-		if err := r.Error(); err != nil {
-			return nil, err
+		resolvedE := e
+		if r != nil {
+			resolvedE = r.resolveString(e)
+			if err := r.Error(); err != nil {
+				return nil, err
+			}
 		}
 
 		key, val, hasValue := strings.Cut(resolvedE, "=")
