@@ -20,6 +20,10 @@ type OptionDef[T any] struct {
 }
 
 // resolveStringOpt resolves a string option through P1-P6.
+//
+// Note: This function contains a nil short-circuit in the resolver flow: when r is nil,
+// expressions/tildes are silently left unresolved, so callers must scan for template
+// markers before passing a possibly nil resolver. Keep the existing resolution behavior unchanged.
 func resolveStringOpt(
 	def OptionDef[string],
 	p1Set bool, p1Val string,
@@ -28,24 +32,42 @@ func resolveStringOpt(
 	r *ExpressionResolver, fs FileSystem,
 ) string {
 	var s string
+	var found bool
+
 	if p1Set {
 		s = p1Val
+		found = true
 	} else if p2Set {
 		s = p2Val
+		found = true
 	} else if def.EnvKey != "" {
-		if env := fs.Getenv(def.EnvKey); env != "" {
+		if env, ok := fs.LookupEnv(def.EnvKey); ok {
 			s = env
+			found = true
 		}
 	}
-	if s == "" && def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			s = def.ToolGetter(tool)
+
+	if !found {
+		if def.ToolGetter != nil && tools != nil {
+			if tool, ok := tools[subcommand]; ok {
+				if val := def.ToolGetter(tool); val != "" {
+					s = val
+					found = true
+				}
+			}
 		}
 	}
-	if s == "" && def.GlobalGetter != nil && global != nil {
-		s = def.GlobalGetter(*global)
+
+	if !found {
+		if def.GlobalGetter != nil && global != nil {
+			if val := def.GlobalGetter(*global); val != "" {
+				s = val
+				found = true
+			}
+		}
 	}
-	if s == "" {
+
+	if !found {
 		s = def.Fallback
 	}
 
