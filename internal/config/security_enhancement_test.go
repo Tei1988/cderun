@@ -153,3 +153,50 @@ func TestUnit_Config_Resolver_SocketMountWarnings(t *testing.T) {
 		assert.NotContains(t, logOutput, "Granting container socket permissions through a numeric VM socket GID")
 	})
 }
+
+func TestUnit_Config_Resolver_PrivilegedCapWarnings_NonPrivileged(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	t.Run("highly privileged capabilities in CapAdd with Privileged false logs warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:      ptr("alpine"),
+			Privileged: ptr(false),
+			CapAdd:     []string{"SYS_ADMIN"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "Highly privileged capability")
+		assert.Contains(t, logOutput, "SYS_ADMIN")
+		assert.NotContains(t, logOutput, "Container is running in privileged mode")
+	})
+}
+
+func TestUnit_Config_Resolver_EnvNullByteSecurity(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	t.Run("environment variable value with null byte is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+			Env:   []string{"SECRET=value\x00injection"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "null byte injection detected")
+	})
+}

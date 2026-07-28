@@ -376,6 +376,10 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			val = v
 		}
 
+		if strings.ContainsRune(val, 0) {
+			return nil, fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
+		}
+
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.
 		final := ""
 		if strings.HasPrefix(e, key+"=") && e[len(key)+1:] == val {

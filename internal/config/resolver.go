@@ -1248,34 +1248,36 @@ func (rv *resolver) validateSecurity() error {
 	if err := rv.validateDeviceSecurity(); err != nil {
 		return err
 	}
-	if rv.res.Privileged {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+	highlyPrivileged := map[string]bool{
+		"ALL":            true,
+		"SYS_ADMIN":      true,
+		"NET_ADMIN":      true,
+		"SYS_RAWIO":      true,
+		"SYS_PTRACE":     true,
+		"SYS_MODULE":     true,
+		"CAP_ALL":        true,
+		"CAP_SYS_ADMIN":  true,
+		"CAP_NET_ADMIN":  true,
+		"CAP_SYS_RAWIO":  true,
+		"CAP_SYS_PTRACE": true,
+		"CAP_SYS_MODULE": true,
+	}
+	var found []string
+	for _, capName := range rv.res.CapAdd {
+		upperCap := strings.ToUpper(strings.TrimSpace(capName))
+		if highlyPrivileged[upperCap] {
+			found = append(found, capName)
+		}
+	}
 
-			highlyPrivileged := map[string]bool{
-				"ALL":            true,
-				"SYS_ADMIN":      true,
-				"NET_ADMIN":      true,
-				"SYS_RAWIO":      true,
-				"SYS_PTRACE":     true,
-				"SYS_MODULE":     true,
-				"CAP_ALL":        true,
-				"CAP_SYS_ADMIN":  true,
-				"CAP_NET_ADMIN":  true,
-				"CAP_SYS_RAWIO":  true,
-				"CAP_SYS_PTRACE": true,
-				"CAP_SYS_MODULE": true,
-			}
-			var found []string
-			for _, capName := range rv.res.CapAdd {
-				upperCap := strings.ToUpper(strings.TrimSpace(capName))
-				if highlyPrivileged[upperCap] {
-					found = append(found, capName)
-				}
-			}
+	if logging.Enabled(logging.WarnLevel) {
+		if rv.res.Privileged {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 			if len(found) > 0 {
 				logging.Warn("Highly privileged capability %v detected in CapAdd while running in privileged mode. Please consider minimizing privileges.", found)
 			}
+		} else if len(found) > 0 {
+			logging.Warn("Highly privileged capability %v detected in CapAdd. Please consider minimizing privileges.", found)
 		}
 	}
 	if rv.res.MountSocket {
@@ -1412,12 +1414,15 @@ func (rv *resolver) validateSlices() error {
 
 func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
-		key, _, _ := strings.Cut(e, "=")
+		key, val, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+		if strings.ContainsRune(val, 0) {
+			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
 	}
 	return nil
