@@ -46,3 +46,12 @@ All error messages referencing paths, tool identifiers, or user-provided input u
 ### Secure Logging
 
 Debug logs use quoted formatting for all resolved environment variables and configuration strings to ensure that control characters in malicious input cannot disrupt the terminal or log file structure. Masking is also applied to debug logs when environment variables are resolved.
+
+### Pre-Creation Config Inspection (T80)
+
+To provide developers with complete visibility into the exact container payload being dispatched, `cderun` logs the entire built `ContainerConfig` at the `DEBUG` log level immediately prior to invoking the runtime-specific container creation API (e.g., Docker or containerd).
+
+Since this struct contains all environment variables merged from various priority layers (P1 to P6), logging it directly would bypass standard presentation-layer masking and leak secrets into the terminal or log files. To resolve this, `cderun` intercepts the configuration and passes the env slice through `config.MaskSensitiveEnvList` before printing.
+
+- **Operation**: The logging helper `logContainerConfig` format-masks the environment list, replacing any sensitive values that match the active masking filters (including the default "Mask-All" state) with `[REDACTED]`.
+- **Significance**: This ensures that even under maximum verbosity (`--log-level debug` or `trace`), credentials like database passwords, API tokens, and TLS keys are guaranteed to remain invisible in the logs while the underlying runtime still receives the raw plaintext secrets.
