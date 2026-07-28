@@ -39,16 +39,18 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	stack := stackBuf[:0]
 	allPairs := allPairsBuf[:0]
 
-	for i := 0; i < len(s)-1; i++ {
+	for i := 0; i < len(s)-1; {
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
-			i++
+			i += 2
 		} else if s[i] == '}' && s[i+1] == '}' {
 			if len(stack) > 0 {
 				start := stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
 				allPairs = append(allPairs, anchorRange{start: start, end: i + 2})
 			}
+			i += 2
+		} else {
 			i++
 		}
 	}
@@ -57,8 +59,6 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		return nil
 	}
 
-	// Since allPairs are collected in order of their closing braces, we can
-	// identify top-level (outermost) ranges in a single backward pass.
 	res := buf[:0]
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
@@ -257,14 +257,15 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			var anchorBuf [8]anchorRange
 			ranges := scanAnchors(s, anchorBuf[:0])
 			if len(ranges) > 0 {
-				var sb strings.Builder
+				var arr [512]byte
+				buf := arr[:0]
 				last := 0
 				sbInitialized := false
 				for _, rng := range ranges {
 					if r.err != nil {
 						if sbInitialized {
-							sb.WriteString(s[last:rng.start])
-							sb.WriteString(s[rng.start:rng.end])
+							buf = append(buf, s[last:rng.start]...)
+							buf = append(buf, s[rng.start:rng.end]...)
 						}
 					} else {
 						content := strings.TrimSpace(s[rng.start+2 : rng.end-2])
@@ -287,25 +288,28 @@ func (r *ExpressionResolver) resolveString(s string) string {
 						if err != nil {
 							r.setError(err)
 							if sbInitialized {
-								sb.WriteString(s[last:rng.start])
-								sb.WriteString(s[rng.start:rng.end])
+								buf = append(buf, s[last:rng.start]...)
+								buf = append(buf, s[rng.start:rng.end]...)
 							}
 						} else {
 							if !sbInitialized {
-								sb.Grow(len(s))
-								sb.WriteString(s[:rng.start])
+								needed := len(s) + 128
+								if needed > len(arr) {
+									buf = make([]byte, 0, needed)
+								}
+								buf = append(buf, s[:rng.start]...)
 								sbInitialized = true
 							} else {
-								sb.WriteString(s[last:rng.start])
+								buf = append(buf, s[last:rng.start]...)
 							}
-							sb.WriteString(res)
+							buf = append(buf, res...)
 						}
 					}
 					last = rng.end
 				}
 				if sbInitialized {
-					sb.WriteString(s[last:])
-					resolved = sb.String()
+					buf = append(buf, s[last:]...)
+					resolved = string(buf)
 				}
 			}
 		}
