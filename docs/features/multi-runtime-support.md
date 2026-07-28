@@ -1,154 +1,120 @@
-# 機能仕様：マルチランタイムサポート (完了)
+# Multi-Runtime Support Specification
 
-## 概要
+## Overview
 
-Docker以外のコンテナランタイム（Podman等）をサポートする。
-共通の`ContainerRuntime`インターフェースを定義し、各ランタイムの独自APIをラップする。
+`cderun` supports running ephemeral containers on multiple container runtimes: **Docker**, **Podman**, and **containerd**. It defines a unified `ContainerRuntime` Go interface that abstracts the underlying APIs of these runtimes.
 
-## サポートされるランタイム
+---
 
-### 優先度1: Docker (完了)
+## Supported Runtimes
 
-- デフォルトのランタイム
-- 最も広く使われている
-- Docker Engine APIを使用
+### 1. Docker
 
-### 優先度2: Podman (完了)
+- **Status**: Fully Supported (Default)
+- **API Foundation**: Uses the official Docker Engine API (`github.com/docker/docker/client`) via Unix socket communication.
+- **Features**: Automatic API version negotiation, full port/network mapping, bind/volume/tmpfs mounting, resource limits, capabilities, and interactive TTY support.
 
-- Dockerのドロップイン代替
-- rootlessコンテナのサポート
-- Podman APIを使用（Docker互換）
+### 2. Podman
 
-### サポートされているランタイム
+- **Status**: Fully Supported
+- **API Foundation**: Communicates directly with the Podman service Unix socket using the Docker-compatible API client, enabling a drop-in replacement on Linux environments.
+- **Features**: Inherits all standard execution features of the Docker runtime adapter. Supports rootless Podman execution seamlessly.
 
-- **containerd (Experimental)**:
-  ネイティブの containerd API (gRPC) を直接利用したサポートを開発中です。
-  - **目的**: Docker/Podman デーモンを経由しない、より軽量なコンテナ実行の実現。
-  - **現状**: 基本的な実行機能は実装されていますが、以下の制限事項があります。
-    - **ネットワーク**: `host` ネットワークのみをサポートしています（デフォルトの `bridge` ネットワークは未サポート）。
-    - **ポート公開**: ポートマッピング（`--publish`, `-p`, `--publish-all`, `-P`）およびポート公開（`--expose`）は未サポートです。
-    - **DNS/ホスト**: カスタムDNSサーバの設定（`--dns`）およびホストマッピングの追加（`--add-host`）は未サポートです。
-    - **マウント**: `volume` タイプ（名前付きボリューム等）のマウントは未サポートです（`bind` または `tmpfs` を使用してください）。
-    - **ケーパビリティ**: `--cap-add`, `--cap-drop` による Linux ケーパビリティの制御はサポートされています。
-    - **ENTRYPOINTの継承**: イメージに `ENTRYPOINT` が定義されている場合、コマンド指定時にもデフォルトの `ENTRYPOINT` が自動的に前置して適用されるようになり、Docker ランタイムと同様の挙動が保証されています。
-    - **プラットフォーム制限**: **Linux専用**です（`//go:build linux` ビルドタグ付き）。macOSやWindowsでは、DockerやPodmanのように仮想マシン内で動作するエンジンを経由せずに直接ローカルの containerd に接続することはできません。
-- **nerdctl (Backlog)**:
-  containerd の CLI である `nerdctl` をラップして実行する方式の検討。
+### 3. containerd (Experimental)
 
-## アーキテクチャ
+- **Status**: Experimental (Direct native gRPC integration)
+- **API Foundation**: Connects directly to the containerd gRPC socket to bypass Docker/Podman daemon layers, enabling lightweight, low-overhead container executions.
+- **Constraints & Platform Restrictions**:
+  - **Linux-Only**: Direct containerd execution requires Linux (`//go:build linux` build tag). It is not supported natively on macOS or Windows without virtual machines.
+  - **Networking**: Only `host` network mode is supported. The default `bridge` networking is not supported.
+  - **Ports & DNS**: Port publishing (`--publish`, `-p`, `--publish-all`, `-P`), exposing (`--expose`), custom DNS (`--dns`), and custom host mappings (`--add-host`) are not supported.
+  - **Mounts**: Named volumes are not supported. Only `bind` and `tmpfs` mounts can be used.
+  - **Capabilities**: Full support for `--cap-add` and `--cap-drop`. The containerd adapter normalizes Docker-compatible names (e.g., `SYS_ADMIN`) into OCI spec compliant names (e.g., `CAP_SYS_ADMIN`).
+  - **ENTRYPOINT Propagation**: If an image specifies a default `ENTRYPOINT` but the user passes custom container commands, containerd correctly prepends the `ENTRYPOINT` to ensure parity with standard Docker behavior.
 
-### 抽象化レイヤー
+---
 
-cderun独自の`ContainerRuntime`インターフェースを定義し、各ランタイムの独自APIをラップする。
+## Architecture & Abstraction Layer
+
+`cderun` defines a unified `ContainerRuntime` interface which isolates command execution from runtime engines:
 
 ```text
-cderun ContainerRuntimeインターフェース
-        │
-        ├── DockerRuntime → Docker Engine API (HTTP over Unix socket)
-        ├── PodmanRuntime → Podman API (HTTP over Unix socket)
-        └── ContainerdRuntime → containerd API (gRPC)
+       cderun Execution Engine (Cobra/CRI)
+                     │
+                     ▼
+          ContainerRuntime Interface
+                     │
+       ┌─────────────┼─────────────┐
+       ▼             ▼             ▼
+ DockerRuntime   PodmanRuntime  ContainerdRuntime
 ```
 
-### 共通インターフェースの役割
+The `ContainerRuntime` interface is responsible for:
 
-`ContainerRuntime` インターフェースは、以下の主要な責務を持つ：
+- Container Lifecycle (Create, Start, Wait, Remove)
+- Standard I/O attachment (with raw TTY and interactive terminal relaying)
+- Real-time window resizing (`SIGWINCH` synchronization)
+- Graceful signal forwarding (`SIGINT`/`SIGTERM`)
 
-- **ライフサイクル管理**: コンテナの作成、起動、終了待機、削除。
-- **IO接続**: コンテナの標準入出力へのアタッチ（TTYサポート含む）。
-- **メタデータ提供**: ランタイム名の識別。
-- **操作**: コンテナへのシグナル送信、TTYリサイズ。
+---
 
-## ランタイムの選択
+## Runtime and Socket Path Selection
 
-**現状 (Phase 4):**
-Docker と Podman をフルサポートしています。Podman は Docker 互換の API を介してサポートされており、ランタイムとソケットの選択は、設定ファイル、環境変数、またはコマンドライン引数によって明示的に指定可能です。
+`cderun` resolves the container engine to use based on settings merged from configuration layers, environment variables, or CLI options.
 
-### 解決ロジック (完了)
+### Auto-detection Sequence
 
-1. **設定ファイル**: `.cderun.yaml` の `runtime` フィールド。
-2. **環境変数**: `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH` 等。
-3. **コマンドライン引数**: `--runtime`, `--socket-path` および P1 内部オーバーライド。
+If no engine or runtime socket path is explicitly provided, `cderun` dynamically probes the local filesystem for active container runtime sockets in the following priority order:
 
-### 自動検出ロジック (完了)
+1. `/var/run/docker.sock` (Runtime: `docker`)
+2. `/run/containerd/containerd.sock` (Runtime: `containerd`)
+3. `/run/podman/podman.sock` (Runtime: `podman`)
 
-ソケットの存在確認によるランタイムの自動選択機能。
+If none of these files are found, `cderun` defaults to `docker` at `/var/run/docker.sock` (which will fail during runtime initialization with a descriptive connection error).
 
-1. `--runtime` または `CDERUN_RUNTIME` が指定されている場合はそれを使用。
-2. 指定がない場合、以下のデフォルトパスを順に確認し、最初に見つかったものを使用。
+---
 
-  - `/var/run/docker.sock` (Runtime: `docker`)
-  - `/run/containerd/containerd.sock` (Runtime: `containerd`)
-  - `/run/podman/podman.sock` (Runtime: `podman`)
+### Socket Detection Cache (Performance Optimization)
 
-3. いずれも見つからない場合は `docker` をデフォルトとし、`/var/run/docker.sock` を使用（実行時にエラーとなる可能性がある）。
+Probing the host filesystem for socket paths can introduce redundant disk I/O and `Stat` system calls on every configuration resolution. `cderun` implements an optimized caching strategy for socket auto-detection:
 
-#### パフォーマンスとキャッシュ設計 (Socket Detection Cache)
+- **Process-Lifetime Caching**: When executing on the real OS filesystem (`RealFileSystem`), the first successfully detected runtime socket path and engine type are cached globally.
+- **RWMutex Synchronization**: The global cache is thread-safe, protected by a process-wide read-write lock (`sync.RWMutex`). Subsequent config resolutions retrieve the cached runtime selection instantly, completely bypassing filesystem lookups.
+- **No Dynamic Re-validation**: Once cached, host environment changes (e.g., subsequent daemon shutdowns or socket removals) are not dynamically re-validated unless the process is restarted or explicit `--runtime` / `--socket-path` overrides are specified on the CLI.
+- **Dynamic Probing on Empty Cache**: If no active sockets are detected on the host during the initial probe, the cache is left empty. This allows subsequent config resolution runs to probe again, catering to situations where a container daemon is started after `cderun` begins execution.
+- **Test Isolation**: Mock or in-memory filesystems used during unit tests bypass this global process-level caching, ensuring complete test case isolation and preventing state leakage.
 
-`cderun` は、設定解決における不要なディスク I/O や `Stat` システムコールを削減するため、ソケット自動検出結果に対してインテリジェントなキャッシュ機構を備えています。
+---
 
-- **実ファイルシステムのキャッシュ化**: 実行ホストの実際のファイルシステム（`RealFileSystem`）を使用している場合、初回に成功したソケット自動検出結果は、グローバルな書き込み/読み込みロック（`sync.RWMutex`）によって保護されたプロセス生存期間キャッシュに保存されます。以降の構成解決（Resolution）処理では、このキャッシュされた結果を直接返すことで、システムコールを完全にバイパスします。
-  - **制限事項と動作**: 初回検出に成功した後は、プロセスの生存期間中にソケットの存在確認や再検証は行われません。そのため、自動検出後にソケットファイルが消失したり、有効なコンテナランタイムが切り替わったりしても古い検出結果（キャッシュ）が使用され続けます。キャッシュを無効化・更新して最新のソケットを検出させるためには、プロセス自体を再起動するか、コマンドライン引数や環境変数で明示的に `--runtime` / `--socket-path` を指定する必要があります。
-- **動的再検出（フォールバック）**: 自動検出時に有効なソケットパスが1つも見つからなかった場合は、キャッシュに登録されません。これは、実行中にバックグラウンドでコンテナデーモンが起動された場合に備え、次回の解決処理時にも再度検出プローブを実行できるようにするためです。
-- **テストの隔離と安全設計**: モックやインメモリファイルシステム（`MockFileSystem` など）を用いたテスト実行時においては、テスト間の状態漏洩や競合を防ぐため、キャッシュへの書き込み・読み込みは意図的にスキップされ、常に動的な検出プローブが実行されます。
+### Explicit Selection Examples
 
-### 明示的な指定 (完了)
-
-#### 設定ファイル (`.cderun.yaml`)
+#### 1. Global Settings (`.cderun.yaml`)
 
 ```yaml
 runtime: podman
+socketPath: /run/user/1000/podman/podman.sock
 ```
 
-#### 環境変数
+#### 2. Environment Variables
 
 ```bash
 export CDERUN_RUNTIME=podman
-export CDERUN_SOCKET_PATH=/run/podman/podman.sock
+export CDERUN_SOCKET_PATH=/run/user/1000/podman/podman.sock
 cderun node app.js
 ```
 
-#### コマンドライン
+#### 3. Command Line Flags
 
 ```bash
-cderun --runtime podman node app.js
+cderun --runtime containerd --socket-path /run/containerd/containerd.sock node app.js
 ```
 
-## ランタイム固有の実装ポイント
+---
 
-- **Docker**: `github.com/docker/docker/client` を使用し、Unixソケット経由で接続。APIバージョンの自動ネゴシエーションを有効化。
-- **Podman**: Docker 互換の API を使用。 Docker クライアントライブラリを共通の基盤として利用し、Podman の Unix ソケット経由で接続。
-- **イメージプルのリトライ**: ネットワークの不安定さやレート制限（`toomanyrequests` 等）に対応するため、指数バックオフを伴うリトライロジック（最大3回）を実装。
+## Diagnosis Mode
 
-## ランタイム情報の表示 (完了)
-
-### 現在のランタイム確認
-
-`--diagnosis` フラグを使用することで、現在のランタイム設定や接続状態を含む診断情報を表示できます。詳細は[診断モード](./diagnosis-mode.md)を参照してください。
+To view the active container runtime configuration, auto-detected socket path, cache status, and connectivity health, run the diagnosis command:
 
 ```bash
 cderun --diagnosis
-```
-
-診断情報の出力フォーマットは `--diagnosis-format` で指定可能です（`yaml`, `json`, `simple`）。
-
-```bash
-cderun --diagnosis --diagnosis-format simple
-```
-
-## 拡張性
-
-### 新しいランタイムの追加手順
-
-1. `ContainerRuntime` インターフェースを実装する新しい構造体を作成。
-2. `internal/command/root.go` の `runtimeFactory` に新しいランタイムを登録。
-3. 設定ファイルや環境変数で新しいランタイムを選択可能にする。
-
-## 依存ライブラリ
-
-### Docker
-
-```go
-import (
-    "github.com/docker/docker/client"
-)
 ```

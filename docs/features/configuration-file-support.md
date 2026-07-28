@@ -1,120 +1,93 @@
-# 機能仕様：設定ファイルサポート
+# Configuration File Support
 
-## 概要
+## Overview
 
-cderun自体の動作設定と、各サブコマンド（ツール）の実行設定を分離して管理する。
+`cderun` separates its own runtime behaviors from the container configurations of individual subcommands (tools) by utilizing two separate configuration files. This decouples system configurations from individual development environment settings.
 
-## 設定ファイル
+---
 
-### ファイル構成
+## Configuration Architecture
 
-設定は2つのファイルに分離されています。
+`cderun` supports configurations defined in YAML format across two standard files:
 
-1. **`.cderun.yaml`**: cderun自体の動作設定（デフォルト値、ランタイム、ログ設定など）
-2. **`.tools.yaml`**: 各サブコマンド（ツール）ごとの実行設定（イメージ、マウント、環境変数など）
+1. **`.cderun.yaml`**: Contains settings for `cderun` itself (e.g., container runtime engine, default CLI values, logger verbosity/format).
+2. **`.tools.yaml`**: Contains tool execution settings mapped by subcommand names (e.g., image tags, bind mounts, and specific environment variables).
 
-### サポートされる形式
+### Strict Decoding Behavior
 
-- YAML形式のみがサポートされます。
-- 厳密なデコード: 未知のフィールドやタイポが含まれている場合、エラーとなります（`KnownFields`の有効化）。
-- **標準ファイル名**: `.cderun.yaml`, `.tools.yaml`
+Both configuration files are parsed using strict decoding mechanics (`KnownFields` verification is enabled). Any typo, unknown field, or malformed property within the YAML file will immediately fail configuration loading with a descriptive syntax or decoding error.
 
-### 設定不可能なオプション
+### Reserved (Non-configurable) Fields
 
-以下のオプションは、設定ファイルの**読み込み先パスを決める**ためのオプションであり、ファイルを読み込む前にパスが確定している必要があるため P1/P2/P3 のみ有効です。P4/P5（設定ファイル内）に記述すると、デコードエラーが発生します。
+Certain CLI options are utilized to locate configuration files. If these options are defined *inside* the configuration files themselves, it would create circular dependency locks. Therefore, the following options are **strictly prohibited** in `.cderun.yaml` and `.tools.yaml`. If present, strict decoding will fail with an error:
 
-- **`config`** (`--config`): cderun設定ファイルのパス（YAML内キー: `config` は不可）
-- **`toolConfig`** (`--tool-config`): ツール設定ファイルのパス（YAML内キー: `toolConfig` は不可）
+- **`config`** (CLI: `--config` / environment: `CDERUN_CONFIG`): Specifies the path of `.cderun.yaml`
+- **`toolConfig`** (CLI: `--tool-config` / environment: `CDERUN_TOOL_CONFIG`): Specifies the path of `.tools.yaml`
 
-> **Note**: `dryRun`, `dryRunFormat`, `diagnosis`, `diagnosisFormat` は、以前の仕様とは異なり、現在は設定ファイル内でもフルサポートされています。
+---
 
-### 明示的な設定ファイルの指定
+## Hierarchical Searching & Merging
 
-標準の検索・マージ挙動をスキップし、特定のファイルを明示的に指定して実行できます。
+`cderun` looks up configuration files in the host environment and merges them hierarchically based on priority.
 
-#### 指定方法
+### 1. File Selection Override
 
-以下のフラグまたは環境変数を使用して指定します：
+Specifying an explicit file path via CLI flags (P1/P2) or environment variables (P3) **completely skips** the automatic hierarchical searching, loading only the specified file:
 
-| 対象 | フラグ (P2) | 内部オーバーライド (P1) | 環境変数 (P3) |
-| :--- | :--- | :--- | :--- |
-| **cderun設定** | `--config <path>` | `--cderun-config <path>` | `CDERUN_CONFIG` |
-| **ツール設定** | `--tool-config <path>` | `--cderun-tool-config <path>` | `CDERUN_TOOL_CONFIG` |
+- **`.cderun.yaml` Path Overrides**: `--config <path>` (P2), `--cderun-config <path>` (P1), or `CDERUN_CONFIG=<path>` (P3).
+- **`.tools.yaml` Path Overrides**: `--tool-config <path>` (P2), `--cderun-tool-config <path>` (P1), or `CDERUN_TOOL_CONFIG=<path>` (P3).
 
-#### 挙動
+Paths specified in overrides support tilde expansion (e.g., `~/.cderun.yaml`). Relative paths configured inside files resolve relative to the directory containing that file.
 
-- これらの指定がある場合、通常の階層的な検索とマージは**スキップ**され、指定されたファイルのみが読み込まれます。
-- 指定されたファイルが存在しない場合、cderunはエラーで終了します。
-- パスには `~` または `~/` を使用してホームディレクトリを指定できます（例: `--config ~/.cderun.yaml`）。
-- 指定されたファイル内の相対パス（`mounts`の`source`など）は、そのファイルが置かれているディレクトリを基準に解決されます。
+---
 
-### 検索とマージ
+### 2. Automatic Search Order (Hierarchical Priority)
 
-cderunは、柔軟な設定管理のため、複数の場所から設定ファイルを検索し、それらを階層的にマージします。
+If no path override is specified, `cderun` dynamically searches for configurations in the following priority order (first match wins/overrides subsequent layers):
 
-#### 検索順序と優先順位
-
-設定ファイルは以下の順序で検索され、先に見つかった（優先順位が高い）ファイルの設定が、後のファイルの設定を上書きします。
-
-1. **プロジェクト設定（親ディレクトリへの探索）**:
-   - カレントディレクトリから始まり、ルートディレクトリ (`/`) に向かって親ディレクトリを遡りながら `.cderun.yaml` / `.tools.yaml` を探します。
-   - 例: `./.cderun.yaml` が `../.cderun.yaml` より優先されます。
-
-2. **ユーザー設定**:
+1. **Project-level (Upward Directory Search)**:
+   - Starts at the execution directory (`{{PWD}}`) and iteratively traverses up toward the root directory (`/`) looking for `.cderun.yaml` and `.tools.yaml`.
+   - Allows fine-tuning of tools and defaults per repository or project tree.
+2. **User-level**:
    - `~/.config/cderun/.cderun.yaml`
    - `~/.config/cderun/.tools.yaml`
-
-3. **システム全体設定**:
+3. **System-level**:
    - `/etc/cderun/.cderun.yaml`
    - `/etc/cderun/.tools.yaml`
-
-4. **ネスト実行時の注入設定**:
+4. **Nested Execution Injection**:
    - `/run/cderun/.cderun.yaml`
    - `/run/cderun/.tools.yaml`
-   - ※この設定はネスト実行（`--mount-cderun`）時に動的に生成・マウントされます。
+   - *Note: These files are dynamically mapped under `/run/cderun/` during recursive nested runs.*
 
-#### マージのルール（リスト型の上書き原則）
+---
 
-- 検索された順序（優先順位の高い順）で設定ファイルの内容が読み込まれ、マージされます。
-- **リスト型の設定（`mounts`, `env`, `ports`, `groupAdd`, `devices`, `sensitiveEnv` など）について**:
-  これらの設定は、**「上書き（完全置き換え）」**となります。優先順位の高いファイルに定義があれば、低いファイルの内容はすべて無視されます。マージ（追加）はされません。
-- **明示的な空リストによるオーバーライド**:
-  上位の設定ファイルで明示的に空のリスト（例: `ports: []` や `env: []`）が定義されている場合、下位の設定ファイルで定義された内容は完全にクリアされ、空として扱われます。これは、コレクション全体の上書き原則によるものです。
+### 3. Merging Rules & List Collection Overriding
 
-## 設定スキーマ
+- **Scalar Options**: Primitive/scalar options (such as strings, integers, floats, and booleans) are merged field-by-field. Higher-priority layers overwrite individual fields of lower-priority layers.
+- **List and Array Options (Collections)**: List-type options (such as `mounts`, `env`, `ports`, `groupAdd`, `devices`, `sensitiveEnv`) follow an **"All-or-Nothing Replacement"** rule. They do *not* merge or append values across different priority layers. If a higher-priority config file defines a list-type option, it completely discards any definitions of that same option found in lower-priority files.
+- **Explicit Empty List Override**: Defining an explicit empty list (e.g., `ports: []` or `env: []`) in a higher-priority configuration file will completely clear out the respective collection, preventing lower-priority values from leaking.
 
-設定ファイルで使用するキー名は、原則としてコマンドラインフラグに対応した**キャメルケース（camelCase）**です。
+---
 
-> **例外**: `mounts` 配列内の各要素（`MountConfig`）のフィールド名のみ、一部でスネークケース（snake_case）が使用されています（例: `read_only`, `optional`）。これは、一般的なコンテナ設定の慣習や互換性を考慮したものです。
+## Configuration Schemas
 
-### `.cderun.yaml` (Global Settings)
+Key names in configuration files are defined in standard **camelCase**, matching their respective CLI names.
 
-#### トップレベル
+> **Exception**: Individual items inside `mounts` and `devices` configuration blocks support certain snake_case properties (e.g., `read_only`, `optional`, `path_on_host`) to align with OCI or Docker specifications.
 
-- `runtime` (string): 使用するコンテナランタイム (`docker` | `podman` | `containerd`)
-- `socketPath` (string): ホスト上のランタイムソケットの絶対パス
-- `defaults` (object): cderunコマンドのデフォルト動作（下記参照）
-- `logging` (object): ログ出力設定
-  - `level`: `error` | `warn` | `info` | `debug` | `trace`
-  - `format`: `text` | `json`
-  - `timestamp`: bool
+### `.cderun.yaml` Schema
 
-#### `defaults` ブロックでサポートされるフィールド
+- **`runtime`** (string): Container runtime to connect with (`docker` | `podman` | `containerd`).
+- **`socketPath`** (string): Absolute path to the runtime engine socket on the host.
+- **`defaults`** (object): Specifies default configuration settings for CLI options (accepts all standard options like `tty`, `interactive`, `remove`, `strictEnv`, `network`, etc.).
+- **`logging`** (object): Configure logging output.
+  - `level` (string): Logger verbosity level (`error` | `warn` | `info` | `debug` | `trace`).
+  - `format` (string): Logger format (`text` | `json`).
+  - `timestamp` (bool): If `true`, prints timestamps in logs.
 
-- `tty`, `interactive`, `remove`, `strictEnv` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout` (string)
-- `cpus` (float64)
-- `pullMaxRetries` (int)
-- `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
-- `mountCderunPath`, `mountSocketPath` (string)
-- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
-- `dryRun`, `diagnosis` (bool)
-- `dryRunFormat`, `diagnosisFormat` (string)
-- `mounts` ([]MountConfig)
-- `devices` (slice of `DeviceConfig` object or string)
+#### Sample `.cderun.yaml`
 
 ```yaml
-# .cderun.yaml の設定例
 runtime: docker
 socketPath: /var/run/docker.sock
 defaults:
@@ -126,26 +99,25 @@ defaults:
   pullMaxRetries: 3
   pullBackoffBase: 1s
   hangTimeout: 10s
-  sensitiveEnv: null # 指定なし = すべての環境変数を自動マスク
 logging:
   level: warn
   format: text
   timestamp: true
 ```
 
-### `.tools.yaml` (Tool Mappings)
+---
 
-各ツール名をキーとして、そのツールの実行設定を定義します。`defaults` ブロックでサポートされているすべてのフィールドに加え、以下のフィールドが必須です。
+### `.tools.yaml` Schema
 
-- `image` (string, 必須): 使用するコンテナイメージ
+Mappings configured as `<tool_name>: <config_block>`. The `<config_block>` accepts all options available in `defaults` of `.cderun.yaml`, along with these additional or overridden fields:
 
-また、以下のログ設定をツールごとに上書き可能です。
+- **`image`** (string, **required**): Image tag or resolution expression (e.g., `"node:20-alpine"`).
+- **`logLevel`, `logFormat`** (string): Tool-specific logger overrides.
+- **`logTimestamp`** (bool): Tool-specific log timestamp control.
 
-- `logLevel`, `logFormat` (string)
-- `logTimestamp` (bool)
+#### Sample `.tools.yaml`
 
 ```yaml
-# .tools.yaml の設定例
 node:
   image: "node:20-alpine"
   workdir: /workspace
@@ -159,7 +131,7 @@ node:
       target: /root/.npmrc
       read_only: true
   env:
-    - "NODE_ENV=development"
+    - NODE_ENV=development
 
 python:
   image: "python:3.11-slim"
@@ -169,38 +141,38 @@ python:
       source: .
       target: /app
   env:
-    - "PYTHONUNBUFFERED=1"
+    - PYTHONUNBUFFERED=1
 ```
 
-## 設定オプション詳細
+---
 
-### マウント設定 (`mounts`)
+## Detailed Block Configurations
 
-`mounts` 配列の各要素は以下のフィールドを持ちます。
+### 1. Mount Configurations (`mounts`)
 
-- `type`: `bind` | `volume` | `tmpfs` (デフォルト: `bind`)
-- `source`: ホスト側のパス
-- `target` (必須): コンテナ内のパス
-- `read_only`: bool
-- `optional`: bool (`type=bind` の場合、ホスト側のソースが存在しなくてもエラーにせずスキップする)
+Each item in the `mounts` list supports the following attributes:
 
-### デバイス設定 (`devices`)
+- `type` (string): Mount strategy (`bind` | `volume` | `tmpfs`). Default: `bind`.
+- `source` (string): Host filesystem path (required for `bind` type).
+- `target` (string, **required**): Destination absolute path inside the container.
+- `read_only` (bool): Mount the path as read-only inside the container.
+- `optional` (bool): For `bind` type only. If `true`, the mount is silently skipped if the source path does not exist on the host filesystem.
 
-`devices` 配列の各要素は、オブジェクト形式または文字列形式をサポートしています。
+### 2. Device Configurations (`devices`)
 
-#### オブジェクト形式
+Accepts both structured objects and shorthand colon-delimited strings:
 
-- `source` (必須): ホスト側のデバイスパス
-- `destination` (必須): コンテナ内のデバイスパス
-- `permissions`: デバイスの権限 (例: `rwm`)。デフォルトは `rwm`。
+#### Object Notation
 
-#### 文字列形式
+- `source` (string, **required**): Path to the device on the host.
+- `destination` (string, **required**): Path to map the device inside the container.
+- `permissions` (string): Access permissions (e.g., `rwm`). Default: `rwm`.
 
-`<host-path>:<container-path>[:<permissions>]` の形式で記述します。
-許可される権限パターン（cgroup permissions）は `rwm` の組み合わせです（例: `rw` や `r`）。安全性を保つために、正規表現検証が行われます。
+#### String Notation
+
+Syntax: `<host-path>:<container-path>[:<permissions>]`. Permissions are strictly validated against `^[rwm]+$`.
 
 ```yaml
-# デバイス指定の例
 devices:
   - source: /dev/fuse
     destination: /dev/fuse
