@@ -80,7 +80,7 @@ When a container is configured to run in privileged mode (`--privileged` or `pri
 To encourage privilege minimization and maintain robust container isolation:
 
 - **Host Network Mode Warning**: When host network namespace sharing is enabled (`--network host` or `network: host` in config files), `cderun` emits a `Warn` level security log. Bypassing network namespace isolation exposes the host's loopback and network services to the container, which should be restricted to trusted workloads.
-- **Sensitive Bind Mounts**: Bind mounts that expose highly sensitive host directories (including `/`, `/boot`, `/dev`, `/etc`, `/proc`, and `/sys` or their subdirectories) are scanned. If a container is configured with any of these host-side paths as a mount source, a visible warning is logged at the `Warn` level to prevent container escapes or accidental host configuration exposure.
+- **Sensitive Bind Mounts**: Bind mounts that expose highly sensitive host directories (including `/`, `/boot`, `/dev`, `/etc`, `/proc`, and `/sys` or their subdirectories) are scanned. If a container is configured with any of these host-side paths as a mount source, a visible warning is logged at the `Warn` level to flag the risk and help users mitigate potential container escapes or host configuration exposure.
 
 ## Registry Mismatch Validation
 
