@@ -17,15 +17,15 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - | - |
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - | - |
 | T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - | - |
-| T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | - |
+| T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | DONE |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - | DONE |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | DONE |
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | DONE |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | DONE |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | DONE |
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
-| T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | - |
-| T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | - |
+| T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
+| T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
@@ -58,7 +58,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T49 | Docker 明示 Remove で匿名ボリュームがリークする | バグ | 中 | 小 | - | DONE |
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
-| T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | - |
+| T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | DONE |
 | T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
 | T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | DONE |
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
@@ -222,51 +222,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
-
----
-
-## T18: `ci.yaml` のアクションをコミットハッシュ固定
-
-- 種別: CI / セキュリティ
-- 対象: `.github/workflows/ci.yaml`
-
-### 問題
-
-`release.yaml` ではコミットハッシュ固定済みだが、`ci.yaml` はタグ指定のまま（`actions/checkout@v4`, `actions/setup-go@v5` 等）。タグは書き換え可能なためサプライチェーン攻撃のリスクがある。
-
-### 方針
-
-`pinact` で自動置換する（**LLM による手書き置換は幻覚のリスクがあるため不可**）。
-
-```bash
-pinact run .github/workflows/ci.yaml
-```
-
-`pinact run` は引数なしで `.github/workflows/` 全体を処理できる。`pinact run -u` でピン済みハッシュの更新も可能なので、定期的なメンテにも使える。
-
-### 完了条件
-
-- `ci.yaml` の全アクションがコミットハッシュ + バージョンコメント形式になっている
-- ハッシュは pinact の出力そのまま（手書き改変なし）
-
----
-
-## T19: CI の Go バージョン指定を `go.mod` に一本化
-
-- 種別: CI / メンテナンス性
-- 対象: `.github/workflows/ci.yaml`
-
-### 問題
-
-`ci.yaml` は `go-version: '1.25.0'` とハードコードされているが、`release.yaml` は `go-version-file: go.mod` を使っている。方針を統一し `ci.yaml` も `go-version-file: go.mod` にする。
-
-### 補足（検証済み）
-
-`go.mod` の go directive は `go 1.25.0` であり、ci.yaml のハードコードは現状 go.mod と一致している。したがってこの変更は挙動を変えず「バージョン管理箇所を go.mod に一本化する」だけの安全な変更。最新（1.26.x）へ上げたい場合は go.mod 側を更新すれば CI も追従する形になる。
-
-### 完了条件
-
-- `ci.yaml` の全ジョブが `go-version-file: go.mod` を使用し、CI がグリーン
 
 ---
 
@@ -962,34 +917,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 - containerd + `type=volume` が明示エラーになるテスト
 - containerd + `type=tmpfs` が有効な OCI マウントになるテスト
-
----
-
-## T52: コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む）
-
-- 種別: 改善（堅牢性）
-- 優先度: 中
-- 対象: `internal/command/root.go:735, 757, 767, 836-864`、`internal/command/signals_unix.go:12-14`
-- 仕様変更: あり → `docs/features/signal-handling-security.md` の更新
-
-### 問題
-
-1. `signal.Notify` はコンテナ start 直前（`root.go:757`）まで設置されないため、`PullImage` / `CreateContainer` 中の SIGINT/SIGTERM はデフォルト動作でプロセスを即死させる。`CreateContainer` 完了後〜Notify 前に受けると deferred remove が走らず orphan コンテナになる
-2. forwarder 開始（757）〜 `StartContainer`（767）の間に受けたシグナルは「未起動コンテナへの転送失敗（warn のみ）」で消費され、その後コンテナは何事もなく起動する — CI の SIGTERM が黙って握りつぶされる
-3. `sigChan` のバッファが 1 のため、`SignalContainer` ブロック中の連続シグナルが落ちる
-4. SIGHUP を Notify していないため、ターミナルクローズで即死し orphan コンテナが残る（T22 の `--prune` は事後対策であり予防にならない）
-
-### 方針
-
-- `initContainer` より前に `signal.Notify` を設置し、コンテナ起動まではシグナルをキューイングするか context キャンセルで作成を中断する
-- チャネルバッファを増やす（例: 4）
-- SIGHUP（必要なら SIGQUIT も）を転送対象に加える。意図的に除外する場合はその設計判断を `signal-handling-security.md` に明記する
-
-### 完了条件
-
-- pull/create 中のシグナルで orphan コンテナが残らないテスト
-- 起動直前のシグナルが失われず、起動後に転送されるかプロセスが安全に中断されるテスト
-- SIGHUP の扱いが実装とドキュメントで一致している
 
 ---
 

@@ -129,18 +129,23 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 			expected: []string{"cderun", "--cderun-tty=true", "sh"},
 		},
 		{
-			name:     "P1 flag with argument following",
-			args:     []string{"cderun", "node", "--cderun-image", "alpine", "app.js"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "app.js"},
+			name:     "P1 flag with argument following (equals-sign format required)",
+			args:     []string{"cderun", "node", "--cderun-image=alpine", "app.js"},
+			expected: []string{"cderun", "--cderun-image=alpine", "node", "app.js"},
+		},
+		{
+			name:     "boolean P1 flag followed by an argument (should not eat next arg)",
+			args:     []string{"cderun", "node", "--cderun-tty", "app.js"},
+			expected: []string{"cderun", "--cderun-tty", "node", "app.js"},
 		},
 		{
 			name:     "complex hoisting with mixed flags",
-			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image", "alpine", "--cderun-tty=false"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "--cderun-tty=false", "-t", "sh", "-c", "ls"},
+			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image=alpine", "--cderun-tty=false"},
+			expected: []string{"cderun", "--cderun-image=alpine", "--cderun-tty=false", "-t", "sh", "-c", "ls"},
 		},
 		{
 			name:     "P1 flag before subcommand (error case)",
-			args:     []string{"cderun", "--cderun-image", "alpine", "sh"},
+			args:     []string{"cderun", "--cderun-image=alpine", "sh"},
 			expected: nil,
 		},
 		{
@@ -150,8 +155,8 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 		},
 		{
 			name:     "polyglot with P1 and regular flags",
-			args:     []string{"node", "--version", "--cderun-image", "alpine", "-t"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version", "-t"},
+			args:     []string{"node", "--version", "--cderun-image=alpine", "-t"},
+			expected: []string{"cderun", "--cderun-image=alpine", "node", "--version", "-t"},
 		},
 		{
 			name:     "no subcommand found (diagnosis mode behavior in preprocess)",
@@ -195,8 +200,8 @@ func TestUnit_Root_PreprocessArgs_HoistingAndPolyglot(t *testing.T) {
 		},
 		{
 			name:     "P1 flag with value and more arguments",
-			args:     []string{"cderun", "node", "--cderun-image", "node:20", "app.js", "--foo"},
-			expected: []string{"cderun", "--cderun-image", "node:20", "node", "app.js", "--foo"},
+			args:     []string{"cderun", "node", "--cderun-image=node:20", "app.js", "--foo"},
+			expected: []string{"cderun", "--cderun-image=node:20", "node", "app.js", "--foo"},
 		},
 	}
 
@@ -796,7 +801,7 @@ func TestUnit_Root_Execute_HangTimeout_Zero_InfiniteWait(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "0"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level=trace", "--cderun-hang-timeout=0"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
@@ -1208,7 +1213,7 @@ func TestUnit_Root_EarlyLoggerInit_LogLevel(t *testing.T) {
 
 func TestUnit_Root_EarlyLoggerInit_CderunLogLevel(t *testing.T) {
 	t.Parallel()
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level=trace"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(int) {}
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return &runtime.MockRuntime{}, nil
@@ -1368,7 +1373,7 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 			},
 		}
 		var buf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-diagnosis", "--cderun-config", "/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-diagnosis", "--cderun-config=/f1.yaml"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
@@ -1496,8 +1501,8 @@ func TestUnit_Root_PreprocessArgs_FlagArguments(t *testing.T) {
 		},
 		{
 			name:     "hoisting P1 flag with argument",
-			args:     []string{"cderun", "node", "--cderun-image", "alpine", "--version"},
-			expected: []string{"cderun", "--cderun-image", "alpine", "node", "--version"},
+			args:     []string{"cderun", "node", "--cderun-image=alpine", "--version"},
+			expected: []string{"cderun", "--cderun-image=alpine", "node", "--version"},
 		},
 		{
 			name:     "no subcommand found with flag arg",
@@ -1520,12 +1525,12 @@ func TestUnit_Signals_Unix_AllSignals(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "SIGINT", getSignalName(syscall.SIGINT))
 	assert.Equal(t, "SIGTERM", getSignalName(syscall.SIGTERM))
+	assert.Equal(t, "SIGHUP", getSignalName(syscall.SIGHUP))
+	assert.Equal(t, "SIGQUIT", getSignalName(syscall.SIGQUIT))
 
 	// Just ensure they are consistent with what syscall returns on this platform
 	killName := syscall.SIGKILL.String()
-	quitName := syscall.SIGQUIT.String()
 	assert.Equal(t, killName, getSignalName(syscall.SIGKILL))
-	assert.Equal(t, quitName, getSignalName(syscall.SIGQUIT))
 }
 
 func TestUnit_RunCderunCore_PreprocessError(t *testing.T) {
@@ -1732,7 +1737,7 @@ func TestUnit_Root_Execute_AttachGracePeriodTimeout_DebugLog(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level=debug"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
@@ -1843,7 +1848,7 @@ func TestUnit_Root_Execute_ResizeContainerTTY(t *testing.T) {
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sh", "--cderun-log-level", "debug"}, func(o *rootOptions, cmd *cobra.Command) {
+			errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--tty", "sh", "--cderun-log-level=debug"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 				o.isTerminal = func(fd int) bool { return true }
 				o.termGetSize = func(fd int) (int, int, error) { return 80, 24, nil }
@@ -1930,7 +1935,7 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 	}
 
 	var logBuf safeBuffer
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level", "trace", "--cderun-hang-timeout", "100ms"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-log-level=trace", "--cderun-hang-timeout=100ms"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false } // Non-terminal
 		o.exitFunc = func(code int) {}
@@ -1950,9 +1955,9 @@ func TestUnit_Root_Execute_HangTimeoutForceTermination(t *testing.T) {
 func TestUnit_Root_PreprocessArgs_UnknownP1Flag(t *testing.T) {
 	t.Parallel()
 	cmd := newRootCmd(&rootOptions{})
-	// Hoisted flag that is not in the flag set (coverage for f == nil)
-	args := []string{"cderun", "sh", "--cderun-unknown", "value"}
-	expected := []string{"cderun", "--cderun-unknown", "sh", "value"}
+	// Hoisted flag that is not in the flag set (should still hoist with = format)
+	args := []string{"cderun", "sh", "--cderun-unknown=value"}
+	expected := []string{"cderun", "--cderun-unknown=value", "sh"}
 	actual, err := preprocessArgs(cmd, args)
 	require.NoError(t, err)
 	assert.Equal(t, expected, actual)
@@ -1984,7 +1989,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 	})
 
 	t.Run("handleDryRun JSON error", func(t *testing.T) {
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "json"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format=json"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.jsonMarshalIndent = func(v any, prefix, indent string) ([]byte, error) {
 				return nil, errors.New("json dry-run error")
@@ -1995,7 +2000,7 @@ func TestUnit_Root_MarshalingErrors(t *testing.T) {
 	})
 
 	t.Run("handleDryRun YAML error", func(t *testing.T) {
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format", "yaml"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh", "--cderun-dry-run", "--cderun-dry-run-format=yaml"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.yamlMarshal = func(v any) ([]byte, error) {
 				return nil, errors.New("yaml dry-run error")
@@ -2120,7 +2125,7 @@ func TestUnit_Root_EarlyLogger_Validation(t *testing.T) {
 	})
 
 	t.Run("invalid early cderun log level", func(t *testing.T) {
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-level", "invalid-level"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-level=invalid-level"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(code int) {}
 		})
 		require.Error(t, err)
@@ -2136,7 +2141,7 @@ func TestUnit_Root_EarlyLogger_Validation(t *testing.T) {
 	})
 
 	t.Run("invalid early cderun log format", func(t *testing.T) {
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-format", "invalid-format"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh", "--cderun-log-format=invalid-format"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(code int) {}
 		})
 		require.Error(t, err)

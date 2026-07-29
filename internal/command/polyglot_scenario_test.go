@@ -62,8 +62,8 @@ func TestScenario_Polyglot_Extra(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		// node -v --cderun-image node:alpine --foo
-		err := runPolyglotTest(ctx, []string{"node", "-v", "--cderun-image", "node:alpine", "--foo"}, mfs, mock)
+		// node -v --cderun-image=node:alpine --foo
+		err := runPolyglotTest(ctx, []string{"node", "-v", "--cderun-image=node:alpine", "--foo"}, mfs, mock)
 
 		require.NoError(t, err)
 		cfg := mock.GetCreatedConfig()

@@ -8,9 +8,9 @@ import (
 	"syscall"
 )
 
-// setupSignals sets up SIGINT and SIGTERM notification.
+// setupSignals sets up SIGINT, SIGTERM, SIGHUP and SIGQUIT notification.
 func setupSignals(sigChan chan os.Signal) {
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 }
 
 // setupResizeSignal sets up SIGWINCH notification.
@@ -25,6 +25,10 @@ func getSignalName(sig os.Signal) string {
 		return "SIGINT"
 	case syscall.SIGTERM:
 		return "SIGTERM"
+	case syscall.SIGHUP:
+		return "SIGHUP"
+	case syscall.SIGQUIT:
+		return "SIGQUIT"
 	default:
 		return sig.String()
 	}

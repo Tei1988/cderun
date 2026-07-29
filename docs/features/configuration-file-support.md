@@ -73,11 +73,13 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
    - `/run/cderun/.tools.yaml`
    - ※この設定はネスト実行（`--mount-cderun`）時に動的に生成・マウントされます。
 
-#### マージのルール
+#### マージのルール（リスト型の上書き原則）
 
 - 検索された順序（優先順位の高い順）で設定ファイルの内容が読み込まれ、マージされます。
 - **リスト型の設定（`mounts`, `env`, `ports`, `groupAdd`, `devices`, `sensitiveEnv` など）について**:
   これらの設定は、**「上書き（完全置き換え）」**となります。優先順位の高いファイルに定義があれば、低いファイルの内容はすべて無視されます。マージ（追加）はされません。
+- **明示的な空リストによるオーバーライド**:
+  上位の設定ファイルで明示的に空のリスト（例: `ports: []` や `env: []`）が定義されている場合、下位の設定ファイルで定義された内容は完全にクリアされ、空として扱われます。これは、コレクション全体の上書き原則によるものです。
 
 ## 設定スキーマ
 
@@ -104,12 +106,32 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 - `cpus` (float64)
 - `pullMaxRetries` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
-- `mountCderunPath`, `mountSocketPath` (ConfigPath object/string)
+- `mountCderunPath`, `mountSocketPath` (string)
 - `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)
 - `devices` (slice of `DeviceConfig` object or string)
+
+```yaml
+# .cderun.yaml の設定例
+runtime: docker
+socketPath: /var/run/docker.sock
+defaults:
+  tty: true
+  interactive: true
+  remove: true
+  network: bridge
+  pull: missing
+  pullMaxRetries: 3
+  pullBackoffBase: 1s
+  hangTimeout: 10s
+  sensitiveEnv: null # 指定なし = すべての環境変数を自動マスク
+logging:
+  level: warn
+  format: text
+  timestamp: true
+```
 
 ### `.tools.yaml` (Tool Mappings)
 
@@ -121,6 +143,34 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 
 - `logLevel`, `logFormat` (string)
 - `logTimestamp` (bool)
+
+```yaml
+# .tools.yaml の設定例
+node:
+  image: "node:20-alpine"
+  workdir: /workspace
+  mounts:
+    - type: bind
+      source: .
+      target: /workspace
+      read_only: false
+    - type: bind
+      source: ~/.npmrc
+      target: /root/.npmrc
+      read_only: true
+  env:
+    - "NODE_ENV=development"
+
+python:
+  image: "python:3.11-slim"
+  workdir: /app
+  mounts:
+    - type: bind
+      source: .
+      target: /app
+  env:
+    - "PYTHONUNBUFFERED=1"
+```
 
 ## 設定オプション詳細
 
@@ -147,3 +197,13 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 #### 文字列形式
 
 `<host-path>:<container-path>[:<permissions>]` の形式で記述します。
+許可される権限パターン（cgroup permissions）は `rwm` の組み合わせです（例: `rw` や `r`）。安全性を保つために、正規表現検証が行われます。
+
+```yaml
+# デバイス指定の例
+devices:
+  - source: /dev/fuse
+    destination: /dev/fuse
+    permissions: rwm
+  - "/dev/snd:/dev/snd:rw"
+```

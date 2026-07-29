@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -283,156 +284,99 @@ func (o *rootOptions) ensureHooks() {
 	}
 }
 
+func opt[T any](changed bool, v T) *T {
+	if !changed {
+		return nil
+	}
+	return &v
+}
+
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
 	cliOpts := config.CLIOptions{
-		Image:                    o.image,
-		ImageSet:                 cmd.Flags().Changed("image"),
-		TTY:                      o.tty,
-		TTYSet:                   cmd.Flags().Changed("tty"),
-		Interactive:              o.interactive,
-		InteractiveSet:           cmd.Flags().Changed("interactive"),
-		Network:                  o.network,
-		NetworkSet:               cmd.Flags().Changed("network"),
-		CderunNetwork:            o.cderunNetwork,
-		CderunNetworkSet:         cmd.Flags().Changed("cderun-network"),
-		Remove:                   o.remove,
-		RemoveSet:                cmd.Flags().Changed("remove"),
-		CderunRemove:             o.cderunRemove,
-		CderunRemoveSet:          cmd.Flags().Changed("cderun-remove"),
-		CderunTTY:                o.cderunTTY,
-		CderunTTYSet:             cmd.Flags().Changed("cderun-tty"),
-		CderunInteractive:        o.cderunInteractive,
-		CderunInteractiveSet:     cmd.Flags().Changed("cderun-interactive"),
-		CderunImage:              o.cderunImage,
-		CderunImageSet:           cmd.Flags().Changed("cderun-image"),
-		Runtime:                  o.runtimeName,
-		RuntimeSet:               cmd.Flags().Changed("runtime"),
-		CderunRuntime:            o.cderunRuntime,
-		CderunRuntimeSet:         cmd.Flags().Changed("cderun-runtime"),
-		SocketPath:               o.socketPath,
-		SocketPathSet:            cmd.Flags().Changed("socket-path"),
-		CderunSocketPath:         o.cderunSocketPath,
-		CderunSocketPathSet:      cmd.Flags().Changed("cderun-socket-path"),
-		MountSocket:              o.mountSocket,
-		MountSocketSet:           cmd.Flags().Changed("mount-socket"),
-		CderunMountSocket:        o.cderunMountSocket,
-		CderunMountSocketSet:     cmd.Flags().Changed("cderun-mount-socket"),
-		MountSocketPath:          o.mountSocketPath,
-		MountSocketPathSet:       cmd.Flags().Changed("mount-socket-path"),
-		CderunMountSocketPath:    o.cderunMountSocketPath,
-		CderunMountSocketPathSet: cmd.Flags().Changed("cderun-mount-socket-path"),
+		Image:                    opt(cmd.Flags().Changed("image"), o.image),
+		TTY:                      opt(cmd.Flags().Changed("tty"), o.tty),
+		Interactive:              opt(cmd.Flags().Changed("interactive"), o.interactive),
+		Network:                  opt(cmd.Flags().Changed("network"), o.network),
+		CderunNetwork:            opt(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
+		Remove:                   opt(cmd.Flags().Changed("remove"), o.remove),
+		CderunRemove:             opt(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
+		CderunTTY:                opt(cmd.Flags().Changed("cderun-tty"), o.cderunTTY),
+		CderunInteractive:        opt(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
+		CderunImage:              opt(cmd.Flags().Changed("cderun-image"), o.cderunImage),
+		Runtime:                  opt(cmd.Flags().Changed("runtime"), o.runtimeName),
+		CderunRuntime:            opt(cmd.Flags().Changed("cderun-runtime"), o.cderunRuntime),
+		SocketPath:               opt(cmd.Flags().Changed("socket-path"), o.socketPath),
+		CderunSocketPath:         opt(cmd.Flags().Changed("cderun-socket-path"), o.cderunSocketPath),
+		MountSocket:              opt(cmd.Flags().Changed("mount-socket"), o.mountSocket),
+		CderunMountSocket:        opt(cmd.Flags().Changed("cderun-mount-socket"), o.cderunMountSocket),
+		MountSocketPath:          opt(cmd.Flags().Changed("mount-socket-path"), o.mountSocketPath),
+		CderunMountSocketPath:    opt(cmd.Flags().Changed("cderun-mount-socket-path"), o.cderunMountSocketPath),
 		Env:                      o.env,
 		CderunEnv:                o.cderunEnv,
-		Workdir:                  o.workdir,
-		WorkdirSet:               cmd.Flags().Changed("workdir"),
-		CderunWorkdir:            o.cderunWorkdir,
-		CderunWorkdirSet:         cmd.Flags().Changed("cderun-workdir"),
+		Workdir:                  opt(cmd.Flags().Changed("workdir"), o.workdir),
+		CderunWorkdir:            opt(cmd.Flags().Changed("cderun-workdir"), o.cderunWorkdir),
 		Mounts:                   o.mounts,
 		CderunMounts:             o.cderunMounts,
-		MountCderun:              o.mountCderun,
-		MountCderunSet:           cmd.Flags().Changed("mount-cderun"),
-		CderunMountCderun:        o.cderunMountCderun,
-		CderunMountCderunSet:     cmd.Flags().Changed("cderun-mount-cderun"),
-		MountCderunPath:          o.mountCderunPath,
-		MountCderunPathSet:       cmd.Flags().Changed("mount-cderun-path"),
-		CderunMountCderunPath:    o.cderunMountCderunPath,
-		CderunMountCderunPathSet: cmd.Flags().Changed("cderun-mount-cderun-path"),
-		MountTools:               o.mountTools,
-		MountToolsSet:            cmd.Flags().Changed("mount-tools"),
-		CderunMountTools:         o.cderunMountTools,
-		CderunMountToolsSet:      cmd.Flags().Changed("cderun-mount-tools"),
-		MountAllTools:            o.mountAllTools,
-		MountAllToolsSet:         cmd.Flags().Changed("mount-all-tools"),
-		CderunMountAllTools:      o.cderunMountAllTools,
-		CderunMountAllToolsSet:   cmd.Flags().Changed("cderun-mount-all-tools"),
-		DryRun:                   o.dryRun,
-		DryRunSet:                cmd.Flags().Changed("dry-run"),
-		CderunDryRun:             o.cderunDryRun,
-		CderunDryRunSet:          cmd.Flags().Changed("cderun-dry-run"),
-		DryRunFormat:             o.dryRunFormat,
-		DryRunFormatSet:          cmd.Flags().Changed("dry-run-format"),
-		CderunDryRunFormat:       o.cderunDryRunFormat,
-		CderunDryRunFormatSet:    cmd.Flags().Changed("cderun-dry-run-format"),
-		Diagnosis:                o.diagnosis,
-		DiagnosisSet:             cmd.Flags().Changed("diagnosis"),
-		CderunDiagnosis:          o.cderunDiagnosis,
-		CderunDiagnosisSet:       cmd.Flags().Changed("cderun-diagnosis"),
-		DiagnosisFormat:          o.diagnosisFormat,
-		DiagnosisFormatSet:       cmd.Flags().Changed("diagnosis-format"),
-		CderunDiagnosisFormat:    o.cderunDiagnosisFormat,
-		CderunDiagnosisFormatSet: cmd.Flags().Changed("cderun-diagnosis-format"),
-		LogLevel:                 o.logLevel,
-		LogLevelSet:              cmd.Flags().Changed("log-level"),
-		LogFormat:                o.logFormat,
-		LogFormatSet:             cmd.Flags().Changed("log-format"),
-		LogTimestamp:             o.logTimestamp,
-		LogTimestampSet:          cmd.Flags().Changed("log-timestamp"),
-		CderunLogLevel:           o.cderunLogLevel,
-		CderunLogLevelSet:        cmd.Flags().Changed("cderun-log-level"),
-		CderunLogFormat:          o.cderunLogFormat,
-		CderunLogFormatSet:       cmd.Flags().Changed("cderun-log-format"),
-		CderunLogTimestamp:       o.cderunLogTimestamp,
-		CderunLogTimestampSet:    cmd.Flags().Changed("cderun-log-timestamp"),
-		StrictEnv:                o.strictEnv,
-		StrictEnvSet:             cmd.Flags().Changed("strict-env"),
-		CderunStrictEnv:          o.cderunStrictEnv,
-		CderunStrictEnvSet:       cmd.Flags().Changed("cderun-strict-env"),
-		HangTimeout:              o.hangTimeout,
-		HangTimeoutSet:           cmd.Flags().Changed("hang-timeout"),
-		CderunHangTimeout:        o.cderunHangTimeout,
-		CderunHangTimeoutSet:     cmd.Flags().Changed("cderun-hang-timeout"),
+		MountCderun:              opt(cmd.Flags().Changed("mount-cderun"), o.mountCderun),
+		CderunMountCderun:        opt(cmd.Flags().Changed("cderun-mount-cderun"), o.cderunMountCderun),
+		MountCderunPath:          opt(cmd.Flags().Changed("mount-cderun-path"), o.mountCderunPath),
+		CderunMountCderunPath:    opt(cmd.Flags().Changed("cderun-mount-cderun-path"), o.cderunMountCderunPath),
+		MountTools:               opt(cmd.Flags().Changed("mount-tools"), o.mountTools),
+		CderunMountTools:         opt(cmd.Flags().Changed("cderun-mount-tools"), o.cderunMountTools),
+		MountAllTools:            opt(cmd.Flags().Changed("mount-all-tools"), o.mountAllTools),
+		CderunMountAllTools:      opt(cmd.Flags().Changed("cderun-mount-all-tools"), o.cderunMountAllTools),
+		DryRun:                   opt(cmd.Flags().Changed("dry-run"), o.dryRun),
+		CderunDryRun:             opt(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
+		DryRunFormat:             opt(cmd.Flags().Changed("dry-run-format"), o.dryRunFormat),
+		CderunDryRunFormat:       opt(cmd.Flags().Changed("cderun-dry-run-format"), o.cderunDryRunFormat),
+		Diagnosis:                opt(cmd.Flags().Changed("diagnosis"), o.diagnosis),
+		CderunDiagnosis:          opt(cmd.Flags().Changed("cderun-diagnosis"), o.cderunDiagnosis),
+		DiagnosisFormat:          opt(cmd.Flags().Changed("diagnosis-format"), o.diagnosisFormat),
+		CderunDiagnosisFormat:    opt(cmd.Flags().Changed("cderun-diagnosis-format"), o.cderunDiagnosisFormat),
+		LogLevel:                 opt(cmd.Flags().Changed("log-level"), o.logLevel),
+		LogFormat:                opt(cmd.Flags().Changed("log-format"), o.logFormat),
+		LogTimestamp:             opt(cmd.Flags().Changed("log-timestamp"), o.logTimestamp),
+		CderunLogLevel:           opt(cmd.Flags().Changed("cderun-log-level"), o.cderunLogLevel),
+		CderunLogFormat:          opt(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
+		CderunLogTimestamp:       opt(cmd.Flags().Changed("cderun-log-timestamp"), o.cderunLogTimestamp),
+		StrictEnv:                opt(cmd.Flags().Changed("strict-env"), o.strictEnv),
+		CderunStrictEnv:          opt(cmd.Flags().Changed("cderun-strict-env"), o.cderunStrictEnv),
+		HangTimeout:              opt(cmd.Flags().Changed("hang-timeout"), o.hangTimeout),
+		CderunHangTimeout:        opt(cmd.Flags().Changed("cderun-hang-timeout"), o.cderunHangTimeout),
 
 		// Docker-compatible flags
 		Ports:                    o.ports,
 		CderunPorts:              o.cderunPorts,
-		PublishAll:               o.publishAll,
-		PublishAllSet:            cmd.Flags().Changed("publish-all"),
-		CderunPublishAll:         o.cderunPublishAll,
-		CderunPublishAllSet:      cmd.Flags().Changed("cderun-publish-all"),
+		PublishAll:               opt(cmd.Flags().Changed("publish-all"), o.publishAll),
+		CderunPublishAll:         opt(cmd.Flags().Changed("cderun-publish-all"), o.cderunPublishAll),
 		Expose:                   o.expose,
 		CderunExpose:             o.cderunExpose,
-		Hostname:                 o.hostname,
-		HostnameSet:              cmd.Flags().Changed("hostname"),
-		CderunHostname:           o.cderunHostname,
-		CderunHostnameSet:        cmd.Flags().Changed("cderun-hostname"),
+		Hostname:                 opt(cmd.Flags().Changed("hostname"), o.hostname),
+		CderunHostname:           opt(cmd.Flags().Changed("cderun-hostname"), o.cderunHostname),
 		DNS:                      o.dns,
 		CderunDNS:                o.cderunDNS,
 		AddHosts:                 o.addHosts,
 		CderunAddHosts:           o.cderunAddHosts,
-		User:                     o.user,
-		UserSet:                  cmd.Flags().Changed("user"),
-		CderunUser:               o.cderunUser,
-		CderunUserSet:            cmd.Flags().Changed("cderun-user"),
-		Privileged:               o.privileged,
-		PrivilegedSet:            cmd.Flags().Changed("privileged"),
-		CderunPrivileged:         o.cderunPrivileged,
-		CderunPrivilegedSet:      cmd.Flags().Changed("cderun-privileged"),
+		User:                     opt(cmd.Flags().Changed("user"), o.user),
+		CderunUser:               opt(cmd.Flags().Changed("cderun-user"), o.cderunUser),
+		Privileged:               opt(cmd.Flags().Changed("privileged"), o.privileged),
+		CderunPrivileged:         opt(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
 		CapAdd:                   o.capAdd,
 		CderunCapAdd:             o.cderunCapAdd,
 		CapDrop:                  o.capDrop,
 		CderunCapDrop:            o.cderunCapDrop,
 		Entrypoint:               o.entrypoint,
 		CderunEntrypoint:         o.cderunEntrypoint,
-		Pull:                     o.pull,
-		PullSet:                  cmd.Flags().Changed("pull"),
-		CderunPull:               o.cderunPull,
-		CderunPullSet:            cmd.Flags().Changed("cderun-pull"),
-		PullMaxRetries:           o.pullMaxRetries,
-		PullMaxRetriesSet:        cmd.Flags().Changed("pull-max-retries"),
-		CderunPullMaxRetries:     o.cderunPullMaxRetries,
-		CderunPullMaxRetriesSet:  cmd.Flags().Changed("cderun-pull-max-retries"),
-		PullBackoffBase:          o.pullBackoffBase,
-		PullBackoffBaseSet:       cmd.Flags().Changed("pull-backoff-base"),
-		CderunPullBackoffBase:    o.cderunPullBackoffBase,
-		CderunPullBackoffBaseSet: cmd.Flags().Changed("cderun-pull-backoff-base"),
-		Memory:                   o.memory,
-		MemorySet:                cmd.Flags().Changed("memory"),
-		CderunMemory:             o.cderunMemory,
-		CderunMemorySet:          cmd.Flags().Changed("cderun-memory"),
-		CPUs:                     o.cpus,
-		CPUsSet:                  cmd.Flags().Changed("cpus"),
-		CderunCPUs:               o.cderunCPUs,
-		CderunCPUsSet:            cmd.Flags().Changed("cderun-cpus"),
+		Pull:                     opt(cmd.Flags().Changed("pull"), o.pull),
+		CderunPull:               opt(cmd.Flags().Changed("cderun-pull"), o.cderunPull),
+		PullMaxRetries:           opt(cmd.Flags().Changed("pull-max-retries"), o.pullMaxRetries),
+		CderunPullMaxRetries:     opt(cmd.Flags().Changed("cderun-pull-max-retries"), o.cderunPullMaxRetries),
+		PullBackoffBase:          opt(cmd.Flags().Changed("pull-backoff-base"), o.pullBackoffBase),
+		CderunPullBackoffBase:    opt(cmd.Flags().Changed("cderun-pull-backoff-base"), o.cderunPullBackoffBase),
+		Memory:                   opt(cmd.Flags().Changed("memory"), o.memory),
+		CderunMemory:             opt(cmd.Flags().Changed("cderun-memory"), o.cderunMemory),
+		CPUs:                     opt(cmd.Flags().Changed("cpus"), o.cpus),
+		CderunCPUs:               opt(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
 		Devices:                  o.devices,
 		CderunDevices:            o.cderunDevices,
 		SensitiveEnv:             o.sensitiveEnv,
@@ -789,6 +733,89 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 	}
 }
 
+type executionState struct {
+	mu               sync.Mutex
+	rt               runtime.ContainerRuntime
+	containerID      string
+	startupBegun     bool
+	containerRunning bool
+	firstSignal      bool
+	deferredSignals  []string
+}
+
+func newExecutionState() *executionState {
+	return &executionState{
+		firstSignal: true,
+	}
+}
+
+func (s *executionState) SetRuntimeAndID(rt runtime.ContainerRuntime, containerID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rt = rt
+	s.containerID = containerID
+}
+
+func (s *executionState) GetRuntime() runtime.ContainerRuntime {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rt
+}
+
+func (s *executionState) GetContainerID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.containerID
+}
+
+func (s *executionState) MarkStartupBegun() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startupBegun = true
+}
+
+func (s *executionState) MarkRunning() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.containerRunning = true
+	deferred := s.deferredSignals
+	s.deferredSignals = nil
+	return deferred
+}
+
+func (s *executionState) CloseRuntime(logger *logging.Logger) {
+	s.mu.Lock()
+	activeRt := s.rt
+	s.mu.Unlock()
+	if activeRt != nil {
+		if closeErr := activeRt.Close(); closeErr != nil {
+			logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}
+}
+
+func (s *executionState) HandleSignal(sigName string) (cancelCtx bool, forwardImmediate bool, activeRt runtime.ContainerRuntime, activeID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// If startup has not begun yet, this is true pre-start.
+	if !s.startupBegun {
+		return true, false, nil, ""
+	}
+
+	// Startup has begun (StartContainer in flight or already completed)
+	if s.firstSignal {
+		s.firstSignal = false
+		if s.containerRunning {
+			return false, true, s.rt, s.containerID
+		}
+		s.deferredSignals = append(s.deferredSignals, sigName)
+		return false, true, s.rt, s.containerID
+	}
+
+	return true, false, nil, ""
+}
+
 func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
@@ -806,18 +833,48 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	ctxG, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	rt, containerID, cleanup, err := o.initContainer(ctx, resolved, containerConfig)
-	if err != nil {
-		return 0, &ExitCodeError{Code: 125, Err: err}
-	}
-	defer func() {
-		if rt != nil {
-			if closeErr := rt.Close(); closeErr != nil {
-				o.logger.Debug("failed to close runtime: %v", closeErr)
+	// Start signal handler early with a buffer of 4 to prevent dropping rapid signals.
+	sigChan := make(chan os.Signal, 4)
+	o.setupSignals(sigChan)
+	defer o.stopSignalHandling(sigChan)
+
+	state := newExecutionState()
+
+	go func() {
+		for {
+			select {
+			case sig := <-sigChan:
+				sigName := getSignalName(sig)
+				cancelCtx, forwardImmediate, activeRt, activeID := state.HandleSignal(sigName)
+
+				if cancelCtx {
+					o.logger.Debug("Cancelling execution on signal %v (%s)", sig, sigName)
+					cancel()
+					return
+				}
+
+				if forwardImmediate && activeRt != nil {
+					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
+					if err := activeRt.SignalContainer(ctx, activeID, sigName); err != nil {
+						o.logger.Warn("failed to forward signal %v: %v", sig, err)
+					} else {
+						o.logger.Debug("Successfully forwarded signal %v to container %s", sig, activeID)
+					}
+				}
+			case <-ctxG.Done():
+				return
 			}
 		}
 	}()
+
+	rt, containerID, cleanup, err := o.initContainer(ctxG, resolved, containerConfig)
+	if err != nil {
+		return 0, &ExitCodeError{Code: 125, Err: err}
+	}
+	defer state.CloseRuntime(o.logger)
 	defer cleanup()
+
+	state.SetRuntimeAndID(rt, containerID)
 
 	// Detect if host stdin is a terminal once
 	stdinFd, isHostStdinTerminal := getFd(cmd.InOrStdin())
@@ -828,25 +885,39 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	restoreTerminal := o.setupTerminal(stdinFd, isHostStdinTerminal, containerConfig)
 	defer restoreTerminal()
 
-	stopSignals := o.startSignalForwarder(ctxG, cancel, rt, containerID)
-	defer stopSignals()
-
-	att, err := o.attachContainer(ctxG, cmd, rt, containerID, containerConfig)
+	att, err := o.attachContainer(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	if err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: err}
 	}
 	defer att.cancelAttach()
 
-	o.logger.Trace("Starting container: %s", containerID)
-	if err := rt.StartContainer(ctx, containerID); err != nil {
+	// Verify if the execution context has been cancelled before starting the container
+	if err := ctxG.Err(); err != nil {
+		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("cancelled before starting container: %w", err)}
+	}
+
+	// Mark startup as begun so signals received during StartContainer startup phase are forwarded or deferred instead of cancelling.
+	state.MarkStartupBegun()
+
+	o.logger.Trace("Starting container: %s", state.GetContainerID())
+	if err := state.GetRuntime().StartContainer(ctxG, state.GetContainerID()); err != nil {
 		return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to start container: %w", err)}
 	}
 	close(att.startSignal) // Signal stdin to start reading
 
-	stopResize := o.startResizeHandler(ctxG, cmd, rt, containerID, containerConfig)
+	// Mark as running and forward any signals that were received during StartContainer startup phase.
+	deferredSigs := state.MarkRunning()
+	for _, sigName := range deferredSigs {
+		o.logger.Debug("Forwarding deferred startup signal %s to container %s", sigName, state.GetContainerID())
+		if err := state.GetRuntime().SignalContainer(ctx, state.GetContainerID(), sigName); err != nil {
+			o.logger.Warn("failed to forward deferred signal %s: %v", sigName, err)
+		}
+	}
+
+	stopResize := o.startResizeHandler(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig)
 	defer stopResize()
 
-	return o.waitForCompletion(ctxG, cmd, rt, containerID, containerConfig, resolved, isHostStdinTerminal, att)
+	return o.waitForCompletion(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig, resolved, isHostStdinTerminal, att)
 }
 
 func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *container.ContainerConfig) {
@@ -948,36 +1019,6 @@ func (o *rootOptions) setupTerminal(stdinFd int, isHostStdinTerminal bool, cc *c
 		}
 	}
 	return func() {}
-}
-
-func (o *rootOptions) startSignalForwarder(ctx context.Context, cancel context.CancelFunc, rt runtime.ContainerRuntime, containerID string) func() {
-	sigChan := make(chan os.Signal, 1)
-	o.setupSignals(sigChan)
-	go func() {
-		firstSignal := true
-		for {
-			select {
-			case sig := <-sigChan:
-				if firstSignal {
-					sigName := getSignalName(sig)
-					o.logger.Debug("Forwarding signal %v (%s) to container", sig, sigName)
-					if err := rt.SignalContainer(ctx, containerID, sigName); err != nil {
-						o.logger.Warn("failed to forward signal %v: %v", sig, err)
-					} else {
-						o.logger.Debug("Successfully forwarded signal %v to container", sig)
-					}
-					firstSignal = false
-				} else {
-					o.logger.Info("Received second signal, terminating...")
-					cancel()
-					return
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return func() { o.stopSignalHandling(sigChan) }
 }
 
 func (o *rootOptions) attachContainer(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig) (*attachResult, error) {
@@ -1498,20 +1539,17 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		shouldHoist := !doubleDashFound && strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
-			overrides = append(overrides, arg)
-			// Handle flags that take arguments (skip next arg if it's the value)
-			// Note: only --cderun- flags are hoisted here.
 			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
 				name := arg[2:]
 				f := cmd.PersistentFlags().Lookup(name)
 				if f == nil {
 					f = cmd.Flags().Lookup(name)
 				}
-				if f != nil && f.NoOptDefVal == "" && i+1 < len(args) {
-					overrides = append(overrides, args[i+1])
-					i++
+				if f != nil && f.NoOptDefVal == "" {
+					return nil, fmt.Errorf("cderun internal override flag %q must use '=' format to specify its value", arg)
 				}
 			}
+			overrides = append(overrides, arg)
 		} else {
 			others = append(others, arg)
 		}

@@ -153,11 +153,9 @@ func TestUnit_Config_Resolver_WrapperMode_Precedence(t *testing.T) {
 	// 1. P1 overrides takes precedence over everything
 	t.Run("P1 takes absolute priority", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:          "alpine:cli",
-			ImageSet:       true,
-			CderunImage:    "alpine:override",
-			CderunImageSet: true,
-		}
+			Image: ptr("alpine:cli"),
+			CderunImage: ptr("alpine:override"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -167,9 +165,8 @@ func TestUnit_Config_Resolver_WrapperMode_Precedence(t *testing.T) {
 	// 2. P2 (CLI) takes precedence over P3 (Env), P4 (Tool), P5 (Global), P6 (Default)
 	t.Run("P2 takes priority over P3 and lower", func(t *testing.T) {
 		cli := &CLIOptions{
-			Image:    "node:cli",
-			ImageSet: true,
-		}
+			Image: ptr("node:cli"),
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Image: "node:tool",
@@ -235,11 +232,9 @@ func TestUnit_Config_Resolver_NegativeMemoryParserBorderCases(t *testing.T) {
 	t.Run("extremely large valid memory limit 1024TiB", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "1024TiB",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("1024TiB"),
+			}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -249,11 +244,9 @@ func TestUnit_Config_Resolver_NegativeMemoryParserBorderCases(t *testing.T) {
 	t.Run("malformed memory values", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "abcG",
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("abcG"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -289,4 +282,83 @@ func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_Config_ValidateWorkdir_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// docs/features/security-validations.md or ValidateWorkdir tests
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"empty string", "", false},
+		{"valid simple absolute path", "/app", false},
+		{"valid nested path", "/var/log/app_name-123.tmp", false},
+		{"invalid relative path without slash", "app", true},
+		{"invalid trailing dot dot", "/app/..", true},
+		{"invalid nested dot dot", "/app/../bin", true},
+		{"invalid illegal characters", "/app$bin", true},
+		{"invalid backslashes", "/app\\bin", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateWorkdir(tt.path)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidatePort mapping anomalies", func(t *testing.T) {
+		// Valid ports
+		assert.NoError(t, ValidatePort("8080"))
+		assert.NoError(t, ValidatePort("80:80"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80:80"))
+		assert.NoError(t, ValidatePort("80/tcp"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80:80/udp"))
+
+		// Invalid protocols
+		require.Error(t, ValidatePort("80/http"))
+		// Port out of range
+		require.Error(t, ValidatePort("70000"))
+		// Invalid formats
+		require.Error(t, ValidatePort("127.0.0.1:80:80:80"))
+	})
+
+	t.Run("ValidateGroupAdd anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateGroupAdd(""))
+		assert.NoError(t, ValidateGroupAdd("sudo"))
+		assert.NoError(t, ValidateGroupAdd("1000"))
+		assert.NoError(t, ValidateGroupAdd("admin-group"))
+
+		// Invalid group-adds
+		require.Error(t, ValidateGroupAdd("-group"))
+		require.Error(t, ValidateGroupAdd("group$name"))
+		require.Error(t, ValidateGroupAdd("group name"))
+	})
+
+	t.Run("ValidateToolName constraints", func(t *testing.T) {
+		assert.NoError(t, ValidateToolName("python"))
+		assert.NoError(t, ValidateToolName("node-js"))
+		assert.NoError(t, ValidateToolName("v1.2"))
+
+		// Rejects empty, dot, dot-dot
+		require.Error(t, ValidateToolName(""))
+		require.Error(t, ValidateToolName("."))
+		require.Error(t, ValidateToolName(".."))
+		// Rejects absolute path and directories
+		require.Error(t, ValidateToolName("/usr/bin/python"))
+		require.Error(t, ValidateToolName("tools/python"))
+		// Rejects unicode or special chars
+		require.Error(t, ValidateToolName("pythön"))
+	})
 }

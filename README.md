@@ -181,6 +181,15 @@ Hoisting ensures that `cderun` settings do not conflict with the flags of the to
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
 3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
 
+#### Equals-Sign Format Requirement for Value-Taking Flags
+
+To ensure reliable, deterministic preprocessing without parsing ambiguity, any internal override flag (`--cderun-*`) that accepts a value **must** use the equals-sign format:
+
+- **Correct**: `--cderun-image=alpine` or `--cderun-workdir=/app`
+- **Incorrect (strictly rejected)**: `--cderun-image alpine` or `--cderun-workdir /app`
+
+If a value-taking internal override flag is specified as space-separated rather than using the equals-sign format, `cderun`'s preprocessor strictly rejects it with an explicit validation error to prevent mis-hoisting or parsing corruption down the line.
+
 This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
 #### Double-Dash (`--`) Delimiter Support
@@ -294,6 +303,12 @@ To maintain strict security boundaries, any path resolved via expressions or til
 ### 4. "Sticky Error" Pattern
 
 The value resolution engine implements a **Sticky Error** pattern. The very first validation or resolution error encountered is stored internally. Subsequent resolution attempts gracefully return the original raw (unresolved) string to avoid compounding errors, and the final execution is securely aborted by propagating the retained error.
+
+### 5. Lazy Resolver Instantiation Optimization
+
+To optimize performance and resource footprint, the `ExpressionResolver` is instantiated lazily via `getR()` only when the configuration actually requires expression parsing (detecting `{{...}}`), tilde expansion (`~`), relative path resolution, or when executing under a nested context (`Level > 0`).
+
+This ensures that simple, static executions bypass the file system probe and resolution engine overhead entirely, while still preserving fully robust and secure path resolutions when dynamic features are needed.
 
 ---
 

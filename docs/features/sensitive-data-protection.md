@@ -13,6 +13,7 @@ The masking behavior is controlled by the `sensitive-env` option, which can be d
 - **Unset (Default)**: If `sensitive-env` is not specified (nil), **all** environment variable values are masked as `[REDACTED]`. This "Secure by Default" approach ensures maximum safety for users who have not yet configured their sensitive environment variables.
 - **Empty List**: If an explicit empty list is provided (e.g., `--sensitive-env=""` in CLI or `sensitiveEnv: []` in YAML), environment variable masking is **disabled**. This is useful for troubleshooting when you want to see all values.
 - **Explicit List of Patterns**: If `sensitive-env` is provided as a non-empty list, only keys matching the specified glob patterns are masked. All other variables will be displayed in plaintext.
+- **Empty Values Preservation**: Note that environment variable masking under both the default (Secure by Default) and fallback (Fail-Closed) modes will only mask non-empty environment values as `[REDACTED]`. Empty environment values (e.g., `KEY=`) remain unchanged and are preserved as-is without modification.
 
 ### Pattern Matching (Explicit List)
 

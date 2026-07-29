@@ -54,6 +54,10 @@ On macOS, since the socket is managed by a lightweight Linux VM (such as Docker 
 
 To grant the necessary permissions, you must add the correct socket GID explicitly to the supplementary groups via the `groupAdd` configuration or the `--cderun-group-add` CLI flag.
 
+> ⚠️ **Security Warning on Socket Sharing**: Sharing the container runtime socket (e.g., `/var/run/docker.sock`) and granting access via supplementary numeric GID is a highly privileged operation. It allows any process within the container to control the container daemon, which is equivalent to granting full root-level access on the host system. Consequently, this setup must only be used in trusted, secure environments and should be explicitly flagged/warned in production designs.
+>
+> When considering alternatives, rootless Podman configurations reduce the blast radius compared with a rootful daemon because processes run as a non-root user on the host. However, please note that shared socket access still grants the owning user broad Podman control, including the ability to create containers and mount host volumes, which could still lead to host-level impact if abused.
+>
 > **Important**: The value `102` shown below is merely an **example**. The actual GID depends on your specific container runtime installation and environment on your machine. You must determine and configure the correct GID for your system.
 
 ### 1. Determine the Socket GID on Your System

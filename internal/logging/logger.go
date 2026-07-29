@@ -156,6 +156,26 @@ func (l *Logger) SetOutput(w io.Writer) {
 	l.writer = w
 }
 
+func (l *Logger) formatJSON(level Level, message string, now time.Time) []byte {
+	entry := map[string]any{
+		"level": level.LowerString(),
+		"msg":   message,
+	}
+	if l.timestamp {
+		entry["time"] = now.Format(time.RFC3339)
+	}
+	data, _ := json.Marshal(entry) //nolint:errcheck
+	return data
+}
+
+func (l *Logger) formatText(level Level, message string, now time.Time) string {
+	ts := ""
+	if l.timestamp {
+		ts = now.Format("2006-01-02 15:04:05") + " "
+	}
+	return fmt.Sprintf("%s[%s] %s\n", ts, level.String(), message)
+}
+
 func (l *Logger) log(level Level, msg string, args ...any) {
 	if level > l.GetLevel() {
 		return
@@ -173,21 +193,11 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 	}
 
 	if l.format == "json" {
-		entry := map[string]any{
-			"level": level.LowerString(),
-			"msg":   message,
-		}
-		if l.timestamp {
-			entry["time"] = now.Format(time.RFC3339)
-		}
-		data, _ := json.Marshal(entry) //nolint:errcheck
+		data := l.formatJSON(level, message, now)
 		_, _ = fmt.Fprintln(l.writer, string(data))
 	} else {
-		ts := ""
-		if l.timestamp {
-			ts = now.Format("2006-01-02 15:04:05") + " "
-		}
-		_, _ = fmt.Fprintf(l.writer, "%s[%s] %s\n", ts, level.String(), message)
+		output := l.formatText(level, message, now)
+		_, _ = fmt.Fprint(l.writer, output)
 	}
 }
 

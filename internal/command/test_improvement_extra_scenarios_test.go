@@ -110,7 +110,7 @@ func TestUnit_Command_Robustness_NullTimeoutBlocksIndefinitely(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-hang-timeout", "0"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-hang-timeout=0"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}

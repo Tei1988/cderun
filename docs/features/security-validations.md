@@ -29,6 +29,10 @@ Any string containing unsafe characters will cause an immediate resolution failu
 
 マジックワード（`{{HOME}}`, `{{PWD}}` 等）やチルダ（`~`）を起点としたパス解決において、解決後のパスが起点ディレクトリの境界を越えて親ディレクトリへ遡っていないかを検証します。これにより、ユーザー入力による意図しないパスへのアクセスやディレクトリトラバーサル攻撃を防止します。詳細は [値の解決](./value-resolution.md#アンカー境界検証-anchor-boundary-validation) を参照してください。
 
+## Working Directory Validation
+
+The working directory validation function (`ValidateWorkdir`) strictly rejects any path containing parent directory traversal references (`..` segments) to prevent path obfuscation and directory traversal attacks within container configurations. Note that this validation and its safe absolute-path requirement apply only when a working directory is specified (non-empty); when provided, the path must be a valid absolute path and is subject to the strict traversal restrictions.
+
 ## Tool Name Safety
 
 The `ValidateToolName` function enforces strict naming conventions for tool identifiers. Tool names are restricted to a whitelist of safe characters:

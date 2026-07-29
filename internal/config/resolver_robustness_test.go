@@ -237,6 +237,9 @@ func TestUnit_Config_ValidateWorkdir_Robustness(t *testing.T) {
 		{"relative path", "app", true},
 		{"space in path", "/app space", true},
 		{"special character in path", "/app!", true},
+		{"path with parent traversal", "/app/../etc", true},
+		{"path ending with parent traversal", "/usr/..", true},
+		{"path starting with parent traversal", "/../usr", true},
 	}
 
 	for _, tt := range tests {
@@ -325,8 +328,7 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("device with control characters raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 			Devices:  []string{"/dev/null\x01"},
 		}
 
@@ -338,9 +340,8 @@ func TestUnit_Config_ValidateDeviceSecurity_Robustness(t *testing.T) {
 	t.Run("programmatic invalid permissions raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Devices: []DeviceConfig{
@@ -365,9 +366,8 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("empty options and nil config defaults to standard values", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 
@@ -381,11 +381,9 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid pull policy raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			Pull:     "invalid_policy",
-			PullSet:  true,
-		}
+			Image: ptr("alpine"),
+			Pull: ptr("invalid_policy"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -395,11 +393,9 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid log level raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:       "alpine",
-			ImageSet:    true,
-			LogLevel:    "VERBOSE",
-			LogLevelSet: true,
-		}
+			Image: ptr("alpine"),
+			LogLevel: ptr("VERBOSE"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -409,11 +405,9 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 	t.Run("invalid log format raises error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:        "alpine",
-			ImageSet:     true,
-			LogFormat:    "yaml",
-			LogFormatSet: true,
-		}
+			Image: ptr("alpine"),
+			LogFormat: ptr("yaml"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -431,8 +425,7 @@ func TestUnit_Config_Resolver_DoubleBracesEscaping_Robustness(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 			Env:      []string{"MY_VAL={{ {{env:MY_VAR}} }}"},
 		}
 
@@ -449,11 +442,9 @@ func TestUnit_Config_Resolver_NegativeDurationErrors_Robustness(t *testing.T) {
 	t.Run("negative pull-backoff-base raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:              "alpine",
-			ImageSet:           true,
-			PullBackoffBase:    "-10s",
-			PullBackoffBaseSet: true,
-		}
+			Image: ptr("alpine"),
+			PullBackoffBase: ptr("-10s"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -465,11 +456,9 @@ func TestUnit_Config_Resolver_NegativeDurationErrors_Robustness(t *testing.T) {
 	t.Run("negative hang-timeout raises validation error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:          "alpine",
-			ImageSet:       true,
-			HangTimeout:    "-5s",
-			HangTimeoutSet: true,
-		}
+			Image: ptr("alpine"),
+			HangTimeout: ptr("-5s"),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -485,9 +474,8 @@ func TestUnit_Config_Resolver_PrecedenceRegistryMatching_Robustness(t *testing.T
 	t.Run("registry check mismatches on option fetching returns mismatch error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-		}
+			Image: ptr("alpine"),
+			}
 
 		// Mock a registry mismatch error by calling inner resolver's applyStringOption with unknown options.
 		r, err := NewExpressionResolver(nil)
@@ -570,11 +558,9 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 	t.Run("negative memory in CLI options is rejected", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:     "alpine",
-			ImageSet:  true,
-			Memory:    "9223372036854775808", // Large value that causes overflow to negative int64
-			MemorySet: true,
-		}
+			Image: ptr("alpine"),
+			Memory: ptr("9223372036854775808"), // Large value that causes overflow to negative int64
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -584,11 +570,9 @@ func TestUnit_Config_Resolver_ResourceLimitsNegative_Robustness(t *testing.T) {
 	t.Run("negative CPUs in CLI options is rejected", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
-			CPUs:     -2.5,
-			CPUsSet:  true,
-		}
+			Image: ptr("alpine"),
+			CPUs:     ptr(-2.5),
+			}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
@@ -613,10 +597,8 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			Privileged:    true,
-			PrivilegedSet: true,
+			Image: ptr("alpine"),
+			Privileged: ptr(true),
 			CapAdd:        []string{"CHOWN", "DAC_OVERRIDE"},
 		}
 
@@ -637,10 +619,8 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:         "alpine",
-			ImageSet:      true,
-			Privileged:    true,
-			PrivilegedSet: true,
+			Image: ptr("alpine"),
+			Privileged: ptr(true),
 			CapAdd:        []string{"SYS_ADMIN", "NET_ADMIN"},
 		}
 
@@ -656,15 +636,14 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		assert.Contains(t, logOutput, "NET_ADMIN")
 	})
 
-	t.Run("non-privileged mode with highly privileged caps does not trigger warning", func(t *testing.T) {
+	t.Run("non-privileged mode with highly privileged caps triggers cap warning", func(t *testing.T) {
 		var buf bytes.Buffer
 		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
 		logging.GetGlobalLogger().SetOutput(&buf)
 		defer logging.GetGlobalLogger().SetOutput(origWriter)
 
 		cli := &CLIOptions{
-			Image:    "alpine",
-			ImageSet: true,
+			Image: ptr("alpine"),
 			CapAdd:   []string{"SYS_ADMIN", "NET_ADMIN"},
 		}
 
@@ -672,6 +651,117 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		require.NoError(t, err)
 
 		logOutput := buf.String()
-		assert.Empty(t, logOutput)
+		assert.Contains(t, logOutput, "Highly privileged capability")
+		assert.Contains(t, logOutput, "SYS_ADMIN")
+		assert.Contains(t, logOutput, "NET_ADMIN")
 	})
+}
+
+func TestUnit_Config_Resolver_EnvKeyValidation_Robustness(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	tests := []struct {
+		name      string
+		env       []string
+		strict    bool
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name:      "Valid key-value environment variable",
+			env:       []string{"VALID_KEY=value"},
+			strict:    false,
+			wantErr:   false,
+		},
+		{
+			name:      "Valid passthrough environment variable",
+			env:       []string{"VALID_KEY"},
+			strict:    false,
+			wantErr:   false,
+		},
+		{
+			name:      "Invalid environment key with prefix number",
+			env:       []string{"123_INVALID=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with prefix number",
+			env:       []string{"123_INVALID"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid environment key with control char in key-value",
+			env:       []string{"BAD\nKEY=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with control char",
+			env:       []string{"BAD\nKEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid environment key with hyphen in key-value",
+			env:       []string{"INVALID-KEY=value"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Invalid passthrough environment key with hyphen",
+			env:       []string{"INVALID-KEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Empty environment variable string",
+			env:       []string{""},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+		{
+			name:      "Valid key and invalid key combined",
+			env:       []string{"VALID_KEY=value", "INVALID-KEY"},
+			strict:    false,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[1] (key)",
+		},
+		{
+			name:      "Invalid passthrough key is validated before strict lookup",
+			env:       []string{"INVALID-KEY"},
+			strict:    true,
+			wantErr:   true,
+			errSubstr: "security validation failed for env[0] (key)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := &CLIOptions{
+				Image:    ptr("alpine"),
+				Env:      tt.env,
+			}
+			if tt.strict {
+				cli.StrictEnv = ptr(true)
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errSubstr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

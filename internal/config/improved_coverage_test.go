@@ -160,7 +160,7 @@ func TestUnit_Resolver_InternalHelpers(t *testing.T) {
 	})
 
 	t.Run("getFieldInfo for non-slice types", func(t *testing.T) {
-		cli := &CLIOptions{TTY: true, TTYSet: true}
+		cli := &CLIOptions{TTY: ptr(true)}
 		cliVal := reflect.ValueOf(cli).Elem()
 
 		fieldOnce.Do(initFieldInfo)

@@ -27,9 +27,8 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 
 	t.Run("P1 override in Wrapper Mode", func(t *testing.T) {
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-		}
+			CderunTTY: ptr(true),
+			}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P1 should override tool config")
@@ -37,9 +36,8 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 
 	t.Run("P2 override in Wrapper Mode", func(t *testing.T) {
 		cli := &CLIOptions{
-			TTY:    true,
-			TTYSet: true,
-		}
+			TTY: ptr(true),
+			}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P2 should override tool config")
@@ -47,11 +45,9 @@ func TestScenario_Config_WrapperMode(t *testing.T) {
 
 	t.Run("P1 and P2 both present: P1 wins", func(t *testing.T) {
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-			TTY:          false,
-			TTYSet:       true,
-		}
+			CderunTTY: ptr(true),
+			TTY: ptr(false),
+			}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY, "P1 should win over P2")
@@ -79,9 +75,8 @@ func TestScenario_Config_SymlinkMode(t *testing.T) {
 		// Simulate 'node --cderun-tty --tty' where --tty is for node, but --cderun-tty is for cderun.
 		// Preprocessing would move --cderun-tty to CderunTTY, but keep --tty as passthrough (not in cli).
 		cli := &CLIOptions{
-			CderunTTY:    true,
-			CderunTTYSet: true,
-		}
+			CderunTTY: ptr(true),
+			}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.TTY)

@@ -20,6 +20,10 @@ type OptionDef[T any] struct {
 }
 
 // resolveStringOpt resolves a string option through P1-P6.
+//
+// Note: This function contains a nil short-circuit in the resolver flow: when r is nil,
+// expressions/tildes are silently left unresolved, so callers must scan for template
+// markers before passing a possibly nil resolver. Keep the existing resolution behavior unchanged.
 func resolveStringOpt(
 	def OptionDef[string],
 	p1Set bool, p1Val string,
@@ -27,30 +31,50 @@ func resolveStringOpt(
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) string {
+	var s string
+	var found bool
+
 	if p1Set {
-		return r.resolveString(p1Val)
-	}
-	if p2Set {
-		return r.resolveString(p2Val)
-	}
-	if def.EnvKey != "" {
-		if env := fs.Getenv(def.EnvKey); env != "" {
-			return r.resolveString(env)
+		s = p1Val
+		found = true
+	} else if p2Set {
+		s = p2Val
+		found = true
+	} else if def.EnvKey != "" {
+		if env, ok := fs.LookupEnv(def.EnvKey); ok {
+			s = env
+			found = true
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			if s := def.ToolGetter(tool); s != "" {
-				return r.resolveString(s)
+
+	if !found {
+		if def.ToolGetter != nil && tools != nil {
+			if tool, ok := tools[subcommand]; ok {
+				if val := def.ToolGetter(tool); val != "" {
+					s = val
+					found = true
+				}
 			}
 		}
 	}
-	if def.GlobalGetter != nil && global != nil {
-		if s := def.GlobalGetter(*global); s != "" {
-			return r.resolveString(s)
+
+	if !found {
+		if def.GlobalGetter != nil && global != nil {
+			if val := def.GlobalGetter(*global); val != "" {
+				s = val
+				found = true
+			}
 		}
 	}
-	return r.resolveString(def.Fallback)
+
+	if !found {
+		s = def.Fallback
+	}
+
+	if r == nil || (!strings.Contains(s, "{{") && !strings.HasPrefix(s, "~")) {
+		return s
+	}
+	return r.resolveString(s)
 }
 
 // resolveBoolOpt resolves a bool option through P1-P6.
@@ -148,9 +172,13 @@ func resolveStringSliceOpt(
 	}
 	var res []string
 	if vals != nil {
-		res = []string{}
+		res = make([]string, 0, len(vals))
 		for _, v := range vals {
-			res = append(res, r.resolveString(v))
+			if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+				res = append(res, v)
+			} else {
+				res = append(res, r.resolveString(v))
+			}
 		}
 	}
 	return res
@@ -185,11 +213,15 @@ func resolveStringSliceCommaOpt(
 	}
 	var res []string
 	if vals != nil {
-		res = []string{}
+		res = make([]string, 0, len(vals))
 		for _, v := range vals {
 			v = strings.TrimSpace(v)
 			if v != "" {
-				res = append(res, r.resolveString(v))
+				if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+					res = append(res, v)
+				} else {
+					res = append(res, r.resolveString(v))
+				}
 			}
 		}
 	}

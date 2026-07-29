@@ -68,154 +68,90 @@ type ResolvedConfig struct {
 
 // CLIOptions represents values from CLI flags.
 type CLIOptions struct {
-	Image                    string
-	ImageSet                 bool
-	TTY                      bool
-	TTYSet                   bool
-	Interactive              bool
-	InteractiveSet           bool
-	Network                  string
-	NetworkSet               bool
-	Remove                   bool
-	RemoveSet                bool
-	CderunTTY                bool
-	CderunTTYSet             bool
-	CderunInteractive        bool
-	CderunInteractiveSet     bool
-	CderunImage              string
-	CderunImageSet           bool
-	CderunNetwork            string
-	CderunNetworkSet         bool
-	CderunRemove             bool
-	CderunRemoveSet          bool
-	Runtime                  string
-	RuntimeSet               bool
-	CderunRuntime            string
-	CderunRuntimeSet         bool
-	SocketPath               string
-	SocketPathSet            bool
-	CderunSocketPath         string
-	CderunSocketPathSet      bool
-	MountSocket              bool
-	MountSocketSet           bool
-	CderunMountSocket        bool
-	CderunMountSocketSet     bool
-	MountSocketPath          string
-	MountSocketPathSet       bool
-	CderunMountSocketPath    string
-	CderunMountSocketPathSet bool
+	Image                    *string
+	TTY                      *bool
+	Interactive              *bool
+	Network                  *string
+	Remove                   *bool
+	CderunTTY                *bool
+	CderunInteractive        *bool
+	CderunImage              *string
+	CderunNetwork            *string
+	CderunRemove             *bool
+	Runtime                  *string
+	CderunRuntime            *string
+	SocketPath               *string
+	CderunSocketPath         *string
+	MountSocket              *bool
+	CderunMountSocket        *bool
+	MountSocketPath          *string
+	CderunMountSocketPath    *string
 	Env                      []string
 	CderunEnv                []string
-	Workdir                  string
-	WorkdirSet               bool
-	CderunWorkdir            string
-	CderunWorkdirSet         bool
+	Workdir                  *string
+	CderunWorkdir            *string
 	Mounts                   []string
 	CderunMounts             []string
-	MountCderun              bool
-	MountCderunSet           bool
-	CderunMountCderun        bool
-	CderunMountCderunSet     bool
-	MountCderunPath          string
-	MountCderunPathSet       bool
-	CderunMountCderunPath    string
-	CderunMountCderunPathSet bool
-	MountTools               string
-	MountToolsSet            bool
-	CderunMountTools         string
-	CderunMountToolsSet      bool
-	MountAllTools            bool
-	MountAllToolsSet         bool
-	CderunMountAllTools      bool
-	CderunMountAllToolsSet   bool
-	DryRun                   bool
-	DryRunSet                bool
-	CderunDryRun             bool
-	CderunDryRunSet          bool
-	DryRunFormat             string
-	DryRunFormatSet          bool
-	CderunDryRunFormat       string
-	CderunDryRunFormatSet    bool
-	Diagnosis                bool
-	DiagnosisSet             bool
-	CderunDiagnosis          bool
-	CderunDiagnosisSet       bool
-	DiagnosisFormat          string
-	DiagnosisFormatSet       bool
-	CderunDiagnosisFormat    string
-	CderunDiagnosisFormatSet bool
-	LogLevel                 string
-	LogLevelSet              bool
-	LogFormat                string
-	LogFormatSet             bool
-	LogTimestampSet          bool
-	LogTimestamp             bool
-	StrictEnv                bool
-	StrictEnvSet             bool
-	CderunStrictEnv          bool
-	CderunStrictEnvSet       bool
-	CderunLogLevel           string
-	CderunLogLevelSet        bool
-	CderunLogFormat          string
-	CderunLogFormatSet       bool
-	CderunLogTimestamp       bool
-	CderunLogTimestampSet    bool
-	HangTimeout              string
-	HangTimeoutSet           bool
-	CderunHangTimeout        string
-	CderunHangTimeoutSet     bool
+	MountCderun              *bool
+	CderunMountCderun        *bool
+	MountCderunPath          *string
+	CderunMountCderunPath    *string
+	MountTools               *string
+	CderunMountTools         *string
+	MountAllTools            *bool
+	CderunMountAllTools      *bool
+	DryRun                   *bool
+	CderunDryRun             *bool
+	DryRunFormat             *string
+	CderunDryRunFormat       *string
+	Diagnosis                *bool
+	CderunDiagnosis          *bool
+	DiagnosisFormat          *string
+	CderunDiagnosisFormat    *string
+	LogLevel                 *string
+	LogFormat                *string
+	LogTimestamp             *bool
+	StrictEnv                *bool
+	CderunStrictEnv          *bool
+	CderunLogLevel           *string
+	CderunLogFormat          *string
+	CderunLogTimestamp       *bool
+	HangTimeout              *string
+	CderunHangTimeout        *string
 
 	// Docker-compatible flags
 	Ports                    []string
 	CderunPorts              []string
-	PublishAll               bool
-	PublishAllSet            bool
-	CderunPublishAll         bool
-	CderunPublishAllSet      bool
+	PublishAll               *bool
+	CderunPublishAll         *bool
 	Expose                   []string
 	CderunExpose             []string
-	Hostname                 string
-	HostnameSet              bool
-	CderunHostname           string
-	CderunHostnameSet        bool
+	Hostname                 *string
+	CderunHostname           *string
 	DNS                      []string
 	CderunDNS                []string
 	AddHosts                 []string
 	CderunAddHosts           []string
-	User                     string
-	UserSet                  bool
-	CderunUser               string
-	CderunUserSet            bool
-	Privileged               bool
-	PrivilegedSet            bool
-	CderunPrivileged         bool
-	CderunPrivilegedSet      bool
+	User                     *string
+	CderunUser               *string
+	Privileged               *bool
+	CderunPrivileged         *bool
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
 	CderunCapDrop            []string
 	Entrypoint               []string
 	CderunEntrypoint         []string
-	Pull                     string
-	PullSet                  bool
-	CderunPull               string
-	CderunPullSet            bool
-	PullMaxRetries           int
-	PullMaxRetriesSet        bool
-	CderunPullMaxRetries     int
-	CderunPullMaxRetriesSet  bool
-	PullBackoffBase          string
-	PullBackoffBaseSet       bool
-	CderunPullBackoffBase    string
-	CderunPullBackoffBaseSet bool
-	Memory                   string
-	MemorySet                bool
-	CderunMemory             string
-	CderunMemorySet          bool
-	CPUs                     float64
-	CPUsSet                  bool
-	CderunCPUs               float64
-	CderunCPUsSet            bool
+	Pull                     *string
+	CderunPull               *string
+	PullMaxRetries           *int
+	CderunPullMaxRetries     *int
+	PullBackoffBase          *string
+	CderunPullBackoffBase    *string
+	Memory                   *string
+	CderunMemory             *string
+	CPUs                     *float64
+	CderunCPUs               *float64
 	Devices                  []string
 	CderunDevices            []string
 	SensitiveEnv             []string
@@ -227,6 +163,14 @@ type CLIOptions struct {
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
 func Resolve(subcommand string, cli *CLIOptions, tools ToolsConfig, global *CDERunConfig) (*ResolvedConfig, error) {
 	return ResolveWithFS(subcommand, cli, tools, global, RealFileSystem{})
+}
+
+func getPtrVal[T any](p *T) (bool, T) {
+	if p == nil {
+		var zero T
+		return false, zero
+	}
+	return true, *p
 }
 
 var (
@@ -271,19 +215,11 @@ func initFieldInfo() {
 			p2ValIdx:  -1,
 		}
 
-		p1SetName := "Cderun" + fieldName + "Set"
 		p1ValName := "Cderun" + fieldName
-		p2SetName := fieldName + "Set"
 		p2ValName := fieldName
 
-		if f, ok := cliType.FieldByName(p1SetName); ok {
-			info.p1SetIdx = f.Index[0]
-		}
 		if f, ok := cliType.FieldByName(p1ValName); ok {
 			info.p1ValIdx = f.Index[0]
-		}
-		if f, ok := cliType.FieldByName(p2SetName); ok {
-			info.p2SetIdx = f.Index[0]
 		}
 		if f, ok := cliType.FieldByName(p2ValName); ok {
 			info.p2ValIdx = f.Index[0]
@@ -316,9 +252,14 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
 	if setIdx != -1 {
 		return val.Field(setIdx).Bool(), val.Field(valIdx)
 	}
-	// For slices and other types without a explicit Set flag
 	v := val.Field(valIdx)
-	if v.Kind() == reflect.Slice || v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface || v.Kind() == reflect.Map {
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return false, reflect.Zero(v.Type().Elem())
+		}
+		return true, v.Elem()
+	}
+	if v.Kind() == reflect.Slice || v.Kind() == reflect.Interface || v.Kind() == reflect.Map {
 		return !v.IsNil(), v
 	}
 	return !v.IsZero(), v
@@ -389,10 +330,102 @@ func (rv *resolver) extractStringSliceValue(v reflect.Value, set bool) ([]string
 	return nil, false
 }
 
+func (rv *resolver) getR() (*ExpressionResolver, error) {
+	if rv.r == nil {
+		var hostCtx *HostContext
+		if rv.global != nil {
+			hostCtx = rv.global.HostContext
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, rv.fs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+		}
+		rv.r = r
+	}
+	return rv.r, nil
+}
+
+func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) bool {
+	if p1Set {
+		return p1Val != ""
+	}
+	if p2Set {
+		return p2Val != ""
+	}
+	if envKey != "" {
+		if env := rv.fs.Getenv(envKey); env != "" {
+			return true
+		}
+	}
+	if rv.tools != nil && tGetter != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			if t := tGetter(tool); !t.IsEmpty() {
+				return true
+			}
+		}
+	}
+	if rv.global != nil && gGetter != nil {
+		if g := gGetter(*rv.global); !g.IsEmpty() {
+			return true
+		}
+	}
+	return fallback != ""
+}
+
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
 	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.getCliVal())
 	if err != nil {
 		return "", err
+	}
+
+	p1ValStr := p1Val.String()
+	p2ValStr := p2Val.String()
+
+	if !rv.hasPathToResolve(p1Set, p1ValStr, p2Set, p2ValStr, envKey, tGetter, gGetter, fallback) {
+		return "", nil
+	}
+
+	// Find the winning raw path
+	var raw string
+	if p1Set {
+		raw = p1ValStr
+	} else if p2Set {
+		raw = p2ValStr
+	} else if env := rv.fs.Getenv(envKey); env != "" {
+		raw = env
+	} else {
+		found := false
+		if rv.tools != nil && tGetter != nil {
+			if tool, ok := rv.tools[rv.subcommand]; ok {
+				if t := tGetter(tool); !t.IsEmpty() {
+					raw = t.Raw
+					found = true
+				}
+			}
+		}
+		if !found && rv.global != nil && gGetter != nil {
+			if g := gGetter(*rv.global); !g.IsEmpty() {
+				raw = g.Raw
+				found = true
+			}
+		}
+		if !found {
+			raw = fallback
+		}
+	}
+
+	var r *ExpressionResolver
+	needResolver := strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~")
+	if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		needResolver = true
+	}
+
+	if needResolver {
+		var err error
+		r, err = rv.getR()
+		if err != nil {
+			return "", err
+		}
 	}
 
 	var tools ToolsConfig
@@ -403,26 +436,92 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 	}
 
 	return resolveConfigPath(
-		p1Set, p1Val.String(),
-		p2Set, p2Val.String(),
+		p1Set, p1ValStr,
+		p2Set, p2ValStr,
 		envKey,
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
 		fallback,
-		rv.r,
+		r,
 		"path",
 		rv.fs,
 	)
 }
 
-func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	info, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
-	if err != nil {
-		return err
+func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 []string, p2 []string) (*ExpressionResolver, error) {
+	var vals []string
+	if p1 != nil {
+		vals = p1
+	} else if p2 != nil {
+		vals = p2
+	} else if def.EnvKey != "" {
+		if env, ok := rv.fs.LookupEnv(def.EnvKey); ok {
+			vals = []string{}
+			for v := range strings.SplitSeq(env, envSep) {
+				v = strings.TrimSpace(v)
+				if v == "" {
+					continue
+				}
+				vals = append(vals, v)
+			}
+		}
+	}
+	if vals == nil && def.ToolGetter != nil && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok {
+			vals = def.ToolGetter(tool)
+		}
+	}
+	if vals == nil && def.GlobalGetter != nil && rv.global != nil {
+		vals = def.GlobalGetter(*rv.global)
 	}
 
-	p1v, _ := rv.extractStringSliceValue(p1Val, p1Set)
-	p2v, _ := rv.extractStringSliceValue(p2Val, p2Set)
+	for _, v := range vals {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+			return rv.getR()
+		}
+	}
+	return nil, nil
+}
+
+func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
+	}
+
+	var p1v, p2v []string
+	var fastPathUsed bool
+
+	expected := expectedFieldIndices[opt.Name]
+	if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
+		info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+		switch opt.Name {
+		case "publish":
+			p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
+			fastPathUsed = true
+		case "expose":
+			p1v, p2v = rv.cli.CderunExpose, rv.cli.Expose
+			fastPathUsed = true
+		case "dns":
+			p1v, p2v = rv.cli.CderunDNS, rv.cli.DNS
+			fastPathUsed = true
+		case "add-host":
+			p1v, p2v = rv.cli.CderunAddHosts, rv.cli.AddHosts
+			fastPathUsed = true
+		case "group-add":
+			p1v, p2v = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
+			fastPathUsed = true
+		case "cap-add":
+			p1v, p2v = rv.cli.CderunCapAdd, rv.cli.CapAdd
+			fastPathUsed = true
+		case "cap-drop":
+			p1v, p2v = rv.cli.CderunCapDrop, rv.cli.CapDrop
+			fastPathUsed = true
+		case "entrypoint":
+			p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
+			fastPathUsed = true
+		}
+	}
 
 	def := OptionDef[[]string]{
 		EnvKey:       opt.EnvKey,
@@ -430,7 +529,47 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if fastPathUsed {
+		rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
+		if err != nil {
+			return err
+		}
+		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
+		switch opt.Name {
+		case "publish":
+			rv.res.Ports = resolved
+		case "expose":
+			rv.res.Expose = resolved
+		case "dns":
+			rv.res.DNS = resolved
+		case "add-host":
+			rv.res.AddHosts = resolved
+		case "group-add":
+			rv.res.GroupAdd = resolved
+		case "cap-add":
+			rv.res.CapAdd = resolved
+		case "cap-drop":
+			rv.res.CapDrop = resolved
+		case "entrypoint":
+			rv.res.Entrypoint = resolved
+		}
+		return nil
+	}
+
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
+	if err != nil {
+		return err
+	}
+
+	p1v, _ = rv.extractStringSliceValue(p1Val, p1Set)
+	p2v, _ = rv.extractStringSliceValue(p2Val, p2Set)
+
+	rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
+	if err != nil {
+		return err
+	}
+
+	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
 	rv.getResVal().Field(info.targetIdx).Set(reflect.ValueOf(resolved))
 	return nil
 }
@@ -448,37 +587,48 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
 	case "image":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunImageSet, rv.cli.CderunImage, rv.cli.ImageSet, rv.cli.Image
+		p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
+		p2Set, p2Val = getPtrVal(rv.cli.Image)
 		fastPathUsed = true
 	case "network":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunNetworkSet, rv.cli.CderunNetwork, rv.cli.NetworkSet, rv.cli.Network
+		p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
+		p2Set, p2Val = getPtrVal(rv.cli.Network)
 		fastPathUsed = true
 	case "workdir":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunWorkdirSet, rv.cli.CderunWorkdir, rv.cli.WorkdirSet, rv.cli.Workdir
+		p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
+		p2Set, p2Val = getPtrVal(rv.cli.Workdir)
 		fastPathUsed = true
 	case "runtime":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRuntimeSet, rv.cli.CderunRuntime, rv.cli.RuntimeSet, rv.cli.Runtime
+		p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
+		p2Set, p2Val = getPtrVal(rv.cli.Runtime)
 		fastPathUsed = true
 	case "user":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunUserSet, rv.cli.CderunUser, rv.cli.UserSet, rv.cli.User
+		p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
+		p2Set, p2Val = getPtrVal(rv.cli.User)
 		fastPathUsed = true
 	case "log-level":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogLevelSet, rv.cli.CderunLogLevel, rv.cli.LogLevelSet, rv.cli.LogLevel
+		p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
+		p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
 		fastPathUsed = true
 	case "log-format":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogFormatSet, rv.cli.CderunLogFormat, rv.cli.LogFormatSet, rv.cli.LogFormat
+		p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
+		p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
 		fastPathUsed = true
 	case "hostname":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunHostnameSet, rv.cli.CderunHostname, rv.cli.HostnameSet, rv.cli.Hostname
+		p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
+		p2Set, p2Val = getPtrVal(rv.cli.Hostname)
 		fastPathUsed = true
 	case "pull":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPullSet, rv.cli.CderunPull, rv.cli.PullSet, rv.cli.Pull
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
+		p2Set, p2Val = getPtrVal(rv.cli.Pull)
 		fastPathUsed = true
 	case "dry-run-format":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDryRunFormatSet, rv.cli.CderunDryRunFormat, rv.cli.DryRunFormatSet, rv.cli.DryRunFormat
+		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
+		p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
 		fastPathUsed = true
 	case "diagnosis-format":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDiagnosisFormatSet, rv.cli.CderunDiagnosisFormat, rv.cli.DiagnosisFormatSet, rv.cli.DiagnosisFormat
+		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
+		p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
 		fastPathUsed = true
 	}
 
@@ -490,6 +640,16 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			Fallback:     opt.Default,
 		}
 		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+			r, err := rv.getR()
+			if err != nil {
+				return err
+			}
+			resolved = r.resolveString(resolved)
+			if err := r.Error(); err != nil {
+				return err
+			}
+		}
 		switch opt.Name {
 		case "image":
 			rv.res.Image = resolved
@@ -522,6 +682,16 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
 	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		resolved = r.resolveString(resolved)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	}
 	rv.getResVal().Field(info.targetIdx).SetString(resolved)
 	return nil
 }
@@ -539,40 +709,52 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
 	case "tty":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunTTYSet, rv.cli.CderunTTY, rv.cli.TTYSet, rv.cli.TTY
+		p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
+		p2Set, p2Val = getPtrVal(rv.cli.TTY)
 		fastPathUsed = true
 	case "interactive":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunInteractiveSet, rv.cli.CderunInteractive, rv.cli.InteractiveSet, rv.cli.Interactive
+		p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
+		p2Set, p2Val = getPtrVal(rv.cli.Interactive)
 		fastPathUsed = true
 	case "remove":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunRemoveSet, rv.cli.CderunRemove, rv.cli.RemoveSet, rv.cli.Remove
+		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
+		p2Set, p2Val = getPtrVal(rv.cli.Remove)
 		fastPathUsed = true
 	case "diagnosis":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDiagnosisSet, rv.cli.CderunDiagnosis, rv.cli.DiagnosisSet, rv.cli.Diagnosis
+		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
+		p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
 		fastPathUsed = true
 	case "strict-env":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunStrictEnvSet, rv.cli.CderunStrictEnv, rv.cli.StrictEnvSet, rv.cli.StrictEnv
+		p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
+		p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
 		fastPathUsed = true
 	case "privileged":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPrivilegedSet, rv.cli.CderunPrivileged, rv.cli.PrivilegedSet, rv.cli.Privileged
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
+		p2Set, p2Val = getPtrVal(rv.cli.Privileged)
 		fastPathUsed = true
 	case "publish-all":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPublishAllSet, rv.cli.CderunPublishAll, rv.cli.PublishAllSet, rv.cli.PublishAll
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
+		p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
 		fastPathUsed = true
 	case "log-timestamp":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunLogTimestampSet, rv.cli.CderunLogTimestamp, rv.cli.LogTimestampSet, rv.cli.LogTimestamp
+		p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
+		p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
 		fastPathUsed = true
 	case "mount-socket":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
+		p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
+		p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
 		fastPathUsed = true
 	case "mount-cderun":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
+		p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
+		p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
 		fastPathUsed = true
 	case "mount-all-tools":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
+		p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
+		p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
 		fastPathUsed = true
 	case "dry-run":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunDryRunSet, rv.cli.CderunDryRun, rv.cli.DryRunSet, rv.cli.DryRun
+		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
+		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
 		fastPathUsed = true
 	}
 
@@ -641,7 +823,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		expected := expectedFieldIndices["pull-max-retries"]
 		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
 			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
-			p1Set, p1Int, p2Set, p2Int = rv.cli.CderunPullMaxRetriesSet, rv.cli.CderunPullMaxRetries, rv.cli.PullMaxRetriesSet, rv.cli.PullMaxRetries
+			p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
+			p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
 			fastPathUsed = true
 		}
 	}
@@ -696,7 +879,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		expected := expectedFieldIndices["cpus"]
 		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
 			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
-			p1Set, p1Float, p2Set, p2Float = rv.cli.CderunCPUsSet, rv.cli.CderunCPUs, rv.cli.CPUsSet, rv.cli.CPUs
+			p1Set, p1Float = getPtrVal(rv.cli.CderunCPUs)
+			p2Set, p2Float = getPtrVal(rv.cli.CPUs)
 			fastPathUsed = true
 		}
 	}
@@ -749,9 +933,11 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	var p1Val, p2Val string
 	switch opt.Name {
 	case "hang-timeout":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunHangTimeoutSet, rv.cli.CderunHangTimeout, rv.cli.HangTimeoutSet, rv.cli.HangTimeout
+		p1Set, p1Val = getPtrVal(rv.cli.CderunHangTimeout)
+		p2Set, p2Val = getPtrVal(rv.cli.HangTimeout)
 	case "pull-backoff-base":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunPullBackoffBaseSet, rv.cli.CderunPullBackoffBase, rv.cli.PullBackoffBaseSet, rv.cli.PullBackoffBase
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPullBackoffBase)
+		p2Set, p2Val = getPtrVal(rv.cli.PullBackoffBase)
 	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 		if err != nil {
@@ -761,9 +947,21 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	}
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if err := rv.r.Error(); err != nil {
-		return err
+	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		valStr = r.resolveString(valStr)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	} else if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return err
+		}
 	}
+
 	if valStr != "" {
 		d, err := time.ParseDuration(valStr)
 		if err != nil {
@@ -792,7 +990,8 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	var p1Val, p2Val string
 	switch opt.Name {
 	case "memory":
-		p1Set, p1Val, p2Set, p2Val = rv.cli.CderunMemorySet, rv.cli.CderunMemory, rv.cli.MemorySet, rv.cli.Memory
+		p1Set, p1Val = getPtrVal(rv.cli.CderunMemory)
+		p2Set, p2Val = getPtrVal(rv.cli.Memory)
 	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 		if err != nil {
@@ -802,11 +1001,24 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	}
 
 	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		valStr = r.resolveString(valStr)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	}
+
 	if valStr != "" {
 		bytes, err := units.RAMInBytes(valStr)
 		if err != nil {
-			if exprErr := rv.r.Error(); exprErr != nil {
-				return exprErr
+			if rv.r != nil {
+				if exprErr := rv.r.Error(); exprErr != nil {
+					return exprErr
+				}
 			}
 			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
 		}
@@ -829,14 +1041,11 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		logging.Trace("Resolving configurations for tool: %s", subcommand)
 	}
 
-	var hostCtx *HostContext
-	if global != nil {
-		hostCtx = global.HostContext
+	if _, err := fs.UserHomeDir(); err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-
-	r, err := NewExpressionResolverWithFS(hostCtx, fs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create expression resolver: %w", err)
+	if _, err := fs.Getwd(); err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	fieldOnce.Do(initFieldInfo)
@@ -848,7 +1057,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		tools:      tools,
 		global:     global,
 		fs:         fs,
-		r:          r,
+		r:          nil, // Lazily initialized
 		res:        res,
 	}
 
@@ -915,7 +1124,12 @@ func (rv *resolver) resolveEarly() error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+		rForSens, err := rv.resolverForSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv)
+		if err != nil {
+			return err
+		}
+
+		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rForSens, rv.fs)
 	}
 	return nil
 }
@@ -946,17 +1160,34 @@ func (rv *resolver) resolveStandardOptions() error {
 		if rv.tools != nil {
 			if tool, ok := rv.tools[rv.subcommand]; ok && tool.Image != "" {
 				cliImage := ""
-				if rv.cli.CderunImageSet {
-					cliImage = rv.cli.CderunImage
-				} else if rv.cli.ImageSet {
-					cliImage = rv.cli.Image
+				if rv.cli.CderunImage != nil {
+					cliImage = *rv.cli.CderunImage
+				} else if rv.cli.Image != nil {
+					cliImage = *rv.cli.Image
 				} else if env := rv.fs.Getenv("CDERUN_IMAGE"); env != "" {
 					cliImage = env
 				}
 
 				if cliImage != "" {
-					resolvedCLIImage, errCLI := rv.r.ResolveString(cliImage)
-					resolvedCfgImage, errCfg := rv.r.ResolveString(tool.Image)
+					var errCLI, errCfg error
+					resolvedCLIImage := cliImage
+					resolvedCfgImage := tool.Image
+
+					if strings.Contains(cliImage, "{{") || strings.HasPrefix(cliImage, "~") {
+						r, err := rv.getR()
+						if err != nil {
+							return err
+						}
+						resolvedCLIImage, errCLI = r.ResolveString(cliImage)
+					}
+					if strings.Contains(tool.Image, "{{") || strings.HasPrefix(tool.Image, "~") {
+						r, err := rv.getR()
+						if err != nil {
+							return err
+						}
+						resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
+					}
+
 					if errCLI == nil && errCfg == nil {
 						if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
 							return err
@@ -991,13 +1222,67 @@ func (rv *resolver) resolveStandardOptions() error {
 
 func (rv *resolver) resolveComplexOptions() error {
 	var err error
+	var rForMounts *ExpressionResolver
+	hasMounts := len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != ""
+	if !hasMounts && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
+			hasMounts = true
+		}
+	}
+	if !hasMounts && rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
+		hasMounts = true
+	}
+
+	if hasMounts {
+		var err error
+		rForMounts, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Complex types (Mounts, Env)
-	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rForMounts, rv.fs)
 	if err != nil {
 		return err
 	}
 
-	rv.res.Env, err = resolveEnv(rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", rv.subcommand, rv.tools, rv.global, rv.res.SensitiveEnv, rv.res.StrictEnv, rv.r, rv.fs)
+	var rForEnv *ExpressionResolver
+	// Check if there are any environment variables
+	var envs []string
+	envs, err = pickConfigs(
+		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Env },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	hasEnvWithExpr := false
+	for _, e := range envs {
+		if strings.Contains(e, "{{") || strings.HasPrefix(e, "~") {
+			hasEnvWithExpr = true
+			break
+		}
+	}
+	if hasEnvWithExpr {
+		var err error
+		rForEnv, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Deduplicate within the winning source (last-one-wins for the same key)
+	var merged []string
+	if len(envs) > 0 {
+		merged = deduplicateEnv(envs)
+	}
+
+	rv.res.Env, err = resolveEnvValues(merged, rv.res.SensitiveEnv, rv.res.StrictEnv, rForEnv, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -1104,12 +1389,14 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 func (rv *resolver) resolveTransitiveOptions() error {
 	// Transitive options (MountTools -> MountCderun -> MountSocket)
+	p2SetTools, p2ValTools := getPtrVal(rv.cli.MountTools)
+	p1SetTools, p1ValTools := getPtrVal(rv.cli.CderunMountTools)
 	rv.res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
 			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
 			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
-		rv.cli.CderunMountToolsSet, rv.cli.CderunMountTools,
-		rv.cli.MountToolsSet, rv.cli.MountTools,
+		p1SetTools, p1ValTools,
+		p2SetTools, p2ValTools,
 		rv.subcommand, rv.tools, rv.global, rv.r, rv.fs,
 	)
 	for _, tool := range rv.res.MountTools {
@@ -1121,7 +1408,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	// Resolve mount-all-tools (transitive trigger)
 	{
 		opt, _ := GetBoolOption("mount-all-tools")
-		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountAllToolsSet, rv.cli.CderunMountAllTools, rv.cli.MountAllToolsSet, rv.cli.MountAllTools
+		p1Set, p1Val := getPtrVal(rv.cli.CderunMountAllTools)
+		p2Set, p2Val := getPtrVal(rv.cli.MountAllTools)
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		var err error
 		rv.res.MountAllTools, err = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
@@ -1133,7 +1421,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	var mountCderunSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-cderun")
-		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountCderunSet, rv.cli.CderunMountCderun, rv.cli.MountCderunSet, rv.cli.MountCderun
+		p1Set, p1Val := getPtrVal(rv.cli.CderunMountCderun)
+		p2Set, p2Val := getPtrVal(rv.cli.MountCderun)
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		var err error
 		rv.res.MountCderun, mountCderunSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
@@ -1162,7 +1451,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	var mountSocketSpecified bool
 	{
 		opt, _ := GetBoolOption("mount-socket")
-		p1Set, p1Val, p2Set, p2Val := rv.cli.CderunMountSocketSet, rv.cli.CderunMountSocket, rv.cli.MountSocketSet, rv.cli.MountSocket
+		p1Set, p1Val := getPtrVal(rv.cli.CderunMountSocket)
+		p2Set, p2Val := getPtrVal(rv.cli.MountSocket)
 		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 		var err error
 		rv.res.MountSocket, mountSocketSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
@@ -1227,8 +1517,28 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
+	var rForDevices *ExpressionResolver
+	// Check if there are any devices to resolve
+	hasDevices := len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != ""
+	if !hasDevices && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
+			hasDevices = true
+		}
+	}
+	if !hasDevices && rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
+		hasDevices = true
+	}
+
+	if hasDevices {
+		var err error
+		rForDevices, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
 	var errDevices error
-	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rForDevices, rv.fs)
 	if errDevices != nil {
 		return errDevices
 	}
@@ -1252,8 +1562,10 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 	rv.res.HostContext = hostCtx
 
-	if err := rv.r.Error(); err != nil {
-		return err
+	if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1274,33 +1586,44 @@ func (rv *resolver) validateSecurity() error {
 	if err := rv.validateDeviceSecurity(); err != nil {
 		return err
 	}
-	if rv.res.Privileged {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+	highlyPrivileged := map[string]bool{
+		"ALL":            true,
+		"SYS_ADMIN":      true,
+		"NET_ADMIN":      true,
+		"SYS_RAWIO":      true,
+		"SYS_PTRACE":     true,
+		"SYS_MODULE":     true,
+		"CAP_ALL":        true,
+		"CAP_SYS_ADMIN":  true,
+		"CAP_NET_ADMIN":  true,
+		"CAP_SYS_RAWIO":  true,
+		"CAP_SYS_PTRACE": true,
+		"CAP_SYS_MODULE": true,
+	}
+	var found []string
+	for _, capName := range rv.res.CapAdd {
+		upperCap := strings.ToUpper(strings.TrimSpace(capName))
+		if highlyPrivileged[upperCap] {
+			found = append(found, capName)
+		}
+	}
 
-			highlyPrivileged := map[string]bool{
-				"ALL":            true,
-				"SYS_ADMIN":      true,
-				"NET_ADMIN":      true,
-				"SYS_RAWIO":      true,
-				"SYS_PTRACE":     true,
-				"SYS_MODULE":     true,
-				"CAP_ALL":        true,
-				"CAP_SYS_ADMIN":  true,
-				"CAP_NET_ADMIN":  true,
-				"CAP_SYS_RAWIO":  true,
-				"CAP_SYS_PTRACE": true,
-				"CAP_SYS_MODULE": true,
-			}
-			var found []string
-			for _, capName := range rv.res.CapAdd {
-				upperCap := strings.ToUpper(strings.TrimSpace(capName))
-				if highlyPrivileged[upperCap] {
-					found = append(found, capName)
-				}
-			}
+	if logging.Enabled(logging.WarnLevel) {
+		if rv.res.Privileged {
+			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 			if len(found) > 0 {
 				logging.Warn("Highly privileged capability %v detected in CapAdd while running in privileged mode. Please consider minimizing privileges.", found)
+			}
+		} else if len(found) > 0 {
+			logging.Warn("Highly privileged capability %v detected in CapAdd. Please consider minimizing privileges.", found)
+		}
+	}
+	if rv.res.MountSocket {
+		if logging.Enabled(logging.WarnLevel) {
+			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+
+			if ContainsNumericGID(rv.res.GroupAdd) {
+				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 			}
 		}
 	}
@@ -1429,12 +1752,15 @@ func (rv *resolver) validateSlices() error {
 
 func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
-		key, _, _ := strings.Cut(e, "=")
+		key, val, _ := strings.Cut(e, "=")
 		if err := validatePathChars(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+		if strings.ContainsRune(val, 0) {
+			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
 	}
 	return nil
@@ -1448,6 +1774,9 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
+		if HasParentTraversal(m.Target) {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
+		}
 	}
 	return nil
 }
@@ -1459,6 +1788,9 @@ func (rv *resolver) validateDeviceSecurity() error {
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
+		}
+		if HasParentTraversal(d.PathInContainer) {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
 		}
 		if d.CgroupPermissions != "" {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
@@ -1474,12 +1806,23 @@ func (rv *resolver) validateDeviceSecurity() error {
 
 func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
+	var baseDir string
+	if r != nil {
+		baseDir = r.Pwd
+	} else {
+		wd, err := fs.Getwd()
+		if err != nil {
+			return "", err
+		}
+		baseDir = wd
+	}
+
 	if p1Set {
-		cp = ConfigPath{Raw: p1Val, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: p1Val, BaseDir: baseDir}
 	} else if cliSet {
-		cp = ConfigPath{Raw: cliVal, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: cliVal, BaseDir: baseDir}
 	} else if env := fs.Getenv(envKey); env != "" {
-		cp = ConfigPath{Raw: env, BaseDir: r.Pwd}
+		cp = ConfigPath{Raw: env, BaseDir: baseDir}
 	} else {
 		found := false
 		if tools != nil {
@@ -1497,7 +1840,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 			}
 		}
 		if !found {
-			cp = ConfigPath{Raw: fallback, BaseDir: r.Pwd}
+			cp = ConfigPath{Raw: fallback, BaseDir: baseDir}
 		}
 	}
 
