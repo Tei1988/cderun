@@ -184,7 +184,7 @@ func TestUnit_Command_Robustness_NullTimeoutBlocksIndefinitely(t *testing.T) {
 
 	waitStarted := make(chan struct{})
 	waitUnblock := make(chan struct{})
-	mockRuntime := &testImprovementHangTimeoutMockRuntime{
+	mockRuntime := &cmdHangTimeoutMockRuntime{
 		MockRuntime: runtime.NewMockRuntime(),
 		waitStarted: waitStarted,
 		waitUnblock: waitUnblock,
@@ -237,7 +237,7 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	o := &rootOptions{logger: &logging.Logger{}}
 
 	t.Run("Signal fails and returns structured exit code error", func(t *testing.T) {
-		mockRuntime := &testImprovementTerminationMockRuntime{
+		mockRuntime := &cmdTerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failure warning")},
 			isRunning:   true,
 		}
@@ -249,7 +249,7 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	})
 
 	t.Run("Signal succeeds without error", func(t *testing.T) {
-		mockRuntime := &testImprovementTerminationMockRuntime{
+		mockRuntime := &cmdTerminationMockRuntime{
 			MockRuntime: runtime.NewMockRuntime(),
 			isRunning:   true,
 		}
@@ -266,7 +266,7 @@ func TestUnit_Command_Robustness_MultipleRapidSignals(t *testing.T) {
 	t.Parallel()
 
 	waitChan := make(chan int)
-	mockRuntime := &testImprovementWaitBlockedMockRuntime{
+	mockRuntime := &cmdWaitBlockedMockRuntime{
 		MockRuntime: runtime.NewMockRuntime(),
 		waitChan:    waitChan,
 	}
@@ -359,13 +359,13 @@ func TestUnit_Command_DryRun_EmptySubcommandError(t *testing.T) {
 
 // Unique helper types to avoid redeclaration collisions
 
-type testImprovementHangTimeoutMockRuntime struct {
+type cmdHangTimeoutMockRuntime struct {
 	*runtime.MockRuntime
 	waitStarted chan struct{}
 	waitUnblock chan struct{}
 }
 
-func (m *testImprovementHangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (int, error) {
+func (m *cmdHangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (int, error) {
 	close(m.waitStarted)
 	select {
 	case <-m.waitUnblock:
@@ -375,36 +375,36 @@ func (m *testImprovementHangTimeoutMockRuntime) WaitContainer(ctx context.Contex
 	}
 }
 
-type testImprovementTerminationMockRuntime struct {
+type cmdTerminationMockRuntime struct {
 	*runtime.MockRuntime
 	isRunning  bool
 	signaledID string
 }
 
-func (m *testImprovementTerminationMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
+func (m *cmdTerminationMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
 	return m.isRunning, 0, nil
 }
 
-func (m *testImprovementTerminationMockRuntime) SignalContainer(ctx context.Context, id string, sig string) error {
+func (m *cmdTerminationMockRuntime) SignalContainer(ctx context.Context, id string, sig string) error {
 	m.signaledID = id
 	return m.MockRuntime.SignalContainer(ctx, id, sig)
 }
 
-type testImprovementWaitBlockedMockRuntime struct {
+type cmdWaitBlockedMockRuntime struct {
 	*runtime.MockRuntime
 	waitChan chan int
 	signals  []string
 	mu       sync.Mutex
 }
 
-func (m *testImprovementWaitBlockedMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+func (m *cmdWaitBlockedMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
 	m.signals = append(m.signals, sig)
 	m.mu.Unlock()
 	return nil
 }
 
-func (m *testImprovementWaitBlockedMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+func (m *cmdWaitBlockedMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	select {
 	case code := <-m.waitChan:
 		return code, nil
