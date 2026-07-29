@@ -200,3 +200,99 @@ func TestUnit_Config_Resolver_EnvNullByteSecurity(t *testing.T) {
 		assert.Contains(t, err.Error(), "null byte injection detected")
 	})
 }
+
+func TestUnit_Config_Resolver_HostNetworkWarning(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	t.Run("host network mode logs warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Network: ptr("host"),
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "Container is running with host network mode enabled")
+	})
+
+	t.Run("bridge network mode does not log host network warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Network: ptr("bridge"),
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.NotContains(t, logOutput, "Container is running with host network mode enabled")
+	})
+}
+
+func TestUnit_Config_Resolver_SensitivePathMountWarnings(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	tests := []struct {
+		name        string
+		mountSource string
+		expectWarn  bool
+	}{
+		{"Mounting root path warns", "/", true},
+		{"Mounting /etc warns", "/etc", true},
+		{"Mounting subdirectory of /etc warns", "/etc/shadow", true},
+		{"Mounting /proc warns", "/proc", true},
+		{"Mounting /sys warns", "/sys", true},
+		{"Mounting /boot warns", "/boot", true},
+		{"Mounting /dev warns", "/dev", true},
+		{"Mounting normal path does not warn", "/work/app", false},
+		{"Mounting custom directory does not warn", "/etc-not-really", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+			logging.GetGlobalLogger().SetOutput(&buf)
+			defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+			cli := &CLIOptions{
+				Image:  ptr("alpine"),
+				Mounts: []string{"type=bind,source=" + tt.mountSource + ",target=/app"},
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.NoError(t, err)
+
+			logOutput := buf.String()
+			if tt.expectWarn {
+				assert.Contains(t, logOutput, "Mounting highly sensitive host path")
+			} else {
+				assert.NotContains(t, logOutput, "Mounting highly sensitive host path")
+			}
+		})
+	}
+}
