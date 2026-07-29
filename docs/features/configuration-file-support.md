@@ -74,6 +74,12 @@ If no path override is specified, `cderun` dynamically searches for configuratio
 Key names in configuration files are defined in standard **camelCase**, matching their respective CLI names.
 
 > **Exception**: Individual items inside `mounts` and `devices` configuration blocks support certain snake_case properties (e.g., `read_only`, `optional`, `path_on_host`) to align with OCI or Docker specifications.
+>
+> **Important Distinction on Mount Options**:
+>
+> - **YAML Configurations**: Must use the snake_case keys `read_only` and `optional` inside `.cderun.yaml` or `.tools.yaml`.
+> - **CLI Arguments**: Use the standard `--mount` key-value syntax (e.g., `--mount type=bind,source=...,target=...,readonly,optional`). Note that CLI parsing and dry-run formats output and use `readonly`, whereas YAML configurations require `read_only`.
+> - **Syntax Warning**: Do **not** copy CLI `--mount` key-value strings or `--mount` syntax directly as list items under YAML `mounts`. They must be written as structured YAML maps conforming to the schema described below.
 
 ### `.cderun.yaml` Schema
 
@@ -160,17 +166,20 @@ Each item in the `mounts` list supports the following attributes:
 
 ### 2. Device Configurations (`devices`)
 
-Accepts both structured objects and shorthand colon-delimited strings:
+Accepts both structured objects and shorthand colon-delimited strings.
 
 #### Object Notation
 
-- `source` (string, **required**): Path to the device on the host.
-- `destination` (string, **required**): Path to map the device inside the container.
-- `permissions` (string): Access permissions (e.g., `rwm`). Default: `rwm`.
+The following config-level fields in `.tools.yaml` or `.cderun.yaml` map directly to dry-run output properties:
+
+- `source` (string, **required**): Path to the device on the host. Maps to dry-run field `path_on_host`.
+- `destination` (string, **required**): Path to map the device inside the container. Maps to dry-run field `path_in_container`.
+- `permissions` (string): Access permissions (e.g., `rwm`). Default: `rwm`. Maps to dry-run field `cgroup_permissions`.
 
 #### String Notation
 
-Syntax: `<host-path>:<container-path>[:<permissions>]`. Permissions are strictly validated against `^[rwm]+$`.
+Syntax: `<host-path>:<container-path>[:<permissions>]` (e.g., `/dev/fuse:/dev/fuse:rwm`). Permissions are strictly validated against `^[rwm]+$`.
+These colon-delimited segments map respectively to `path_on_host`, `path_in_container`, and `cgroup_permissions` in the dry-run output and intermediate representation.
 
 ```yaml
 devices:

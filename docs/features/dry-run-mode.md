@@ -123,29 +123,29 @@ Output of `cderun --dry-run -f simple node app.js`:
 
 ```text
 Image: node:latest
-Command: app.js
+Command: "app.js"
 TTY: true
 Interactive: true
 Network: bridge
 Remove: true
-Mounts: type=bind,source=/home/user/project,target=/workspace,readonly=false
+Mounts: type=bind,source="/home/user/project",target="/workspace",readonly=false
 Env: "NODE_ENV"="[REDACTED]"
 Workdir: /workspace
 User:
-Ports:
+Ports: 8080:80
 PublishAll: false
-Expose:
-Hostname:
-DNS:
-AddHosts:
+Expose: 80/tcp
+Hostname: node-app
+DNS: 8.8.8.8
+AddHosts: my-server:192.168.1.100
 Privileged: false
-CapAdd:
-CapDrop:
-Entrypoint:
-Pull: missing
+CapAdd: SYS_ADMIN
+CapDrop: NET_RAW
+GroupAdd:
+Devices: /dev/fuse
 Memory: 512MiB
 CPUs: 1.5
-Devices:
+Entrypoint: "/usr/bin/node"
 ```
 
 > **Note on Units**: In the simple output format, `Memory` is displayed using human-readable binary units (such as `MiB` or `GiB`) for readability, and `CPUs` is displayed as a clean float representation (e.g., `1.5`). Additionally, all command arguments and environment definitions are individually quoted (`%q`) in this format to guard against terminal control-character injections.

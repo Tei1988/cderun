@@ -59,7 +59,20 @@ Before executing the container:
 
 1. **Splitting and Validating Keys**: Each entry in the `Env` slice is analyzed. The key portion (everything before the first `=` sign) is extracted and strictly validated using `ValidateEnvKey` to reject null bytes (`\x00`) and command injection attempts. If a key is invalid, execution is immediately aborted with a validation error.
 2. **Value Fetching**: If an entry consists of only a key (no `=` sign), `cderun` queries the host environment using `os.Getenv(key)` (or `fs.LookupEnv`) to fetch the value and transforms it into the native `KEY=value` representation.
-3. **Control Character Safe Values**: Only the keys are subject to strict character restrictions. The values can safely contain newlines or control characters (such as multiline PEM certificates) without failing validation.
+3. **Control Character Safe Values**: Only the keys are subject to strict character restrictions. The values may contain newlines and other non-NUL characters (such as multiline PEM certificates) without failing validation. However, NUL (`\x00`) bytes are strictly rejected by the resolver in both keys and values to prevent injection and string truncation attacks.
+
+   For example, you can safely pass a multiline SSL certificate via environment variables:
+
+   ```yaml
+   # .tools.yaml
+   web:
+     image: nginx:alpine
+     env:
+       - |
+         SSL_CERT=-----BEGIN CERTIFICATE-----
+         MIIDBzCCAe+gAwIBAgIJAO...
+         -----END CERTIFICATE-----
+   ```
 
 ---
 
@@ -77,7 +90,7 @@ cderun --env NONEXISTENT node -e "console.log(JSON.stringify(process.env.NONEXIS
 
 ### Strict Mode (`strictEnv: true`)
 
-When `strictEnv` is enabled, `cderun` immediately aborts execution with an error if a requested passthrough variable is missing or empty on the host.
+When `strictEnv` is enabled, `cderun` immediately aborts execution with an error only if a requested passthrough variable is completely **missing** from the host environment (the environment variable is not set on the host). If the environment variable exists on the host but has an empty value (e.g., `export NPM_TOKEN=""`), it is accepted and resolved as empty inside the container without causing an execution abort.
 
 #### Configuration Options
 
@@ -98,6 +111,8 @@ export CDERUN_STRICT_ENV=true
 ```
 
 #### Behavior
+
+If the requested variable `NPM_TOKEN` is not defined at all on the host:
 
 ```bash
 cderun node app.js

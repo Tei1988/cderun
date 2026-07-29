@@ -34,18 +34,18 @@ These rules are consistently resolved across all configuration priority layers a
 cderun --mount-all-tools sh
 ```
 
-#### Under-the-hood Mount Architecture
+#### Under-the-hood Mount Architecture (Runtime-Agnostic with Overrides)
 
-If `.tools.yaml` defines `node`, `python`, and `git`, `cderun` configures the following mounts:
+If `.tools.yaml` defines `node`, `python`, and `git`, `cderun` configures the following mounts. This architecture dynamically respects the configured host paths (e.g., `--socket-path`, `--mount-cderun-path`) and container target locations (e.g., `--mount-socket-path`):
 
 ```text
 Host Path                         Container Target
 ┌───────────────────────────┐     ┌────────────────────────────────┐
-│ /var/run/docker.sock      │ ──> │ /var/run/docker.sock           │
-│ /usr/local/bin/cderun     │ ──> │ /usr/local/bin/cderun (ro)     │
-│ /usr/local/bin/cderun     │ ──> │ /usr/local/bin/node (ro)       │
-│ /usr/local/bin/cderun     │ ──> │ /usr/local/bin/python (ro)     │
-│ /usr/local/bin/cderun     │ ──> │ /usr/local/bin/git (ro)        │
+│ <socket-path>             │ ──> │ <mount-socket-path>            │
+│ <mount-cderun-path>       │ ──> │ /usr/local/bin/cderun (ro)     │
+│ <mount-cderun-path>       │ ──> │ /usr/local/bin/node (ro)       │
+│ <mount-cderun-path>       │ ──> │ /usr/local/bin/python (ro)     │
+│ <mount-cderun-path>       │ ──> │ /usr/local/bin/git (ro)        │
 └───────────────────────────┘     └────────────────────────────────┘
 ```
 

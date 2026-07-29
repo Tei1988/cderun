@@ -189,7 +189,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 ### `--cderun-env`
 
 - **Type**: stringArray
-- **Description**: High-priority environment variable override (P1 resolution). Can be placed after the subcommand.
+- **Description**: High-priority environment variable override (P1 resolution). This option can be placed after the subcommand.
 - **Example**:
 
   ```bash
