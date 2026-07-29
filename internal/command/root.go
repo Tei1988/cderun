@@ -112,6 +112,7 @@ type rootOptions struct {
 	addHosts              []string
 	user                  string
 	privileged            bool
+	readOnly              bool
 	capAdd                []string
 	capDrop               []string
 	entrypoint            []string
@@ -128,6 +129,7 @@ type rootOptions struct {
 	cderunAddHosts        []string
 	cderunUser            string
 	cderunPrivileged      bool
+	cderunReadOnly        bool
 	cderunCapAdd          []string
 	cderunCapDrop         []string
 	cderunGroupAdd        []string
@@ -361,6 +363,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunUser:               opt(cmd.Flags().Changed("cderun-user"), o.cderunUser),
 		Privileged:               opt(cmd.Flags().Changed("privileged"), o.privileged),
 		CderunPrivileged:         opt(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
+		ReadOnly:                 opt(cmd.Flags().Changed("read-only"), o.readOnly),
+		CderunReadOnly:           opt(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
 		CapAdd:                   o.capAdd,
 		CderunCapAdd:             o.cderunCapAdd,
 		CapDrop:                  o.capDrop,
@@ -532,6 +536,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,
 		Remove:      resolved.Remove,
+		ReadOnly:    resolved.ReadOnly,
 		Mounts:      resolved.Mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,

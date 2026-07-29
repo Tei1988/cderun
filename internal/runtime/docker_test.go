@@ -1161,3 +1161,40 @@ func TestUnit_Docker_WaitContainer_AutoRemove(t *testing.T) {
 		assert.Equal(t, 0, code)
 	})
 }
+
+func TestUnit_Docker_CreateContainer_ReadOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	t.Run("read-only enabled", func(t *testing.T) {
+		mock := &mockDockerClient{
+			createResp: dockercontainer.CreateResponse{ID: "created-id"},
+		}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+		config := &container.ContainerConfig{
+			Image:    "test-image",
+			ReadOnly: true,
+		}
+
+		_, err := runtime.CreateContainer(ctx, config)
+		require.NoError(t, err)
+		assert.True(t, mock.createHostConfig.ReadonlyRootfs)
+	})
+
+	t.Run("read-only disabled", func(t *testing.T) {
+		mock := &mockDockerClient{
+			createResp: dockercontainer.CreateResponse{ID: "created-id"},
+		}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+		config := &container.ContainerConfig{
+			Image:    "test-image",
+			ReadOnly: false,
+		}
+
+		_, err := runtime.CreateContainer(ctx, config)
+		require.NoError(t, err)
+		assert.False(t, mock.createHostConfig.ReadonlyRootfs)
+	})
+}

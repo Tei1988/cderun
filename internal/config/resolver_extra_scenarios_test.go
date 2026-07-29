@@ -307,3 +307,96 @@ func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath, "Fell back to default socket path")
 	}
 }
+
+func TestUnit_Config_Resolver_ReadOnly_Precedence(t *testing.T) {
+	t.Parallel()
+
+	// P6: Hardcoded default should be false
+	t.Run("P6 default", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{Image: ptr("alpine")}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.False(t, res.ReadOnly)
+	})
+
+	// P5: Global config defaults
+	t.Run("P5 global config", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{Image: ptr("alpine")}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				ReadOnly: ptr(true),
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, nil, global, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	// P4: Tool config wins over global
+	t.Run("P4 tool config wins over global", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{Image: ptr("alpine")}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				ReadOnly: ptr(false),
+			},
+		}
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				ReadOnly: ptr(true),
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, tools, global, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	// P3: Env key CDERUN_READ_ONLY wins over tool config
+	t.Run("P3 env var wins over tool", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_READ_ONLY": "true",
+			},
+		}
+		cli := &CLIOptions{Image: ptr("alpine")}
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				ReadOnly: ptr(false),
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+
+	// P2: CLI ReadOnly wins over environment variable
+	t.Run("P2 CLI flag wins over env", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_READ_ONLY": "true",
+			},
+		}
+		cli := &CLIOptions{
+			Image:    ptr("alpine"),
+			ReadOnly: ptr(false),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.False(t, res.ReadOnly)
+	})
+
+	// P1: CLI CderunReadOnly wins over CLI ReadOnly
+	t.Run("P1 internal override wins over CLI flag", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image:          ptr("alpine"),
+			ReadOnly:       ptr(false),
+			CderunReadOnly: ptr(true),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.ReadOnly)
+	})
+}

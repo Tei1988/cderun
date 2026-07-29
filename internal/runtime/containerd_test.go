@@ -8,8 +8,11 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,6 +89,23 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_Containerd_CreateContainer_ReadOnly_SpecOpt(t *testing.T) {
+	t.Parallel()
+	s := &specs.Spec{}
+	opt := func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		if s.Root == nil {
+			s.Root = &specs.Root{}
+		}
+		s.Root.Readonly = true
+		return nil
+	}
+
+	err := opt(context.Background(), nil, nil, s)
+	require.NoError(t, err)
+	assert.NotNil(t, s.Root)
+	assert.True(t, s.Root.Readonly)
 }
 
 func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {

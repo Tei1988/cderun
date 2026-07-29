@@ -53,6 +53,7 @@ type ResolvedConfig struct {
 	DNS             []string
 	AddHosts        []string
 	Privileged      bool
+	ReadOnly        bool
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string
@@ -136,6 +137,8 @@ type CLIOptions struct {
 	CderunUser               *string
 	Privileged               *bool
 	CderunPrivileged         *bool
+	ReadOnly                 *bool
+	CderunReadOnly           *bool
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
@@ -756,6 +759,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
 		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
 		fastPathUsed = true
+	case "read-only":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
+		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
@@ -793,6 +800,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.MountAllTools = resolved
 		case "dry-run":
 			rv.res.DryRun = resolved
+		case "read-only":
+			rv.res.ReadOnly = resolved
 		}
 		return nil
 	}

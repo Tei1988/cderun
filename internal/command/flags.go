@@ -206,6 +206,8 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 		return &o.diagnosis, &o.cderunDiagnosis
 	case "log-timestamp":
 		return &o.logTimestamp, &o.cderunLogTimestamp
+	case "read-only":
+		return &o.readOnly, &o.cderunReadOnly
 	default:
 		return nil, nil
 	}
