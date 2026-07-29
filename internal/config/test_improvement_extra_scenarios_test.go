@@ -400,7 +400,7 @@ func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateNetworkName("my-net_1.0"))
 
 		// Invalid cases
-		assert.Error(t, ValidateNetworkName("-net")) // invalid start char
+		require.Error(t, ValidateNetworkName("-net")) // invalid start char
 		assert.Error(t, ValidateNetworkName("net$work")) // invalid character
 	})
 
@@ -430,10 +430,10 @@ func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateExposePort("80/udp"))
 
 		// Invalid
-		assert.Error(t, ValidateExposePort("90-80")) // start > end
-		assert.Error(t, ValidateExposePort("0")) // cannot be zero
-		assert.Error(t, ValidateExposePort("70000")) // out of range
-		assert.Error(t, ValidateExposePort("80/http")) // invalid protocol
+		require.Error(t, ValidateExposePort("90-80")) // start > end
+		require.Error(t, ValidateExposePort("0")) // cannot be zero
+		require.Error(t, ValidateExposePort("70000")) // out of range
+		require.Error(t, ValidateExposePort("80/http")) // invalid protocol
 		assert.Error(t, ValidateExposePort("80-invalid")) // invalid format
 	})
 
@@ -443,7 +443,7 @@ func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateDNS("2001:db8::1"))
 
 		// Invalid
-		assert.Error(t, ValidateDNS("invalid-ip"))
+		require.Error(t, ValidateDNS("invalid-ip"))
 		assert.Error(t, ValidateDNS("1.1.1.1\x00")) // control char
 	})
 
@@ -474,8 +474,8 @@ func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateEnvKey("VAR123"))
 
 		// Invalid
-		assert.Error(t, ValidateEnvKey("")) // empty
-		assert.Error(t, ValidateEnvKey("1VAR")) // starts with digit
+		require.Error(t, ValidateEnvKey("")) // empty
+		require.Error(t, ValidateEnvKey("1VAR")) // starts with digit
 		assert.Error(t, ValidateEnvKey("MY-VAR")) // hyphen not allowed
 	})
 
@@ -491,8 +491,8 @@ func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
 
 	t.Run("validatePathChars thoroughly", func(t *testing.T) {
 		assert.NoError(t, validatePathChars("/app/path"))
-		assert.Error(t, validatePathChars("\x01/app/path")) // control char
-		assert.Error(t, validatePathChars("/app\x7F/path")) // delete control char
+		require.Error(t, validatePathChars("\x01/app/path")) // control char
+		require.Error(t, validatePathChars("/app\x7F/path")) // delete control char
 	})
 
 	t.Run("ContainsNumericGID thoroughly", func(t *testing.T) {

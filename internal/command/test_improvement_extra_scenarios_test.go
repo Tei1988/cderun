@@ -198,10 +198,10 @@ func TestUnit_Command_DryRun_EmptySubcommandError(t *testing.T) {
 	assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
 }
 
-// TestUnit_Command_WrapperMode_ValueTakingP1WithoutEqualsRejection validates that a value-taking
-// P1 override specified without an equals sign (e.g. `--cderun-image node`) is strictly rejected
-// with a validation error during preprocessing.
-func TestUnit_Command_WrapperMode_ValueTakingP1WithoutEqualsRejection(t *testing.T) {
+// TestUnit_Command_StandardMode_ValueTakingP1WithoutEqualsRejection validates that a value-taking
+// P1 override specified without an equals sign (e.g. `--cderun-image node`) in standard mode is strictly
+// rejected with a validation error during preprocessing.
+func TestUnit_Command_StandardMode_ValueTakingP1WithoutEqualsRejection(t *testing.T) {
 	t.Parallel()
 
 	args := []string{
@@ -223,13 +223,54 @@ func TestUnit_Command_WrapperMode_ValueTakingP1WithoutEqualsRejection(t *testing
 	assert.Contains(t, err.Error(), "must use '=' format to specify its value")
 }
 
+type doubleSignalMockRuntime struct {
+	runtime.MockRuntime
+	signals   []string
+	waitChan  chan int
+	startChan chan struct{}
+	mu        sync.Mutex
+}
+
+func (m *doubleSignalMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
+	m.signals = append(m.signals, sig)
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *doubleSignalMockRuntime) StartContainer(ctx context.Context, id string) error {
+	if m.startChan != nil {
+		close(m.startChan)
+	}
+	return m.MockRuntime.StartContainer(ctx, id)
+}
+
+func (m *doubleSignalMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	select {
+	case code := <-m.waitChan:
+		return code, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+}
+
+func (m *doubleSignalMockRuntime) getSignals() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sigs := make([]string, len(m.signals))
+	copy(sigs, m.signals)
+	return sigs
+}
+
 // TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation validates that receiving a second signal
 // (rapid double SIGINT) during active execution immediately cancels the execution context on the host.
 func TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation(t *testing.T) {
 	t.Parallel()
 
-	mock := &signalCapturingMockRuntime{
-		waitChan: make(chan int),
+	startChan := make(chan struct{})
+	mock := &doubleSignalMockRuntime{
+		waitChan:  make(chan int),
+		startChan: startChan,
 	}
 	mock.CreatedContainerID = "double-signal-id"
 
@@ -261,14 +302,18 @@ func TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation(t *test
 	}()
 
 	// Wait for signal setup to be captured
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		sigChanMu.Lock()
 		defer sigChanMu.Unlock()
 		return capturedSigChan != nil
 	}, 2*time.Second, 10*time.Millisecond)
 
-	// Wait until runtime StartContainer has completed
-	time.Sleep(100 * time.Millisecond)
+	// Wait for StartContainer to be invoked so startupBegun is set to true
+	select {
+	case <-startChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("StartContainer was not called in time")
+	}
 
 	// Send first signal (SIGINT)
 	sigChanMu.Lock()
@@ -276,7 +321,7 @@ func TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation(t *test
 	sigChanMu.Unlock()
 
 	// Wait for first signal to be forwarded
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		return slices.Contains(mock.getSignals(), "SIGINT")
 	}, 2*time.Second, 10*time.Millisecond)
 
@@ -341,7 +386,7 @@ func TestUnit_Command_Robustness_EarlySignalPreStartCancellation(t *testing.T) {
 		t.Fatal("Execution did not reach PullImage")
 	}
 
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		sigChanMu.Lock()
 		defer sigChanMu.Unlock()
 		return capturedSigChan != nil
