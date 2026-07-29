@@ -107,7 +107,17 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
 			}
-			parsed.SetBaseDir(r.Pwd)
+			var baseDir string
+			if r != nil {
+				baseDir = r.Pwd
+			} else {
+				wd, err := fs.Getwd()
+				if err != nil {
+					return DeviceConfig{}, err
+				}
+				baseDir = wd
+			}
+			parsed.SetBaseDir(baseDir)
 			return parsed, nil
 		},
 		fs,
@@ -428,7 +438,17 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
 			}
-			parsed.SetBaseDir(r.Pwd)
+			var baseDir string
+			if r != nil {
+				baseDir = r.Pwd
+			} else {
+				wd, err := fs.Getwd()
+				if err != nil {
+					return MountConfig{}, err
+				}
+				baseDir = wd
+			}
+			parsed.SetBaseDir(baseDir)
 			return parsed, nil
 		},
 		fs,
@@ -448,12 +468,18 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			if err != nil {
 				return nil, err
 			}
-			if _, err := r.Stat(hostPath); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
+			var errStat error
+			if r != nil {
+				_, errStat = r.Stat(hostPath)
+			} else {
+				_, errStat = fs.Stat(hostPath)
+			}
+			if errStat != nil {
+				if errors.Is(errStat, os.ErrNotExist) {
 					// Skip if source doesn't exist
 					continue
 				}
-				return nil, err
+				return nil, errStat
 			}
 		}
 

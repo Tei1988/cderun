@@ -442,38 +442,85 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 }
 
 func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 []string, p2 []string) (*ExpressionResolver, error) {
-	var vals []string
-	if p1 != nil {
-		vals = p1
-	} else if p2 != nil {
-		vals = p2
-	} else if def.EnvKey != "" {
-		if env, ok := rv.fs.LookupEnv(def.EnvKey); ok {
-			vals = []string{}
-			for v := range strings.SplitSeq(env, envSep) {
-				v = strings.TrimSpace(v)
-				if v == "" {
-					continue
-				}
-				vals = append(vals, v)
-			}
-		}
-	}
-	if vals == nil && def.ToolGetter != nil && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok {
-			vals = def.ToolGetter(tool)
-		}
-	}
-	if vals == nil && def.GlobalGetter != nil && rv.global != nil {
-		vals = def.GlobalGetter(*rv.global)
-	}
-
+	vals := resolveStringSliceOpt(def, envSep, p1, p2, rv.subcommand, rv.tools, rv.global, nil, rv.fs)
 	for _, v := range vals {
 		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
 			return rv.getR()
 		}
 	}
 	return nil, nil
+}
+
+func (rv *resolver) collectRawMounts() []string {
+	if rv.cli.CderunMounts != nil {
+		return rv.cli.CderunMounts
+	}
+	if rv.cli.Mounts != nil {
+		return rv.cli.Mounts
+	}
+	if env, ok := rv.fs.LookupEnv("CDERUN_MOUNT"); ok {
+		var res []string
+		for s := range strings.SplitSeq(env, ";") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				res = append(res, s)
+			}
+		}
+		return res
+	}
+	if rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
+			res := make([]string, 0, len(tool.Mounts)*2)
+			for _, m := range tool.Mounts {
+				res = append(res, m.Source.Raw, m.Target.Raw)
+			}
+			return res
+		}
+	}
+	if rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
+		res := make([]string, 0, len(rv.global.Defaults.Mounts)*2)
+		for _, m := range rv.global.Defaults.Mounts {
+			res = append(res, m.Source.Raw, m.Target.Raw)
+		}
+		return res
+	}
+	return nil
+}
+
+func (rv *resolver) collectRawDevices() []string {
+	if rv.cli.CderunDevices != nil {
+		return rv.cli.CderunDevices
+	}
+	if rv.cli.Devices != nil {
+		return rv.cli.Devices
+	}
+	if env, ok := rv.fs.LookupEnv("CDERUN_DEVICE"); ok {
+		var res []string
+		for s := range strings.SplitSeq(env, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				res = append(res, s)
+			}
+		}
+		return res
+	}
+	if rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
+			res := make([]string, 0, len(tool.Devices)*2)
+			for _, d := range tool.Devices {
+				res = append(res, d.Source.Raw, d.Destination.Raw)
+			}
+			return res
+		}
+	}
+	if rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
+		res := make([]string, 0, len(rv.global.Defaults.Devices)*2)
+		for _, d := range rv.global.Defaults.Devices {
+			res = append(res, d.Source.Raw, d.Destination.Raw)
+		}
+		return res
+	}
+	return nil
 }
 
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
@@ -1213,17 +1260,20 @@ func (rv *resolver) resolveStandardOptions() error {
 func (rv *resolver) resolveComplexOptions() error {
 	var err error
 	var rForMounts *ExpressionResolver
-	hasMounts := len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != ""
-	if !hasMounts && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
-			hasMounts = true
+	rawMounts := rv.collectRawMounts()
+	hasMountsWithExpr := false
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		hasMountsWithExpr = true
+	} else {
+		for _, m := range rawMounts {
+			if strings.Contains(m, "{{") || strings.HasPrefix(m, "~") {
+				hasMountsWithExpr = true
+				break
+			}
 		}
 	}
-	if !hasMounts && rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
-		hasMounts = true
-	}
 
-	if hasMounts {
+	if hasMountsWithExpr {
 		var err error
 		rForMounts, err = rv.getR()
 		if err != nil {
@@ -1509,17 +1559,20 @@ func (rv *resolver) resolveCustomParsing() error {
 
 	var rForDevices *ExpressionResolver
 	// Check if there are any devices to resolve
-	hasDevices := len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != ""
-	if !hasDevices && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
-			hasDevices = true
+	rawDevices := rv.collectRawDevices()
+	hasDevicesWithExpr := false
+	if rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+		hasDevicesWithExpr = true
+	} else {
+		for _, d := range rawDevices {
+			if strings.Contains(d, "{{") || strings.HasPrefix(d, "~") {
+				hasDevicesWithExpr = true
+				break
+			}
 		}
 	}
-	if !hasDevices && rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
-		hasDevices = true
-	}
 
-	if hasDevices {
+	if hasDevicesWithExpr {
 		var err error
 		rForDevices, err = rv.getR()
 		if err != nil {
