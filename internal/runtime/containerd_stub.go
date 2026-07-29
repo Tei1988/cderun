@@ -62,6 +62,10 @@ func (r *ContainerdRuntime) SignalContainer(_ context.Context, _ string, _ strin
 
 func (r *ContainerdRuntime) Name() string { return "containerd" }
 
+func (r *ContainerdRuntime) ValidateConfig(_ *container.ContainerConfig) error {
+	return fmt.Errorf("containerd runtime is only supported on Linux")
+}
+
 func (r *ContainerdRuntime) InspectContainer(_ context.Context, _ string) (bool, int, error) {
 	return false, 0, fmt.Errorf("containerd runtime is only supported on Linux")
 }

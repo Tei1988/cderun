@@ -23,7 +23,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T12 | `IsRetryablePullError` を型付きエラー判定に移行 | 改善 | 中 | 小 | - | DONE |
 | T14 | `Phase N` コメント前後の整理 | クリーンアップ | 低 | 小 | - | DONE |
 | T15 | containerd `AttachContainer` のポーリング排除 | 改善 | 低 | 小 | - | DONE |
-| T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | - |
+| T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
@@ -222,27 +222,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、bool フラグ直後の引数の扱いについてテストがある
-
----
-
-## T16: ランタイム未対応機能の事前バリデーション
-
-- 種別: 改善（UX）
-- 対象: `internal/runtime/containerd.go:150-155`、`internal/runtime/interface.go`（`ContainerRuntime` インターフェース）
-
-### 問題
-
-`--network bridge` や `--publish` を containerd ランタイムで使うと、コンテナ作成時（実行時）に初めて "not supported yet" エラーになる。設定ロードや起動前のバリデーション段階で弾く方がユーザー体験が良い。また "not supported yet" のまま放置されているため、対応予定があるなら issue 化したい。
-
-### 方針（2 案）
-
-1. `ContainerRuntime` インターフェースに `Capabilities()` メソッド（未対応機能の宣言）を追加し、`initContainer` の前に `resolved` の値と突き合わせる — ランタイム毎の対応差分が宣言的になり、Podman 固有の制限が将来見つかった場合にも同じ仕組みで対応できる
-2. バリデーション専用メソッド `ValidateConfig(cc *ContainerConfig) error` をインターフェースに足す — さらに単純で、こちらでも十分
-
-### 完了条件
-
-- containerd + `--network` / `--publish` がコンテナ作成前にエラーになる
-- エラーメッセージに「どのランタイムが何を未対応か」が含まれる
 
 ---
 

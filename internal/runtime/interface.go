@@ -14,6 +14,7 @@ type ContainerRuntime interface {
 	PullImage(ctx context.Context, image string, pullPolicy string, maxRetries int, backoffBase time.Duration) error
 
 	// Container lifecycle
+	ValidateConfig(config *container.ContainerConfig) error
 	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
 	StartContainer(ctx context.Context, containerID string) error
 	WaitContainer(ctx context.Context, containerID string) (int, error)

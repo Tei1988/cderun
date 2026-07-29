@@ -34,6 +34,7 @@ type MockRuntime struct {
 	ExitCode            int
 	WaitDelay           time.Duration
 	PullErr             error
+	ValidateErr         error
 	CreateErr           error
 	StartErr            error
 	WaitErr             error
@@ -56,6 +57,12 @@ func (m *MockRuntime) WithLockedMock(f func(m *MockRuntime)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	f(m)
+}
+
+func (m *MockRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.ValidateErr
 }
 
 func (m *MockRuntime) PullImage(ctx context.Context, image string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
