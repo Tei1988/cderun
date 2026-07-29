@@ -178,3 +178,9 @@ func TestUnit_ExpressionResolver_ResolveString_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, r.resolveString(""))
 }
+
+func TestUnit_ExpressionResolver_WithoutHostContext_NilReceiver(t *testing.T) {
+	var r *ExpressionResolver
+	res := r.WithoutHostContext()
+	assert.Nil(t, res)
+}
