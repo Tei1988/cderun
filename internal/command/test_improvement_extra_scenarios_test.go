@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"slices"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -192,4 +196,168 @@ func TestUnit_Command_DryRun_EmptySubcommandError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--dry-run requires a subcommand")
+}
+
+// TestUnit_Command_WrapperMode_ValueTakingP1WithoutEqualsRejection validates that a value-taking
+// P1 override specified without an equals sign (e.g. `--cderun-image node`) is strictly rejected
+// with a validation error during preprocessing.
+func TestUnit_Command_WrapperMode_ValueTakingP1WithoutEqualsRejection(t *testing.T) {
+	t.Parallel()
+
+	args := []string{
+		"cderun",
+		"sh",
+		"--cderun-image", "alpine",
+	}
+
+	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return &runtime.MockRuntime{}, nil
+		}
+		o.exitFunc = func(code int) {}
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must use '=' format to specify its value")
+}
+
+// TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation validates that receiving a second signal
+// (rapid double SIGINT) during active execution immediately cancels the execution context on the host.
+func TestUnit_Command_Robustness_RapidConsecutiveSignalsHostCancellation(t *testing.T) {
+	t.Parallel()
+
+	mock := &signalCapturingMockRuntime{
+		waitChan: make(chan int),
+	}
+	mock.CreatedContainerID = "double-signal-id"
+
+	var capturedSigChan chan os.Signal
+	var sigChanMu sync.Mutex
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var execErr error
+	done := make(chan struct{})
+	go func() {
+		execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			o.setupSignals = func(sigChan chan os.Signal) {
+				sigChanMu.Lock()
+				capturedSigChan = sigChan
+				sigChanMu.Unlock()
+			}
+			o.stopSignalHandling = func(sigChan chan os.Signal) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+		close(done)
+	}()
+
+	// Wait for signal setup to be captured
+	assert.Eventually(t, func() bool {
+		sigChanMu.Lock()
+		defer sigChanMu.Unlock()
+		return capturedSigChan != nil
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Wait until runtime StartContainer has completed
+	time.Sleep(100 * time.Millisecond)
+
+	// Send first signal (SIGINT)
+	sigChanMu.Lock()
+	capturedSigChan <- syscall.SIGINT
+	sigChanMu.Unlock()
+
+	// Wait for first signal to be forwarded
+	assert.Eventually(t, func() bool {
+		return slices.Contains(mock.getSignals(), "SIGINT")
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Send second signal (SIGINT)
+	sigChanMu.Lock()
+	capturedSigChan <- syscall.SIGINT
+	sigChanMu.Unlock()
+
+	// The second signal should cancel the context immediately on the host.
+	select {
+	case <-done:
+		require.Error(t, execErr)
+		assert.Contains(t, execErr.Error(), "context canceled")
+	case <-time.After(2 * time.Second):
+		t.Fatal("double signal did not cancel execution context on the host")
+	}
+}
+
+// TestUnit_Command_Robustness_EarlySignalPreStartCancellation validates that receiving a signal before
+// startup has begun cancels execution immediately on the host without any container creation or starting.
+func TestUnit_Command_Robustness_EarlySignalPreStartCancellation(t *testing.T) {
+	t.Parallel()
+
+	pullBlocked := make(chan struct{}, 1)
+	pullChan := make(chan struct{})
+	mock := &signalAbortMockRuntime{
+		PullBlocked: pullBlocked,
+		PullChan:    pullChan,
+	}
+
+	var capturedSigChan chan os.Signal
+	var sigChanMu sync.Mutex
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var execErr error
+	done := make(chan struct{})
+	go func() {
+		execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mock, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.isTerminal = func(fd int) bool { return false }
+			o.setupSignals = func(sigChan chan os.Signal) {
+				sigChanMu.Lock()
+				capturedSigChan = sigChan
+				sigChanMu.Unlock()
+			}
+			o.stopSignalHandling = func(sigChan chan os.Signal) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+		close(done)
+	}()
+
+	// Wait until we block in PullImage (startup has not begun yet)
+	select {
+	case <-pullBlocked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Execution did not reach PullImage")
+	}
+
+	assert.Eventually(t, func() bool {
+		sigChanMu.Lock()
+		defer sigChanMu.Unlock()
+		return capturedSigChan != nil
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Send SIGINT
+	sigChanMu.Lock()
+	capturedSigChan <- syscall.SIGINT
+	sigChanMu.Unlock()
+
+	// Wait for execution to finish
+	select {
+	case <-done:
+		require.Error(t, execErr)
+		assert.Contains(t, execErr.Error(), "context canceled")
+	case <-time.After(2 * time.Second):
+		t.Fatal("signal received pre-start did not cancel execution")
+	}
 }

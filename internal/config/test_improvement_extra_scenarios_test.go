@@ -362,3 +362,144 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		require.Error(t, ValidateToolName("pythön"))
 	})
 }
+
+func TestUnit_Config_SecurityValidations_ThoroughEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidateImageName thorough coverage", func(t *testing.T) {
+		// Valid cases
+		assert.NoError(t, ValidateImageName("ubuntu"))
+		assert.NoError(t, ValidateImageName("ubuntu:latest"))
+		assert.NoError(t, ValidateImageName("my-registry.com:5000/my-app:v1.0.0"))
+		assert.NoError(t, ValidateImageName("alpine@sha256:e4355b66995c529d4b9c6b8f7a17307de672467d58b0f8b180d22081ed53bfa3"))
+
+		// Invalid cases
+		assert.Error(t, ValidateImageName(":invalid")) // starts with invalid char
+		assert.Error(t, ValidateImageName("alpine@sha256:123@another")) // multiple @
+		assert.Error(t, ValidateImageName("ubuntu$latest")) // invalid char $
+		assert.Error(t, ValidateImageName("ubuntu\x00latest")) // null byte
+	})
+
+	t.Run("ValidateUserName thorough coverage", func(t *testing.T) {
+		// Valid cases
+		assert.NoError(t, ValidateUserName("root"))
+		assert.NoError(t, ValidateUserName("1000"))
+		assert.NoError(t, ValidateUserName("root:root"))
+		assert.NoError(t, ValidateUserName("1000:1000"))
+		assert.NoError(t, ValidateUserName("user_name-1:group_name"))
+
+		// Invalid cases
+		assert.Error(t, ValidateUserName("root:root:excessive")) // too many parts
+		assert.Error(t, ValidateUserName("-root")) // invalid starting char
+		assert.Error(t, ValidateUserName("root:$invalid")) // invalid group chars
+	})
+
+	t.Run("ValidateNetworkName thorough coverage", func(t *testing.T) {
+		// Valid cases
+		assert.NoError(t, ValidateNetworkName("bridge"))
+		assert.NoError(t, ValidateNetworkName("my-net_1.0"))
+
+		// Invalid cases
+		assert.Error(t, ValidateNetworkName("-net")) // invalid start char
+		assert.Error(t, ValidateNetworkName("net$work")) // invalid character
+	})
+
+	t.Run("ValidatePort mapping thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidatePort("80"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80"))
+		assert.NoError(t, ValidatePort("127.0.0.1:80:80"))
+		assert.NoError(t, ValidatePort("80:80/tcp"))
+		assert.NoError(t, ValidatePort("80:80/udp"))
+
+		// Invalid
+		assert.Error(t, ValidatePort("127.0.0.1:invalid:80"))
+		assert.Error(t, ValidatePort("127.0.0.1:80:invalid"))
+		assert.Error(t, ValidatePort("99999")) // out of range
+		assert.Error(t, ValidatePort("0")) // port cannot be zero
+		assert.Error(t, ValidatePort("80/invalid")) // invalid protocol
+		assert.Error(t, ValidatePort("127.0.0.1:80:80:80")) // excessive parts
+		assert.Error(t, ValidatePort("invalid-ip:80:80")) // invalid IP
+	})
+
+	t.Run("ValidateExposePort thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidateExposePort("80"))
+		assert.NoError(t, ValidateExposePort("80-90"))
+		assert.NoError(t, ValidateExposePort("80-90/tcp"))
+		assert.NoError(t, ValidateExposePort("80/udp"))
+
+		// Invalid
+		assert.Error(t, ValidateExposePort("90-80")) // start > end
+		assert.Error(t, ValidateExposePort("0")) // cannot be zero
+		assert.Error(t, ValidateExposePort("70000")) // out of range
+		assert.Error(t, ValidateExposePort("80/http")) // invalid protocol
+		assert.Error(t, ValidateExposePort("80-invalid")) // invalid format
+	})
+
+	t.Run("ValidateDNS thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidateDNS("1.1.1.1"))
+		assert.NoError(t, ValidateDNS("2001:db8::1"))
+
+		// Invalid
+		assert.Error(t, ValidateDNS("invalid-ip"))
+		assert.Error(t, ValidateDNS("1.1.1.1\x00")) // control char
+	})
+
+	t.Run("ValidateAddHost thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidateAddHost("myhost:1.2.3.4"))
+		assert.NoError(t, ValidateAddHost("myhost:host-gateway"))
+
+		// Invalid
+		assert.Error(t, ValidateAddHost("myhost")) // no colon
+		assert.Error(t, ValidateAddHost("myhost:invalid-ip"))
+		assert.Error(t, ValidateAddHost("-myhost:1.2.3.4")) // invalid host format
+	})
+
+	t.Run("ValidateCapability thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidateCapability("SYS_ADMIN"))
+		assert.NoError(t, ValidateCapability("NET_ADMIN"))
+
+		// Invalid
+		assert.Error(t, ValidateCapability("sys_admin")) // lowercase not allowed
+		assert.Error(t, ValidateCapability("SYS-ADMIN")) // invalid char -
+	})
+
+	t.Run("ValidateEnvKey thoroughly", func(t *testing.T) {
+		// Valid
+		assert.NoError(t, ValidateEnvKey("MY_VAR"))
+		assert.NoError(t, ValidateEnvKey("VAR123"))
+
+		// Invalid
+		assert.Error(t, ValidateEnvKey("")) // empty
+		assert.Error(t, ValidateEnvKey("1VAR")) // starts with digit
+		assert.Error(t, ValidateEnvKey("MY-VAR")) // hyphen not allowed
+	})
+
+	t.Run("HasParentTraversal thoroughly", func(t *testing.T) {
+		assert.True(t, HasParentTraversal("../app"))
+		assert.True(t, HasParentTraversal("app/.."))
+		assert.True(t, HasParentTraversal("app/../bin"))
+		assert.True(t, HasParentTraversal("..\\app"))
+		assert.True(t, HasParentTraversal("app\\.."))
+		assert.False(t, HasParentTraversal("app/dotdot"))
+		assert.False(t, HasParentTraversal("app/.dot"))
+	})
+
+	t.Run("validatePathChars thoroughly", func(t *testing.T) {
+		assert.NoError(t, validatePathChars("/app/path"))
+		assert.Error(t, validatePathChars("\x01/app/path")) // control char
+		assert.Error(t, validatePathChars("/app\x7F/path")) // delete control char
+	})
+
+	t.Run("ContainsNumericGID thoroughly", func(t *testing.T) {
+		assert.True(t, ContainsNumericGID([]string{"1000"}))
+		assert.True(t, ContainsNumericGID([]string{"sudo", "1000"}))
+		assert.False(t, ContainsNumericGID([]string{"sudo"}))
+		assert.False(t, ContainsNumericGID([]string{}))
+		assert.False(t, ContainsNumericGID([]string{"1000a"}))
+	})
+}
