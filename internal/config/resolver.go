@@ -187,9 +187,7 @@ var (
 
 type optionFields struct {
 	targetIdx int
-	p1SetIdx  int
 	p1ValIdx  int
-	p2SetIdx  int
 	p2ValIdx  int
 }
 
@@ -209,9 +207,7 @@ func initFieldInfo() {
 
 		info := optionFields{
 			targetIdx: targetField.Index[0],
-			p1SetIdx:  -1,
 			p1ValIdx:  -1,
-			p2SetIdx:  -1,
 			p2ValIdx:  -1,
 		}
 
@@ -248,10 +244,7 @@ func initFieldInfo() {
 	}
 }
 
-func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
-	if setIdx != -1 {
-		return val.Field(setIdx).Bool(), val.Field(valIdx)
-	}
+func getFieldInfo(val reflect.Value, valIdx int) (bool, reflect.Value) {
 	v := val.Field(valIdx)
 	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
@@ -267,8 +260,8 @@ func getFieldInfo(val reflect.Value, setIdx, valIdx int) (bool, reflect.Value) {
 
 func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
 	info := fieldInfo[key]
-	p1Set, p1Val := getFieldInfo(cliVal, info.p1SetIdx, info.p1ValIdx)
-	p2Set, p2Val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
+	p1Set, p1Val := getFieldInfo(cliVal, info.p1ValIdx)
+	p2Set, p2Val := getFieldInfo(cliVal, info.p2ValIdx)
 	return info, p1Set, p1Val, p2Set, p2Val, nil
 }
 
@@ -493,8 +486,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	var fastPathUsed bool
 
 	expected := expectedFieldIndices[opt.Name]
-	if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
-		info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+	if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 		switch opt.Name {
 		case "publish":
 			p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
@@ -677,8 +669,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
 	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
@@ -797,8 +789,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Val, p2Val = p1v.Bool(), p2v.Bool()
 	def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
 	resolved, err := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
@@ -821,8 +813,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 
 	if opt.Name == "pull-max-retries" {
 		expected := expectedFieldIndices["pull-max-retries"]
-		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
-			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+		if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
 			p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
 			fastPathUsed = true
@@ -846,8 +837,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Int, p1Set = rv.extractIntValue(p1v, s1)
 	p2Int, p2Set = rv.extractIntValue(p2v, s2)
 
@@ -877,8 +868,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 
 	if opt.Name == "cpus" {
 		expected := expectedFieldIndices["cpus"]
-		if info.p1SetIdx == expected.p1SetIdx && info.p1ValIdx == expected.p1ValIdx &&
-			info.p2SetIdx == expected.p2SetIdx && info.p2ValIdx == expected.p2ValIdx {
+		if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			p1Set, p1Float = getPtrVal(rv.cli.CderunCPUs)
 			p2Set, p2Float = getPtrVal(rv.cli.CPUs)
 			fastPathUsed = true
@@ -902,8 +892,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		return nil
 	}
 
-	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1SetIdx, info.p1ValIdx)
-	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2SetIdx, info.p2ValIdx)
+	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
+	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Float, p1Set = rv.extractFloatValue(p1v, s1)
 	p2Float, p2Set = rv.extractFloatValue(p2v, s2)
 

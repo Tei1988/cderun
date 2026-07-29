@@ -42,22 +42,22 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	val := reflect.ValueOf(ts)
 
 	t.Run("Ptr set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 0)
+		set, _ := getFieldInfo(val, 0)
 		assert.True(t, set)
 	})
 
 	t.Run("Interface set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 1)
+		set, _ := getFieldInfo(val, 1)
 		assert.True(t, set)
 	})
 
 	t.Run("Map set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 2)
+		set, _ := getFieldInfo(val, 2)
 		assert.True(t, set)
 	})
 
 	t.Run("Zero not set", func(t *testing.T) {
-		set, _ := getFieldInfo(val, -1, 3)
+		set, _ := getFieldInfo(val, 3)
 		assert.False(t, set)
 	})
 
@@ -69,17 +69,17 @@ func TestUnit_Config_GetFieldInfo_Exhaustive(t *testing.T) {
 	valNil := reflect.ValueOf(tsNil)
 
 	t.Run("Ptr nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 0)
+		set, _ := getFieldInfo(valNil, 0)
 		assert.False(t, set)
 	})
 
 	t.Run("Interface nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 1)
+		set, _ := getFieldInfo(valNil, 1)
 		assert.False(t, set)
 	})
 
 	t.Run("Map nil", func(t *testing.T) {
-		set, _ := getFieldInfo(valNil, -1, 2)
+		set, _ := getFieldInfo(valNil, 2)
 		assert.False(t, set)
 	})
 }

@@ -167,7 +167,7 @@ func TestUnit_Resolver_InternalHelpers(t *testing.T) {
 		info, ok := fieldInfo["tty"]
 		assert.True(t, ok, "fieldInfo['tty'] must exist")
 
-		set, val := getFieldInfo(cliVal, info.p2SetIdx, info.p2ValIdx)
+		set, val := getFieldInfo(cliVal, info.p2ValIdx)
 		assert.True(t, set)
 		assert.True(t, val.Bool())
 	})
