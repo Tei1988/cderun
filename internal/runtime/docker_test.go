@@ -1161,3 +1161,19 @@ func TestUnit_Docker_WaitContainer_AutoRemove(t *testing.T) {
 		assert.Equal(t, 0, code)
 	})
 }
+
+func TestUnit_Docker_CreateContainer_ReadOnly(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockDockerClient{}
+	runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+	config := &container.ContainerConfig{
+		Image:    "test-image",
+		ReadOnly: true,
+	}
+
+	_, err := runtime.CreateContainer(context.Background(), config)
+	require.NoError(t, err)
+	assert.True(t, mock.createHostConfig.ReadonlyRootfs)
+}

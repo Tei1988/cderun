@@ -194,6 +194,8 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 		return &o.mountAllTools, &o.cderunMountAllTools
 	case "remove":
 		return &o.remove, &o.cderunRemove
+	case "read-only":
+		return &o.readOnly, &o.cderunReadOnly
 	case "publish-all":
 		return &o.publishAll, &o.cderunPublishAll
 	case "privileged":

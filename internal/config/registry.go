@@ -593,6 +593,17 @@ var BoolOptions = []BoolOption{
 			return g.Logging.Timestamp
 		},
 	},
+	{
+		Name:   "read-only",
+		EnvKey: "CDERUN_READ_ONLY",
+		Usage:  "Mount the container's root filesystem as read-only",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.ReadOnly
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.ReadOnly
+		},
+	},
 }
 
 var (
