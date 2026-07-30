@@ -1560,7 +1560,9 @@ func (rv *resolver) resolveCustomParsing() error {
 	return nil
 }
 
-var highlyPrivilegedCapabilities = map[string]bool{
+// highlyPrivilegedCaps defines highly privileged Linux capabilities in both standard
+// and "CAP_"-prefixed forms. Granting these capabilities poses security risks (e.g., container breakout).
+var highlyPrivilegedCaps = map[string]bool{
 	"ALL":            true,
 	"SYS_ADMIN":      true,
 	"NET_ADMIN":      true,
@@ -1573,6 +1575,13 @@ var highlyPrivilegedCapabilities = map[string]bool{
 	"CAP_SYS_RAWIO":  true,
 	"CAP_SYS_PTRACE": true,
 	"CAP_SYS_MODULE": true,
+}
+
+// isHighlyPrivilegedCapability returns true if the given capability name is highly privileged.
+// It performs a case-insensitive, trimmed, read-only lookup to prevent mutation of the underlying map.
+func isHighlyPrivilegedCapability(capName string) bool {
+	upperCap := strings.ToUpper(strings.TrimSpace(capName))
+	return highlyPrivilegedCaps[upperCap]
 }
 
 func (rv *resolver) validateSecurity() error {
@@ -1593,8 +1602,7 @@ func (rv *resolver) validateSecurity() error {
 	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {
-		upperCap := strings.ToUpper(strings.TrimSpace(capName))
-		if highlyPrivilegedCapabilities[upperCap] {
+		if isHighlyPrivilegedCapability(capName) {
 			found = append(found, capName)
 		}
 	}
