@@ -1560,6 +1560,21 @@ func (rv *resolver) resolveCustomParsing() error {
 	return nil
 }
 
+var highlyPrivilegedCapabilities = map[string]bool{
+	"ALL":            true,
+	"SYS_ADMIN":      true,
+	"NET_ADMIN":      true,
+	"SYS_RAWIO":      true,
+	"SYS_PTRACE":     true,
+	"SYS_MODULE":     true,
+	"CAP_ALL":        true,
+	"CAP_SYS_ADMIN":  true,
+	"CAP_NET_ADMIN":  true,
+	"CAP_SYS_RAWIO":  true,
+	"CAP_SYS_PTRACE": true,
+	"CAP_SYS_MODULE": true,
+}
+
 func (rv *resolver) validateSecurity() error {
 	if err := rv.validateCriticalFields(); err != nil {
 		return err
@@ -1576,24 +1591,10 @@ func (rv *resolver) validateSecurity() error {
 	if err := rv.validateDeviceSecurity(); err != nil {
 		return err
 	}
-	highlyPrivileged := map[string]bool{
-		"ALL":            true,
-		"SYS_ADMIN":      true,
-		"NET_ADMIN":      true,
-		"SYS_RAWIO":      true,
-		"SYS_PTRACE":     true,
-		"SYS_MODULE":     true,
-		"CAP_ALL":        true,
-		"CAP_SYS_ADMIN":  true,
-		"CAP_NET_ADMIN":  true,
-		"CAP_SYS_RAWIO":  true,
-		"CAP_SYS_PTRACE": true,
-		"CAP_SYS_MODULE": true,
-	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {
 		upperCap := strings.ToUpper(strings.TrimSpace(capName))
-		if highlyPrivileged[upperCap] {
+		if highlyPrivilegedCapabilities[upperCap] {
 			found = append(found, capName)
 		}
 	}
@@ -1621,68 +1622,110 @@ func (rv *resolver) validateSecurity() error {
 }
 
 func (rv *resolver) validateCriticalFields() error {
-	criticalFields := []struct {
-		name      string
-		value     string
-		validator func(string) error
-	}{
-		{"image", rv.res.Image, ValidateImageName},
-		{"user", rv.res.User, ValidateUserName},
-		{"network", rv.res.Network, ValidateNetworkName},
-		{"hostname", rv.res.Hostname, ValidateHostname},
-		{"workdir", rv.res.Workdir, ValidateWorkdir},
-		{"runtime", rv.res.Runtime, func(s string) error {
-			if s != "docker" && s != "podman" && s != "containerd" {
-				return fmt.Errorf("unsupported runtime: %q", s)
-			}
-			return nil
-		}},
-		{"pull", rv.res.Pull, func(s string) error {
-			if s != "" && s != "always" && s != "missing" && s != "never" {
-				return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", s)
-			}
-			return nil
-		}},
-		{"socket-path", rv.res.SocketPath, nil},
-		{"mount-socket-path", rv.res.MountSocketPath, nil},
-		{"mount-cderun-path", rv.res.MountCderunPath, nil},
-		{"dry-run-format", rv.res.DryRunFormat, func(s string) error {
-			if s != "" && s != "yaml" && s != "json" && s != "simple" {
-				return fmt.Errorf("unsupported dry-run format: %q", s)
-			}
-			return nil
-		}},
-		{"diagnosis-format", rv.res.DiagnosisFormat, func(s string) error {
-			if s != "" && s != "yaml" && s != "json" && s != "simple" {
-				return fmt.Errorf("unsupported diagnosis format: %q", s)
-			}
-			return nil
-		}},
-		{"log-level", rv.res.LogLevel, func(s string) error {
-			if s != "" {
-				l := strings.ToLower(s)
-				if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
-					return fmt.Errorf("unsupported log level: %q", s)
-				}
-			}
-			return nil
-		}},
-		{"log-format", rv.res.LogFormat, func(s string) error {
-			if s != "" && s != "text" && s != "json" {
-				return fmt.Errorf("unsupported log format: %q", s)
-			}
-			return nil
-		}},
+	// image
+	if err := validatePathChars(rv.res.Image); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "image", err)
 	}
-	for _, f := range criticalFields {
-		if err := validatePathChars(f.value); err != nil {
-			return fmt.Errorf("security validation failed for %q: %w", f.name, err)
+	if err := ValidateImageName(rv.res.Image); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "image", err)
+	}
+
+	// user
+	if err := validatePathChars(rv.res.User); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "user", err)
+	}
+	if err := ValidateUserName(rv.res.User); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "user", err)
+	}
+
+	// network
+	if err := validatePathChars(rv.res.Network); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "network", err)
+	}
+	if err := ValidateNetworkName(rv.res.Network); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "network", err)
+	}
+
+	// hostname
+	if err := validatePathChars(rv.res.Hostname); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "hostname", err)
+	}
+	if err := ValidateHostname(rv.res.Hostname); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "hostname", err)
+	}
+
+	// workdir
+	if err := validatePathChars(rv.res.Workdir); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "workdir", err)
+	}
+	if err := ValidateWorkdir(rv.res.Workdir); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "workdir", err)
+	}
+
+	// runtime
+	if err := validatePathChars(rv.res.Runtime); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "runtime", err)
+	}
+	if rv.res.Runtime != "docker" && rv.res.Runtime != "podman" && rv.res.Runtime != "containerd" {
+		return fmt.Errorf("security validation failed for %q: unsupported runtime: %q", "runtime", rv.res.Runtime)
+	}
+
+	// pull
+	if err := validatePathChars(rv.res.Pull); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "pull", err)
+	}
+	if rv.res.Pull != "" && rv.res.Pull != "always" && rv.res.Pull != "missing" && rv.res.Pull != "never" {
+		return fmt.Errorf("security validation failed for %q: invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", "pull", rv.res.Pull)
+	}
+
+	// socket-path
+	if err := validatePathChars(rv.res.SocketPath); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "socket-path", err)
+	}
+
+	// mount-socket-path
+	if err := validatePathChars(rv.res.MountSocketPath); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "mount-socket-path", err)
+	}
+
+	// mount-cderun-path
+	if err := validatePathChars(rv.res.MountCderunPath); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "mount-cderun-path", err)
+	}
+
+	// dry-run-format
+	if err := validatePathChars(rv.res.DryRunFormat); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "dry-run-format", err)
+	}
+	if rv.res.DryRunFormat != "" && rv.res.DryRunFormat != "yaml" && rv.res.DryRunFormat != "json" && rv.res.DryRunFormat != "simple" {
+		return fmt.Errorf("security validation failed for %q: unsupported dry-run format: %q", "dry-run-format", rv.res.DryRunFormat)
+	}
+
+	// diagnosis-format
+	if err := validatePathChars(rv.res.DiagnosisFormat); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "diagnosis-format", err)
+	}
+	if rv.res.DiagnosisFormat != "" && rv.res.DiagnosisFormat != "yaml" && rv.res.DiagnosisFormat != "json" && rv.res.DiagnosisFormat != "simple" {
+		return fmt.Errorf("security validation failed for %q: unsupported diagnosis format: %q", "diagnosis-format", rv.res.DiagnosisFormat)
+	}
+
+	// log-level
+	if err := validatePathChars(rv.res.LogLevel); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "log-level", err)
+	}
+	if rv.res.LogLevel != "" {
+		l := strings.ToLower(rv.res.LogLevel)
+		if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
+			return fmt.Errorf("security validation failed for %q: unsupported log level: %q", "log-level", rv.res.LogLevel)
 		}
-		if f.validator != nil {
-			if err := f.validator(f.value); err != nil {
-				return fmt.Errorf("security validation failed for %q: %w", f.name, err)
-			}
-		}
+	}
+
+	// log-format
+	if err := validatePathChars(rv.res.LogFormat); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "log-format", err)
+	}
+	if rv.res.LogFormat != "" && rv.res.LogFormat != "text" && rv.res.LogFormat != "json" {
+		return fmt.Errorf("security validation failed for %q: unsupported log format: %q", "log-format", rv.res.LogFormat)
 	}
 
 	if rv.res.Memory < 0 {
@@ -1704,39 +1747,94 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateSlices() error {
-	criticalSlices := []struct {
-		name      string
-		slice     []string
-		validator func(string) error
-	}{
-		{"entrypoint", rv.res.Entrypoint, nil},
-		{"ports", rv.res.Ports, ValidatePort},
-		{"expose", rv.res.Expose, ValidateExposePort},
-		{"dns", rv.res.DNS, ValidateDNS},
-		{"add-hosts", rv.res.AddHosts, ValidateAddHost},
-		{"cap-add", rv.res.CapAdd, ValidateCapability},
-		{"cap-drop", rv.res.CapDrop, ValidateCapability},
-		{"group-add", rv.res.GroupAdd, ValidateGroupAdd},
-		{"sensitive-env", rv.res.SensitiveEnv, func(s string) error {
-			_, err := path.Match(s, "TEST")
-			if err != nil {
-				return fmt.Errorf("invalid glob pattern: %w", err)
-			}
-			return nil
-		}},
-	}
-	for _, s := range criticalSlices {
-		for i, e := range s.slice {
-			if err := validatePathChars(e); err != nil {
-				return fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
-			}
-			if s.validator != nil {
-				if err := s.validator(e); err != nil {
-					return fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
-				}
-			}
+	// entrypoint
+	for i, e := range rv.res.Entrypoint {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "entrypoint", i, err)
 		}
 	}
+
+	// ports
+	for i, e := range rv.res.Ports {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "ports", i, err)
+		}
+		if err := ValidatePort(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "ports", i, err)
+		}
+	}
+
+	// expose
+	for i, e := range rv.res.Expose {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "expose", i, err)
+		}
+		if err := ValidateExposePort(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "expose", i, err)
+		}
+	}
+
+	// dns
+	for i, e := range rv.res.DNS {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "dns", i, err)
+		}
+		if err := ValidateDNS(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "dns", i, err)
+		}
+	}
+
+	// add-hosts
+	for i, e := range rv.res.AddHosts {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "add-hosts", i, err)
+		}
+		if err := ValidateAddHost(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "add-hosts", i, err)
+		}
+	}
+
+	// cap-add
+	for i, e := range rv.res.CapAdd {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-add", i, err)
+		}
+		if err := ValidateCapability(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-add", i, err)
+		}
+	}
+
+	// cap-drop
+	for i, e := range rv.res.CapDrop {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-drop", i, err)
+		}
+		if err := ValidateCapability(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-drop", i, err)
+		}
+	}
+
+	// group-add
+	for i, e := range rv.res.GroupAdd {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "group-add", i, err)
+		}
+		if err := ValidateGroupAdd(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "group-add", i, err)
+		}
+	}
+
+	// sensitive-env
+	for i, e := range rv.res.SensitiveEnv {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", "sensitive-env", i, err)
+		}
+		_, err := path.Match(e, "TEST")
+		if err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: invalid glob pattern: %w", "sensitive-env", i, err)
+		}
+	}
+
 	return nil
 }
 
