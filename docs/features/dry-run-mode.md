@@ -1,30 +1,33 @@
-# Dry-Run Mode Specification
+# 機能仕様：ドライランモード (完了)
 
-## Overview
+## 概要
 
-`cderun` supports a **Dry-Run Mode** to preview the fully resolved intermediate configuration (`ContainerConfig`) before committing to the actual container lifecycle. This assists in debugging configurations, verifying resolver dynamic expressions, and validating security rules.
+実際にコンテナを実行せず、生成される中間表現（ContainerConfig）を表示する機能。
 
----
+## 要件
 
-## Behavior and Rules
+### 基本動作
 
-When `--dry-run` is requested:
+`--dry-run`フラグが指定された場合：
 
-1. **Subcommand Requirement**: A subcommand (e.g., `node`) must be supplied. It is used as the lookup key to search and merge configurations. Running without a subcommand will fail with an error (unless running `--diagnosis`).
-2. **Configuration Resolving**: `cderun` executes all resolution layers (P1 down to P6), expanding expressions (like `{{HOME}}`), tildes (`~`), relative paths, and environment settings.
-3. **Execution Skip**: The actual container creation, pull, and execution phases are completely bypassed.
-4. **Configuration Display**: The resolved settings are printed to standard output in the requested format.
-5. **Exit Status**: On successful render, `cderun` exits with status `0`.
+1. サブコマンドの指定が必須（指定がない場合はエラー）
+2. 通常通り設定を読み込み、中間表現を生成
+3. コンテナを実行せず、中間表現を表示
+4. 終了コード0で終了
 
----
+## 使用方法
 
-## Formatting Options
+### 基本的な使用
 
-The output style is controlled via the `dryRunFormat` (CLI: `--dry-run-format` / `-f`) property.
+```bash
+cderun --dry-run node --version
+```
 
-### 1. YAML Format (Default)
+## 出力フォーマット
 
-Output of `cderun --dry-run node app.js`:
+### YAML形式（デフォルト）
+
+`cderun --dry-run node app.js`
 
 ```yaml
 image: node:latest
@@ -68,11 +71,9 @@ devices:
     cgroup_permissions: rwm
 ```
 
----
+### JSON形式
 
-### 2. JSON Format
-
-Output of `cderun --dry-run --dry-run-format json node app.js`:
+`cderun --dry-run --dry-run-format json node app.js`
 
 ```json
 {
@@ -115,11 +116,9 @@ Output of `cderun --dry-run --dry-run-format json node app.js`:
 }
 ```
 
----
+### 簡易形式
 
-### 3. Simple Format
-
-Output of `cderun --dry-run -f simple node app.js`:
+`cderun --dry-run --dry-run-format simple node app.js`
 
 ```text
 Image: node:latest
@@ -148,47 +147,83 @@ CPUs: 1.5
 Entrypoint: "/usr/bin/node"
 ```
 
-> **Note on Units**: In the simple output format, `Memory` is displayed using human-readable binary units (such as `MiB` or `GiB`) for readability, and `CPUs` is displayed as a clean float representation (e.g., `1.5`). Additionally, all command arguments and environment definitions are individually quoted (`%q`) in this format to guard against terminal control-character injections.
+> **Note**: `Memory` は `512MiB` や `1GiB` のようなバイナリ単位（MiB/GiB）を用いた人間が読みやすい形式で表示され、`CPUs` は浮動小数点数（例: `1.5`）として表示されます。
 
----
+## ユースケース
 
-## Practical Debugging Use Cases
+### 1. デバッグ
 
-### 1. Verify Configuration Resolutions
-
-Confirm that `.tools.yaml` settings are being selected and applied correctly:
+設定が正しく適用されているか確認：
 
 ```bash
 cderun --dry-run python script.py
 ```
 
-### 2. Export Rendered Configurations
-
-Output the fully resolved configuration to a file for backup or documentation:
-
-```bash
-cderun --dry-run -f yaml node app.js > resolved-node-config.yaml
-```
-
-### 3. Automate Configuration Auditing
-
-Verify the resolved image dynamically in bash scripts before running critical tests:
+### 2. 設定の検証
 
 ```bash
 #!/bin/bash
-image_resolved=$(cderun --dry-run -f json node | jq -r '.image')
-if [[ "$image_resolved" == "node:20-alpine" ]]; then
-  echo "Image matches verified baseline."
+output=$(cderun --dry-run --dry-run-format json node --version)
+image=$(echo $output | jq -r '.image')
+if [[ $image == "node:20-alpine" ]]; then
+  echo "Configuration is correct"
 else
-  echo "Error: Unverified image target: $image_resolved"
-  exit 1
+  echo "Unexpected image: $image"
+  false
 fi
 ```
 
----
+### 3. 設定ファイルのドキュメント化
 
-## Resolution Optimization & Security Masking
+```bash
+cderun --dry-run --dry-run-format yaml node app.js > config-example.yaml
+```
 
-- **Secure by Default**: During dry-run generation, all environment values are automatically masked as `[REDACTED]` (Secure by Default) unless `--sensitive-env` configuration explicitly overrides or disables masking (see [Sensitive Data Protection](./sensitive-data-protection.md)).
-- **Absolute Paths**: All relative paths configured via CLI or files are resolved to their fully qualified absolute paths (e.g., `./src` resolves to `/home/user/project/src`).
-- **YAML Configuration Support**: Dry-run features can be enabled globally or per-tool inside configuration files (e.g., `dryRun: true`, `dryRunFormat: json` under `defaults`).
+## 他のフラグとの組み合わせ
+
+### --log-levelとの組み合わせ
+
+```bash
+cderun --dry-run --log-level info node app.js
+[INFO] Loading configuration from: /home/user/project/.cderun.yaml
+[INFO] Resolved image: node:20-alpine
+[INFO] Working directory: /home/user/project
+[INFO] Environment variables: NODE_ENV=development
+[INFO] Generated ContainerConfig:
+image: node:20-alpine
+...
+```
+
+## 実装上の注意
+
+### 設定ファイル（YAML）でのサポート
+
+ドライランモードの設定 (`dryRun`, `dryRunFormat`) は、設定ファイル (`.cderun.yaml`, `.tools.yaml`) でもサポートされています。これにより、特定のツールに対して常にドライランを適用したり、プロジェクト全体のデフォルトの出力形式を指定したりすることが可能です。
+
+設定ファイル内でのキー名はキャメルケース（`dryRun`, `dryRunFormat`）を使用します。
+
+### 環境変数の展開
+
+ドライラン時も環境変数は実際の値に解決されるが、出力上はデフォルトで**すべての値がマスクされる**（Secure by Default。[機密データ保護](./sensitive-data-protection.md) を参照）：
+
+```bash
+export API_KEY=secret123
+cderun --dry-run --env API_KEY node app.js
+env:
+  - API_KEY=[REDACTED]
+```
+
+実際の値を出力で確認したい場合は、`--sensitive-env=""` を指定してマスクを無効化する。
+
+### パスの解決
+
+相対パスは絶対パスに解決される：
+
+```bash
+cderun --dry-run node ./app.js
+# mounts の source などが絶対パスに解決される
+mounts:
+  - type: bind
+    source: /home/user/project
+    target: /workspace
+```
