@@ -466,9 +466,9 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", cfg.Defaults.MountCderunPath.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.MountSocketPath.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Source.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
+		assert.Empty(t, cfg.Defaults.Mounts[0].Target.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
-		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
+		assert.Empty(t, cfg.Defaults.Devices[0].Destination.BaseDir)
 		assert.Equal(t, "/base/relative", cfg.HostContext.Mounts[0].Source)
 	})
 
@@ -487,9 +487,9 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
 		assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
 		assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
-		assert.Equal(t, "/base", tc.Mounts[0].Target.BaseDir)
+		assert.Empty(t, tc.Mounts[0].Target.BaseDir)
 		assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
-		assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
+		assert.Empty(t, tc.Devices[0].Destination.BaseDir)
 	})
 
 	t.Run("CDERunConfig SetBaseDir HostContext resolution", func(t *testing.T) {

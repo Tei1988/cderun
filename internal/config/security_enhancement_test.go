@@ -45,6 +45,28 @@ func TestUnit_Config_Resolver_MountTargetTraversalSecurity(t *testing.T) {
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 	})
+
+	t.Run("Mount target with relative path is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:  ptr("alpine"),
+			Mounts: []string{"type=bind,source=/src,target=relative/path"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target must be an absolute path")
+	})
+
+	t.Run("Mount target with empty target is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:  ptr("alpine"),
+			Mounts: []string{"type=bind,source=/src,target="},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target is required")
+	})
 }
 
 func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
@@ -60,6 +82,29 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "device destination cannot contain parent directory references")
+	})
+
+	t.Run("Device destination with relative path is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/sda:relative/path"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device destination must be an absolute path")
+	})
+
+	t.Run("Device destination with empty container path is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/sda:"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		// Since ParseDeviceConfig rejects "/dev/sda:" early (returning false), we assert on invalid device config
+		assert.Contains(t, err.Error(), "invalid device config")
 	})
 
 	t.Run("Device destination with Windows-style traversal segments is rejected", func(t *testing.T) {

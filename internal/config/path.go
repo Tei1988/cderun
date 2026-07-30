@@ -134,9 +134,6 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	if mc.Source.Raw != "" {
 		mc.Source.BaseDir = baseDir
 	}
-	if mc.Target.Raw != "" {
-		mc.Target.BaseDir = baseDir
-	}
 }
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
@@ -256,9 +253,6 @@ func (dc DeviceConfig) MarshalYAML() (any, error) {
 func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	if dc.Source.Raw != "" {
 		dc.Source.BaseDir = baseDir
-	}
-	if dc.Destination.Raw != "" {
-		dc.Destination.BaseDir = baseDir
 	}
 }
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
