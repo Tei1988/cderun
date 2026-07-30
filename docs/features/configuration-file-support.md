@@ -86,6 +86,12 @@ cderunは、柔軟な設定管理のため、複数の場所から設定ファ�
 設定ファイルで使用するキー名は、原則としてコマンドラインフラグに対応した**キャメルケース（camelCase）**です。
 
 > **例外**: `mounts` 配列内の各要素（`MountConfig`）のフィールド名のみ、一部でスネークケース（snake_case）が使用されています（例: `read_only`, `optional`）。これは、一般的なコンテナ設定の慣習や互換性を考慮したものです。
+>
+> **注意（マウント指定の形式表記の違い）**:
+>
+> - **YAML設定（`.tools.yaml`, `.cderun.yaml`）内**: `read_only` や `optional` のようにスネークケースのキー名を使用します。
+> - **CLI（`--mount`フラグ）内**: `readonly` や `optional` のようなキー（例: `type=bind,source=...,target=...,readonly,optional`）を使用します。CLIの引数解析やドライラン表示の出力データでは `readonly` が使用されます。
+> - CLIフラグの `--mount` 構文の文字列（`type=bind,source=...`）そのものを直接 `.tools.yaml` などの `mounts` 配列要素にコピペして使用することはできません。必ず後述の構造化されたYAMLマップ形式で定義してください。
 
 ### `.cderun.yaml` (Global Settings)
 
@@ -190,13 +196,16 @@ python:
 
 #### オブジェクト形式
 
-- `source` (必須): ホスト側のデバイスパス
-- `destination` (必須): コンテナ内のデバイスパス
-- `permissions`: デバイスの権限 (例: `rwm`)。デフォルトは `rwm`。
+YAMLファイルで定義するオブジェクト形式のフィールドは、ドライランの出力表示などのインターフェースと一対一で対応しています。
+
+- `source` (必須): ホスト側のデバイスパス（ドライラン出力の `path_on_host` フィールドにマッピングされます）
+- `destination` (必須): コンテナ内のデバイスパス（ドライラン出力の `path_in_container` フィールドにマッピングされます）
+- `permissions`: デバイスの権限 (例: `rwm`)。デフォルトは `rwm`（ドライラン出力の `cgroup_permissions` フィールドにマッピングされます）。
 
 #### 文字列形式
 
-`<host-path>:<container-path>[:<permissions>]` の形式で記述します。
+`<host-path>:<container-path>[:<permissions>]` の形式で記述します。コロンで区切られた各フィールドは、それぞれオブジェクト形式の `source`、`destination`、および `permissions`（ドライラン出力の `path_on_host`、`path_in_container`、および `cgroup_permissions`）へと解決されます。
+
 許可される権限パターン（cgroup permissions）は `rwm` の組み合わせです（例: `rw` や `r`）。安全性を保つために、正規表現検証が行われます。
 
 ```yaml
