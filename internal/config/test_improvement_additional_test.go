@@ -239,22 +239,20 @@ func TestUnit_Config_PathSecurity_TraversalsAndValidation(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_ValidateSecurity_PrivilegedWarnings asserts validation warnings on highly privileged capabilities,
-// host network namespace sharing, and sensitive host path mounts.
-func TestUnit_Config_ValidateSecurity_PrivilegedWarnings(t *testing.T) {
+// TestUnit_Config_Resolve_WithPrivilegedAndSocketSettings tests configuration-resolution coverage
+// for options involving privileged modes and socket mounting configurations.
+func TestUnit_Config_Resolve_WithPrivilegedAndSocketSettings(t *testing.T) {
 	t.Parallel()
 
-	// Capture environment-based logs or check warns
-	t.Run("privileged warnings checks", func(t *testing.T) {
+	t.Run("resolve with privileged and mount socket options", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
 			Privileged: ptr(true),
 			CapAdd: []string{"SYS_ADMIN"},
 			MountSocket: ptr(true),
-			GroupAdd: []string{"1234"}, // Numeric GID warning trigger
+			GroupAdd: []string{"1234"},
 		}
-		// Resolve should succeed but emit warnings (verified implicitly through coverage)
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.True(t, res.Privileged)
