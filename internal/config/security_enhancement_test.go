@@ -110,7 +110,7 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 	t.Run("Device destination with Windows-style traversal segments is rejected", func(t *testing.T) {
 		cli := &CLIOptions{
 			Image:    ptr("alpine"),
-			Devices:  []string{"/dev/sda:\\dev\\..\\sda"},
+			Devices:  []string{"/dev/sda:/dev/..\\sda"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
