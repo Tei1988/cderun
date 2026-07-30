@@ -33,7 +33,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
+| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -1112,4 +1112,4 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 ## Documentation Update Tasks
 
-- [ ] Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
