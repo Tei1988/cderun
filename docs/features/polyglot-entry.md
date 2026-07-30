@@ -19,8 +19,11 @@ Upon program startup (at the very beginning of the `main` function), `cderun` in
    - **Case A: Base name is `cderun`**
      Do nothing. Proceed with standard execution.
    - **Case B: Base name is NOT `cderun`**
-     Prepend the extracted base name to the argument list. The modified structure of `os.Args` becomes:
-     `os.Args = [ "cderun", <extracted_base_name>, ...original_arguments ]`
+     The arguments are rewritten in a two-phase process:
+     - **Phase 1 (Binary invocation rewrite)**: Emit the `cderun` command as `os.Args[0]`.
+     - **Phase 2 (Hoisting & Subcommand placement)**: Hoist only `--cderun-*` flags before the symlink-derived subcommand, then preserve the subcommand and all remaining arguments in their original order.
+     The final structure of rewritten `os.Args` is:
+     `os.Args = [ "cderun", ...hoisted_cderun_flags, <extracted_base_name>, ...original_arguments_excluding_hoisted_flags ]`
 
 ---
 
@@ -50,13 +53,13 @@ node --cderun-tty=false --version
 
 - **Actual Process Startup**: `os.Args = ["node", "--cderun-tty=false", "--version"]`
 - **Rewritten Internal Args**: `os.Args = ["cderun", "--cderun-tty=false", "node", "--version"]`
-- **Result**: Equivalent to running `cderun --tty=false node --version`. The `cderun` engine processes `--cderun-tty=false` as a high-priority P1 setting, while the wrapped `node` subcommand runs and processes the `--version` passthrough argument.
+- **Result**: Equivalent to running `cderun --tty=false node --version`. The `cderun` engine processes `--cderun-tty=false` as a high-priority P1 setting, while the wrapped `node` subcommand runs and processes the `--version` passthrough argument in original order.
 
 ---
 
 ## Hoisting Restrictions in Polyglot Mode
 
-In **Symlink Mode** (Polyglot Entry Point), a strict hosting restriction is enforced to prevent argument collision:
+In **Symlink Mode** (Polyglot Entry Point), a strict hoisting restriction is enforced to prevent argument collision:
 
 - **Rule**: Only flags prefixed with `--cderun-` (P1 internal overrides) are eligible for hoisting from behind the subcommand.
 - **Behavior**: Standard, non-prefixed `cderun` flags (such as `--interactive` or `--tty`) that appear *after* the subcommand are **never hoisted**. They are treated as literal, raw passthrough arguments and are forwarded directly to the wrapped container tool.
