@@ -48,7 +48,7 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 			WD:    "/project",
 		}
 		cfs := &customStatFS{
-			MockFileSystem: *fs,
+			MockFileSystem: fs,
 			statSize:       10,
 		}
 
@@ -79,7 +79,7 @@ func TestUnit_ExpressionResolver_ResolveFile_MaxDirectiveFileSizeBoundary(t *tes
 }
 
 type customStatFS struct {
-	MockFileSystem
+	*MockFileSystem
 	statSize int64
 }
 

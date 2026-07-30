@@ -342,9 +342,18 @@ func TestUnit_Expression_SecurityAndEdgeCases(t *testing.T) {
 	})
 
 	t.Run("complex mixed resolution", func(t *testing.T) {
-		fsWithHome := *fs
-		fsWithHome.HomeDir = "/home/user"
-		r, err := NewExpressionResolverWithFS(hostCtx, &fsWithHome)
+		fsWithHome := &MockFileSystem{
+			Files: map[string][]byte{
+				"/project/inner.txt": []byte("outer.txt"),
+				"/project/outer.txt": []byte("content"),
+			},
+			Dirs: map[string]bool{
+				"/project": true,
+			},
+			WD:      "/project",
+			HomeDir: "/home/user",
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, fsWithHome)
 		require.NoError(t, err)
 		val := r.resolveString("~/.config/{{file:inner.txt}}/settings.json")
 		require.NoError(t, r.Error())
