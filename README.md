@@ -190,6 +190,11 @@ To ensure reliable, deterministic preprocessing without parsing ambiguity, any i
 
 If a value-taking internal override flag is specified as space-separated rather than using the equals-sign format, `cderun`'s preprocessor strictly rejects it with an explicit validation error to prevent mis-hoisting or parsing corruption down the line.
 
+#### Hoisting with Boolean vs. Value-Taking Overrides
+
+- **Boolean Override Flags**: Override flags that act as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not accept a separate argument value. They can be hoisted autonomously without checking for following values.
+- **Value-Taking Override Flags**: Override flags that expect values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) **must** use the equals-sign (`=`) format. This prevents ambiguity during pre-processing (e.g. preventing a tool subcommand or standard argument from being mis-hoisted as the value of the override flag).
+
 This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
 #### Double-Dash (`--`) Delimiter Support
@@ -236,6 +241,7 @@ cderun echo -- --cderun-tty
 - `--device`: Add a host device to the container.
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
+- `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
 - `--group-add`: Add supplementary groups to the container (group name or GID). Note: containerd only supports numeric GIDs.
@@ -272,7 +278,15 @@ cderun echo -- --cderun-tty
 
 `cderun` features a unified dynamic value resolution engine (`ExpressionResolver`) that evaluates string inputs, slices, and maps recursively in configuration files and CLI flags.
 
-### 1. Expressions (`{{...}}`)
+### 1. Recursive Value Resolution
+
+Value resolution is applied recursively to complex configuration structures:
+
+- **Strings**: Directly evaluated for expression expansions, tilde expansion, and relative-to-absolute path resolution.
+- **Slices & Lists**: Every element is parsed and resolved recursively.
+- **Maps**: Key-value pairs are evaluated dynamically to ensure nested configurations inherit proper resolved paths.
+
+### 2. Expressions (`{{...}}`)
 
 Expressions can be used to inject host-context or dynamic values into options like `--image`, `--env`, and `--mount`:
 
@@ -286,25 +300,33 @@ Expressions can be used to inject host-context or dynamic values into options li
   - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`).
   - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
 
-### 2. Tilde Expansion & Relative Path Resolution
+### 3. Tilde Expansion & Relative Path Resolution
 
 Paths starting with `~` or `~/` are expanded to the home directory. Relative paths starting with `./` or `../` are automatically resolved to absolute paths relative to:
 
 - The configuration file's parent directory (for YAML properties).
 - The current working directory (`{{PWD}}`) (for CLI flags).
 
-### 3. Anchor Boundary Validation & Directory Traversal Prevention
+### 4. Anchor Boundary Validation & Directory Traversal Prevention
 
 To maintain strict security boundaries, any path resolved via expressions or tildes undergoes **Anchor Boundary Validation**.
 
 - **Rule**: The finalized absolute path must remain within the boundary directory defined by the expression's anchor (e.g., `{{HOME}}` or `{{PWD}}`).
 - **Directory Traversal Defense**: Parent traversals using `..` (such as `../`) are allowed within anchor-based path resolution, provided that the normalized final absolute path remains within the anchor's boundary directory (e.g., `{{HOME}}/Documents/..` resolves to `{{HOME}}` and is permitted). However, any traversals that escape the anchor's boundary directory (such as `{{HOME}}/..` or `{{HOME}}/../../etc/passwd`) will trigger an immediate validation error. Absolute paths are strictly forbidden inside local subpaths for safety.
+- **Multiple Anchors Validation**: If a path contains multiple expressions or anchors (e.g., `{{HOME}}/{{PWD}}/file`), the final resolved path must simultaneously satisfy the boundary check for **all** anchors present.
 
-### 4. "Sticky Error" Pattern
+### 5. String Safety & Validation Rules
+
+To prevent string truncation and security injection attacks during environment transmission and config handling:
+
+- **Null Byte Rejection**: Environmental keys and values are strictly scanned for null bytes (`\x00`). If a null byte is detected, the engine raises an immediate security validation error.
+- **Container Target Path Safety**: Target paths in mount configurations (e.g. `mc.Target`) and destination paths in device mappings inside the container must be non-empty and absolute. Because these are container-side paths, they are NOT processed by host-side relative path resolution (e.g. `SetBaseDir` does not apply to them) to guarantee that relative container paths are correctly caught and rejected instead of leaking base host directories.
+
+### 6. "Sticky Error" Pattern
 
 The value resolution engine implements a **Sticky Error** pattern. The very first validation or resolution error encountered is stored internally. Subsequent resolution attempts gracefully return the original raw (unresolved) string to avoid compounding errors, and the final execution is securely aborted by propagating the retained error.
 
-### 5. Lazy Resolver Instantiation Optimization
+### 7. Lazy Resolver Instantiation Optimization
 
 To optimize performance and resource footprint, the `ExpressionResolver` is instantiated lazily via `getR()` only when the configuration actually requires expression parsing (detecting `{{...}}`), tilde expansion (`~`), relative path resolution, or when executing under a nested context (`Level > 0`).
 
