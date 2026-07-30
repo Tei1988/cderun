@@ -1,52 +1,80 @@
-# 機能仕様：ポリグロットエントリーポイント (完了)
+# Feature Specification: Polyglot Entry Point (Symlink Mode)
 
-## 概要
+## Overview
 
-このツールは `cderun` という名前以外で実行された場合（シンボリックリンク等）、その実行ファイル名を「サブコマンド」として解釈する。
+When `cderun` is executed under a name other than `cderun` (such as via a symbolic link), it interprets the invoking executable file's name as the **subcommand**. This provides a seamless, polyglot entry point where you can execute containerized commands transparently as if they were natively installed.
 
-## 要件
+---
 
-### 引数の書き換えロジック
+## Technical Requirements & Behavior
 
-プログラム起動時（`main`関数の冒頭）に以下をチェックする。
+### Argument Rewriting Logic
 
-1. **実行ファイル名の確認**
-   `os.Args[0]` のベース名（パスを除いた部分）を確認する。
+Upon program startup (at the very beginning of the `main` function), `cderun` inspects and potentially rewrites command-line arguments based on the following rules:
 
-2. **条件分岐**
-   - 名前が `cderun` である場合: 何もしない。
-   - 名前が `cderun` **ではない**場合:
-     - `os.Args` を書き換え、`[プログラム名, 実行ファイル名, 元の引数...]` という形にする。
+1. **Check Executable Name**
+   Extract the base name of `os.Args[0]` (the filename, excluding directory path segments).
 
-### 具体例
+2. **Conditional Rewriting**
+   - **Case A: Base name is `cderun`**
+     Do nothing. Proceed with standard execution.
+   - **Case B: Base name is NOT `cderun`**
+     Prepend the extracted base name to the argument list. The modified structure of `os.Args` becomes:
+     `os.Args = [ "cderun", <extracted_base_name>, ...original_arguments ]`
 
-- ユーザーが `node --version` と実行した場合（`node` が `cderun` へのシンボリックリンクとする）:
-  - 実際のプロセス起動: `os.Args = ["node", "--version"]`
-  - 書き換え後の内部状態: `os.Args = ["cderun", "node", "--version"]`
-  - 結果として、`cderun` のサブコマンドとして `node` が呼び出される。
+---
 
-- ユーザーが `node --cderun-tty=false --version` と実行した場合（シンボリックリンク経由で `cderun` の設定を上書き）:
-  - 実際のプロセス起動: `os.Args = ["node", "--cderun-tty=false", "--version"]`
-  - 書き換え後の内部状態: `os.Args = ["cderun", "--cderun-tty=false", "node", "--version"]`
-  - 結果として、`cderun --tty=false node --version` と等価な挙動となり、サブコマンド側（node）にフラグが渡されることなく `cderun` の動作を制御できる。
+## Detailed Examples
 
-### フラグのホイスト（前方移動）に関する制限
+### Example 1: Basic Symlink Execution
 
-ポリグロットモード（シンボリックリンク等での実行）では、サブコマンド名の後にある引数のうち、**`--cderun-` プレフィックスが付いたフラグのみ**がホイスト（サブコマンドの前方に移動して `cderun` 自体の設定として適用）の対象となる。
+Assume a symlink named `node` points to `cderun`:
 
-`--interactive` や `--tty` といったプレフィックスなしの `cderun` 標準フラグは、サブコマンド（コンテナ内で実行されるコマンド）への引数としてそのまま渡され、`cderun` 自体の動作を制御することはない。
+```bash
+# User executes the command:
+node --version
+```
 
-これは、ラップ対象のツールが持つ同名のフラグと競合することを避けるための仕様である。ポリグロットモードで `cderun` の動作を制御したい場合は、必ず `--cderun-` プレフィックスを使用しなければならない。
+- **Actual Process Startup**: `os.Args = ["node", "--version"]`
+- **Rewritten Internal Args**: `os.Args = ["cderun", "node", "--version"]`
+- **Result**: `cderun` is invoked with `node` as the subcommand lookup key. The tool maps `node` to its configured image and executes the command within a container, returning the Node.js version.
 
-### シンボリックリンク名のセキュリティ検証 (Security Validation on Symlink Names)
+### Example 2: Mixing settings with Symlink Modes
 
-ポリグロットモード（シンボリックリンク等での実行）では、実行ファイル名（`os.Args[0]`）がそのままサブコマンド/ツール名として抽出されます。そのため、安全な実行を保証するために、この抽出された名前に対しても `ValidateToolName` による厳密なセキュリティ検証が適用されます。
+You can configure `cderun` behavior using P1 internal override flags even when invoking via a symlink:
 
-検証ルールでは、ツール名は以下の許可されたASCII文字のみで構成されている必要があります：
+```bash
+# User executes the command:
+node --cderun-tty=false --version
+```
 
-- 英数字 (`a-z`, `A-Z`, `0-9`)
-- ドット (`.`)
-- アンダースコア (`_`)
-- ハイフン (`-`)
+- **Actual Process Startup**: `os.Args = ["node", "--cderun-tty=false", "--version"]`
+- **Rewritten Internal Args**: `os.Args = ["cderun", "--cderun-tty=false", "node", "--version"]`
+- **Result**: Equivalent to running `cderun --tty=false node --version`. The `cderun` engine processes `--cderun-tty=false` as a high-priority P1 setting, while the wrapped `node` subcommand runs and processes the `--version` passthrough argument.
 
-Unicode文字やキリル文字（例: キリル文字の 'о' -> `\u043e`）など、上記のASCII文字に含まれない文字がシンボリックリンク名に含まれている場合、安全性の観点から検証はクリーンに失敗（エラー）となります。これにより、文字難読化（ホモグラフ攻撃など）によるセキュリティ検証のバイパスや予期せぬ挙動を未然に防ぎます。
+---
+
+## Hoisting Restrictions in Polyglot Mode
+
+In **Symlink Mode** (Polyglot Entry Point), a strict hosting restriction is enforced to prevent argument collision:
+
+- **Rule**: Only flags prefixed with `--cderun-` (P1 internal overrides) are eligible for hoisting from behind the subcommand.
+- **Behavior**: Standard, non-prefixed `cderun` flags (such as `--interactive` or `--tty`) that appear *after* the subcommand are **never hoisted**. They are treated as literal, raw passthrough arguments and are forwarded directly to the wrapped container tool.
+
+This design ensures that standard flags belong strictly to the wrapped application (e.g., if the wrapped binary has its own `--tty` or `--interactive` flag, `cderun` will not intercept or hijack it). If you need to override `cderun` parameters when executing via a symlink, you **must** use the explicit `--cderun-` prefix.
+
+---
+
+## Security Validations on Symlink Names
+
+In **Symlink Mode**, the invoking filename is directly extracted and consumed as the subcommand/lookup key. To enforce a secure-by-default posture and prevent directory traversal, injection, or obfuscation attacks, `cderun` applies strict security validation to the symlink name:
+
+1. **Character Whitelist (ValidateToolName)**:
+   The extracted name must be composed strictly of the following allowed ASCII characters:
+   - Alphanumeric characters (`a-z`, `A-Z`, `0-9`)
+   - Period (`.`)
+   - Underscore (`_`)
+   - Hyphen (`-`)
+
+2. **Homograph & Obfuscation Prevention**:
+   Any characters outside the whitelisted ASCII set—such as Cyrillic characters (e.g., Cyrillic 'о' -> `\u043e`), non-printable chars, control sequences, or directory traversal segments—are strictly rejected. If validation fails, `cderun` aborts execution immediately with a clear security validation error. This prevents malicious symlinks from executing arbitrary tools or bypassing security checks.
