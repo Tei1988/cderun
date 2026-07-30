@@ -404,6 +404,18 @@ cderun --group-add adm --group-add sudo alpine id
 cderun --privileged alpine ls /dev
 ```
 
+### `--read-only`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_READ_ONLY`
+- **Description**: Mount the container's root filesystem as read-only.
+- **Details**: When enabled, the container's root filesystem is mounted as a read-only filesystem, mapping to `ReadonlyRootfs` in the Docker host configuration and setting `Root.Readonly = true` in the containerd OCI specification.
+
+```bash
+cderun --read-only alpine touch /test-write
+```
+
 ### `--cap-add`
 
 - **型**: stringArray
@@ -640,6 +652,7 @@ cderun --log-timestamp=false node app.js
   - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
     `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
     `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-privileged`,
+    `--cderun-read-only`,
     `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`,
     `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`,
     `--cderun-cap-drop`, `--cderun-hang-timeout`
