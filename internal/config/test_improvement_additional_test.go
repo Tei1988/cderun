@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestUnit_Config_TildeExpansion_Additional verifies the tilde expansion behavior
+// TestUnit_Config_TildeExpansion_StartAndInside verifies the tilde expansion behavior
 // defined in docs/features/value-resolution.md under various scenarios.
-func TestUnit_Config_TildeExpansion_Additional(t *testing.T) {
+func TestUnit_Config_TildeExpansion_StartAndInside(t *testing.T) {
 	t.Parallel()
 
 	// 1. Tilde at the absolute start vs inside a path
@@ -82,9 +82,9 @@ func TestUnit_Config_TildeExpansion_Additional(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_Recursive_Resolution_Additional verifies that recursive resolution
+// TestUnit_Config_RecursiveResolution_DoubleBraces verifies that recursive resolution
 // correctly traverses various config structures as specified in docs/features/value-resolution.md.
-func TestUnit_Config_Recursive_Resolution_Additional(t *testing.T) {
+func TestUnit_Config_RecursiveResolution_DoubleBraces(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nested double braces escaping", func(t *testing.T) {
@@ -105,10 +105,10 @@ func TestUnit_Config_Recursive_Resolution_Additional(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_NestedExecution_MagicWords_Additional verifies that nested execution
+// TestUnit_Config_NestedExecution_ContextPriority verifies that nested execution
 // magic words like {{BASE_HOME}} and {{BASE_PWD}} resolve correctly in both Level 0 (host)
 // and Level 1+ (nested container) contexts.
-func TestUnit_Config_NestedExecution_MagicWords_Additional(t *testing.T) {
+func TestUnit_Config_NestedExecution_ContextPriority(t *testing.T) {
 	t.Parallel()
 
 	// Level 0 (Host) Resolution: BASE_HOME/BASE_PWD fall back to local HOME/PWD
@@ -163,19 +163,19 @@ func TestUnit_Config_NestedExecution_MagicWords_Additional(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_EnvSecurity_NullBytes_And_Keys verifies environment variables validations,
+// TestUnit_Config_EnvSecurity_ValidationAndNullBytes verifies environment variables validations,
 // verifying invalid format keys are rejected and null bytes in keys or values are caught.
-func TestUnit_Config_EnvSecurity_NullBytes_And_Keys(t *testing.T) {
+func TestUnit_Config_EnvSecurity_ValidationAndNullBytes(t *testing.T) {
 	t.Parallel()
 
 	// Test case: Env keys validation
 	t.Run("environment keys validation formats", func(t *testing.T) {
 		validKeys := []string{"MY_VAR", "var_name", "VAR123", "_VAR"}
 		for _, k := range validKeys {
-			assert.NoError(t, ValidateEnvKey(k), "key %q should be valid", k)
+			require.NoError(t, ValidateEnvKey(k), "key %q should be valid", k)
 		}
 
-		invalidKeys := []string{"", "123VAR", "MY-VAR", "MY$VAR", "MY VAR"}
+		invalidKeys := []string{"", "123VAR", "MY-VAR", "MY$VAR", "MY VAR", "VALID\x00KEY"}
 		for _, k := range invalidKeys {
 			assert.Error(t, ValidateEnvKey(k), "key %q should be invalid", k)
 		}
@@ -197,9 +197,9 @@ func TestUnit_Config_EnvSecurity_NullBytes_And_Keys(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_PathSecurity_Traversals_Additional validates security checks on container targets
+// TestUnit_Config_PathSecurity_TraversalsAndValidation validates security checks on container targets
 // and host sources to ensure path-traversal safety and absolute destination checks.
-func TestUnit_Config_PathSecurity_Traversals_Additional(t *testing.T) {
+func TestUnit_Config_PathSecurity_TraversalsAndValidation(t *testing.T) {
 	t.Parallel()
 
 	t.Run("ValidateWorkdir strictly rejects parent traversal", func(t *testing.T) {
@@ -239,9 +239,9 @@ func TestUnit_Config_PathSecurity_Traversals_Additional(t *testing.T) {
 	})
 }
 
-// TestUnit_Config_ValidateSecurity_Privileges asserts validation warnings on highly privileged capabilities,
+// TestUnit_Config_ValidateSecurity_PrivilegedWarnings asserts validation warnings on highly privileged capabilities,
 // host network namespace sharing, and sensitive host path mounts.
-func TestUnit_Config_ValidateSecurity_Privileges(t *testing.T) {
+func TestUnit_Config_ValidateSecurity_PrivilegedWarnings(t *testing.T) {
 	t.Parallel()
 
 	// Capture environment-based logs or check warns

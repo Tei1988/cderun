@@ -51,9 +51,9 @@ func (m *cmdSignalCapturingMock) getSignals() []string {
 	return sigs
 }
 
-// TestUnit_Command_Robustness_ConsecutiveSignals_Additional validates that receiving
+// TestUnit_Command_Robustness_ConsecutiveSignals validates that receiving
 // consecutive rapid signals (e.g. double SIGINT) triggers immediate cancellation on the host.
-func TestUnit_Command_Robustness_ConsecutiveSignals_Additional(t *testing.T) {
+func TestUnit_Command_Robustness_ConsecutiveSignals(t *testing.T) {
 	t.Parallel()
 
 	waitChan := make(chan int)
@@ -120,15 +120,15 @@ func TestUnit_Command_Robustness_ConsecutiveSignals_Additional(t *testing.T) {
 	select {
 	case <-done:
 		require.Error(t, execErr)
-		assert.ErrorIs(t, execErr, context.Canceled)
+		require.ErrorIs(t, execErr, context.Canceled)
 	case <-time.After(2 * time.Second):
 		t.Fatal("second signal failed to trigger context cancellation")
 	}
 }
 
-// TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals_Additional validates that
+// TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals validates that
 // value-taking overrides specified without the equals sign (e.g. `--cderun-image node`) are strictly rejected.
-func TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals_Additional(t *testing.T) {
+func TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals(t *testing.T) {
 	t.Parallel()
 
 	args := []string{
@@ -151,9 +151,9 @@ func TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals_Additional(t
 	assert.Contains(t, err.Error(), "must use '=' format to specify its value")
 }
 
-// TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode_Additional validates polyglot/symlink mode
+// TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode validates polyglot/symlink mode
 // with cleaned paths and unicode arguments, ensuring correct command-line parsing.
-func TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode_Additional(t *testing.T) {
+func TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode(t *testing.T) {
 	t.Parallel()
 
 	mockRuntime := &runtime.MockRuntime{}
@@ -164,8 +164,8 @@ func TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode_Additional(t *testing.T
 		},
 	}
 
-	// Executing python through relative dirty path
-	args := []string{"./python/../python", "-c", "print('hello')"}
+	// Executing python through relative dirty path with Unicode arguments
+	args := []string{"./python/../python", "-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}
 	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
@@ -182,5 +182,5 @@ func TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode_Additional(t *testing.T
 	require.NotNil(t, cfg)
 
 	assert.Equal(t, "python:3.11-slim", cfg.Image)
-	assert.Equal(t, []string{"-c", "print('hello')"}, cfg.Command)
+	assert.Equal(t, []string{"-c", "print('こんにちは, 🔥 Emojis and 日本語!')"}, cfg.Command)
 }
