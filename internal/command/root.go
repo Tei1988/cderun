@@ -58,11 +58,13 @@ type rootOptions struct {
 	mountCderunPath       string
 	image                 string
 	remove                bool
+	readOnly              bool
 	cderunTTY             bool
 	cderunInteractive     bool
 	cderunImage           string
 	cderunNetwork         string
 	cderunRemove          bool
+	cderunReadOnly        bool
 	cderunRuntime         string
 	cderunSocketPath      string
 	cderunMountSocket     bool
@@ -300,6 +302,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunNetwork:            opt(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
 		Remove:                   opt(cmd.Flags().Changed("remove"), o.remove),
 		CderunRemove:             opt(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
+		ReadOnly:                 opt(cmd.Flags().Changed("read-only"), o.readOnly),
+		CderunReadOnly:           opt(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
 		CderunTTY:                opt(cmd.Flags().Changed("cderun-tty"), o.cderunTTY),
 		CderunInteractive:        opt(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
 		CderunImage:              opt(cmd.Flags().Changed("cderun-image"), o.cderunImage),
@@ -532,6 +536,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,
 		Remove:      resolved.Remove,
+		ReadOnly:    resolved.ReadOnly,
 		Mounts:      resolved.Mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
@@ -647,6 +652,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
 		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
 		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
+		_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", maskedContainerConfig.ReadOnly)
 		var mounts []string
 		for _, m := range maskedContainerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))

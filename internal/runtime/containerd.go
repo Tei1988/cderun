@@ -336,6 +336,16 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.Hostname != "" {
 		opts = append(opts, oci.WithHostname(config.Hostname))
 	}
+
+	if config.ReadOnly {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Root == nil {
+				s.Root = &specs.Root{}
+			}
+			s.Root.Readonly = true
+			return nil
+		})
+	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
 	}

@@ -59,6 +59,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		ExtraHosts:      config.AddHosts,
 		PublishAllPorts: config.PublishAll,
 		GroupAdd:        config.GroupAdd,
+		ReadonlyRootfs:  config.ReadOnly,
 		Resources: dockercontainer.Resources{
 			Memory:   config.Memory,
 			NanoCPUs: int64(config.CPUs * 1e9),

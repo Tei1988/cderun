@@ -23,6 +23,7 @@ type ResolvedConfig struct {
 	Interactive     bool
 	Network         string
 	Remove          bool
+	ReadOnly        bool
 	Mounts          []container.Mount
 	Env             []string
 	Workdir         string
@@ -73,11 +74,13 @@ type CLIOptions struct {
 	Interactive              *bool
 	Network                  *string
 	Remove                   *bool
+	ReadOnly                 *bool
 	CderunTTY                *bool
 	CderunInteractive        *bool
 	CderunImage              *string
 	CderunNetwork            *string
 	CderunRemove             *bool
+	CderunReadOnly           *bool
 	Runtime                  *string
 	CderunRuntime            *string
 	SocketPath               *string
@@ -708,6 +711,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
 		p2Set, p2Val = getPtrVal(rv.cli.Interactive)
 		fastPathUsed = true
+	case "read-only":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
+		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
+		fastPathUsed = true
 	case "remove":
 		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
 		p2Set, p2Val = getPtrVal(rv.cli.Remove)
@@ -765,6 +772,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.TTY = resolved
 		case "interactive":
 			rv.res.Interactive = resolved
+		case "read-only":
+			rv.res.ReadOnly = resolved
 		case "remove":
 			rv.res.Remove = resolved
 		case "diagnosis":
