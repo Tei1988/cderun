@@ -561,7 +561,7 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		return
 	}
 
-	if vOrig.Kind() == reflect.Ptr {
+	if vOrig.Kind() == reflect.Pointer {
 		if !vOrig.IsNil() {
 			assert.NotSame(t, vOrig.Interface(), vCloned.Interface(), "Pointer should be different")
 			assertDeepCopyDistinct(t, vOrig.Elem().Interface(), vCloned.Elem().Interface())
@@ -582,7 +582,7 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		// Other kinds are already covered by the top-level assert.Equal.
 		//nolint:exhaustive
 		switch fOrig.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			if !fOrig.IsNil() {
 				assert.NotSame(t, fOrig.Interface(), fCloned.Interface(), "Field %s should be a different pointer", fieldName)
 			}

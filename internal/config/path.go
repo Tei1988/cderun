@@ -720,12 +720,12 @@ func ValidateImageName(s string) error {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if i == 0 {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
 				return fmt.Errorf("invalid image name: %q", s)
 			}
 		} else {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-				c == '.' || c == '_' || c == '-' || c == '/' || c == ':' || c == '@') {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') &&
+				c != '.' && c != '_' && c != '-' && c != '/' && c != ':' && c != '@' {
 				return fmt.Errorf("invalid image name: %q", s)
 			}
 			if c == '@' {
@@ -762,12 +762,12 @@ func ValidateNetworkName(s string) error {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if i == 0 {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
 				return fmt.Errorf("invalid network name: %q", s)
 			}
 		} else {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-				c == '_' || c == '.' || c == '-') {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') &&
+				c != '_' && c != '.' && c != '-' {
 				return fmt.Errorf("invalid network name: %q", s)
 			}
 		}
@@ -927,10 +927,8 @@ func ValidateWorkdir(s string) error {
 	if !workdirRegex.MatchString(s) {
 		return fmt.Errorf("invalid characters in working directory: %q", s)
 	}
-	for _, part := range strings.Split(s, "/") {
-		if part == ".." {
-			return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
-		}
+	if slices.Contains(strings.Split(s, "/"), "..") {
+		return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
 	}
 	return nil
 }

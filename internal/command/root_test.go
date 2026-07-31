@@ -1909,7 +1909,7 @@ func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (
 	}
 	close(m.waitStarted)
 	select {
-	case <-m.MockRuntime.SigChan:
+	case <-m.SigChan:
 		return 137, nil
 	case <-ctx.Done():
 		return 137, ctx.Err()
