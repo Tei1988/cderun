@@ -1383,6 +1383,15 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		}
 	}
 	rv.res.SocketPath = strings.TrimPrefix(rv.res.SocketPath, "unix://")
+
+	// Validate Runtime
+	if err := validatePathChars(rv.res.Runtime); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "runtime", err)
+	}
+	if rv.res.Runtime != "docker" && rv.res.Runtime != "podman" && rv.res.Runtime != "containerd" {
+		return fmt.Errorf("security validation failed for %q: unsupported runtime: %q", "runtime", rv.res.Runtime)
+	}
+
 	return nil
 }
 
@@ -1673,14 +1682,6 @@ func (rv *resolver) validateCriticalFields() error {
 	}
 	if err := ValidateWorkdir(rv.res.Workdir); err != nil {
 		return fmt.Errorf("security validation failed for %q: %w", "workdir", err)
-	}
-
-	// runtime
-	if err := validatePathChars(rv.res.Runtime); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "runtime", err)
-	}
-	if rv.res.Runtime != "docker" && rv.res.Runtime != "podman" && rv.res.Runtime != "containerd" {
-		return fmt.Errorf("security validation failed for %q: unsupported runtime: %q", "runtime", rv.res.Runtime)
 	}
 
 	// pull
