@@ -258,5 +258,6 @@ func TestUnit_Config_Resolve_WithPrivilegedAndSocketSettings(t *testing.T) {
 		assert.True(t, res.Privileged)
 		assert.Contains(t, res.CapAdd, "SYS_ADMIN")
 		assert.True(t, res.MountSocket)
+		assert.Contains(t, res.GroupAdd, "1234")
 	})
 }
