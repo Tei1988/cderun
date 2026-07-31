@@ -200,3 +200,50 @@ func TestUnit_Config_Resolver_EnvNullByteSecurity(t *testing.T) {
 		assert.Contains(t, err.Error(), "null byte injection detected")
 	})
 }
+
+func TestUnit_Config_Resolver_SensitiveDeviceWarnings(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	t.Run("Highly sensitive device triggers warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/mem:/dev/mem"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "Highly sensitive device(s)")
+		assert.Contains(t, logOutput, "/dev/mem")
+	})
+
+	t.Run("Non-sensitive device does not trigger warning", func(t *testing.T) {
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/null:/dev/null"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.NotContains(t, logOutput, "Highly sensitive device(s)")
+	})
+}

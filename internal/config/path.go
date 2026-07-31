@@ -1005,3 +1005,35 @@ func isNamedVolume(s string) bool {
 	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
 }
+
+// ValidateMountSocketPath ensures the container-side socket mount path is valid and safe.
+func ValidateMountSocketPath(s string) error {
+	if s == "" {
+		return nil
+	}
+	if !path.IsAbs(s) && !filepath.IsAbs(s) {
+		return fmt.Errorf("mount socket path must be an absolute path: %q", s)
+	}
+	if HasParentTraversal(s) {
+		return fmt.Errorf("mount socket path cannot contain parent directory references: %q", s)
+	}
+	return nil
+}
+
+// isSensitiveDevicePath checks if a host-side device path is highly sensitive.
+func isSensitiveDevicePath(p string) bool {
+	p = strings.TrimSpace(p)
+	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" {
+		return true
+	}
+	// Check for raw block/disk/loop devices
+	if strings.HasPrefix(p, "/dev/sd") ||
+		strings.HasPrefix(p, "/dev/hd") ||
+		strings.HasPrefix(p, "/dev/vd") ||
+		strings.HasPrefix(p, "/dev/nvme") ||
+		strings.HasPrefix(p, "/dev/loop") ||
+		strings.HasPrefix(p, "/dev/mapper/") {
+		return true
+	}
+	return false
+}

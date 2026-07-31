@@ -39,6 +39,58 @@ func TestUnit_Config_ValidateImageName(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ValidateMountSocketPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Absolute Unix path", "/var/run/docker.sock", false},
+		{"Root path", "/", false},
+		{"Empty path", "", false},
+		{"Relative path", "var/run/docker.sock", true},
+		{"Path traversal with ..", "/var/run/../run/docker.sock", true},
+		{"Windows-style path traversal", "/var/run\\..\\run/docker.sock", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateMountSocketPath(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
+func TestUnit_Config_IsSensitiveDevicePath(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"Mem device", "/dev/mem", true},
+		{"Kmem device", "/dev/kmem", true},
+		{"Port device", "/dev/port", true},
+		{"Raw block device sd", "/dev/sda", true},
+		{"Raw block device nvme", "/dev/nvme0n1", true},
+		{"Raw block device loop", "/dev/loop0", true},
+		{"Raw block device mapper", "/dev/mapper/root", true},
+		{"Safe device null", "/dev/null", false},
+		{"Safe device urandom", "/dev/urandom", false},
+		{"Empty path", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := isSensitiveDevicePath(tt.input)
+			assert.Equal(t, tt.want, res, "input: %q", tt.input)
+		})
+	}
+}
+
 func TestUnit_Config_ValidateGroupAdd(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -485,6 +537,22 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				Image: ptr("alpine;rm -rf /"),
 				},
 			wantErr: "security validation failed for \"image\"",
+		},
+		{
+			name: "Invalid mount-socket-path (relative) in ResolveWithFS",
+			cli: &CLIOptions{
+				Image:           ptr("alpine"),
+				MountSocketPath: ptr("var/run/docker.sock"),
+			},
+			wantErr: "security validation failed for \"mount-socket-path\"",
+		},
+		{
+			name: "Invalid mount-socket-path (traversal) in ResolveWithFS",
+			cli: &CLIOptions{
+				Image:           ptr("alpine"),
+				MountSocketPath: ptr("/var/run/../run/docker.sock"),
+			},
+			wantErr: "security validation failed for \"mount-socket-path\"",
 		},
 		{
 			name: "Invalid EnvKey in ResolveWithFS (CLI)",

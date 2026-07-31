@@ -431,6 +431,11 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		subcommand = rv.subcommand
 	}
 
+	pType := "path"
+	if name == "mount-socket-path" {
+		pType = "container"
+	}
+
 	return resolveConfigPath(
 		p1Set, p1ValStr,
 		p2Set, p2ValStr,
@@ -439,7 +444,7 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		rv.global, gGetter,
 		fallback,
 		r,
-		"path",
+		pType,
 		rv.fs,
 	)
 }
@@ -1626,6 +1631,17 @@ func (rv *resolver) validateSecurity() error {
 			}
 		}
 	}
+
+	var sensitiveDevices []string
+	for _, d := range rv.res.Devices {
+		if isSensitiveDevicePath(d.PathOnHost) {
+			sensitiveDevices = append(sensitiveDevices, d.PathOnHost)
+		}
+	}
+	if len(sensitiveDevices) > 0 && logging.Enabled(logging.WarnLevel) {
+		logging.Warn("Highly sensitive device(s) %v detected. Granting direct access to raw host devices can bypass container isolation and compromise the host.", sensitiveDevices)
+	}
+
 	return nil
 }
 
@@ -1653,7 +1669,7 @@ func (rv *resolver) validateCriticalFields() error {
 			return nil
 		}},
 		{"socket-path", rv.res.SocketPath, nil},
-		{"mount-socket-path", rv.res.MountSocketPath, nil},
+		{"mount-socket-path", rv.res.MountSocketPath, ValidateMountSocketPath},
 		{"mount-cderun-path", rv.res.MountCderunPath, nil},
 		{"dry-run-format", rv.res.DryRunFormat, func(s string) error {
 			if s != "" && s != "yaml" && s != "json" && s != "simple" {
@@ -1709,6 +1725,39 @@ func (rv *resolver) validateCriticalFields() error {
 		}
 	}
 
+	if err := rv.validateMountSocketPathRaw(); err != nil {
+		return fmt.Errorf("security validation failed for \"mount-socket-path\": %w", err)
+	}
+
+	return nil
+}
+
+func (rv *resolver) validateMountSocketPathRaw() error {
+	_, p1Set, p1Val, p2Set, p2Val, _ := fetchFieldAndParams("mount-socket-path", rv.getCliVal())
+	raw := ""
+	if p1Set {
+		raw = p1Val.String()
+	} else if p2Set {
+		raw = p2Val.String()
+	} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+		raw = env
+	} else {
+		if rv.tools != nil {
+			if tool, ok := rv.tools[rv.subcommand]; ok {
+				if t := tool.MountSocketPath; !t.IsEmpty() {
+					raw = t.Raw
+				}
+			}
+		}
+		if raw == "" && rv.global != nil {
+			if g := rv.global.Defaults.MountSocketPath; !g.IsEmpty() {
+				raw = g.Raw
+			}
+		}
+	}
+	if raw != "" && HasParentTraversal(raw) {
+		return fmt.Errorf("mount socket path cannot contain parent directory references: %q", raw)
+	}
 	return nil
 }
 
@@ -1814,6 +1863,10 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 			return "", err
 		}
 		baseDir = wd
+	}
+
+	if pathType == "container" {
+		baseDir = ""
 	}
 
 	if p1Set {

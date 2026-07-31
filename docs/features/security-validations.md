@@ -60,6 +60,13 @@ To enforce secure device mounting, cgroup permissions for any device specified v
 
 This ensures that only valid permission flags (read `r`, write `w`, and mknod `m`) are specified, preventing any parameter injection or malformed input.
 
+Additionally, to restrict direct raw device access and limit container privileges, `cderun` scans specified host-side device paths. It emits a visible security warning at the `Warn` level if highly sensitive host devices are detected:
+
+  - `/dev/mem` (physical memory access)
+  - `/dev/kmem` (kernel virtual memory access)
+  - `/dev/port` (raw I/O port access)
+  - Block/disk devices (e.g. `/dev/sd*`, `/dev/hd*`, `/dev/vd*`, `/dev/nvme*`, `/dev/loop*`, `/dev/mapper/*`) which allow bypassing file system controls.
+
 ## Resource Settings Validation
 
 To prevent invalid or unsafe resource configurations:
@@ -84,6 +91,11 @@ When a container is configured to run in privileged mode (`--privileged` or `pri
 ## Absolute Mount Targets
 
 All mount configurations must specify an absolute path for the `Target` (container-side path). Relative paths in mount targets are ambiguous and potentially dangerous, so they are rejected during resolution.
+
+The same strict security rules are enforced on the container runtime socket mount target path (`--mount-socket-path`):
+
+  - It must be specified as a valid absolute path.
+  - It cannot contain any parent directory traversal (`..`) segments.
 
 ## Environment Variable Validation
 
