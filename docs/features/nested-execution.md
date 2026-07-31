@@ -1,180 +1,165 @@
-# Feature: Nested Execution (Recursive Execution)
+# Feature Specification: Nested Execution (Recursive Containers)
 
-`cderun` は、自身が作成したコンテナ内で自分自身を実行することをサポートしています。これを「Nested Execution（ネスト実行）」または「Recursive Execution（再帰実行）」と呼びます。
+`cderun` supports running itself inside a container recursively. This capability is referred to as "Nested Execution" or "Recursive Execution".
 
-## 用語定義
+---
 
-### Base Host (基底ホスト)
+## Terminology
 
-最初の `cderun` が実行された物理マシンまたはVM。コンテナランタイム（Docker/Podman）が実際に動作している場所です。
+### Base Host (Level 0 Host)
 
-### Execution Host (実行ホスト)
+The physical machine or VM where the initial `cderun` command is executed. The actual container runtime engine (Docker/Podman) resides and operates here.
 
-現在の `cderun` コマンドが実行されている環境。基底ホスト、またはコンテナのいずれかになります。
+### Execution Host
 
-### Nested Level (ネストレベル)
+The environment where the current `cderun` command is executing. This can be either the Base Host (Level 0) or an active container (Level 1+).
 
-実行の深さ。
+### Nested Level
 
-- レベル 0: 基底ホスト
-- レベル 1: レベル 0 から起動されたコンテナ
-- レベル 2: レベル 1 から起動されたコンテナ、といった具合に続きます。
+The depth of the recursive container execution tree:
 
-## 仕組み
+- **Level 0**: The Base Host.
+- **Level 1**: A container spawned directly from the Level 0 host.
+- **Level 2**: A container spawned from within a Level 1 container, and so on.
 
-ネスト実行は、主に以下の3つの機能に基づいています。
+---
 
-1. **バイナリマウント (`--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`)**: 基底ホストの `cderun` バイナリがコンテナ内にマウントされます（通常は `/usr/local/bin/cderun`）。`--mount-cderun-path` を使用することで、マウントするホスト側のバイナリを明示的に指定できます。
-   - **自動有効化**: `--mount-tools` または `--mount-all-tools` を使用する場合、`--mount-cderun` は自動的に有効になります。
-2. **ソケットマウント (`--mount-socket`)**: コンテナランタイムのソケット（例: `/var/run/docker.sock`）がコンテナ内にマウントされ、コンテナ内の `cderun` が基底ホスト上の Docker/Podman デーモンと通信できるようになります。
-   - **自動有効化**: `--mount-cderun`（自動有効化されたものを含む）が有効な場合、`--mount-socket` は自動的に有効になります（明示的に `false` が指定されている場合を除く）。
-3. **コンテキスト伝播 (スナップショット)**: ネスト実行が有効な状態でコンテナが開始されると（上記マウントフラグのいずれかが有効、または既にネスト環境である場合）、`cderun` は現在の設定とホストコンテキストの「スナップショット」を作成し、コンテナ内にマウントします。
+## Architectural Mechanisms
 
-## コンテキスト伝播とスナップショット
+Nested execution relies on three fundamental mechanisms:
 
-`cderun` がネスト呼び出しを行う可能性のあるコンテナを起動する際、スナップショットディレクトリを生成し、コンテナ内の `/run/cderun/` にマウントします。
+1. **Binary Mounting (`--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`)**:
+   The host's `cderun` binary is mounted into the container (typically at `/usr/local/bin/cderun`).
+   - Specifying `--mount-tools` or `--mount-all-tools` automatically enables `--mount-cderun`.
+   - `--mount-cderun-path` allows explicitly selecting which host-side binary is mounted.
 
-### スナップショット作成の処理順序
+2. **Socket Mounting (`--mount-socket`)**:
+   The container runtime socket (e.g., `/var/run/docker.sock`) is mounted inside the container, giving the nested `cderun` direct access to the container engine on the Base Host.
+   - Enabling `--mount-cderun` automatically enables `--mount-socket` unless explicitly deactivated.
 
-スナップショット作成では、「ファイルの書き込み先パス（実行ホスト内パス）」と、コンテナ起動時にマウントの `source` として渡す「基底ホスト上のパス（ホストパス）」を明確に区別します。
+3. **Context Propagation (Snapshotting)**:
+   When spawning a nested-enabled container, `cderun` creates an execution configuration "snapshot" on the host and mounts it into the container at `/run/cderun/` to propagate execution settings.
 
-```mermaid
-flowchart TD
-    A[スナップショットID生成] --> B[HostContext 構築]
-    B --> C[現在のマウント情報を HostContext に追記]
-    C --> D[OverlayFS upperdir を検出し HostContext に追記]
-    D --> E[実行ホスト内パスにディレクトリ作成]
-    E --> F{ネストレベル >= 2か？}
-    F -- Yes --> G[HostContext のマウントマッピングを使って\n実行ホスト内パス → 基底ホストパスに逆解決]
-    F -- No --> H[基底ホストパス = 実行ホスト内パス]
-    G --> I[HostContext.SnapshotDir に基底ホストパスをセット]
-    H --> I
-    I --> J[設定ファイルを実行ホスト内パスに書き込み]
-    J --> K[実行ホスト内パスと基底ホストパスを返却]
+---
+
+## Context Propagation and Snapshot Workflow
+
+When a container that supports nested execution is started, `cderun` generates a temporary snapshot directory and mounts it inside the container.
+
+### Snapshot Creation Sequence
+
+The snapshot creation sequence distinguishes between the path on the current Execution Host (where files are written) and the path on the Base Host (used as the mount source for the container runtime daemon).
+
+```text
+                  [Snapshot Creation Pipeline]
+
+              Generate Unique Snapshot ID (UUID)
+                              │
+                              ▼
+                  Construct HostContext Object
+                              │
+                              ▼
+            Record Current Mount Mappings to HostContext
+                              │
+                              ▼
+         Detect OverlayFS Upperdir & Append to Mounts
+                              │
+                              ▼
+        Create Snapshot Directory on Execution Host (0700)
+                              │
+                              ▼
+                 Is Nested Level >= 2?
+                ├── [Yes] ──> Apply Reverse Path Resolution
+                │             to derive Base Host path
+                └── [No]  ──> Base Host path is identical to
+                              Execution Host path
+                              │
+                              ▼
+          Populate HostContext.SnapshotDir with Base Path
+                              │
+                              ▼
+         Write config files (.cderun.yaml, .tools.yaml) (0600)
+                              │
+                              ▼
+         Return Execution Host path and Base Host path
 ```
 
-**ポイント**:
+#### Directory and File Permissions
 
-- **OverlayFS upperdir 検出**: ディレクトリ作成より前に行います。逆パス解決のマッピング情報として使用するためです。
-- **逆パス解決の適用**: レベル 2 以上のコンテナを（コンテナ内から）作成する場合、そのスナップショットディレクトリ自体のパスも基底ホストのパスに翻訳してマウント設定に渡す必要があります。実行ホストが基底ホスト（レベル 0）の場合、パスの翻訳は行われません。
+To prevent unauthorized access and credential leakage in multi-user environments, snapshots are protected with strict POSIX permissions:
 
-**戻り値の使い分け**:
+- **Snapshot Directory**: `0700` (Owner read, write, and execute only).
+- **Configuration Files**: `0600` (Owner read and write only).
 
-- コンテナ内パス: ファイルの書き込み・クリーンアップ（`RemoveAll`）に使用
-- ホストパス: コンテナランタイムへのマウント `source` に使用（コンテナランタイムデーモンは基底ホスト上で動作しているため）
+### Snapshot Directory Contents
 
-### セキュリティと権限
+The generated snapshot directory contains:
 
-マルチユーザー環境での情報露出を防ぐため、スナップショットディレクトリおよびその中の設定ファイルには厳格なアクセス権限が設定されます。
+- `.cderun.yaml`: Evaluated and merged global configuration.
+- `.tools.yaml`: Evaluated and merged tool configuration mappings.
+- **Host Context (`hostContext`)**: Metadata enabling the nested engine to map its local paths back to physical host paths.
 
-- **スナップショットディレクトリ**: `0700` (所有者のみ読み書き実行可能)
-- **設定ファイル (.cderun.yaml, .tools.yaml)**: `0600` (所有者のみ読み書き可能)
-
-### スナップショットの内容
-
-このスナップショットには以下が含まれます：
-
-- `.cderun.yaml`: 実行ホストからマージされたグローバル設定。
-- `.tools.yaml`: 実行ホストからマージされたツール設定。
-- **Host Context (ホストコンテキスト)**: ネストされた `cderun` が基底ホストとの関係を理解するためのメタデータ。
-
-### ホストコンテキスト (`hostContext`)
-
-スナップショット内の `.cderun.yaml` には `hostContext` セクションが含まれます：
+#### Host Context Specimen
 
 ```yaml
 hostContext:
-  binPath: "/usr/local/bin/cderun"          # 基底ホスト上のバイナリ位置
-  snapshotDir: "/tmp/cderun-snap-xxxx"     # 基底ホスト上のスナップショットディレクトリ位置
-  workingDir: "/home/user/project"         # 現在のカレントワーキングディレクトリのホスト側パス
-  level: 1                                 # 現在のネストレベル
-  mounts:                                  # 基底ホストパスと現在のコンテナパスのマッピング
+  binPath: "/usr/local/bin/cderun"          # Location of the binary on the Base Host
+  snapshotDir: "/tmp/cderun-snap-xxxx"     # Location of the snapshot on the Base Host
+  workingDir: "/home/user/project"         # Current working directory on the Base Host
+  level: 1                                 # Current execution nest level
+  mounts:                                  # Path mapping table
     - source: "/home/user/project"
       target: "/app"
       level: 1
 ```
 
-## ホストパス追跡 (逆パス解決)
+---
 
-コンテナランタイムデーモン（Docker/Podman）は**基底ホスト**上で動作しているため、デーモンに渡すマウントの `source` パスは常に基底ホスト上に存在する物理的なパスである必要があります。
+## Reverse Path Resolution
 
-`cderun` がコンテナ内（Nested Level >= 1）で実行されており、そこからさらに別のコンテナへディレクトリをマウントしたい場合（例: `--mount .:/src`）、現在のコンテナローカルのパス（例: `/app`）を、基底ホスト上の元のパス（例: `/home/user/project`）に翻訳する必要があります。これを **「逆パス解決 (Reverse Path Resolution)」** と呼びます。
+Because the container runtime daemon runs on the **Base Host** (Level 0), any directories specified as bind mount sources by a nested container (e.g., `--mount .:/src` running inside a Level 1 container) must be translated to paths that are physically accessible on the Base Host.
 
-### 解決ロジック
+`cderun` implements **Reverse Path Resolution** to map container-local paths back to original host paths.
 
-1. **実行環境の判定**: 現在の `cderun` がコンテナ内（Nested Level 1 以上）で実行されているかを確認します。基底ホスト（Level 0）では逆解決は行われません。
-2. **パスの絶対化**: 要求されたパス（例: `./src`, `~/data`, `/app/src`）を、現在の**実行ホスト**における絶対パスに解決します。
-3. **マッピングの検索**: スナップショットから渡された `hostContext.mounts` を検索し、解決した絶対パスのプレフィックスとして最もよく一致する `target` を探します。
+### Resolution Steps
 
-4. **一致の優先順位**:
-    - **最長一致（Longest Match）**: 複数のマッピングがプレフィックスとして一致する場合、より長い `target` パスを持つものが優先されます（例: `/app/data` への一致は `/app` への一致より優先される）。これにより、広範なマッピングよりも特定のボリュームマウントが優先されます。
-    - **最新レベル（Deepest Level）**: ターゲットパスの長さが全く同じ場合、より高い `level`（より最近のネスト実行で追加されたマッピング）が優先されます。
+1. **Verify Nest Level**: Checks if `Level >= 1`. If execution is on the Base Host (Level 0), path translation is skipped.
+2. **Absolute Path Conversion**: Converts the requested mount source (such as `./src` or `/app/src`) to an absolute path on the current Execution Host.
+3. **Lookup Match**: Scans the `hostContext.mounts` table, matching the path against the recorded `target` prefixes.
+4. **Precedence Rules**:
+   - **Longest Match (Longest Target Prefix)**: If multiple mappings match (e.g., `/app` and `/app/src`), the longest matched `target` prefix is selected to favor more specific mounts over generic ones.
+   - **Deepest Level Priority**: If targets are of equal length, the mapping with the highest `level` (the most recent nested mount) is selected.
+5. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
 
-5. 一致した `target` プレフィックスを、対応する `source`（基底ホスト上のパス）に置き換え、残りの相対パスを結合して最終的なホストパスを生成します。
+### Concrete Example
 
-このロジックにより、ネストされたコンテナが「自分の外側」の世界を知らなくても、基底ホスト上の正しいリソースを指し示すことが可能になります。
+1. **Level 0 (Base Host)**: User executes `cderun --mount .:/app node`.
+   - Host Path: `/home/user/project`
+   - Container Path (L1): `/app`
+2. **Level 1 (Container)**: Nested execution runs `cderun --mount ./src:/src go build`.
+   - Requested Path: `./src`
+   - Absolute Container Path (L1): `/app/src`
+   - **Reverse Translation**:
+     - Scans `hostContext.mounts`, matching `/app/src` against the target prefix `/app`.
+     - Replaces `/app` with the host source `/home/user/project`.
+     - Output host path: `/home/user/project/src`.
+3. **Runtime Spawning**: Instructs the Docker daemon to mount `/home/user/project/src` to `/src` inside the new Level 2 container.
 
-### 具体的な解決例
+---
 
-以下のシナリオを想定します：
+## Automated Host Root Detection via OverlayFS
 
-1. **レベル 0 (ホスト)**: `cderun --mount .:/app node` を実行
-   - ホストパス: `/home/user/project`
-   - コンテナパス (L1): `/app`
-2. **レベル 1 (コンテナ)**: コンテナ内で `cderun --mount ./src:/src go build` を実行
-   - 要求されたパス: `./src`
-   - コンテナ内絶対パス (L1): `/app/src`
-   - **逆解決プロセス**:
-     - `hostContext.mounts` に `/app` -> `/home/user/project` のマッピングが存在
-     - `/app/src` のプレフィックス `/app` が一致
-     - 結果のホストパス: `/home/user/project/src`
-3. **ランタイム呼び出し**: 基底ホストの Docker デーモンに対し、`source: /home/user/project/src, target: /src` のマウントを指示
+If `cderun` detects that it is executing inside a container with an OverlayFS root filesystem, it automatically parses `/proc/self/mountinfo` to extract the host-side `upperdir` path.
 
-これにより、ネストされたコンテナ間でも一貫したファイルアクセスが可能になります。
+It then appends a fallback root mapping (`source: <upperdir>, target: /`) to `hostContext.mounts`. This allows mounting files that reside in the container's scratch space (such as files created in `/tmp`) into nested containers, even if those paths do not belong to a pre-existing volume or bind mount.
 
-## 自動ルート検出 (OverlayFS)
+For more information, see the [/proc/self/mountinfo Specification](../references/proc-self-mountinfo.md).
 
-`cderun` が OverlayFS ルートファイルシステムを持つコンテナ内で実行されていることを検出した場合、`/proc/self/mountinfo` を解析してホスト側の `upperdir` を自動的に発見します。そして、 `hostContext` に `/` のベースマッピング（`source: upperdir, target: /`）を追加します。
+---
 
-### OverlayFS 検出のメリット
+## macOS Nested Execution Constraints
 
-明示的にマウントされたボリューム（例: `/app`）以外の場所にあるファイルも、ネストされたコンテナにマウントできるようになります。
-
-**例:**
-
-1. `cderun --mount-cderun alpine` を実行（特定のソースマウントなし）。
-2. コンテナ内で `touch /tmp/hello.txt` を実行。
-3. さらにコンテナ内で `cderun --mount /tmp/hello.txt:/hello.txt alpine cat /hello.txt` を実行。
-
-このとき、`/tmp/hello.txt` はボリュームではないため通常の逆解決では失敗しますが、OverlayFS 検出により `/` がホストの `upperdir`（例: `/var/lib/docker/overlay2/.../diff`）にマップされているため、正しくホストパスへ変換されます。
-詳細な仕様については [proc-self-mountinfo 仕様書](../references/proc-self-mountinfo.md) を参照してください。
-
-## 設定発見の優先順位
-
-コンテナ内では、`cderun` は以下の順序で設定ファイルを検索します（上が最高優先度）：
-
-1. **P1: cderun内部オーバーライド** (`--cderun-*` フラグ)
-2. **P2: コマンドライン引数**
-3. **P3: 環境変数**
-4. **P4: ツール固有設定** (`.tools.yaml`)
-   - カレントディレクトリから親へ遡って検索
-   - `~/.config/cderun/.tools.yaml`
-   - `/etc/cderun/.tools.yaml`
-   - **/run/cderun/.tools.yaml** (ネスト注入された設定)
-5. **P5: cderunデフォルト設定** (`.cderun.yaml`)
-   - カレントディレクトリから親へ遡って検索
-   - `~/.config/cderun/.cderun.yaml`
-   - `/etc/cderun/.cderun.yaml`
-   - **/run/cderun/.cderun.yaml** (ネスト注入された設定)
-6. **P6: ハードコードされたデフォルト値**
-
-※ `/run/cderun/` は「真のデフォルト」として機能し、ユーザーがコンテナ内で明示的に用意した設定ファイルがある場合はそちらが優先されます。
-
-## macOS 実行環境におけるネスト制約
-
-macOS ホスト環境におけるコンテナランタイムは、通常バックグラウンドの Linux 仮想マシン（VM）上で動作しているため、ネスト実行を設定する際には以下のような特有の考慮事項と制約があります。
-
-### 1. 動作概念と構成図
+Running nested containers on macOS requires additional configurations because container engines run inside a Linux virtual machine:
 
 ```text
   macOS Host (Darwin)                   Linux VM (Docker / Podman)
@@ -190,38 +175,19 @@ macOS ホスト環境におけるコンテナランタイムは、通常バッ�
  └─────────────────────────┘           └─────────────────────────────┘
 ```
 
-### 2. マウントされるバイナリのアーキテクチャ
+### 1. Cross-Compilation Requirements
 
-macOS 自体は Darwin OS であるため、ホスト上の `cderun` バイナリ（Darwin 版）をそのまま Linux コンテナ内へマウントして実行することはできません。
+Because macOS uses the Darwin kernel, the host's `cderun` binary cannot execute inside a Linux container.
 
-- **解決策**: 事前に Linux 向けにコンパイルした `cderun` バイナリ（例: `GOOS=linux GOARCH=<arch>`、`<arch>` 部分は `amd64` または `arm64` などの環境依存のアーキテクチャ）を用意し、それを `--mount-cderun-path` オプションでホスト側のマウント元として明示的に指定します。
+- **Solution**: Compile a Linux binary of `cderun` (`GOOS=linux GOARCH=amd64` or `GOOS=linux GOARCH=arm64`) and specify its location using `--mount-cderun-path` to mount it into the container.
 
-### 3. ランタイムソケットのパーミッションと補助グループの指定
+### 2. VM Socket GID Authorization
 
-macOS の Docker / Podman 実行環境では、ホスト側ソケットを VM 上でマウントする際の Group ID (GID) が macOS ホスト上の一般グループと一致しないケースがあります。
+The Group ID (GID) of the container socket inside the macOS Linux VM might not match the user's GID inside the container.
 
-- **解決策**: VM 上でのソケット所有 GID（例: `<VM_GID>`）を特定し、それを `--cderun-group-add` CLI フラグまたは設定ファイルの `groupAdd` フィールドを用いて数値 GID で指定します。これにより、コンテナ内ユーザーにマウントされたソケットへのアクセス権が付与されます。
+- **Solution**: Find the numeric GID of the socket inside the Linux VM and pass it using the `--cderun-group-add` flag (e.g., `--cderun-group-add 102`) or via the `groupAdd` array in YAML configurations. This grants the container user the necessary permissions to access the socket.
 
-> **⚠️ セキュリティ警告**:
-> ランタイムソケット（特に rootful な Docker/Podman デーモン）へのアクセスをコンテナに許可することは、コンテナエスケープやホスト権限奪取のリスクを伴います。そのため、この設定は**信頼できる rootful な Docker/Podman デプロイメントにのみ限定**して使用してください。
-> なお、rootless Podman 環境でのソケットマウントは、その影響範囲が対象の rootless デーモンインスタンス（ユーザー権限スコープ内）のみに制限されますが、rootful なランタイムへのソケットアクセスはホストシステム全体への広範な管理アクセス権を与えることになります。
-
-## ライフサイクル管理
-
-- **作成**: `--mount-cderun`, `--mount-tools`, `--mount-all-tools` のいずれかを伴う実行（設定ファイルでの指定を含む）、または既にネストレベルが 1 以上の環境での実行において、コンテナ起動プロセスの途中で生成されます。
-- **削除**: コンテナが終了（または `cderun` プロセスが終了）した際に、実行ホスト上のコンテナ内パス（`/tmp/cderun-snap-<uuid>/`）を再帰的に削除します。
-
-## 課題と制限事項
-
-- **ファイルシステムの可視性**: 基底ホストから現在のコンテナに既にマウントされているパスのみが、ネストされたコンテナに正常にマウントできます。
-- **ソケットの権限**: コンテナ内のユーザーは、マウントされたコンテナランタイムソケットにアクセスする権限を持っている必要があります。
-- **クリーンアップ**: `cderun` は終了時にスナップショットをクリーンアップしようとしますが、予期せぬ中断によって孤立したファイルが残る可能性があります。
-- **UUIDの衝突**: 非常に低い確率ですが、UUIDの衝突を避けるための実装（リトライ等）が推奨されます。
-- **環境変数の非継承**: 実行ホスト（コンテナ）内で設定した環境変数は、ネストされたコンテナには引き継がれません。明示的に `--env` で指定する必要があります。
-- **プラットフォーム依存**: `cderun` バイナリは実行ホストと同じアーキテクチャである必要があります。静的リンクされたバイナリが推奨されます。
-- **`{{HOME}}` / `{{PWD}}` の展開**: ネスト実行環境（コンテナ内）では `{{HOME}}` や `{{PWD}}` はコンテナ内の値に展開されます。基底ホストのパスを参照したい場合は `{{BASE_HOME}}` と `{{BASE_PWD}}` を使用してください。詳細は [Value Resolution](value-resolution.md) を参照してください。
-
-## セキュリティ考慮事項
-
-- **ランタイムソケットへのアクセス**: `--mount-socket` により、コンテナ内から基底ホストのコンテナランタイムへの完全アクセスが可能になります。コンテナエスケープのリスクがあるため、信頼できる環境でのみ使用してください。
-- **cderun バイナリ**: read-only でマウントされます。
+> **⚠️ Security Warning**:
+> Sharing the container runtime socket (especially with rootful Docker or Podman) grants broad control over the host daemon, representing a high privilege operation. It can lead to container escape or host configuration exposures. This capability should only be shared with trusted container workloads.
+>
+> In contrast, sharing a rootless Podman socket restricts the impact strictly to the user-scoped daemon instance, significantly reducing the security blast radius compared to a rootful engine.

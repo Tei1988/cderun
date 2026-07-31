@@ -1,153 +1,108 @@
-# cderun 機能 ドキュメント
+# cderun Feature Specifications Index
 
-## 概要
+## Overview
 
-このディレクトリには`cderun`の各機能の詳細仕様が含まれています。
+This directory contains the detailed technical and functional specifications for each feature of `cderun`.
 
-## 機能一覧
+## Feature Specifications
 
-### コア機能
+### Core Mechanisms
 
-1. **[引数解析 (完了)](./argument-parsing.md)**
+1. **[Argument Parsing & Hoisting](./argument-parsing.md)**
+   - Explains the strict boundary parsing mechanism that separates `cderun`'s flags from the subcommand arguments.
+   - Details the hoisting (relocation) mechanics of Phase 1 (P1) internal overrides.
 
-  - 厳密な境界解析により、cderun自体のフラグと、ラップされたサブコマンドの引数を完全に分離します。
-  - P1内部オーバーライドの「ホイスト（前方移動）」メカニズムについて解説します。
+2. **[Argument & Setting Priority Logic](./argument-priority-logic.md)**
+   - Defines the configuration precedence hierarchy from P1 (internal overrides) down to P6 (defaults).
+   - Explains the deterministic evaluation sequence used to select winning options.
 
-2. **[引数・設定優先順位 (完了)](./argument-priority-logic.md)**
+3. **[Polyglot Entry Point (Symlink Mode)](./polyglot-entry.md)**
+   - Explains how creating symbolic links to `cderun` enables transparent, native-like command execution.
+   - Explains tool-name auto-detection and character whitelisting security checks.
 
-  - P1（内部オーバーライド）からP6（デフォルト）までの優先順位階層を定義します。
-  - どの設定が最終的な実行に採用されるかの決定ロジックを詳細に説明します。
+4. **[Configuration File Support](./configuration-file-support.md)**
+   - Documents the structure and role of `.cderun.yaml` (global defaults) and `.tools.yaml` (tool mapping).
+   - Explains the hierarchical directory traversal, search, and list overwriting/merging sequence.
 
-3. **[ポリグロットエントリーポイント (完了)](./polyglot-entry.md)**
+5. **[Standard Input Synchronization](./stdin-synchronization.md)**
+   - Details the synchronous coordination of container startup and STDIN attachment to ensure no data loss during piped executions.
 
-  - cderunへのシンボリックリンクを作成することで、`node` や `python` を直接実行しているかのように振る舞わせる機能です。
-  - 実行ファイル名からのツール自動検出の仕組みについて説明します。
+6. **[Value Resolution & Expression Engine](./value-resolution.md)**
+   - Documents dynamic expression evaluation (`{{...}}`), tilde expansion, relative path resolution, anchor boundary validation, and lazy instantiation.
 
-4. **[設定ファイルサポート (完了)](./configuration-file-support.md)**
+7. **[Hang Timeout Protection](./hang-timeout.md)**
+   - Documents the automated termination logic (SIGKILL) to prevent execution hangs in non-TTY, non-interactive environments when IO finishes.
 
-  - `.cderun.yaml`（グローバル設定）と `.tools.yaml`（ツール別実行定義）の構造と役割を説明します。
-  - 階層的なファイル探索とマージの仕様について解説します。
+### Runtime Integration
 
-5. **[標準入力同期 (完了)](./stdin-synchronization.md)**
+1. **[Multi-Runtime Support](./multi-runtime-support.md)**
+   - Documents native support for Docker, Podman, and containerd engines, socket auto-detection, and host socket caching.
 
-  - コンテナの起動と標準入力のアタッチを同期させ、パイプ経由の入力を1ビットも漏らさずにコンテナへ渡すための実装詳細です。
+2. **[Direct Container Execution](./direct-container-execution.md)**
+   - Details the direct SDK/API communication flow with container daemons, avoiding subprocess overhead and shell injection risks.
 
-6. **[値の解決 (完了)](./value-resolution.md)**
+3. **[Image Mapping & Selection](./image-mapping.md)**
+   - Documents how subcommand names are mapped to specific container images, and how to customize default tags.
 
-  - `{{PWD}}` や `{{env:KEY}}` などの動的変数（式）、チルダ展開、および相対パスの絶対パス解決ルールを定義します。
+### Execution Environment
 
-7. **[ハングタイムアウト (完了)](./hang-timeout.md)**
+1. **[Environment Variable Passthrough](./env-passthrough.md)**
+   - Details how host environment variables are securely and selectively passed down to the container.
 
-  - 非TTY・非インタラクティブ実行において、I/O終了後にコンテナが終了しない場合のハングアップ防止メカニズム（SIGKILL送信）について説明します。
+2. **[Mount Tools Dynamically](./mount-tools.md)**
+   - Documents the dynamic injection of other tools' `cderun` wrappers into a running container environment.
 
-### ランタイム機能
+3. **[Container Command Lifecycle](./container-command-execution.md)**
+   - Explains ephemeral container creation, startup, termination, exit-code capture, and automatic cleanup.
 
-1. **[マルチランタイムサポート (完了)](./multi-runtime-support.md)**
+### Advanced Capabilities
 
-  - Docker・Podman（および実験的な containerd）をサポートし、環境に応じて最適なランタイムを自動検出する仕組みを説明します。
+1. **[Docker-Compatible CLI Options](./command-line-options.md)**
+   - Outlines port publishing, resource constraints, supplementary groups, and user ID overriding, mapping them to the engine specs.
 
-2. **[直接コンテナ実行 (完了)](./direct-container-execution.md)**
+2. **[Nested Execution (Recursive Containers)](./nested-execution.md)**
+   - Details how `cderun` executes itself inside a container recursively, including snapshotting, reverse path resolution, and macOS VM GID setup.
 
-  - `docker run` コマンドを文字列として生成するのではなく、ランタイムのAPI（SDK）を直接叩くことで、安全かつ高速なコンテナ制御を実現しています。
+3. **[Dry-Run Mode](./dry-run-mode.md)**
+   - Details previewing container configuration without execution, outputting in YAML, JSON, or Simple text format.
 
-3. **[イメージマッピング (完了)](./image-mapping.md)**
+4. **[Logging & Debugging](./logging-debugging.md)**
+   - Documents trace, debug, info, warn, and error levels, JSON/text formats, early initialization, and sanitized logging.
 
-  - サブコマンド名から対応するコンテナイメージを特定するロジックと、そのカスタマイズ方法について解説します。
+5. **[Interactive Terminal UX](./interactive-terminal.md)**
+   - Details TTY allocation, Unix signal forwarding (SIGINT/SIGTERM), and terminal size (winch) synchronization.
 
-### 実行環境機能
+### Management & System Diagnostics
 
-1. **[環境変数パススルー (完了)](./env-passthrough.md)**
+1. **[Version Management](./version-management.md)**
+   - Details Git metadata injection (Tag, SHA, BuildDate) and formatted `--version` outputs.
 
-  - ホストの環境変数をコンテナへ安全に引き継ぐ方法を説明します。明示的な指定によるセキュリティの確保と利便性の両立について述べます。
+2. **[Diagnosis Mode](./diagnosis-mode.md)**
+   - Documents system diagnostic verification and tool discovery without requiring a subcommand.
 
-2. **[Mount Tools (完了)](./mount-tools.md)**
+### Security Hardening
 
-  - ホストにインストールされている他のツール（のcderunエイリアス）を、実行中のコンテナ内へ動的に注入する革新的な機能です。
+1. **[Security Validations](./security-validations.md)**
+   - Details character whitelisting, absolute path enforcement on targets, and strict validation of critical fields.
 
-3. **[コンテナコマンド実行 (完了)](./container-command-execution.md)**
+2. **[Sensitive Data Protection](./sensitive-data-protection.md)**
+   - Documents the secure-by-default environment masking (`[REDACTED]`), fail-closed glob fallback, and quoted logging.
 
-  - エフェメラル（使い捨て）コンテナ上でコマンドを実行し、終了後にクリーンな状態を保つためのライフサイクル管理を説明します。
+3. **[Signal Handling Security](./signal-handling-security.md)**
+   - Details signal validation and Unix/Windows signal constraints to prevent injection of malicious control signals.
 
-### 高度な機能
+## Technical References
 
-1. **[Docker互換フラグ (完了)](./command-line-options.md)**
+- **[Proc-Self-Mountinfo Specification](../references/proc-self-mountinfo.md)**
 
-  - ポート公開、リソース制限（CPU/メモリ）、ユーザー指定など、主要なDocker CLIオプションとの互換性について網羅的に解説します。
-
-2. **[cderunバイナリマウント・ネスト実行 (完了)](./nested-execution.md)**
-
-  - コンテナ内からさらに別のコンテナを起動する「再帰的実行」のサポート。ホストパスの逆解決（Reverse Path Resolution）など、複雑な課題への解決策を示します。
-
-3. **[ドライランモード (完了)](./dry-run-mode.md)**
-
-  - 実際にコンテナを起動することなく、どのような設定で実行されようとしているかをJSON/YAML形式でプレビューする機能です。
-
-4. **[ログ・デバッグ (完了)](./logging-debugging.md)**
-
-  - 内部動作をトレースするための詳細なロギング機能と、問題発生時の調査方法について説明します。
-
-5. **[インタラクティブ・ターミナル (完了)](./interactive-terminal.md)**
-
-  - シグナル（SIGINT等）の転送、TTYのリサイズ同期など、インタラクティブなシェル利用におけるUXの最適化について解説します。
-
-### 管理・デバッグ機能
-
-1. **[バージョン管理 (完了)](./version-management.md)**
-
-  - Git 情報の動的注入 (Tag, SHA, BuildDate)
-  - 詳細な `--version` 出力
-
-### 開発・検証機能
-
-1. **[診断モード (完了)](./diagnosis-mode.md)**
-
-  - システム診断情報と利用可能なツールの表示
-
-### セキュリティ機能
-
-1. **[セキュリティバリデーション (完了)](./security-validations.md)**
-
-  - 文字列の安全性チェック、ツール名の検証、およびマウントターゲットの絶対パス強制について解説します。
-
-2. **[機密情報の保護 (完了)](./sensitive-data-protection.md)**
-
-  - 環境変数のマスキングロジック、ドライラン出力の安全性向上、およびログのクォート処理について説明します。
-
-3. **[シグナルハンドリングのセキュリティ (完了)](./signal-handling-security.md)**
-
-  - コンテナへのシグナル送信時における厳密なシグナル名検証メカニズムについて解説します。
-
-## テストドキュメント
-
-テストに関するドキュメントは [`docs/testing/`](../testing/) を参照すること。
-
-  - [ランタイムテスト](../testing/runtime-tests.md)
-  - [統合テスト](../testing/integration.md)
-  - [テスト構成・網羅性計画](../testing/organization.md)
-  - [テストカバレッジ計測](../testing/coverage.md)
-
-## 技術リファレンス
-
-  - **[/proc/self/mountinfo 仕様](../references/proc-self-mountinfo.md)**
-
-## 機能間の関係
+## Execution Pipeline
 
 ```text
-引数解析 → 優先順位解決 → 中間表現(ContainerConfig)
-                              ↓
-                         ランタイム選択
-                              ↓
-                    直接コンテナ実行(CRI)
-                              ↓
-                         コンテナ起動
+Argument Parsing → Priority Logic → Intermediate Config (ContainerConfig)
+                                                   │
+                                          Runtime Adapter Selection
+                                                   │
+                                        Direct Container Execution
+                                                   │
+                                         Lifecycle & IO Coordination
 ```
-
-## 重要な設計原則
-
-1. **中間表現の使用**: すべての設定を`ContainerConfig`に集約
-
-2. **ランタイム抽象化**: Docker/Podman/containerdを統一インターフェースで扱う
-
-3. **明示的な設定**: デフォルトで安全な動作、必要に応じて明示的に指定
-
-4. **環境の分離**: デフォルトでは環境変数を引き継がない
