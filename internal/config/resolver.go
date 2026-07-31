@@ -1733,7 +1733,10 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateMountSocketPathRaw() error {
-	_, p1Set, p1Val, p2Set, p2Val, _ := fetchFieldAndParams("mount-socket-path", rv.getCliVal())
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", rv.getCliVal())
+	if err != nil {
+		return err
+	}
 	raw := ""
 	if p1Set {
 		raw = p1Val.String()
