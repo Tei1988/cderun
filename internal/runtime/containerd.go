@@ -242,9 +242,10 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		validatedGids = make([]uint32, 0, len(config.GroupAdd))
 		for _, g := range config.GroupAdd {
 			gid64, err := strconv.ParseUint(g, 10, 32)
-			if err == nil {
-				validatedGids = append(validatedGids, uint32(gid64))
+			if err != nil {
+				return "", fmt.Errorf("containerd runtime: invalid GroupAdd GID %q: %w", g, err)
 			}
+			validatedGids = append(validatedGids, uint32(gid64))
 		}
 	}
 
