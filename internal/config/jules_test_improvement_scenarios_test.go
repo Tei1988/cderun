@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Config_jules_ContainsNumericGID(t *testing.T) {
+func TestUnit_Config_ContainsNumericGID_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -35,7 +35,7 @@ func TestUnit_Config_jules_ContainsNumericGID(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_jules_ValidateExposePort(t *testing.T) {
+func TestUnit_Config_ValidateExposePort_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -76,7 +76,7 @@ func TestUnit_Config_jules_ValidateExposePort(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_jules_ValidateNetworkName(t *testing.T) {
+func TestUnit_Config_ValidateNetworkName_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -112,7 +112,7 @@ func TestUnit_Config_jules_ValidateNetworkName(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_jules_ValidateUserName(t *testing.T) {
+func TestUnit_Config_ValidateUserName_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -148,7 +148,7 @@ func TestUnit_Config_jules_ValidateUserName(t *testing.T) {
 	}
 }
 
-func TestUnit_Config_jules_TildeExpansion_Error(t *testing.T) {
+func TestUnit_Config_TildeExpansion_ErrorScenario(t *testing.T) {
 	t.Parallel()
 
 	t.Run("home dir error triggers path resolution failure", func(t *testing.T) {
@@ -166,7 +166,7 @@ func TestUnit_Config_jules_TildeExpansion_Error(t *testing.T) {
 	})
 }
 
-func TestUnit_Config_jules_RecursiveAndNestedExpressions(t *testing.T) {
+func TestUnit_Config_RecursiveAndNestedExpressions_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	t.Run("deep triple nested dynamic evaluation fallback sequence", func(t *testing.T) {

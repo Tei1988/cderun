@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_Command_jules_RapidConsecutiveSignals(t *testing.T) {
+func TestUnit_Command_RapidConsecutiveSignals_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	state := newExecutionState()
@@ -27,7 +27,7 @@ func TestUnit_Command_jules_RapidConsecutiveSignals(t *testing.T) {
 	assert.False(t, forwardImmediate)
 }
 
-func TestUnit_Command_jules_SymlinkMode_CleanedRelativePaths(t *testing.T) {
+func TestUnit_Command_SymlinkMode_CleanedRelativePaths(t *testing.T) {
 	t.Parallel()
 
 	o := &rootOptions{}
@@ -44,7 +44,7 @@ func TestUnit_Command_jules_SymlinkMode_CleanedRelativePaths(t *testing.T) {
 	assert.Equal(t, expected, processed)
 }
 
-func TestUnit_Command_jules_P1Override_ValidationFailure(t *testing.T) {
+func TestUnit_Command_P1Override_ValidationFailure(t *testing.T) {
 	t.Parallel()
 
 	o := &rootOptions{}
@@ -69,7 +69,7 @@ func TestUnit_Command_jules_P1Override_ValidationFailure(t *testing.T) {
 	}
 }
 
-func TestUnit_Command_jules_HangTimeout_NegativeValue(t *testing.T) {
+func TestUnit_Command_HangTimeout_NegativeValue(t *testing.T) {
 	t.Parallel()
 
 	args := []string{"cderun", "--image", "alpine", "sh", "--cderun-hang-timeout=-5s"}
