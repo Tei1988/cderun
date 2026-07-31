@@ -915,6 +915,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		ready := make(chan struct{})
 		go func() {
 			<-started
+			time.Sleep(50 * time.Millisecond)
 			_ = pw.Close()
 		}()
 
