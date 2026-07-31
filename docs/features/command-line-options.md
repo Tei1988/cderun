@@ -567,7 +567,7 @@ cderun --hang-timeout 5s node script.js
 
 ## P1 Internal Overrides (`--cderun-*`)
 
-Every standard command-line flag has a corresponding `--cderun-` prefixed counterpart (e.g., `--cderun-tty`, `--cderun-image`).
+Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOptions`, and `Float64Options` have a corresponding `--cderun-` prefixed counterpart (e.g., `--cderun-tty`, `--cderun-image`).
 
 - **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers.
 - **Hoisting Mechanics**: During argument preprocessing, any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally.

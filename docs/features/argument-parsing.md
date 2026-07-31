@@ -144,11 +144,11 @@ In this mode:
 
 ```bash
 # Executed via symlink 'node':
-node --env DEBUG=app app.js --cderun-env NODE_ENV=production
+node --env DEBUG=app app.js --cderun-env=NODE_ENV=production
 
 # Internal Resolution Workflow:
 # 1. Identifies 'node' as the subcommand from the executable name.
-# 2. Scans and detects '--cderun-env NODE_ENV=production', hoisting it to the front.
+# 2. Scans and detects '--cderun-env=NODE_ENV=production', hoisting it to the front.
 # 3. Keeps '--env DEBUG=app app.js' intact as passthrough arguments.
 # 4. Executes 'node --env DEBUG=app app.js' in the container, applying 'NODE_ENV=production' internally with P1 priority.
 ```

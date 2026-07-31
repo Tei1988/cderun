@@ -171,4 +171,4 @@ To inspect environmental values during debugging, pass `--sensitive-env=""` to d
 
 ### Absolute Path Resolution
 
-All relative paths (such as `./app.js` or relative mount sources) are fully resolved to absolute paths before being rendered in the Dry-Run output.
+Path-valued configuration fields—especially mount sources on the host—are fully resolved to absolute paths before being rendered in the Dry-Run output. Note that raw passthrough command arguments in `ContainerConfig.Command` (such as `./app.js`) are treated as literal command inputs and are not rewritten or converted to absolute paths.

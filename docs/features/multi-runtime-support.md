@@ -24,7 +24,7 @@
 - **Communication Protocol**: Interacts directly with the containerd gRPC API, bypassing Docker/Podman engines for lighter execution.
 - **Limitations**:
   - **Platform Constraint**: **Linux-only** (`//go:build linux` build tags). It is not supported on macOS or Windows, which require virtual machines.
-  - **Networking**: Only supports `host` networking; the default `bridge` networking is unsupported.
+  - **Networking**: Only supports `host` networking. Users **must** explicitly pass `--network host` (or configure `network: host` in configurations), as the default `bridge` network setting is rejected by the containerd adapter.
   - **Port Mappings**: Port publishing (`--publish`, `-p`, `--publish-all`, `-P`) and exposing (`--expose`) are unsupported.
   - **DNS and Host Mappings**: Custom DNS servers (`--dns`) and host-to-IP mappings (`--add-host`) are unsupported.
   - **Mount Types**: Named volumes are unsupported; only `bind` and `tmpfs` mounts are supported.

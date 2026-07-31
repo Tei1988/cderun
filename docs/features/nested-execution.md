@@ -133,10 +133,10 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 
 ### Concrete Example
 
-1. **Level 0 (Base Host)**: User executes `cderun --mount .:/app node`.
+1. **Level 0 (Base Host)**: User executes `cderun --mount type=bind,source=.,target=/app node`.
    - Host Path: `/home/user/project`
    - Container Path (L1): `/app`
-2. **Level 1 (Container)**: Nested execution runs `cderun --mount ./src:/src go build`.
+2. **Level 1 (Container)**: Nested execution runs `cderun --mount type=bind,source=./src,target=/src go build`.
    - Requested Path: `./src`
    - Absolute Container Path (L1): `/app/src`
    - **Reverse Translation**:
@@ -185,7 +185,7 @@ Because macOS uses the Darwin kernel, the host's `cderun` binary cannot execute 
 
 The Group ID (GID) of the container socket inside the macOS Linux VM might not match the user's GID inside the container.
 
-- **Solution**: Find the numeric GID of the socket inside the Linux VM and pass it using the `--cderun-group-add` flag (e.g., `--cderun-group-add 102`) or via the `groupAdd` array in YAML configurations. This grants the container user the necessary permissions to access the socket.
+- **Solution**: Find the numeric GID of the socket inside the Linux VM and pass it using the `--cderun-group-add` flag (e.g., `--cderun-group-add=102`) or via the `groupAdd` array in YAML configurations. This grants the container user the necessary permissions to access the socket.
 
 > **⚠️ Security Warning**:
 > Sharing the container runtime socket (especially with rootful Docker or Podman) grants broad control over the host daemon, representing a high privilege operation. It can lead to container escape or host configuration exposures. This capability should only be shared with trusted container workloads.
