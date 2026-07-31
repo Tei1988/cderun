@@ -30,7 +30,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
@@ -337,36 +337,6 @@ cderun --prune
 
 - **内容**: `internal/config/resolver_test.go` において、`ptr` ヘルパー関数が 11 行目と 1035 行目に二重に定義されており、テストコンパイル時にエラー (`ptr redeclared in this block`) が発生する状態になっている。
 - **対応**: 1035 行目の重複する `ptr` 関数定義を削除することを推奨。 (Recorded by Jules)
-
----
-
-## T24: `--shm-size` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-Puppeteer / Playwright によるブラウザテスト、ML ワークロード（PyTorch DataLoader の共有メモリ）等で `/dev/shm` のサイズ不足が頻発する。Docker デフォルトは 64MB であり、多くのケースで不足する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--shm-size` | string | (Docker デフォルト: 64MB) | `CDERUN_SHM_SIZE` |
-
-- Docker の `--shm-size` と同一形式（例: `256m`, `1g`, `2147483648`）
-- `docker/go-units` の `RAMInBytes` でパース
-- Docker: `HostConfig.ShmSize int64`
-- containerd: OCI spec の `/dev/shm` tmpfs マウントの `size` オプション
-
-### 完了条件
-
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -1113,3 +1083,4 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 ## Documentation Update Tasks
 
 - [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
+- [ ] @jules: Update `docs/features/command-line-options.md`, `docs/features/argument-priority-logic.md`, and `docs/features/configuration-file-support.md` to document the `--shm-size` and `--cderun-shm-size` flags, explaining that it configures `/dev/shm` size, maps to `CDERUN_SHM_SIZE` environment variable, and works across both Docker and containerd.

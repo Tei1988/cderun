@@ -1017,3 +1017,89 @@ func TestUnit_Config_Resolve_ExpressionErrorInDuration(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "file not found")
 }
+
+func TestUnit_Config_Resolve_ShmSize(t *testing.T) {
+	mfs := &MockFileSystem{}
+
+	t.Run("valid shm-size from CLI", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("256m"),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(256*1024*1024), res.ShmSize)
+	})
+
+	t.Run("valid cderun-shm-size priority over shm-size", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:         ptr("alpine"),
+			ShmSize:       ptr("256m"),
+			CderunShmSize: ptr("512m"),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(512*1024*1024), res.ShmSize)
+	})
+
+	t.Run("valid shm-size from environment variable", func(t *testing.T) {
+		cli := &CLIOptions{Image: ptr("alpine")}
+		mfsEnv := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_SHM_SIZE": "1g",
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfsEnv)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1024*1024*1024), res.ShmSize)
+	})
+
+	t.Run("valid shm-size from tool config", func(t *testing.T) {
+		cli := &CLIOptions{Image: ptr("alpine")}
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				ShmSize: "128m",
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(128*1024*1024), res.ShmSize)
+	})
+
+	t.Run("valid shm-size from global config", func(t *testing.T) {
+		cli := &CLIOptions{Image: ptr("alpine")}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				ShmSize: "64m",
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, nil, global, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, int64(64*1024*1024), res.ShmSize)
+	})
+
+	t.Run("invalid shm-size format", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("invalid"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "shm-size", cfgErr.Field)
+	})
+
+	t.Run("negative shm-size limit", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("-256m"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "shm-size", cfgErr.Field)
+		assert.Contains(t, cfgErr.Error(), "invalid size")
+	})
+}

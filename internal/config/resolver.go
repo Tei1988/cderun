@@ -61,6 +61,7 @@ type ResolvedConfig struct {
 	PullMaxRetries  int
 	PullBackoffBase time.Duration
 	Memory          int64
+	ShmSize         int64
 	CPUs            float64
 	Devices         []container.DeviceMapping
 	SensitiveEnv    []string
@@ -153,6 +154,8 @@ type CLIOptions struct {
 	CderunPullBackoffBase    *string
 	Memory                   *string
 	CderunMemory             *string
+	ShmSize                  *string
+	CderunShmSize            *string
 	CPUs                     *float64
 	CderunCPUs               *float64
 	Devices                  []string
@@ -991,6 +994,9 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	case "memory":
 		p1Set, p1Val = getPtrVal(rv.cli.CderunMemory)
 		p2Set, p2Val = getPtrVal(rv.cli.Memory)
+	case "shm-size":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunShmSize)
+		p2Set, p2Val = getPtrVal(rv.cli.ShmSize)
 	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
 		if err != nil {
@@ -1549,6 +1555,13 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
+	// Resolve shm-size via registry
+	if opt, ok := GetStringOption("shm-size"); ok {
+		if err := rv.applyMemoryOption(opt, &rv.res.ShmSize); err != nil {
+			return err
+		}
+	}
+
 	for _, opt := range Float64Options {
 		if err := rv.applyFloat64Option(opt); err != nil {
 			return err
@@ -1699,6 +1712,13 @@ func (rv *resolver) validateCriticalFields() error {
 			Field: "memory",
 			Value: fmt.Sprintf("%d", rv.res.Memory),
 			Err:   errors.New("memory limit cannot be negative"),
+		}
+	}
+	if rv.res.ShmSize < 0 {
+		return &InvalidConfigError{
+			Field: "shm-size",
+			Value: fmt.Sprintf("%d", rv.res.ShmSize),
+			Err:   errors.New("shm-size cannot be negative"),
 		}
 	}
 	if rv.res.CPUs < 0 {

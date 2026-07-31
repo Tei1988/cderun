@@ -119,6 +119,7 @@ type rootOptions struct {
 	entrypoint            []string
 	pull                  string
 	memory                string
+	shmSize               string
 	cpus                  float64
 	devices               []string
 	groupAdd              []string
@@ -136,6 +137,7 @@ type rootOptions struct {
 	cderunEntrypoint      []string
 	cderunPull            string
 	cderunMemory          string
+	cderunShmSize         string
 	cderunCPUs            float64
 	cderunDevices         []string
 	sensitiveEnv          []string
@@ -379,6 +381,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunPullBackoffBase:    opt(cmd.Flags().Changed("cderun-pull-backoff-base"), o.cderunPullBackoffBase),
 		Memory:                   opt(cmd.Flags().Changed("memory"), o.memory),
 		CderunMemory:             opt(cmd.Flags().Changed("cderun-memory"), o.cderunMemory),
+		ShmSize:                  opt(cmd.Flags().Changed("shm-size"), o.shmSize),
+		CderunShmSize:            opt(cmd.Flags().Changed("cderun-shm-size"), o.cderunShmSize),
 		CPUs:                     opt(cmd.Flags().Changed("cpus"), o.cpus),
 		CderunCPUs:               opt(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
 		Devices:                  o.devices,
@@ -556,6 +560,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Pull:       resolved.Pull,
 		Memory:     resolved.Memory,
 		CPUs:       resolved.CPUs,
+		ShmSize:    resolved.ShmSize,
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,
 	}
@@ -692,6 +697,9 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 
 		if maskedContainerConfig.Memory > 0 {
 			_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(maskedContainerConfig.Memory)))
+		}
+		if maskedContainerConfig.ShmSize > 0 {
+			_, _ = fmt.Fprintf(w, "ShmSize: %s\n", units.BytesSize(float64(maskedContainerConfig.ShmSize)))
 		}
 		if maskedContainerConfig.CPUs > 0 {
 			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))

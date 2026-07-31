@@ -294,6 +294,8 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 		return &o.pullBackoffBase, &o.cderunPullBackoffBase
 	case "memory":
 		return &o.memory, &o.cderunMemory
+	case "shm-size":
+		return &o.shmSize, &o.cderunShmSize
 	case "dry-run-format":
 		return &o.dryRunFormat, &o.cderunDryRunFormat
 	case "diagnosis-format":

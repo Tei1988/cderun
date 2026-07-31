@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +89,72 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_Containerd_ShmSize_SpecOpts(t *testing.T) {
+	applyShmSize := func(shmSize int64, s *specs.Spec) {
+		if s.Mounts == nil {
+			s.Mounts = []specs.Mount{}
+		}
+		var found bool
+		for i, m := range s.Mounts {
+			if m.Destination == "/dev/shm" {
+				s.Mounts[i].Type = "tmpfs"
+				s.Mounts[i].Source = "tmpfs"
+				var newOpts []string
+				for _, opt := range m.Options {
+					if !strings.HasPrefix(opt, "size=") {
+						newOpts = append(newOpts, opt)
+					}
+				}
+				newOpts = append(newOpts, fmt.Sprintf("size=%d", shmSize))
+				s.Mounts[i].Options = newOpts
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "tmpfs",
+				Source:      "tmpfs",
+				Destination: "/dev/shm",
+				Options:     []string{"nosuid", "nodev", "noexec", "relatime", fmt.Sprintf("size=%d", shmSize)},
+			})
+		}
+	}
+
+	t.Run("creates new /dev/shm mount if not present", func(t *testing.T) {
+		spec := &specs.Spec{}
+		applyShmSize(256*1024*1024, spec)
+
+		require.Len(t, spec.Mounts, 1)
+		mount := spec.Mounts[0]
+		assert.Equal(t, "/dev/shm", mount.Destination)
+		assert.Equal(t, "tmpfs", mount.Type)
+		assert.Equal(t, "tmpfs", mount.Source)
+		assert.Contains(t, mount.Options, "size=268435456")
+	})
+
+	t.Run("updates existing /dev/shm mount", func(t *testing.T) {
+		spec := &specs.Spec{
+			Mounts: []specs.Mount{
+				{
+					Destination: "/dev/shm",
+					Type:        "tmpfs",
+					Source:      "tmpfs",
+					Options:     []string{"nosuid", "size=64m"},
+				},
+			},
+		}
+		applyShmSize(512*1024*1024, spec)
+
+		require.Len(t, spec.Mounts, 1)
+		mount := spec.Mounts[0]
+		assert.Equal(t, "/dev/shm", mount.Destination)
+		assert.Contains(t, mount.Options, "nosuid")
+		assert.Contains(t, mount.Options, "size=536870912")
+		assert.NotContains(t, mount.Options, "size=64m")
+	})
 }
 
 func TestUnit_Containerd_ValidateConfig(t *testing.T) {
@@ -250,6 +318,14 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative memory limit")
+	})
+
+	t.Run("negative shm-size limit", func(t *testing.T) {
+		_, err := rt.CreateContainer(context.Background(), &container.ContainerConfig{
+			ShmSize: -1,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "negative shm-size limit")
 	})
 
 	t.Run("negative CPU limit", func(t *testing.T) {
