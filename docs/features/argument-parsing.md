@@ -1,167 +1,163 @@
-# 機能仕様：引数解析 (Argument Parsing & Hoisting)
+# Feature Specification: Argument Parsing & Hoisting
 
-`cderun` はラッパーツールであり、cderun自体の動作を定義するフラグと、コンテナ内で実行されるコマンドおよびその引数（パススルー引数）を厳密に区別して解析する仕組みを備えています。
+`cderun` acts as a wrapper tool. It is equipped with an argument parsing mechanism designed to strictly distinguish between flags meant for `cderun` itself and commands/arguments destined to run inside the container (passthrough arguments).
 
-## 基本構文
+---
+
+## Basic Syntax
 
 ```bash
 cderun [cderun-flags] <subcommand> [passthrough-args]
 ```
 
-- **[cderun-flags]**: `cderun` 自体の動作を制御するフラグ。サブコマンドの**前**に置く「標準フラグ（P2）」と、`--cderun-` で始まる「内部オーバーライドフラグ（P1）」に分けられます。
-- **\<subcommand\>**: 最初の非フラグ引数。`.tools.yaml` から設定を読み込むための**キー（Lookup Key）**としてのみ使用され、原則としてコンテナの `CMD` には含まれません。
-- **[passthrough-args]**: サブコマンド以降のすべての引数。コンテナ内で実行されるコマンドの引数（リテラル引数）としてそのまま渡されます。ただし、`--cderun-` フラグが含まれる場合は前方にホイストされます。
+- **[cderun-flags]**: Flags that control the behavior of `cderun`. This includes standard flags (P2) placed **before** the subcommand, and internal overrides (P1) starting with `--cderun-` which can be placed **after** the subcommand.
+- **\<subcommand\>**: The first non-flag argument. It serves as a **Lookup Key** to locate tool configurations within `.tools.yaml` and is not included in the container's execution command by default.
+- **[passthrough-args]**: All arguments following the subcommand. These are forwarded directly as arguments to the container command, except for `--cderun-` overrides which are hoisted to the front.
 
 ---
 
-## イメージ名の決定
+## Container Image Selection Sequence
 
-使用するコンテナイメージは、以下の優先順位で決定されます。詳細な解決プロセスについては、[引数・設定優先順位](./argument-priority-logic.md) を参照してください。
+The container image is selected according to the following precedence hierarchy. For a detailed resolution process, please refer to [Argument & Setting Priority Logic](./argument-priority-logic.md).
 
-1. `--image` / `--cderun-image` フラグ (P1/P2)
-2. `CDERUN_IMAGE` 環境変数 (P3)
-3. `<subcommand>` をキーとして `.tools.yaml` から検索 (P4)
-4. いずれも解決できない場合はエラー終了
+1. `--image` / `--cderun-image` flags (P1/P2)
+2. `CDERUN_IMAGE` environment variable (P3)
+3. Lookup Key `<subcommand>` matches inside `.tools.yaml` (P4)
+4. Failing all of the above, execution aborts with a configuration resolution error.
 
 ---
 
-## コンテナに渡されるコマンド
+## Commands Forwarded to the Container
 
-- `<subcommand>` はキー（Lookup Key）として消費され、コンテナの `CMD` には含まれません。
-- コンテナの `CMD` は、原則として `[passthrough-args]` のみで構成されます。
+- The `<subcommand>` is consumed as a lookup key and is not included in the container's execution command.
+- The execution command executed within the container consists strictly of the `[passthrough-args]`.
 
-### 実行例
+### Execution Examples
 
-- **ケース1: .tools.yaml に設定がある場合**
+- **Case 1: Match Found in `.tools.yaml`**
 
-  `.tools.yaml` に `my-tool: {image: alpine, entrypoint: [/usr/bin/my-tool-impl]}` が記述されている状態で、以下を実行した場合：
+  Given a `.tools.yaml` configuration of `my-tool: {image: alpine, entrypoint: [/usr/bin/my-tool-impl]}`:
 
   ```bash
   cderun my-tool -l -a
   ```
 
-  コンテナ内では `/usr/bin/my-tool-impl -l -a` が実行されます。
+  Within the container, the command executed is `/usr/bin/my-tool-impl -l -a`.
 
-- **ケース2: --image を明示指定する場合**
+- **Case 2: Explicit `--image` and `--entrypoint` supplied**
 
   ```bash
   cderun --image=golang:1.22 --entrypoint=go go --version
   ```
 
-  `go`（サブコマンド）はキーとして消費され、コンテナ内では `go --version` が実行されます。
+  `go` (the subcommand) is consumed as the lookup key. Inside the container, `go --version` is executed.
 
-- **ケース3: イメージが特定できない場合**
+- **Case 3: Unregistered Subcommand without Image Specification**
 
   ```bash
   cderun go --version
   ```
 
-  `.tools.yaml` に `go` の定義がなく、環境変数やフラグによるイメージ指定もない場合はエラーとなります。
+  If `.tools.yaml` does not define `go` and no image is supplied via environment variables or flags, execution immediately fails with a resolution error.
 
 ---
 
-## 境界検出 (Boundary Detection)
+## Boundary Detection
 
-`cderun` は、標準の Cobra パーサーが動く前に独自の前処理（`preprocessArgs`）を実行し、引数リストの中から「サブコマンド」がどこにあるかを特定して境界（Boundary）を決定します。
+Before invoking the standard Cobra flag parser, `cderun` runs a dedicated preprocessing step (`preprocessArgs`) to identify the boundary of the subcommand.
 
-### 1. スキャンとスキップ
+### 1. Sequential Scanning and Skipping
 
-引数リストの先頭から順に走査し、登録された `cderun` の標準フラグ（P2）とその値のペアをスキップしていきます。
+The preprocessor scans the argument list from left to right, skipping standard `cderun` flags (P2) and their values:
 
-- **フラグと値の認識**: フラグが値を必要とする型（例: `--image`, `-w`）であり、かつ `=` を含まない場合（例: `--image alpine`）、次の引数もフラグの一部としてスキップします。
-- **短縮形（Shorthand）の考慮**: `-it` などの短縮形の組み合わせや、`-p 80:80` などの値を必要とする短縮形も正しく判別します。
+- **Flag-Value Association**: If a flag expects an argument (e.g., `--image`, `-w`) and does not use the equals-sign format (e.g., `--image alpine`), the subsequent argument is skipped along with the flag itself.
+- **Shorthand Flags**: Handles combined shorthands (e.g., `-it`) and those requiring arguments (e.g., `-p 80:80`).
 
-### 2. サブコマンドの特定
+### 2. Identifying the Subcommand
 
-このスキャンプロセスで最初に見つかった、登録フラグでもその値ではない「最初の非フラグ引数」が **サブコマンド** と定義されます。
+The first argument encountered during this scan that is neither a registered `cderun` flag nor an associated argument value is designated as the **subcommand**.
 
-### 3. 標準フラグの配置保存 (Preserving Standard Flags Order)
+### 3. Preserving Standard Flags Order
 
-境界検出およびホイスト処理中、標準のP2フラグ（例: `--tty` や `--env`）の相対的な順序や配置は、一切変更・再配列されず、そのまま維持されます。ホイストが適用されるのは、サブコマンドの後ろに配置されたP1内部オーバーライド（`--cderun-*`）のみです。この設計により、下流の Cobra 解析器が標準フラグをユーザーの意図通りの順番で解釈することが保証されます。
+During boundary scanning and preprocessing, the relative order of standard (P2) flags (e.g., `--tty`, `--env`) is strictly preserved and not modified. Only Phase 1 (P1) internal override flags (`--cderun-*`) placed after the subcommand are relocated. This ensures that the downstream Cobra flag parser interprets standard flags in the exact sequence specified by the user.
 
 ---
 
-## P1 内部オーバーライドのホイスト (P1 Overrides Hoisting)
+## Phase 1 (P1) Internal Overrides Hoisting
 
-`--cderun-` で始まるフラグは **「P1 内部オーバーライド（Phase 1 Overrides）」** と呼ばれ、設定解決の最優先順位を持ちます。
+Flags prefixed with `--cderun-` are called **"Phase 1 (P1) Internal Overrides"**, possessing the highest priority in the configuration hierarchy.
 
-### 1. 配置ルール
+### 1. Placement Rule
 
-標準の **Wrapper Mode** では、`--cderun-` フラグは必ず**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に置くと、フラグの所有権の曖昧さを避けるためエラーとなります。
+In standard **Wrapper Mode**, `--cderun-` flags **must** be placed **after** the subcommand. Specifying them before the subcommand is strictly prohibited and triggers an immediate error to ensure clear flag ownership.
 
-### 2. ホイストの仕組み
+### 2. Hoisting Mechanics
 
-前処理（`preprocessArgs`）において、サブコマンドより後ろにある引数の中から `--cderun-` で始まるフラグ群をすべてスキャンし、サブコマンドの**前**へと移動（ホイスト）させます。
-これにより、後ろに置かれた `cderun` 用の引数が、コンテナ内コマンドへのパススルー引数として誤って扱われるのを防ぎます。
+During preprocessing (`preprocessArgs`), the preprocessor scans the argument list behind the subcommand, extracts all `--cderun-` prefixed flags and their values, and prepends (hoists) them before the subcommand. This ensures that these configuration flags are parsed as `cderun` settings instead of being passed to the container command.
 
-#### 値を持つフラグの書式制限 (Equals-Sign Format Requirement)
+#### Equals-Sign Format Constraints for Value-Taking Flags
 
-堅牢かつシンプルな引数解析を実現するため、値を必要とする `--cderun-` フラグ（例：`--cderun-image`）を指定する場合は、**必ずイコール記号 `=` を使用した書式**（例：`--cderun-image=alpine`）で指定する必要があります。
+To guarantee robust, unambiguous preprocessing, any internal override flag that takes a value (e.g., `--cderun-image`, `--cderun-workdir`) **must use the equals-sign format** (e.g., `--cderun-image=alpine`).
 
-値をとる内部オーバーライドフラグ（例：`--cderun-image`）をスペース区切りの書式（例：`--cderun-image alpine`）で指定した場合、前方のフラグが単独でホイストされて下流の解析器が誤動作するのを防ぐため、前処理の段階でエラー（例：`cderun internal override flag "--cderun-image" must use '=' format to specify its value`）として厳格に排除されます。これにより、意図しない引数の消失や誤解析が未然に防止されます。また、`--cderun-tty` などの boolean フラグの後続引数が誤って値として消費されることもありません。
+Specifying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with an explicit validation error (e.g., `cderun internal override flag "--cderun-image" must use '=' format to specify its value`) to prevent accidental hoisting of standalone flags and downstream parser corruption. Boolean override flags (e.g., `--cderun-tty`) require no value and can be hoisted autonomously.
 
-#### ホイスト前後の引数状態の変遷
+#### Preprocessing Transformation Example
 
 ```text
-【実行時の入力】
+[Initial User Input]
 cderun node app.js --cderun-tty --cderun-image=node:20-alpine
 
-【前処理（ホイスト）後】
+[Post-Preprocessing (Hoisted)]
 cderun --cderun-tty --cderun-image=node:20-alpine node app.js
 ```
 
-これにより、Cobra パーサーが実行される時点では、すべての `cderun` 関連フラグが前方に集約され、サブコマンド以降は純粋なパススルー引数のみになります。
+By the time the Cobra parser is invoked, all `cderun`-specific settings are gathered at the front, leaving only pure passthrough arguments following the subcommand.
 
 ---
 
-## ダブルダッシュ (`--`) エスケープへの対応 (Double-Dash Delimiter)
+## Double-Dash (`--`) Delimiter Support
 
-コンテナ内のコマンドに対してリテラル文字列として `--cderun-` プレフィックスの付いた引数（例: `--cderun-tty` という文字列そのもの）を渡したい場合、ホイスト処理が再帰的に動くと不都合が生じます。
+To allow passing literal `--cderun-` strings to the container application (e.g., `echo --cderun-tty`), `cderun` respects the double-dash (`--`) delimiter (end-of-flags marker).
 
-これを防ぐため、`cderun` は特殊なデリミタであるダブルダッシュ（`--`、エンドオブフラグ）を厳密に解釈します。
+### Rules of Behavior
 
-### 挙動のルール
+1. During argument preprocessing scan, if a `--` delimiter is encountered behind the subcommand, **all hoisting of subsequent arguments is deactivated**. The preprocessor continues scanning but leaves all arguments after `--` untouched.
+2. Any `--cderun-` prefixed flags appearing after `--` remain in place and are forwarded to the container literally as passthrough arguments.
 
-1. サブコマンドの後ろ（ポリグロットモードの場合は実行ファイル名以降）の引数リストを走査中に `--` が見つかった場合、**それ以降の引数に対するホイスト（前方移動）処理を停止** します。引数の走査（イテレーション）自体は継続されますが、`--` 以降に出現するすべての引数はホイスト対象から除外され、そのままリテラルのパススルー引数として保持されます。
-2. `--` 以降にある `--cderun-` プレフィックス付き引数もホイストされず、そのままコンテナコマンドへ引き渡されます。
-
-#### エスケープの具体例
+#### Delimiter Escaping Example
 
 ```bash
-# `--` の後ろの '--cderun-tty' はホイストされず、そのまま echo に渡される
+# The '--cderun-tty' following '--' is not hoisted, executing 'echo --cderun-tty' in the container
 cderun echo -- --cderun-tty
 ```
 
-ホイスト処理は `--` を見つけた時点でホイスト動作を停止するため、この時の実際のコンテナ実行は `echo --cderun-tty` となります。
-
 ---
 
-## シンボリックリンクとポリグロットモード (Symlink Mode & Polyglot)
+## Symlink Mode & Polyglot Entry Point
 
-cderun へのシンボリックリンク（例: `node` -> `cderun`）を経由して実行される **Symlink Mode** では、実行されたバイナリ名（`node`）が自動的にサブコマンドとして認識されます。
+When `cderun` is executed via a symbolic link (e.g., `node` -> `cderun`), the base name of the executable (`node`) is automatically detected as the subcommand.
 
-このモードでは：
+In this mode:
 
-- サブコマンド（`node`）の後ろにある引数のうち、**`--cderun-` プレフィックスが付いた P1 フラグのみ** がホイストされます。
-- 標準フラグ名と同名のフラグ（例: `--env`）がサブコマンドの後ろにあっても、それはホイストの対象とならず、コンテナ内のコマンドへのパススルー引数として正しく扱われます。
+- Only `--cderun-` prefixed flags appearing after the executable name are hoisted.
+- Standard flags without the `--cderun-` prefix (such as `--env`) appearing after the executable name are treated as literal passthrough arguments and are forwarded directly to the containerized tool.
 
 ```bash
-# node が cderun へのシンボリックリンクの場合の入力
-node --env DEBUG=app app.js --cderun-env NODE_ENV=production
+# Executed via symlink 'node':
+node --env DEBUG=app app.js --cderun-env=NODE_ENV=production
 
-# 内部解析プロセス
-# 1. 実行名 'node' からサブコマンドを特定
-# 2. '--cderun-env NODE_ENV=production' を検出して前方に移動
-# 3. '--env DEBUG=app app.js' は node のパススルー引数として維持
-# 4. コンテナ内では 'node --env DEBUG=app app.js' が実行され、
-#    cderun 内部の設定としては 'NODE_ENV=production' が P1 優先度で適用される
+# Internal Resolution Workflow:
+# 1. Identifies 'node' as the subcommand from the executable name.
+# 2. Scans and detects '--cderun-env=NODE_ENV=production', hoisting it to the front.
+# 3. Keeps '--env DEBUG=app app.js' intact as passthrough arguments.
+# 4. Executes 'node --env DEBUG=app app.js' in the container, applying 'NODE_ENV=production' internally with P1 priority.
 ```
 
 ---
 
-## テストケース要件
+## Test Scenario Requirements
 
 ```bash
-# 最初の --tty は cderun フラグ (P2)、後の --tty は docker へのパススルー引数
+# The first '--tty' is processed as a cderun flag (P2), while the second '--tty' is passed literally to docker.
 cderun --tty docker --tty
 ```

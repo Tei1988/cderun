@@ -1,61 +1,66 @@
-# ハングタイムアウト (Hang Timeout)
+# Feature Specification: Hang Timeout Protection
 
-このドキュメントでは、`cderun` におけるハングタイムアウトの仕組み、その目的、および動作条件について詳細に説明します。
+This document details the design, configuration, and execution conditions of the automated Hang Timeout Protection mechanism in `cderun`.
 
-## 概要
+---
 
-`cderun` は、コンテナランタイムの予期せぬハングによる実行の停止を防止し、CI環境やバッチ処理における実行の安定性を確保するために、自動終了ロジックを実装しています。
+## Overview
 
-## 動作メカニズム
+In non-interactive or non-TTY environments, container execution can occasionally hang due to network blockages, blocked I/O descriptors, or zombie processes. `cderun` implements an automated termination routine (sending `SIGKILL`) to safeguard CI pipelines and batch jobs from hanging indefinitely.
 
-`cderun` は、ホストの標準入力が端末（TTY）ではない場合、またはインタラクティブモード（`--interactive` / `-i`）が有効ではない場合に、以下のフローでハングを検知し対処します。
+---
 
-1. **並行待機**: コンテナの終了（`WaitContainer`）と IO の完了（`AttachContainer`）を並行して待機します。
-2. **IO 完了の検知**: コンテナからの出力ストリームが閉じられる（EOF 到着）と、IO 待機が終了します。
-3. **猶予期間 (Hang Timeout)**: IO が完了したにもかかわらず、一定の猶予期間内にコンテナが終了しない場合、ハングが発生したとみなします。
-4. **強制終了**: タイムアウト経過後、コンテナがまだ実行中であれば `SIGKILL` を送信して強制終了し、CLI の制御をホストに戻します。
+## Execution and Detection Flow
 
-### 出力の同期猶予期間 (Output Synchronization Grace Period)
+When the host's standard input is not a terminal, or when interactive mode (`--interactive` / `-i`) is disabled, `cderun` uses the following parallel flow to detect and resolve hangs:
 
-コンテナが終了した直後、`cderun` は未処理の出力（stdout/stderr）がストリームに残っている可能性があるため、一律で **5秒間** の猶予期間 (`attachGracePeriod`) を設けて IO の完了を待ちます。この期間内に IO が完了しない場合は、強制的にアタッチ接続を解除します。
+1. **Parallel Monitoring**: The engine starts two concurrent monitoring loops: one waiting for the container's natural exit (`WaitContainer`) and another waiting for the input/output streams to complete (`AttachContainer`).
+2. **I/O Completion Detection**: Once the container's output stream receives EOF (indicating the process has closed its stdout and stderr streams), the I/O monitoring loop completes.
+3. **Hang Timeout Window**: If the container does not naturally exit within a specified grace period after its I/O streams have finished, the engine determines that the execution is hung.
+4. **Enforced Termination**: Upon timeout expiration, if the container remains active, the engine sends a `SIGKILL` signal to terminate the container and returns shell control to the host.
 
-この 5秒間 の猶予期間はハードコードされており、ユーザーが設定可能な `hang-timeout` とは独立して動作します。コンテナ終了後に IO が完了するまでの最大待機時間となります。
+### Output Synchronization Grace Period
 
-## 設定
+To ensure outstanding container outputs are not lost, `cderun` implements a hardcoded **5-second** grace period (`attachGracePeriod`) after the container has exited.
 
-ハングタイムアウトの時間は、以下の全ての経路で変更可能です。
+During this window, the engine attempts to drain any remaining stdout/stderr bytes. If the streams do not close within 5 seconds, the engine deactivates the attach connection to prevent I/O blocking. This grace period operates independently of the user-configured `hang-timeout`.
 
-- **デフォルト値**: `10s` (10秒)
-- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0`）
-  - `0` を指定した場合、コンテナが自然終了するまで無期限に待機します。
-- **P1 フラグ**: `--cderun-hang-timeout`（サブコマンドの後ろに指定）
-- **P2 フラグ**: `--hang-timeout`
-- **P3 環境変数**: `CDERUN_HANG_TIMEOUT`
-- **P4 ツール別設定** (`.tools.yaml`): `hangTimeout` フィールド
-- **P5 グローバルデフォルト** (`.cderun.yaml` defaults): `hangTimeout` フィールド
+---
 
-## 適用条件
+## Configuration
 
-この自動終了ロジック（SIGKILL）は、以下の条件の**いずれか**を満たす場合に適用されます。
+The hang timeout duration can be adjusted using any of the following configuration layers (listed in priority order):
 
-- **ホストの標準入力が端末ではない**（パイプやファイルからのリダイレクトなど）
-- **インタラクティブモード（`--interactive` / `-i`）が有効ではない**
+- **Default Value**: `10s` (10 seconds)
+- **Format**: Go Duration string (e.g., `10s`, `5s`, `0`).
+- **Special Values**: `0` or any negative duration disables the timeout, waiting indefinitely for the container to terminate.
+- **P1 Override**: `--cderun-hang-timeout`
+- **P2 CLI Flag**: `--hang-timeout`
+- **P3 Env Var**: `CDERUN_HANG_TIMEOUT`
+- **P4 Tool Setting** (`.tools.yaml`): `hangTimeout`
+- **P5 Global Defaults** (`.cderun.yaml`): `hangTimeout`
 
-逆に、**ホストの標準入力が端末であり、かつインタラクティブモードが有効である場合**、このロジックは適用されず、コンテナが自然に終了するまで無期限に待機します。
+### Premature Attach Failure Handling
 
-| ホスト標準入力 | `--interactive` / `-i` | 自動終了ロジック |
+If `cderun` encounters a premature communication or attach failure *before* the container naturally exits, the timeout value controls its recovery:
+
+- **If `hangTimeout > 0`**: It initiates the configured countdown and terminates execution if exceeded.
+- **If `hangTimeout <= 0`**: The engine blocks synchronously and waits indefinitely for the container's termination signal (`waitDone` channel) rather than immediately cutting off execution.
+
+---
+
+## Application Matrix
+
+The automated termination routine is applied selectively based on TTY and interactive settings:
+
+| Host STDIN | `--interactive` / `-i` | Hang Timeout Protection |
 | :--- | :--- | :--- |
-| **端末 (TTY)** | **有効** | **適用されない** (SIGKILL 無効) |
-| **端末 (TTY)** | 無効 | **適用される** (SIGKILL 有効) |
-| パイプ / ファイル | 有効 | **適用される** (SIGKILL 有効) |
-| パイプ / ファイル | 無効 | **適用される** (SIGKILL 有効) |
+| **Terminal (TTY)** | **Enabled** | **Deactivated** (Never sends SIGKILL) |
+| **Terminal (TTY)** | Disabled | **Activated** |
+| Pipe or File | Enabled | **Activated** |
+| Pipe or File | Disabled | **Activated** |
 
-### 補足
+### Additional Operational Notes
 
-- **対話型実行**: `cderun -i alpine sh` を端末で実行している場合（かつホストの入力が端末である場合）、ユーザーの入力を待ち続ける必要があるため、タイムアウトによる強制終了は行われません。
-- **非対話型・パイプ実行**: `echo "test" | cderun cat` のような実行や、フラグなしでの実行では、IO 完了後に**デフォルトでは10秒（P1: `--cderun-hang-timeout`, P2: `--hang-timeout`, P3: `CDERUN_HANG_TIMEOUT`, P4: `.tools.yaml` の `hangTimeout`, P5: `.cderun.yaml` の `hangTimeout` で上書き可能、`0` 指定で無期限）**待ってもコンテナが終了しない場合に `SIGKILL` が適用されます。
-
-## 関連ドキュメント
-
-- [標準入力の同期](./stdin-synchronization.md)
-- [コマンドラインオプション](./command-line-options.md)
+- **Interactive Shell Executions**: Running `cderun -i alpine sh` on a terminal deactivates the hang timeout protection, letting the shell remain open indefinitely to receive user input.
+- **Piped Executions**: Running piped operations like `echo "test" | cderun cat` activates hang timeout protection. After input streams close, the container has a maximum of `hang-timeout` duration (default `10s`) to exit before being terminated with `SIGKILL`.
