@@ -354,7 +354,7 @@ func TestUnit_Config_Path_Validators_Coverage(t *testing.T) {
 
 	t.Run("ValidateEnvKey exhaustive", func(t *testing.T) {
 		require.Error(t, ValidateEnvKey(""))
-		assert.NoError(t, ValidateEnvKey("VALID_KEY"))
+		require.NoError(t, ValidateEnvKey("VALID_KEY"))
 		require.Error(t, ValidateEnvKey("INVALID-KEY"))
 	})
 

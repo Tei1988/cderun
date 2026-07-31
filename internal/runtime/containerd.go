@@ -241,8 +241,10 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if len(config.GroupAdd) > 0 {
 		validatedGids = make([]uint32, 0, len(config.GroupAdd))
 		for _, g := range config.GroupAdd {
-			gid64, _ := strconv.ParseUint(g, 10, 32)
-			validatedGids = append(validatedGids, uint32(gid64))
+			gid64, err := strconv.ParseUint(g, 10, 32)
+			if err == nil {
+				validatedGids = append(validatedGids, uint32(gid64))
+			}
 		}
 	}
 

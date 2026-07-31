@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -532,8 +533,7 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 
 	var merged CDERunConfig
 	var loadedPaths []string
-	for i := len(paths) - 1; i >= 0; i-- {
-		path := paths[i]
+	for _, path := range slices.Backward(paths) {
 		baseDir := filepath.Dir(path)
 		data, err := l.fs.ReadFile(path)
 		if err != nil {
@@ -577,8 +577,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 	merged := make(ToolsConfig)
 	var loadedPaths []string
-	for i := len(paths) - 1; i >= 0; i-- {
-		path := paths[i]
+	for _, path := range slices.Backward(paths) {
 		baseDir := filepath.Dir(path)
 		data, err := l.fs.ReadFile(path)
 		if err != nil {

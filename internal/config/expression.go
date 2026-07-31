@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -61,8 +62,7 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 
 	res := buf[:0]
 	lastStart := len(s) + 1
-	for i := len(allPairs) - 1; i >= 0; i-- {
-		p := allPairs[i]
+	for _, p := range slices.Backward(allPairs) {
 		if p.end <= lastStart {
 			res = append(res, p)
 			lastStart = p.start
