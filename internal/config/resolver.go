@@ -1616,6 +1616,25 @@ func (rv *resolver) validateSecurity() error {
 		} else if len(found) > 0 {
 			logging.Warn("Highly privileged capability %v detected in CapAdd. Please consider minimizing privileges.", found)
 		}
+		if rv.res.Network == "host" {
+			logging.Warn("Container is running with host network mode enabled. This disables network isolation and may expose host network services to the container.")
+		}
+		for _, m := range rv.res.Mounts {
+			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
+				cleanSource := path.Clean(m.Source)
+				sensitivePaths := []string{"/boot", "/dev", "/etc", "/proc", "/sys"}
+				isSensitive := cleanSource == "/"
+				for _, p := range sensitivePaths {
+					if cleanSource == p || strings.HasPrefix(cleanSource, p+"/") {
+						isSensitive = true
+						break
+					}
+				}
+				if isSensitive {
+					logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
+				}
+			}
+		}
 	}
 	if rv.res.MountSocket {
 		if logging.Enabled(logging.WarnLevel) {
