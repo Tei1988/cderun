@@ -369,6 +369,7 @@ cderun --privileged alpine ls /dev
 - **Environment Variable**: `CDERUN_READ_ONLY`
 - **Description**: Mount the container's root filesystem as read-only.
 - **Details**: Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI specification.
+- **P1 Internal Override**: `--cderun-read-only` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine touch /test-write --cderun-read-only`).
 
 ```bash
 cderun --read-only alpine touch /test-write
