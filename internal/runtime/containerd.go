@@ -685,12 +685,7 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 }
 
 // UpdateShmSize mutates specs.Spec to configure the /dev/shm tmpfs mount.
-// @jules review helper.
 func UpdateShmSize(s *specs.Spec, shmSize int64) {
-	if s.Mounts == nil {
-		s.Mounts = []specs.Mount{}
-	}
-
 	// Remove every matching /dev/shm mount to give configured ShmSize precedence
 	var filtered []specs.Mount
 	for _, m := range s.Mounts {
