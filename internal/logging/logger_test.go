@@ -144,9 +144,9 @@ func TestUnit_Logging_SanitizeLogString(t *testing.T) {
 			expected: "hello world 123",
 		},
 		{
-			name:     "contains carriage returns, tabs, and newlines (allowed)",
+			name:     "contains carriage returns, tabs, and newlines (carriage returns and newlines escaped, tabs allowed)",
 			input:    "line1\n\rline2\tline3",
-			expected: "line1\n\rline2\tline3",
+			expected: "line1\\x0a\\x0dline2\tline3",
 		},
 		{
 			name:     "contains escape sequences and delete",

@@ -1607,6 +1607,9 @@ func (rv *resolver) validateSecurity() error {
 		"AUDIT_CONTROL":        true,
 		"MAC_ADMIN":            true,
 		"MAC_OVERRIDE":         true,
+		"BPF":                  true,
+		"PERFMON":              true,
+		"CHECKPOINT_RESTORE":   true,
 		"CAP_ALL":              true,
 		"CAP_SYS_ADMIN":        true,
 		"CAP_NET_ADMIN":        true,
@@ -1627,6 +1630,9 @@ func (rv *resolver) validateSecurity() error {
 		"CAP_AUDIT_CONTROL":    true,
 		"CAP_MAC_ADMIN":        true,
 		"CAP_MAC_OVERRIDE":     true,
+		"CAP_BPF":              true,
+		"CAP_PERFMON":          true,
+		"CAP_CHECKPOINT_RESTORE": true,
 	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {

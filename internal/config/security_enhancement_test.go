@@ -323,6 +323,12 @@ func TestUnit_Config_Resolver_ExpandedPrivilegedCapWarnings(t *testing.T) {
 		{"AUDIT_CONTROL"},
 		{"MAC_ADMIN"},
 		{"MAC_OVERRIDE"},
+		{"BPF"},
+		{"PERFMON"},
+		{"CHECKPOINT_RESTORE"},
+		{"CAP_BPF"},
+		{"CAP_PERFMON"},
+		{"CAP_CHECKPOINT_RESTORE"},
 	}
 
 	for _, tt := range tests {
