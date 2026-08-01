@@ -1106,10 +1106,6 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 
 	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, cc.Interactive, resolved)
 
-	type waitResult struct {
-		code int
-		err  error
-	}
 	waitDone := make(chan waitResult, 1)
 	go func() {
 		code, err := rt.WaitContainer(ctx, containerID)
@@ -1128,87 +1124,23 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 
 		// After container exits, wait a short grace period for remaining output
 		if !att.attachDoneConsumed {
-			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
-			select {
-			case err := <-att.attachDone:
-				if err != nil && !errors.Is(err, context.Canceled) {
-					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-					code := exitCode
-					if code == 0 {
-						code = 125
-					}
-					return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
-				}
-				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-			case <-time.After(o.attachGracePeriod):
-				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-				att.cancelAttach()
-				<-att.attachDone
+			if err := o.drainRemainingOutput(containerID, exitCode, att); err != nil {
+				return exitCode, err
 			}
 		}
 
 	case err := <-att.attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
-			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
-			// Wait for container to finish (best effort)
-			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
-			// until it finishes, the timeout expires, or a second signal is received.
-			if effectiveHangTimeout > 0 {
-				select {
-				case res := <-waitDone:
-					exitCode = res.code
-				case <-time.After(effectiveHangTimeout):
-					o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
-				}
-			} else {
-				res := <-waitDone
-				exitCode = res.code
-			}
-			code := exitCode
-			if code == 0 {
-				code = 125
-			}
-			return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
+			return o.handleAttachErrorBeforeExit(containerID, err, effectiveHangTimeout, waitDone)
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
 
 		// IO finished before container exited.
 		if !isHostStdinTerminal || !cc.Interactive {
-			if effectiveHangTimeout > 0 {
-				o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
-				select {
-				case result := <-waitDone:
-					if result.err != nil {
-						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
-					}
-					exitCode = result.code
-				case <-time.After(effectiveHangTimeout):
-					killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer killCancel()
-					var err error
-					exitCode, err = o.signalKillIfRunning(killCtx, rt, containerID)
-					if err != nil {
-						return 0, err
-					}
-					select {
-					case result := <-waitDone:
-						exitCode = result.code
-					case <-time.After(effectiveHangTimeout):
-						code := exitCode
-						if code == 0 {
-							code = 125
-						}
-						return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
-					}
-				}
-			} else {
-				// effectiveHangTimeout is 0, wait indefinitely
-				o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
-				result := <-waitDone
-				if result.err != nil {
-					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
-				}
-				exitCode = result.code
+			var err error
+			exitCode, err = o.handleIOFinishedBeforeExit(ctx, rt, containerID, effectiveHangTimeout, waitDone)
+			if err != nil {
+				return exitCode, err
 			}
 		} else {
 			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
