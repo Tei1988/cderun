@@ -77,6 +77,17 @@ func BenchmarkMaskSensitiveEnv(b *testing.B) {
 }
 
 func BenchmarkMaskSensitiveEnv_WithPatterns(b *testing.B) {
+	b.Run("ExactMatch", func(b *testing.B) {
+		b.ReportAllocs()
+		key := "DB_PASSWORD"
+		val := "my-secret-password"
+		patterns := []string{"DB_PASSWORD", "DB_KEY", "DB_TOKEN"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnv(key, val, patterns)
+		}
+	})
+
 	b.Run("UppercaseFastPath", func(b *testing.B) {
 		b.ReportAllocs()
 		key := "DB_PASSWORD_SECRET_TOKEN"
@@ -101,6 +112,56 @@ func BenchmarkMaskSensitiveEnv_WithPatterns(b *testing.B) {
 }
 
 func BenchmarkMaskSensitiveEnvList_WithPatterns(b *testing.B) {
+	b.Run("NilPatterns", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"DB_PASSWORD=my-secret-password",
+			"DB_KEY=admin",
+			"NORMAL_VAR=value",
+			"ANOTHER_NORMAL_VAR=another-value",
+			"PORT=8080",
+			"HOST=localhost",
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, nil)
+		}
+	})
+
+	b.Run("EmptyPatterns", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"DB_PASSWORD=my-secret-password",
+			"DB_KEY=admin",
+			"NORMAL_VAR=value",
+			"ANOTHER_NORMAL_VAR=another-value",
+			"PORT=8080",
+			"HOST=localhost",
+		}
+		patterns := []string{}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, patterns)
+		}
+	})
+
+	b.Run("ExactMatch", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"DB_PASSWORD=my-secret-password",
+			"DB_KEY=admin",
+			"NORMAL_VAR=value",
+			"ANOTHER_NORMAL_VAR=another-value",
+			"PORT=8080",
+			"HOST=localhost",
+		}
+		patterns := []string{"DB_PASSWORD", "DB_KEY", "DB_TOKEN"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, patterns)
+		}
+	})
+
 	b.Run("UppercaseFastPath", func(b *testing.B) {
 		b.ReportAllocs()
 		env := []string{

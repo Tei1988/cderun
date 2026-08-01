@@ -36,22 +36,39 @@ func MaskSensitiveEnv(key, value string, patterns []string) string {
 
 	// Mode 3: patterns provided -> Mask matching keys
 	// Matching is case-insensitive for patterns and keys.
-	upperKey := key
-	if !isUpper(key) {
-		upperKey = strings.ToUpper(key)
-	}
+	var upperKey string
+	var upperKeyInitialized bool
+
 	for _, p := range patterns {
-		upperPattern := p
-		if !isUpper(p) {
-			upperPattern = strings.ToUpper(p)
-		}
-		matched, err := path.Match(upperPattern, upperKey)
-		if err != nil {
-			// Fail-closed: if the pattern is invalid, we redact to be safe.
-			return "[REDACTED]"
-		}
-		if matched {
-			return "[REDACTED]"
+		// Optimization: if pattern does not contain glob characters,
+		// we can perform a case-insensitive exact match using strings.EqualFold.
+		// This avoids allocating uppercase strings for 'key' or 'p'.
+		if !strings.ContainsAny(p, "*?[\\") {
+			if strings.EqualFold(key, p) {
+				return "[REDACTED]"
+			}
+		} else {
+			// If it's a glob pattern, fall back to path.Match.
+			// Lazily initialize upperKey only when a glob pattern is encountered.
+			if !upperKeyInitialized {
+				upperKey = key
+				if !isUpper(key) {
+					upperKey = strings.ToUpper(key)
+				}
+				upperKeyInitialized = true
+			}
+			upperPattern := p
+			if !isUpper(p) {
+				upperPattern = strings.ToUpper(p)
+			}
+			matched, err := path.Match(upperPattern, upperKey)
+			if err != nil {
+				// Fail-closed: if the pattern is invalid, we redact to be safe.
+				return "[REDACTED]"
+			}
+			if matched {
+				return "[REDACTED]"
+			}
 		}
 	}
 
@@ -75,19 +92,35 @@ func maskSensitiveEnvWithUpperPatterns(key, value string, patterns, upperPattern
 
 	// Mode 3: patterns provided -> Mask matching keys
 	// Matching is case-insensitive for patterns and keys.
-	upperKey := key
-	if !isUpper(key) {
-		upperKey = strings.ToUpper(key)
-	}
+	var upperKey string
+	var upperKeyInitialized bool
+
 	for i := range patterns {
-		upperPattern := upperPatterns[i]
-		matched, err := path.Match(upperPattern, upperKey)
-		if err != nil {
-			// Fail-closed: if the pattern is invalid, we redact to be safe.
-			return "[REDACTED]"
-		}
-		if matched {
-			return "[REDACTED]"
+		p := patterns[i]
+		// Optimization: if pattern does not contain glob characters,
+		// use strings.EqualFold to bypass allocations entirely.
+		if !strings.ContainsAny(p, "*?[\\") {
+			if strings.EqualFold(key, p) {
+				return "[REDACTED]"
+			}
+		} else {
+			// Lazily initialize upperKey only when a glob pattern is encountered.
+			if !upperKeyInitialized {
+				upperKey = key
+				if !isUpper(key) {
+					upperKey = strings.ToUpper(key)
+				}
+				upperKeyInitialized = true
+			}
+			upperPattern := upperPatterns[i]
+			matched, err := path.Match(upperPattern, upperKey)
+			if err != nil {
+				// Fail-closed: if the pattern is invalid, we redact to be safe.
+				return "[REDACTED]"
+			}
+			if matched {
+				return "[REDACTED]"
+			}
 		}
 	}
 
@@ -99,6 +132,13 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	if env == nil {
 		return nil
 	}
+
+	// Mode 2 Fast Path: patterns is non-nil but empty -> Mask nothing.
+	// We can safely return the original slice directly, saving allocations and matching logic.
+	if patterns != nil && len(patterns) == 0 {
+		return env
+	}
+
 	upperPatterns := patterns
 	if len(patterns) > 0 {
 		var copied []string
