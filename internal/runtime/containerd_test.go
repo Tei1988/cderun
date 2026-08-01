@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strings"
 	"testing"
 	"time"
 
@@ -91,41 +90,11 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+// @jules TestUnit_Containerd_ShmSize_SpecOpts exercises the extracted package-level UpdateShmSize helper.
 func TestUnit_Containerd_ShmSize_SpecOpts(t *testing.T) {
-	applyShmSize := func(shmSize int64, s *specs.Spec) {
-		if s.Mounts == nil {
-			s.Mounts = []specs.Mount{}
-		}
-		var found bool
-		for i, m := range s.Mounts {
-			if m.Destination == "/dev/shm" {
-				s.Mounts[i].Type = "tmpfs"
-				s.Mounts[i].Source = "tmpfs"
-				var newOpts []string
-				for _, opt := range m.Options {
-					if !strings.HasPrefix(opt, "size=") {
-						newOpts = append(newOpts, opt)
-					}
-				}
-				newOpts = append(newOpts, fmt.Sprintf("size=%d", shmSize))
-				s.Mounts[i].Options = newOpts
-				found = true
-				break
-			}
-		}
-		if !found {
-			s.Mounts = append(s.Mounts, specs.Mount{
-				Type:        "tmpfs",
-				Source:      "tmpfs",
-				Destination: "/dev/shm",
-				Options:     []string{"nosuid", "nodev", "noexec", "relatime", fmt.Sprintf("size=%d", shmSize)},
-			})
-		}
-	}
-
 	t.Run("creates new /dev/shm mount if not present", func(t *testing.T) {
 		spec := &specs.Spec{}
-		applyShmSize(256*1024*1024, spec)
+		UpdateShmSize(spec, 256*1024*1024)
 
 		require.Len(t, spec.Mounts, 1)
 		mount := spec.Mounts[0]
@@ -146,7 +115,7 @@ func TestUnit_Containerd_ShmSize_SpecOpts(t *testing.T) {
 				},
 			},
 		}
-		applyShmSize(512*1024*1024, spec)
+		UpdateShmSize(spec, 512*1024*1024)
 
 		require.Len(t, spec.Mounts, 1)
 		mount := spec.Mounts[0]
