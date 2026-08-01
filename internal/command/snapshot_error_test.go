@@ -86,7 +86,7 @@ func TestUnit_Snapshot_ErrorHandling(t *testing.T) {
 		cmd.SetErr(&logBuf) // Redirect command's stderr to our buffer
 
 		// Normal command, no explicit nested flags.
-		cmd.SetArgs([]string{"--image", "alpine", "node", "--version"})
+		cmd.SetArgs([]string{"--log-level", "warn", "--image", "alpine", "node", "--version"})
 
 		err := cmd.ExecuteContext(context.Background())
 		// Should NOT return an error because it's only a warning for implicit propagation

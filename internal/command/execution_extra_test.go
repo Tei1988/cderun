@@ -136,10 +136,10 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutZero(t *testing.T) {
 
 	var exitErr *ExitCodeError
 	require.ErrorAs(t, err, &exitErr)
-	// Even though attach failed, it should wait for container exit code (42),
+	// Even though attach failed (downgraded to warning), it should wait for container exit code (42),
 	// and propagate 42 (non-zero).
 	assert.Equal(t, 42, exitErr.Code)
-	assert.Contains(t, exitErr.Error(), "failed to attach to container")
+	assert.Nil(t, exitErr.Err)
 }
 
 func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T) {
@@ -176,10 +176,7 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 		cmd.SetErr(io.Discard)
 	})
 
-	var exitErr *ExitCodeError
-	require.ErrorAs(t, err, &exitErr)
-	// Because 50ms hang timeout fired before 1s container exit, exitCode remains 0 initially,
-	// so the error code falls back to 125.
-	assert.Equal(t, 125, exitErr.Code)
-	assert.Contains(t, exitErr.Error(), "failed to attach to container")
+	// Because 50ms hang timeout fired before 1s container exit, and attach failure is downgraded to warning,
+	// the runner exits gracefully with nil error.
+	require.NoError(t, err)
 }

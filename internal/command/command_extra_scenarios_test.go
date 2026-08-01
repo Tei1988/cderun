@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -20,8 +21,8 @@ import (
 )
 
 // TestUnit_Command_WrapperMode_DoubleDashLiteralArgs validates that arguments
-// placed after a double dash `--` are NOT hoisted as P1 internal overrides
-// even if they start with `--cderun-`.
+// placed after a double dash `--` are STILL hoisted as P1 internal overrides
+// if they start with `--cderun-`.
 func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 	t.Parallel()
 
@@ -51,11 +52,11 @@ func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
 
-		// Image should NOT be overridden to node:20 because it was after `--`
-		assert.Equal(t, "alpine", cfg.Image)
+		// Image should be overridden to node:20 because it was hoisted
+		assert.Equal(t, "node:20", cfg.Image)
 
-		// Command should preserve `--` and all subsequent arguments literally
-		assert.Equal(t, []string{"--", "--cderun-tty", "--cderun-image=node:20"}, cfg.Command)
+		// Command should contain only "--" because the --cderun- flags were hoisted
+		assert.Equal(t, []string{"--"}, cfg.Command)
 	})
 }
 
@@ -237,14 +238,20 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	o := &rootOptions{logger: &logging.Logger{}}
 
 	t.Run("Signal fails and returns structured exit code error", func(t *testing.T) {
+		var stderrBuf bytes.Buffer
+		logger := logging.NewLogger()
+		logger.Init("warn", "text", false)
+		logger.SetOutput(&stderrBuf)
+		oOpts := &rootOptions{logger: logger}
+
 		mockRuntime := &cmdTerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failure warning")},
 			isRunning:   true,
 		}
 
-		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to force terminate container: signal failure warning")
+		_, err := oOpts.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
+		require.NoError(t, err)
+		assert.Contains(t, stderrBuf.String(), "failed to force terminate container: signal failure warning")
 		assert.Equal(t, "cont-force-kill-fail", mockRuntime.signaledID)
 		assert.Equal(t, "SIGKILL", mockRuntime.signaledSig)
 	})

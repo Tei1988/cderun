@@ -115,21 +115,15 @@ By the time the Cobra parser is invoked, all `cderun`-specific settings are gath
 
 ---
 
-## Double-Dash (`--`) Delimiter Support
+## Double-Dash (`--`) Hoisting Exemption (Not Supported)
 
-To allow passing literal `--cderun-` strings to the container application (e.g., `echo --cderun-tty`), `cderun` respects the double-dash (`--`) delimiter (end-of-flags marker).
+To simplify argument parsing and avoid semantic ambiguity with shell-native and application-specific option delimiters, `cderun` does **NOT** support double-dash (`--`) for stopping or exempting arguments from hoisting.
 
 ### Rules of Behavior
 
-1. During argument preprocessing scan, if a `--` delimiter is encountered behind the subcommand, **all hoisting of subsequent arguments is deactivated**. The preprocessor continues scanning but leaves all arguments after `--` untouched.
-2. Any `--cderun-` prefixed flags appearing after `--` remain in place and are forwarded to the container literally as passthrough arguments.
-
-#### Delimiter Escaping Example
-
-```bash
-# The '--cderun-tty' following '--' is not hoisted, executing 'echo --cderun-tty' in the container
-cderun echo -- --cderun-tty
-```
+1. **No Delimiter Exemption**: The argument preprocessor scans the entire list of arguments following the subcommand. It does not treat a double-dash (`--`) as a barrier to stop the extraction of `--cderun-` prefixed flags.
+2. **Always Hoisted**: Any `--cderun-` prefixed flags appearing anywhere in the argument list (even after a `--` delimiter) are **always** hoisted to the front of the command as part of `cderun`'s configuration parsing.
+3. **No Double-Dash Hoisting Prevention**: This design ensures robust, predictable hoisting behavior that remains independent of shell-level option interpretation. Future modifications are prohibited from introducing double-dash hoisting-prevention mechanisms to maintain maximum parsing simplicity.
 
 ---
 

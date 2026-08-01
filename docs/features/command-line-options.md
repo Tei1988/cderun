@@ -545,7 +545,7 @@ cderun --hang-timeout 5s node script.js
 ### `--log-level`
 
 - **Type**: string
-- **Default**: `warn`
+- **Default**: `error`
 - **Environment Variable**: `CDERUN_LOG_LEVEL`
 - **Supported Values**: `error`, `warn`, `warning` (alias), `info`, `debug`, `trace`.
 
