@@ -684,34 +684,27 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 	return args, nil
 }
 
-// @jules UpdateShmSize mutates specs.Spec to configure the /dev/shm tmpfs mount.
+// UpdateShmSize mutates specs.Spec to configure the /dev/shm tmpfs mount.
+// @jules review helper.
 func UpdateShmSize(s *specs.Spec, shmSize int64) {
 	if s.Mounts == nil {
 		s.Mounts = []specs.Mount{}
 	}
-	var found bool
-	for i, m := range s.Mounts {
-		if m.Destination == "/dev/shm" {
-			s.Mounts[i].Type = "tmpfs"
-			s.Mounts[i].Source = "tmpfs"
-			var newOpts []string
-			for _, opt := range m.Options {
-				if !strings.HasPrefix(opt, "size=") {
-					newOpts = append(newOpts, opt)
-				}
-			}
-			newOpts = append(newOpts, fmt.Sprintf("size=%d", shmSize))
-			s.Mounts[i].Options = newOpts
-			found = true
-			break
+
+	// Remove every matching /dev/shm mount to give configured ShmSize precedence
+	var filtered []specs.Mount
+	for _, m := range s.Mounts {
+		if m.Destination != "/dev/shm" {
+			filtered = append(filtered, m)
 		}
 	}
-	if !found {
-		s.Mounts = append(s.Mounts, specs.Mount{
-			Type:        "tmpfs",
-			Source:      "tmpfs",
-			Destination: "/dev/shm",
-			Options:     []string{"nosuid", "nodev", "noexec", "relatime", fmt.Sprintf("size=%d", shmSize)},
-		})
-	}
+	s.Mounts = filtered
+
+	// Add one sanitized tmpfs mount with the configured size
+	s.Mounts = append(s.Mounts, specs.Mount{
+		Type:        "tmpfs",
+		Source:      "tmpfs",
+		Destination: "/dev/shm",
+		Options:     []string{"nosuid", "nodev", "noexec", "relatime", fmt.Sprintf("size=%d", shmSize)},
+	})
 }

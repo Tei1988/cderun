@@ -122,7 +122,39 @@ func TestUnit_Containerd_ShmSize_SpecOpts(t *testing.T) {
 		assert.Equal(t, "/dev/shm", mount.Destination)
 		assert.Contains(t, mount.Options, "nosuid")
 		assert.Contains(t, mount.Options, "size=536870912")
-		assert.NotContains(t, mount.Options, "size=64m")
+	})
+
+	t.Run("updates existing /dev/shm mount by replacing all matching mounts", func(t *testing.T) {
+		spec := &specs.Spec{
+			Mounts: []specs.Mount{
+				{
+					Destination: "/dev/shm",
+					Type:        "tmpfs",
+					Source:      "tmpfs",
+					Options:     []string{"size=64m"},
+				},
+				{
+					Destination: "/dev/shm",
+					Type:        "tmpfs",
+					Source:      "tmpfs",
+					Options:     []string{"size=128m"},
+				},
+				{
+					Destination: "/var",
+					Type:        "bind",
+					Source:      "/var",
+				},
+			},
+		}
+		UpdateShmSize(spec, 512*1024*1024)
+
+		// Verifying only the configured mount remains for /dev/shm, while other mounts like /var are preserved.
+		require.Len(t, spec.Mounts, 2)
+		assert.Equal(t, "/var", spec.Mounts[0].Destination)
+
+		shmMount := spec.Mounts[1]
+		assert.Equal(t, "/dev/shm", shmMount.Destination)
+		assert.Contains(t, shmMount.Options, "size=536870912")
 	})
 }
 
