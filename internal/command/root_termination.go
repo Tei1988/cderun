@@ -29,6 +29,13 @@ func (o *rootOptions) getHangTimeout(isHostStdinTerminal bool, interactive bool,
 	return hangTimeout
 }
 
+func fallbackExitCode(code int) int {
+	if code == 0 {
+		return 125
+	}
+	return code
+}
+
 func (o *rootOptions) signalKillIfRunning(ctx context.Context, rt runtime.ContainerRuntime, containerID string) (int, error) {
 	isRunning, exitCode, err := rt.InspectContainer(ctx, containerID)
 	if err != nil {
@@ -45,11 +52,7 @@ func (o *rootOptions) signalKillIfRunning(ctx context.Context, rt runtime.Contai
 	o.logger.Debug("Container %s still running, forcing termination", containerID)
 	if err := rt.SignalContainer(ctx, containerID, "SIGKILL"); err != nil {
 		o.logger.Debug("failed to force terminate container %s: %v", containerID, err)
-		code := exitCode
-		if code == 0 {
-			code = 125
-		}
-		return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to force terminate container: %w", err)}
+		return exitCode, &ExitCodeError{Code: fallbackExitCode(exitCode), Err: fmt.Errorf("failed to force terminate container: %w", err)}
 	}
 
 	// SIGKILL is sent asynchronously. The caller should wait for the container to exit if needed.
@@ -63,11 +66,7 @@ func (o *rootOptions) drainRemainingOutput(containerID string, exitCode int, att
 	case err := <-att.attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
 			o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-			code := exitCode
-			if code == 0 {
-				code = 125
-			}
-			return &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
+			return &ExitCodeError{Code: fallbackExitCode(exitCode), Err: fmt.Errorf("failed to attach to container: %w", err)}
 		}
 		o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 	case <-time.After(o.attachGracePeriod):
@@ -85,22 +84,27 @@ func (o *rootOptions) handleAttachErrorBeforeExit(containerID string, err error,
 	// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
 	// until it finishes, the timeout expires, or a second signal is received.
 	var exitCode int
+	var waitErr error
 	if effectiveHangTimeout > 0 {
 		select {
 		case res := <-waitDone:
 			exitCode = res.code
+			waitErr = res.err
 		case <-time.After(effectiveHangTimeout):
 			o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
 		}
 	} else {
 		res := <-waitDone
 		exitCode = res.code
+		waitErr = res.err
 	}
-	code := exitCode
-	if code == 0 {
-		code = 125
+
+	errReason := fmt.Errorf("failed to attach to container: %w", err)
+	if waitErr != nil {
+		errReason = fmt.Errorf("failed to attach to container: %v; wait failed: %w", err, waitErr)
 	}
-	return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
+
+	return exitCode, &ExitCodeError{Code: fallbackExitCode(exitCode), Err: errReason}
 }
 
 // handleIOFinishedBeforeExit handles the case where AttachContainer finished before WaitContainer.
@@ -124,13 +128,12 @@ func (o *rootOptions) handleIOFinishedBeforeExit(ctx context.Context, rt runtime
 			}
 			select {
 			case result := <-waitDone:
+				if result.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+				}
 				exitCode = result.code
 			case <-time.After(effectiveHangTimeout):
-				code := exitCode
-				if code == 0 {
-					code = 125
-				}
-				return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
+				return exitCode, &ExitCodeError{Code: fallbackExitCode(exitCode), Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
 			}
 		}
 	} else {
