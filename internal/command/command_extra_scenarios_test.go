@@ -246,6 +246,7 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to force terminate container: signal failure warning")
 		assert.Equal(t, "cont-force-kill-fail", mockRuntime.signaledID)
+		assert.Equal(t, "SIGKILL", mockRuntime.signaledSig)
 	})
 
 	t.Run("Signal succeeds without error", func(t *testing.T) {
@@ -257,6 +258,7 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-success")
 		require.NoError(t, err)
 		assert.Equal(t, "cont-force-kill-success", mockRuntime.signaledID)
+		assert.Equal(t, "SIGKILL", mockRuntime.signaledSig)
 	})
 }
 
@@ -300,16 +302,25 @@ func TestUnit_Command_Robustness_MultipleRapidSignals(t *testing.T) {
 	}()
 
 	// Wait until signal channel is captured
-	assert.Eventually(t, func() bool {
+	ok := assert.Eventually(t, func() bool {
 		sigChanMu.Lock()
 		defer sigChanMu.Unlock()
 		return capturedSigChan != nil
 	}, 2*time.Second, 10*time.Millisecond)
+	require.True(t, ok, "timed out waiting for signal channel to be captured")
+
+	var ch chan os.Signal
+	sigChanMu.Lock()
+	ch = capturedSigChan
+	sigChanMu.Unlock()
+	require.NotNil(t, ch, "captured signal channel must not be nil")
 
 	// Send first SIGINT - should be forwarded (firstSignal is consumed)
-	sigChanMu.Lock()
-	capturedSigChan <- syscall.SIGINT
-	sigChanMu.Unlock()
+	select {
+	case ch <- syscall.SIGINT:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out sending first SIGINT")
+	}
 
 	// Verify it was forwarded to container
 	assert.Eventually(t, func() bool {
@@ -323,9 +334,11 @@ func TestUnit_Command_Robustness_MultipleRapidSignals(t *testing.T) {
 	mockRuntime.mu.Unlock()
 
 	// Send second SIGINT - should trigger host context cancellation via HandleSignal
-	sigChanMu.Lock()
-	capturedSigChan <- syscall.SIGINT
-	sigChanMu.Unlock()
+	select {
+	case ch <- syscall.SIGINT:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out sending second SIGINT")
+	}
 
 	// Wait for execution to finish
 	select {
@@ -377,8 +390,9 @@ func (m *cmdHangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string
 
 type cmdTerminationMockRuntime struct {
 	*runtime.MockRuntime
-	isRunning  bool
-	signaledID string
+	isRunning   bool
+	signaledID  string
+	signaledSig string
 }
 
 func (m *cmdTerminationMockRuntime) InspectContainer(ctx context.Context, id string) (bool, int, error) {
@@ -387,6 +401,7 @@ func (m *cmdTerminationMockRuntime) InspectContainer(ctx context.Context, id str
 
 func (m *cmdTerminationMockRuntime) SignalContainer(ctx context.Context, id string, sig string) error {
 	m.signaledID = id
+	m.signaledSig = sig
 	return m.MockRuntime.SignalContainer(ctx, id, sig)
 }
 
