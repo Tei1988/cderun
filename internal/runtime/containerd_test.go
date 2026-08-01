@@ -191,6 +191,13 @@ func TestUnit_Containerd_ValidateConfig(t *testing.T) {
 			errContains: "add-host is not supported yet",
 		},
 		{
+			name: "init setting",
+			cfg: &container.ContainerConfig{
+				Init: true,
+			},
+			errContains: "init is not supported yet",
+		},
+		{
 			name: "volume mount",
 			cfg: &container.ContainerConfig{
 				Mounts: []container.Mount{

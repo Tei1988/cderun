@@ -54,6 +54,7 @@ type ResolvedConfig struct {
 	DNS             []string
 	AddHosts        []string
 	Privileged      bool
+	Init            bool
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string
@@ -139,6 +140,8 @@ type CLIOptions struct {
 	CderunUser               *string
 	Privileged               *bool
 	CderunPrivileged         *bool
+	Init                     *bool
+	CderunInit               *bool
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
@@ -731,6 +734,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
 		p2Set, p2Val = getPtrVal(rv.cli.Privileged)
 		fastPathUsed = true
+	case "init":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunInit)
+		p2Set, p2Val = getPtrVal(rv.cli.Init)
+		fastPathUsed = true
 	case "publish-all":
 		p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
 		p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
@@ -782,6 +789,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.StrictEnv = resolved
 		case "privileged":
 			rv.res.Privileged = resolved
+		case "init":
+			rv.res.Init = resolved
 		case "publish-all":
 			rv.res.PublishAll = resolved
 		case "log-timestamp":

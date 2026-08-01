@@ -114,6 +114,7 @@ type rootOptions struct {
 	addHosts              []string
 	user                  string
 	privileged            bool
+	init                  bool
 	capAdd                []string
 	capDrop               []string
 	entrypoint            []string
@@ -130,6 +131,7 @@ type rootOptions struct {
 	cderunAddHosts        []string
 	cderunUser            string
 	cderunPrivileged      bool
+	cderunInit            bool
 	cderunCapAdd          []string
 	cderunCapDrop         []string
 	cderunGroupAdd        []string
@@ -365,6 +367,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunUser:               opt(cmd.Flags().Changed("cderun-user"), o.cderunUser),
 		Privileged:               opt(cmd.Flags().Changed("privileged"), o.privileged),
 		CderunPrivileged:         opt(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
+		Init:                     opt(cmd.Flags().Changed("init"), o.init),
+		CderunInit:               opt(cmd.Flags().Changed("cderun-init"), o.cderunInit),
 		CapAdd:                   o.capAdd,
 		CderunCapAdd:             o.cderunCapAdd,
 		CapDrop:                  o.capDrop,
@@ -550,6 +554,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		DNS:        resolved.DNS,
 		AddHosts:   resolved.AddHosts,
 		Privileged: resolved.Privileged,
+		Init:       resolved.Init,
 		CapAdd:     resolved.CapAdd,
 		CapDrop:    resolved.CapDrop,
 		Entrypoint: resolved.Entrypoint,

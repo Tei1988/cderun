@@ -549,6 +549,17 @@ var BoolOptions = []BoolOption{
 		},
 	},
 	{
+		Name:   "init",
+		EnvKey: "CDERUN_INIT",
+		Usage:  "Run an init inside the container that forwards signals and reaps processes",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Init
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Init
+		},
+	},
+	{
 		Name:   "strict-env",
 		EnvKey: "CDERUN_STRICT_ENV",
 		Usage:  "Require all environment variables to be present on the host",

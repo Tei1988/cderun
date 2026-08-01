@@ -19,6 +19,7 @@ type ContainerConfig struct {
 	Interactive bool `json:"interactive" yaml:"interactive"`
 	Remove      bool `json:"remove" yaml:"remove"`
 	ReadOnly    bool `json:"read_only,omitempty" yaml:"read_only,omitempty"`
+	Init        bool `json:"init,omitempty" yaml:"init,omitempty"`
 
 	// Network
 	Network    string   `json:"network" yaml:"network"`

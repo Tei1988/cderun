@@ -157,6 +157,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: add-host is not supported yet")
 	}
 
+	if config.Init {
+		return fmt.Errorf("containerd runtime: init is not supported yet")
+	}
+
 	for _, m := range config.Mounts {
 		if m.Type == "volume" {
 			return fmt.Errorf("containerd runtime: volume mount type is not supported")

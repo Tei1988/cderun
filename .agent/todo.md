@@ -31,7 +31,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -59,7 +59,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T50 | pull ポリシーの未知値が `always` として動作する | 改善 | 中 | 小 | - | DONE |
 | T51 | containerd: `volume` / `tmpfs` マウントが不正な OCI spec になる | バグ | 中 | 小 | - | DONE |
 | T52 | コンテナ起動前後のシグナルハンドリングの隙間（SIGHUP 含む） | 改善 | 中 | 中 | あり | DONE |
-| T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | - |
+| T53 | 引数ホイストの `--` エスケープ対応 | 挙動変更 | 中 | 小 | あり | DONE |
 | T54 | 環境変数の bool/int/float パース失敗が黙殺される | 改善 | 中 | 小 | - | DONE |
 | T55 | CLI `--device` が不正な perms を黙認する | 改善 | 低 | 小 | - | DONE |
 | T56 | ポート番号の範囲検証（0 / 負数 / 65535 超） | 改善 | 低 | 小 | - | DONE |
@@ -367,39 +367,6 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 - [ ] 全経路チェックリスト満たす
 - [ ] `docs/features/command-line-options.md` に記載
 - [ ] Docker / containerd 両方のユニットテスト
-
----
-
-## T25: `--init` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-コンテナの PID 1 問題。`--init` なしだとシグナルがアプリに届かずゾンビプロセスが残る場合がある。特に `cderun` はシグナルフォワーディングを行うが、コンテナ内プロセスが PID 1 としてシグナルを適切にハンドリングしない場合に問題になる。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--init` | bool | `false` | `CDERUN_INIT` |
-
-- Docker: `HostConfig.Init *bool`
-- containerd: tini 等の init バイナリをコンテナに注入する機構が必要。containerd 単体では直接サポートしないため、エラーまたは警告とする設計判断が必要
-
-### 実装上の注意
-
-- containerd での対応方針を設計時に決定すること（エラーにする / 警告のみ / tini バイナリマウント）
-
-### 完了条件
-
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker: `HostConfig.Init` に渡るテスト
-- [ ] containerd: 設計決定に基づいた挙動のテスト
 
 ---
 
@@ -889,28 +856,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 - containerd + `type=volume` が明示エラーになるテスト
 - containerd + `type=tmpfs` が有効な OCI マウントになるテスト
-
----
-
-## T53: 引数ホイストの `--` エスケープ対応
-
-- 種別: 挙動変更
-- 優先度: 中
-- 対象: `internal/command/root.go:1299-1325`（ホイストループ）
-- 仕様変更: あり → `docs/features/argument-parsing.md` の更新必須
-
-### 問題
-
-ホイストはサブコマンド後の全引数を走査し `--` (end-of-flags) を認識しないため、`cderun echo -- --cderun-tty` でもホイストされてしまい、リテラルの `--cderun-*` 文字列をコンテナコマンドに渡す手段が存在しない。
-
-### 方針
-
-リテラル `--` 以降はホイスト対象外とする。`--` 自体を strip するか残すかを仕様として決定し `argument-parsing.md` に明記する。T07 のリライトと同時に実装するのが効率的。
-
-### 完了条件
-
-- `--` 以降の `--cderun-*` がコンテナに素通しされるテスト
-- 仕様が `docs/features/argument-parsing.md` に記載されている
 
 ---
 

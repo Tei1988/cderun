@@ -73,6 +73,7 @@ type ConfigDefaults struct {
 	AddHosts        []string       `yaml:"addHosts,omitempty"`
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
+	Init            *bool          `yaml:"init,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
@@ -105,6 +106,7 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.MountAllTools = copyBoolPtr(d.MountAllTools)
 	res.PublishAll = copyBoolPtr(d.PublishAll)
 	res.Privileged = copyBoolPtr(d.Privileged)
+	res.Init = copyBoolPtr(d.Init)
 	res.DryRun = copyBoolPtr(d.DryRun)
 	res.Diagnosis = copyBoolPtr(d.Diagnosis)
 	res.CPUs = copyFloat64Ptr(d.CPUs)
@@ -211,6 +213,7 @@ type ToolConfig struct {
 	AddHosts        []string       `yaml:"addHosts,omitempty"`
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
+	Init            *bool          `yaml:"init,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
@@ -246,6 +249,7 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.MountAllTools = copyBoolPtr(t.MountAllTools)
 	res.PublishAll = copyBoolPtr(t.PublishAll)
 	res.Privileged = copyBoolPtr(t.Privileged)
+	res.Init = copyBoolPtr(t.Init)
 	res.LogTimestamp = copyBoolPtr(t.LogTimestamp)
 	res.DryRun = copyBoolPtr(t.DryRun)
 	res.Diagnosis = copyBoolPtr(t.Diagnosis)

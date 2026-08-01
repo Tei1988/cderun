@@ -66,6 +66,11 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		},
 	}
 
+	if config.Init {
+		initVal := true
+		hostConfig.Init = &initVal
+	}
+
 	// Handle PortBindings
 	if len(config.Ports) > 0 {
 		exposedPorts, bindings, err := nat.ParsePortSpecs(config.Ports)

@@ -200,6 +200,8 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 		return &o.publishAll, &o.cderunPublishAll
 	case "privileged":
 		return &o.privileged, &o.cderunPrivileged
+	case "init":
+		return &o.init, &o.cderunInit
 	case "strict-env":
 		return &o.strictEnv, &o.cderunStrictEnv
 	case "dry-run":
