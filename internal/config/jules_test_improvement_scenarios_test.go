@@ -51,6 +51,7 @@ func TestUnit_Config_ValidateExposePort_Scenarios(t *testing.T) {
 		{"maximum single port", "65535", false},
 		{"maximum port range with protocol", "1-65535/udp", false},
 		{"empty exposed port", "", false},
+		{"normal range and protocol", "80-90/udp", false},
 
 		{"port zero", "0", true},
 		{"out of bounds port", "70000", true},
@@ -62,6 +63,13 @@ func TestUnit_Config_ValidateExposePort_Scenarios(t *testing.T) {
 		{"control character injection", "80\n", true},
 		{"shell command injection", "80;rm", true},
 		{"multiple protocols", "80/tcp/udp", true},
+		{"port is negative", "-80", true},
+		{"port range end negative", "80--90", true},
+		{"port range end less than start", "100-90", true},
+		{"invalid start port in range", "abc-90", true},
+		{"invalid trailing hyphen", "80-", true},
+		{"invalid leading hyphen", "-90", true},
+		{"multiple hyphens", "80-90-100", true},
 	}
 
 	for _, tt := range tests {
@@ -295,7 +303,7 @@ func TestUnit_Config_ParseMountFlag_Scenarios(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, res)
 			}
 		})
@@ -459,48 +467,11 @@ func TestUnit_Config_AnchorBoundaries_EdgeCases(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		// Anchor resolves to an empty string. ProcessBoundary should return an error.
+		// Anchor resolves to an empty string. validateAnchorBoundaries should return an error.
 		_, err = ResolvePath("{{env:EMPTY_ENV}}/some/file", "/work", r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "anchor path is empty")
 	})
-}
-
-func TestUnit_Config_ValidateExposePort_AdditionalEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"empty string is valid", "", false},
-		{"normal port", "80", false},
-		{"normal range", "80-90", false},
-		{"normal protocol", "80/tcp", false},
-		{"normal range and protocol", "80-90/udp", false},
-		{"port is negative", "-80", true},
-		{"port range end negative", "80--90", true},
-		{"port range end less than start", "100-90", true},
-		{"invalid start port in range", "abc-90", true},
-		{"invalid end port in range", "80-abc", true},
-		{"invalid port number too high", "70000", true},
-		{"invalid protocol name", "80/http", true},
-		{"invalid trailing hyphen", "80-", true},
-		{"invalid leading hyphen", "-90", true},
-		{"multiple hyphens", "80-90-100", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateExposePort(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
 }
 
 func TestUnit_Config_ValidateWorkdir_AdditionalEdgeCases(t *testing.T) {
