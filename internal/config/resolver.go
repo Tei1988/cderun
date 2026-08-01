@@ -1151,7 +1151,7 @@ func (rv *resolver) resolveStandardOptions() error {
 	}
 	if rv.res.Image != "" {
 		// Security validation before any further use (including logging)
-		if err := validatePathChars(rv.res.Image); err != nil {
+		if err := ValidatePathChars(rv.res.Image); err != nil {
 			return fmt.Errorf("security validation failed for image: %w", err)
 		}
 
@@ -1587,18 +1587,46 @@ func (rv *resolver) validateSecurity() error {
 		return err
 	}
 	highlyPrivileged := map[string]bool{
-		"ALL":            true,
-		"SYS_ADMIN":      true,
-		"NET_ADMIN":      true,
-		"SYS_RAWIO":      true,
-		"SYS_PTRACE":     true,
-		"SYS_MODULE":     true,
-		"CAP_ALL":        true,
-		"CAP_SYS_ADMIN":  true,
-		"CAP_NET_ADMIN":  true,
-		"CAP_SYS_RAWIO":  true,
-		"CAP_SYS_PTRACE": true,
-		"CAP_SYS_MODULE": true,
+		"ALL":                  true,
+		"SYS_ADMIN":            true,
+		"NET_ADMIN":            true,
+		"SYS_RAWIO":            true,
+		"SYS_PTRACE":           true,
+		"SYS_MODULE":           true,
+		"SYS_CHROOT":           true,
+		"SYS_BOOT":             true,
+		"SYS_TIME":             true,
+		"SYSLOG":               true,
+		"DAC_OVERRIDE":         true,
+		"DAC_READ_SEARCH":      true,
+		"LINUX_IMMUTABLE":      true,
+		"IPC_LOCK":             true,
+		"IPC_OWNER":            true,
+		"SYS_TTY_CONFIG":       true,
+		"LEASE":                true,
+		"AUDIT_CONTROL":        true,
+		"MAC_ADMIN":            true,
+		"MAC_OVERRIDE":         true,
+		"CAP_ALL":              true,
+		"CAP_SYS_ADMIN":        true,
+		"CAP_NET_ADMIN":        true,
+		"CAP_SYS_RAWIO":        true,
+		"CAP_SYS_PTRACE":       true,
+		"CAP_SYS_MODULE":       true,
+		"CAP_SYS_CHROOT":       true,
+		"CAP_SYS_BOOT":         true,
+		"CAP_SYS_TIME":         true,
+		"CAP_SYSLOG":           true,
+		"CAP_DAC_OVERRIDE":     true,
+		"CAP_DAC_READ_SEARCH":  true,
+		"CAP_LINUX_IMMUTABLE":  true,
+		"CAP_IPC_LOCK":         true,
+		"CAP_IPC_OWNER":        true,
+		"CAP_SYS_TTY_CONFIG":   true,
+		"CAP_LEASE":            true,
+		"CAP_AUDIT_CONTROL":    true,
+		"CAP_MAC_ADMIN":        true,
+		"CAP_MAC_OVERRIDE":     true,
 	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {
@@ -1704,7 +1732,7 @@ func (rv *resolver) validateCriticalFields() error {
 		}},
 	}
 	for _, f := range criticalFields {
-		if err := validatePathChars(f.value); err != nil {
+		if err := ValidatePathChars(f.value); err != nil {
 			return fmt.Errorf("security validation failed for %q: %w", f.name, err)
 		}
 		if f.validator != nil {
@@ -1756,7 +1784,7 @@ func (rv *resolver) validateSlices() error {
 	}
 	for _, s := range criticalSlices {
 		for i, e := range s.slice {
-			if err := validatePathChars(e); err != nil {
+			if err := ValidatePathChars(e); err != nil {
 				return fmt.Errorf("security validation failed for %s[%d]: %w", s.name, i, err)
 			}
 			if s.validator != nil {
@@ -1772,7 +1800,7 @@ func (rv *resolver) validateSlices() error {
 func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
 		key, val, _ := strings.Cut(e, "=")
-		if err := validatePathChars(key); err != nil {
+		if err := ValidatePathChars(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 		if err := ValidateEnvKey(key); err != nil {
@@ -1787,10 +1815,10 @@ func (rv *resolver) validateEnvSecurity() error {
 
 func (rv *resolver) validateMountSecurity() error {
 	for i, m := range rv.res.Mounts {
-		if err := validatePathChars(m.Source); err != nil {
+		if err := ValidatePathChars(m.Source); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
 		}
-		if err := validatePathChars(m.Target); err != nil {
+		if err := ValidatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
 		if HasParentTraversal(m.Target) {
@@ -1802,17 +1830,17 @@ func (rv *resolver) validateMountSecurity() error {
 
 func (rv *resolver) validateDeviceSecurity() error {
 	for i, d := range rv.res.Devices {
-		if err := validatePathChars(d.PathOnHost); err != nil {
+		if err := ValidatePathChars(d.PathOnHost); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
 		}
-		if err := validatePathChars(d.PathInContainer); err != nil {
+		if err := ValidatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
 		}
 		if HasParentTraversal(d.PathInContainer) {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
 		}
 		if d.CgroupPermissions != "" {
-			if err := validatePathChars(d.CgroupPermissions); err != nil {
+			if err := ValidatePathChars(d.CgroupPermissions); err != nil {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): %w", i, err)
 			}
 			if !permsRegex.MatchString(d.CgroupPermissions) {

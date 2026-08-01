@@ -131,3 +131,54 @@ func TestUnit_Logging_OutputNil(t *testing.T) {
 	SetOutput(nil)
 	assert.Equal(t, io.Discard, GetGlobalLogger().GetWriter())
 }
+
+func TestUnit_Logging_SanitizeLogString(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no control characters",
+			input:    "hello world 123",
+			expected: "hello world 123",
+		},
+		{
+			name:     "contains carriage returns, tabs, and newlines (allowed)",
+			input:    "line1\n\rline2\tline3",
+			expected: "line1\n\rline2\tline3",
+		},
+		{
+			name:     "contains escape sequences and delete",
+			input:    "escape \x1b[31mred\x1b[0m and \x7fdelete",
+			expected: `escape \x1b[31mred\x1b[0m and \x7fdelete`,
+		},
+		{
+			name:     "contains null byte",
+			input:    "null\x00byte",
+			expected: `null\x00byte`,
+		},
+		{
+			name:     "control characters in format output",
+			input:    "message \x01\x02\x1f",
+			expected: `message \x01\x02\x1f`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := SanitizeLogString(tt.input)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestUnit_Logging_SanitizedLoggerOutput(t *testing.T) {
+	buf := &bytes.Buffer{}
+	logger := NewLogger()
+	logger.SetOutput(buf)
+	_ = logger.Init("info", "text", false)
+
+	logger.log(InfoLevel, "dangerous escape sequence: \x1b[2J")
+	assert.Contains(t, buf.String(), `[INFO] dangerous escape sequence: \x1b[2J`)
+}

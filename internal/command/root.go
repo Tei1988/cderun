@@ -236,6 +236,12 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 		cderunPath = env
 	}
 
+	if cderunPath != "" {
+		if err := config.ValidatePathChars(cderunPath); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("security validation failed for config path: %w", err)
+		}
+	}
+
 	var globalCfg *config.CDERunConfig
 	var globalPaths []string
 	var err error
@@ -259,6 +265,12 @@ func (o *rootOptions) loadConfigs(cmd *cobra.Command) (config.ToolsConfig, *conf
 		toolsPath = o.toolConfigPath
 	} else if env := o.fs.Getenv("CDERUN_TOOL_CONFIG"); env != "" {
 		toolsPath = env
+	}
+
+	if toolsPath != "" {
+		if err := config.ValidatePathChars(toolsPath); err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("security validation failed for tool config path: %w", err)
+		}
 	}
 
 	var toolsCfg config.ToolsConfig

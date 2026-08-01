@@ -569,8 +569,8 @@ func HasParentTraversal(s string) bool {
 	return slices.Contains(parts, "..")
 }
 
-// validatePathChars ensures the string does not contain ASCII control characters.
-func validatePathChars(s string) error {
+// ValidatePathChars ensures the string does not contain ASCII control characters.
+func ValidatePathChars(s string) error {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c <= 31 || c == 127 {
@@ -812,7 +812,7 @@ func ValidatePort(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
+	if err := ValidatePathChars(s); err != nil {
 		return err
 	}
 
@@ -870,7 +870,7 @@ func ValidateDNS(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
+	if err := ValidatePathChars(s); err != nil {
 		return err
 	}
 	if net.ParseIP(s) == nil {
@@ -884,7 +884,7 @@ func ValidateAddHost(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
+	if err := ValidatePathChars(s); err != nil {
 		return err
 	}
 	parts := strings.SplitN(s, ":", 2)
@@ -905,7 +905,7 @@ func ValidateCapability(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
+	if err := ValidatePathChars(s); err != nil {
 		return err
 	}
 	if !capRegex.MatchString(s) {
@@ -938,7 +938,7 @@ func ValidateExposePort(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
+	if err := ValidatePathChars(s); err != nil {
 		return err
 	}
 	// Format: port[-port][/protocol]

@@ -599,7 +599,7 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_Robustness(t *testing.T) {
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
 			Privileged: ptr(true),
-			CapAdd:        []string{"CHOWN", "DAC_OVERRIDE"},
+			CapAdd:        []string{"CHOWN", "NET_BIND_SERVICE"},
 		}
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)

@@ -2224,3 +2224,42 @@ func TestUnit_Root_EarlyLogger_Validation(t *testing.T) {
 		assert.False(t, capturedLogger.GetTimestamp())
 	})
 }
+
+func TestUnit_Root_ConfigPath_SecurityValidation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("CDERUN_CONFIG with control character is rejected", func(t *testing.T) {
+		mfs := &config.MockFileSystem{
+			Env: map[string]string{"CDERUN_CONFIG": "/etc/cderun\x00.yaml"},
+		}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for config path")
+	})
+
+	t.Run("--config with control character is rejected", func(t *testing.T) {
+		mfs := &config.MockFileSystem{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--config", "/some/path/with/\n/newline.yaml", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for config path")
+	})
+
+	t.Run("--tool-config with control character is rejected", func(t *testing.T) {
+		mfs := &config.MockFileSystem{}
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--tool-config", "/some/path/with/\t/tab.yaml", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for tool config path")
+	})
+}

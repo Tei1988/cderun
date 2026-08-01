@@ -119,7 +119,7 @@ func TestUnit_Config_ValidatePathChars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePathChars(tt.input)
+			err := ValidatePathChars(tt.input)
 			if tt.wantErr {
 				require.Error(t, err, "input: %q", tt.input)
 			} else {

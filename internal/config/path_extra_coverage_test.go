@@ -181,8 +181,8 @@ func TestUnit_Path_Resolve_Errors_Extra(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("validatePathChars", func(t *testing.T) {
-		err := validatePathChars("path\x01")
+	t.Run("ValidatePathChars", func(t *testing.T) {
+		err := ValidatePathChars("path\x01")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid character")
 	})

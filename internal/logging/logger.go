@@ -176,12 +176,28 @@ func (l *Logger) formatText(level Level, message string, now time.Time) string {
 	return fmt.Sprintf("%s[%s] %s\n", ts, level.String(), message)
 }
 
+// SanitizeLogString replaces ASCII control characters (ASCII < 32 and ASCII 127)
+// except for \n, \r, and \t with hex-escaped strings to prevent terminal injection.
+func SanitizeLogString(s string) string {
+	var buf strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < 32 && c != '\n' && c != '\r' && c != '\t') || c == 127 {
+			buf.WriteString(fmt.Sprintf(`\x%02x`, c))
+		} else {
+			buf.WriteByte(c)
+		}
+	}
+	return buf.String()
+}
+
 func (l *Logger) log(level Level, msg string, args ...any) {
 	if level > l.GetLevel() {
 		return
 	}
 
 	message := fmt.Sprintf(msg, args...)
+	message = SanitizeLogString(message)
 	now := time.Now()
 
 	l.mu.Lock()

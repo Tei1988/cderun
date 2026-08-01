@@ -296,3 +296,53 @@ func TestUnit_Config_Resolver_SensitivePathMountWarnings(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Config_Resolver_ExpandedPrivilegedCapWarnings(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	tests := []struct {
+		capName string
+	}{
+		{"SYS_CHROOT"},
+		{"SYS_BOOT"},
+		{"SYS_TIME"},
+		{"SYSLOG"},
+		{"DAC_OVERRIDE"},
+		{"DAC_READ_SEARCH"},
+		{"LINUX_IMMUTABLE"},
+		{"IPC_LOCK"},
+		{"IPC_OWNER"},
+		{"SYS_TTY_CONFIG"},
+		{"LEASE"},
+		{"AUDIT_CONTROL"},
+		{"MAC_ADMIN"},
+		{"MAC_OVERRIDE"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.capName+" triggers warning", func(t *testing.T) {
+			var buf bytes.Buffer
+			logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+			logging.GetGlobalLogger().SetOutput(&buf)
+			defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+			cli := &CLIOptions{
+				Image:  ptr("alpine"),
+				CapAdd: []string{tt.capName},
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.NoError(t, err)
+
+			logOutput := buf.String()
+			assert.Contains(t, logOutput, "Highly privileged capability")
+			assert.Contains(t, logOutput, tt.capName)
+		})
+	}
+}
