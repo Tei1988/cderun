@@ -1181,16 +1181,32 @@ func TestUnit_Docker_CreateContainer_ReadOnly(t *testing.T) {
 func TestUnit_Docker_CreateContainer_Init(t *testing.T) {
 	t.Parallel()
 
-	mock := &mockDockerClient{}
-	runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+	t.Run("enabled", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
 
-	config := &container.ContainerConfig{
-		Image: "test-image",
-		Init:  true,
-	}
+		config := &container.ContainerConfig{
+			Image: "test-image",
+			Init:  true,
+		}
 
-	_, err := runtime.CreateContainer(context.Background(), config)
-	require.NoError(t, err)
-	require.NotNil(t, mock.createHostConfig.Init)
-	assert.True(t, *mock.createHostConfig.Init)
+		_, err := runtime.CreateContainer(context.Background(), config)
+		require.NoError(t, err)
+		require.NotNil(t, mock.createHostConfig.Init)
+		assert.True(t, *mock.createHostConfig.Init)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+		config := &container.ContainerConfig{
+			Image: "test-image",
+			Init:  false,
+		}
+
+		_, err := runtime.CreateContainer(context.Background(), config)
+		require.NoError(t, err)
+		assert.Nil(t, mock.createHostConfig.Init)
+	})
 }
