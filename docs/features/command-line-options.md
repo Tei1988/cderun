@@ -1,17 +1,17 @@
-# Command-Line Options Reference
+# コマンドラインオプション
 
-## Overview
+## 概要
 
-This document provides a comprehensive reference of all command-line options supported by `cderun`.
+`cderun`のすべてのコマンドラインオプションのリファレンス。
 
-### List-Type (Array-Type) Options and Environment Variable Separator Rules
+### リスト型（配列型）オプションと環境変数のセパレータ規則
 
-When supplying multiple values for a list-type option (e.g., `stringArray` or `[]string`) using environment variables (P3), `cderun` enforces specific separator rules depending on the variable:
+複数の値をとるリスト型オプション（`stringArray`）を環境変数（P3）で指定する場合、オプションごとに使用する区切り文字（セパレータ）が異なります。
 
-- **Semicolon (`;`) Separator**:
-  - `CDERUN_ENV` (e.g., `export CDERUN_ENV="KEY1=val1;KEY2=val2"`)
-  - `CDERUN_MOUNT` (e.g., `export CDERUN_MOUNT="type=bind,source=./src,target=/app;type=tmpfs,target=/tmp"`)
-- **Comma (`,`) Separator**:
+- **セミコロン（`;`）をセパレータとして使用する環境変数**:
+  - `CDERUN_ENV` (例: `export CDERUN_ENV="KEY1=val1;KEY2=val2"`)
+  - `CDERUN_MOUNT` (例: `export CDERUN_MOUNT="type=bind,source=./src,target=/app;type=tmpfs,target=/tmp"`)
+- **カンマ（`,`）をセパレータとして使用する環境変数**:
   - `CDERUN_GROUP_ADD`
   - `CDERUN_MOUNT_TOOLS`
   - `CDERUN_DEVICE`
@@ -24,32 +24,28 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_ENTRYPOINT`
   - `CDERUN_SENSITIVE_ENV`
 
-*Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`).*
+*(CLIフラグ（P1/P2）で指定する場合は、セパレータではなく、`--env A=1 --env B=2` や `--dns 8.8.8.8 --dns 1.1.1.1` のようにフラグ自体を繰り返して指定する必要があります。)*
 
----
-
-## Basic Syntax
+## 基本構文
 
 ```bash
 cderun [cderun-flags] <subcommand> [passthrough-args]
 ```
 
-- **[cderun-flags]**: Flags that control the behavior of `cderun`.
-  - **Standard Flags (P2)**: Placed **before** the subcommand (e.g., `--tty`, `--env`).
-- **\<subcommand\>**: The first non-flag argument (e.g., `node`, `python`). It acts as a **Lookup Key** to load configurations from `.tools.yaml` and is not included in the container's command by default.
-- **[passthrough-args]**: Any arguments appearing after the subcommand. All arguments are forwarded directly to the container's command, except for P1 internal overrides (`--cderun-*`), which are intercepted and hoisted during preprocessing.
+- **[cderun-flags]**: `cderun` の動作を制御するフラグ。
+  - **標準フラグ (P2)**: `--tty` や `--env` など。サブコマンドの**前**に置く必要があります。
+- **\<subcommand\>**: 最初の非フラグ引数（例: `node`, `python`）。
+- **[passthrough-args]**: サブコマンドに渡される引数。`--cderun-` で始まるフラグは `cderun` の優先設定（P1オーバーライド）としてパースされ、それ以外の全ての引数はサブコマンドにそのまま渡されます。
 
----
-
-## Global Options
+## グローバルオプション
 
 ### `--tty`, `-t`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_TTY`
-- **Description**: Allocate a pseudo-TTY.
-- **Use Case**: Used for interactive terminal execution (e.g., shell access).
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_TTY`
+- **説明**: 疑似TTYを割り当てる
+- **用途**: インタラクティブなコマンド実行時に使用
 
 ```bash
 cderun --tty bash
@@ -58,48 +54,58 @@ cderun -t node
 
 ### `--interactive`, `-i`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_INTERACTIVE`
-- **Description**: Keep STDIN open even if not attached.
-- **Use Case**: Necessary for reading interactive input.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_INTERACTIVE`
+- **説明**: STDINを開いたままにする
+- **用途**: インタラクティブな入力が必要な場合
 
 ```bash
 cderun --interactive python
 cderun -i bash
 ```
 
+**組み合わせ例**:
+
+```bash
+cderun --tty --interactive bash
+cderun -ti bash  # 短縮形
+```
+
 ### `--network`
 
-- **Type**: string
-- **Default**: `bridge`
-- **Environment Variable**: `CDERUN_NETWORK`
-- **Description**: Connect a container to a network.
-- **Supported Values**: `bridge`, `host`, `none`, or any custom network name.
+- **型**: string
+- **デフォルト**: `bridge`
+- **環境変数**: `CDERUN_NETWORK`
+- **説明**: コンテナを接続するネットワーク
+- **値**: `bridge`, `host`, `none`, カスタムネットワーク名
 
 ```bash
 cderun --network host node server.js
 cderun --network none python script.py
+cderun --network my-network node app.js
 ```
 
 ### `--socket-path`
 
-- **Type**: string
-- **Default**: Auto-detected (e.g., `/var/run/docker.sock`)
-- **Environment Variable**: `CDERUN_SOCKET_PATH`
-- **Description**: Specify the path to the container runtime socket on the host.
+- **型**: string
+- **デフォルト**: 自動検出（`/var/run/docker.sock` 等）
+- **環境変数**: `CDERUN_SOCKET_PATH`
+- **説明**: コンテナランタイムソケットのホスト上のパスを指定
+- **用途**: cderunが接続するランタイムソケットを指定する
 
 ```bash
 cderun --socket-path /var/run/docker.sock docker ps
+cderun podman images --cderun-socket-path /run/podman/podman.sock
 ```
 
 ### `--mount-socket`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_MOUNT_SOCKET`
-- **Description**: Mount the host's container runtime socket inside the container.
-- **Use Case**: Enables Docker-in-Docker or container control from within the container.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_MOUNT_SOCKET`
+- **説明**: ホストのランタイムソケットをコンテナ内にマウントする
+- **用途**: コンテナ内からホストのDocker/Podmanを操作する場合に使用
 
 ```bash
 cderun --mount-socket docker ps
@@ -107,11 +113,11 @@ cderun --mount-socket docker ps
 
 ### `--mount-socket-path`
 
-- **Type**: string
-- **Default**: The host-side socket path (`--socket-path` or auto-detected socket)
-- **Environment Variable**: `CDERUN_MOUNT_SOCKET_PATH`
-- **Description**: Specifies the path inside the container where the socket should be mounted.
-- **Validation**: Must be an absolute path and must not contain any parent traversal (`..`) segments.
+- **型**: string
+- **デフォルト**: ホスト側のソケットパス（`--socket-path` または自動検出された値）
+- **環境変数**: `CDERUN_MOUNT_SOCKET_PATH`
+- **説明**: ソケットをコンテナ内にマウントする際のパスを指定
+- **用途**: ホストとコンテナ内でソケットのパスを異なるものにしたい場合に使用
 
 ```bash
 cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
@@ -119,13 +125,15 @@ cderun --mount-socket --mount-socket-path /var/run/docker.sock node app.js
 
 ### `--mount-cderun`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_MOUNT_CDERUN`
-- **Description**: Mount the host's `cderun` binary into the container at `/usr/local/bin/cderun`.
-- **Note**:
-  - Automatically enables `--mount-socket` unless explicitly set to `false`.
-  - Automatically enabled when `--mount-tools` or `--mount-all-tools` is specified.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_MOUNT_CDERUN`
+- **説明**: cderunバイナリをコンテナ内の `/usr/local/bin/cderun` にマウント
+- **用途**: コンテナ内でcderunを使用可能にする（再帰的実行）
+- **補足**:
+  - `--mount-tools` または `--mount-all-tools` を使用する場合、このフラグは自動的に有効になります。
+  - ネスト実行が検出された場合も自動的にマウントが構成されます。
+  - このフラグが有効な場合、`--mount-socket` が明示的に `false` に設定されていない限り、`--mount-socket` も自動的に有効になります。
 
 ```bash
 cderun --mount-cderun alpine sh
@@ -133,10 +141,10 @@ cderun --mount-cderun alpine sh
 
 ### `--mount-cderun-path`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_MOUNT_CDERUN_PATH`
-- **Description**: Specifies the host-side path of the `cderun` binary to mount.
-- **Use Case**: Necessary on macOS where the host binary (Darwin) cannot run in the Linux VM container, allowing you to specify a pre-compiled Linux binary.
+- **型**: string
+- **環境変数**: `CDERUN_MOUNT_CDERUN_PATH`
+- **説明**: コンテナ内にマウントするホスト側のcderunバイナリのパスを指定
+- **用途**: 明示的に特定のcderunバイナリをマウントしたい場合に使用
 
 ```bash
 cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
@@ -144,10 +152,12 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 
 ### `--mount-tools`
 
-- **Type**: string (comma-separated list)
-- **Environment Variable**: `CDERUN_MOUNT_TOOLS`
-- **Description**: Dynamically mount specified tool wrappers from `.tools.yaml` into the container.
-- **Note**: Automatically enables `--mount-cderun` and `--mount-socket`.
+- **型**: string
+- **環境変数**: `CDERUN_MOUNT_TOOLS`
+- **説明**: 指定したツール（カンマ区切り）のエイリアスをコンテナ内にマウント
+- **補足**:
+  - 対象のツールは `.tools.yaml` に定義されている必要があります。
+  - このオプションを使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
 
 ```bash
 cderun --mount-tools node,python alpine sh
@@ -155,11 +165,12 @@ cderun --mount-tools node,python alpine sh
 
 ### `--mount-all-tools`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_MOUNT_ALL_TOOLS`
-- **Description**: Dynamically mount all tool wrappers defined in `.tools.yaml` into the container.
-- **Note**: Automatically enables `--mount-cderun` and `--mount-socket`.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_MOUNT_ALL_TOOLS`
+- **説明**: `.tools.yaml` に定義されているすべてのツールのエイリアスをコンテナ内にマウント
+- **補足**:
+  - このオプションを使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります（明示的に `false` が指定されている場合を除く）。
 
 ```bash
 cderun --mount-all-tools alpine sh
@@ -167,10 +178,12 @@ cderun --mount-all-tools alpine sh
 
 ### `--image`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_IMAGE`
-- **Description**: Explicitly specify the container image to use (overriding image mappings).
-- **Note**: Supports resolution expressions (e.g., `{{env:TAG}}`).
+- **型**: string
+- **環境変数**: `CDERUN_IMAGE`
+- **説明**: 使用するコンテナイメージを明示的に指定（イメージマッピングを上書き）
+- **注意**:
+  - アドホック実行（設定にないツール名の指定）時には必須となります。
+  - `{{env:KEY}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --image node:18-alpine node --version
@@ -179,53 +192,64 @@ cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 
 ### `--env`, `-e`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_ENV`
-- **Description**: Set or pass through environment variables.
-- **Format**: `KEY=value` (explicit setting) or `KEY` (passthrough from host).
-- **Note**: Supports dynamic resolution expressions (e.g., `{{PWD}}`).
+- **型**: stringArray
+- **環境変数**: `CDERUN_ENV`
+- **説明**: 環境変数の設定・パススルー
+- **用途**: `KEY=value`（直接指定）または `KEY`（ホストから取得）
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数の環境変数を指定する場合、フラグを繰り返す必要があります（例: `-e A=1 -e B=2`）。
+  - 環境変数 `CDERUN_ENV` (P3) では、**セミコロン (`;`)** をセパレータとして使用します（例: `export CDERUN_ENV="A=1;B=2"`）。
+  - 値には `{{PWD}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --env NODE_ENV=production node app.js
-cderun --env NPM_TOKEN node app.js
+cderun --env NPM_TOKEN node app.js  # ホストから取得
 cderun --env "PROJECT_DIR={{PWD}}" node app.js
 ```
 
 ### `--cderun-env`
 
-- **Type**: stringArray
-- **Description**: Force-override environment variables (P1 internal override).
-- **Placement**: Must be specified **after** the subcommand in Wrapper Mode.
+- **型**: stringArray
+- **説明**: 環境変数の強制上書き（P1優先順位）
+- **用途**: サブコマンドの後ろでも指定可能
 
 ```bash
+# サブコマンドの後ろで指定
 cderun node app.js --cderun-env=NODE_ENV=production
 ```
 
 ### `--mount`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_MOUNT`
-- **Description**: Specify file system mounts. Supports `bind`, `volume`, and `tmpfs`.
-- **Format Parameters**:
-  - `type`: `bind` | `volume` | `tmpfs` (default: `bind`)
-  - `source` (aliases: `src`): Path on the host. Supports expressions (e.g., `{{HOME}}`).
-  - `target` (aliases: `dst`, `destination`): Absolute path inside the container. Must be non-empty and absolute.
-  - `readonly`: Mounts the file system as read-only.
-  - `optional` (or `optional=true`): Skips the bind mount without failing if the host-side `source` path is missing.
+- **型**: stringArray
+- **環境変数**: `CDERUN_MOUNT`
+- **説明**: マウントの設定（bind, volume, tmpfsをサポート）
+- **用途**: `type=bind,source=hostPath,target=containerPath[,readonly][,optional]`
+- **キーワード**:
+  - `type`: `bind` | `volume` | `tmpfs`
+  - `source` (エイリアス: `src`): ホスト側のパス
+  - `target` (エイリアス: `dst`, `destination`): コンテナ内のパス
+  - `readonly`: 読み取り専用マウント
+  - `optional`: ホスト側のソースが存在しなくてもエラーにせずスキップする（`type=bind` のみ）
+- **補足**:
+  - `optional`（または `optional=true`）を指定すると、`type=bind` の場合にホスト側の `source` パスが存在しなくてもエラーにせず、マウントをスキップします。
+  - CLIフラグ（P1/P2）では、複数のマウントを指定する場合、フラグを繰り返す必要があります。
+  - 環境変数 `CDERUN_MOUNT` (P3) では、**セミコロン (`;`)** をセパレータとして使用します。
+  - `source` や `target` には `{{HOME}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --mount type=bind,source=./data,target=/data python script.py
 cderun --mount type=bind,source=~/.ssh,target=/root/.ssh,readonly git clone ...
 cderun --mount type=bind,source=./config,target=/config,optional node app.js
 cderun --mount type=tmpfs,target=/tmp alpine
+cderun --mount "type=bind,source={{HOME}}/.npmrc,target=/root/.npmrc" node app.js
 ```
 
 ### `--workdir`, `-w`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_WORKDIR`
-- **Description**: Specify the container's working directory.
-- **Validation**: Enforces absolute path checks and blocks parent directory traversals (`..`) if explicitly configured.
+- **型**: string
+- **環境変数**: `CDERUN_WORKDIR`
+- **説明**: 作業ディレクトリの指定
+- **補足**: `{{PWD}}` などの式が使用可能です。詳細は [値の解決](./value-resolution.md) を参照してください。
 
 ```bash
 cderun --workdir /app node server.js
@@ -234,10 +258,10 @@ cderun --workdir "{{PWD}}/src" node app.js
 
 ### `--strict-env`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_STRICT_ENV`
-- **Description**: If true, aborts execution with an error if any requested passthrough environment variables are missing on the host.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_STRICT_ENV`
+- **説明**: 指定された環境変数がホストに存在しない場合にエラーとする
 
 ```bash
 cderun --strict-env --env NPM_TOKEN node app.js
@@ -245,10 +269,11 @@ cderun --strict-env --env NPM_TOKEN node app.js
 
 ### `--runtime`
 
-- **Type**: string
-- **Default**: Auto-detected (`docker` -> `containerd` -> `podman`)
-- **Environment Variable**: `CDERUN_RUNTIME`
-- **Supported Engines**: `docker`, `podman`, `containerd`.
+- **型**: string
+- **デフォルト**: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。いずれも見つからない場合は `docker` にフォールバック）
+- **環境変数**: `CDERUN_RUNTIME`
+- **説明**: 使用するコンテナランタイムを指定（`docker` | `podman` | `containerd`）
+- **補足**: `containerd` は現在実験的なサポート段階です。制限事項については [マルチランタイムサポート](./multi-runtime-support.md) を参照してください。
 
 ```bash
 cderun --runtime podman node app.js
@@ -256,22 +281,25 @@ cderun --runtime podman node app.js
 
 ### `--remove`
 
-- **Type**: bool
-- **Default**: `true`
-- **Environment Variable**: `CDERUN_REMOVE`
-- **Description**: Automatically remove the container when it exits.
+- **型**: bool
+- **デフォルト**: `true`
+- **環境変数**: `CDERUN_REMOVE`
+- **説明**: コンテナ終了後に自動的に削除する
 
 ```bash
-cderun --remove=false node app.js
+cderun --remove=false node app.js  # コンテナを残す
 ```
 
 ### `--publish`, `-p`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_PUBLISH`
-- **Description**: Publish a container's port(s) to the host.
-- **Format**: `hostPort:containerPort` (e.g., `8080:80`).
-- **Validation**: Strict validation enforces numeric boundaries (e.g., values must be within the `1-65535` range).
+- **型**: stringArray
+- **環境変数**: `CDERUN_PUBLISH`
+- **説明**: ポートマッピング（ホストポート:コンテナポート）
+- **用途**: コンテナのポートをホストに公開
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数のポートを指定する場合、フラグを繰り返す必要があります。
+  - 環境変数 `CDERUN_PUBLISH` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
+  - P1/P2/P3 のいずれかで**明示的に空のリスト**（YAMLでの `[]` や環境変数での空文字列）を指定した場合、それは意図的な「空の設定」とみなされ、下位レベルの設定を上書き（無効化）します。
 
 ```bash
 cderun -p 8080:80 nginx
@@ -279,17 +307,19 @@ cderun -p 8080:80 nginx
 
 ### `--publish-all`, `-P`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_PUBLISH_ALL`
-- **Description**: Publish all exposed ports to random high ports on the host.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_PUBLISH_ALL`
+- **説明**: すべての公開ポートをランダムなポートにマッピング
 
 ### `--expose`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_EXPOSE`
-- **Description**: Expose a port or range of ports.
-- **Format**: `port/protocol` (e.g., `80`, `80/udp`).
+- **型**: stringArray
+- **環境変数**: `CDERUN_EXPOSE`
+- **説明**: 特定のポートまたはポート範囲を公開
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_EXPOSE` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --expose 80 node app.js
@@ -298,9 +328,9 @@ cderun --expose 80/udp node app.js
 
 ### `--hostname`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_HOSTNAME`
-- **Description**: Specify the container host name. Must be a valid hostname or fully qualified domain name (FQDN).
+- **型**: string
+- **環境変数**: `CDERUN_HOSTNAME`
+- **説明**: コンテナのホスト名
 
 ```bash
 cderun --hostname my-container alpine hostname
@@ -308,9 +338,12 @@ cderun --hostname my-container alpine hostname
 
 ### `--dns`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_DNS`
-- **Description**: Set custom DNS servers.
+- **型**: stringArray
+- **環境変数**: `CDERUN_DNS`
+- **説明**: カスタムDNSサーバの設定
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_DNS` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --dns 8.8.8.8 alpine ping google.com
@@ -318,9 +351,12 @@ cderun --dns 8.8.8.8 alpine ping google.com
 
 ### `--add-host`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_ADD_HOST`
-- **Description**: Add a custom host-to-IP mapping (`host:ip`).
+- **型**: stringArray
+- **環境変数**: `CDERUN_ADD_HOST`
+- **説明**: `/etc/hosts` へのカスタムホストマッピングの追加 (host:ip)
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_ADD_HOST` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --add-host my-server:192.168.1.10 alpine ping my-server
@@ -328,9 +364,9 @@ cderun --add-host my-server:192.168.1.10 alpine ping my-server
 
 ### `--user`, `-u`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_USER`
-- **Description**: Username or UID (format: `<name|uid>[:<group|gid>]`).
+- **型**: string
+- **環境変数**: `CDERUN_USER`
+- **説明**: 実行ユーザー/UID (format: <name|uid>[:<group|gid>])
 
 ```bash
 cderun -u 1000:1000 alpine whoami
@@ -338,25 +374,31 @@ cderun -u 1000:1000 alpine whoami
 
 ### `--group-add`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_GROUP_ADD`
-- **Description**: Add supplementary groups to the container execution user.
-- **Validation**: Enforces strict alphanumeric/numeric GID validation via regular expressions.
-- **Runtime Limitations**:
-  - **Docker / Podman**: Supports both group names (e.g., `docker`, `adm`) and numeric GIDs (e.g., `1001`).
-  - **containerd**: Due to direct OCI spec translation without internal container database access, **only numeric GIDs** (e.g., `1001`) are supported. Specifying group names will trigger an explicit execution error.
+- **型**: stringArray
+- **環境変数**: `CDERUN_GROUP_ADD`
+- **説明**: コンテナ起動時、実行ユーザーに追加の補助グループ（Supplementary Groups）を付与します。
+- **補足**:
+  - CLIフラグ（P1/P2）では、複数の追加グループを設定したい場合、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_GROUP_ADD` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
+  - **初期バリデーション**: 制御文字の混入や不適切なパラメータインジェクション攻撃を防ぐため、UNIXグループ名および数値型GIDパターンに準拠しているか、正規表現による厳密な検証が実行されます。
+  - **ランタイムによる制限 (重要)**:
+    - **DockerおよびPodman**: グループ名（例: `docker`）と数値GID（例: `1001`）の両方がサポートされます。
+    - **containerd**: 直接 containerd 実行を行う場合、コンテナエンジン内部での名前解決が行われない仕様（変換契約）に基づき、**数値GIDのみ**（例: `"1001"`, `"102"`, `"1002"`, etc.）がサポートされます。非数値のグループ名を指定するとエラーとなります。
 
 ```bash
+# 複数グループを数値GIDで追加して実行 (Docker / containerd)
 cderun --group-add 1001 --group-add 1002 alpine id
+
+# グループ名で追加して実行 (Docker / Podman のみ)
+cderun --group-add adm --group-add sudo alpine id
 ```
 
 ### `--privileged`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_PRIVILEGED`
-- **Description**: Give extended privileges to the container.
-- **Security Check**: Enforces a `Warn` level security log alert when activated.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_PRIVILEGED`
+- **説明**: 特権モードで実行
 
 ```bash
 cderun --privileged alpine ls /dev
@@ -368,7 +410,7 @@ cderun --privileged alpine ls /dev
 - **Default**: `false`
 - **Environment Variable**: `CDERUN_READ_ONLY`
 - **Description**: Mount the container's root filesystem as read-only.
-- **Details**: Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI specification.
+- **Details**: When enabled, the container's root filesystem is mounted as a read-only filesystem, mapping to `ReadonlyRootfs` in the Docker host configuration and setting `Root.Readonly = true` in the containerd OCI specification.
 
 ```bash
 cderun --read-only alpine touch /test-write
@@ -376,10 +418,12 @@ cderun --read-only alpine touch /test-write
 
 ### `--cap-add`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_CAP_ADD`
-- **Description**: Add Linux capabilities.
-- **Security Auditing**: Highly privileged capabilities (such as `ALL`, `SYS_ADMIN`, `NET_ADMIN`, `SYS_RAWIO`, `SYS_PTRACE`, `SYS_MODULE` with or without `CAP_` prefix) are scanned and trigger a `Warn` level audit alert to encourage the principle of least privilege.
+- **型**: stringArray
+- **環境変数**: `CDERUN_CAP_ADD`
+- **説明**: Linuxケーパビリティの追加
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_CAP_ADD` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --cap-add SYS_ADMIN alpine mount ...
@@ -387,33 +431,43 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 
 ### `--cap-drop`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_CAP_DROP`
-- **Description**: Drop Linux capabilities.
+- **型**: stringArray
+- **環境変数**: `CDERUN_CAP_DROP`
+- **説明**: Linuxケーパビリティの削除
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_CAP_DROP` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ### `--sensitive-env`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_SENSITIVE_ENV`
-- **Description**: List of environment variable patterns (glob format) to mask.
-- **Secure-by-Default Architecture**:
-  - **Default (Unset)**: All environment variables are treated as sensitive, masking values of non-empty keys as `[REDACTED]` in dry-runs and debug logs.
-  - **Explicit Disable**: Pass `--sensitive-env=""` (or YAML empty list `sensitiveEnv: []`) to completely disable masking.
-  - **Fail-Closed Fallback**: If any glob pattern syntax is malformed (e.g., `[` with no closing bracket), `cderun` safely falls back to masking all non-empty environment values to prevent accidental credential leakage.
+- **型**: stringArray
+- **環境変数**: `CDERUN_SENSITIVE_ENV`
+- **説明**: マスク（非表示）にする環境変数のパターンのリスト。
+- **詳細な仕様（Secure by Default）**:
+  - **未指定時（デフォルト）**: 安全性を最優先するため（Secure by Default）、すべての環境変数の一覧を自動的にマスクします。ドライラン出力やデバッグログなどの非実行出力においては、非空（値が存在する）の環境変数の値が一律で `[REDACTED]` と表示されます（空文字列の環境変数はマスクされず、空のまま維持されます）。
+  - **明示的な空値の指定**: マスク処理を完全に無効化したい場合は、CLIで明示的に空を指定（例: `--sensitive-env=""`）するか、YAML設定ファイルで空リスト（例: `sensitiveEnv: []`）を指定します。これにより、全ての環境変数がプレーンテキストとして表示されます。
+  - **パターンによるフィルタリング**: マスクしたい環境変数の特定のパターンを glob 形式で指定（例: `DB_*` や `*_PASSWORD`）すると、一致するキーのみがマスクされ、それ以外は通常どおりプレーンテキストで表示されます。
+  - **フォールバック（Fail-Closed）**: 万が一指定された glob パターンに不正な構文エラー（例: `[` の閉じ忘れなど）が含まれてパースに失敗した場合、安全のため「Fail-Closed（失敗時保護）」ロジックが働き、すべての非空の環境変数を再び自動的にマスク（非表示）します（空文字列の環境変数はマスクされず、空のまま維持されます）。
 
 ```bash
-# Secure-by-default behavior masking all environment variables
+# すべてをマスクするデフォルト動作
 cderun --dry-run node
 
-# Selectively mask keys starting with DB_
+# DBで始まるキーのみをマスクする
 cderun --sensitive-env "DB_*" --dry-run node
+
+# マスク処理を完全に無効化する
+cderun --sensitive-env "" --dry-run node
 ```
 
 ### `--entrypoint`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_ENTRYPOINT`
-- **Description**: Overwrite the default ENTRYPOINT of the image.
+- **型**: stringArray
+- **環境変数**: `CDERUN_ENTRYPOINT`
+- **説明**: イメージのデフォルトENTRYPOINTを上書き
+- **補足**:
+  - CLIフラグ（P1/P2）では、フラグを繰り返して複数指定します。
+  - 環境変数 `CDERUN_ENTRYPOINT` (P3) では、**カンマ (`,`)** をセパレータとして使用します。
 
 ```bash
 cderun --entrypoint /bin/sh node -c "ls"
@@ -421,61 +475,46 @@ cderun --entrypoint /bin/sh node -c "ls"
 
 ### `--pull`
 
-- **Type**: string
-- **Default**: `missing`
-- **Environment Variable**: `CDERUN_PULL`
-- **Supported Values**: `always`, `missing`, `never`.
-- **Validation**: Unrecognized values trigger an immediate invalid configuration error at startup.
-
-```bash
-cderun --pull always node
-```
+- **型**: string
+- **デフォルト**: `missing`
+- **環境変数**: `CDERUN_PULL`
+- **値**: `always`, `missing`, `never`
+- **説明**: 実行前のイメージプルポリシー
 
 ### `--pull-max-retries`
 
-- **Type**: int
-- **Default**: `3`
-- **Environment Variable**: `CDERUN_PULL_MAX_RETRIES`
-- **Description**: Maximum retry count for image pull operations.
+- **型**: int
+- **デフォルト**: `3`
+- **環境変数**: `CDERUN_PULL_MAX_RETRIES`
+- **説明**: イメージプル失敗時の最大リトライ回数（1以上の整数を指定）。
 
 ### `--pull-backoff-base`
 
-- **Type**: string (Duration)
-- **Default**: `1s`
-- **Environment Variable**: `CDERUN_PULL_BACKOFF_BASE`
-- **Description**: Base exponential backoff duration for retry delays (e.g., `1s`, `500ms`).
+- **型**: string (Duration)
+- **デフォルト**: `1s`
+- **環境変数**: `CDERUN_PULL_BACKOFF_BASE`
+- **説明**: イメージプルリトライ時の指数バックオフの基底時間（例: `1s`, `500ms`）。
 
 ### `--memory`, `-m`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_MEMORY`
-- **Description**: Limit memory allocation (e.g., `512m`, `1g`).
-- **Validation**: Validates that memory limits are non-negative.
-
-```bash
-cderun -m 512m node
-```
+- **型**: string
+- **環境変数**: `CDERUN_MEMORY`
+- **説明**: メモリ制限 (例: `512m`, `1g`)
 
 ### `--cpus`
 
-- **Type**: float64
-- **Environment Variable**: `CDERUN_CPUS`
-- **Description**: Limit CPU allocation.
-- **Validation**: Validates that CPU limits are non-negative.
-
-```bash
-cderun --cpus 1.5 node
-```
+- **型**: float64
+- **環境変数**: `CDERUN_CPUS`
+- **説明**: CPU数制限
 
 ### `--device`
 
-- **Type**: stringArray
-- **Environment Variable**: `CDERUN_DEVICE`
-- **Description**: Add a host device to the container.
-- **Format**: `<host-path>:<container-path>[:<permissions>]` (e.g., `/dev/fuse:/dev/fuse:rwm`).
-- **Permissions Validation**: Permissions are strictly validated against `^[rwm]+$`.
-- **Host Security Auditing**: Highly sensitive host paths (such as `/dev/mem`, `/dev/kmem`, `/dev/port`, and block devices like `/dev/sd*`, `/dev/nvme*`, `/dev/loop*`, `/dev/mapper/*`) are scanned and trigger explicit security warnings at the `Warn` log level.
-- **Container Destination Safety**: Container-side destination paths (`dc.Destination`) must be absolute and non-empty. Relative target directories are strictly blocked from conversion into absolute host directories, guaranteeing immediate validation errors.
+- **型**: stringArray
+- **環境変数**: `CDERUN_DEVICE`
+- **説明**: ホストデバイスをコンテナに追加
+- **詳細な仕様**:
+  - 形式: `<ホスト上のパス>:<コンテナ内のパス>[:<アクセス権限>]` (例: `/dev/fuse:/dev/fuse:rwm`)
+  - **厳格なセキュリティバリデーション**: 制御文字、空白文字、またはメタキャラクターの混入を防ぐため、アクセス権限（cgroup permissions）部分は正規表現 `^[rwm]+$` によって厳格に検証されます。不適切な権限の記述やパラメータインジェクション攻撃に繋がる不適合な設定は、設定解決フェーズで早期に即時エラーとなります。
 
 ```bash
 cderun --device /dev/fuse alpine ls /dev/fuse
@@ -483,22 +522,34 @@ cderun --device /dev/fuse alpine ls /dev/fuse
 
 ### `--config`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_CONFIG`
-- **Description**: Path to `cderun` configuration file (overriding search logic). Supports tilde (`~`) expansions.
+- **型**: string
+- **環境変数**: `CDERUN_CONFIG`
+- **説明**: cderun自体の設定ファイル（`.cderun.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます。
+- **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+
+```bash
+cderun --config my-cderun.yaml node app.js
+cderun --config ~/.config/cderun/custom.yaml node app.js
+```
 
 ### `--tool-config`
 
-- **Type**: string
-- **Environment Variable**: `CDERUN_TOOL_CONFIG`
-- **Description**: Path to `tools` configuration file (overriding search logic). Supports tilde (`~`) expansions.
+- **型**: string
+- **環境変数**: `CDERUN_TOOL_CONFIG`
+- **説明**: ツール実行設定ファイル（`.tools.yaml` 相当）を明示的に指定。パスの先頭に `~` または `~/` を使用してホームディレクトリを指定できます。
+- **効果**: 指定された場合、標準の階層的検索とマージをスキップします。
+
+```bash
+cderun --tool-config my-tools.yaml node app.js
+cderun --tool-config ~/tools-config.yaml node app.js
+```
 
 ### `--dry-run`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_DRY_RUN`
-- **Description**: Generate and output the container configuration intermediate representation without executing the container.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_DRY_RUN`
+- **説明**: 実際のコンテナ実行を行わずに、コンテナ構成を表示する
 
 ```bash
 cderun --dry-run node --version
@@ -506,17 +557,23 @@ cderun --dry-run node --version
 
 ### `--dry-run-format`, `-f`
 
-- **Type**: string
-- **Default**: `yaml`
-- **Environment Variable**: `CDERUN_DRY_RUN_FORMAT`
-- **Supported Formats**: `yaml`, `json`, `simple`.
+- **型**: string
+- **デフォルト**: `yaml`
+- **環境変数**: `CDERUN_DRY_RUN_FORMAT`
+- **説明**: ドライラン時の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --dry-run --dry-run-format json node --version
+cderun --dry-run -f simple node --version
+```
 
 ### `--diagnosis`
 
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_DIAGNOSIS`
-- **Description**: Display active container engine diagnostics and available tools. No subcommand is required.
+- **型**: bool
+- **デフォルト**: `false`
+- **環境変数**: `CDERUN_DIAGNOSIS`
+- **説明**: システム診断情報と利用可能なツールの一覧を表示する。このモードはサブコマンドの指定を必要としません。
 
 ```bash
 cderun --diagnosis
@@ -524,51 +581,233 @@ cderun --diagnosis
 
 ### `--diagnosis-format`
 
-- **Type**: string
-- **Default**: `yaml`
-- **Environment Variable**: `CDERUN_DIAGNOSIS_FORMAT`
-- **Supported Formats**: `yaml`, `json`, `simple`.
+- **型**: string
+- **デフォルト**: `yaml`
+- **環境変数**: `CDERUN_DIAGNOSIS_FORMAT`
+- **説明**: 診断情報の出力形式を指定
+- **値**: `yaml`, `json`, `simple`
+
+```bash
+cderun --diagnosis --diagnosis-format json
+```
 
 ### `--hang-timeout`
 
-- **Type**: string (Duration)
-- **Default**: `10s`
-- **Environment Variable**: `CDERUN_HANG_TIMEOUT`
-- **Description**: Period to wait for the container to terminate after I/O finishes in non-TTY, non-interactive environments before sending `SIGKILL`.
-- **Special Values**: `0` or `<= 0` disables the timeout, waiting indefinitely.
-- **Premature Attach Handling**: If an attach error occurs before container termination, setting `hang-timeout` to `<= 0` prevents immediate execution cutoff, causing the engine to block synchronously until the container naturally finishes.
+- **型**: string (Duration)
+- **デフォルト**: `10s`
+- **環境変数**: `CDERUN_HANG_TIMEOUT`
+- **説明**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の強制終了猶予時間。
+- **形式**: Go の Duration 形式（例: `10s`, `5s`, `0` または負の値）。
+- **詳細な動作条件**:
+  - **`0` または負の数値**: コンテナプロセスが自律して完全に終了するまで、猶予時間のタイムアウトを設けず、無期限にブロックして終了待機を行います。
+  - **アタッチ失敗時の堅牢な終了待機**: `cderun` がコンテナの起動中、コンテナ自体の自然な exit よりも前に、 premature（予期せぬ早期の）アタッチ通信失敗を検出した場合、hang-timeout が `0` (または `<= 0`) であれば、即時にエラーを吐いて実行を打ち切ることなく、コンテナが安全に終了する（または `waitDone` 終了検知チャネルが届く）まで無期限に同期的にブロックして待機します。
+  - **早期の式解決エラーの伝搬**: Duration パースエラー（例えば `10invalid` などの不正な値）が渡された場合、解決中の式エラーと同じく「Sticky Error」パターンで早期に解決エラーとして捕らえられ、実行前にエラーとして安全に中断・検知されます。
+- **詳細**: [ハングタイムアウト](./hang-timeout.md) を参照
 
 ```bash
 cderun --hang-timeout 5s node script.js
+cderun --hang-timeout 0 node background.js  # 無期限にコンテナを待つ
 ```
 
 ### `--log-level`
 
-- **Type**: string
-- **Default**: `error`
-- **Environment Variable**: `CDERUN_LOG_LEVEL`
-- **Supported Values**: `error`, `warn`, `warning` (alias), `info`, `debug`, `trace`.
+- **型**: string
+- **デフォルト**: `warn`
+- **環境変数**: `CDERUN_LOG_LEVEL`
+- **説明**: ログレベルを直接指定
+- **値**: `error`, `warn`, `info`, `debug`, `trace` (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
+- **注意**: `-v` や `--verbose` フラグは意図的にサポートされていません。代わりに `--log-level` を使用してください。
+
+```bash
+cderun --log-level info node app.js
+```
 
 ### `--log-format`
 
-- **Type**: string
-- **Default**: `text`
-- **Environment Variable**: `CDERUN_LOG_FORMAT`
-- **Supported Values**: `text`, `json`.
+- **型**: string
+- **デフォルト**: `text`
+- **環境変数**: `CDERUN_LOG_FORMAT`
+- **説明**: ログの出力形式 (`text` | `json`)
+
+```bash
+cderun --log-format json --log-level info node app.js
+```
 
 ### `--log-timestamp`
 
-- **Type**: bool
-- **Default**: `true`
-- **Environment Variable**: `CDERUN_LOG_TIMESTAMP`
-- **Description**: Print timestamps in log outputs.
+- **型**: bool
+- **デフォルト**: `true`
+- **環境変数**: `CDERUN_LOG_TIMESTAMP`
+- **説明**: ログにタイムスタンプを含める
+
+```bash
+cderun --log-timestamp=false node app.js
+```
+
+### `--cderun-*` (内部オーバーライドフラグ)
+
+- **説明**: 設定ファイルや環境変数を上書きして動作を強制する（P1優先順位）。すべての標準フラグに対応する `--cderun-` プレフィックス付きのフラグが存在します。
+- **カテゴリ別の対応フラグ例**:
+
+  - **実行制御**: `--cderun-tty`, `--cderun-interactive`, `--cderun-env`,
+    `--cderun-image`, `--cderun-runtime`, `--cderun-remove`,
+    `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-privileged`,
+    `--cderun-read-only`,
+    `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`,
+    `--cderun-pull-backoff-base`, `--cderun-strict-env`, `--cderun-cap-add`,
+    `--cderun-cap-drop`, `--cderun-hang-timeout`
+  - **ネットワーク**: `--cderun-network`, `--cderun-publish`,
+    `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`,
+    `--cderun-dns`, `--cderun-add-host`
+  - **リソース**: `--cderun-memory`, `--cderun-cpus`
+  - **マウント・ツール**: `--cderun-mount`, `--cderun-socket-path`,
+    `--cderun-mount-socket`, `--cderun-mount-socket-path`,
+    `--cderun-mount-cderun`, `--cderun-mount-cderun-path`,
+    `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-device`
+  - **設定ファイル**: `--cderun-config`, `--cderun-tool-config`
+  - **診断・ログ**: `--cderun-dry-run`, `--cderun-dry-run-format`,
+    `--cderun-diagnosis`, `--cderun-diagnosis-format`,
+    `--cderun-log-level`, `--cderun-log-format`,
+    `--cderun-log-timestamp`
+
+- **挙動**: これらは**サブコマンドの後ろ**に配置する必要があります。サブコマンドの前に配置するとエラーになります（Diagnosis Mode を除く）。
+- **配置規則**:
+  - **Wrapper Mode**: 必ずサブコマンドの後ろに配置してください。
+  - **Diagnosis Mode**: サブコマンドがないため、任意の場所に配置可能です。
+
+詳細な動作（ホイスト機能）については [引数解析](./argument-parsing.md) を参照してください。
+
+## その他の設定オプション
+
+### `strictEnv`
+
+- **説明**: 指定された環境変数がホストに存在しない場合にエラーとする設定。
+- **指定方法**: `.cderun.yaml`, `.tools.yaml` の `strictEnv` フィールド、
+  環境変数 `CDERUN_STRICT_ENV=true`、またはコマンドラインフラグ `--strict-env` で指定します。
+
+## オプションの優先順位
+
+優先順位の詳細は [引数・設定優先順位](./argument-priority-logic.md) を参照。
+
+### 実行制御用環境変数
+
+これらは優先順位階層（P1-P6）とは別に、実行時の挙動を直接制御するために使用されます。
+
+- **`CDERUN_HANG_TIMEOUT`**: 非インタラクティブまたは非TTYセッションにおける、I/O完了後の終了猶予時間（デフォルト: `10s`）。詳細な動作条件については [ハングタイムアウト](./hang-timeout.md) を参照してください。
+- **`CDERUN_REMOVE`**: 自動的にコンテナを削除するかどうか（デフォルト: `true`）。
+
+## 使用例
+
+### 基本的な使用
+
+```bash
+# シンプルな実行
+cderun node --version
+
+# TTY付き
+cderun --tty bash
+
+# インタラクティブ
+cderun -ti python
+```
+
+### ネットワーク設定
+
+```bash
+# ホストネットワーク
+cderun --network host node server.js
+
+# ネットワーク分離
+cderun --network none python script.py
+```
+
+### Docker-in-Docker
+
+```bash
+# Dockerソケットマウント
+cderun --mount-socket docker ps
+
+# cderunの入れ子実行（ソケットは自動的にマウントされます）
+cderun --mount-cderun alpine sh
+
+# Mac等でホストとコンテナのマウントパスを変える場合
+cderun --socket-path ~/.rd/docker.sock --mount-socket \
+  --mount-socket-path /var/run/docker.sock docker ps
+```
+
+### 複数オプションの組み合わせ
+
+```bash
+cderun --tty --interactive --network host --mount-socket docker sh
+```
+
+## 注意事項
+
+### フラグの位置
+
+cderunのフラグ（標準フラグ）は、原則として**サブコマンドの前**に指定する必要があります。
+
+```bash
+# 正しい（標準フラグ）
+cderun --tty node --version
+
+# 間違い（--ttyがnodeに渡される）
+cderun node --tty --version
+```
 
 ---
 
-## P1 Internal Overrides (`--cderun-*`)
+**例外**: `--cderun-*` で始まる**内部オーバーライドフラグ (P1)** は、通常**サブコマンドの後ろ**に指定する必要があります（前に置くとエラーになります）。ただし、サブコマンドを必要としない **Diagnosis Mode** では任意の場所に配置できます。
 
-Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOptions`, and `Float64Options` have a corresponding `--cderun-` prefixed counterpart (e.g., `--cderun-tty`, `--cderun-image`).
+```bash
+# 正しい（Wrapper Mode での内部オーバーライドフラグ）
+cderun node --version --cderun-tty
 
-- **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers.
-- **Hoisting Mechanics**: During argument preprocessing, any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally.
-- **Equals-Sign Format Constraints**: All value-taking internal overrides **must** use the equals-sign format (e.g., `--cderun-image=alpine`). Supplying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with a preprocessing validation error to guarantee robust argument parsing.
+# 間違い（Wrapper Mode）
+cderun --cderun-tty node --version
+
+# 正しい（Diagnosis Mode）
+cderun --diagnosis --cderun-log-level=debug
+cderun --cderun-log-level=debug --diagnosis
+```
+
+### 短縮形
+
+現在サポートされている短縮形：
+
+- `-t` → `--tty`
+- `-i` → `--interactive`
+- `-w` → `--workdir`
+- `-e` → `--env`
+- `-f` → `--dry-run-format`
+- `-p` → `--publish`
+- `-P` → `--publish-all`
+- `-u` → `--user`
+- `-m` → `--memory`
+
+### デフォルト値の確認
+
+```bash
+cderun --help
+```
+
+## トラブルシューティング
+
+### オプションが認識されない
+
+```bash
+cderun node --tty
+# --ttyがnodeに渡される
+```
+
+**解決策**: cderunの標準オプション（P2）はサブコマンドの前に指定します。
+
+```bash
+cderun --tty node
+```
+
+ただし、内部オーバーライド（P1）を使用する場合はサブコマンドの後ろに指定します。
+
+```bash
+cderun node --version --cderun-tty
+```

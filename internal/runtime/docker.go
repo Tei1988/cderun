@@ -165,7 +165,7 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		}
 
 		// Policy is "always" or "missing" (and not found locally)
-		d.logger.Debug("Pulling image %s...", img)
+		d.logger.Info("Pulling image %s...", img)
 		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 		if err != nil {
 			lastErr = err

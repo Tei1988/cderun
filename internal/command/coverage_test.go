@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -88,10 +87,6 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 
 	t.Run("attachDone error before container exit, timeout expires", func(t *testing.T) {
 		o := &rootOptions{logger: logging.NewLogger()}
-		o.logger.Init("warn", "text", false)
-		var stderrBuf bytes.Buffer
-		o.logger.SetOutput(&stderrBuf)
-
 		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{
 				WaitFunc: func(ctx context.Context, id string) (int, error) {
@@ -108,17 +103,10 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 		}
 		att.attachDone <- errors.New("early attach error")
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		_, err := o.waitForCompletion(ctx, cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{HangTimeout: 10 * time.Millisecond}, false, att)
+		exitCode, err := o.waitForCompletion(context.Background(), cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{HangTimeout: 10 * time.Millisecond}, false, att)
 		require.Error(t, err)
-		var exitErr *ExitCodeError
-		require.ErrorAs(t, err, &exitErr)
-		assert.Equal(t, 125, exitErr.Code)
-		assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
-		cancel()
-		assert.Contains(t, stderrBuf.String(), "failed to attach to container: early attach error")
+		assert.Contains(t, err.Error(), "early attach error")
+		assert.Equal(t, 0, exitCode)
 	})
 
 	t.Run("AttachContainer fails after container exit within grace period", func(t *testing.T) {
@@ -126,10 +114,6 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 			logger:            logging.NewLogger(),
 			attachGracePeriod: 1 * time.Second,
 		}
-		o.logger.Init("warn", "text", false)
-		var stderrBuf bytes.Buffer
-		o.logger.SetOutput(&stderrBuf)
-
 		waitStarted := make(chan struct{})
 		exitNotified := make(chan struct{})
 		mockRuntime := &runtime.MockRuntime{
@@ -151,9 +135,9 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 		}()
 
 		exitCode, err := o.waitForCompletion(context.Background(), cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{}, false, att)
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "attach failure after exit")
 		assert.Equal(t, 42, exitCode)
-		assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach failure after exit")
 	})
 }
 

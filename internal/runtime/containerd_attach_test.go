@@ -53,9 +53,8 @@ func TestUnit_Containerd_TaskReady_Concurrent(t *testing.T) {
 
 	var wg sync.WaitGroup
 	// Spin up multiple goroutines waiting for taskReady
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		//nolint:modernize
 		go func() {
 			defer wg.Done()
 			<-readyC

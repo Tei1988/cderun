@@ -63,7 +63,8 @@ func runGoldenTest(t *testing.T, dir string) {
 	// Load env if exists
 	envFile := filepath.Join(dir, "env.txt")
 	if data, err := os.ReadFile(envFile); err == nil {
-		for line := range strings.SplitSeq(string(data), "\n") {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
@@ -179,7 +180,7 @@ func normalizeGoldenOutput(s string) string {
 	s = strings.ReplaceAll(s, "/usr/local/bin/cderun", "{{BIN}}")
 
 	// If it's JSON, pretty-print it
-	var j any
+	var j interface{}
 	if err := json.Unmarshal([]byte(s), &j); err == nil {
 		if b, err := json.MarshalIndent(j, "", "  "); err == nil {
 			s = string(b) + "\n"

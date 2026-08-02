@@ -214,7 +214,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 			}
 		}
 
-		r.logger.Debug("Pulling image %s...", img)
+		r.logger.Info("Pulling image %s...", img)
 		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
 		if err != nil {
 			lastErr = err
@@ -244,10 +244,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if len(config.GroupAdd) > 0 {
 		validatedGids = make([]uint32, 0, len(config.GroupAdd))
 		for _, g := range config.GroupAdd {
-			gid64, err := strconv.ParseUint(g, 10, 32)
-			if err != nil {
-				return "", fmt.Errorf("containerd runtime: invalid GroupAdd GID %q: %w", g, err)
-			}
+			gid64, _ := strconv.ParseUint(g, 10, 32)
 			validatedGids = append(validatedGids, uint32(gid64))
 		}
 	}

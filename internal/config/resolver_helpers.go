@@ -163,8 +163,8 @@ func deduplicateEnv(env []string) []string {
 		return env
 	}
 	if len(env) <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 		hasDuplicates := false
 
@@ -177,8 +177,7 @@ func deduplicateEnv(env []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
+			if foundIdx != -1 {
 				vals[foundIdx] = e
 				hasDuplicates = true
 			} else {
@@ -229,8 +228,8 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 
 	if total <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 
 		for _, e := range base {
@@ -242,8 +241,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
+			if foundIdx != -1 {
 				vals[foundIdx] = e
 			} else {
 				keys[size] = key
@@ -261,8 +259,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
+			if foundIdx != -1 {
 				vals[foundIdx] = e
 			} else {
 				keys[size] = key
@@ -280,8 +277,7 @@ func mergeEnv(base, p2, p1 []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
+			if foundIdx != -1 {
 				vals[foundIdx] = e
 			} else {
 				keys[size] = key

@@ -466,9 +466,9 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", cfg.Defaults.MountCderunPath.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.MountSocketPath.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Source.BaseDir)
-		assert.Empty(t, cfg.Defaults.Mounts[0].Target.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Mounts[0].Target.BaseDir)
 		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Source.BaseDir)
-		assert.Empty(t, cfg.Defaults.Devices[0].Destination.BaseDir)
+		assert.Equal(t, "/base", cfg.Defaults.Devices[0].Destination.BaseDir)
 		assert.Equal(t, "/base/relative", cfg.HostContext.Mounts[0].Source)
 	})
 
@@ -487,9 +487,9 @@ func TestUnit_Config_SetBaseDir(t *testing.T) {
 		assert.Equal(t, "/base", tc.MountCderunPath.BaseDir)
 		assert.Equal(t, "/base", tc.MountSocketPath.BaseDir)
 		assert.Equal(t, "/base", tc.Mounts[0].Source.BaseDir)
-		assert.Empty(t, tc.Mounts[0].Target.BaseDir)
+		assert.Equal(t, "/base", tc.Mounts[0].Target.BaseDir)
 		assert.Equal(t, "/base", tc.Devices[0].Source.BaseDir)
-		assert.Empty(t, tc.Devices[0].Destination.BaseDir)
+		assert.Equal(t, "/base", tc.Devices[0].Destination.BaseDir)
 	})
 
 	t.Run("CDERunConfig SetBaseDir HostContext resolution", func(t *testing.T) {
@@ -561,7 +561,7 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		return
 	}
 
-	if vOrig.Kind() == reflect.Pointer {
+	if vOrig.Kind() == reflect.Ptr {
 		if !vOrig.IsNil() {
 			assert.NotSame(t, vOrig.Interface(), vCloned.Interface(), "Pointer should be different")
 			assertDeepCopyDistinct(t, vOrig.Elem().Interface(), vCloned.Elem().Interface())
@@ -582,7 +582,7 @@ func assertDeepCopyDistinct(t *testing.T, orig, cloned any) {
 		// Other kinds are already covered by the top-level assert.Equal.
 		//nolint:exhaustive
 		switch fOrig.Kind() {
-		case reflect.Pointer:
+		case reflect.Ptr:
 			if !fOrig.IsNil() {
 				assert.NotSame(t, fOrig.Interface(), fCloned.Interface(), "Field %s should be a different pointer", fieldName)
 			}

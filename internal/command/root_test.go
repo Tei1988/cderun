@@ -396,17 +396,15 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		mockRuntime := &runtime.MockRuntime{
 			AttachErr: errors.New("attach failed"),
 		}
-		var stderrBuf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.exitFunc = func(int) {}
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
 			o.isTerminal = func(fd int) bool { return true }
-			cmd.SetErr(&stderrBuf)
 		})
-		require.NoError(t, err)
-		assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach failed")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to attach to container: attach failed")
 	})
 }
 
@@ -619,7 +617,7 @@ func TestUnit_Root_Cleanup_RemoveContainerWarning(t *testing.T) {
 		}
 
 		var stderrBuf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 				return mockRuntime, nil
 			}
@@ -877,20 +875,15 @@ func TestUnit_Root_SignalKillIfRunning(t *testing.T) {
 	})
 
 	t.Run("Signal fails, propagate error", func(t *testing.T) {
-		var stderrBuf bytes.Buffer
-		logger := logging.NewLogger()
-		logger.Init("warn", "text", false)
-		logger.SetOutput(&stderrBuf)
-		oOpts := &rootOptions{logger: logger}
-
 		mockRuntime := &TerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failed")},
 			IsRunning:   true,
 		}
-		_, err := oOpts.signalKillIfRunning(t.Context(), mockRuntime, "c1")
-		require.NoError(t, err)
+		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "c1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "signal failed")
 		assert.Equal(t, "c1", mockRuntime.SignaledContainerID)
-		assert.Contains(t, stderrBuf.String(), "failed to force terminate container: signal failed")
+		assert.Equal(t, "SIGKILL", mockRuntime.Signal)
 	})
 }
 
@@ -1187,7 +1180,7 @@ func TestUnit_Root_RunE_CleanupSnapshotWarning(t *testing.T) {
 	mfs := &config.MockFileSystem{
 		RemoveAllErr: errors.New("remove failed"),
 	}
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--mount-cderun", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.exitFunc = func(int) {}
 		o.fs = mfs
 		o.configLoader = config.NewConfigLoaderWithFS(mfs)
@@ -1462,6 +1455,11 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 			setup:    func(m *runtime.MockRuntime) { m.CreateErr = errors.New("create failed") },
 			expected: "failed to create container: create failed",
 		},
+		{
+			name:     "AttachContainer fails",
+			setup:    func(m *runtime.MockRuntime) { m.AttachErr = errors.New("attach failed") },
+			expected: "failed to attach to container: attach failed",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1477,21 +1475,6 @@ func TestUnit_Root_Execute_ErrorPropagation(t *testing.T) {
 			assert.ErrorContains(t, err, tt.expected)
 		})
 	}
-
-	t.Run("AttachContainer fails (downgraded to warning)", func(t *testing.T) {
-		mockRuntime := &runtime.MockRuntime{
-			AttachErr: errors.New("attach failed"),
-		}
-		var stderrBuf bytes.Buffer
-		err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
-			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
-			o.isTerminal = func(fd int) bool { return false }
-			o.exitFunc = func(code int) {}
-			cmd.SetErr(&stderrBuf)
-		})
-		require.NoError(t, err)
-		assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach failed")
-	})
 }
 
 func TestUnit_Root_PreprocessArgs_FlagArguments(t *testing.T) {
@@ -1633,21 +1616,15 @@ func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 		AttachErr: errors.New("attach failed early"),
 		ExitCode:  42,
 	}
-	var stderrBuf bytes.Buffer
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mockRuntime, nil
 		}
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
-		cmd.SetErr(&stderrBuf)
 	})
 	require.Error(t, err)
-	var exitErr *ExitCodeError
-	require.ErrorAs(t, err, &exitErr)
-	assert.Equal(t, 42, exitErr.Code)
-	require.NoError(t, exitErr.Err)
-	assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach failed early")
+	assert.ErrorContains(t, err, "failed to attach to container: attach failed early")
 }
 
 func TestUnit_Root_PreprocessArgs_NoSubcommandHoisting(t *testing.T) {
@@ -1708,7 +1685,7 @@ func TestUnit_Root_Execute_SignalForwardingFailure_Warning(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		errCh <- ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 			o.isTerminal = func(fd int) bool { return false }
 			o.exitFunc = func(code int) {}
@@ -1815,28 +1792,22 @@ func TestUnit_Root_Execute_AttachFailureAfterExit(t *testing.T) {
 		},
 	}
 
-	var stderrBuf bytes.Buffer
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return false }
 		o.exitFunc = func(code int) {}
 		o.attachGracePeriod = 2 * time.Second
-		cmd.SetErr(&stderrBuf)
 	})
 
 	require.Error(t, err)
-	var exitErr *ExitCodeError
-	require.ErrorAs(t, err, &exitErr)
-	assert.Equal(t, 77, exitErr.Code)
-	require.NoError(t, exitErr.Err)
-	assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach error after exit")
+	assert.Contains(t, err.Error(), "failed to attach to container: attach error after exit")
 }
 
 func TestUnit_Root_Execute_MakeRawFailure_Warning(t *testing.T) {
 	t.Parallel()
 	mockRuntime := &runtime.MockRuntime{}
 	var stderrBuf bytes.Buffer
-	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--log-level", "warn", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+	err := ExecuteContextWithOptions(context.Background(), []string{"cderun", "--image", "alpine", "--tty", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(n, s string, l *logging.Logger) (runtime.ContainerRuntime, error) { return mockRuntime, nil }
 		o.isTerminal = func(fd int) bool { return true }
 		o.makeRaw = func(fd int) (*term.State, error) { return nil, errors.New("makeRaw failed") }
@@ -1938,7 +1909,7 @@ func (m *hangTimeoutMockRuntime) WaitContainer(ctx context.Context, id string) (
 	}
 	close(m.waitStarted)
 	select {
-	case <-m.SigChan:
+	case <-m.MockRuntime.SigChan:
 		return 137, nil
 	case <-ctx.Done():
 		return 137, ctx.Err()

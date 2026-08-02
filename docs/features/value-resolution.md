@@ -1,177 +1,186 @@
-# Feature Specification: Value Resolution & Expression Engine
+# 機能仕様：値の解決 (Value Resolution)
 
-In `cderun`, option values specified within configuration files or command-line arguments undergo a multi-layered evaluation and conversion process prior to execution. This dynamic evaluation allows flexible, context-aware configurations while maintaining strict security constraints.
+cderunでは、設定ファイル内の値やコマンドライン引数で指定された値が、実行前にいくつかの変換プロセスを経て解釈されます。これにより、環境に応じた柔軟な設定や動的な値の埋め込みが可能になります。
 
----
-
-## Recursive Resolution Mechanics
-
-Value resolution is recursively applied down configuration trees. This ensures that dynamic expressions, tildes, and relative paths are correctly expanded regardless of their depth.
-
-### Resolution Targets
-
-- **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution.
-- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively.
-- **Maps (`map[string]any` / `map[string]string`)**: Values of each key-value pair are recursively resolved.
+これらの解決ルールは、**設定ファイル内の値**と**コマンドライン引数の値**の両方に適用されます。
 
 ---
 
-## cderun Expressions (`{{...}}`)
+## 解決の仕組み (Recursive Resolution)
 
-Dynamic variables and expressions can be embedded inside strings using the double-brace `{{...}}` syntax.
+cderunの内部では、文字列だけでなく、スライス（配列）やマップ（オブジェクト）に対しても再帰的に値の解決が適用されます。これにより、ネストされた設定値の中にある `{{...}}` 式やチルダ展開が正しく評価されます。
 
-The expression engine automatically trims leading and trailing whitespaces within braces. For instance, `{{ HOME }}` is normalized and evaluated identically to `{{HOME}}`.
+### 再帰的解決の対象
 
-### Anchor Boundary Validation
+- **文字列**: 式の展開、チルダ展開、相対パスの絶対パス化。
+- **スライス (`[]any`)**: 要素ごとに再帰的に解決。
+- **マップ (`map[string]any`)**: 値ごとに再帰的に解決。
 
-To prevent directory traversal attacks (such as specifying `{{HOME}}/../../etc/passwd`), `cderun` enforces strict **Anchor Boundary Validation** on any path resolved via magic words, custom expressions, or tilde expansions.
+---
 
-#### Validation Workflow
+## cderun Expressions (cderun式)
 
-1. **Identify Anchors**: The engine scans for any `{{...}}` expression or leading `~` that acts as a path origin (anchor).
-2. **Determine Anchor Boundaries**: Each anchor is individually resolved to an absolute directory, representing the permissible "boundary directory".
-3. **Resolve Path**: The path undergoes complete expression evaluation, tilde expansion, and relative path resolution, yielding a normalized absolute target path.
-4. **Boundary Verification**: The engine checks whether the resolved target path resides strictly within the boundary directory of **every** active anchor. If the normalized path escapes the boundary directory (e.g., traverses up past the anchor root using `..`), the engine raises an immediate security validation error.
+任意の文字列値の中で、`{{...}}` という構文を使って動的に値を埋め込むことができます。
 
-#### Pass/Fail Scenarios
+`cderun` は式の中身に対して自動的に前後の空白を除去（トリミング）します。そのため、`{{ HOME }}` のようにスペースを入れても `{{HOME}}` と同様に正しく認識されます。
 
-Assuming the anchor `{{HOME}}` resolves to `/home/user`:
+### アンカー境界検証 (Anchor Boundary Validation)
 
-| Raw Input Path | Resolved Absolute Path | Verdict | Reason |
+マジックワード（`{{HOME}}`, `{{PWD}}` など）、任意の `{{...}}` 式、およびチルダ（`~`）をパスの起点として使用する場合、`cderun` は解決後の最終的なパスがその「アンカー（起点）」の範囲外に脱出していないかを厳密に検証します。
+
+これは、`{{HOME}}/../../etc/passwd` や `{{env:MY_DIR}}/../../etc/passwd` のような指定によるディレクトリトラバーサル攻撃を防止するための重要なセキュリティ機構です。
+
+#### 検証のルール
+
+1. **アンカーの特定**: `{{...}}` 形式のすべての式、および先頭の `~` を「アンカー」として認識します。
+2. **境界の確定**: アンカーを個別に解決し、それが指し示す絶対パスを「境界（Anchor Directory）」として取得します。
+3. **パスの解決**: 式の展開、チルダ展開、および相対パスの解決を行い、最終的な絶対パスを算出します。
+4. **逸脱のチェック**: 解決後のパスが、アンカーの境界ディレクトリの配下（または同一）に留まっているかを確認します。境界を越えて親ディレクトリへ遡るようなパス（例: `..` による脱出）が検出された場合、エラーとなります。
+
+#### 判定例 (Pass/Fail Scenarios)
+
+アンカーが `{{HOME}}`（`/home/user`）の場合：
+
+| 指定されたパス | 解決後の絶対パス | 判定 | 理由 |
 | :--- | :--- | :--- | :--- |
-| `{{HOME}}/Documents/data.txt` | `/home/user/Documents/data.txt` | **PASS** | Resides within boundary directory |
-| `{{HOME}}/Documents/../data.txt` | `/home/user/data.txt` | **PASS** | Resides within boundary directory |
-| `{{HOME}}/..` | `/home` | **FAIL** | Escapes boundary directory (goes into parent) |
-| `{{HOME}}/../../etc/passwd` | `/etc/passwd` | **FAIL** | Escapes boundary directory (directory traversal) |
+| `{{HOME}}/Documents/data.txt` | `/home/user/Documents/data.txt` | **PASS** | 境界内（配下） |
+| `{{HOME}}/Documents/../data.txt` | `/home/user/data.txt` | **PASS** | 境界内（同一） |
+| `{{HOME}}/..` | `/home` | **FAIL** | 境界外（親ディレクトリへ脱出） |
+| `{{HOME}}/../../etc/passwd` | `/etc/passwd` | **FAIL** | 境界外（ディレクトリトラバーサル） |
 
-#### Under-the-Hood Security Logic
+#### 内部メカニズム
 
-Anchor boundary checks leverage Go's `filepath.Clean` and `filepath.Rel` to construct a platform-agnostic, normalized relationship between the anchor directory (e.g., `/home/user`) and the resolved target path (e.g., `/etc/passwd`).
+アンカー境界検証は、内部的に Go の `filepath.Clean` および `filepath.Rel` を組み合わせて検証しています。
+具体的には、アンカーが指す基準パス（例: `/home/user`）と、最終解決されたパス（例: `/etc/passwd`）との間の相対パスを計算します。
+算出された相対パスの先頭に `../` や `..`（Windows の場合は `..\` や `..`）が含まれる場合、基準パスの外側（親方向）へ脱出していると判断し、`path traversal detected: %q escapes anchor boundary %q` の形式でエラーを返します（例: `path traversal detected: "{{HOME}}/../../etc/passwd" escapes anchor boundary "/home/user"`）。
+これにより、OSごとのパスデリミタの違いやパス表記の揺らぎを吸収した堅牢なセキュリティガードを実現しています。
 
-If the computed relative path begins with `../` (or `..\` on Windows) or is `..`, it indicates that the target path escapes the boundary. In such cases, execution is aborted with an error resembling:
+### 複数アンカーの取り扱い (Handling Multiple Anchors)
 
-```text
-path traversal detected: "{{HOME}}/../../etc/passwd" escapes anchor boundary "/home/user"
-```
+パス内に複数の `{{...}}` 式が含まれる場合、それらはすべて個別の境界として機能します。解決後の最終的な絶対パスは、**出現するすべてのアンカーの境界条件を同時に満たす**必要があります。
 
-This ensures full defense against directory traversals across different operating systems.
+例えば、`{{HOME}}/{{PWD}}/file` のように指定され、`{{HOME}}` が `/home/user`、`{{PWD}}` が `/work` と解決された場合、最終的なパスは `/home/user/work/file` となりますが、これは `/work` の境界を越えているためエラーとなります（`/home/user/work/file` は `/work` の配下ではないため）。
 
-### Multiple Anchors Evaluation
+また、ネストされた式（例: `{{env:DIR:-{{HOME}}}}`）の場合、内側の式の結果が外側の式の解決に使われます。境界検証は、最終的に「アンカー」として機能した各式に対して行われます。
 
-If a single path string contains multiple anchors (e.g., `{{HOME}}/{{PWD}}/file`), the resolved absolute path must simultaneously satisfy the boundary verification check for **every** anchor present.
+この検証により、ユーザーが意図したディレクトリツリーの範囲内でのみファイルアクセスが許可されることが保証されます。
 
-For example, if `{{HOME}}` is `/home/user` and `{{PWD}}` is `/work`, the path `{{HOME}}/{{PWD}}/file` evaluates to `/home/user/work/file`, which is then rejected because it does not lie within `/work`'s boundary directory.
+### 種類
 
-In nested expressions (e.g., `{{env:DIR:-{{HOME}}}}`), the inner expression is evaluated first to supply the fallback parameters for the outer expression. Boundary checking is ultimately applied to the resolved anchors that contribute to the final path.
+#### 1. マジックワード (Magic Words)
 
----
+cderunが特別な意味を持つと定義しているキーワードです。
 
-## Expression Types
-
-### 1. Magic Words
-
-Magic words represent internal, pre-defined constants representing the host's execution context.
-
-| Keyword | Description |
+| ワード | 説明 |
 | :--- | :--- |
-| `{{HOME}}` | Expands to the home directory of the current host execution user. |
-| `{{PWD}}` | Expands to the current working directory of the host execution environment. |
-| `{{BASE_HOME}}` | Expands to the home directory of the **base host** (Level 0 host/VM). Under nested execution, `{{HOME}}` expands to the container's home (e.g., `/root`), whereas `{{BASE_HOME}}` preserves the original physical host's home path. |
-| `{{BASE_PWD}}` | Expands to the working directory of the **base host** (Level 0 host/VM). Under nested execution, `{{BASE_PWD}}` retains the initial directory where the host process was started. |
+| `{{HOME}}` | 実行ユーザーのホームディレクトリに置換されます。 |
+| `{{PWD}}` | `cderun` コマンドを実行したカレントワーキングディレクトリに置換されます。 |
+| `{{BASE_HOME}}` | **基底ホスト**のホームディレクトリに置換されます。Nested 実行環境（コンテナ内）では `{{HOME}}` がコンテナ内のホームディレクトリ（例: `/root`）に展開されるのに対し、`{{BASE_HOME}}` は常に物理ホスト（またはVM）のホームディレクトリ（例: `/Users/user`）に展開されます。Level 0（基底ホスト）では `{{HOME}}` と同じ値になります。 |
+| `{{BASE_PWD}}` | **基底ホスト**のカレントワーキングディレクトリに置換されます。Nested 実行環境では `{{PWD}}` がコンテナ内の作業ディレクトリに展開されるのに対し、`{{BASE_PWD}}` は常に物理ホスト（またはVM）で最初に `cderun` を実行したディレクトリに展開されます。Level 0 では `{{PWD}}` と同じ値になります。 |
 
-### 2. Directives
+#### 2. ディレクティブ (Directives)
 
-Directives use the format `{{type:parameter}}` to query dynamic data sources.
+`:` を含む形式で、特定のデータソースから値を読み込むよう指示します。
 
-| Directive | Description |
+| ディレクティブ | 説明 |
 | :--- | :--- |
-| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. |
-| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. |
+| `{{file:<ファイル名>}}` | 指定された `<ファイル名>` の内容を読み込み、その値で置換します。ファイルは、カレントディレクトリからルートディレクトリ、および `~/.config/cderun/`, `/etc/cderun/`, `/run/cderun/` を順に上方探索して検索されます。見つかったファイル内容の前後の空白・改行は除去されます。ファイルが見つからない場合や、絶対パス・`..` を含むファイル名が指定された場合はエラーとなります。また、セキュリティ上の理由から **1MB (1,048,576 bytes)** を超えるファイルは読み込めません。 |
+| `{{find_dir:<名前>}}` | 指定されたファイルまたはディレクトリ `<名前>` を `{{file:...}}` と同じルールで上方探索し、それが発見されたディレクトリの**絶対パス**で置換します。見つからない場合はエラーとなります。 |
+| `{{env:<環境変数名>}}` | ホスト側の実行環境の環境変数 `<環境変数名>` の値に置換されます。環境変数が存在しない場合は空文字列に置換されます。また、`{{env:KEY:-default}}` の形式で、環境変数が未設定または空の場合のデフォルト値を指定できます。 |
 
-### 3. Unrecognized and Unknown Expressions
+#### 3. 未知のディレクティブの扱い
 
-To prevent silent failures and typos (such as typing `{{HOM}}` instead of `{{HOME}}`), the engine implements **Strict Resolution** rules for unrecognized brace contents:
+`{{...}}` 内のコンテンツがマジックワード（例: `{{HOME}}`）や既知のディレクティブ（例: `{{env:KEY}}`）のいずれにも該当しない場合、意図したキーワードのタイポ（例: `{{HOM}}`）による設定ミスを防ぐため、以下のルールで処理されます。
 
-1. **Immediate Failure**: If the content resembles a magic word (all uppercase letters and underscores, such as `{{HOM}}`) or a directive (contains a `:`, such as `{{envv:KEY}}`), the engine immediately throws an invalid expression error and halts execution.
-2. **Literal Preservation**: If the content does not fit either of those patterns (e.g., `{{foo}}`), it is assumed to belong to another templating engine (such as Go templates or Ansible) and is preserved literally without changes.
+1. **エラーとなるケース**: コンテンツが「マジックワード風（すべて大文字英数字とアンダースコア）」または「ディレクティブ風（`:` を含む）」である場合、未知の指定として**エラー**となり、実行が中断されます。
+2. **リテラルとして残るケース**: 上記に該当しない場合（例: `{{foo}}`）は、他の用途（Go template 等）のリテラルであると判断され、置換されずにそのまま残ります。
 
-### 4. Double-Brace Escaping Syntax
+この厳格な解決（Strict Resolution）ルールにより、不正確な式が静かに無視されて意図しない値がコンテナに渡されるのを防ぎます。
 
-If you need to pass a literal string containing double braces to the container (such as passing a raw `{{HOME}}` string to `echo`), you can escape it by wrapping it inside an outer pair of braces:
+#### 4. エスケープ記法 (Escaping)
+
+リテラルとして `{{HOME}}` や `{{env:VAR}}` という文字列をそのままコンテナに渡したい場合は、さらに `{{` と `}}` で囲むことでエスケープできます。
 
 - `{{ {{HOME}} }}` → `{{HOME}}`
 - `{{ {{file:config}} }}` → `{{file:config}}`
 
-This escaping mechanism bypasses evaluation and also prevents strict resolution checks from failing on non-standard expressions.
+この記法により、cderunの解決エンジンによる置換を明示的に回避できます。また、意図的に「マジックワード風」や「ディレクティブ風」の文字列（例: `{{MY:VAL}}`）をリテラルとして渡したい場合も、このエスケープ記法を使用することで Strict Resolution によるエラーを回避できます。
 
-### 5. Nested Expressions
+### ネストされた式 (Nested Expressions)
 
-Expressions can be nested to configure complex fallback scenarios. The expression engine evaluates expressions from the inside out.
+cderun式は再帰的に解決されるため、式の中にさらに別の式を**含められます**。これは、環境変数が未設定の場合にファイルから値を読み込むといった高度なフォールバックに役立ちます。
 
-**Example:**
+**例:**
 
-```text
-{{env:VERSION:-{{file:.version}}}}
-```
-
-1. The inner expression `{{file:.version}}` is evaluated first (e.g., resolving to `1.2.3`).
-2. The outer expression is evaluated with the fallback parameter: `{{env:VERSION:-1.2.3}}`.
-3. If the host environment variable `VERSION` is set, its value is used; otherwise, it falls back to `1.2.3`.
+- `{{env:VERSION:-{{file:.version}}}}`
+  1. まず内側の `{{file:.version}}` が解決されます（例: `1.2.3`）。
+  2. 次に `{{env:VERSION:-1.2.3}}` が評価され、環境変数 `VERSION` があればその値、なければ `1.2.3` が採用されます。
 
 ---
 
-## Security Hardening and Constraints
+## セキュリティ制約 (Security Restraints)
 
-The value resolution engine implements multiple security layers:
+cderunの式解決には、セキュリティ上の理由から以下の厳格な制約があります。
 
-### 1. Directive Parameter Restrictions
+### 1. ディレクティブパラメータの制限
 
-- **Absolute Paths Prohibited**: Parameters of `{{file:...}}` and `{{find_dir:...}}` must be simple filenames or directory names. Specifying absolute paths (such as `/etc/passwd`) is strictly rejected.
-- **Path Separation Blocked**: Parameters must not contain path separators (`/` or `\`).
-- **Parent Traversals Blocked**: Specifying `..` within directive parameters (e.g., `{{file:../config}}`) is strictly prohibited and triggers an immediate error.
+- **パス指定の禁止**: `{{find_dir:...}}` や `{{file:...}}` にはローカルなファイル名またはディレクトリ名のみ指定可能です。`./` や `../`、あるいはディレクトリ区切り文字 (`/`, `\`) を含むパスを指定することはできません。
+- **絶対パスの禁止**: `/etc/passwd` や `C:\windows\system32\...` のような絶対パスは指定できません。
+- **親ディレクトリ参照 (`..`) の一律禁止**: パス内に `..` セグメントを含むことは一切許可されません（例: `{{file:../config}}` はエラー）。
 
-### 2. Container Target Path Safety
+### 2. アンカーパス解決に対する制約
 
-Because container-side paths—such as the target directories in mount configs (`mc.Target`) and destination directories in device mappings (`dc.Destination`)—reside inside the container, they are **never** subjected to host-side absolute path conversions (such as those done by `SetBaseDir`).
+マジックワード（`{{HOME}}` 等）、任意の `{{...}}` 式、またはチルダ（`~`）を起点とするパス解決では、利便性と安全性を両立させるため、以下のルールが適用されます。
 
-This ensures that relative target directories are not silently mapped to host directories. During evaluation, container target paths must be absolute and non-empty, and relative inputs will be correctly detected and rejected.
+- **親ディレクトリ参照 (`..`) の許容**: パス内に `..` を含めること自体は許可されます。
+- **境界逸脱の禁止 (最重要)**: [アンカー境界検証](#アンカー境界検証-anchor-boundary-validation) により、最終的に解決されたパスが**アンカーの起点ディレクトリの外側**（親方向）に出ていないかをチェックします。
+  - 例: `{{HOME}}/Documents/..` は `{{HOME}}` と等価なため **許可** されます。
+  - 例: `{{HOME}}/..` はホームディレクトリを脱出するため **禁止** されます。
 
-### 3. Null-Byte Injections Guard
+この境界逸脱の検証は、内部的に `filepath.Rel` を用いた相対距離計算（起点ディレクトリからの遡りがないかのチェック）によって、OSごとのパス区切り文字の違いを考慮した上で行われます。
 
-To prevent string truncation and injection vulnerabilities in operating system and container execution APIs, the engine scans environmental keys and values for null bytes (`\x00`). The presence of any null byte triggers an immediate security validation error.
+### 3. 共通の制約
 
-### 4. "Sticky Error" Pattern
+- **ファイル名の妥当性**: `{{file:...}}` や `{{find_dir:...}}` で指定されるファイル名は、`filepath.IsLocal` (Go 1.20+) によって、単一のローカルファイル名（絶対パスや `..` を含まない）であるかどうかが検証されます。
+- **ファイルサイズの制限**: `{{file:...}}` で読み込めるファイルは **1MB** (`MaxDirectiveFileSize`) 以下に制限されています。この制限は、セキュリティ上の理由から、ファイルへのアクセス後に取得されたデータのサイズに基づいて厳密に適用されます。
 
-To prevent invalid or compromised configurations from propagating, the evaluation engine implements a **Sticky Error** pattern:
+### スティッキーエラー (Sticky Error) パターン
 
-1. The first resolution or security validation error encountered is captured and stored internally.
-2. For all subsequent evaluation steps, the resolver transitions to a safe, non-evaluating fallback state where raw input strings are returned unmodified.
-3. Upon completing the resolution sweep, the retained error is propagated to the calling sequence, cleanly aborting execution.
+解決プロセス中にこれらの制約違反（セキュリティ違反やファイル不在など）が検出された場合、解決エンジン（`ExpressionResolver`）は即座にエラーを内部に保持（`setError`）し、以降の動作を変更します。
+
+1. **安全なフォールバック**: エラー発生以降のすべての解決リクエストは、元の値をそのまま（未解決のまま）返します。
+2. **エラーの伝搬**: 最終的な解決結果を取得する際、呼び出し元は `Error()` メソッドを通じて最初に発生した違反内容を確認し、処理を中断できます。
+3. **確実な中断**: この仕組みにより、複数の値が含まれるスライスやマップの解決において、一部の不正な値が「静かに無視」されるのを防ぎ、システム全体として安全に停止させることができます。
+
+この「スティッキー」な特性により、一度でもエラー状態に陥るとその解決コンテキストは「汚染」されたとみなされ、一貫性と安全性を最優先した挙動をとります。
 
 ---
 
-## Tilde Expansion
+## チルダ展開 (Tilde Expansion)
 
-Path strings starting with `~` or `~/` are expanded to the current user's home directory.
+シェルの挙動と一貫性を持たせるため、値の**先頭**が `~` または `~/` で始まるパスは、実行ユーザーのホームディレクトリに展開されます。
 
-**Example:**
+**例:**
 
 - `~/.ssh` -> `/home/user/.ssh`
-- `~/project` -> `/home/user/project`
+- `~/workspace/project` -> `/home/user/workspace/project`
+- `~` -> `/home/user`
 
-**Constraint**: Tilde expansion only applies if the tilde character resides at the **absolute start** of the string. Mid-path tildes (e.g., `/foo/~bar`) are treated as literal characters.
+**重要な制限事項**:
+チルダ展開は、値の**絶対的な先頭**にある場合にのみ適用されます。パスの途中（例: `/foo/~bar`）に含まれる `~` は単なるリテラルとして扱われ、ホームディレクトリへの展開は行われません。
+
+この挙動はアンカー境界検証とも連動しており、パス途中の `~` はアンカー（境界の起点）とはみなされません。
 
 ---
 
-## Relative Path Resolution
+## 相対パスの解決 (Relative Path Resolution)
 
-Relative paths (starting with `./` or `../`) are automatically converted to absolute paths using the following criteria:
+`mounts` の `source` や `devices` のホストパスなど、ホスト側のパスを指す設定値に `./` や `../` で始まる相対パスが記述されている場合、そのパスは以下の基準で絶対パスへ変換されます。
 
-1. **Within Configuration Files**: Resolved relative to the directory containing the configuration file.
-2. **Within CLI Flags**: Resolved relative to the host's current working directory (`{{PWD}}`).
+1. **設定ファイル内の値**: その設定ファイルが置かれているディレクトリが基準となります。
+2. **コマンドライン引数**: コマンドを実行したカレントディレクトリ (`{{PWD}}`) が基準となります。
 
-**Example**: Inside `/home/user/project/.tools.yaml`:
+**例:** `/home/user/project/.tools.yaml` 内の以下の記述
 
 ```yaml
 mounts:
@@ -180,34 +189,101 @@ mounts:
     target: /app
 ```
 
-The `source` path is resolved to `/home/user/project/src`.
+は、`source: /home/user/project/src` として解決されます。
 
 ---
 
-## Evaluation Sequence
+## 解決の順序とルール (Order of Evaluation)
 
-Values are evaluated according to the following strict sequence:
+値の解決は、原則として以下の順序で実行されます。
 
-1. **cderun Expressions**: Evaluate double-brace `{{...}}` expressions.
-2. **Tilde Expansion**: Resolve leading tildes to home directories.
-3. **Relative Path Resolution**: Convert remaining relative paths (`./` or `../`) to absolute paths based on configuration or CLI contexts.
-4. **Path Cleaning**: Normalize paths by removing redundant separators and parent traversals (e.g., `/home/user/project/../src` -> `/home/user/src`).
+1. **cderun Expressions の展開**: `{{...}}` 式が評価されます。
+2. **チルダ展開**: `~` または `~/` がホームディレクトリに展開されます。
+3. **相対パスの解決**: 上記の結果、値が相対パス (`./` or `../`) になった場合、適切なディレクトリ（設定ファイル内の値ならそのファイルのディレクトリ、CLIなら `{{PWD}}`）を基準に絶対パスへ解決されます。
+4. **パスの正規化**: 最終的なパス文字列は、冗長な要素を除去し正規化されます。
+   - 例: `/home/user/project/../src` → `/home/user/src`
+   - 例: `./src` (at `/app`) → `/app/src`
+
+**注記**: マウントの `target` パスなど、コンテナ内のパスを指定する箇所では、ホストコンテキストによる逆パス解決（Reverse Path Resolution）の影響を受けないよう、マジックワードの評価のみが適用され、ホスト側の絶対パス解決はスキップされます。
 
 ---
 
-## Performance Optimizations
+## キャッシュとパフォーマンス (Cache & Performance)
 
-### Process Socket Cache
+cderun は、多数の設定項目や再帰的な解決を効率的に行うために、以下の最適化を行っています。
 
-Process socket caches store the auto-detected socket paths to avoid repeated disk I/O, as described in [Multi-Runtime Support](./multi-runtime-support.md).
+- **式スキャンの効率化**: 文字列内の `{{...}}` の検出はシングルパス (O(n)) で行われ、ネストされた括弧も正しく処理されます。
+- **ファイル・ステータスキャッシュ**: `{{file:...}}` による内容の読み込みや、`{{find_dir:...}}` のためのファイル存在確認結果は、一つの解決セッション内でキャッシュされます。これにより、複数の設定項目で同じファイルを繰り返し参照する場合でも、ディスク I/O の発生を最小限に抑えます。
+- **高速パス (Fast-path)**: 式やチルダを含まない単純な文字列については、不必要な解析処理をスキップするように設計されています。
+- **遅延インスタンス化（Lazy Instantiation）**: 解析エンジン（`ExpressionResolver`）は、設定解決時に `{{...}}` などの式、チルダ（`~`）、相対パス解決、またはネストされた実行環境（`Level > 0`）が実際に検出された場合にのみ、`getR()` を通じて遅延して初期化されます。これにより、動的な解決が不要なシンプルで静的な実行パスでは、ファイルシステムの探索や初期化処理のオーバーヘッドを完全にバイパスします。
 
-### Lazy Resolver Instantiation
+---
 
-To minimize runtime overhead and resource usage, the `ExpressionResolver` is instantiated lazily via `getR()` only when:
+## 使用例 (Practical Examples)
 
-- An expression marker (`{{`) is detected.
-- A tilde expansion (`~`) is required.
-- A relative path requires absolute conversion.
-- Execution occurs under a nested context (`Level > 0`).
+### 1. プロジェクト間でのバージョン同期 (`{{file:...}}`)
 
-Static commands that do not utilize dynamic variables bypass resolver instantiation and filesystem scans entirely, resulting in near-zero overhead.
+プロジェクトごとに `.go-version` や `.nvmrc` を用意している場合、それらのファイル内容をコンテナイメージのタグに直接埋め込むことができます。これにより、開発環境（ホスト）と実行環境（コンテナ）のバージョンを完璧に一致させることが可能です。
+
+```bash
+# .go-version の内容（例: 1.22.1）をタグに使用
+cderun --image="golang:{{file:.go-version}}" go version
+
+# .nvmrc の内容を node イメージ의 タグに使用
+cderun --image="node:{{file:.nvmrc}}-alpine" node --version
+```
+
+### 2. プロジェクトルートを基準としたパス指定 (`{{find_dir:...}}`)
+
+`.git` や `package.json` が存在するディレクトリ（プロジェクトルート）を自動的に探し出し、その絶対パスを使ってファイルをマウントできます。
+なお、Nested 実行環境（コンテナ内）でマウント情報がある場合、見つかったディレクトリのパスはホスト側の絶対パスへ逆解決（host path へ再マッピング）されます。
+自分がプロジェクト内のどの階層（`src/` や `tests/` 等）にいても、常に正しいソースを参照できます。
+
+```bash
+# リポジトリルートの node_modules を /node_modules にマウントする例
+cderun --mount type=bind,source="{{find_dir:.git}}/node_modules",target=/node_modules node app.js
+
+# 設定ファイル (.tools.yaml) 内での記述例
+# 常にプロジェクトルートの logs ディレクトリをマウントする
+my-tool:
+  mounts:
+    - type: bind
+      source: "{{find_dir:package.json}}/logs"
+      target: "/var/log/app"
+```
+
+### 3. 環境に応じたフォールバック (`{{env:...}}`)
+
+環境変数が設定されている場合はそれを使用し、未設定の場合はデフォルト値を使用する柔軟な構成が可能です。
+
+```bash
+# CI環境等で IMAGE_TAG があればそれを使用し、なければ latest を使用する
+cderun --image="my-app:{{env:IMAGE_TAG:-latest}}" my-app
+```
+
+### 4. その他の使用例
+
+```bash
+cderun --workdir="{{PWD}}/src" node app.js
+cderun --image="node:{{env:NODE_VERSION}}" node --version
+# 環境変数が未設定または空の場合のデフォルト値を指定する例
+cderun --image="node:{{env:NODE_VERSION:-20-alpine}}" node --version
+```
+
+```yaml
+# .tools.yaml での使用
+node:
+  mounts:
+    - type: bind
+      source: "{{HOME}}/.npmrc"
+      target: /root/.npmrc
+
+# Nested 実行環境での使用例
+# {{BASE_HOME}} を使うことで、コンテナ内から別のコンテナを起動する際に
+# 基底ホストのパスを正しく参照できます。
+clasp:
+  mounts:
+    - type: bind
+      source: "{{BASE_HOME}}/.config/gcloud"
+      target: /root/.config/gcloud
+```

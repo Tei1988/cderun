@@ -913,19 +913,14 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 
 		started := make(chan struct{})
 		ready := make(chan struct{})
-
-		errCh := make(chan error, 1)
 		go func() {
-			errCh <- runtime.AttachContainer(context.Background(), "id", false, &syncFailingReader{started: started}, nil, nil, ready)
+			<-started
+			_ = pw.Close()
 		}()
 
-		// Wait for AttachContainer to finish with error
-		err := <-errCh
+		err := runtime.AttachContainer(context.Background(), "id", false, &syncFailingReader{started: started}, nil, nil, ready)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "read error")
-
-		// Release the blocked output goroutine by closing pw
-		_ = pw.Close()
 	})
 
 	t.Run("nil output writers", func(t *testing.T) {
