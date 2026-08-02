@@ -1594,6 +1594,27 @@ func isHighlyPrivilegedCapability(capName string) bool {
 	return highlyPrivilegedCaps[upperCap]
 }
 
+// isHighlySensitiveDevice returns true if the given path on host represents a highly sensitive device.
+func isHighlySensitiveDevice(p string) bool {
+	p = path.Clean(p)
+	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" {
+		return true
+	}
+	if matched, _ := path.Match("/dev/sd*", p); matched {
+		return true
+	}
+	if matched, _ := path.Match("/dev/nvme*", p); matched {
+		return true
+	}
+	if matched, _ := path.Match("/dev/loop*", p); matched {
+		return true
+	}
+	if matched, _ := path.Match("/dev/mapper/*", p); matched {
+		return true
+	}
+	return false
+}
+
 func (rv *resolver) validateSecurity() error {
 	if err := rv.validateCriticalFields(); err != nil {
 		return err
@@ -1643,6 +1664,11 @@ func (rv *resolver) validateSecurity() error {
 				if isSensitive {
 					logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
 				}
+			}
+		}
+		for _, d := range rv.res.Devices {
+			if isHighlySensitiveDevice(d.PathOnHost) {
+				logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
 			}
 		}
 	}
@@ -1720,9 +1746,21 @@ func (rv *resolver) validateCriticalFields() error {
 		return fmt.Errorf("security validation failed for %q: %w", "socket-path", err)
 	}
 
+	if err := rv.validateMountSocketPathRaw(); err != nil {
+		return err
+	}
+
 	// mount-socket-path
 	if err := validatePathChars(rv.res.MountSocketPath); err != nil {
 		return fmt.Errorf("security validation failed for %q: %w", "mount-socket-path", err)
+	}
+	if rv.res.MountSocketPath != "" {
+		if !path.IsAbs(rv.res.MountSocketPath) {
+			return fmt.Errorf("security validation failed for %q: mount target must be an absolute path: %q", "mount-socket-path", rv.res.MountSocketPath)
+		}
+		if HasParentTraversal(rv.res.MountSocketPath) {
+			return fmt.Errorf("security validation failed for %q: mount target cannot contain parent directory references: %q", "mount-socket-path", rv.res.MountSocketPath)
+		}
 	}
 
 	// mount-cderun-path
@@ -1780,6 +1818,42 @@ func (rv *resolver) validateCriticalFields() error {
 		}
 	}
 
+	return nil
+}
+
+func (rv *resolver) validateMountSocketPathRaw() error {
+	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", rv.getCliVal())
+	if err != nil {
+		return err
+	}
+	var raw string
+	if p1Set {
+		raw = p1Val.String()
+	} else if p2Set {
+		raw = p2Val.String()
+	} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+		raw = env
+	} else {
+		found := false
+		if rv.tools != nil {
+			if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountSocketPath.Raw != "" {
+				raw = tool.MountSocketPath.Raw
+				found = true
+			}
+		}
+		if !found && rv.global != nil && rv.global.Defaults.MountSocketPath.Raw != "" {
+			raw = rv.global.Defaults.MountSocketPath.Raw
+		}
+	}
+
+	if raw != "" {
+		if !path.IsAbs(raw) {
+			return fmt.Errorf("security validation failed for %q: mount target must be an absolute path: %q", "mount-socket-path", raw)
+		}
+		if HasParentTraversal(raw) {
+			return fmt.Errorf("security validation failed for %q: mount target cannot contain parent directory references: %q", "mount-socket-path", raw)
+		}
+	}
 	return nil
 }
 
