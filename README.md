@@ -313,7 +313,7 @@ Expressions can be used to inject host-context or dynamic values into options li
 #### Detailed Value Resolution and Escaping Mechanics
 
 - **Recursive Processing**: Resolving is performed recursively. If a resolved environment variable or file contents itself contain a dynamic expression, it is evaluated sequentially to prevent unexpanded parameters.
-- **Double-Brace Escaping**: To pass raw double-brace strings without trigger resolution, you can escape them by prefixing with a backslash or nesting (e.g., `\{\{TEXT\}\}` or double-bracing literal blocks).
+- **Double-Brace Escaping**: To pass raw double-brace strings without triggering resolution, you can escape them by prefixing each brace with a backslash (e.g., `\{\{TEXT\}\}` which is preserved literally as `{{TEXT}}`). This provides a deterministic, unambiguous way to prevent expression evaluation.
 - **Size and Traversal Safety**: The file directive strictly limits output parsing to 1MB to prevent out-of-memory states, and strictly enforces parent-directory traversal security boundaries to prevent host environment leaks.
 
 ### 3. Tilde Expansion & Relative Path Resolution
