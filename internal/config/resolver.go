@@ -70,100 +70,100 @@ type ResolvedConfig struct {
 
 // CLIOptions represents values from CLI flags.
 type CLIOptions struct {
-	Image                    *string
-	TTY                      *bool
-	Interactive              *bool
-	Network                  *string
-	Remove                   *bool
-	ReadOnly                 *bool
-	CderunTTY                *bool
-	CderunInteractive        *bool
-	CderunImage              *string
-	CderunNetwork            *string
-	CderunRemove             *bool
-	CderunReadOnly           *bool
-	Runtime                  *string
-	CderunRuntime            *string
-	SocketPath               *string
-	CderunSocketPath         *string
-	MountSocket              *bool
-	CderunMountSocket        *bool
-	MountSocketPath          *string
-	CderunMountSocketPath    *string
-	Env                      []string
-	CderunEnv                []string
-	Workdir                  *string
-	CderunWorkdir            *string
-	Mounts                   []string
-	CderunMounts             []string
-	MountCderun              *bool
-	CderunMountCderun        *bool
-	MountCderunPath          *string
-	CderunMountCderunPath    *string
-	MountTools               *string
-	CderunMountTools         *string
-	MountAllTools            *bool
-	CderunMountAllTools      *bool
-	DryRun                   *bool
-	CderunDryRun             *bool
-	DryRunFormat             *string
-	CderunDryRunFormat       *string
-	Diagnosis                *bool
-	CderunDiagnosis          *bool
-	DiagnosisFormat          *string
-	CderunDiagnosisFormat    *string
-	LogLevel                 *string
-	LogFormat                *string
-	LogTimestamp             *bool
-	StrictEnv                *bool
-	CderunStrictEnv          *bool
-	CderunLogLevel           *string
-	CderunLogFormat          *string
-	CderunLogTimestamp       *bool
-	HangTimeout              *string
-	CderunHangTimeout        *string
+	Image                 *string
+	TTY                   *bool
+	Interactive           *bool
+	Network               *string
+	Remove                *bool
+	ReadOnly              *bool
+	CderunTTY             *bool
+	CderunInteractive     *bool
+	CderunImage           *string
+	CderunNetwork         *string
+	CderunRemove          *bool
+	CderunReadOnly        *bool
+	Runtime               *string
+	CderunRuntime         *string
+	SocketPath            *string
+	CderunSocketPath      *string
+	MountSocket           *bool
+	CderunMountSocket     *bool
+	MountSocketPath       *string
+	CderunMountSocketPath *string
+	Env                   []string
+	CderunEnv             []string
+	Workdir               *string
+	CderunWorkdir         *string
+	Mounts                []string
+	CderunMounts          []string
+	MountCderun           *bool
+	CderunMountCderun     *bool
+	MountCderunPath       *string
+	CderunMountCderunPath *string
+	MountTools            *string
+	CderunMountTools      *string
+	MountAllTools         *bool
+	CderunMountAllTools   *bool
+	DryRun                *bool
+	CderunDryRun          *bool
+	DryRunFormat          *string
+	CderunDryRunFormat    *string
+	Diagnosis             *bool
+	CderunDiagnosis       *bool
+	DiagnosisFormat       *string
+	CderunDiagnosisFormat *string
+	LogLevel              *string
+	LogFormat             *string
+	LogTimestamp          *bool
+	StrictEnv             *bool
+	CderunStrictEnv       *bool
+	CderunLogLevel        *string
+	CderunLogFormat       *string
+	CderunLogTimestamp    *bool
+	HangTimeout           *string
+	CderunHangTimeout     *string
 
 	// Docker-compatible flags
-	Ports                    []string
-	CderunPorts              []string
-	PublishAll               *bool
-	CderunPublishAll         *bool
-	Expose                   []string
-	CderunExpose             []string
-	Hostname                 *string
-	CderunHostname           *string
-	DNS                      []string
-	CderunDNS                []string
-	AddHosts                 []string
-	CderunAddHosts           []string
-	User                     *string
-	CderunUser               *string
-	Privileged               *bool
-	CderunPrivileged         *bool
-	Pid                      *string
-	CderunPid                *string
-	CapAdd                   []string
-	CderunCapAdd             []string
-	CapDrop                  []string
-	CderunCapDrop            []string
-	Entrypoint               []string
-	CderunEntrypoint         []string
-	Pull                     *string
-	CderunPull               *string
-	PullMaxRetries           *int
-	CderunPullMaxRetries     *int
-	PullBackoffBase          *string
-	CderunPullBackoffBase    *string
-	Memory                   *string
-	CderunMemory             *string
-	CPUs                     *float64
-	CderunCPUs               *float64
-	Devices                  []string
-	CderunDevices            []string
-	SensitiveEnv             []string
-	CderunSensitiveEnv       []string
-	GroupAdd                 []string
-	CderunGroupAdd           []string
+	Ports                 []string
+	CderunPorts           []string
+	PublishAll            *bool
+	CderunPublishAll      *bool
+	Expose                []string
+	CderunExpose          []string
+	Hostname              *string
+	CderunHostname        *string
+	DNS                   []string
+	CderunDNS             []string
+	AddHosts              []string
+	CderunAddHosts        []string
+	User                  *string
+	CderunUser            *string
+	Privileged            *bool
+	CderunPrivileged      *bool
+	Pid                   *string
+	CderunPid             *string
+	CapAdd                []string
+	CderunCapAdd          []string
+	CapDrop               []string
+	CderunCapDrop         []string
+	Entrypoint            []string
+	CderunEntrypoint      []string
+	Pull                  *string
+	CderunPull            *string
+	PullMaxRetries        *int
+	CderunPullMaxRetries  *int
+	PullBackoffBase       *string
+	CderunPullBackoffBase *string
+	Memory                *string
+	CderunMemory          *string
+	CPUs                  *float64
+	CderunCPUs            *float64
+	Devices               []string
+	CderunDevices         []string
+	SensitiveEnv          []string
+	CderunSensitiveEnv    []string
+	GroupAdd              []string
+	CderunGroupAdd        []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -1669,117 +1669,123 @@ func (rv *resolver) validateSecurity() error {
 
 func (rv *resolver) validateCriticalFields() error {
 	// image
-	if err := validatePathChars(rv.res.Image); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "image", err)
-	}
-	if err := ValidateImageName(rv.res.Image); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "image", err)
+	if err := validateField(rv.res.Image, "image", ValidateImageName); err != nil {
+		return err
 	}
 
 	// pid
-	if err := validatePathChars(rv.res.Pid); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "pid", err)
+	pidValidator := func(v string) error {
+		if v != "" && v != "host" {
+			return fmt.Errorf("unsupported pid namespace: %q", v)
+		}
+		return nil
 	}
-	if rv.res.Pid != "" && rv.res.Pid != "host" {
-		return fmt.Errorf("security validation failed for %q: unsupported pid namespace: %q", "pid", rv.res.Pid)
+	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
+		return err
 	}
 
 	// user
-	if err := validatePathChars(rv.res.User); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "user", err)
-	}
-	if err := ValidateUserName(rv.res.User); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "user", err)
+	if err := validateField(rv.res.User, "user", ValidateUserName); err != nil {
+		return err
 	}
 
 	// network
-	if err := validatePathChars(rv.res.Network); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "network", err)
-	}
-	if err := ValidateNetworkName(rv.res.Network); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "network", err)
+	if err := validateField(rv.res.Network, "network", ValidateNetworkName); err != nil {
+		return err
 	}
 
 	// hostname
-	if err := validatePathChars(rv.res.Hostname); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "hostname", err)
-	}
-	if err := ValidateHostname(rv.res.Hostname); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "hostname", err)
+	if err := validateField(rv.res.Hostname, "hostname", ValidateHostname); err != nil {
+		return err
 	}
 
 	// workdir
-	if err := validatePathChars(rv.res.Workdir); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "workdir", err)
-	}
-	if err := ValidateWorkdir(rv.res.Workdir); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "workdir", err)
+	if err := validateField(rv.res.Workdir, "workdir", ValidateWorkdir); err != nil {
+		return err
 	}
 
 	// runtime
-	if err := validatePathChars(rv.res.Runtime); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "runtime", err)
+	runtimeValidator := func(v string) error {
+		if v != "docker" && v != "podman" && v != "containerd" {
+			return fmt.Errorf("unsupported runtime: %q", v)
+		}
+		return nil
 	}
-	if rv.res.Runtime != "docker" && rv.res.Runtime != "podman" && rv.res.Runtime != "containerd" {
-		return fmt.Errorf("security validation failed for %q: unsupported runtime: %q", "runtime", rv.res.Runtime)
+	if err := validateField(rv.res.Runtime, "runtime", runtimeValidator); err != nil {
+		return err
 	}
 
 	// pull
-	if err := validatePathChars(rv.res.Pull); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "pull", err)
+	pullValidator := func(v string) error {
+		if v != "" && v != "always" && v != "missing" && v != "never" {
+			return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", v)
+		}
+		return nil
 	}
-	if rv.res.Pull != "" && rv.res.Pull != "always" && rv.res.Pull != "missing" && rv.res.Pull != "never" {
-		return fmt.Errorf("security validation failed for %q: invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", "pull", rv.res.Pull)
+	if err := validateField(rv.res.Pull, "pull", pullValidator); err != nil {
+		return err
 	}
 
 	// socket-path
-	if err := validatePathChars(rv.res.SocketPath); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "socket-path", err)
+	if err := validateField(rv.res.SocketPath, "socket-path", nil); err != nil {
+		return err
 	}
 
 	// mount-socket-path
-	if err := validatePathChars(rv.res.MountSocketPath); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "mount-socket-path", err)
+	if err := validateField(rv.res.MountSocketPath, "mount-socket-path", nil); err != nil {
+		return err
 	}
 
 	// mount-cderun-path
-	if err := validatePathChars(rv.res.MountCderunPath); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "mount-cderun-path", err)
+	if err := validateField(rv.res.MountCderunPath, "mount-cderun-path", nil); err != nil {
+		return err
 	}
 
 	// dry-run-format
-	if err := validatePathChars(rv.res.DryRunFormat); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "dry-run-format", err)
+	dryRunFormatValidator := func(v string) error {
+		if v != "" && v != "yaml" && v != "json" && v != "simple" {
+			return fmt.Errorf("unsupported dry-run format: %q", v)
+		}
+		return nil
 	}
-	if rv.res.DryRunFormat != "" && rv.res.DryRunFormat != "yaml" && rv.res.DryRunFormat != "json" && rv.res.DryRunFormat != "simple" {
-		return fmt.Errorf("security validation failed for %q: unsupported dry-run format: %q", "dry-run-format", rv.res.DryRunFormat)
+	if err := validateField(rv.res.DryRunFormat, "dry-run-format", dryRunFormatValidator); err != nil {
+		return err
 	}
 
 	// diagnosis-format
-	if err := validatePathChars(rv.res.DiagnosisFormat); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "diagnosis-format", err)
+	diagnosisFormatValidator := func(v string) error {
+		if v != "" && v != "yaml" && v != "json" && v != "simple" {
+			return fmt.Errorf("unsupported diagnosis format: %q", v)
+		}
+		return nil
 	}
-	if rv.res.DiagnosisFormat != "" && rv.res.DiagnosisFormat != "yaml" && rv.res.DiagnosisFormat != "json" && rv.res.DiagnosisFormat != "simple" {
-		return fmt.Errorf("security validation failed for %q: unsupported diagnosis format: %q", "diagnosis-format", rv.res.DiagnosisFormat)
+	if err := validateField(rv.res.DiagnosisFormat, "diagnosis-format", diagnosisFormatValidator); err != nil {
+		return err
 	}
 
 	// log-level
-	if err := validatePathChars(rv.res.LogLevel); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "log-level", err)
-	}
-	if rv.res.LogLevel != "" {
-		l := strings.ToLower(rv.res.LogLevel)
-		if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
-			return fmt.Errorf("security validation failed for %q: unsupported log level: %q", "log-level", rv.res.LogLevel)
+	logLevelValidator := func(v string) error {
+		if v != "" {
+			l := strings.ToLower(v)
+			if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
+				return fmt.Errorf("unsupported log level: %q", v)
+			}
 		}
+		return nil
+	}
+	if err := validateField(rv.res.LogLevel, "log-level", logLevelValidator); err != nil {
+		return err
 	}
 
 	// log-format
-	if err := validatePathChars(rv.res.LogFormat); err != nil {
-		return fmt.Errorf("security validation failed for %q: %w", "log-format", err)
+	logFormatValidator := func(v string) error {
+		if v != "" && v != "text" && v != "json" {
+			return fmt.Errorf("unsupported log format: %q", v)
+		}
+		return nil
 	}
-	if rv.res.LogFormat != "" && rv.res.LogFormat != "text" && rv.res.LogFormat != "json" {
-		return fmt.Errorf("security validation failed for %q: unsupported log format: %q", "log-format", rv.res.LogFormat)
+	if err := validateField(rv.res.LogFormat, "log-format", logFormatValidator); err != nil {
+		return err
 	}
 
 	if rv.res.Memory < 0 {
@@ -1801,92 +1807,40 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateSlices() error {
-	// entrypoint
-	for i, e := range rv.res.Entrypoint {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "entrypoint", i, err)
-		}
+	if err := validateSliceElements(rv.res.Entrypoint, "entrypoint", nil); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.Ports, "ports", ValidatePort); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.Expose, "expose", ValidateExposePort); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.DNS, "dns", ValidateDNS); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.AddHosts, "add-hosts", ValidateAddHost); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.CapAdd, "cap-add", ValidateCapability); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.CapDrop, "cap-drop", ValidateCapability); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.GroupAdd, "group-add", ValidateGroupAdd); err != nil {
+		return err
 	}
 
-	// ports
-	for i, e := range rv.res.Ports {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "ports", i, err)
-		}
-		if err := ValidatePort(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "ports", i, err)
-		}
-	}
-
-	// expose
-	for i, e := range rv.res.Expose {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "expose", i, err)
-		}
-		if err := ValidateExposePort(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "expose", i, err)
-		}
-	}
-
-	// dns
-	for i, e := range rv.res.DNS {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "dns", i, err)
-		}
-		if err := ValidateDNS(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "dns", i, err)
-		}
-	}
-
-	// add-hosts
-	for i, e := range rv.res.AddHosts {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "add-hosts", i, err)
-		}
-		if err := ValidateAddHost(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "add-hosts", i, err)
-		}
-	}
-
-	// cap-add
-	for i, e := range rv.res.CapAdd {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-add", i, err)
-		}
-		if err := ValidateCapability(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-add", i, err)
-		}
-	}
-
-	// cap-drop
-	for i, e := range rv.res.CapDrop {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-drop", i, err)
-		}
-		if err := ValidateCapability(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "cap-drop", i, err)
-		}
-	}
-
-	// group-add
-	for i, e := range rv.res.GroupAdd {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "group-add", i, err)
-		}
-		if err := ValidateGroupAdd(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "group-add", i, err)
-		}
-	}
-
-	// sensitive-env
-	for i, e := range rv.res.SensitiveEnv {
-		if err := validatePathChars(e); err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: %w", "sensitive-env", i, err)
-		}
+	sensitiveEnvValidator := func(e string) error {
 		_, err := path.Match(e, "TEST")
 		if err != nil {
-			return fmt.Errorf("security validation failed for %s[%d]: invalid glob pattern: %w", "sensitive-env", i, err)
+			return fmt.Errorf("invalid glob pattern: %w", err)
 		}
+		return nil
+	}
+	if err := validateSliceElements(rv.res.SensitiveEnv, "sensitive-env", sensitiveEnvValidator); err != nil {
+		return err
 	}
 
 	return nil
@@ -1916,14 +1870,8 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
-		if m.Target == "" {
-			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot be empty", i)
-		}
-		if !path.IsAbs(m.Target) {
-			return fmt.Errorf("security validation failed for mounts[%d] (target): target path must be an absolute path: %q", i, m.Target)
-		}
-		if HasParentTraversal(m.Target) {
-			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
+		if err := validateContainerPath(m.Target, "mounts", i, "target", "target"); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1937,14 +1885,8 @@ func (rv *resolver) validateDeviceSecurity() error {
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
 		}
-		if d.PathInContainer == "" {
-			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot be empty", i)
-		}
-		if !path.IsAbs(d.PathInContainer) {
-			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path must be an absolute path: %q", i, d.PathInContainer)
-		}
-		if HasParentTraversal(d.PathInContainer) {
-			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
+		if err := validateContainerPath(d.PathInContainer, "devices", i, "path-in-container", "destination"); err != nil {
+			return err
 		}
 		if d.CgroupPermissions != "" {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
@@ -1954,6 +1896,45 @@ func (rv *resolver) validateDeviceSecurity() error {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): invalid cgroup permissions %q", i, d.CgroupPermissions)
 			}
 		}
+	}
+	return nil
+}
+
+func validateField(value string, name string, validator func(string) error) error {
+	if err := validatePathChars(value); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", name, err)
+	}
+	if validator != nil {
+		if err := validator(value); err != nil {
+			return fmt.Errorf("security validation failed for %q: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func validateSliceElements(slice []string, name string, validator func(string) error) error {
+	for i, e := range slice {
+		if err := validatePathChars(e); err != nil {
+			return fmt.Errorf("security validation failed for %s[%d]: %w", name, i, err)
+		}
+		if validator != nil {
+			if err := validator(e); err != nil {
+				return fmt.Errorf("security validation failed for %s[%d]: %w", name, i, err)
+			}
+		}
+	}
+	return nil
+}
+
+func validateContainerPath(val string, listName string, index int, fieldName string, pathName string) error {
+	if val == "" {
+		return fmt.Errorf("security validation failed for %s[%d] (%s): %s path cannot be empty", listName, index, fieldName, pathName)
+	}
+	if !path.IsAbs(val) {
+		return fmt.Errorf("security validation failed for %s[%d] (%s): %s path must be an absolute path: %q", listName, index, fieldName, pathName, val)
+	}
+	if HasParentTraversal(val) {
+		return fmt.Errorf("security validation failed for %s[%d] (%s): %s path cannot contain parent directory references: %q", listName, index, fieldName, pathName, val)
 	}
 	return nil
 }

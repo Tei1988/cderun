@@ -20,7 +20,7 @@ func TestUnit_Config_SymlinkMode_Defaults(t *testing.T) {
 	// ToolsConfig contains default image for "node" as "node:18".
 	cli := &CLIOptions{
 		CderunImage: ptr("node:20"), // P1 internal override flag
-		}
+	}
 
 	tools := ToolsConfig{
 		"node": ToolConfig{

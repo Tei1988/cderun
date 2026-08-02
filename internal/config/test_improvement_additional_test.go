@@ -219,7 +219,7 @@ func TestUnit_Config_PathSecurity_TraversalsAndValidation(t *testing.T) {
 		// Mock resolver and config
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := &CLIOptions{
-			Image: ptr("alpine"),
+			Image:  ptr("alpine"),
 			Mounts: []string{"type=bind,source=/work,target=/app/../escape"},
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -230,7 +230,7 @@ func TestUnit_Config_PathSecurity_TraversalsAndValidation(t *testing.T) {
 	t.Run("Device destinations must not have traversal", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := &CLIOptions{
-			Image: ptr("alpine"),
+			Image:   ptr("alpine"),
 			Devices: []string{"/dev/null:/app/../escape"},
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
@@ -247,11 +247,11 @@ func TestUnit_Config_Resolve_WithPrivilegedAndSocketSettings(t *testing.T) {
 	t.Run("resolve with privileged and mount socket options", func(t *testing.T) {
 		mfs := &MockFileSystem{WD: "/work"}
 		cli := &CLIOptions{
-			Image: ptr("alpine"),
-			Privileged: ptr(true),
-			CapAdd: []string{"SYS_ADMIN"},
+			Image:       ptr("alpine"),
+			Privileged:  ptr(true),
+			CapAdd:      []string{"SYS_ADMIN"},
 			MountSocket: ptr(true),
-			GroupAdd: []string{"1234"},
+			GroupAdd:    []string{"1234"},
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
@@ -304,8 +304,8 @@ func TestUnit_Config_PidOption(t *testing.T) {
 		}
 		cli := &CLIOptions{
 			Image:     ptr("alpine"),
-			Pid:       ptr("invalid"),    // P2 would fail
-			CderunPid: ptr("host"),       // P1 should win
+			Pid:       ptr("invalid"), // P2 would fail
+			CderunPid: ptr("host"),    // P1 should win
 		}
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)

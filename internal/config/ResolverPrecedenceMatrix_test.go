@@ -20,10 +20,10 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image: ptr("alpine"),
-			Network: ptr("p2-net"), // P2
+			Image:         ptr("alpine"),
+			Network:       ptr("p2-net"), // P2
 			CderunNetwork: ptr("p1-net"), // P1
-			}
+		}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -48,9 +48,9 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 			},
 		}
 		cli := &CLIOptions{
-			Image: ptr("alpine"),
+			Image:   ptr("alpine"),
 			Network: ptr("p2-net"), // P2
-			}
+		}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -76,7 +76,7 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 		}
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
-			}
+		}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -98,7 +98,7 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
-			}
+		}
 		tools := ToolsConfig{
 			"sh": ToolConfig{
 				Network: "p4-net", // P4
@@ -120,7 +120,7 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
-			}
+		}
 		global := &CDERunConfig{
 			Defaults: ConfigDefaults{
 				Network: "p5-net", // P5
@@ -137,7 +137,7 @@ func TestUnit_Config_WrapperMode_PrecedenceResolving(t *testing.T) {
 		mfs := &MockFileSystem{}
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
-			}
+		}
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)

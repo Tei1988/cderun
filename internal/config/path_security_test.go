@@ -450,16 +450,16 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 		{
 			name: "Invalid control char in LogFormat",
 			cli: &CLIOptions{
-				Image: ptr("alpine"),
+				Image:     ptr("alpine"),
 				LogFormat: ptr("text\t"),
-				},
+			},
 			wantErr: "security validation failed for \"log-format\"",
 		},
 		{
 			name: "Invalid control char in Env key",
 			cli: &CLIOptions{
 				Image: ptr("alpine"),
-				Env:      []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
+				Env:   []string{"SAFE=VALUE", "UNSAFE\n=VALUE"},
 			},
 			wantErr: "invalid environment variable key",
 		},
@@ -467,7 +467,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			name: "Multiline Env value (PEM) is allowed",
 			cli: &CLIOptions{
 				Image: ptr("alpine"),
-				Env:      []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
+				Env:   []string{"CERT=-----BEGIN CERTIFICATE-----\nMIIDDTCCAfWgAwIBAgIU...\n-----END CERTIFICATE-----"},
 			},
 			wantErr: "", // No error expected
 		},
@@ -475,7 +475,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			name: "Invalid control char in Ports element",
 			cli: &CLIOptions{
 				Image: ptr("alpine"),
-				Ports:    []string{"8080:80\r"},
+				Ports: []string{"8080:80\r"},
 			},
 			wantErr: "security validation failed for ports[0]",
 		},
@@ -483,14 +483,14 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 			name: "Invalid ImageName in ResolveWithFS",
 			cli: &CLIOptions{
 				Image: ptr("alpine;rm -rf /"),
-				},
+			},
 			wantErr: "security validation failed for \"image\"",
 		},
 		{
 			name: "Invalid EnvKey in ResolveWithFS (CLI)",
 			cli: &CLIOptions{
 				Image: ptr("alpine"),
-				Env:      []string{"INVALID-KEY=VALUE"},
+				Env:   []string{"INVALID-KEY=VALUE"},
 			},
 			wantErr: "invalid environment variable key",
 		},
