@@ -159,6 +159,16 @@ cderun node app.js --cderun-image node:20-alpine
 cderun --cderun-image node:20-alpine node app.js
 ```
 
+#### Detailed Explanation of the Configuration Priority
+
+The P1–P6 priority layers allow highly flexible execution setups.
+- **P1 (Internal Overrides)**: Allows the caller to force-override any option dynamically, regardless of what has been configured globally or tool-wise. These flags are intercepted before subcommand execution.
+- **P2 (CLI Flags)**: Represents regular options provided to `cderun` before the subcommand.
+- **P3 (Env Vars)**: Enables environment-based configuration overrides on the host. List values are comma-separated or semicolon-separated (such as `CDERUN_ENV`).
+- **P4 (Tool Config)**: Defined inside `.tools.yaml` for specific subcommands. This is where you configure tool-specific Docker images, mounts, and default working directories.
+- **P5 (Global Config)**: Defined inside `.cderun.yaml` and contains global defaults like fallback container runtime or log level.
+- **P6 (Defaults)**: Hardcoded settings within the binary itself, ensuring safe execution even without configuration files.
+
 #### Detailed Hoisting Mechanics
 
 Hoisting ensures that `cderun` settings do not conflict with the flags of the tool you are wrapping.
@@ -299,6 +309,12 @@ Expressions can be used to inject host-context or dynamic values into options li
   - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`).
   - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`).
   - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
+
+#### Detailed Value Resolution and Escaping Mechanics
+
+- **Recursive Processing**: Resolving is performed recursively. If a resolved environment variable or file contents itself contain a dynamic expression, it is evaluated sequentially to prevent unexpanded parameters.
+- **Double-Brace Escaping**: To pass raw double-brace strings without triggering resolution, you can escape them by prefixing each brace with a backslash (e.g., `\{\{TEXT\}\}` which is preserved literally as `{{TEXT}}`). This provides a deterministic, unambiguous way to prevent expression evaluation.
+- **Size and Traversal Safety**: The file directive strictly limits output parsing to 1MB to prevent out-of-memory states, and strictly enforces parent-directory traversal security boundaries to prevent host environment leaks.
 
 ### 3. Tilde Expansion & Relative Path Resolution
 
