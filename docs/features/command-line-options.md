@@ -369,9 +369,29 @@ cderun --privileged alpine ls /dev
 - **Environment Variable**: `CDERUN_READ_ONLY`
 - **Description**: Mount the container's root filesystem as read-only.
 - **Details**: Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI specification.
+- **P1 Internal Override**: `--cderun-read-only` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine touch /test-write --cderun-read-only`).
 
 ```bash
 cderun --read-only alpine touch /test-write
+```
+
+### `--pid`
+
+- **Type**: string
+- **Default**: `""` (private PID namespace)
+- **Environment Variable**: `CDERUN_PID`
+- **Description**: Configure the PID namespace for the container.
+- **Supported Values**:
+  - `""` (empty string, default): Use a private, isolated PID namespace inside the container.
+  - `"host"`: Share the host system's PID namespace with the container. This allows processes in the container to see all processes on the host. Any other values are strictly rejected with an error.
+- **Details**:
+  - **Docker / Podman**: Maps to `PidMode` in the host configuration.
+  - **containerd**: Appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`.
+- **P1 Internal Override**: `--cderun-pid` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must use the equals-sign format if specified with a value (e.g., `--cderun-pid=host`), and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+# Share host PID namespace
+cderun --pid host alpine ps aux
 ```
 
 ### `--cap-add`
