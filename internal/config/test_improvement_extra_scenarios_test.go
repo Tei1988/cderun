@@ -196,6 +196,17 @@ func TestUnit_Config_Resolver_WrapperMode_Precedence(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "node:env", res.Image)
 	})
+
+	// 4. Extra Wrapper Mode options precedence cases (booleans, list options)
+	t.Run("P1 Boolean overrides take precedence", func(t *testing.T) {
+		cli := &CLIOptions{
+			TTY: ptr(false),
+			CderunTTY: ptr(true),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.True(t, res.TTY)
+	})
 }
 
 func TestUnit_Config_Resolver_SymlinkMode_Defaults(t *testing.T) {
@@ -223,6 +234,22 @@ func TestUnit_Config_Resolver_SymlinkMode_Defaults(t *testing.T) {
 		assert.True(t, res.TTY)
 		assert.InDelta(t, 4.0, res.CPUs, 0.0001)
 		assert.Equal(t, int64(1024*1024*1024), res.Memory)
+	})
+
+	t.Run("symlink tool resolving with env overrides", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_IMAGE": "python:env",
+			},
+		}
+		tools := ToolsConfig{
+			"python": ToolConfig{
+				Image: "python:tool",
+			},
+		}
+		res, err := ResolveWithFS("python", &CLIOptions{}, tools, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "python:env", res.Image)
 	})
 }
 
@@ -254,6 +281,16 @@ func TestUnit_Config_Resolver_NegativeMemoryParserBorderCases(t *testing.T) {
 		require.ErrorAs(t, err, &cfgErr)
 		assert.Equal(t, "memory", cfgErr.Field)
 	})
+
+	t.Run("negative memory parsing failure", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+			Memory: ptr("-500MB"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+	})
 }
 
 func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
@@ -270,6 +307,9 @@ func TestUnit_Config_Resolver_ValidateHostname_EdgeCases(t *testing.T) {
 		{"IP-like hostname", "192.168.1.1", false},
 		{"Hostname with dot but starts with dot", ".web-server", true},
 		{"Hostname too long", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz01234567", true},
+		{"Empty hostname is valid for options", "", false},
+		{"Hostname with trailing dot", "web-server.", true},
+		{"Hostname with consecutive dots", "web..server", true},
 	}
 
 	for _, tt := range tests {
@@ -301,6 +341,8 @@ func TestUnit_Config_ValidateWorkdir_EdgeCases(t *testing.T) {
 		{"invalid nested dot dot", "/app/../bin", true},
 		{"invalid illegal characters", "/app$bin", true},
 		{"invalid backslashes", "/app\\bin", true},
+		{"trailing slash on root", "/", false},
+		{"nested trailing slash", "/app/", false},
 	}
 
 	for _, tt := range tests {
@@ -330,8 +372,11 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		require.Error(t, ValidatePort("80/http"))
 		// Port out of range
 		require.Error(t, ValidatePort("70000"))
+		require.Error(t, ValidatePort("-1"))
 		// Invalid formats
 		require.Error(t, ValidatePort("127.0.0.1:80:80:80"))
+		require.Error(t, ValidatePort("127.0.0.1:abc:80"))
+		require.Error(t, ValidatePort("127.0.0.1:80:abc"))
 	})
 
 	t.Run("ValidateGroupAdd anomalies", func(t *testing.T) {
@@ -360,5 +405,87 @@ func TestUnit_Config_RobustValidation_EdgeCases(t *testing.T) {
 		require.Error(t, ValidateToolName("tools/python"))
 		// Rejects unicode or special chars
 		require.Error(t, ValidateToolName("pythön"))
+	})
+
+	t.Run("ValidateDNS anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateDNS(""))
+		assert.NoError(t, ValidateDNS("1.1.1.1"))
+		assert.NoError(t, ValidateDNS("2001:db8::1"))
+
+		require.Error(t, ValidateDNS("invalid-dns"))
+		require.Error(t, ValidateDNS("999.999.999.999"))
+	})
+
+	t.Run("ValidateAddHost anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateAddHost(""))
+		assert.NoError(t, ValidateAddHost("myhost:1.1.1.1"))
+		assert.NoError(t, ValidateAddHost("myhost:host-gateway"))
+
+		require.Error(t, ValidateAddHost("myhost"))
+		require.Error(t, ValidateAddHost("myhost:invalid-ip"))
+		require.Error(t, ValidateAddHost(".myhost:1.1.1.1"))
+	})
+
+	t.Run("ValidateCapability anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateCapability(""))
+		assert.NoError(t, ValidateCapability("SYS_ADMIN"))
+		assert.NoError(t, ValidateCapability("NET_ADMIN"))
+
+		require.Error(t, ValidateCapability("sys_admin"))
+		require.Error(t, ValidateCapability("SYS-ADMIN"))
+		require.Error(t, ValidateCapability("SYS_ADMIN$"))
+	})
+
+	t.Run("ValidateExposePort anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateExposePort(""))
+		assert.NoError(t, ValidateExposePort("8080"))
+		assert.NoError(t, ValidateExposePort("80-90"))
+		assert.NoError(t, ValidateExposePort("8080/tcp"))
+		assert.NoError(t, ValidateExposePort("80-90/udp"))
+
+		require.Error(t, ValidateExposePort("8080/sctp"))
+		require.Error(t, ValidateExposePort("90-80")) // start > end
+		require.Error(t, ValidateExposePort("-1"))
+		require.Error(t, ValidateExposePort("70000"))
+	})
+
+	t.Run("ValidateEnvKey anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateEnvKey("VAR_NAME"))
+		assert.NoError(t, ValidateEnvKey("VAR123"))
+
+		require.Error(t, ValidateEnvKey(""))
+		require.Error(t, ValidateEnvKey("123VAR"))
+		require.Error(t, ValidateEnvKey("VAR-NAME"))
+		require.Error(t, ValidateEnvKey("VAR NAME"))
+	})
+
+	t.Run("ValidateImageName anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateImageName(""))
+		assert.NoError(t, ValidateImageName("ubuntu"))
+		assert.NoError(t, ValidateImageName("library/ubuntu:latest"))
+		assert.NoError(t, ValidateImageName("myregistry.io/ubuntu@sha256:abcdef"))
+
+		require.Error(t, ValidateImageName("/ubuntu"))
+		require.Error(t, ValidateImageName("ubuntu@sha256:abc@def")) // multiple @
+		require.Error(t, ValidateImageName("ubuntu$latest"))
+	})
+
+	t.Run("ValidateNetworkName anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateNetworkName(""))
+		assert.NoError(t, ValidateNetworkName("bridge"))
+		assert.NoError(t, ValidateNetworkName("my-net_123"))
+
+		require.Error(t, ValidateNetworkName("-net"))
+		require.Error(t, ValidateNetworkName("net$"))
+	})
+
+	t.Run("ValidateUserName anomalies", func(t *testing.T) {
+		assert.NoError(t, ValidateUserName(""))
+		assert.NoError(t, ValidateUserName("root"))
+		assert.NoError(t, ValidateUserName("1000:1000"))
+		assert.NoError(t, ValidateUserName("root:sudo"))
+
+		require.Error(t, ValidateUserName("root:sudo:wheel")) // too many parts
+		require.Error(t, ValidateUserName("invalid user"))
 	})
 }

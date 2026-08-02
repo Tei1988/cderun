@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -38,6 +39,11 @@ func TestUnit_Root_Execute_AttachFailure(t *testing.T) {
 			},
 		}
 		setupMocks(opts)
+		// Make sure logger prints warnings so we can capture it
+		opts.logger.Init("warn", "text", false)
+
+		var errBuf bytes.Buffer
+		opts.logger.SetOutput(&errBuf)
 
 		cmd := &cobra.Command{}
 		cmd.SetContext(context.Background())
@@ -45,8 +51,8 @@ func TestUnit_Root_Execute_AttachFailure(t *testing.T) {
 		cc := &container.ContainerConfig{Image: "alpine"}
 
 		_, err := opts.execute(cmd, resolved, cc)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to attach to container: attach failed")
+		require.NoError(t, err)
+		assert.Contains(t, errBuf.String(), "failed to attach to container: attach failed")
 	})
 
 	t.Run("attachContainer context cancellation", func(t *testing.T) {

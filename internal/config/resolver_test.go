@@ -695,7 +695,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		assert.Contains(t, res.Env, "TOOL=1")
 
 		// Test resolveDevices with Tool getter
-		tools = ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/t"}}}}}
+		tools = ToolsConfig{"node": ToolConfig{Devices: []DeviceConfig{{Source: ConfigPath{Raw: "/dev/t"}, Destination: ConfigPath{Raw: "/dev/t"}}}}}
 		res, err = ResolveWithFS("node", &CLIOptions{Image: ptr("alpine"), }, tools, nil, &MockFileSystem{})
 		require.NoError(t, err)
 		require.Len(t, res.Devices, 1)
