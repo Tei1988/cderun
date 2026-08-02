@@ -2135,8 +2135,8 @@ func TestUnit_Root_Cleanup_Timeout(t *testing.T) {
 		}
 
 		// Ensure it returned after the configured cleanupTimeout but within a short upper bound
-		assert.GreaterOrEqual(t, elapsed, 50 * time.Millisecond)
-		assert.Less(t, elapsed, 500 * time.Millisecond)
+		assert.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
+		assert.Less(t, elapsed, 500*time.Millisecond)
 	})
 }
 
