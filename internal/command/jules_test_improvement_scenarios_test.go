@@ -44,7 +44,7 @@ func TestUnit_Command_SymlinkMode_CleanedRelativePaths(t *testing.T) {
 	assert.Equal(t, expected, processed)
 }
 
-func TestUnit_Command_P1Override_ValidationFailure(t *testing.T) {
+func TestUnit_Command_P1Override_ValueTakingSpaceSeparated(t *testing.T) {
 	t.Parallel()
 
 	o := &rootOptions{}

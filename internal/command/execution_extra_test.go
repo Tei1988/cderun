@@ -165,7 +165,9 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 		}
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			return mock, nil
@@ -182,4 +184,5 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 125, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
+	cancel()
 }

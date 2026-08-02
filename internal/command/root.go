@@ -1543,7 +1543,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" {
-					if i+1 < len(args) {
+					if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--cderun-") {
 						overrides = append(overrides, arg)
 						overrides = append(overrides, args[i+1])
 						i++
