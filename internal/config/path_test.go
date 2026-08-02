@@ -745,7 +745,7 @@ func TestUnit_Path_ResolveVolume_Device(t *testing.T) {
 		}
 		dc.SetBaseDir("/base")
 		assert.Equal(t, "/base", dc.Source.BaseDir)
-		assert.Equal(t, "/base", dc.Destination.BaseDir)
+		assert.Empty(t, dc.Destination.BaseDir)
 	})
 }
 

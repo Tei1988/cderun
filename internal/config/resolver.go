@@ -1899,6 +1899,12 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validatePathChars(m.Target); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): %w", i, err)
 		}
+		if m.Target == "" {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot be empty", i)
+		}
+		if !path.IsAbs(m.Target) {
+			return fmt.Errorf("security validation failed for mounts[%d] (target): target path must be an absolute path: %q", i, m.Target)
+		}
 		if HasParentTraversal(m.Target) {
 			return fmt.Errorf("security validation failed for mounts[%d] (target): target path cannot contain parent directory references: %q", i, m.Target)
 		}
@@ -1913,6 +1919,12 @@ func (rv *resolver) validateDeviceSecurity() error {
 		}
 		if err := validatePathChars(d.PathInContainer); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): %w", i, err)
+		}
+		if d.PathInContainer == "" {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot be empty", i)
+		}
+		if !path.IsAbs(d.PathInContainer) {
+			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path must be an absolute path: %q", i, d.PathInContainer)
 		}
 		if HasParentTraversal(d.PathInContainer) {
 			return fmt.Errorf("security validation failed for devices[%d] (path-in-container): destination path cannot contain parent directory references: %q", i, d.PathInContainer)
