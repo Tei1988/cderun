@@ -95,41 +95,47 @@ In standard **Wrapper Mode**, `--cderun-` flags **must** be placed **after** the
 
 During preprocessing (`preprocessArgs`), the preprocessor scans the argument list behind the subcommand, extracts all `--cderun-` prefixed flags and their values, and prepends (hoists) them before the subcommand. This ensures that these configuration flags are parsed as `cderun` settings instead of being passed to the container command.
 
-#### Equals-Sign Format Constraints for Value-Taking Flags
+#### Support for Space-Separated and Equals-Sign Formats for Value-Taking Flags
 
-To guarantee robust, unambiguous preprocessing, any internal override flag that takes a value (e.g., `--cderun-image`, `--cderun-workdir`) **must use the equals-sign format** (e.g., `--cderun-image=alpine`).
+To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`) can specify their value using either the space-separated format (e.g., `--cderun-image alpine`) or the equals-sign format (e.g., `--cderun-image=alpine`).
 
-Specifying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with an explicit validation error (e.g., `cderun internal override flag "--cderun-image" must use '=' format to specify its value`) to prevent accidental hoisting of standalone flags and downstream parser corruption. Boolean override flags (e.g., `--cderun-tty`) require no value and can be hoisted autonomously.
+During the argument preprocessing scan, `cderun` looks up the registration metadata of any encountered `--cderun-` flag. If the flag is defined to expect a value (meaning it is a non-boolean standard flag) and is written without an equals-sign, the preprocessor automatically consumes the next adjacent argument as its value, hoisting both arguments together. Boolean override flags (e.g., `--cderun-tty`) take no value and are hoisted autonomously without consuming subsequent arguments.
 
-#### Preprocessing Transformation Example
+#### Preprocessing Transformation Examples
 
-```text
-[Initial User Input]
-cderun node app.js --cderun-tty --cderun-image=node:20-alpine
+- **Example 1: Space-Separated Value-Taking Flag**
 
-[Post-Preprocessing (Hoisted)]
-cderun --cderun-tty --cderun-image=node:20-alpine node app.js
-```
+  ```text
+  [Initial User Input]
+  cderun node app.js --cderun-image node:20-alpine --cderun-tty
+
+  [Post-Preprocessing (Hoisted)]
+  cderun --cderun-image node:20-alpine --cderun-tty node app.js
+  ```
+
+- **Example 2: Equals-Sign Format**
+
+  ```text
+  [Initial User Input]
+  cderun node app.js --cderun-tty --cderun-image=node:20-alpine
+
+  [Post-Preprocessing (Hoisted)]
+  cderun --cderun-tty --cderun-image=node:20-alpine node app.js
+  ```
 
 By the time the Cobra parser is invoked, all `cderun`-specific settings are gathered at the front, leaving only pure passthrough arguments following the subcommand.
 
 ---
 
-## Double-Dash (`--`) Delimiter Support
+## Double-Dash (`--`) Hoisting Exemption (Not Supported)
 
-To allow passing literal `--cderun-` strings to the container application (e.g., `echo --cderun-tty`), `cderun` respects the double-dash (`--`) delimiter (end-of-flags marker).
+To simplify argument parsing and avoid semantic ambiguity with shell-native and application-specific option delimiters, `cderun` does **NOT** support double-dash (`--`) for stopping or exempting arguments from hoisting.
 
 ### Rules of Behavior
 
-1. During argument preprocessing scan, if a `--` delimiter is encountered behind the subcommand, **all hoisting of subsequent arguments is deactivated**. The preprocessor continues scanning but leaves all arguments after `--` untouched.
-2. Any `--cderun-` prefixed flags appearing after `--` remain in place and are forwarded to the container literally as passthrough arguments.
-
-#### Delimiter Escaping Example
-
-```bash
-# The '--cderun-tty' following '--' is not hoisted, executing 'echo --cderun-tty' in the container
-cderun echo -- --cderun-tty
-```
+1. **No Delimiter Exemption**: The argument preprocessor scans the entire list of arguments following the subcommand. It does not treat a double-dash (`--`) as a barrier to stop the extraction of `--cderun-` prefixed flags.
+2. **Always Hoisted**: Any `--cderun-` prefixed flags appearing anywhere in the argument list (even after a `--` delimiter) are **always** hoisted to the front of the command as part of `cderun`'s configuration parsing.
+3. **No Double-Dash Hoisting Prevention**: This design ensures robust, predictable hoisting behavior that remains independent of shell-level option interpretation. Future modifications are prohibited from introducing double-dash hoisting-prevention mechanisms to maintain maximum parsing simplicity.
 
 ---
 

@@ -37,14 +37,19 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--cderun-image=node:20-alpine", "node", "app.js"},
 		},
 		{
-			name:    "P1 override with value in next arg (must use equals sign)",
-			args:    []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
-			wantErr: "cderun internal override flag \"--cderun-image\" must use '=' format to specify its value",
+			name:     "P1 override with value in next arg (space-separated format supported)",
+			args:     []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
+			expected: []string{"cderun", "--cderun-image", "node:20-alpine", "node", "app.js"},
 		},
 		{
 			name:     "boolean P1 flag followed by string arg (does not consume next arg)",
 			args:     []string{"cderun", "node", "--cderun-tty", "app.js"},
 			expected: []string{"cderun", "--cderun-tty", "node", "app.js"},
+		},
+		{
+			name:    "value-taking P1 override followed by another P1 flag is rejected",
+			args:    []string{"cderun", "node", "--cderun-image", "--cderun-tty", "app.js"},
+			wantErr: "cderun internal override flag \"--cderun-image\" requires a value",
 		},
 		{
 			name:    "P1 override must be after subcommand in standard mode",
@@ -62,9 +67,9 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--cderun-tty", "--cderun-image=alpine", "node", "--version"},
 		},
 		{
-			name:     "double dash -- stops hoisting (T53)",
+			name:     "double dash -- does not stop hoisting",
 			args:     []string{"cderun", "echo", "--", "--cderun-tty"},
-			expected: []string{"cderun", "echo", "--", "--cderun-tty"},
+			expected: []string{"cderun", "--cderun-tty", "echo", "--"},
 		},
 		{
 			name:     "no subcommand but has flags",
@@ -72,9 +77,9 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--diagnosis", "--log-level", "debug"},
 		},
 		{
-			name:     "complex interleaving (double dash stops hoisting)",
+			name:     "complex interleaving (double dash does not stop hoisting)",
 			args:     []string{"cderun", "-t", "sh", "-c", "ls", "--cderun-image=alpine", "--", "--cderun-literal"},
-			expected: []string{"cderun", "--cderun-image=alpine", "-t", "sh", "-c", "ls", "--", "--cderun-literal"},
+			expected: []string{"cderun", "--cderun-image=alpine", "--cderun-literal", "-t", "sh", "-c", "ls", "--"},
 		},
 	}
 

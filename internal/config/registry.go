@@ -418,7 +418,7 @@ var StringOptions = []StringOption{
 		Name:    "log-level",
 		EnvKey:  "CDERUN_LOG_LEVEL",
 		Usage:   "Set log level (error, warn, info, debug, trace)",
-		Default: "warn",
+		Default: "error",
 		ToolGetter: func(t ToolConfig) string {
 			return t.LogLevel
 		},

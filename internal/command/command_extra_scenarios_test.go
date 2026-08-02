@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -20,8 +21,8 @@ import (
 )
 
 // TestUnit_Command_WrapperMode_DoubleDashLiteralArgs validates that arguments
-// placed after a double dash `--` are NOT hoisted as P1 internal overrides
-// even if they start with `--cderun-`.
+// placed after a double dash `--` are STILL hoisted as P1 internal overrides
+// if they start with `--cderun-`.
 func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 	t.Parallel()
 
@@ -51,11 +52,11 @@ func TestUnit_Command_WrapperMode_DoubleDashLiteralArgs(t *testing.T) {
 		cfg := mockRuntime.GetCreatedConfig()
 		require.NotNil(t, cfg)
 
-		// Image should NOT be overridden to node:20 because it was after `--`
-		assert.Equal(t, "alpine", cfg.Image)
+		// Image should be overridden to node:20 because it was hoisted
+		assert.Equal(t, "node:20", cfg.Image)
 
-		// Command should preserve `--` and all subsequent arguments literally
-		assert.Equal(t, []string{"--", "--cderun-tty", "--cderun-image=node:20"}, cfg.Command)
+		// Command should contain only "--" because the --cderun- flags were hoisted
+		assert.Equal(t, []string{"--"}, cfg.Command)
 	})
 }
 
@@ -88,7 +89,7 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 		assert.Equal(t, "alpine:latest", cfg.Image)
 	})
 
-	t.Run("strict rejection of hoisting value-taking flags without equals", func(t *testing.T) {
+	t.Run("hoisting value-taking flags with space separation", func(t *testing.T) {
 		t.Parallel()
 		args := []string{
 			"cderun",
@@ -96,9 +97,10 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 			"--cderun-image", "alpine:latest",
 		}
 
+		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-				return &runtime.MockRuntime{}, nil
+				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return false }
@@ -106,8 +108,10 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 			cmd.SetErr(io.Discard)
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must use '=' format")
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "alpine:latest", cfg.Image)
 	})
 }
 
@@ -237,14 +241,20 @@ func TestUnit_Command_Robustness_SignalKillForceTermination(t *testing.T) {
 	o := &rootOptions{logger: &logging.Logger{}}
 
 	t.Run("Signal fails and returns structured exit code error", func(t *testing.T) {
+		var stderrBuf bytes.Buffer
+		logger := logging.NewLogger()
+		logger.Init("warn", "text", false)
+		logger.SetOutput(&stderrBuf)
+		oOpts := &rootOptions{logger: logger}
+
 		mockRuntime := &cmdTerminationMockRuntime{
 			MockRuntime: &runtime.MockRuntime{SignalErr: errors.New("signal failure warning")},
 			isRunning:   true,
 		}
 
-		_, err := o.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to force terminate container: signal failure warning")
+		_, err := oOpts.signalKillIfRunning(t.Context(), mockRuntime, "cont-force-kill-fail")
+		require.NoError(t, err)
+		assert.Contains(t, stderrBuf.String(), "failed to force terminate container: signal failure warning")
 		assert.Equal(t, "cont-force-kill-fail", mockRuntime.signaledID)
 		assert.Equal(t, "SIGKILL", mockRuntime.signaledSig)
 	})

@@ -122,7 +122,7 @@ func newDefaultLogger() *Logger {
 		format:    "text",
 		timestamp: true,
 	}
-	l.SetLevel(WarnLevel)
+	l.SetLevel(ErrorLevel)
 	return l
 }
 
