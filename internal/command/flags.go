@@ -274,6 +274,8 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 		return &o.mountCderunPath, &o.cderunMountCderunPath
 	case "image":
 		return &o.image, &o.cderunImage
+	case "pid":
+		return &o.pid, &o.cderunPid
 	case "runtime":
 		return &o.runtimeName, &o.cderunRuntime
 	case "workdir":

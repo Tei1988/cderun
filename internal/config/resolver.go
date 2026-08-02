@@ -54,6 +54,7 @@ type ResolvedConfig struct {
 	DNS             []string
 	AddHosts        []string
 	Privileged      bool
+	Pid             string
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string
@@ -139,6 +140,8 @@ type CLIOptions struct {
 	CderunUser               *string
 	Privileged               *bool
 	CderunPrivileged         *bool
+	Pid                      *string
+	CderunPid                *string
 	CapAdd                   []string
 	CderunCapAdd             []string
 	CapDrop                  []string
@@ -585,6 +588,10 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
 		p2Set, p2Val = getPtrVal(rv.cli.Image)
 		fastPathUsed = true
+	case "pid":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
+		p2Set, p2Val = getPtrVal(rv.cli.Pid)
+		fastPathUsed = true
 	case "network":
 		p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
 		p2Set, p2Val = getPtrVal(rv.cli.Network)
@@ -648,6 +655,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		switch opt.Name {
 		case "image":
 			rv.res.Image = resolved
+		case "pid":
+			rv.res.Pid = resolved
 		case "network":
 			rv.res.Network = resolved
 		case "workdir":
@@ -1665,6 +1674,14 @@ func (rv *resolver) validateCriticalFields() error {
 	}
 	if err := ValidateImageName(rv.res.Image); err != nil {
 		return fmt.Errorf("security validation failed for %q: %w", "image", err)
+	}
+
+	// pid
+	if err := validatePathChars(rv.res.Pid); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "pid", err)
+	}
+	if rv.res.Pid != "" && rv.res.Pid != "host" {
+		return fmt.Errorf("security validation failed for %q: unsupported pid namespace: %q", "pid", rv.res.Pid)
 	}
 
 	// user

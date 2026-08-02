@@ -73,6 +73,7 @@ type ConfigDefaults struct {
 	AddHosts        []string       `yaml:"addHosts,omitempty"`
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
+	Pid             string         `yaml:"pid,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
@@ -211,6 +212,7 @@ type ToolConfig struct {
 	AddHosts        []string       `yaml:"addHosts,omitempty"`
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
+	Pid             string         `yaml:"pid,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`

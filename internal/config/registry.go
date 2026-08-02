@@ -285,6 +285,17 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
+		Name:   "pid",
+		EnvKey: "CDERUN_PID",
+		Usage:  "PID namespace to use",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Pid
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.Pid
+		},
+	},
+	{
 		Name:   "runtime",
 		EnvKey: "CDERUN_RUNTIME",
 		Usage:  "Container runtime to use (docker/podman/containerd)",
