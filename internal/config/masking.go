@@ -143,7 +143,10 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	if len(patterns) > 0 {
 		var copied []string
 		for i, p := range patterns {
-			if !isUpper(p) {
+			// Optimization: only normalize patterns that contain glob syntax.
+			// Pure literal patterns are matched case-insensitively via strings.EqualFold,
+			// so they do not require eager uppercase normalization/allocations.
+			if strings.ContainsAny(p, "*?[\\") && !isUpper(p) {
 				if copied == nil {
 					copied = make([]string, len(patterns))
 					copy(copied, patterns)

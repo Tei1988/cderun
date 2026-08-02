@@ -145,6 +145,23 @@ func BenchmarkMaskSensitiveEnvList_WithPatterns(b *testing.B) {
 		}
 	})
 
+	b.Run("ExactMatchLowercase", func(b *testing.B) {
+		b.ReportAllocs()
+		env := []string{
+			"DB_PASSWORD=my-secret-password",
+			"DB_KEY=admin",
+			"NORMAL_VAR=value",
+			"ANOTHER_NORMAL_VAR=another-value",
+			"PORT=8080",
+			"HOST=localhost",
+		}
+		patterns := []string{"db_password", "db_key", "db_token"}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = MaskSensitiveEnvList(env, patterns)
+		}
+	})
+
 	b.Run("ExactMatch", func(b *testing.B) {
 		b.ReportAllocs()
 		env := []string{
