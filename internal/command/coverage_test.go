@@ -108,9 +108,16 @@ func TestUnit_Root_WaitForCompletion(t *testing.T) {
 		}
 		att.attachDone <- errors.New("early attach error")
 
-		exitCode, err := o.waitForCompletion(context.Background(), cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{HangTimeout: 10 * time.Millisecond}, false, att)
-		require.NoError(t, err)
-		assert.Equal(t, 0, exitCode)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		_, err := o.waitForCompletion(ctx, cmd, mockRuntime, "c1", &container.ContainerConfig{}, &config.ResolvedConfig{HangTimeout: 10 * time.Millisecond}, false, att)
+		require.Error(t, err)
+		var exitErr *ExitCodeError
+		require.ErrorAs(t, err, &exitErr)
+		assert.Equal(t, 125, exitErr.Code)
+		assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
+		cancel()
 		assert.Contains(t, stderrBuf.String(), "failed to attach to container: early attach error")
 	})
 

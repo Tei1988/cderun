@@ -89,7 +89,7 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 		assert.Equal(t, "alpine:latest", cfg.Image)
 	})
 
-	t.Run("strict rejection of hoisting value-taking flags without equals", func(t *testing.T) {
+	t.Run("hoisting value-taking flags with space separation", func(t *testing.T) {
 		t.Parallel()
 		args := []string{
 			"cderun",
@@ -97,9 +97,10 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 			"--cderun-image", "alpine:latest",
 		}
 
+		mockRuntime := &runtime.MockRuntime{}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-				return &runtime.MockRuntime{}, nil
+				return mockRuntime, nil
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return false }
@@ -107,8 +108,10 @@ func TestUnit_Command_WrapperMode_HoistingWithEquals(t *testing.T) {
 			cmd.SetErr(io.Discard)
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must use '=' format")
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "alpine:latest", cfg.Image)
 	})
 }
 

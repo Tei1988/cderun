@@ -95,21 +95,33 @@ In standard **Wrapper Mode**, `--cderun-` flags **must** be placed **after** the
 
 During preprocessing (`preprocessArgs`), the preprocessor scans the argument list behind the subcommand, extracts all `--cderun-` prefixed flags and their values, and prepends (hoists) them before the subcommand. This ensures that these configuration flags are parsed as `cderun` settings instead of being passed to the container command.
 
-#### Equals-Sign Format Constraints for Value-Taking Flags
+#### Support for Space-Separated and Equals-Sign Formats for Value-Taking Flags
 
-To guarantee robust, unambiguous preprocessing, any internal override flag that takes a value (e.g., `--cderun-image`, `--cderun-workdir`) **must use the equals-sign format** (e.g., `--cderun-image=alpine`).
+To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`) can specify their value using either the space-separated format (e.g., `--cderun-image alpine`) or the equals-sign format (e.g., `--cderun-image=alpine`).
 
-Specifying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with an explicit validation error (e.g., `cderun internal override flag "--cderun-image" must use '=' format to specify its value`) to prevent accidental hoisting of standalone flags and downstream parser corruption. Boolean override flags (e.g., `--cderun-tty`) require no value and can be hoisted autonomously.
+During the argument preprocessing scan, `cderun` looks up the registration metadata of any encountered `--cderun-` flag. If the flag is defined to expect a value (meaning it is a non-boolean standard flag) and is written without an equals-sign, the preprocessor automatically consumes the next adjacent argument as its value, hoisting both arguments together. Boolean override flags (e.g., `--cderun-tty`) take no value and are hoisted autonomously without consuming subsequent arguments.
 
-#### Preprocessing Transformation Example
+#### Preprocessing Transformation Examples
 
-```text
-[Initial User Input]
-cderun node app.js --cderun-tty --cderun-image=node:20-alpine
+- **Example 1: Space-Separated Value-Taking Flag**
 
-[Post-Preprocessing (Hoisted)]
-cderun --cderun-tty --cderun-image=node:20-alpine node app.js
-```
+  ```text
+  [Initial User Input]
+  cderun node app.js --cderun-image node:20-alpine --cderun-tty
+
+  [Post-Preprocessing (Hoisted)]
+  cderun --cderun-image node:20-alpine --cderun-tty node app.js
+  ```
+
+- **Example 2: Equals-Sign Format**
+
+  ```text
+  [Initial User Input]
+  cderun node app.js --cderun-tty --cderun-image=node:20-alpine
+
+  [Post-Preprocessing (Hoisted)]
+  cderun --cderun-tty --cderun-image=node:20-alpine node app.js
+  ```
 
 By the time the Cobra parser is invoked, all `cderun`-specific settings are gathered at the front, leaving only pure passthrough arguments following the subcommand.
 

@@ -50,9 +50,9 @@ func TestUnit_Command_P1Override_ValidationFailure(t *testing.T) {
 	o := &rootOptions{}
 	cmd := newRootCmd(o)
 
-	// Value-taking P1 override flags must use '=' format. If specified with space separation,
-	// the preprocessor must strictly reject it with a clear error message.
-	invalidFlags := []string{
+	// Value-taking P1 override flags can use space separation format.
+	// The preprocessor must successfully extract both the flag and its value.
+	valueFlags := []string{
 		"--cderun-image",
 		"--cderun-network",
 		"--cderun-socket-path",
@@ -61,11 +61,12 @@ func TestUnit_Command_P1Override_ValidationFailure(t *testing.T) {
 		"--cderun-hang-timeout",
 	}
 
-	for _, flg := range invalidFlags {
+	for _, flg := range valueFlags {
 		args := []string{"cderun", "sh", flg, "some-value"}
-		_, err := preprocessArgs(cmd, args)
-		require.Error(t, err, "expected error for flag %q", flg)
-		assert.Contains(t, err.Error(), "must use '=' format to specify its value")
+		actual, err := preprocessArgs(cmd, args)
+		require.NoError(t, err, "expected no error for flag %q", flg)
+		expected := []string{"cderun", flg, "some-value", "sh"}
+		assert.Equal(t, expected, actual)
 	}
 }
 

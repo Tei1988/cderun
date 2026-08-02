@@ -1158,6 +1158,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					exitCode = res.code
 				case <-time.After(effectiveHangTimeout):
 					o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
 				}
 			} else {
 				res := <-waitDone
@@ -1196,6 +1197,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 						exitCode = result.code
 					case <-time.After(effectiveHangTimeout):
 						o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
+						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
 					}
 				}
 			} else {
@@ -1541,7 +1543,14 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" {
-					return nil, fmt.Errorf("cderun internal override flag %q must use '=' format to specify its value", arg)
+					if i+1 < len(args) {
+						overrides = append(overrides, arg)
+						overrides = append(overrides, args[i+1])
+						i++
+						continue
+					} else {
+						return nil, fmt.Errorf("cderun internal override flag %q requires a value", arg)
+					}
 				}
 			}
 			overrides = append(overrides, arg)

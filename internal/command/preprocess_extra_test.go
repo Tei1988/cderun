@@ -37,9 +37,9 @@ func TestUnit_Root_PreprocessArgs_Extra(t *testing.T) {
 			expected: []string{"cderun", "--cderun-image=node:20-alpine", "node", "app.js"},
 		},
 		{
-			name:    "P1 override with value in next arg (must use equals sign)",
-			args:    []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
-			wantErr: "cderun internal override flag \"--cderun-image\" must use '=' format to specify its value",
+			name:     "P1 override with value in next arg (space-separated format supported)",
+			args:     []string{"cderun", "node", "--cderun-image", "node:20-alpine", "app.js"},
+			expected: []string{"cderun", "--cderun-image", "node:20-alpine", "node", "app.js"},
 		},
 		{
 			name:     "boolean P1 flag followed by string arg (does not consume next arg)",

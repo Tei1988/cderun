@@ -1646,7 +1646,7 @@ func TestUnit_Root_Execute_AttachEarlyFailure_Error(t *testing.T) {
 	var exitErr *ExitCodeError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 42, exitErr.Code)
-	assert.Nil(t, exitErr.Err)
+	assert.NoError(t, exitErr.Err)
 	assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach failed early")
 }
 
@@ -1828,7 +1828,7 @@ func TestUnit_Root_Execute_AttachFailureAfterExit(t *testing.T) {
 	var exitErr *ExitCodeError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 77, exitErr.Code)
-	assert.Nil(t, exitErr.Err)
+	assert.NoError(t, exitErr.Err)
 	assert.Contains(t, stderrBuf.String(), "failed to attach to container: attach error after exit")
 }
 

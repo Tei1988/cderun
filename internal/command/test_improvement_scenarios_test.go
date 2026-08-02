@@ -239,10 +239,14 @@ func TestScenario_Command_ZeroHangTimeoutBlocking(t *testing.T) {
 		}()
 
 		// Since hang-timeout is 50ms, it should return quite quickly even if WaitContainer is still blocked.
-		// Since attach errors are now downgraded to warnings, this should return without error.
+		// Since a timeout occurs, we expect exit code 125.
 		select {
 		case <-done:
-			require.NoError(t, execErr)
+			require.Error(t, execErr)
+			var exitErr *ExitCodeError
+			require.ErrorAs(t, execErr, &exitErr)
+			assert.Equal(t, 125, exitErr.Code)
+			assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
 		case <-time.After(1 * time.Second):
 			t.Fatal("Execution hung indefinitely despite positive hang-timeout")
 		}
