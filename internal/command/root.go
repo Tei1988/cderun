@@ -836,7 +836,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	if len(containerConfig.Entrypoint) > 0 {
 		fullCmdStr = strings.Join(containerConfig.Entrypoint, " ") + " " + fullCmdStr
 	}
-	o.logger.Info("Running: %s", fullCmdStr)
+	o.logger.Debug("Running: %s", fullCmdStr)
 	o.logger.Debug("Image: %s", containerConfig.Image)
 	o.logger.Debug("Command: %v", containerConfig.Command)
 	o.logger.Debug("Entrypoint: %v", containerConfig.Entrypoint)
@@ -1140,14 +1140,10 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 			select {
 			case err := <-att.attachDone:
 				if err != nil && !errors.Is(err, context.Canceled) {
-					o.logger.Debug("AttachContainer finished with error after container exit for %s: %v", containerID, err)
-					code := exitCode
-					if code == 0 {
-						code = 125
-					}
-					return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
+					o.logger.Warn("failed to attach to container: %v", err)
+				} else {
+					o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 				}
-				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
 			case <-time.After(o.attachGracePeriod):
 				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
 				att.cancelAttach()
@@ -1157,26 +1153,29 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 
 	case err := <-att.attachDone:
 		if err != nil && !errors.Is(err, context.Canceled) {
-			o.logger.Debug("AttachContainer finished with error before container exit for %s: %v", containerID, err)
+			o.logger.Warn("failed to attach to container: %v", err)
 			// Wait for container to finish (best effort)
 			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
 			// until it finishes, the timeout expires, or a second signal is received.
 			if effectiveHangTimeout > 0 {
 				select {
 				case res := <-waitDone:
+					if res.err != nil {
+						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+					}
 					exitCode = res.code
 				case <-time.After(effectiveHangTimeout):
 					o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
 				}
 			} else {
 				res := <-waitDone
+				if res.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+				}
 				exitCode = res.code
 			}
-			code := exitCode
-			if code == 0 {
-				code = 125
-			}
-			return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("failed to attach to container: %w", err)}
+			return exitCode, nil
 		}
 		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
 
@@ -1200,13 +1199,13 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 					}
 					select {
 					case result := <-waitDone:
+						if result.err != nil {
+							return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+						}
 						exitCode = result.code
 					case <-time.After(effectiveHangTimeout):
-						code := exitCode
-						if code == 0 {
-							code = 125
-						}
-						return exitCode, &ExitCodeError{Code: code, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
+						o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
+						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
 					}
 				}
 			} else {
@@ -1255,7 +1254,7 @@ intended for the subcommand.`,
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// Early logger initialization with CLI and Environment settings before config loading.
 		// This allows loadConfigs() to use the correct log level.
-		initialLevel := "warn"
+		initialLevel := "error"
 		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
 			initialLevel = env
 		}
@@ -1527,7 +1526,6 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	var overrides []string
 	var others []string
-	doubleDashFound := false
 
 	// Scan all arguments after the executable name
 	// In polyglot mode, everything after index 0 is after the subcommand.
@@ -1536,9 +1534,6 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	if !isPolyglot && subcmdIdx != -1 {
 		// Standard mode: hoist only from after the subcommand
 		for i := 1; i <= subcmdIdx; i++ {
-			if args[i] == "--" {
-				doubleDashFound = true
-			}
 			others = append(others, args[i])
 		}
 		startIdx = subcmdIdx + 1
@@ -1546,11 +1541,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 
 	for i := startIdx; i < len(args); i++ {
 		arg := args[i]
-		if arg == "--" {
-			doubleDashFound = true
-		}
-
-		shouldHoist := !doubleDashFound && strings.HasPrefix(arg, "--cderun-")
+		shouldHoist := strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
 			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
@@ -1560,7 +1551,14 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" {
-					return nil, fmt.Errorf("cderun internal override flag %q must use '=' format to specify its value", arg)
+					if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--cderun-") {
+						overrides = append(overrides, arg)
+						overrides = append(overrides, args[i+1])
+						i++
+						continue
+					} else {
+						return nil, fmt.Errorf("cderun internal override flag %q requires a value", arg)
+					}
 				}
 			}
 			overrides = append(overrides, arg)

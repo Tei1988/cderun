@@ -126,29 +126,32 @@ func TestUnit_Command_Robustness_ConsecutiveSignals(t *testing.T) {
 	}
 }
 
-// TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals validates that
-// value-taking overrides specified without the equals sign (e.g. `--cderun-image node`) are strictly rejected.
-func TestUnit_Command_WrapperMode_ValueTakingOverridesWithoutEquals(t *testing.T) {
+// TestUnit_Command_WrapperMode_ValueTakingOverridesWithSpaceSeparation validates that
+// value-taking overrides specified with space separation (e.g. `--cderun-image node`) are successfully hoisted.
+func TestUnit_Command_WrapperMode_ValueTakingOverridesWithSpaceSeparation(t *testing.T) {
 	t.Parallel()
 
 	args := []string{
 		"cderun",
 		"--image", "alpine",
 		"sh",
-		"--cderun-image", "ubuntu", // without equals sign format
+		"--cderun-image", "ubuntu", // with space separation
 	}
 
+	mockRuntime := &runtime.MockRuntime{}
 	err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
-			return &runtime.MockRuntime{}, nil
+			return mockRuntime, nil
 		}
 		o.exitFunc = func(code int) {}
 		cmd.SetOut(io.Discard)
 		cmd.SetErr(io.Discard)
 	})
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must use '=' format to specify its value")
+	require.NoError(t, err)
+	cfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, cfg)
+	assert.Equal(t, "ubuntu", cfg.Image)
 }
 
 // TestUnit_Command_SymlinkMode_CleanedPathsAndUnicode validates polyglot/symlink mode

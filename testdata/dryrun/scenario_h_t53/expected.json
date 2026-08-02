@@ -1,7 +1,6 @@
 {
   "command": [
-    "--",
-    "--cderun-tty"
+    "--"
   ],
   "env": [],
   "image": "alpine",
@@ -10,7 +9,7 @@
   "network": "bridge",
   "pull": "missing",
   "remove": true,
-  "tty": false,
+  "tty": true,
   "user": "",
   "workdir": ""
 }

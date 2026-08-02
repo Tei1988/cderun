@@ -211,7 +211,7 @@ func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolic
 			}
 		}
 
-		r.logger.Info("Pulling image %s...", img)
+		r.logger.Debug("Pulling image %s...", img)
 		_, err := r.client.Pull(ctx, img, client.WithPullUnpack)
 		if err != nil {
 			lastErr = err
