@@ -21,6 +21,8 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Exact match case-insensitive", "my_password", "secret", []string{"MY_PASSWORD"}, "[REDACTED]"},
 		{"Glob match start", "DB_PASSWORD", "secret", []string{"DB_*"}, "[REDACTED]"},
 		{"Glob match end", "MY_PASSWORD", "secret", []string{"*_PASSWORD"}, "[REDACTED]"},
+		{"Glob match end non-ASCII", "MY_パスワード", "secret", []string{"*_パスワード"}, "[REDACTED]"},
+		{"Glob match start non-ASCII", "パスワード_MY", "secret", []string{"パスワード_*"}, "[REDACTED]"},
 		{"Glob match middle", "MY_PASSWORD_VAR", "secret", []string{"*_PASSWORD_*"}, "[REDACTED]"},
 		{"No match", "SAFE_VAR", "value", []string{"*_PASSWORD"}, "value"},
 		{"Empty value", "EMPTY_SECRET", "", []string{"*"}, ""},

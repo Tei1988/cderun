@@ -79,6 +79,9 @@ func fastMatchFold(pattern, key string) (bool, bool) {
 	}
 
 	if count == 1 {
+		if !isASCII(key) || !isASCII(pattern) {
+			return false, false
+		}
 		if pattern[0] == '*' {
 			suffix := pattern[1:]
 			if len(key) >= len(suffix) {
