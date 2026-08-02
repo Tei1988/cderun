@@ -5,7 +5,10 @@ import (
 	"io"
 	"testing"
 
+	"cderun/internal/container"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnitDockerRetryablePullErrorExhaustive(t *testing.T) {
@@ -22,4 +25,14 @@ func TestUnitDockerRetryablePullErrorExhaustive(t *testing.T) {
 	assert.False(t, IsRetryablePullError(errors.New("unauthorized")))
 	assert.False(t, IsRetryablePullError(errors.New("other error")))
 	assert.False(t, IsRetryablePullError(io.EOF))
+}
+
+func TestUnit_Docker_toDockerContainerConfig_Pid(t *testing.T) {
+	config := &container.ContainerConfig{
+		Image: "alpine",
+		Pid:   "host",
+	}
+	_, hostConfig, _, err := toDockerContainerConfig(config)
+	require.NoError(t, err)
+	assert.Equal(t, "host", string(hostConfig.PidMode))
 }

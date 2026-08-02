@@ -261,3 +261,71 @@ func TestUnit_Config_Resolve_WithPrivilegedAndSocketSettings(t *testing.T) {
 		assert.Contains(t, res.GroupAdd, "1234")
 	})
 }
+
+// TestUnit_Config_PidOption verifies resolution, priority, and security validation
+// for the new '--pid' and '--cderun-pid' configuration options.
+func TestUnit_Config_PidOption(t *testing.T) {
+	t.Parallel()
+
+	// 1. Valid and invalid security validations
+	t.Run("pid validation rules", func(t *testing.T) {
+		mfs := &MockFileSystem{WD: "/work"}
+
+		// Valid cases: empty or "host"
+		cliValidEmpty := &CLIOptions{Image: ptr("alpine"), Pid: ptr("")}
+		res, err := ResolveWithFS("sh", cliValidEmpty, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "", res.Pid)
+
+		cliValidHost := &CLIOptions{Image: ptr("alpine"), Pid: ptr("host")}
+		res, err = ResolveWithFS("sh", cliValidHost, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "host", res.Pid)
+
+		// Invalid cases: anything else
+		cliInvalid := &CLIOptions{Image: ptr("alpine"), Pid: ptr("invalid")}
+		_, err = ResolveWithFS("sh", cliInvalid, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported pid namespace")
+
+		cliInvalidChars := &CLIOptions{Image: ptr("alpine"), Pid: ptr("host\x00")}
+		_, err = ResolveWithFS("sh", cliInvalidChars, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in path")
+	})
+
+	// 2. Precedence (P1 override takes priority)
+	t.Run("P1 takes absolute priority", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/work",
+			Env: map[string]string{
+				"CDERUN_PID": "invalid", // would fail validation if used
+			},
+		}
+		cli := &CLIOptions{
+			Image:     ptr("alpine"),
+			Pid:       ptr("invalid"),    // P2 would fail
+			CderunPid: ptr("host"),       // P1 should win
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "host", res.Pid)
+	})
+
+	// 3. Precedence (P2 over P3)
+	t.Run("P2 takes priority over P3", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/work",
+			Env: map[string]string{
+				"CDERUN_PID": "invalid",
+			},
+		}
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+			Pid:   ptr("host"),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "host", res.Pid)
+	})
+}

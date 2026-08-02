@@ -1113,3 +1113,4 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 ## Documentation Update Tasks
 
 - [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.

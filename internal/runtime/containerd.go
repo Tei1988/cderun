@@ -352,6 +352,9 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
 	}
+	if config.Pid == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.PIDNamespace))
+	}
 
 	if len(config.GroupAdd) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {

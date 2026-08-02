@@ -296,3 +296,39 @@ func TestUnit_Command_TerminationAndExitCodes(t *testing.T) {
 		assert.Contains(t, exitErr.Error(), "low-level OCI spec creation failure")
 	})
 }
+
+// TestUnit_Command_PidFlagResolution verifies that `--pid` and `--cderun-pid` options
+// are registered as CLI options and are correctly parsed and mapped through resolveSettings.
+func TestUnit_Command_PidFlagResolution(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pid option resolved via standard flags", func(t *testing.T) {
+		o := &rootOptions{}
+		o.fs = config.RealFileSystem{}
+		o.ensureHooks()
+		cmd := newRootCmd(o)
+
+		// Set `--pid host` and `--image alpine`
+		err := cmd.ParseFlags([]string{"--pid", "host", "--image", "alpine"})
+		require.NoError(t, err)
+
+		resolved, err := o.resolveSettings(cmd, "node", nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "host", resolved.Pid)
+	})
+
+	t.Run("cderun-pid option resolved via wrapper-mode override", func(t *testing.T) {
+		o := &rootOptions{}
+		o.fs = config.RealFileSystem{}
+		o.ensureHooks()
+		cmd := newRootCmd(o)
+
+		// Set `--cderun-pid host`, `--pid invalid`, and `--image alpine` (which would fail validation if not overridden)
+		err := cmd.ParseFlags([]string{"--pid", "invalid", "--cderun-pid", "host", "--image", "alpine"})
+		require.NoError(t, err)
+
+		resolved, err := o.resolveSettings(cmd, "node", nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "host", resolved.Pid)
+	})
+}
