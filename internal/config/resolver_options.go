@@ -146,55 +146,58 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	var fastPathUsed bool
 
 	// Fast-path for common options to avoid reflection and redundant map lookups
-	switch opt.Name {
-	case "image":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
-		p2Set, p2Val = getPtrVal(rv.cli.Image)
-		fastPathUsed = true
-	case "pid":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
-		p2Set, p2Val = getPtrVal(rv.cli.Pid)
-		fastPathUsed = true
-	case "network":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
-		p2Set, p2Val = getPtrVal(rv.cli.Network)
-		fastPathUsed = true
-	case "workdir":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
-		p2Set, p2Val = getPtrVal(rv.cli.Workdir)
-		fastPathUsed = true
-	case "runtime":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
-		p2Set, p2Val = getPtrVal(rv.cli.Runtime)
-		fastPathUsed = true
-	case "user":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
-		p2Set, p2Val = getPtrVal(rv.cli.User)
-		fastPathUsed = true
-	case "log-level":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
-		p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
-		fastPathUsed = true
-	case "log-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
-		fastPathUsed = true
-	case "hostname":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
-		p2Set, p2Val = getPtrVal(rv.cli.Hostname)
-		fastPathUsed = true
-	case "pull":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
-		p2Set, p2Val = getPtrVal(rv.cli.Pull)
-		fastPathUsed = true
-	case "dry-run-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
-		fastPathUsed = true
-	case "diagnosis-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
-		fastPathUsed = true
+	expected := expectedFieldIndices[opt.Name]
+	if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		switch opt.Name {
+		case "image":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
+			p2Set, p2Val = getPtrVal(rv.cli.Image)
+			fastPathUsed = true
+		case "pid":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
+			p2Set, p2Val = getPtrVal(rv.cli.Pid)
+			fastPathUsed = true
+		case "network":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
+			p2Set, p2Val = getPtrVal(rv.cli.Network)
+			fastPathUsed = true
+		case "workdir":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
+			p2Set, p2Val = getPtrVal(rv.cli.Workdir)
+			fastPathUsed = true
+		case "runtime":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
+			p2Set, p2Val = getPtrVal(rv.cli.Runtime)
+			fastPathUsed = true
+		case "user":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
+			p2Set, p2Val = getPtrVal(rv.cli.User)
+			fastPathUsed = true
+		case "log-level":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
+			p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
+			fastPathUsed = true
+		case "log-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
+			fastPathUsed = true
+		case "hostname":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
+			p2Set, p2Val = getPtrVal(rv.cli.Hostname)
+			fastPathUsed = true
+		case "pull":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
+			p2Set, p2Val = getPtrVal(rv.cli.Pull)
+			fastPathUsed = true
+		case "dry-run-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
+			fastPathUsed = true
+		case "diagnosis-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
+			fastPathUsed = true
+		}
 	}
 
 	if fastPathUsed {
@@ -274,59 +277,62 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	var fastPathUsed bool
 
 	// Fast-path for common options to avoid reflection and redundant map lookups
-	switch opt.Name {
-	case "tty":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
-		p2Set, p2Val = getPtrVal(rv.cli.TTY)
-		fastPathUsed = true
-	case "interactive":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
-		p2Set, p2Val = getPtrVal(rv.cli.Interactive)
-		fastPathUsed = true
-	case "read-only":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
-		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
-		fastPathUsed = true
-	case "remove":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
-		p2Set, p2Val = getPtrVal(rv.cli.Remove)
-		fastPathUsed = true
-	case "diagnosis":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
-		p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
-		fastPathUsed = true
-	case "strict-env":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
-		p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
-		fastPathUsed = true
-	case "privileged":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
-		p2Set, p2Val = getPtrVal(rv.cli.Privileged)
-		fastPathUsed = true
-	case "publish-all":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
-		p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
-		fastPathUsed = true
-	case "log-timestamp":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
-		p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
-		fastPathUsed = true
-	case "mount-socket":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
-		p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
-		fastPathUsed = true
-	case "mount-cderun":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
-		p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
-		fastPathUsed = true
-	case "mount-all-tools":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
-		p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
-		fastPathUsed = true
-	case "dry-run":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
-		fastPathUsed = true
+	expected := expectedFieldIndices[opt.Name]
+	if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		switch opt.Name {
+		case "tty":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
+			p2Set, p2Val = getPtrVal(rv.cli.TTY)
+			fastPathUsed = true
+		case "interactive":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
+			p2Set, p2Val = getPtrVal(rv.cli.Interactive)
+			fastPathUsed = true
+		case "read-only":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
+			p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
+			fastPathUsed = true
+		case "remove":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
+			p2Set, p2Val = getPtrVal(rv.cli.Remove)
+			fastPathUsed = true
+		case "diagnosis":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
+			p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
+			fastPathUsed = true
+		case "strict-env":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
+			p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
+			fastPathUsed = true
+		case "privileged":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
+			p2Set, p2Val = getPtrVal(rv.cli.Privileged)
+			fastPathUsed = true
+		case "publish-all":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
+			p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
+			fastPathUsed = true
+		case "log-timestamp":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
+			p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
+			fastPathUsed = true
+		case "mount-socket":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
+			p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
+			fastPathUsed = true
+		case "mount-cderun":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
+			p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
+			fastPathUsed = true
+		case "mount-all-tools":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
+			p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
+			fastPathUsed = true
+		case "dry-run":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
+			p2Set, p2Val = getPtrVal(rv.cli.DryRun)
+			fastPathUsed = true
+		}
 	}
 
 	if fastPathUsed {

@@ -161,8 +161,11 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// mount-socket-path
-	if err := validateField(rv.res.MountSocketPath, "mount-socket-path", nil); err != nil {
+	// mount-socket-path (strictly validated as container bind target)
+	if err := validatePathChars(rv.res.MountSocketPath); err != nil {
+		return fmt.Errorf("security validation failed for %q: %w", "mount-socket-path", err)
+	}
+	if err := validateContainerPath(rv.res.MountSocketPath, "mount-socket-path", 0, "path", "target"); err != nil {
 		return err
 	}
 
