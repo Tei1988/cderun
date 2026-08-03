@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -185,4 +186,107 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 	assert.Equal(t, 125, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
 	cancel()
+}
+
+func TestUnit_Command_Execution_SIGKILLTimeout(t *testing.T) {
+	mock := &runtime.MockRuntime{
+		CreatedContainerID: "sigkill-timeout-c1",
+	}
+
+	// Attach finishes immediately and successfully
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return nil
+	}
+
+	mock.InspectFunc = func(ctx context.Context, id string) (bool, int, error) {
+		return true, 0, nil
+	}
+
+	// WaitContainer blocks indefinitely, so it won't exit even after SIGKILL
+	mock.WaitFunc = func(ctx context.Context, containerID string) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(5 * time.Second):
+			return 0, nil
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return false }
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+	})
+
+	var exitErr *ExitCodeError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, 125, exitErr.Code)
+	assert.Contains(t, exitErr.Error(), "failed to exit after SIGKILL timeout")
+}
+
+func TestUnit_Command_Execution_SIGKILLFailure_NormalExit(t *testing.T) {
+	mock := &runtime.MockRuntime{
+		CreatedContainerID: "sigkill-fail-c1",
+	}
+
+	// Attach finishes immediately and successfully
+	mock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		return nil
+	}
+
+	mock.InspectFunc = func(ctx context.Context, id string) (bool, int, error) {
+		return true, 0, nil
+	}
+
+	// SignalContainer fails when SIGKILL is sent
+	mock.SignalErr = errors.New("injected SIGKILL failure")
+
+	// WaitContainer blocks for 100ms (longer than 50ms, but exits during second select)
+	mock.WaitFunc = func(ctx context.Context, containerID string) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+			return 42, nil
+		}
+	}
+
+	var stderrBuf bytes.Buffer
+	logger := logging.NewLogger()
+	logger.Init("warn", "text", false)
+	logger.SetOutput(&stderrBuf)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--log-level", "warn", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
+		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+			return mock, nil
+		}
+		o.logger = logger
+		o.exitFunc = func(code int) {}
+		o.isTerminal = func(fd int) bool { return false }
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(&stderrBuf)
+	})
+
+	var exitErr *ExitCodeError
+	require.ErrorAs(t, err, &exitErr)
+	// The container's exit code should be returned successfully because the container exited on its own,
+	// and the SIGKILL failure is downgraded to a warning.
+	assert.Equal(t, 42, exitErr.Code)
+	assert.Contains(t, stderrBuf.String(), "failed to force terminate container: injected SIGKILL failure")
 }
