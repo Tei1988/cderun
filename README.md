@@ -252,6 +252,7 @@ cderun echo -- --cderun-tty
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
+- `--pid`: Configure the PID namespace for the container. Accepts `"host"` or `""` (private). Maps to `PidMode` in Docker host configuration, and appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`. (Default: `""`)
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
 - `--group-add`: Add supplementary groups to the container (group name or GID). Note: containerd only supports numeric GIDs.
