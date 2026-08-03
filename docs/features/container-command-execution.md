@@ -1,67 +1,64 @@
-# Feature: コンテナコマンド実行 (Completed)
+# Feature Specification: Container Command Execution
 
-## 概要
+## Overview
 
-`cderun`はエフェメラルコンテナでコマンドを実行し、開発ツールのローカルインストールを必要とせずにクリーンで再現可能な環境を提供する。
-コマンドライン引数は、[引数解析ストラテジー](./argument-parsing.md)で定義されたルールに従って解析され、コンテナ内で実行される最終的なコマンドが決定される。
+`cderun` runs execution commands within ephemeral containers, providing clean, isolated, and reproducible workspace environments without requiring tools (such as Node.js or Python) to be installed locally on the host machine.
 
-## コア機能
+Command-line parameters are parsed according to the rules defined in the [Argument Parsing Feature Specification](./argument-parsing.md) to determine the exact command structure passed to the container.
 
-### コマンドラッピング
+## Core Features
 
-- 任意のコマンドをコンテナ内で実行するようにラップ
-- 実行後にコンテナを自動削除 (`--rm`)
-- コマンドの終了コードと出力を保持
+### Command Wrapping
 
-### インタラクティブサポート
+- Executes arbitrary commands seamlessly inside containers.
+- Automatically removes the container after execution (`--rm`).
+- Preserves and returns the exact process exit codes and standard output streams.
 
-- インタラクティブコマンド用のTTY割り当て (`--tty`)
-- インタラクティブ入力用のSTDIN転送 (`--interactive`)
-- フルターミナル体験の保持
+### Interactive Terminal Support
 
-## 使用例
+- Allocates pseudo-TTYs for interactive command flows (`--tty`).
+- Maintains continuous STDIN piping for interactive shell sessions (`--interactive`).
+- Preserves full-screen interactive console properties.
 
-### 基本コマンド実行
+## Usage Scenarios
 
-`cderun` のコマンドライン引数の解釈と、それに伴うコンテナコマンドの組み立て方は、[引数解析ストラテジー](./argument-parsing.md) にて詳細に定義されています。
+### Basic Command Execution
 
-以下に代表的な使用例を示します。
+The detailed sequence of parsing command line arguments and assembling the container's execution command is documented under [Argument Parsing Specification](./argument-parsing.md).
+
+Representative execution commands:
 
 ```bash
-# .tools.yaml に node ツールが定義されている場合 (例: image: node:20-alpine, entrypoint: ["node"])
+# Given 'node' defined in .tools.yaml (e.g. image: node:20-alpine, entrypoint: ["node"]):
 cderun node --version
-# => サブコマンド 'node' がキーとして使われ、イメージ 'node:20-alpine' と entrypoint: ["node"] が解決される。
-#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'node --version' が実行される。
+# => Subcommand 'node' serves as the lookup key, resolving 'node:20-alpine' and entrypoint: ["node"].
+#    The final command arguments forwarded to the container are '["--version"]', running 'node --version' inside.
 
-# --image フラグと、サブコマンドがある場合 (サブコマンド 'go' はツール定義なし)
-# イメージ内のデフォルト ENTRYPOINT に指定されていないコマンドを実行したい場合は --entrypoint を使用します。
+# Specifying an explicit image and subcommand ('go' has no mapping in .tools.yaml):
+# For tools where the desired command is not the image's default ENTRYPOINT, use the --entrypoint option.
 cderun --image=golang:1.22 --entrypoint=go go --version
-# => サブコマンド 'go' がキーとして使われるがツール定義は見つからない。イメージは 'golang:1.22'、
-#    ENTRYPOINT は 'go' が指定される。
-#    コンテナに渡されるコマンドは '["--version"]' となり、コンテナ内で 'go --version' が実行される。
+# => Subcommand 'go' is consumed as the lookup key (no profile match found). The image is 'golang:1.22',
+#    and the ENTRYPOINT is overridden as 'go'.
+#    The final container arguments are '["--version"]', running 'go --version' inside.
 ```
 
-### インタラクティブシェル
+### Interactive Console Session
 
 ```bash
-# .tools.yaml に bash ツールが定義されている場合 (例: image: node:20-alpine, entrypoint: ["bash"])
-# ※イメージ内に該当する実行ファイルが存在する必要があります。
+# Given 'bash' defined in .tools.yaml (e.g. image: node:20-alpine, entrypoint: ["bash"]):
 cderun --tty --interactive bash
-# => サブコマンド 'bash' がキーとして使われ、イメージ 'node:20-alpine' と entrypoint: ["bash"] が解決される。
-#    コンテナに渡されるコマンドは空となり、インタラクティブbashシェルが開かれる。
+# => Subcommand 'bash' is the lookup key, resolving image 'node:20-alpine' and entrypoint 'bash'.
+#    The final command argument list is empty, starting an interactive bash session in the container.
 
-# --image フラグと、サブコマンドがある場合 (サブコマンド 'sh' はツール定義なし)
-# イメージ内のデフォルト ENTRYPOINT に指定されていないコマンドを実行したい場合は --entrypoint を使用します。
+# Specifying a custom image and entrypoint on a tool with no profile mapping:
 cderun --tty --interactive --image=alpine --entrypoint=sh sh
-# => サブコマンド 'sh' がキーとして使われるがツール定義は見つからない。イメージは 'alpine'、
-#    ENTRYPOINT は 'sh' が指定される。
-#    コンテナに渡されるコマンドは空となり、インタラクティブshシェルが開かれる。
+# => Subcommand 'sh' is consumed as the lookup key. The image is 'alpine' and ENTRYPOINT is overwritten as 'sh'.
+#    An interactive 'sh' shell starts inside the container.
 ```
 
-## メリット
+## Key Benefits
 
-- **ゼロローカル依存**: ツールをローカルにインストールする必要がない
-- **一貫した環境**: 異なるマシン間で同じ動作
-- **分離**: コマンドは分離されたコンテナで実行
-- **クリーンアップ**: 実行後のコンテナ自動削除
-- **透明性**: ネイティブコマンド実行のように動作
+- **Zero Host Pollution**: Develop without installing multiple programming language runtimes or databases locally.
+- **Environment Homogeneity**: Guarantee identical command behavior and versions across different developer environments and CI machines.
+- **Workload Isolation**: Commands execute within sandbox containers, protecting the host system.
+- **Transparent Execution**: Operates smoothly, mimicking the feel of locally installed commands.

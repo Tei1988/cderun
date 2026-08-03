@@ -1,113 +1,113 @@
-# 機能仕様：ツールマウント (完了)
+# Feature Specification: Tool Mounting
 
-## 概要
+## Overview
 
-`.tools.yaml`に定義されたツールをコンテナ内で使用可能にする機能。
-cderunバイナリを複数のツール名でマウントし、ポリグロットエントリーポイント機能を活用します。
+Tool Mounting is a feature that enables executing host-configured tools seamlessly within a container. By mounting the `cderun` binary inside the container under multiple tool-specific names, `cderun` leverages its Polyglot Entry Point functionality to run tools recursively without requiring local installations inside the container.
 
-## 前提条件
+## Prerequisites
 
-- `.tools.yaml` が存在し、対象のツールが定義されていること
+- A tools configuration file (`.tools.yaml`) must exist with the target tools defined.
 
-`--mount-tools` または `--mount-all-tools` を使用すると、`--mount-cderun` および `--mount-socket` が自動的に有効になります。これは [Transitive Auto-enablement](./argument-priority-logic.md#特殊な連動ロジック-transitive-auto-enablement) ロジックに基づいています。
+Specifying `--mount-tools` or `--mount-all-tools` transitively and automatically enables both `--mount-cderun` and `--mount-socket`. This behavior follows the [Transitive Auto-enablement](./argument-priority-logic.md#transitive-auto-enablement) priority rules.
 
-## オプション
+## Options
 
 ### `--mount-all-tools`
 
-**型**: bool
-**デフォルト**: `false`
-**説明**: `.tools.yaml`に定義されているすべてのツールをマウント
+- **Type**: bool
+- **Default**: `false`
+- **Description**: Mount all tools configured inside `.tools.yaml` into the container.
 
-**使用例**:
+**Example**:
 
 ```bash
 cderun --mount-all-tools sh
 ```
 
-**動作**:
+**Underlying Behavior**:
+
+If `.tools.yaml` defines `node`, `python`, and `gemini-cli`, the container runs with the following bind mounts:
 
 ```bash
-# .tools.yamlに node, python, gemini-cli が定義されている場合
 docker run --rm \
   --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/cderun,readonly \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/node,readonly \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/gemini-cli,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/cderun,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/node,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/python,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/gemini-cli,readonly \
   alpine:latest
 ```
 
-**コンテナ内での使用**:
+**Executing Inside the Container**:
 
 ```bash
-# コンテナ内で
-node --version    # cderunがnodeとして実行される
-python script.py  # cderunがpythonとして実行される
-gemini-cli ask    # cderunがgemini-cliとして実行される
+# Inside the container shell:
+node --version    # Executed via cderun as 'node'
+python script.py  # Executed via cderun as 'python'
+gemini-cli ask    # Executed via cderun as 'gemini-cli'
 ```
 
 ### `--mount-tools`
 
-**型**: string
-**デフォルト**: `""`
-**説明**: 指定したツールのみをマウント（カンマ区切り）
+- **Type**: string
+- **Default**: `""`
+- **Description**: Mount only specified tools into the container (comma-separated list).
 
-**使用例**:
+**Example**:
 
 ```bash
 cderun --mount-tools python,node sh
 ```
 
-**動作イメージ(実際はランタイムAPIで実現)**:
+**Underlying Behavior**:
 
 ```bash
 docker run --rm \
   --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/cderun,readonly \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/python,readonly \
-  --mount type=bind,source=<ホスト側cderunのパス>,target=/usr/local/bin/node,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/cderun,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/python,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/node,readonly \
   alpine:latest
 ```
 
-**コンテナ内での使用**:
+**Executing Inside the Container**:
 
 ```bash
-# コンテナ内で
+# Inside the container shell:
 python --version  # OK
 node --version    # OK
-gemini-cli ask    # エラー: マウントされていない
+gemini-cli ask    # Error: gemini-cli is not mounted inside the container
 ```
 
-## 実装詳細
+## Implementation Details
 
-### マウント先
+### Target Directory
 
-ツールは`/usr/local/bin/`にマウントされます:
+Tools are mounted as read-only executables inside the `/usr/local/bin/` directory:
 
 ```text
 /usr/local/bin/
-├── cderun       -> <ホスト側cderunのパス>
-├── node         -> <ホスト側cderunのパス>
-├── python       -> <ホスト側cderunのパス>
-└── gemini-cli   -> <ホスト側cderunのパス>
+├── cderun       -> <host-cderun-path>
+├── node         -> <host-cderun-path>
+├── python       -> <host-cderun-path>
+└── gemini-cli   -> <host-cderun-path>
 ```
 
-### ポリグロットエントリーポイントの活用
+### Polyglot Entry Point Invocation
 
-cderunのポリグロットエントリーポイント機能により、実行ファイル名が自動的にサブコマンドとして認識されます:
+Due to the Polyglot Entry Point architecture of `cderun`, invoking the tool binary name automatically sets the lookup key:
 
 ```bash
-# コンテナ内で "node" を実行
+# Invoking 'node' inside the container:
 node --version
 
-# cderunが実際に実行するコマンド
+# Translates internally to:
 cderun node --version
 ```
 
-### ツールの検証
+### Tool Validation
 
-指定されたツールが`.tools.yaml`に存在しない場合はエラー:
+If a tool specified in `--mount-tools` is missing from the active `.tools.yaml` configuration, the execution immediately fails:
 
 ```bash
 cderun --mount-tools unknown-tool alpine sh
@@ -115,48 +115,35 @@ Error: tool "unknown-tool" not found in .tools.yaml
 available tools: node, python, gemini-cli
 ```
 
-## 使用例
+## Practical Scenarios
 
-### 開発環境の構築
+### Uniform Development Environments
 
 ```bash
-# .tools.yamlにbashが定義されている場合
-cderun --mount-all-tools bash
-
-# または --image で明示的に指定
+# Boot an Ubuntu workspace with all tools mounted
 cderun --mount-all-tools \
   --image ubuntu:22.04 \
   bash
 
-# コンテナ内で
+# Inside the Ubuntu container:
 node --version
 python --version
-gemini-cli --version
+gemini-cli ask
 ```
 
-### 特定ツールのみマウント
+### CI/CD Pipeline Isolation
 
 ```bash
-# .tools.yamlにshが定義されている場合
-cderun --mount-tools python,node sh
-```
-
-### CI/CDパイプライン
-
-```bash
-# .tools.yamlに定義されたツールを使用
+# Selectively mount node and docker wrappers
 cderun --mount-tools node,docker \
   sh -c '
-    # nodeコマンドはcderun経由で実行される
     node --version
-
-    # dockerコマンドもcderun経由で実行される
     docker build -t myapp .
     docker push myapp
   '
 ```
 
-**注意**: `npm`や`npx`などのコマンドを使う場合は、`.tools.yaml`に別途定義する必要があります：
+**Note**: Commands such as `npm` or `npx` must be explicitly defined in `.tools.yaml` to be mounted and executed:
 
 ```yaml
 # .tools.yaml
@@ -170,7 +157,7 @@ npx:
   image: node:20-alpine
 ```
 
-そうすれば以下のように使用できます：
+This setup enables seamless command flows:
 
 ```bash
 cderun --mount-tools node,npm,npx \
@@ -181,16 +168,15 @@ cderun --mount-tools node,npm,npx \
   '
 ```
 
-## 制限事項
+## Limitations
 
-1. **依存性**: 動作にはホストのコンテナランタイムソケットへのアクセスが必要（通常は `--mount-socket` によって自動的にマウントされます）
-2. **読み取り専用**: マウントされたツールは読み取り専用
-3. **パスの上書き**: コンテナ内に同名のツールがある場合、上書きされる
-4. **アーキテクチャ一致**: コンテナのアーキテクチャに合ったcderunバイナリが必要（実行中のバイナリがそのままマウントされるため）
+1. **Daemon Dependency**: Execution requires mounting the host's container engine socket inside the container (transitively managed via `--mount-socket`).
+2. **Read-Only Mounts**: Mounted tool binaries are strictly read-only.
+3. **Path Collisions**: Any tool with a colliding name already installed inside the container's base image will be overwritten in `/usr/local/bin/`.
+4. **Binary Architecture**: The mounted `cderun` binary must match the target container's CPU architecture and operating system (as the host binary is mounted directly). On macOS hosts, a Linux-compatible `cderun` binary must be compiled and specified via `--mount-cderun-path`.
 
-## メリット
+## Key Benefits
 
-- **柔軟性**: 必要なツールだけを選択的にマウント
-- **軽量**: 実際のツールをインストールする必要がない
-- **統一インターフェース**: すべてのツールがcderun経由で実行される
-- **シンプル**: ポリグロットエントリーポイントを活用
+- **High Flexibility**: Mount only the subset of tools required for a given script or pipeline.
+- **Zero Install Footprint**: Execute developer tools instantly without polluting container base images.
+- **Unified Interface**: All nested tool execution passes through the native `cderun` pipeline for uniform settings and logging.

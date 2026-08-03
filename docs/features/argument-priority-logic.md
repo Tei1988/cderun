@@ -1,79 +1,78 @@
-# 機能仕様：引数・設定優先順位ロジック
+# Feature Specification: Argument and Setting Priority Logic
 
-## 概要
+## Overview
 
-`cderun` は、複数のソース（CLI、環境変数、YAML、デフォルト値）から設定を読み込む。
-設定の競合が発生した場合、以下の **P1（最高）〜 P6（最低）** の優先順位に従って値を確定させる。
+`cderun` loads configurations from multiple sources, including the CLI, environment variables, YAML profiles, and internal default values. When configuration conflicts arise, `cderun` resolves and determines the final settings according to the priority hierarchy defined below, ranging from **P1 (highest)** to **P6 (lowest)**.
 
-## 優先順位階層 (Resolution Hierarchy)
+## Resolution Hierarchy
 
-設定は以下の P1（最高）から P6（最低）の順に解決されます。
+Settings are resolved in the following priority order, from highest to lowest:
 
-### P1: CDERUN Internal Overrides (最高優先順位)
+### P1: CDERUN Internal Overrides (Highest Priority)
 
-- **定義**: `cderun` の動作を強制的に変更・上書きするための専用フラグ。シンボリックリンク（ポリグロットモード）利用時でも、ラップされたツールの引数と衝突せずに `cderun` 側の設定を指定することを可能にします。
-- **フラグ名**: `cderun` 標準フラグ（P2）のすべてに対応する `--cderun-` プレフィックス付きフラグ。
-  - **主要な P1 フラグ**:
-    - **実行制御**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`
-    - **マウント**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-cderun`
-    - **診断**: `--cderun-dry-run`, `--cderun-log-level`
-- **挙動**: これらが指定された場合、他のソース（P2〜P6）をすべて無視してこの値が最優先で採用されます。
-- **配置規則とホイスト (Hoisting)**:
-  - **Wrapper Mode**: 原則として**サブコマンドの後ろ**に配置します。`cderun` はサブコマンドの後ろにある `--cderun-*` フラグを検出し、内部的にサブコマンドの前に「ホイスト（前方移動）」してパースします。
-  - **メリット**: ラップ対象のツールが持つ独自のフラグ（例: `node --env`）と、`cderun` 側のフラグ（例: `node --cderun-env`）を完璧に分離できます。
-  - **注意**: Wrapper Mode でサブコマンドより前に配置すると、「P2 標準フラグ」と誤認されるのを防ぐため、バリデーションによりエラーとなります。
-  - **Diagnosis Mode**: サブコマンドがないため、フラグは任意の場所に配置可能です。
+- **Definition**: Dedicated flags designed to force-override the behavior of `cderun`. These flags enable specifying settings on the `cderun` side even when using symbolic links (Polyglot Mode) without conflicting with the arguments of wrapped tools.
+- **Flag Names**: All standard `cderun` flags (P2) have a corresponding P1 counterpart prefixed with `--cderun-`.
+  - **Key P1 Flags**:
+    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`
+    - **Mounting**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-cderun`
+    - **Diagnostics**: `--cderun-dry-run`, `--cderun-log-level`
+- **Behavior**: When specified, these values take absolute precedence, completely ignoring all other sources (P2–P6).
+- **Placement Rules and Hoisting**:
+  - **Wrapper Mode**: By rule, these flags must be placed **after** the subcommand. During preprocessing, `cderun` scans the arguments after the subcommand, extracts any `--cderun-*` flags, and internally "hoists" (relocates) them before the subcommand prior to standard parsing.
+  - **Advantages**: This perfectly isolates wrapped tool-specific flags (e.g., `node --env`) from `cderun` configurations (e.g., `node --cderun-env`).
+  - **Validation Check**: Specifying a P1 internal override before the subcommand in Wrapper Mode is strictly prohibited to prevent confusion with standard P2 flags, resulting in a validation error.
+  - **Diagnosis Mode**: Since no subcommand is required, these flags can be placed anywhere.
 
-「ホイスト（Hoisting）」メカニズムを含む詳細な動作については [引数解析](./argument-parsing.md) を参照してください。
+For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoisting](./argument-parsing.md).
 
-### P2: CLI Flags (ユーザーの意図)
+### P2: CLI Flags (User Intent)
 
-- **定義**: 実行時にユーザーが明示的に指定した標準フラグ。サブコマンドの**前**に置く必要があります。
-- **フラグ名**:
+- **Definition**: Standard CLI options explicitly provided by the user at execution time. These must be placed **before** the subcommand.
+- **Flag Names**:
   - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--remove`, `--config`, `--tool-config`
   - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--add-host`, `--user`, `--group-add`, `--privileged`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--pull-max-retries`, `--pull-backoff-base`, `--strict-env`, `--sensitive-env`, `--memory`, `--cpus`, `--device`, `--hang-timeout`
   - `--dry-run`, `--dry-run-format`, `--diagnosis`, `--diagnosis-format`, `--log-level`, `--log-format`, `--log-timestamp`
-- **判定条件**: ユーザーがコマンドラインで明示的にフラグを指定したこと。指定がない場合、P3以下の判定へ進みます。
+- **Condition**: Applied only when explicitly specified by the user on the command line. Otherwise, the resolution proceeds to P3 and below.
 
-### P3: Environment Variables (グローバルオーバーライド)
+### P3: Environment Variables (Global Overrides)
 
-- **定義**: 実行環境全体に適用される設定。
-- **主要なキー**:
-  - **設定・実行**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`
-  - **入出力・TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_ENV`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`, `CDERUN_GROUP_ADD`
-  - **ネットワーク**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`
-  - **マウント・ツール**: `CDERUN_MOUNT`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_ALL_TOOLS`
-  - **リソース・権限**: `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_DEVICE`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`
-  - **イメージ取得**: `CDERUN_PULL`, `CDERUN_PULL_MAX_RETRIES`, `CDERUN_PULL_BACKOFF_BASE`, `CDERUN_ENTRYPOINT`
-  - **診断・ログ**: `CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`, `CDERUN_DIAGNOSIS`, `CDERUN_DIAGNOSIS_FORMAT`, `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`, `CDERUN_SENSITIVE_ENV`
-- **注記 (`CDERUN_CONFIG` / `CDERUN_TOOL_CONFIG`)**: これらは P4/P5 の設定ファイルの**読み込み先パスを決める**ために、設定ファイルの探索前に評価されます。
-- **セパレータ**:
-  - セミコロン (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
-  - カンマ (`,`): `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`, `CDERUN_SENSITIVE_ENV`
+- **Definition**: Settings applied globally across the execution host environment.
+- **Key Variables**:
+  - **Configuration & Execution**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`
+  - **I/O & TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_ENV`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`, `CDERUN_GROUP_ADD`
+  - **Networking**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`
+  - **Mounting & Tools**: `CDERUN_MOUNT`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_ALL_TOOLS`
+  - **Resources & Privileges**: `CDERUN_MEMORY`, `CDERUN_CPUS`, `CDERUN_DEVICE`, `CDERUN_PRIVILEGED`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`
+  - **Image Retrieval**: `CDERUN_PULL`, `CDERUN_PULL_MAX_RETRIES`, `CDERUN_PULL_BACKOFF_BASE`, `CDERUN_ENTRYPOINT`
+  - **Diagnostics & Logging**: `CDERUN_DRY_RUN`, `CDERUN_DRY_RUN_FORMAT`, `CDERUN_DIAGNOSIS`, `CDERUN_DIAGNOSIS_FORMAT`, `CDERUN_LOG_LEVEL`, `CDERUN_LOG_FORMAT`, `CDERUN_LOG_TIMESTAMP`, `CDERUN_SENSITIVE_ENV`
+- **Evaluation Timing (`CDERUN_CONFIG` / `CDERUN_TOOL_CONFIG`)**: These variables are evaluated *before* searching for configuration files to determine the respective configuration loading paths.
+- **List Separators**:
+  - Semicolon (`;`): `CDERUN_ENV`, `CDERUN_MOUNT`
+  - Comma (`,`): `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_DEVICE`, `CDERUN_SENSITIVE_ENV`
 
-### P4: Tool-specific config (YAMLプロファイル)
+### P4: Tool-specific Config (YAML Profile)
 
-- **定義**: 設定ファイル（`.tools.yaml`）内の、実行対象サブコマンド（ツール）に紐づく設定ブロック。
-- **挙動**: CLIも環境変数も指定がない場合、この値を採用する。
+- **Definition**: The configuration block inside the tools configuration file (`.tools.yaml`) tied to the target subcommand (tool) being executed.
+- **Behavior**: Selected if neither CLI flags nor environment variables are specified.
 
-### P5: Global defaults (プロファイルデフォルト)
+### P5: Global Defaults (Profile Default)
 
-- **定義**: 設定ファイル（`.cderun.yaml`）の `defaults` ブロック。
-- **挙動**: P1〜P4のいずれも指定がない場合、この値を採用する。
+- **Definition**: The global `defaults` configuration block inside the default configuration file (`.cderun.yaml`).
+- **Behavior**: Selected if no configurations are specified from P1 to P4.
 
-### P6: Hardcoded Defaults (最低優先順位)
+### P6: Hardcoded Defaults (Lowest Priority)
 
-- **定義**: プログラム内でハードコードされた最終フォールバック値。
-- **デフォルト値:**
+- **Definition**: The final fallback values hardcoded inside the `cderun` binary.
+- **Default Values**:
   - `tty: false`
   - `interactive: false`
   - `network: bridge`
   - `remove: true`
-  - `runtime`: なし（利用可能なソケットから docker → containerd → podman の順で自動検出。見つからない場合は `docker` にフォールバック）
+  - `runtime`: None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
   - `pull: missing`
   - `pullMaxRetries: 3`
   - `pullBackoffBase: 1s`
-  - `logLevel: warn`
+  - `logLevel: error`
   - `logFormat: text`
   - `logTimestamp: true`
   - `strictEnv: false`
@@ -87,45 +86,45 @@
   - `diagnosis: false`
   - `diagnosisFormat: yaml`
   - `hangTimeout: 10s`
-  - `sensitiveEnv: nil`（未指定 = 全環境変数の値をマスク）
-  - `image`: なし (Fatal Error)
+  - `sensitiveEnv: nil` (Unset; means all environment variable values are masked)
+  - `image`: None (Trigger Fatal Error if unresolved)
 
-## 解決の具体例 (Resolution Example)
+## Resolution Example
 
-例えば、`tty` オプションが以下の複数の場所で指定されている場合を考えます。
+Consider a scenario where the `tty` option is specified in multiple locations:
 
-1. **P6 (Fallback)**: `false` (ハードコード)
-2. **P5 (Global)**: `.cderun.yaml` で `tty: true`
-3. **P4 (Tool)**: `.tools.yaml` の `node` セクションで `tty: false`
+1. **P6 (Fallback)**: `false` (hardcoded)
+2. **P5 (Global)**: `tty: true` in `.cderun.yaml`
+3. **P4 (Tool)**: `tty: false` in the `node` section of `.tools.yaml`
 4. **P3 (Env)**: `export CDERUN_TTY=true`
 5. **P2 (CLI P2)**: `cderun --tty=false node ...`
 6. **P1 (CLI P1)**: `cderun node ... --cderun-tty=true`
 
-この場合、**P1 の `true`** が最終的な値として採用されます。もし P1 が指定されていなければ P2 (`false`)、P2 がなければ P3 (`true`) ... と順に下がっていきます。
+In this case, the final value adopted is **P1's `true`**. If P1 were not specified, P2 (`false`) would win; if P2 were missing, P3 (`true`) would win, and so forth.
 
-## コレクション型（リスト型）の設定について
+## Collection and List-type Option Resolution
 
-`mounts`, `devices`, `env`, `ports`, `mountTools` などのリスト形式の設定も、スカラ型と同様に **「優先順位の高いソースに値があれば、それより低い優先順位のソースはすべて無視される（上書き）」** という挙動になります。
+List configurations such as `mounts`, `devices`, `env`, `ports`, and `mountTools` follow the same resolution model: **"If a higher-priority source contains a value, lower-priority sources are completely ignored (overwritten)."**
 
-**重要な注意点**:
-実装上、高い優先順位のソースにおいて**明示的な空のリスト**（YAMLでの `[]` や環境変数での空文字列）が指定された場合、それは意図的な「空の設定」とみなされ、より低い優先順位のソースの設定を上書き（無効化）します。これは、マージではなく「完全な上書き」の原則に基づいています。
+**Critical Principle**:
+To support intentional removal or clearing of lists, specifying an **explicitly empty list** in a higher-priority source (e.g., `mounts: []` in YAML or `export CDERUN_ENV=""` in environment variables) is treated as an intentional empty setting. This completely overwrites and disables configuration values defined in any lower-priority sources.
 
-- **例**: `.tools.yaml` (P4) で `mounts: []` と明示的に空のリストを指定した場合、`.cderun.yaml` (P5) に `mounts` の定義があっても、最終的なマウント設定は空になります。
-- **環境変数**: `export CDERUN_ENV=""` のように空文字列を設定した場合も、下位レベル（P4/P5）の環境変数設定をすべて無効化します。
+- **Example**: If `.tools.yaml` (P4) defines `mounts: []`, any `mounts` specified in `.cderun.yaml` (P5) are completely ignored, resulting in an empty mount list.
+- **Environment Variable Example**: Setting `export CDERUN_ENV=""` (P3) disables any environment variables defined in `.tools.yaml` (P4) or `.cderun.yaml` (P5).
 
-### 同一ソース内での重複排除 (Intra-source Deduplication)
+### Intra-source Deduplication
 
-リスト形式の設定（特に環境変数 `env`）において、同じソース（例：CLIフラグのみ、または一つのYAMLファイル内のみ）で同じキーが複数回指定された場合、**最後に指定された値**が優先されます（Last-one-wins）。
+Within a single source (e.g., only CLI flags or inside a single YAML block), if a duplicate list-type key is defined (especially environment keys), **the last specified value wins**.
 
-- **例**: `cderun --env A=1 --env A=2 node` を実行した場合、コンテナ内の環境変数 `A` の値は `2` になります。
+- **Example**: Running `cderun --env A=1 --env A=2 node` results in environment variable `A` holding the value `2` inside the container.
 
-## 特殊な連動ロジック (Transitive Auto-enablement)
+## Transitive Auto-enablement
 
-一部のオプションは、他のオプションの設定状況に基づいて連鎖的に自動有効化されます。これらのロジックは、対象のオプションが P1〜P5 のどのレベルでも**明示的に設定（`nil` 以外）されていない場合にのみ**適用されます。
+Certain options are dynamically and transitively enabled based on the resolution state of other options. These transitive rules apply **only when the target option remains unconfigured (`nil`) across all P1 to P5 layers**:
 
-1. **`mountCderun` の自動有効化**:
-   `mountTools`（指定あり）または `mountAllTools: true` の場合、`mountCderun` は自動的に `true` になります。
-2. **`mountSocket` の自動有効化**:
-   `mountCderun` が `true`（自動有効化されたものを含む）の場合、`mountSocket` は自動的に `true` になります。
+1. **`mountCderun` Auto-enablement**:
+   If `mountTools` is specified (non-empty) or if `mountAllTools` resolves to `true`, `mountCderun` is transitively set to `true`.
+2. **`mountSocket` Auto-enablement**:
+   If `mountCderun` resolves to `true` (including transitively), `mountSocket` is transitively set to `true`.
 
-**注意**: いずれかの優先順位（P1〜P5）で明示的に `false` が指定されている場合、上記の自動有効化は行われません。例えば、`.cderun.yaml` で `mountSocket: false` と設定されている場合、`mountCderun` が有効であってもソケットはマウントされません。
+**Note**: If an option is explicitly set to `false` in any layer (P1–P5), its dynamic auto-enablement is suppressed. For example, if `.cderun.yaml` configures `mountSocket: false`, the socket will not be mounted even if `mountCderun` resolves to `true`.

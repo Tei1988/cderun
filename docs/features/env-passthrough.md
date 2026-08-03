@@ -1,59 +1,58 @@
-# 機能仕様：環境変数パススルー (完了)
+# Feature Specification: Environment Variable Passthrough
 
-## 概要
+## Overview
 
-実行ホストの環境変数を選択的にコンテナに引き継ぐ機能。
-**デフォルトでは環境変数は引き継がれない。**明示的に指定した環境変数のみがコンテナに渡される。
+Environment Variable Passthrough selectively forwards host environment variables into execution containers. **By default, no environment variables are passed through.** Only variables explicitly configured are transmitted to the container.
 
-`.tools.yaml`（優先順位 P4）、`--env` フラグ（優先順位 P2）、`--cderun-env` フラグ（優先順位 P1）および環境変数 `CDERUN_ENV`（優先順位 P3）による指定がサポートされており、`KEY=value` 形式（明示的指定）と `KEY` 形式（ホストからの取得）の両方に対応しています。
+Passthrough is supported via tool-specific configurations inside `.tools.yaml` (P4 priority), command-line flags `--env` / `-e` (P2), internal override flags `--cderun-env` (P1), and the `CDERUN_ENV` environment variable (P3). Both `KEY=value` (explicit setting) and `KEY` (passthrough from host) formats are supported.
 
-## 中間表現での扱い
+## Intermediate Representation
 
-`ContainerConfig.Env` は `[]string` 型で保持し、各要素は以下のいずれかの形式をとる。
+`ContainerConfig.Env` is a string slice (`[]string`) containing elements in one of two formats:
 
-### env配列の形式
+### env Element Formats
 
-1. **`KEY=value`** (明示的指定): 指定された値をそのまま使用。
-2. **`KEY`** (パススルー): 実行ホストの環境変数から値を取得して `KEY=value` 形式に変換。
+1. **`KEY=value`** (explicit assignment): The value is passed as-is.
+2. **`KEY`** (passthrough): The value is dynamically retrieved from the host at execution time and converted into `KEY=value` format.
 
-## 設定方法
+## Configuration Methods
 
-### ツール設定
+### Tool Profile Configuration
 
 ```yaml
 # .tools.yaml
 node:
   env:
-    - NODE_ENV=production      # 明示的な値
-    - NPM_TOKEN                 # 実行ホストから取得
-    - HOME                      # 実行ホストから取得
+    - NODE_ENV=production      # Explicit assignment
+    - NPM_TOKEN                 # Passthrough from host
+    - HOME                      # Passthrough from host
 ```
 
-### コマンドライン
+### Command Line Flags
 
 ```bash
-# 明示的な値を設定
+# Set an explicit assignment
 cderun --env NODE_ENV=production node app.js
 
-# 実行ホストから取得
+# Pass through from the host environment
 cderun --env NPM_TOKEN --env HOME node app.js
 
-# 混在
+# Combined usage
 cderun --env NODE_ENV=production --env NPM_TOKEN node app.js
 ```
 
-### 環境変数 (P3)
+### Environment Variable (P3)
 
-`CDERUN_ENV` 環境変数を使用して、複数の環境変数を一度に指定できます。セパレータとしてセミコロン (`;`) を使用します。
+Use the `CDERUN_ENV` environment variable to define multiple variables simultaneously, using a semicolon (`;`) as a separator:
 
 ```bash
 export CDERUN_ENV="NODE_ENV=production;NPM_TOKEN;HOME"
 cderun node app.js
 ```
 
-## 優先順位
+## Priority Rules
 
-高い優先順位のソース（CLI、環境変数、設定ファイル）に値がある場合、それより低い優先順位のソースはすべて無視されます（上書き）。
+Under the priority hierarchy, if a higher-priority configuration layer contains any definition for the `env` setting, all lower-priority layers are ignored completely (completely overwritten).
 
 ```yaml
 # .tools.yaml
@@ -65,23 +64,25 @@ node:
 
 ```bash
 cderun --env NODE_ENV=production node app.js
-# → NODE_ENV=production のみがコンテナに渡されます。
-# 設定ファイル内の PORT=3000 は無視されます。
+# -> Only NODE_ENV=production is passed to the container.
+#    The PORT=3000 mapping from .tools.yaml is completely ignored.
 ```
 
-### 同じソース内でキーが複数回指定された場合
+### Key Redefinitions in the Same Source
+
+If the same key is defined multiple times inside the same source (such as duplicate CLI flags or duplicate entries in a single YAML block), **the last specified value takes precedence**.
 
 ```yaml
 # .tools.yaml
 node:
   env:
     - NODE_ENV=development
-    - NODE_ENV=production  # この値が使われる
+    - NODE_ENV=production  # This value is adopted
 ```
 
-## 実行例
+## Resolution Examples
 
-### 例1: 明示的な値の設定
+### Example 1: Explicit Settings
 
 ```yaml
 # .tools.yaml
@@ -96,33 +97,33 @@ cderun node app.js
 # ContainerConfig.Env = ["NODE_ENV=production", "PORT=3000"]
 ```
 
-### 例2: 実行ホストから取得
+### Example 2: Passthrough from Host
 
 ```yaml
 # .tools.yaml
 node:
   env:
-    - NPM_TOKEN  # 実行ホストから取得
-    - HOME       # 実行ホストから取得
+    - NPM_TOKEN  # Passthrough
+    - HOME       # Passthrough
 ```
 
 ```bash
 export NPM_TOKEN=secret123
 export HOME=/home/alice
 cderun node app.js
-# 実行時に解決:
+# Resolved at runtime:
 # ContainerConfig.Env = ["NPM_TOKEN=secret123", "HOME=/home/alice"]
 ```
 
-### 例3: 混在
+### Example 3: Mixed Usage
 
 ```yaml
 # .tools.yaml
 node:
   env:
-    - NODE_ENV=production  # 明示的
-    - NPM_TOKEN            # 実行ホストから
-    - PORT=3000            # 明示的
+    - NODE_ENV=production  # Explicit
+    - NPM_TOKEN            # Passthrough
+    - PORT=3000            # Explicit
 ```
 
 ```bash
@@ -135,25 +136,25 @@ cderun node app.js
 # ]
 ```
 
-## 環境変数が存在しない場合
+## Unset Environment Variables
 
-### デフォルト動作
+### Default Behavior
 
-実行ホストに存在しない環境変数は空文字列として渡される：
+If a requested passthrough variable is not defined on the host, `cderun` defaults to passing it as an empty string:
 
 ```bash
 cderun --env NONEXISTENT node -e "console.log(process.env.NONEXISTENT)"
 # ContainerConfig.Env = ["NONEXISTENT="]
-# 出力: "" (空文字列)
+# Output: "" (empty string)
 ```
 
-### 厳密モード (Strict Mode)
+### Strict Mode (`strictEnv`)
 
-`strictEnv` を `true` に設定すると、指定された環境変数が実行ホストに存在しない場合にエラーを返します。
+Setting `strictEnv` to `true` causes execution to immediately fail with a configuration error if any requested passthrough environment variables are missing on the host.
 
-#### 設定方法
+#### Configuration Methods
 
-.cderun.yaml（グローバル）、.tools.yaml（ツール固有）、またはコマンドラインフラグ `--strict-env` で設定可能です。
+Can be configured inside `.cderun.yaml` (global defaults), `.tools.yaml` (tool profile), or via the command-line flag `--strict-env`.
 
 ```yaml
 # .cderun.yaml
@@ -161,53 +162,53 @@ defaults:
   strictEnv: true
 ```
 
-またはコマンドラインフラグで指定：
+Or via command-line flags:
 
 ```bash
 cderun --strict-env node app.js
 ```
 
-または環境変数で指定：
+Or via environment variables:
 
 ```bash
 export CDERUN_STRICT_ENV=true
 ```
 
-#### 挙動
+#### Behavior
 
 ```bash
 cderun node app.js
 Error: required environment variable not found: NPM_TOKEN
 ```
 
-## 環境変数の解決ロジック
+## Environment Resolution Logic
 
-コンテナを作成する前に、`Env` 配列内の各要素をスキャンし、`=` を含まない要素（キーのみの指定）については、実行ホストの `os.Getenv(key)` を呼び出して値を解決する。解決された値は `KEY=value` の形式でランタイムAPIに渡される。
+Prior to container creation, the execution engine scans the resolved `Env` slice. For any entries that do not contain an equals sign (`=`), the engine queries `os.Getenv(key)`. The resulting resolved `KEY=value` string is passed directly to the container runtime API.
 
-## ベストプラクティスと使い分け
+## Best Practices
 
-デフォルト動作と厳密モード（Strict Mode）の使い分けの指針を以下に示します。
+Guidance on choosing between default passthrough behavior and Strict Mode:
 
-### デフォルト動作 (strictEnv: false)
+### Default Passthrough (`strictEnv: false`)
 
-- **特徴**: 指定した変数がホストになくてもエラーにせず、空文字としてコンテナに渡します。
-- **メリット**: 柔軟性が高く、一部の環境変数が欠けていても動作が継続できる場合に便利です。
-- **推奨されるユースケース**:
-  - アドホックな開発作業。
-  - オプショナルな設定（ログレベルの変更など）をパススルーする場合。
+- **Characteristics**: Missing host variables do not trigger errors; they are passed as empty values.
+- **Benefits**: Offers flexibility, allowing container tasks to run even if minor configuration details are missing.
+- **Recommended Use Cases**:
+  - Local ad-hoc developer tasks.
+  - Optional logging levels or debugging switches.
 
-### 厳密モード (strictEnv: true)
+### Strict Mode (`strictEnv: true`)
 
-- **特徴**: 指定した変数がホストに存在しない場合、即座にエラーで停止します（Fail Fast）。
-- **メリット**: 設定漏れによるサイレントな失敗（意図しないデフォルト値での動作など）を確実に防げます。
-- **推奨されるユースケース**:
-  - **認証情報/シークレット**: `NPM_TOKEN`, `AWS_ACCESS_KEY_ID` など、欠落すると正常に動作しないことが明らかな場合。
-  - **CI/CD環境**: 実行環境の一貫性が強く求められる自動化パイプライン。
-  - **チーム共有設定**: `.tools.yaml` をチームで共有しており、全員の環境が正しくセットアップされていることを保証したい場合。
+- **Characteristics**: Missing host variables halt execution instantly (fail-fast behavior).
+- **Benefits**: Eliminates silent failures resulting from unset variables or configuration typos.
+- **Recommended Use Cases**:
+  - **Secrets and Credentials**: Critical tokens (such as `NPM_TOKEN`, `AWS_ACCESS_KEY_ID`) where omission leads to immediate execution failures.
+  - **CI/CD Environments**: Ensuring strict environment consistency across automated test runners.
+  - **Shared Team Profiles**: Ensuring all teammates have properly set up local environment keys as specified in `.tools.yaml`.
 
-## デバッグ
+## Debugging and Verification
 
-### dry-runでの確認
+### Verifying Settings via Dry Run
 
 ```bash
 cderun --dry-run node app.js
@@ -217,4 +218,4 @@ env:
   - HOME=[REDACTED]
 ```
 
-デフォルトでは**すべての**環境変数の値がマスクされます（Secure by Default）。実際の値を確認したい場合は `--sensitive-env=""` でマスクを無効化できます（[機密データ保護](./sensitive-data-protection.md) を参照）。
+By default, **all** environment variable values are automatically masked as `[REDACTED]` in dry-run configurations (Secure by Default). To inspect actual resolved values, disable masking using `--sensitive-env=""` (see [Sensitive Data Protection](./sensitive-data-protection.md)).

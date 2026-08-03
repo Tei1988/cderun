@@ -1,46 +1,46 @@
-# Feature: Logging and Debugging (Completed)
+# Feature Specification: Logging and Debugging
 
-## 概要
+## Overview
 
-cderunの動作を詳細に確認するためのログ出力とデバッグ機能。
-内部的にはスレッドセーフな設計となっており、ロック競合を最小限に抑えるための最適化（ロック取得前のログレベル判定など）が施されています。
+`cderun` provides comprehensive logging and debugging features to inspect container setups and execution steps.
+The logging system is designed to be completely thread-safe, incorporating optimizations (such as early log-level checks prior to acquiring mutexes) to keep performance overhead minimal.
 
-## ログレベル
+## Log Levels
 
-### レベル定義
+### Level Definitions
 
-- `ERROR`: エラーのみ
-- `WARN`: 警告とエラー（デフォルト）
-- `INFO`: 一般的な情報
-- `DEBUG`: 詳細なデバッグ情報
-- `TRACE`: 最も詳細な情報（全ての内部ステップ、引数処理、APIコール等）
+- `ERROR`: Captures fatal errors and command aborts.
+- `WARN`: Records warnings and non-fatal errors (Default level for CLI).
+- `INFO`: General informational lifecycle logs.
+- `DEBUG`: Detailed operational traces (e.g. configuration files loaded, socket connections resolved).
+- `TRACE`: Extreme fine-grained step-by-step logs (e.g. low-level argument processing, API payloads, internal timing metrics).
 
-### 設定方法
+### Configuration Options
 
-#### コマンドライン
+#### Command-Line Flags
 
 ```bash
-# 情報の表示 (INFO)
+# Print general logs (INFO)
 cderun --log-level info node app.js
 
-# 詳細ログ (DEBUG)
+# Print detailed operational logs (DEBUG)
 cderun --log-level debug node app.js
 
-# 最も詳細 (TRACE)
+# Print complete trace logs (TRACE)
 cderun --log-level trace node app.js
 ```
 
-#### 設定ファイル
+#### Configuration Profile
 
 ```yaml
 # .cderun.yaml
 logging:
-  level: warn  # error | warn | info | debug | trace
+  level: error  # error | warn | info | debug | trace
   format: text  # text | json
   timestamp: true
 ```
 
-#### 環境変数
+#### Environment Variables
 
 ```bash
 export CDERUN_LOG_LEVEL=debug
@@ -49,25 +49,25 @@ export CDERUN_LOG_TIMESTAMP=true
 
 ## P1 Internal Overrides
 
-他の設定同様、`--cderun-` プレフィックスを用いた Priority 1 オーバーライドが可能です。サブコマンドの後に指定し、設定ファイルや環境変数の値を強制的に上書きします。
+Like other settings, you can override logging properties using the `--cderun-` prefixed Phase 1 (P1) flags placed after the subcommand in Wrapper Mode:
 
 - `--cderun-log-level`
 - `--cderun-log-format`
 - `--cderun-log-timestamp`
 - `--cderun-hang-timeout`
 
-## ログ出力例
+## Logging Output Examples
 
-### デフォルト（WARNレベル）
+### Default (WARN/ERROR level)
 
 ```bash
 cderun node app.js
 Hello, World!
 ```
 
-> **Note**: デフォルトでは `INFO` レベルの "Running: ..." 等のメッセージは表示されず、コマンドの出力のみが表示されます。
+> **Note**: At default levels, no diagnostic messages (such as "Running: ...") are printed, ensuring a clean output consisting solely of the wrapped tool's output.
 
-### INFO レベル
+### INFO Level
 
 ```bash
 cderun --log-level info node app.js
@@ -75,7 +75,7 @@ cderun --log-level info node app.js
 Hello, World!
 ```
 
-### DEBUG レベル
+### DEBUG Level
 
 ```bash
 cderun --log-level debug node app.js
@@ -89,13 +89,13 @@ Hello, World!
 2026-02-28 10:30:46 [DEBUG] Container exited with code: 0
 ```
 
-#### ContainerConfig 構造体のデバッグログ出力と機密情報のマスキング
+#### ContainerConfig Debug Output and Sensitive Data Masking
 
-`cderun` はコンテナを生成する直前に、構築された `ContainerConfig`（コンテナイメージ名、実行コマンド、エントリーポイント、マウント情報、環境変数リスト、実行ユーザー等）の情報を `DEBUG` レベルで詳細に出力します。
+Immediately prior to starting the container, `cderun` logs the finalized `ContainerConfig` structure (including image name, command, entrypoint, volume mounts, environment lists, and user context) at the `DEBUG` level.
 
-このデバッグ出力では、セキュリティを担保するため、`config.MaskSensitiveEnvList` が適用されます。環境変数に登録されている機密情報（`sensitive-env` フィルタに一致、または未指定時のデフォルト全マスク等）は `[REDACTED]` でマスクされた状態でログ出力されるため、デバッグログ経由での秘密鍵やパスワードなどの機密情報の漏洩を防ぎます。
+To ensure strict compliance with security standards, the environment variables printed inside this dump are processed via `config.MaskSensitiveEnvList`. Any environment variables matched by the active `sensitive-env` patterns (or all environment variables by default) are printed as `[REDACTED]`, ensuring that authentication keys, database passwords, or credentials never leak into operational log files.
 
-デバッグログ出力例：
+Diagnostic config dump example:
 
 ```text
 2026-02-28 10:30:45 [DEBUG] ContainerConfig:
@@ -108,7 +108,7 @@ Hello, World!
   User:       1000:1000
 ```
 
-### TRACE レベル
+### TRACE Level
 
 ```bash
 cderun --log-level trace node app.js
@@ -124,66 +124,58 @@ cderun --log-level trace node app.js
 ...
 ```
 
-## フォーマット
+## Formats
 
-### テキスト形式（デフォルト）
+### Text Format (Default)
 
 ```text
 2026-02-28 10:30:45 [INFO] Running: node app.js
 ```
 
-### JSON形式
+### JSON Format
 
 ```bash
 cderun --log-format json --log-level info node app.js
 {"level":"info","msg":"Running: node app.js","time":"2026-02-28T10:30:45Z"}
 ```
 
-## デバッグ機能
+## Debugging Utilities
 
-### 1. ドライラン
+### 1. Dry Run Mode
 
-実行せずにコンテナ構成を表示します。詳細は[ドライランモード](./dry-run-mode.md)を参照してください。
+Previews the generated container IR configuration without launching the container on the host engine. For more details, see [Dry Run Mode Spec](./dry-run-mode.md).
 
 ```bash
 cderun --dry-run node app.js
 ```
 
-## 内部実装の注意点
+## Internal Architecture Notes
 
-### コンテナ出力のキャプチャ (`Logs: false`)
+### Streaming Output Capture (`Logs: false`)
 
-Dockerランタイムの実装 (`internal/runtime/docker.go`) において、`ContainerAttach` のオプションで `Logs: false` を設定しています。
+Inside the Docker runtime adapter (`internal/runtime/docker.go`), the standard `AttachContainer` configuration sets `Logs: false`.
 
-これは、以下の経緯と理由によります：
+This design decision stems from the following history:
 
-1. **不具合修正の経緯**:
-    - 以前は `Logs: true` を使用していましたが、コンテナがまだ開始されていない状態でアタッチすると、一部のランタイム挙動によりログのダンプが完了した時点でストリームがEOFを返してしまい、出力キャプチャ用ゴルーチンが早期に終了して接続が閉じられるという問題がありました。これにより、その後に開始されたコンテナの出力がキャプチャできず、また標準入力も途切れてしまう現象が発生していました。
-2. **同期処理による保証**: cderunでは、`AttachContainer` 内でアタッチが完了しゴルーチンが開始されたことを確認してから `StartContainer` を呼び出す同期メカニズム（`attachReady` チャネル）を導入しています。
-3. **安全な全出力取得**: この同期メカニズムにより、コンテナの開始直後からの出力を確実にキャプチャできるため、`Logs: false` を使用してもデータの欠落は発生しません。
+1. **Bug Resolution**:
+   - Eagerly calling attach with `Logs: true` on certain Docker daemon setups before the container starts can cause the engine to immediately deliver a blank EOF token and close the streaming connection, truncating subsequently started command outputs.
+2. **Synchronization Guard**: `cderun` enforces a synchronous startup sequence where the connection copier is established and confirmed via the `attachReady` channel *before* `StartContainer` is invoked.
+3. **Lossless Stream Capturing**: This orchestration ensures that setting `Logs: false` is completely safe and robust, catching all console stdout/stderr streams instantly upon startup without duplicate buffering or race conditions.
 
-過去の記録では `Logs: false` でも改善しなかったとありましたが、同期メカニズムと適切に組み合わせることで、ハングおよび出力欠損の根本的な原因を解消できることが確認されました。
+### Post-Execution Hang Safe-Termination (`CDERUN_HANG_TIMEOUT`)
 
-### 終了時のハング対策 (`CDERUN_HANG_TIMEOUT`)
+Following the completion of stream I/O operations, certain container workloads may hang or fail to exit. `cderun` mitigates this via the following timeout policies:
 
-I/Oが完了した後、コンテナが期待通りに終了しない（ハングする）現象が発生することがあります。cderunはこれを防ぐため、以下のタイムアウト制御を実装しています。
+- **Grace Timeout**: Controlled via the `--hang-timeout` option / `CDERUN_HANG_TIMEOUT` environment variable.
+- **Handling**: Upon grace period expiration (default 10s), if the container is still executing, a SIGKILL signal is sent to force termination.
+- **Diagnostics**: Detailed timeout events and SIGKILL executions are logged at the `DEBUG` level to prevent terminal clutter.
 
-- **タイムアウト設定**: 環境変数 `CDERUN_HANG_TIMEOUT` で制御可能です。
-- **挙動**: I/O完了後、指定された時間（デフォルト: 10s）待機してもコンテナが終了しない場合、cderunはコンテナの終了を待たずに復帰するか、必要に応じて強制終了（SIGKILL）を試みます。
-  - **選択ルール**: `CDERUN_HANG_TIMEOUT` 経過時、コンテナが既に終了状態（exit status取得可能）であれば即座に復帰（return）し、プロセスが依然として実行中であれば強制終了（SIGKILL）を実行します。
-- **ログ**: このタイムアウトによる終了待機や強制終了の詳細は、`DEBUG` レベルで出力されます。
+## Log Verbosity Guidelines
 
-## ログ出力の方針
+To provide a clean, noise-free CLI execution environment while preserving rich diagnostic metrics, `cderun` follows these verbosity practices:
 
-cderunでは、ユーザーの利便性とデバッグの容易さを両立するため、以下のログ出力方針を採用しています。
+### Post-Startup Operational Warnings
 
-### 実行完了後のログレベル
+Operational events occurring after the container launches (such as connection closure warnings, container SIGKILL actions, or non-timeout attachment errors) are classified under the `Warn` level internally but are suppressed at the default `error` log level.
 
-コンテナのメインプロセスが終了した後のクリーンアップや後処理に関連するログ（コンテナの強制終了、アタッチエラーなど）は、原則として `DEBUG` レベル以下で出力します。
-
-これは、以下の理由によります：
-
-- **Dockerの既知の挙動への対応**: Docker 29以降などで、IO完了後にコンテナが即座に終了せず、強制終了が必要になる場合があります。これらは `WARN` レベルで出力すると、正常な実行時にも頻繁に警告が表示され、ユーザーのノイズとなる可能性があります。
-- **正常実行の優先**: コンテナの実行自体が成功している場合、その後の事後処理における軽微な問題や環境起因の挙動は、詳細な調査が必要な場合（DEBUG指定時）にのみ表示されるべきという考えに基づいています。
-
-重要なエラー（コンテナの起動失敗、実行中の致命的なエラーなど）については、引き続き `ERROR` または `WARN` レベルで出力されます。
+This guarantees that standard, successful command executions remain clean and uncluttered by daemon warnings, while still allowing developers to easily access diagnostic warnings by enabling `info` or `debug` log levels.

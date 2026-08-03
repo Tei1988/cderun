@@ -162,6 +162,7 @@ cderun --cderun-image node:20-alpine node app.js
 #### Detailed Explanation of the Configuration Priority
 
 The P1–P6 priority layers allow highly flexible execution setups.
+
 - **P1 (Internal Overrides)**: Allows the caller to force-override any option dynamically, regardless of what has been configured globally or tool-wise. These flags are intercepted before subcommand execution.
 - **P2 (CLI Flags)**: Represents regular options provided to `cderun` before the subcommand.
 - **P3 (Env Vars)**: Enables environment-based configuration overrides on the host. List values are comma-separated or semicolon-separated (such as `CDERUN_ENV`).

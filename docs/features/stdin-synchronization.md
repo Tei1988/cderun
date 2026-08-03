@@ -1,30 +1,30 @@
-# 標準入力の同期 (Standard Input Synchronization)
+# Feature Specification: Standard Input Synchronization
 
-このドキュメントでは、`cderun` における標準入力（STDIN）の同期メカニズムと、なぜそれが信頼性の高いパイプ実行に必要なのかを説明します。
+This document explains the standard input (STDIN) synchronization mechanism implemented in `cderun` to ensure reliable pipe-based command execution.
 
-## 問題点: パイプ実行におけるレースコンディション
+## The Challenge: Race Conditions in Pipe Executions
 
-`echo "test" | cderun ... cat` のようなコマンドを実行すると、以下のイベント間でレースコンディション（競合状態）が発生します。
+When running shell pipes (e.g., `echo "test" | cderun ... cat`), a severe race condition can occur between the following operations:
 
-1. **STDINのアタッチ**: `cderun` が Docker の `AttachContainer` API を呼び出し、ホストの STDIN をコンテナに接続する。
-2. **コンテナの開始**: `cderun` が Docker の `StartContainer` API を呼び出し、実際にコマンド（例: `cat`）の実行を開始する。
-3. **STDINの消費**: コンテナ内のコマンド（例: `cat`）が自身の STDIN からの読み取りを開始する。
+1. **STDIN Attachment**: `cderun` invokes the container runtime's attachment API to stream host STDIN to the container.
+2. **Container Start**: `cderun` invokes the container runtime's start API to boot the target containerized command (e.g., `cat`).
+3. **STDIN Consumption**: The containerized command opens and starts reading from its internal STDIN.
 
-ホストの STDIN がパイプ（`echo` などから）である場合、データは即座に利用可能です。`cderun` がコンテナの開始**前**にこのデータをコンテナの入力ストリームにコピーし始めると、一部の Docker バージョンや構成では、データが欠落したり、プロセスが開始されたときに正しく配信されなかったりすることがあります。
+If the host STDIN data is available instantly (as with `echo` or files), and `cderun` eagerly streams the entire input stream *before* the containerized process officially shifts into a running state, the data may be dropped or fail to be processed by the container daemon.
 
-さらに、データが小さい場合（例: "test\n"）、コンテナ化されたプロセスが自身の STDIN を開く機会を得る前に、`cderun` がすべてのデータのコピーを完了し、接続に対して `CloseWrite()` を呼び出してしまう可能性があります。これにより、プロセスが即座に EOF を検知して終了してしまったり（あるいは、データが全く見えずハングしたり）することがよくあります。
+Furthermore, if the data is small (such as a single word or character), `cderun` might read the EOF from the host pipe, transmit the data, and immediately invoke `CloseWrite()` on the stream before the container process even registers. This can cause the containerized process to exit with an immediate EOF without ever reading the transmitted data.
 
-## 解決策: 同期された STDIN
+## Solution: Synchronized STDIN
 
-信頼性の高いパイプ入力を保証するために、`cderun` は `syncReader` を使用した同期メカニズムを実装しています。
+To ensure deterministic, reliable pipe execution, `cderun` incorporates a synchronized STDIN mechanism utilizing a custom `syncReader`.
 
-### 1. 遅延 STDIN 読み取り
+### 1. Deferred STDIN Streaming
 
-`cderun` は、ホストの STDIN を `syncReader` でラップしてから、ランタイムの `AttachContainer` メソッドに渡します。このリーダーは、信号を受け取るまで `Read` 呼び出しをブロックします。
+The host's STDIN stream is wrapped with a custom `syncReader` before being passed to the runtime adapter's `AttachContainer` method. This reader blocks any incoming `Read` operations until a ready signal is dispatched.
 
-### 2. コンテナ開始時の信号
+### 2. Container Startup Signal
 
-`syncReader` のブロックを解除する信号は、`StartContainer` API 呼び出しが正常に返された**後**にのみ送信されます。これにより、ホストの STDIN からのデータがコンテナの入力ストリームに送られる前に、コンテナが公式に「実行中（running）」であることが保証されます。
+The ready signal is dispatched to unblock the `syncReader` **only after** the `StartContainer` API call successfully returns. This guarantees that host data is only transmitted when the container is officially "running" and ready to consume input.
 
 ```go
 // internal/command/root.go
@@ -45,36 +45,36 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 }
 ```
 
-### 3. StdinOnce による確実な EOF 伝達
+### 3. StdinOnce for Reliable EOF Propagation
 
-`internal/runtime/docker.go` において、`Interactive` モードが有効な場合に `StdinOnce: true` を設定しています。
+For Docker runtimes (`internal/runtime/docker.go`), when interactive mode is active, `StdinOnce: true` is configured on the attachment options.
 
-Docker のデフォルト挙動（`StdinOnce: false`）では、クライアントが標準入力を閉じても、Docker デーモン側でコンテナの入力ストリームを維持し続けることがあります。特に非 TTY かつパイプ入力の場合、これによりコンテナ内のプロセス（`cat` など）が EOF を検知できず、終了しない原因となります。
+Under default Docker settings (`StdinOnce: false`), the daemon may keep the container input stream open indefinitely even after the client closes its end. For non-TTY, pipe-based commands, this prevents the containerized process (e.g., `cat`) from detecting EOF, causing it to hang.
 
-`StdinOnce: true` を設定することで、`cderun` が標準入力のコピーを完了して接続を閉じた際に、Docker が確実にコンテナへ EOF を伝え、プロセスが正常に終了（Exit 0）することを保証します。
+Configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, the Docker daemon propagates the EOF directly to the container process, allowing the command to terminate normally with exit status `0`.
 
-### 4. CloseWrite 前の猶予期間 (Docker)
+### 4. CloseWrite Grace Period (Docker)
 
-Docker ランタイム実装 (`internal/runtime/docker.go`) では、STDIN の全データコピーが完了した後、`CloseWrite` を呼び出す前に **100ミリ秒** の猶予期間 (`attachCloseWriteGrace`) を設けています。これにより、非常に小さなデータがコンテナ内のプロセスに到達する前に接続が切断されるのを防ぎ、Docker デーモンが確実にデータを処理する時間を確保します。
+In the Docker adapter (`internal/runtime/docker.go`), once the input copier finishes copying all bytes, it sleeps for **100 milliseconds** (`attachCloseWriteGrace`) before invoking `CloseWrite()`. This short delay guarantees that small payloads are fully flushed and processed by the Docker daemon before the connection is severed.
 
-### 5. Attach 時のログ取得の無効化
+### 5. Disable Historical Log Dumping on Attach
 
-`internal/runtime/docker.go` において、`AttachContainer` 呼び出し時に `Logs: false` を設定しています。
+During `AttachContainer`, `Logs: false` is configured on the attachment settings.
 
-`cderun` は常にコンテナを開始する前にアタッチするため、取得すべき既存のログは存在しません。`Logs: true` を設定すると、特に高負荷時や特定の Docker バージョンにおいて、コンテナがまだ開始されていない場合に Docker デーモンが初期（空の）ログストリームを送信し、その後接続を閉じたり誤動作したりすることがあります。これを無効にすることで、リアルタイム IO に特化したクリーンなストリーム接続が確保されます。
+Since `cderun` attaches streams *before* starting the container, there are no historical logs to dump. Enabling `Logs: true` can cause the daemon to transmit a blank log-dump sequence and prematurely terminate or disrupt the streaming socket connection on certain Docker engine versions. Setting `Logs: false` ensures a clean, real-time-only stream connection.
 
-## メリット
+## Key Benefits
 
-- **信頼性**: 非常に高速に実行されるコマンドや小さなデータセットに対しても、パイプ入力が一貫して動作します。
-- **データ欠損なし**: コンテナがデータを受け取る準備ができてからデータが送信されます。
-- **正確な EOF 処理**: ホストの STDIN からの EOF が、適切なタイミングでコンテナ化されたプロセスに配信されます。
+- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for extremely small, fast-executing payloads.
+- **Zero Data Loss**: Data streaming starts only when the container is fully initialized and listening.
+- **Accurate EOF Handling**: EOF signals on the host are forwarded safely, avoiding hanging pipeline commands.
 
-## 検証
+## Verification
 
-この挙動は `internal/command/stdin_test.go` のユニットテストによって検証されています。このテストでは、コンテナの起動を遅らせ、即座に利用可能な STDIN をシミュレートしています。
+This behavior is verified via unit tests inside `internal/command/stdin_test.go`, which simulate immediate stdin streaming and artificial container startup delays.
 
-## タイムアウトによる自動終了処理
+## Hang Timeout Safe Fallback
 
-`cderun` は、特定の環境下で発生しうるコンテナのハングに対処するため、非 TTY または非インタラクティブ実行時に自動終了（ハングタイムアウト）ロジックを実装しています。
+To prevent containers from hanging indefinitely under unexpected edge cases, `cderun` implements an automatic fallback timeout mechanism for non-interactive, non-TTY sessions.
 
-詳細については、[ハングタイムアウト](./hang-timeout.md) を参照してください。
+For more details, see [Hang Timeout Feature Specification](./hang-timeout.md).

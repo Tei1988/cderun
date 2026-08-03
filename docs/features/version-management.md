@@ -1,47 +1,47 @@
-# バージョン管理
+# Feature Specification: Version Management
 
-`cderun` は Git の情報を利用した動的なバージョン管理を行っています。
+`cderun` performs dynamic version management utilizing Git metadata resolved during compilation.
 
-## 概要
+## Overview
 
-実行バイナリには、ビルド時の Git タグ、コミット SHA、およびビルド日時が自動的に組み込まれます。これにより、デバッグ時や Issue 報告時に、どのバージョンのバイナリを使用しているかを正確に把握できます。
+The compiled executable dynamically embeds the Git tag, commit SHA (revision), and build timestamp. This ensures that users and developers can accurately identify the precise binary version when debugging or reporting issues.
 
-## 特徴
+## Features
 
-- **自動情報注入**: `Makefile` や `GoReleaser` を通じて、ビルド時に自動的に情報が埋め込まれます。
-- **詳細な出力**: `--version` フラグにより、リビジョンやビルド日時を含む詳細な情報を表示します。
-- **開発時フォールバック**: `go run` や直接の `go build`（ldflags なし）では、バージョンが `dev`、リビジョンが `unknown` として表示され、リリース版でないことが一目でわかります。
+- **Automated Metadata Injection**: Build details are automatically compiled into the binary using linker flags managed by `Makefile` or `GoReleaser`.
+- **Comprehensive Output**: The `--version` flag prints detailed compile-time metrics, including Git revision and build date.
+- **Development Fallbacks**: Direct invocations via `go run` or standard `go build` (without linker overrides) automatically fall back to `dev` for the version and `unknown` for the revision, indicating a non-release local build.
 
-## 詳細仕様
+## Specifications
 
-### 保持される情報
+### Compiled Version Details
 
-| 項目 | 説明 | 例 |
+| Field | Description | Example |
 | :--- | :--- | :--- |
-| Version | Git タグまたは `dev` | `0.0.2`, `v1.1.0-dirty` |
-| Revision | 短縮 Git コミット SHA | `abc1234` |
-| BuildDate | ISO8601 形式のビルド日時 | `2026-03-02T12:34:56Z` |
-| OS/Arch | 実行環境の OS とアーキテクチャ | `linux/amd64`, `darwin/arm64` |
+| Version | Git release tag or `dev` | `0.0.2`, `v1.1.0-dirty` |
+| Revision | Shortened Git commit SHA | `abc1234` |
+| BuildDate | ISO 8601 formatted compilation timestamp | `2026-03-02T12:34:56Z` |
+| OS/Arch | Operating system and CPU architecture | `linux/amd64`, `darwin/arm64` |
 
-### 出力フォーマット
+### Standard Output Format
 
-`cderun --version` を実行した際の出力例：
+Invoking `cderun --version` outputs the version string in the following format:
 
 ```text
 cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
 ```
 
-## 実装の仕組み
+## Compilation Mechanism
 
-### 1. `internal/version` パッケージ
+### 1. `internal/version` Package
 
-バージョン情報を一元管理する独立したパッケージです。ビジネスロジックには依存せず、情報の保持と整形（`Info()` 関数）のみを担当します。
+The version information is encapsulated inside a dedicated, isolated package `internal/version`. It retains no dependencies on business or command-execution logic, serving solely to store and format compilation metadata (via the `Info()` helper).
 
-### 2. `ldflags` による注入
+### 2. Injection via Linker Flags (`ldflags`)
 
-ビルド時に Go のリンカーフラグ (`-ldflags`) を使用して、`internal/version` パッケージ内の変数を直接書き換えます。
+Linker flags (`-ldflags`) are supplied during compilation to dynamically override the default package-level string variables in `internal/version`.
 
-#### Makefile での例
+#### Makefile Example
 
 ```makefile
 LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
@@ -51,9 +51,9 @@ LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
 go build -ldflags "$(LDFLAGS)" -o cderun main.go
 ```
 
-### 3. GoReleaser との統合
+### 3. GoReleaser Integration
 
-公式リリースの際は `.goreleaser.yaml` によって同様の注入が行われます。
+During automated CI release compilation, GoReleaser overrides these fields using `.goreleaser.yaml` templates:
 
 ```yaml
 builds:
@@ -63,6 +63,6 @@ builds:
       - -X cderun/internal/version.BuildDate={{.Date}}
 ```
 
-## 関連ドキュメント
+## Related Documents
 
-- [アーキテクチャ: バージョン管理](../architecture/versioning.md)
+- [Architecture Reference: Versioning](../architecture/versioning.md)
