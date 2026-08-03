@@ -221,10 +221,10 @@ func TestUnit_Config_ParseMountFlag_Scenarios(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		input   string
+		name     string
+		input    string
 		expected MountConfig
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			name:  "all options specified",
