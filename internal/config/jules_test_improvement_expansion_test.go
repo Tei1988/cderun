@@ -151,9 +151,9 @@ func TestUnit_Config_ValidateExposePort_Expansion(t *testing.T) {
 		},
 		{
 			name:    "invalid characters",
-			port:    "80;rm",
+			port:    "80;\n",
 			wantErr: true,
-			errMsg:  "invalid port: invalid port",
+			errMsg:  "invalid character in path or configuration",
 		},
 	}
 

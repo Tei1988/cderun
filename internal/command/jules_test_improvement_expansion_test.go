@@ -83,6 +83,31 @@ func TestUnit_Command_ValueTakingP1_Expansion(t *testing.T) {
 		assert.Equal(t, "alpine:3.18", cfg.Image)
 	})
 
+	// 1b. Equals-sign format: `--cderun-image=alpine:3.18`
+	t.Run("equals sign format wins", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
+		args := []string{
+			"cderun",
+			"sh",
+			"--cderun-image=alpine:3.18",
+		}
+
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRuntime, nil
+			}
+			o.exitFunc = func(code int) {}
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.NoError(t, err)
+		cfg := mockRuntime.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "alpine:3.18", cfg.Image)
+	})
+
 	// 2. Requires a value error when adjacent parameter is missing or is another flag
 	t.Run("requires a value error on missing adjacent parameter", func(t *testing.T) {
 		t.Parallel()
@@ -244,38 +269,32 @@ func TestUnit_Command_SymlinkMode_Unicode_Expansion(t *testing.T) {
 	assert.Equal(t, []string{"-c", "print('日本語 & Emojis ✨')"}, cfg.Command)
 }
 
-type cmdRapidSignalsMockRuntime struct {
+type signalRecordingMockRuntime struct {
 	runtime.MockRuntime
 	waitChan    chan int
-	sigCount    int
 	signals     []string
-	signalErr   error
 	mu          sync.Mutex
 	startedChan chan struct{}
+	startOnce   sync.Once
 }
 
-func (m *cmdRapidSignalsMockRuntime) StartContainer(ctx context.Context, id string) error {
-	m.mu.Lock()
+func (m *signalRecordingMockRuntime) StartContainer(ctx context.Context, id string) error {
 	if m.startedChan != nil {
-		select {
-		case <-m.startedChan:
-		default:
+		m.startOnce.Do(func() {
 			close(m.startedChan)
-		}
+		})
 	}
-	m.mu.Unlock()
 	return m.MockRuntime.StartContainer(ctx, id)
 }
 
-func (m *cmdRapidSignalsMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+func (m *signalRecordingMockRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
-	m.sigCount++
 	m.signals = append(m.signals, sig)
 	m.mu.Unlock()
-	return m.signalErr
+	return nil
 }
 
-func (m *cmdRapidSignalsMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
+func (m *signalRecordingMockRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	select {
 	case code := <-m.waitChan:
 		return code, nil
@@ -284,7 +303,7 @@ func (m *cmdRapidSignalsMockRuntime) WaitContainer(ctx context.Context, containe
 	}
 }
 
-func (m *cmdRapidSignalsMockRuntime) getSignals() []string {
+func (m *signalRecordingMockRuntime) getSignals() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	sigs := make([]string, len(m.signals))
@@ -302,7 +321,7 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 		t.Parallel()
 		waitChan := make(chan int)
 		startedChan := make(chan struct{})
-		mock := &cmdRapidSignalsMockRuntime{
+		mock := &signalRecordingMockRuntime{
 			waitChan:    waitChan,
 			startedChan: startedChan,
 		}
@@ -335,7 +354,7 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			close(done)
 		}()
 
-		assert.Eventually(t, func() bool {
+		require.Eventually(t, func() bool {
 			sigChanMu.Lock()
 			defer sigChanMu.Unlock()
 			return capturedSigChan != nil
@@ -348,17 +367,24 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			t.Fatal("Container did not start in time")
 		}
 
-		// Send simulated SIGHUP
+		// Copy the channel under the mutex before sending
 		sigChanMu.Lock()
-		capturedSigChan <- syscall.SIGHUP
+		localSigChan := capturedSigChan
 		sigChanMu.Unlock()
+
+		// Send simulated SIGHUP
+		localSigChan <- syscall.SIGHUP
 
 		assert.Eventually(t, func() bool {
 			return slices.Contains(mock.getSignals(), "SIGHUP")
 		}, 2*time.Second, 10*time.Millisecond)
 
-		// Exit normally
-		waitChan <- 0
+		// Exit normally using timeout select
+		select {
+		case waitChan <- 0:
+		case <-time.After(1 * time.Second):
+			t.Fatal("Failed to send exit code to waitChan (timed out)")
+		}
 		<-done
 		require.NoError(t, execErr)
 	})
@@ -368,7 +394,7 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 		t.Parallel()
 		waitChan := make(chan int)
 		startedChan := make(chan struct{})
-		mock := &cmdRapidSignalsMockRuntime{
+		mock := &signalRecordingMockRuntime{
 			waitChan:    waitChan,
 			startedChan: startedChan,
 		}
@@ -401,7 +427,7 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			close(done)
 		}()
 
-		assert.Eventually(t, func() bool {
+		require.Eventually(t, func() bool {
 			sigChanMu.Lock()
 			defer sigChanMu.Unlock()
 			return capturedSigChan != nil
@@ -414,27 +440,34 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			t.Fatal("Container did not start in time")
 		}
 
-		// Send simulated SIGQUIT
+		// Copy the channel under the mutex before sending
 		sigChanMu.Lock()
-		capturedSigChan <- syscall.SIGQUIT
+		localSigChan := capturedSigChan
 		sigChanMu.Unlock()
+
+		// Send simulated SIGQUIT
+		localSigChan <- syscall.SIGQUIT
 
 		assert.Eventually(t, func() bool {
 			return slices.Contains(mock.getSignals(), "SIGQUIT")
 		}, 2*time.Second, 10*time.Millisecond)
 
-		// Exit normally
-		waitChan <- 0
+		// Exit normally using timeout select
+		select {
+		case waitChan <- 0:
+		case <-time.After(1 * time.Second):
+			t.Fatal("Failed to send exit code to waitChan (timed out)")
+		}
 		<-done
 		require.NoError(t, execErr)
 	})
 
 	// 3. Consecutive signals context cancellation
-	t.Run("Rapid consecutive signals trigger host cancellation", func(t *testing.T) {
+	t.Run("second SIGINT cancels the host context", func(t *testing.T) {
 		t.Parallel()
 		waitChan := make(chan int)
 		startedChan := make(chan struct{})
-		mock := &cmdRapidSignalsMockRuntime{
+		mock := &signalRecordingMockRuntime{
 			waitChan:    waitChan,
 			startedChan: startedChan,
 		}
@@ -467,7 +500,7 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			close(done)
 		}()
 
-		assert.Eventually(t, func() bool {
+		require.Eventually(t, func() bool {
 			sigChanMu.Lock()
 			defer sigChanMu.Unlock()
 			return capturedSigChan != nil
@@ -480,19 +513,20 @@ func TestUnit_Command_Signals_SighupSigquitAndConsecutive(t *testing.T) {
 			t.Fatal("Container did not start in time")
 		}
 
-		// First SIGINT (forwarded)
+		// Copy the channel under the mutex before sending
 		sigChanMu.Lock()
-		capturedSigChan <- syscall.SIGINT
+		localSigChan := capturedSigChan
 		sigChanMu.Unlock()
+
+		// First SIGINT (forwarded)
+		localSigChan <- syscall.SIGINT
 
 		assert.Eventually(t, func() bool {
 			return slices.Contains(mock.getSignals(), "SIGINT")
 		}, 2*time.Second, 10*time.Millisecond)
 
 		// Second SIGINT (triggers context cancellation)
-		sigChanMu.Lock()
-		capturedSigChan <- syscall.SIGINT
-		sigChanMu.Unlock()
+		localSigChan <- syscall.SIGINT
 
 		// Wait for execution to finish with context.Canceled error
 		select {
