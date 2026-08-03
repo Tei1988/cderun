@@ -1600,16 +1600,16 @@ func isHighlySensitiveDevice(p string) bool {
 	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" {
 		return true
 	}
-	if matched, _ := path.Match("/dev/sd*", p); matched {
+	if strings.HasPrefix(p, "/dev/sd") {
 		return true
 	}
-	if matched, _ := path.Match("/dev/nvme*", p); matched {
+	if strings.HasPrefix(p, "/dev/nvme") {
 		return true
 	}
-	if matched, _ := path.Match("/dev/loop*", p); matched {
+	if strings.HasPrefix(p, "/dev/loop") {
 		return true
 	}
-	if matched, _ := path.Match("/dev/mapper/*", p); matched {
+	if strings.HasPrefix(p, "/dev/mapper/") {
 		return true
 	}
 	return false
