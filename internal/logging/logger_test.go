@@ -131,3 +131,45 @@ func TestUnit_Logging_OutputNil(t *testing.T) {
 	SetOutput(nil)
 	assert.Equal(t, io.Discard, GetGlobalLogger().GetWriter())
 }
+
+func TestUnit_Logging_SanitizeLogString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "plain string unchanged",
+			input:    "hello world 123",
+			expected: "hello world 123",
+		},
+		{
+			name:     "preserves tab",
+			input:    "hello\tworld",
+			expected: "hello\tworld",
+		},
+		{
+			name:     "escapes carriage return and line feed",
+			input:    "line1\nline2\r\n",
+			expected: "line1\\x0aline2\\x0d\\x0a",
+		},
+		{
+			name:     "escapes backspace, formfeed, escape, delete",
+			input:    "backspace\b ff\f esc\x1b del\x7f",
+			expected: "backspace\\x08 ff\\x0c esc\\x1b del\\x7f",
+		},
+		{
+			name:     "unicode is untouched",
+			input:    "こんにちは",
+			expected: "こんにちは",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, SanitizeLogString(tt.input))
+		})
+	}
+}
