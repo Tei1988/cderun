@@ -591,4 +591,4 @@ Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOp
 
 - **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers.
 - **Hoisting Mechanics**: During argument preprocessing, any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally.
-- **Equals-Sign Format Constraints**: All value-taking internal overrides **must** use the equals-sign format (e.g., `--cderun-image=alpine`). Supplying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with a preprocessing validation error to guarantee robust argument parsing.
+- **Equals-Sign & Space-Separated Formats**: Value-taking internal overrides can be specified using either the equals-sign format (e.g., `--cderun-image=alpine`) or the space-separated format (e.g., `--cderun-image alpine`). `cderun`'s preprocessor uses option metadata to correctly identify value-taking options and consumes the subsequent adjacent parameter as their value during the hoisting scan.
