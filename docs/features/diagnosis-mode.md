@@ -1,41 +1,41 @@
-# 機能仕様：診断モード
+# Feature Specification: Diagnosis Mode
 
-## 概要
+## Overview
 
-システムの診断情報（ランタイムの状態、設定ファイルの読み込み状況）および利用可能なツールの一覧を表示する機能。
+Diagnosis Mode is a feature that retrieves and displays system diagnostic information (container engine runtime status, configuration files loading status) and the list of available tools.
 
-## 要件
+## Requirements
 
-### 基本動作
+### Basic Behavior
 
-`--diagnosis`フラグが指定された場合：
+When the `--diagnosis` flag is specified:
 
-1. システム診断情報と利用可能なツールの一覧を収集
-2. 設定されたフォーマットで情報を表示
-3. コンテナの実行（およびドライラン）をスキップ
-4. 終了コード0で終了
+1. System diagnostic information and the list of available tools are gathered.
+2. The collected details are displayed in the configured format.
+3. Container execution and dry-runs are skipped.
+4. Upon successful diagnostic information collection and rendering, the execution exits normally with status code `0`. If diagnostic errors occur, they are propagated through the root command's `RunE`, producing a standard command execution error.
 
-## 使用方法
+## Usage
 
-### 基本的な使用
+### Basic Usage
 
 ```bash
 cderun --diagnosis
 ```
 
-### サブコマンドとの併用
+### Usage with a Subcommand
 
-サブコマンドが指定されていても、診断モードが優先されます。
+Even if a subcommand is specified, Diagnosis Mode takes precedence:
 
 ```bash
 cderun --diagnosis node --version
 ```
 
-## 出力フォーマット
+## Output Formats
 
-### YAML形式（デフォルト）
+### YAML Format (Default)
 
-`cderun --diagnosis` または `cderun --diagnosis --diagnosis-format yaml`
+`cderun --diagnosis` or `cderun --diagnosis --diagnosis-format yaml`
 
 ```yaml
 runtime:
@@ -53,11 +53,11 @@ available_tools:
   - python
 ```
 
-※実際の出力項目は、実装の変更に伴い多少異なる場合があります。
+*Note: The actual output fields may vary slightly based on implementation updates.*
 
-### JSON形式
+### JSON Format
 
-`cderun --diagnosis --diagnosis-format json` または `cderun <subcommand> --cderun-diagnosis-format json`
+`cderun --diagnosis --diagnosis-format json` or `cderun <subcommand> --cderun-diagnosis-format json`
 
 ```json
 {
@@ -82,7 +82,7 @@ available_tools:
 }
 ```
 
-### 簡易形式
+### Simple Format
 
 `cderun --diagnosis --diagnosis-format simple`
 
@@ -96,33 +96,33 @@ Available Tools: git, node, python
 
 ## P1 Internal Overrides
 
-他のフラグ同様、`--cderun-` プレフィックスを用いた Priority 1 オーバーライドが可能です。診断モードではサブコマンドが不要なため、フラグの配置場所に制限はありません（Wrapper Mode ではサブコマンドの後ろに置く必要があります）。
+Like other standard flags, you can use the `--cderun-` prefix to specify a Priority 1 override for Diagnosis Mode. Since Diagnosis Mode does not require a subcommand, there are no placement restrictions for the flag (though in standard Wrapper Mode with a subcommand, it must be placed after the subcommand).
 
 ```bash
 cderun --cderun-diagnosis
-# または
+# or
 cderun --diagnosis --cderun-diagnosis-format json
 ```
 
-## 環境変数
+## Environment Variables
 
-`CDERUN_DIAGNOSIS` 環境変数を `true` に設定することで、フラグなしで診断モードを有効にできます。
+You can enable Diagnosis Mode without flags by setting the `CDERUN_DIAGNOSIS` environment variable to `true`.
 
 ```bash
 export CDERUN_DIAGNOSIS=true
 cderun
 ```
 
-### 出力フォーマットの環境変数
+### Output Format Environment Variable
 
-`CDERUN_DIAGNOSIS_FORMAT` 環境変数を使用して、出力フォーマットを制御できます。
+Use the `CDERUN_DIAGNOSIS_FORMAT` environment variable to control the output format.
 
 ```bash
 export CDERUN_DIAGNOSIS_FORMAT=json
 cderun --diagnosis
 ```
 
-`CDERUN_DIAGNOSIS=true` と組み合わせることで、フラグなしで特定のフォーマットの診断出力を得ることができます。
+Combining both `CDERUN_DIAGNOSIS=true` and `CDERUN_DIAGNOSIS_FORMAT` allows flagless diagnosis outputs in a specific format.
 
 ```bash
 export CDERUN_DIAGNOSIS=true
@@ -130,10 +130,10 @@ export CDERUN_DIAGNOSIS_FORMAT=json
 cderun
 ```
 
-利用可能な値は `yaml`（デフォルト）、`json`、`simple` です。
+Supported format values are `yaml` (default), `json`, and `simple`.
 
-## 設定ファイル
+## Configuration Files
 
-診断モードの設定 (`diagnosis`, `diagnosisFormat`) は、設定ファイル (`.cderun.yaml`, `.tools.yaml`) でもサポートされています。特定のツールに対して常に診断モードを有効にしたり、デフォルトの出力形式を指定したりすることが可能です。
+Diagnosis Mode configurations (`diagnosis`, `diagnosisFormat`) are also supported inside global and tool-specific configuration files (`.cderun.yaml`, `.tools.yaml`). This allows you to always enable Diagnosis Mode for specific tools or set a default output format.
 
-設定ファイル内でのキー名はキャメルケース（`diagnosis`, `diagnosisFormat`）を使用します。
+Key names within YAML configuration files must use camelCase (e.g., `diagnosis`, `diagnosisFormat`).

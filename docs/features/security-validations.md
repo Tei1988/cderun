@@ -1,6 +1,6 @@
 # Security Validations
 
-cderun implements several validation layers to prevent command injection, path traversal, and log injection attacks.
+`cderun` implements several validation layers to prevent command injection, path traversal, and log injection attacks.
 
 ## Character Validation
 
@@ -25,9 +25,9 @@ This validation is applied to:
 
 Any string containing unsafe characters will cause an immediate resolution failure.
 
-## Anchor Boundary Validation (アンカー境界検証)
+## Anchor Boundary Validation
 
-マジックワード（`{{HOME}}`, `{{PWD}}` 等）やチルダ（`~`）を起点としたパス解決において、解決後のパスが起点ディレクトリの境界を越えて親ディレクトリへ遡っていないかを検証します。これにより、ユーザー入力による意図しないパスへのアクセスやディレクトリトラバーサル攻撃を防止します。詳細は [値の解決](./value-resolution.md#アンカー境界検証-anchor-boundary-validation) を参照してください。
+During dynamic path resolution utilizing magic words (`{{HOME}}`, `{{PWD}}`, etc.) or tildes (`~`), `cderun` validates that the final resolved absolute path does not escape or cross the boundaries of the associated anchor directory. This prevents directory traversal attacks and unauthorized access to arbitrary host system files. For more details, see [Anchor Boundary Validation](./value-resolution.md#anchor-boundary-validation).
 
 ## Working Directory Validation
 
@@ -84,9 +84,9 @@ To encourage privilege minimization and maintain robust container isolation:
 
 ## Registry Mismatch Validation
 
-誤ったレジストリや許可されていないレジストリの使用を防止するため、CLIや環境変数で指定されたイメージが、ツールの設定（`.tools.yaml`）で定義されたレジストリと一致するかを検証します。
+To prevent pulling and running unauthorized container images, `cderun` validates that the image specified on the command-line or environment variable matches the registry rules defined in the tools profile (`.tools.yaml`).
 
-一致の判定は、ホスト名とリポジトリ名（例: `docker.io/library/node`）に基づいて行われ、タグやダイジェストの違いは許容されます。不一致（例: 設定では `docker.io` を期待しているが CLI で `private-reg.com` が指定された場合）が検出されると、`RegistryMismatchError` を返し、実行を中断します。
+The registry validation matching checks the hostname and repository namespace (e.g. `docker.io/library/node`), ignoring differing tags or digest suffixes. If a mismatch is identified (such as specifying a custom repository `private-reg.com` when `.tools.yaml` restricts the tool to `docker.io`), execution terminates with a `RegistryMismatchError` before contacting the daemon.
 
 ## Absolute Mount Targets
 
