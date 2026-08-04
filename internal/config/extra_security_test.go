@@ -128,7 +128,7 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 				Image: ptr("alpine"),
 				Ports: []string{"80:80/tcp!"},
 			},
-			wantErr: "security validation failed for ports[0]: invalid protocol",
+			wantErr: "security validation failed for publish[0]: invalid protocol",
 		},
 		{
 			name: "invalid expose port (invalid protocol)",

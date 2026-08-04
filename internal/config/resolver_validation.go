@@ -309,7 +309,7 @@ func (rv *resolver) validateSlices() error {
 	if err := validateSliceElements(rv.res.Entrypoint, "entrypoint", nil); err != nil {
 		return err
 	}
-	if err := validateSliceElements(rv.res.Ports, "ports", ValidatePort); err != nil {
+	if err := validateSliceElements(rv.res.Ports, "publish", ValidatePort); err != nil {
 		return err
 	}
 	if err := validateSliceElements(rv.res.Expose, "expose", ValidateExposePort); err != nil {
@@ -318,7 +318,7 @@ func (rv *resolver) validateSlices() error {
 	if err := validateSliceElements(rv.res.DNS, "dns", ValidateDNS); err != nil {
 		return err
 	}
-	if err := validateSliceElements(rv.res.AddHosts, "add-hosts", ValidateAddHost); err != nil {
+	if err := validateSliceElements(rv.res.AddHosts, "add-host", ValidateAddHost); err != nil {
 		return err
 	}
 	if err := validateSliceElements(rv.res.CapAdd, "cap-add", ValidateCapability); err != nil {
@@ -391,7 +391,7 @@ func (rv *resolver) validateDeviceSecurity() error {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): %w", i, err)
 			}
-			if !permsRegex.MatchString(d.CgroupPermissions) {
+			if !PermsRegex.MatchString(d.CgroupPermissions) {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): invalid cgroup permissions %q", i, d.CgroupPermissions)
 			}
 		}
