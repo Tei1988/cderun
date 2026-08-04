@@ -342,6 +342,57 @@ func TestUnit_Config_Resolver_SensitivePathMountWarnings(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_Expression_HardenedValidations(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	t.Run("resolveFile rejects control characters", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{file:some\x01file}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in file directive parameter")
+	})
+
+	t.Run("resolveFindDir rejects control characters", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{find_dir:some\x01dir}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in find_dir directive parameter")
+	})
+
+	t.Run("resolveEnv rejects invalid environment keys", func(t *testing.T) {
+		// Env key containing an invalid character like '=' or special symbols
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY=VAL}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Env key with null byte
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY\x00INJECTION}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Env key with control characters
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY\x1fKEY}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Empty env key
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+	})
+}
+
 func TestUnit_Config_Resolver_MountSocketPathSecurity(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{WD: "/work"}

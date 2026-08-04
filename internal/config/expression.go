@@ -384,6 +384,9 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
+	if err := validatePathChars(filename); err != nil {
+		return "", fmt.Errorf("invalid character in file directive parameter: %w", err)
+	}
 	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) || strings.ContainsAny(filename, "/\\") {
 		return "", fmt.Errorf("only a single file name is allowed in file directive: %q", filename)
 	}
@@ -450,6 +453,9 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
+	if err := validatePathChars(name); err != nil {
+		return "", fmt.Errorf("invalid character in find_dir directive parameter: %w", err)
+	}
 	if filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\") {
 		return "", fmt.Errorf("only a single file or directory name is allowed in find_dir directive: %q", name)
 	}
@@ -475,6 +481,9 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 // It supports default value syntax: {{env:KEY:-default}}.
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	key, defaultValue, hasDefault := strings.Cut(input, ":-")
+	if err := ValidateEnvKey(key); err != nil {
+		return "", fmt.Errorf("security validation failed for env directive key: %w", err)
+	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
 		return defaultValue, nil
