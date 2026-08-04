@@ -47,7 +47,7 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 
 ### 3. StdinOnce for Reliable EOF Propagation
 
-For Docker runtimes (`internal/runtime/docker.go`), when interactive mode is active, `StdinOnce: true` is configured on the attachment options.
+For Docker runtimes (`internal/runtime/docker.go`), whenever the execution path uses `syncReader` (such as in non-interactive pipe commands or when STDIN is explicitly attached), `StdinOnce: true` is configured on the attachment options. This occurs regardless of whether interactive mode (`config.Interactive`) is enabled.
 
 Under default Docker settings (`StdinOnce: false`), the daemon may keep the container input stream open indefinitely even after the client closes its end. For non-TTY, pipe-based commands, this prevents the containerized process (e.g., `cat`) from detecting EOF, causing it to hang.
 

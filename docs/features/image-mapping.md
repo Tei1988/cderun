@@ -15,7 +15,7 @@ node:
 python:
   image: "python:3.11-slim"
 custom-tool:
-  image: "my-registry/custom:latest"
+  image: "my-registry/custom:1.2.3"
 ```
 
 ### Error Handling

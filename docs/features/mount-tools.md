@@ -172,7 +172,7 @@ cderun --mount-tools node,npm,npx \
 
 1. **Daemon Dependency**: Execution requires mounting the host's container engine socket inside the container (transitively managed via `--mount-socket`).
 2. **Read-Only Mounts**: Mounted tool binaries are strictly read-only.
-3. **Path Collisions**: Any tool with a colliding name already installed inside the container's base image will be overwritten in `/usr/local/bin/`.
+3. **Path Collisions**: Any tool with a colliding name already installed inside the container's base image will be shadowed (masked) in `/usr/local/bin/` by the mounted binary while the bind mount is active. The original tool binary inside the image itself remains unmodified.
 4. **Binary Architecture**: The mounted `cderun` binary must match the target container's CPU architecture and operating system (as the host binary is mounted directly). On macOS hosts, a Linux-compatible `cderun` binary must be compiled and specified via `--mount-cderun-path`.
 
 ## Key Benefits

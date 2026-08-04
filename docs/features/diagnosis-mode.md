@@ -13,7 +13,7 @@ When the `--diagnosis` flag is specified:
 1. System diagnostic information and the list of available tools are gathered.
 2. The collected details are displayed in the configured format.
 3. Container execution and dry-runs are skipped.
-4. The execution exits normally with status code `0`.
+4. Upon successful diagnostic information collection and rendering, the execution exits normally with status code `0`. If diagnostic errors occur, they are propagated through the root command's `RunE`, producing a standard command execution error.
 
 ## Usage
 

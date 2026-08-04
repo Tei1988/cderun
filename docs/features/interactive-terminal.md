@@ -14,9 +14,9 @@ When a pseudo-TTY is allocated (`--tty`), `cderun` uses the `golang.org/x/term` 
 
 `cderun` traps standard OS lifecycle signals (such as `SIGINT`, `SIGTERM`, and `SIGHUP`) received on the host and forwards them directly to the containerized process via the container engine APIs. This ensures that pressing `Ctrl+C` or terminating the host process triggers proper signal-handling and graceful resource cleanup within the container. A two-phase termination (SIGINT followed by SIGKILL with grace periods) handles stuck containers.
 
-### 3. Window Resize Synchronization (`SIGWINCH`)
+### 3. Window Resize Synchronization (`SIGWINCH` on Unix)
 
-The execution engine monitors terminal window resize events (`SIGWINCH`) on the host. When a resize occurs, the active terminal dimension (rows and columns) is dynamically synced with the containerized TTY. This prevents interface layout distortion when executing rich console utilities or text editors (such as `vim`, `nano`, or `htop`).
+On Unix platforms, the execution engine monitors terminal window resize events (`SIGWINCH`) on the host. When a resize occurs, the active terminal dimension (rows and columns) is dynamically synced with the containerized TTY. This prevents interface layout distortion when executing rich console utilities or text editors (such as `vim`, `nano`, or `htop`).
 
 ### 4. Robust I/O Lifecycle and Goroutine Cleanup
 
@@ -30,4 +30,4 @@ To deliver a consistent interactive console experience on Windows hosts, native 
 
 - **Terminal Raw Mode**: Configured via `term.MakeRaw(int(os.Stdin.Fd()))`.
 - **Signal Forwarding**: Orchestrated via standard Go `os/signal` channels and the abstract `Runtime.SignalContainer` API.
-- **Resize Tracking**: Trapped via `SIGWINCH` (delegated via platform-specific routines in `signals_unix.go` and `signals_windows.go`) and applied using the abstract `Runtime.ResizeContainerTTY` API.
+- **Resize Tracking**: On Unix systems, resize tracking is trapped via `SIGWINCH` (handled in `signals_unix.go`) and applied to the container using the abstract `Runtime.ResizeContainerTTY` API. Windows terminal resizing is not handled via the same signal-trapping mechanism.

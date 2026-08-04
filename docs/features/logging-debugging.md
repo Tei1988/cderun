@@ -9,11 +9,13 @@ The logging system is designed to be completely thread-safe, incorporating optim
 
 ### Level Definitions
 
-- `ERROR`: Captures fatal errors and command aborts.
-- `WARN`: Records warnings and non-fatal errors (Default level for CLI).
+- `ERROR`: Captures fatal errors and command aborts (Default level for CLI).
+- `WARN`: Records warnings and non-fatal errors.
 - `INFO`: General informational lifecycle logs.
 - `DEBUG`: Detailed operational traces (e.g. configuration files loaded, socket connections resolved).
 - `TRACE`: Extreme fine-grained step-by-step logs (e.g. low-level argument processing, API payloads, internal timing metrics).
+
+*Note: The `initialLevel` inside the root command functions as a separate early bootstrap level. It is initialized to `error` to suppress early initialization noise prior to config-resolution parsing.*
 
 ### Configuration Options
 
@@ -58,7 +60,7 @@ Like other settings, you can override logging properties using the `--cderun-` p
 
 ## Logging Output Examples
 
-### Default (WARN/ERROR level)
+### Default (ERROR level)
 
 ```bash
 cderun node app.js
@@ -94,6 +96,8 @@ Hello, World!
 Immediately prior to starting the container, `cderun` logs the finalized `ContainerConfig` structure (including image name, command, entrypoint, volume mounts, environment lists, and user context) at the `DEBUG` level.
 
 To ensure strict compliance with security standards, the environment variables printed inside this dump are processed via `config.MaskSensitiveEnvList`. Any environment variables matched by the active `sensitive-env` patterns (or all environment variables by default) are printed as `[REDACTED]`, ensuring that authentication keys, database passwords, or credentials never leak into operational log files.
+
+**WARNING**: Setting the opt-out pattern `sensitive-env=NONE` completely disables masking. Because this pattern opts out of redaction, all environment variable values will remain fully visible in `DEBUG` logs. Credentials such as authentication keys, api tokens, and passwords may be exposed when this opt-out is used.
 
 Diagnostic config dump example:
 

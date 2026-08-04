@@ -154,7 +154,7 @@ Setting `strictEnv` to `true` causes execution to immediately fail with a config
 
 #### Configuration Methods
 
-Can be configured inside `.cderun.yaml` (global defaults), `.tools.yaml` (tool profile), or via the command-line flag `--strict-env`.
+It can be configured inside `.cderun.yaml` (global defaults), `.tools.yaml` (tool profile), or via the command-line flag `--strict-env`.
 
 ```yaml
 # .cderun.yaml

@@ -11,11 +11,12 @@ Settings are resolved in the following priority order, from highest to lowest:
 ### P1: CDERUN Internal Overrides (Highest Priority)
 
 - **Definition**: Dedicated flags designed to force-override the behavior of `cderun`. These flags enable specifying settings on the `cderun` side even when using symbolic links (Polyglot Mode) without conflicting with the arguments of wrapped tools.
-- **Flag Names**: All standard `cderun` flags (P2) have a corresponding P1 counterpart prefixed with `--cderun-`.
+- **Flag Names**: Supported standard `cderun` options have a corresponding P1 counterpart prefixed with `--cderun-`.
   - **Key P1 Flags**:
-    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`
+    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-network`, `--cderun-runtime`, `--cderun-strict-env`
     - **Mounting**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-cderun`
-    - **Diagnostics**: `--cderun-dry-run`, `--cderun-log-level`
+    - **Ports & Publishing**: `--cderun-publish-all`
+    - **Diagnostics & Logging**: `--cderun-dry-run`, `--cderun-log-level`, `--cderun-log-format`
 - **Behavior**: When specified, these values take absolute precedence, completely ignoring all other sources (P2–P6).
 - **Placement Rules and Hoisting**:
   - **Wrapper Mode**: By rule, these flags must be placed **after** the subcommand. During preprocessing, `cderun` scans the arguments after the subcommand, extracts any `--cderun-*` flags, and internally "hoists" (relocates) them before the subcommand prior to standard parsing.

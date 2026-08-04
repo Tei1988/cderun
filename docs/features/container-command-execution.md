@@ -2,7 +2,7 @@
 
 ## Overview
 
-`cderun` runs execution commands within ephemeral containers, providing clean, isolated, and reproducible workspace environments without requiring tools (such as Node.js or Python) to be installed locally on the host machine.
+`cderun` runs execution commands within containers, providing clean, isolated, and reproducible workspace environments without requiring tools (such as Node.js or Python) to be installed locally on the host machine. By default, container cleanup is enabled to maintain ephemeral environments.
 
 Command-line parameters are parsed according to the rules defined in the [Argument Parsing Feature Specification](./argument-parsing.md) to determine the exact command structure passed to the container.
 
@@ -11,7 +11,7 @@ Command-line parameters are parsed according to the rules defined in the [Argume
 ### Command Wrapping
 
 - Executes arbitrary commands seamlessly inside containers.
-- Automatically removes the container after execution (`--rm`).
+- Automatically removes the container after execution by default (controlled via the `--remove` flag).
 - Preserves and returns the exact process exit codes and standard output streams.
 
 ### Interactive Terminal Support
