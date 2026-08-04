@@ -230,6 +230,14 @@ func TestUnit_Command_Execution_SIGKILLTimeout(t *testing.T) {
 
 	var exitErr *ExitCodeError
 	require.ErrorAs(t, err, &exitErr)
+
+	// Assert that mock.SignalContainer recorded that SIGKILL was requested
+	var signaled string
+	mock.WithLockedMock(func(m *runtime.MockRuntime) {
+		signaled = m.Signal
+	})
+	assert.Equal(t, "SIGKILL", signaled)
+
 	assert.Equal(t, 125, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "failed to exit after SIGKILL timeout")
 }
@@ -254,12 +262,12 @@ func TestUnit_Command_Execution_SIGKILLFailure_NormalExit(t *testing.T) {
 	// SignalContainer fails when SIGKILL is sent
 	mock.SignalErr = errors.New("injected SIGKILL failure")
 
-	// WaitContainer blocks for 100ms (longer than 50ms, but exits during second select)
+	// WaitContainer blocks for 70ms (longer than first 50ms, but exits before second 50ms timeout)
 	mock.WaitFunc = func(ctx context.Context, containerID string) (int, error) {
 		select {
 		case <-ctx.Done():
 			return 0, ctx.Err()
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(70 * time.Millisecond):
 			return 42, nil
 		}
 	}
