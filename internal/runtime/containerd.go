@@ -355,6 +355,9 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	if config.Pid == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.PIDNamespace))
 	}
+	if config.ShmSize > 0 {
+		opts = append(opts, UpdateShmSize(config.ShmSize))
+	}
 
 	if len(config.GroupAdd) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
@@ -678,4 +681,35 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 		args = append(args, config.Command...)
 	}
 	return args, nil
+}
+
+// UpdateShmSize updates the /dev/shm mount size in the OCI specification.
+// @jules
+// UpdateShmSize gives the configured shmSize complete precedence over any existing /dev/shm mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+func UpdateShmSize(shmSize int64) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		if s.Mounts == nil {
+			s.Mounts = []specs.Mount{}
+		}
+
+		// Remove existing /dev/shm mount first to give configured shmSize complete precedence
+		var filteredMounts []specs.Mount
+		for _, m := range s.Mounts {
+			if m.Destination != "/dev/shm" {
+				filteredMounts = append(filteredMounts, m)
+			}
+		}
+
+		// Append single sanitized tmpfs mount with the configured size
+		shmOpt := fmt.Sprintf("size=%d", shmSize)
+		filteredMounts = append(filteredMounts, specs.Mount{
+			Type:        "tmpfs",
+			Source:      "shm",
+			Destination: "/dev/shm",
+			Options:     []string{"nosuid", "nodev", "noexec", "mode=1777", shmOpt},
+		})
+
+		s.Mounts = filteredMounts
+		return nil
+	}
 }

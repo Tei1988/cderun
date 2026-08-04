@@ -120,6 +120,7 @@ type rootOptions struct {
 	entrypoint            []string
 	pull                  string
 	memory                string
+	shmSize               string
 	cpus                  float64
 	devices               []string
 	groupAdd              []string
@@ -138,6 +139,7 @@ type rootOptions struct {
 	cderunEntrypoint      []string
 	cderunPull            string
 	cderunMemory          string
+	cderunShmSize         string
 	cderunCPUs            float64
 	cderunDevices         []string
 	sensitiveEnv          []string
@@ -383,6 +385,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunPullBackoffBase: opt(cmd.Flags().Changed("cderun-pull-backoff-base"), o.cderunPullBackoffBase),
 		Memory:                opt(cmd.Flags().Changed("memory"), o.memory),
 		CderunMemory:          opt(cmd.Flags().Changed("cderun-memory"), o.cderunMemory),
+		ShmSize:               opt(cmd.Flags().Changed("shm-size"), o.shmSize),
+		CderunShmSize:         opt(cmd.Flags().Changed("cderun-shm-size"), o.cderunShmSize),
 		CPUs:                  opt(cmd.Flags().Changed("cpus"), o.cpus),
 		CderunCPUs:            opt(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
 		Devices:               o.devices,
@@ -560,6 +564,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Entrypoint: resolved.Entrypoint,
 		Pull:       resolved.Pull,
 		Memory:     resolved.Memory,
+		ShmSize:    resolved.ShmSize,
 		CPUs:       resolved.CPUs,
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,

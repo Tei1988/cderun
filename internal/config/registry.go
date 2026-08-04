@@ -401,6 +401,18 @@ var StringOptions = []StringOption{
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as bytes)
 	},
 	{
+		Name:   "shm-size",
+		EnvKey: "CDERUN_SHM_SIZE",
+		Usage:  "Size of /dev/shm (e.g. 512m, 1g)",
+		ToolGetter: func(t ToolConfig) string {
+			return t.ShmSize
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.ShmSize
+		},
+		SkipResolution: true, // resolved in resolveCustomParsing (parsed as bytes)
+	},
+	{
 		Name:      "dry-run-format",
 		Shorthand: "f",
 		EnvKey:    "CDERUN_DRY_RUN_FORMAT",

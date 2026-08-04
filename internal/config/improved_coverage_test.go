@@ -178,3 +178,50 @@ func TestUnit_ExpressionResolver_ResolveString_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, r.resolveString(""))
 }
+
+func TestUnit_Config_ShmSize_Resolution(t *testing.T) {
+	t.Run("shm-size string parsing", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("256m"),
+		}
+		res, err := Resolve("node", &cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(256*1024*1024), res.ShmSize)
+	})
+
+	t.Run("shm-size negative value validation", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("-256m"),
+		}
+		_, err := Resolve("node", &cli, nil, nil)
+		require.Error(t, err)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "shm-size", cfgErr.Field)
+	})
+
+	t.Run("shm-size invalid format", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:   ptr("alpine"),
+			ShmSize: ptr("invalid"),
+		}
+		_, err := Resolve("node", &cli, nil, nil)
+		require.Error(t, err)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "shm-size", cfgErr.Field)
+	})
+
+	t.Run("shm-size precedence cderun-shm-size", func(t *testing.T) {
+		cli := CLIOptions{
+			Image:         ptr("alpine"),
+			ShmSize:       ptr("128m"),
+			CderunShmSize: ptr("512m"),
+		}
+		res, err := Resolve("node", &cli, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(512*1024*1024), res.ShmSize)
+	})
+}

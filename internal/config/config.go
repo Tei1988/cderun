@@ -81,6 +81,7 @@ type ConfigDefaults struct {
 	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
 	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
+	ShmSize         string         `yaml:"shmSize,omitempty"`
 	CPUs            *float64       `yaml:"cpus,omitempty"`
 	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
 	DryRun          *bool          `yaml:"dryRun,omitempty"`
@@ -220,6 +221,7 @@ type ToolConfig struct {
 	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
 	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
+	ShmSize         string         `yaml:"shmSize,omitempty"`
 	CPUs            *float64       `yaml:"cpus,omitempty"`
 	HangTimeout     string         `yaml:"hangTimeout,omitempty"`
 	LogLevel        string         `yaml:"logLevel,omitempty"`
