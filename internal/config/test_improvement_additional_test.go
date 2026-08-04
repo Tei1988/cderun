@@ -275,7 +275,7 @@ func TestUnit_Config_PidOption(t *testing.T) {
 		cliValidEmpty := &CLIOptions{Image: ptr("alpine"), Pid: ptr("")}
 		res, err := ResolveWithFS("sh", cliValidEmpty, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "", res.Pid)
+		assert.Empty(t, res.Pid)
 
 		cliValidHost := &CLIOptions{Image: ptr("alpine"), Pid: ptr("host")}
 		res, err = ResolveWithFS("sh", cliValidHost, nil, nil, mfs)
