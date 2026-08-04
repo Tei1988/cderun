@@ -1,118 +1,116 @@
-# 機能仕様：直接コンテナ実行 (完了)
+# Feature Specification: Direct Container Execution
 
-## 概要
+## Overview
 
-各ランタイムの独自APIを介して直接コンテナを実行する。
-コマンド生成は行わず、中間表現（IR）を各ランタイムのAPIコールに変換する。
+`cderun` executes containers directly via the native API of each supported container engine. Instead of dynamically generating and calling terminal shell commands (e.g., calling `docker run`), the unified Intermediate Representation (IR) is mapped directly to container engine API calls on the host.
 
-## アーキテクチャ
+## Architecture
 
 ```text
-cderunフラグ → 中間表現（IR） → ランタイムAPIコール → コンテナ実行
-                    ↓
-               ContainerConfig
-                    ↓
-          runtime.CreateContainer()
-          runtime.StartContainer()
-          runtime.AttachContainer()
-          ...
+cderun Flags → Intermediate Representation (IR) → Runtime API Calls → Container Execution
+                           ↓
+                    ContainerConfig
+                           ↓
+                runtime.CreateContainer()
+                runtime.StartContainer()
+                runtime.AttachContainer()
+                ...
 ```
 
-### 実装ステータス (CRIインターフェース)
+### Implementation Status (CRI Interface)
 
-| メソッド | Docker (moby) | Podman (compatible API) | containerd (gRPC, 実験的) |
+| Method | Docker (Moby) | Podman (Compatible API) | containerd (gRPC, Experimental) |
 | :--- | :---: | :---: | :---: |
-| `CreateContainer` | 実装済み | 実装済み | 実装済み（`--network`/`--publish` 未対応） |
-| `StartContainer` | 実装済み | 実装済み | 実装済み |
-| `WaitContainer` | 実装済み | 実装済み | 実装済み |
-| `RemoveContainer` | 実装済み | 実装済み | 実装済み |
-| `AttachContainer` | 実装済み | 実装済み | 実装済み |
-| `SignalContainer` | 実装済み | 実装済み | 実装済み |
-| `ResizeContainerTTY` | 実装済み | 実装済み | 実装済み |
+| `CreateContainer` | Supported | Supported | Supported (except `--network`/`--publish`) |
+| `StartContainer` | Supported | Supported | Supported |
+| `WaitContainer` | Supported | Supported | Supported |
+| `RemoveContainer` | Supported | Supported | Supported |
+| `AttachContainer` | Supported | Supported | Supported |
+| `SignalContainer` | Supported | Supported | Supported |
+| `ResizeContainerTTY` | Supported | Supported | Supported |
 
-**メリット:**
+**Benefits:**
 
-- コマンド生成不要
-- プログラマティックな制御
-- エラーハンドリングが容易
-- ネストした実行でも環境を引き継げる
+- **No Command Generation**: Eliminates shell escaping errors, command injection vectors, and platform-specific terminal quirks.
+- **Programmatic Control**: Direct lifecycle management of resources and connection monitoring.
+- **Robust Error Handling**: Real-time diagnostic error codes can be retrieved directly from the container engine instead of parsing standard error text outputs.
+- **Nested Context Preservation**: Seamless recursive execution of nested container layers.
 
-## 中間表現（IR）: ContainerConfig
+## Intermediate Representation (IR): ContainerConfig
 
-すべての実行要求を統一的に扱うためのデータ構造。
+The unified data structure that handles all execution requests consistently:
 
-- **基本属性**: イメージ名、コマンド（`Command`）。これらは実行時に結合され、ランタイムに渡されます。
-- **実行制御**: TTY、インタラクティブモード、自動削除フラグ、イメージプルポリシー（`Pull`）。
-- **ネットワーク**: ネットワークモード、ポートマッピング（`Ports`）、全ポート公開（`PublishAll`）、ポート露出（`Expose`）、ホスト名、DNS設定、ホストマップ（`AddHosts`）。
-- **環境構成**: ボリュームマウント（Host/Container/tmpfs、および `read_only` 指定）、環境変数、作業ディレクトリ、実行ユーザー。
-- **セキュリティ・リソース**: 特権モード（`Privileged`）、ケーパビリティ追加/削除（`CapAdd`/`CapDrop`）、メモリ制限、CPU制限。
-- **その他**: エントリーポイント上書き、デバイス追加。
+- **Basic Attributes**: Image name, command (`Command`). These are consolidated at run-time and passed to the container runtime.
+- **Execution Control**: TTY, interactive mode, automatic removal flag (`Remove`), and image pull policy (`Pull`).
+- **Networking**: Network mode, port mapping (`Ports`), publishing all exposed ports (`PublishAll`), exposing ports (`Expose`), hostname, DNS servers, and custom host mappings (`AddHosts`).
+- **Environment**: Volumes and bind mounts (including host, container, and tmpfs with `readonly` capabilities), environment variables, working directory, and execution user.
+- **Security & Resources**: Privileged mode (`Privileged`), capability additions/removals (`CapAdd`/`CapDrop`), memory limit, and CPU limit.
+- **Other**: Entrypoint override, device additions.
 
-## CRIインターフェース: ContainerRuntime
+## CRI Interface: ContainerRuntime
 
-各ランタイムの差異を吸収するための共通インターフェース。
+The common abstraction interface that normalizes the differences between each container runtime:
 
-- **ライフサイクル**: 作成、起動、待機、削除の各フェーズをメソッド化。
-- **IO制御**: 標準入出力（stdin/stdout/stderr）のアタッチ。
-- **操作**: シグナル送信（SignalContainer）、TTYリサイズ（ResizeContainerTTY）。
-- **ストリーム処理**: TTYが無効な場合、標準出力と標準エラー出力が多重化されたストリーム（`stdcopy` 形式）を適切に分離して処理。
+- **Lifecycle Management**: Methods for creation, startup, waiting, and deletion.
+- **I/O Control**: Dynamic attachment of standard I/O streams (stdin, stdout, stderr).
+- **Control Operations**: Sending OS signals (`SignalContainer`) and synchronizing TTY window resizes (`ResizeContainerTTY`).
+- **Stream Multiplexing**: When a TTY is disabled, standard output and standard error streams are separated using a multiplexed stream format (standard `stdcopy` format) and handled appropriately.
 
-### ランタイム実装のポイント
+### Key Runtime Adaptation Details
 
-- **Docker実装**: Docker Engine API (`github.com/docker/docker/client`) を使用。
-- **Podman実装**: Docker 互換 API を使用。Docker クライアントライブラリを共通の基盤として利用。
-- **共通ロジック**: `ContainerConfig` を各ランタイム固有の `Config`, `HostConfig` 等に変換。
+- **Docker Implementation**: Implemented via the official Docker Engine API (`github.com/docker/docker/client`).
+- **Podman Implementation**: Implemented via the Docker-compatible local API of Podman, sharing the core Docker client library infrastructure.
+- **Translation Logic**: Maps the abstract `ContainerConfig` into runtime-specific configurations (such as Docker's `Config`, `HostConfig`, and `NetworkingConfig`).
 
-## 実行フロー
+## Execution Flow
 
-### 基本的な実行手順
+### Basic Execution Sequence
 
-1. **コンテナ作成**: `CreateContainer` で設定を渡し、IDを取得。
-2. **クリーンアップ予約**: `config.Remove` が真なら、終了時に `RemoveContainer` を呼ぶよう `defer` 等で設定。
-3. **コンテナ起動**: `StartContainer` を呼び出す。
-4. **IOアタッチ**: `TTY` または `Interactive` の場合、`AttachContainer` で入出力を接続。
-5. **シグナル/リサイズ処理**: 実行中にシグナル転送やTTYリサイズ同期を行う。
-6. **終了待機**: `WaitContainer` でプロセス終了を待ち、終了コードを取得。
+1. **Container Creation**: Invoke `CreateContainer` with the configuration, returning a unique container ID.
+2. **Scheduled Cleanup**: If `config.Remove` is true, schedule `RemoveContainer` via `defer` or context cleanups to ensure ephemeral behavior.
+3. **Container Startup**: Call `StartContainer` to boot the container namespace.
+4. **I/O Attachment**: If `TTY` or `Interactive` is enabled, call `AttachContainer` to hook up stdin, stdout, and stderr streams.
+5. **Signal & Resize Forwarders**: Spin up background routines to forward OS signals and window resizing events to the running container.
+6. **Completion Wait**: Block on `WaitContainer` to await container process exit and retrieve the final exit status code.
 
-## ネストした実行の解決
+## Resolving Nested Execution
 
-CRIを直接使うことで、コンテナ内からcderunを実行しても、同じランタイムインスタンスを使用できる。
+By utilizing direct container engine APIs over raw socket mounts, `cderun` executed within a container can naturally interface with the host's container daemon.
 
-- **ランタイム共有**: ホストからマウントされたソケット経由で、コンテナ内からもホストのランタイムを操作。
-- **環境変数の引き継ぎ**: 実行ホスト（コンテナ内）の環境変数を `ContainerConfig` にマウントまたは追加することで、ネストしたコンテナに引き継ぐ。
+- **Shared Runtime Socket**: Containers can mount the host's runtime socket, allowing nested `cderun` executions to spawn companion sibling containers directly on the host rather than requiring nested Docker-in-Docker daemons.
+- **Environment Inheritance**: Current execution host environment variables are mounted or injected directly into the `ContainerConfig` of the child container.
 
-## ロードマップ
+## Roadmap
 
-### Phase 1: コア機能 (完了)
+### Phase 1: Core Functionality (Completed)
 
-- 中間表現（ContainerConfig）の定義
-- Docker CRI実装
-- 基本的な実行フロー
+- Definition of Intermediate Representation (`ContainerConfig`)
+- Docker CRI Adapter implementation
+- Standard execution flow orchestration
 
-### Phase 2: 設定管理 (完了)
+### Phase 2: Configuration Management (Completed)
 
-- 設定ファイル読み込み
-- イメージマッピング
-- 優先順位解決
-- ドライランモード (Phase 4から前倒しで完了)
+- Loading configuration profiles
+- Subcommand image mapping
+- Layered precedence resolution
+- Dry-run preview mode
 
-### Phase 3: 高度な機能 (完了)
+### Phase 3: Advanced Functionality (Completed)
 
-- 環境変数パススルー
-- ソケット・バイナリマウント・ツールマウント
+- Dynamic environment passthrough
+- Auto-detection and mounting of the `cderun` binary, sockets, and tools
 
-### Phase 4: 利便性向上 (完了)
+### Phase 4: Enhancements (Completed)
 
-- Podman CRI実装
-- エラーハンドリングの強化
-- シグナル転送・リサイズ同期
-- 詳細ログ機能
+- Podman CRI Adapter integration
+- Enhanced error diagnostics and robust signal forwarding
+- Multi-threaded log streaming and TTY resizing
 
-### Phase 5: Docker互換フラグの拡充 (完了)
+### Phase 5: Docker-compatible Flag Expansion (Completed)
 
-- 詳細なコンテナ設定（ネットワーク、リソース、セキュリティ等）のIRへの追加と各ランタイムでの実装。
+- Detailed resource constraints, namespace overrides (such as `--pid`), network controls, and capability security validations added to the IR and implemented across all adapters.
 
-## 依存ライブラリ
+## Dependency Libraries
 
 ```go
 import (

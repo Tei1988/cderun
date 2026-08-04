@@ -341,3 +341,137 @@ func TestUnit_Config_Resolver_SensitivePathMountWarnings(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_Config_Expression_HardenedValidations(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	t.Run("resolveFile rejects control characters", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{file:some\x01file}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in file directive parameter")
+	})
+
+	t.Run("resolveFindDir rejects control characters", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{find_dir:some\x01dir}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in find_dir directive parameter")
+	})
+
+	t.Run("resolveEnv rejects invalid environment keys", func(t *testing.T) {
+		// Env key containing an invalid character like '=' or special symbols
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY=VAL}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Env key with null byte
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY\x00INJECTION}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Env key with control characters
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:KEY\x1fKEY}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+
+		// Empty env key
+		r, err = NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+		_, err = r.ResolveString("{{env:}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for env directive key")
+	})
+}
+
+func TestUnit_Config_Resolver_MountSocketPathSecurity(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+
+	t.Run("MountSocketPath relative is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:           ptr("alpine"),
+			MountSocketPath: ptr("relative/path"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target must be an absolute path")
+	})
+
+	t.Run("MountSocketPath with parent traversal is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:           ptr("alpine"),
+			MountSocketPath: ptr("/app/../etc"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target cannot contain parent directory references")
+	})
+
+	t.Run("MountSocketPath absolute is accepted", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:           ptr("alpine"),
+			MountSocketPath: ptr("/var/run/docker.sock"),
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+	})
+}
+
+func TestUnit_Config_Resolver_SensitiveDeviceWarnings(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	tests := []struct {
+		name       string
+		devicePath string
+		expectWarn bool
+	}{
+		{"/dev/mem warns", "/dev/mem", true},
+		{"/dev/kmem warns", "/dev/kmem", true},
+		{"/dev/port warns", "/dev/port", true},
+		{"/dev/sda warns", "/dev/sda", true},
+		{"/dev/nvme0n1 warns", "/dev/nvme0n1", true},
+		{"/dev/loop0 warns", "/dev/loop0", true},
+		{"/dev/mapper/vol warns", "/dev/mapper/vol", true},
+		{"/dev/fuse does not warn", "/dev/fuse", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+			logging.GetGlobalLogger().SetOutput(&buf)
+			defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+			cli := &CLIOptions{
+				Image:   ptr("alpine"),
+				Devices: []string{tt.devicePath + ":" + tt.devicePath},
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.NoError(t, err)
+
+			logOutput := buf.String()
+			if tt.expectWarn {
+				assert.Contains(t, logOutput, "Mounting highly sensitive host device")
+			} else {
+				assert.NotContains(t, logOutput, "Mounting highly sensitive host device")
+			}
+		})
+	}
+}

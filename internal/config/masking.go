@@ -10,6 +10,7 @@ import (
 // 1. patterns is nil (Unset): ALL environment variables are masked.
 // 2. patterns is non-nil but empty: NO environment variables are masked.
 // 3. patterns is non-empty: Only keys matching the glob patterns are masked (fail-closed on invalid glob).
+
 func isUpper(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 'a' && s[i] <= 'z' {
@@ -17,6 +18,144 @@ func isUpper(s string) bool {
 		}
 	}
 	return true
+}
+
+func equalFoldASCII(s1, s2 string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i := 0; i < len(s1); i++ {
+		c1 := s1[i]
+		c2 := s2[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func hasSuffixFoldASCII(s, suffix string) bool {
+	if len(s) < len(suffix) {
+		return false
+	}
+	start := len(s) - len(suffix)
+	for i := 0; i < len(suffix); i++ {
+		c1 := s[start+i]
+		c2 := suffix[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func hasPrefixFoldASCII(s, prefix string) bool {
+	if len(s) < len(prefix) {
+		return false
+	}
+	for i := 0; i < len(prefix); i++ {
+		c1 := s[i]
+		c2 := prefix[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func containsFoldASCII(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(s) < len(substr) {
+		return false
+	}
+	limit := len(s) - len(substr)
+	for i := 0; i <= limit; i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			c1 := s[i+j]
+			c2 := substr[j]
+			if c1 != c2 {
+				if c1 >= 'A' && c1 <= 'Z' {
+					c1 += 'a' - 'A'
+				}
+				if c2 >= 'A' && c2 <= 'Z' {
+					c2 += 'a' - 'A'
+				}
+				if c1 != c2 {
+					match = false
+					break
+				}
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 128 {
+			return false
+		}
+	}
+	return true
+}
+
+func fastMatchFold(key, pattern string) (bool, bool) {
+	// Returns (matched, ok). If ok is false, caller must fall back to slow path (glob).
+	if !isASCII(key) || !isASCII(pattern) {
+		return false, false
+	}
+
+	// 1. Exact match (no wildcard characters)
+	if !strings.ContainsAny(pattern, "*?[\\") {
+		return equalFoldASCII(key, pattern), true
+	}
+
+	// 2. Suffix match "*suffix" (contains exactly one '*' at index 0)
+	if strings.HasPrefix(pattern, "*") && !strings.ContainsAny(pattern[1:], "*?[\\") {
+		return hasSuffixFoldASCII(key, pattern[1:]), true
+	}
+
+	// 3. Prefix match "prefix*" (contains exactly one '*' at the end)
+	if strings.HasSuffix(pattern, "*") && !strings.ContainsAny(pattern[:len(pattern)-1], "*?[\\") {
+		return hasPrefixFoldASCII(key, pattern[:len(pattern)-1]), true
+	}
+
+	// 4. Substring match "*substr*" (contains '*' at start and end, and no other wildcard characters)
+	if len(pattern) >= 2 && strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") && !strings.ContainsAny(pattern[1:len(pattern)-1], "*?[\\") {
+		return containsFoldASCII(key, pattern[1:len(pattern)-1]), true
+	}
+
+	return false, false
 }
 
 func MaskSensitiveEnv(key, value string, patterns []string) string {
@@ -40,35 +179,34 @@ func MaskSensitiveEnv(key, value string, patterns []string) string {
 	var upperKeyInitialized bool
 
 	for _, p := range patterns {
-		// Optimization: if pattern does not contain glob characters,
-		// we can perform a case-insensitive exact match using strings.EqualFold.
-		// This avoids allocating uppercase strings for 'key' or 'p'.
-		if !strings.ContainsAny(p, "*?[\\") {
-			if strings.EqualFold(key, p) {
-				return "[REDACTED]"
-			}
-		} else {
-			// If it's a glob pattern, fall back to path.Match.
-			// Lazily initialize upperKey only when a glob pattern is encountered.
-			if !upperKeyInitialized {
-				upperKey = key
-				if !isUpper(key) {
-					upperKey = strings.ToUpper(key)
-				}
-				upperKeyInitialized = true
-			}
-			upperPattern := p
-			if !isUpper(p) {
-				upperPattern = strings.ToUpper(p)
-			}
-			matched, err := path.Match(upperPattern, upperKey)
-			if err != nil {
-				// Fail-closed: if the pattern is invalid, we redact to be safe.
-				return "[REDACTED]"
-			}
+		// Try allocation-free fast-path first!
+		if matched, ok := fastMatchFold(key, p); ok {
 			if matched {
 				return "[REDACTED]"
 			}
+			continue
+		}
+
+		// Fallback to slow path (Glob/Unicode)
+		// Lazily initialize upperKey only when a glob pattern is encountered.
+		if !upperKeyInitialized {
+			upperKey = key
+			if !isUpper(key) {
+				upperKey = strings.ToUpper(key)
+			}
+			upperKeyInitialized = true
+		}
+		upperPattern := p
+		if !isUpper(p) {
+			upperPattern = strings.ToUpper(p)
+		}
+		matched, err := path.Match(upperPattern, upperKey)
+		if err != nil {
+			// Fail-closed: if the pattern is invalid, we redact to be safe.
+			return "[REDACTED]"
+		}
+		if matched {
+			return "[REDACTED]"
 		}
 	}
 
@@ -97,30 +235,31 @@ func maskSensitiveEnvWithUpperPatterns(key, value string, patterns, upperPattern
 
 	for i := range patterns {
 		p := patterns[i]
-		// Optimization: if pattern does not contain glob characters,
-		// use strings.EqualFold to bypass allocations entirely.
-		if !strings.ContainsAny(p, "*?[\\") {
-			if strings.EqualFold(key, p) {
-				return "[REDACTED]"
-			}
-		} else {
-			// Lazily initialize upperKey only when a glob pattern is encountered.
-			if !upperKeyInitialized {
-				upperKey = key
-				if !isUpper(key) {
-					upperKey = strings.ToUpper(key)
-				}
-				upperKeyInitialized = true
-			}
-			upperPattern := upperPatterns[i]
-			matched, err := path.Match(upperPattern, upperKey)
-			if err != nil {
-				// Fail-closed: if the pattern is invalid, we redact to be safe.
-				return "[REDACTED]"
-			}
+		// Try allocation-free fast-path first!
+		if matched, ok := fastMatchFold(key, p); ok {
 			if matched {
 				return "[REDACTED]"
 			}
+			continue
+		}
+
+		// Fallback to slow path
+		// Lazily initialize upperKey only when a glob pattern is encountered.
+		if !upperKeyInitialized {
+			upperKey = key
+			if !isUpper(key) {
+				upperKey = strings.ToUpper(key)
+			}
+			upperKeyInitialized = true
+		}
+		upperPattern := upperPatterns[i]
+		matched, err := path.Match(upperPattern, upperKey)
+		if err != nil {
+			// Fail-closed: if the pattern is invalid, we redact to be safe.
+			return "[REDACTED]"
+		}
+		if matched {
+			return "[REDACTED]"
 		}
 	}
 

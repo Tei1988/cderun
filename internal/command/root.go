@@ -1192,8 +1192,7 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 				case <-time.After(effectiveHangTimeout):
 					killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
 					defer killCancel()
-					var err error
-					_, err = o.signalKillIfRunning(killCtx, rt, containerID)
+					_, err := o.signalKillIfRunning(killCtx, rt, containerID)
 					if err != nil {
 						return 0, err
 					}

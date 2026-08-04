@@ -1,12 +1,12 @@
-# 機能仕様：イメージマッピング (完了)
+# Feature Specification: Image Mapping
 
-## 概要
+## Overview
 
-`cderun`はサブコマンドを適切なコンテナイメージに自動マッピングし、コンテナイメージを手動で指定する必要をなくします。
+`cderun` automatically maps subcommands to appropriate container images, eliminating the need to specify the container image name manually every time.
 
-## 設定
+## Configuration
 
-設定は `.tools.yaml` で行います。
+Image mapping configuration is defined in `.tools.yaml`:
 
 ```yaml
 # .tools.yaml
@@ -15,17 +15,17 @@ node:
 python:
   image: "python:3.11-slim"
 custom-tool:
-  image: "my-registry/custom:latest"
+  image: "my-registry/custom:1.2.3"
 ```
 
-### エラーハンドリング
+### Error Handling
 
-- マッピングが存在しない場合、エラーを出力して終了
-- 例: `cderun unknown-tool` → `Error: no image mapping found for tool: unknown-tool`
-- ユーザーは明示的に `--image` フラグでイメージを指定する必要がある
+- If no image mapping exists for a specified subcommand, execution terminates immediately with an error.
+- Example: `cderun unknown-tool` -> `Error: no image mapping found for tool: unknown-tool`
+- To bypass this lookup and run arbitrary tools, you must specify the image explicitly using the `--image` flag.
 
-## メリット
+## Benefits
 
-- **便利性**: イメージ名を記憶する必要がない
-- **一貫性**: 標準化されたイメージ選択
-- **柔軟性**: カスタマイズ可能なマッピング
+- **Convenience**: No need to memorize complex container image tags.
+- **Consistency**: Standardized tool execution environments across machines.
+- **Flexibility**: Custom mapping support via per-project or global configuration profiles.
