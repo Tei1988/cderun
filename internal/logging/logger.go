@@ -182,6 +182,7 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 	}
 
 	message := fmt.Sprintf(msg, args...)
+	message = SanitizeLogString(message)
 	now := time.Now()
 
 	l.mu.Lock()
@@ -237,4 +238,24 @@ func GetGlobalLogger() *Logger {
 
 func NewLogger() *Logger {
 	return newDefaultLogger()
+}
+
+// SanitizeLogString escapes ASCII control characters (ASCII < 32 and ASCII 127)
+// with hex-escaped strings, preserving only tab ('\t') to prevent terminal
+// escape sequence or log injection attacks. Carriage returns ('\r') and
+// line feeds ('\n') are explicitly hex-escaped as "\x0d" and "\x0a".
+func SanitizeLogString(s string) string {
+	var builder strings.Builder
+	builder.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\t' {
+			builder.WriteByte(c)
+		} else if c < 32 || c == 127 {
+			_, _ = fmt.Fprintf(&builder, "\\x%02x", c)
+		} else {
+			builder.WriteByte(c)
+		}
+	}
+	return builder.String()
 }
