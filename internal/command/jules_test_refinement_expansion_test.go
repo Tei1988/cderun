@@ -20,12 +20,13 @@ import (
 )
 
 // docs/features/polyglot-entry.md: Polyglot Entry Point / Symlink Mode
-// Executing the CLI in Symlink Mode with non-ASCII CJK in arguments and dirty paths should clean and resolve the tool name correctly,
-// and unrecognized tools should return config.ImageNotFoundError.
+// Executing the CLI in Symlink Mode with CJK in arguments and dirty paths should clean and resolve the tool name correctly.
+// Unrecognized tools return config.ImageNotFoundError.
+// Due to security invariants, any non-ASCII CJK characters in the tool name itself must be rejected by character validation.
 func TestUnit_Command_SymlinkMode_UnicodeAndUnrecognized(t *testing.T) {
 	t.Parallel()
 
-	// 1. Unicode/CJK dirty relative path tool execution
+	// 1. Unicode/CJK dirty relative path tool execution (with CJK arguments)
 	t.Run("dirty relative path cleans and executes with unicode arguments", func(t *testing.T) {
 		t.Parallel()
 		mockRuntime := &runtime.MockRuntime{}
@@ -56,7 +57,34 @@ func TestUnit_Command_SymlinkMode_UnicodeAndUnrecognized(t *testing.T) {
 		assert.Equal(t, []string{"-c", "print('こんにちは, 🔥!')"}, cfg.Command)
 	})
 
-	// 2. Unrecognized tool triggers config.ImageNotFoundError
+	// 2. CJK-named tool path used as config key and invoked via dirty parent traversal.
+	// As per security guidelines, this must be rejected by ValidateToolName.
+	t.Run("CJK tool name in dirty relative path fails character validation", func(t *testing.T) {
+		t.Parallel()
+		mfs := &config.MockFileSystem{
+			WD: "/workspace",
+			Files: map[string][]byte{
+				"/workspace/.tools.yaml": []byte("python日本語:\n  image: python:3.11-slim"),
+			},
+		}
+
+		args := []string{"./python日本語/../python日本語", "-c", "print('こんにちは, 🔥!')"}
+		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return &runtime.MockRuntime{}, nil
+			}
+			o.exitFunc = func(code int) {}
+			o.fs = mfs
+			o.configLoader = config.NewConfigLoaderWithFS(mfs)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in tool name")
+	})
+
+	// 3. Unrecognized tool triggers config.ImageNotFoundError
 	t.Run("unrecognized tool returns ImageNotFoundError", func(t *testing.T) {
 		t.Parallel()
 		mfs := &config.MockFileSystem{
@@ -209,8 +237,9 @@ func TestUnit_Command_RapidSignals_HostCancellation(t *testing.T) {
 		close(done)
 	}()
 
-	// Wait for signal handler to capture channel
-	assert.Eventually(t, func() bool {
+	// Wait for signal handler to capture channel.
+	// Use require.Eventually to fail fast and terminate before nil dereference or sending to a nil channel.
+	require.Eventually(t, func() bool {
 		sigChanMu.Lock()
 		defer sigChanMu.Unlock()
 		return capturedSigChan != nil
