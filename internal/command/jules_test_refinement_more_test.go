@@ -137,12 +137,15 @@ func TestUnit_Command_SymlinkMode_UnicodePreservation(t *testing.T) {
 
 // docs/features/signal-handling-security.md: Early Signal Handler
 // Verifies consecutive rapid SIGINT signals trigger immediate cancellation of the host context.
+// Exercises cancellation specifically during a blocked SignalContainer call.
 func TestUnit_Command_ConsecutiveSignals_RobustHostCancellation(t *testing.T) {
 	t.Parallel()
 
 	waitChan := make(chan int)
-	mock := &julesSignalCapturingMockMore{
-		waitChan: waitChan,
+	receivedChan := make(chan struct{})
+	mock := &blockingSignalCapturingRuntime{
+		waitChan:     waitChan,
+		receivedChan: receivedChan,
 	}
 	mock.CreatedContainerID = "consecutive-signals-test"
 
@@ -187,12 +190,18 @@ func TestUnit_Command_ConsecutiveSignals_RobustHostCancellation(t *testing.T) {
 	capturedSigChan <- syscall.SIGINT
 	sigChanMu.Unlock()
 
-	// Verify first signal is forwarded to mock runtime
-	assert.Eventually(t, func() bool {
-		return slices.Contains(mock.getSignals(), "SIGINT")
-	}, 2*time.Second, 10*time.Millisecond)
+	// Wait for the mock's SignalContainer call to be entered and blocked
+	select {
+	case <-receivedChan:
+		// First signal is captured and mock is blocked inside SignalContainer
+	case <-time.After(2 * time.Second):
+		t.Fatal("SignalContainer call was not entered/blocked in time")
+	}
 
-	// Send second SIGINT rapidly to trigger immediate host cancellation
+	// Verify first signal is recorded in the mock runtime
+	assert.True(t, slices.Contains(mock.getSignals(), "SIGINT"))
+
+	// Send second SIGINT rapidly while blocked to trigger immediate host cancellation
 	sigChanMu.Lock()
 	capturedSigChan <- syscall.SIGINT
 	sigChanMu.Unlock()
@@ -207,22 +216,37 @@ func TestUnit_Command_ConsecutiveSignals_RobustHostCancellation(t *testing.T) {
 	}
 }
 
-// julesSignalCapturingMockMore is a mock runtime that records forwarded signals, scoped specifically to avoid duplicate declaration collisions.
-type julesSignalCapturingMockMore struct {
+// blockingSignalCapturingRuntime is a mock runtime that records forwarded signals and blocks,
+// scoped specifically to avoid duplicate declaration collisions.
+type blockingSignalCapturingRuntime struct {
 	runtime.MockRuntime
 	waitChan         chan int
+	receivedChan     chan struct{}
+	receivedOnce     sync.Once
 	forwardedSignals []string
 	mu               sync.Mutex
 }
 
-func (m *julesSignalCapturingMockMore) SignalContainer(ctx context.Context, containerID string, sig string) error {
+func (m *blockingSignalCapturingRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
 	m.forwardedSignals = append(m.forwardedSignals, sig)
 	m.mu.Unlock()
-	return nil
+
+	// Notify that the first signal was received and the call is blocking
+	m.receivedOnce.Do(func() {
+		close(m.receivedChan)
+	})
+
+	// Block until context is cancelled or timeout expires
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(2 * time.Second):
+		return nil
+	}
 }
 
-func (m *julesSignalCapturingMockMore) WaitContainer(ctx context.Context, containerID string) (int, error) {
+func (m *blockingSignalCapturingRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	select {
 	case code := <-m.waitChan:
 		return code, nil
@@ -231,7 +255,7 @@ func (m *julesSignalCapturingMockMore) WaitContainer(ctx context.Context, contai
 	}
 }
 
-func (m *julesSignalCapturingMockMore) getSignals() []string {
+func (m *blockingSignalCapturingRuntime) getSignals() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	sigs := make([]string, len(m.forwardedSignals))
