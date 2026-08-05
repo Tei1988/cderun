@@ -203,7 +203,7 @@ During argument preprocessing, `cderun` looks up the registration metadata of st
 
 #### Hoisting with Boolean vs. Value-Taking Overrides
 
-- **Boolean Override Flags**: Override flags acting as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not accept an argument value and are hoisted autonomously.
+- **Boolean Override Flags**: Override flags acting as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not consume a separate adjacent argument and are hoisted autonomously. However, they may accept an optional inline value using the equals-sign format (e.g., `--cderun-tty=false`).
 - **Value-Taking Override Flags**: Override flags expecting values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) consume the subsequent adjacent parameter as their value when written in the space-separated format. If a value-taking flag is followed by another `--cderun-` flag, preprocessing rejects it with a validation error to prevent parsing corruption.
 
 This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty=false`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
