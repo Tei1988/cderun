@@ -192,30 +192,28 @@ Hoisting ensures that `cderun` settings do not conflict with the flags of the to
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
 3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
 
-#### Equals-Sign Format Requirement for Value-Taking Flags
+#### Equals-Sign and Space-Separated Formats for Value-Taking Flags
 
-To ensure reliable, deterministic preprocessing without parsing ambiguity, any internal override flag (`--cderun-*`) that accepts a value **must** use the equals-sign format:
+To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`) can specify their value using either the space-separated format or the equals-sign format:
 
-- **Correct**: `--cderun-image=alpine` or `--cderun-workdir=/app`
-- **Incorrect (strictly rejected)**: `--cderun-image alpine` or `--cderun-workdir /app`
+- **Space-Separated**: `--cderun-image alpine` or `--cderun-workdir /app`
+- **Equals-Sign**: `--cderun-image=alpine` or `--cderun-workdir=/app`
 
-If a value-taking internal override flag is specified as space-separated rather than using the equals-sign format, `cderun`'s preprocessor strictly rejects it with an explicit validation error to prevent mis-hoisting or parsing corruption down the line.
+During argument preprocessing, `cderun` looks up the registration metadata of standard options. If the encountered `--cderun-` flag is registered to expect a value and is specified without an equals-sign, the preprocessor automatically consumes the next adjacent argument as its value, hoisting both arguments together.
 
 #### Hoisting with Boolean vs. Value-Taking Overrides
 
-- **Boolean Override Flags**: Override flags that act as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not accept a separate argument value. They can be hoisted autonomously without checking for following values.
-- **Value-Taking Override Flags**: Override flags that expect values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) **must** use the equals-sign (`=`) format. This prevents ambiguity during pre-processing (e.g. preventing a tool subcommand or standard argument from being mis-hoisted as the value of the override flag).
+- **Boolean Override Flags**: Override flags acting as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not consume a separate adjacent argument and are hoisted autonomously. However, they may accept an optional inline value using the equals-sign format (e.g., `--cderun-tty=false`).
+- **Value-Taking Override Flags**: Override flags expecting values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) consume the subsequent adjacent parameter as their value when written in the space-separated format. If a value-taking flag is followed by another `--cderun-` flag, preprocessing rejects it with a validation error to prevent parsing corruption.
 
-This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
+This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty=false`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
-#### Double-Dash (`--`) Delimiter Support
+#### Double-Dash (`--`) Hoisting Exemption (Not Supported)
 
-To prevent recursive hoisting for literal arguments, `cderun` respects the `--` (double-dash) delimiter. Any arguments appearing after `--` are treated as literal strings and are **not** hoisted, even if they are prefixed with `--cderun-`.
+To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT** support double-dash (`--`) for stopping or exempting arguments from hoisting:
 
-```bash
-# The '--cderun-tty' after '--' is passed literally to 'echo'
-cderun echo -- --cderun-tty
-```
+1. **No Delimiter Exemption**: The preprocessor scans the entire list of arguments after the subcommand and does not treat `--` as a barrier to halt the extraction of `--cderun-` flags.
+2. **Always Hoisted**: Any `--cderun-` prefixed flags appearing anywhere in the argument list (even after a `--` delimiter) are always hoisted to the front. This design keeps the hoisting behavior predictable and fully independent of shell-level option interpretation.
 
 ### Available Flags
 
@@ -278,7 +276,7 @@ cderun echo -- --cderun-tty
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
 - `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
-- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
+- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `error`)
 - `--log-format`: Set log format (`text`, `json`).
 - `--log-timestamp`: Include timestamp in logs. (Default: `true`)
 
@@ -315,7 +313,10 @@ Expressions can be used to inject host-context or dynamic values into options li
 #### Detailed Value Resolution and Escaping Mechanics
 
 - **Recursive Processing**: Resolving is performed recursively. If a resolved environment variable or file contents itself contain a dynamic expression, it is evaluated sequentially to prevent unexpanded parameters.
-- **Double-Brace Escaping**: To pass raw double-brace strings without triggering resolution, you can escape them by prefixing each brace with a backslash (e.g., `\{\{TEXT\}\}` which is preserved literally as `{{TEXT}}`). This provides a deterministic, unambiguous way to prevent expression evaluation.
+- **Double-Brace Escaping**: To pass raw double-brace strings without triggering resolution, you can escape them by nesting them inside an outer set of double braces:
+  - `{{ {{HOME}} }}` resolves to the literal string `{{HOME}}`
+  - `{{{{HOME}}}}` resolves to the literal string `{{HOME}}`
+  - This escaping mechanism bypasses evaluation and prevents strict resolution checks from failing on non-standard expressions.
 - **Size and Traversal Safety**: The file directive strictly limits output parsing to 1MB to prevent out-of-memory states, and strictly enforces parent-directory traversal security boundaries to prevent host environment leaks.
 
 ### 3. Tilde Expansion & Relative Path Resolution
