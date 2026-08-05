@@ -387,7 +387,7 @@ cderun --read-only alpine touch /test-write
 - **Details**:
   - **Docker / Podman**: Maps to `PidMode` in the host configuration.
   - **containerd**: Appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`.
-- **P1 Internal Override**: `--cderun-pid=<value>` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must use the equals-sign format unconditionally (e.g., `--cderun-pid=host`), and must be placed after the subcommand in Wrapper Mode.
+- **P1 Internal Override**: `--cderun-pid=<value>` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value (supporting both `--cderun-pid=host` and `--cderun-pid host`), and must be placed after the subcommand in Wrapper Mode.
 
 ```bash
 # Share host PID namespace
@@ -591,4 +591,5 @@ Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOp
 
 - **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers.
 - **Hoisting Mechanics**: During argument preprocessing, any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally.
-- **Equals-Sign Format Constraints**: All value-taking internal overrides **must** use the equals-sign format (e.g., `--cderun-image=alpine`). Supplying a value-taking override flag without an equals-sign (e.g., `--cderun-image alpine`) is strictly rejected with a preprocessing validation error to guarantee robust argument parsing.
+- **Flexible Formatting Support (Space-Separated and Equals-Sign Formats)**: All value-taking internal overrides support both space-separated (e.g., `--cderun-image alpine`) and equals-sign (e.g., `--cderun-image=alpine`) formats. The preprocessor dynamically looks up registration metadata to identify flags requiring a value. If such a flag is provided in the space-separated format, the preprocessor automatically consumes the next adjacent parameter as its value, hoisting them together. If the adjacent parameter is missing or is another override flag, preprocessing fails immediately with an explicit validation error.
+- **Double-Dash (`--`) Delimiter**: Double-dash (`--`) does **NOT** prevent hoisting of `--cderun-` prefixed flags. Any `--cderun-` flags found in the arguments list (even after a `--` delimiter) are unconditionally hoisted to ensure absolute simplicity in preprocessing.

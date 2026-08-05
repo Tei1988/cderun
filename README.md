@@ -192,30 +192,29 @@ Hoisting ensures that `cderun` settings do not conflict with the flags of the to
 2. **Extraction**: It gathers all `--cderun-` prefixed flags (and their associated values) that appear *after* the subcommand.
 3. **Internal Relocation**: These flags are moved before the subcommand internally before parsing begins.
 
-#### Equals-Sign Format Requirement for Value-Taking Flags
+#### Flexible Formatting Support (Space-Separated and Equals-Sign Formats)
 
-To ensure reliable, deterministic preprocessing without parsing ambiguity, any internal override flag (`--cderun-*`) that accepts a value **must** use the equals-sign format:
+To provide a natural, user-friendly CLI experience, internal override flags (`--cderun-*`) that expect a value (such as `--cderun-image` or `--cderun-workdir`) can specify their value using either the space-separated format or the equals-sign format:
 
-- **Correct**: `--cderun-image=alpine` or `--cderun-workdir=/app`
-- **Incorrect (strictly rejected)**: `--cderun-image alpine` or `--cderun-workdir /app`
+- **Space-Separated Format**: `--cderun-image alpine` or `--cderun-workdir /app`
+- **Equals-Sign Format**: `--cderun-image=alpine` or `--cderun-workdir=/app`
 
-If a value-taking internal override flag is specified as space-separated rather than using the equals-sign format, `cderun`'s preprocessor strictly rejects it with an explicit validation error to prevent mis-hoisting or parsing corruption down the line.
+During argument preprocessing, `cderun` looks up the registration metadata of any encountered `--cderun-` flag. If a flag is defined to expect a value (meaning it is a non-boolean standard flag) and is specified in the space-separated format, the preprocessor automatically consumes the next adjacent parameter as its value, hoisting both arguments together. If the next adjacent parameter is missing or is another `--cderun-` flag, preprocessing fails immediately with an explicit validation error (e.g. `"cderun internal override flag \"--cderun-image\" requires a value"`).
 
 #### Hoisting with Boolean vs. Value-Taking Overrides
 
-- **Boolean Override Flags**: Override flags that act as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not accept a separate argument value. They can be hoisted autonomously without checking for following values.
-- **Value-Taking Override Flags**: Override flags that expect values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) **must** use the equals-sign (`=`) format. This prevents ambiguity during pre-processing (e.g. preventing a tool subcommand or standard argument from being mis-hoisted as the value of the override flag).
+- **Boolean Override Flags**: Override flags acting as boolean toggles (such as `--cderun-read-only`, `--cderun-tty`, or `--cderun-privileged`) do not accept a separate argument value. They are hoisted autonomously without checking or consuming subsequent parameters.
+- **Value-Taking Override Flags**: Override flags expecting values (such as `--cderun-image`, `--cderun-workdir`, or `--cderun-env`) will consume the next adjacent argument as their value when written in the space-separated format. This ensures correct, unambiguous parameter hoisting before standard parsing begins.
 
 This mechanism is especially critical in **Symlink Mode (Polyglot Entry Point)**, where it allows you to configure `cderun`'s behavior (e.g., `node --cderun-tty`) without affecting the arguments passed to the wrapped tool (e.g., `node --version`).
 
-#### Double-Dash (`--`) Delimiter Support
+#### Double-Dash (`--`) Delimiter (Not Supported for Hoisting Prevention)
 
-To prevent recursive hoisting for literal arguments, `cderun` respects the `--` (double-dash) delimiter. Any arguments appearing after `--` are treated as literal strings and are **not** hoisted, even if they are prefixed with `--cderun-`.
+To simplify argument parsing and avoid semantic conflicts with shell-native and application-specific option delimiters, `cderun` does **NOT** support double-dash (`--`) for stopping or exempting arguments from hoisting.
 
-```bash
-# The '--cderun-tty' after '--' is passed literally to 'echo'
-cderun echo -- --cderun-tty
-```
+- **No Delimiter Exemption**: The argument preprocessor scans all arguments after the subcommand. It does not treat a double-dash (`--`) as a barrier to stop the extraction of `--cderun-` prefixed flags.
+- **Always Hoisted**: Any `--cderun-` prefixed flags appearing anywhere in the argument list (even after a `--` delimiter) are **always** hoisted to the front of the command as part of `cderun`'s configuration parsing.
+- **Example**: Running `cderun node app.js -- --cderun-tty` will still hoist `--cderun-tty` to the front, rather than passing it literally to the containerized tool. This ensures robust, predictable hoisting behavior that remains independent of shell-level option interpretation.
 
 ### Available Flags
 
@@ -278,7 +277,7 @@ cderun echo -- --cderun-tty
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
 - `--diagnosis-format`: Output format for diagnosis (`yaml`, `json`, `simple`).
-- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `warn`)
+- `--log-level`: Set log level (`error`, `warn`, `info`, `debug`, `trace`). (Note: `warning` is also accepted as an alias for `warn`. Default: `error`)
 - `--log-format`: Set log format (`text`, `json`).
 - `--log-timestamp`: Include timestamp in logs. (Default: `true`)
 
