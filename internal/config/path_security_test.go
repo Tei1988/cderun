@@ -477,7 +477,7 @@ func TestUnit_Config_ResolveWithFS_SecurityValidation(t *testing.T) {
 				Image: ptr("alpine"),
 				Ports: []string{"8080:80\r"},
 			},
-			wantErr: "security validation failed for ports[0]",
+			wantErr: "security validation failed for publish[0]",
 		},
 		{
 			name: "Invalid ImageName in ResolveWithFS",

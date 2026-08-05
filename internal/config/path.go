@@ -218,7 +218,7 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 		if a.Destination.IsEmpty() {
 			return fmt.Errorf("device destination is required at line %d", node.Line)
 		}
-		if a.Permissions != "" && !permsRegex.MatchString(a.Permissions) {
+		if a.Permissions != "" && !PermsRegex.MatchString(a.Permissions) {
 			return fmt.Errorf("invalid device permissions at line %d: %q", node.Line, a.Permissions)
 		}
 
@@ -354,7 +354,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	lastColon := strings.LastIndex(remainder, ":")
 	if lastColon != -1 {
 		perms := remainder[lastColon+1:]
-		if permsRegex.MatchString(perms) {
+		if PermsRegex.MatchString(perms) {
 			permissions = perms
 			containerPath = remainder[:lastColon]
 			// If there's another colon, it's malformed (we only support host:container:perms).
@@ -382,7 +382,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 
 var (
 	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
-	permsRegex  = regexp.MustCompile(`^[rwm]+$`)
+	PermsRegex  = regexp.MustCompile(`^[rwm]+$`)
 
 	hostnameRegex  = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
 	userPartRegex  = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)

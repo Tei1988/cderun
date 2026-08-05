@@ -323,10 +323,10 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			cli  CLIOptions
 		}{
 			{"entrypoint", CLIOptions{Entrypoint: []string{"ep\n"}}},
-			{"ports", CLIOptions{Ports: []string{"80\r"}}},
+			{"publish", CLIOptions{Ports: []string{"80\r"}}},
 			{"expose", CLIOptions{Expose: []string{"80\t"}}},
 			{"dns", CLIOptions{DNS: []string{"8.8.8.8\v"}}},
-			{"add-hosts", CLIOptions{AddHosts: []string{"host:ip\f"}}},
+			{"add-host", CLIOptions{AddHosts: []string{"host:ip\f"}}},
 			{"cap-add", CLIOptions{CapAdd: []string{"SYS_ADMIN\n"}}},
 			{"cap-drop", CLIOptions{CapDrop: []string{"ALL\r"}}},
 		}
