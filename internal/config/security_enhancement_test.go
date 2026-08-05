@@ -342,6 +342,107 @@ func TestUnit_Config_Resolver_SensitivePathMountWarnings(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_Loader_ConfigPathSecurity(t *testing.T) {
+	t.Parallel()
+	mfs := &MockFileSystem{WD: "/work"}
+	loader := NewConfigLoaderWithFS(mfs)
+
+	t.Run("CDERun config loading rejects path with control characters", func(t *testing.T) {
+		_, _, err := loader.LoadCDERunConfigFromPath("/etc/cderun\x01.yaml")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in configuration path")
+	})
+
+	t.Run("CDERun config loading rejects path with null bytes", func(t *testing.T) {
+		_, _, err := loader.LoadCDERunConfigFromPath("/etc/cderun\x00.yaml")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in configuration path")
+	})
+
+	t.Run("Tools config loading rejects path with control characters", func(t *testing.T) {
+		_, _, err := loader.LoadToolsConfigFromPath("/etc/tools\x01.yaml")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in configuration path")
+	})
+
+	t.Run("Tools config loading rejects path with null bytes", func(t *testing.T) {
+		_, _, err := loader.LoadToolsConfigFromPath("/etc/tools\x00.yaml")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character in configuration path")
+	})
+}
+
+func TestUnit_Config_Resolver_HighlyPrivilegedCapsWarnings(t *testing.T) {
+	mfs := &MockFileSystem{WD: "/work"}
+
+	origLevel := logging.GetGlobalLogger().GetLevel()
+	defer logging.GetGlobalLogger().SetLevel(origLevel)
+
+	origWriter := logging.GetGlobalLogger().GetWriter()
+	defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+	tests := []struct {
+		name string
+		cap  string
+	}{
+		{"SYS_CHROOT warns", "SYS_CHROOT"},
+		{"CAP_SYS_CHROOT warns", "CAP_SYS_CHROOT"},
+		{"SYS_BOOT warns", "SYS_BOOT"},
+		{"CAP_SYS_BOOT warns", "CAP_SYS_BOOT"},
+		{"SYS_TIME warns", "SYS_TIME"},
+		{"CAP_SYS_TIME warns", "CAP_SYS_TIME"},
+		{"SYSLOG warns", "SYSLOG"},
+		{"CAP_SYSLOG warns", "CAP_SYSLOG"},
+		{"DAC_OVERRIDE warns", "DAC_OVERRIDE"},
+		{"CAP_DAC_OVERRIDE warns", "CAP_DAC_OVERRIDE"},
+		{"DAC_READ_SEARCH warns", "DAC_READ_SEARCH"},
+		{"CAP_DAC_READ_SEARCH warns", "CAP_DAC_READ_SEARCH"},
+		{"LINUX_IMMUTABLE warns", "LINUX_IMMUTABLE"},
+		{"CAP_LINUX_IMMUTABLE warns", "CAP_LINUX_IMMUTABLE"},
+		{"IPC_LOCK warns", "IPC_LOCK"},
+		{"CAP_IPC_LOCK warns", "CAP_IPC_LOCK"},
+		{"IPC_OWNER warns", "IPC_OWNER"},
+		{"CAP_IPC_OWNER warns", "CAP_IPC_OWNER"},
+		{"SYS_TTY_CONFIG warns", "SYS_TTY_CONFIG"},
+		{"CAP_SYS_TTY_CONFIG warns", "CAP_SYS_TTY_CONFIG"},
+		{"LEASE warns", "LEASE"},
+		{"CAP_LEASE warns", "CAP_LEASE"},
+		{"AUDIT_CONTROL warns", "AUDIT_CONTROL"},
+		{"CAP_AUDIT_CONTROL warns", "CAP_AUDIT_CONTROL"},
+		{"MAC_ADMIN warns", "MAC_ADMIN"},
+		{"CAP_MAC_ADMIN warns", "CAP_MAC_ADMIN"},
+		{"MAC_OVERRIDE warns", "MAC_OVERRIDE"},
+		{"CAP_MAC_OVERRIDE warns", "CAP_MAC_OVERRIDE"},
+		{"BPF warns", "BPF"},
+		{"CAP_BPF warns", "CAP_BPF"},
+		{"PERFMON warns", "PERFMON"},
+		{"CAP_PERFMON warns", "CAP_PERFMON"},
+		{"CHECKPOINT_RESTORE warns", "CHECKPOINT_RESTORE"},
+		{"CAP_CHECKPOINT_RESTORE warns", "CAP_CHECKPOINT_RESTORE"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+			logging.GetGlobalLogger().SetOutput(&buf)
+			defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+			cli := &CLIOptions{
+				Image:  ptr("alpine"),
+				CapAdd: []string{tt.cap},
+			}
+
+			_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+			require.NoError(t, err)
+
+			logOutput := buf.String()
+			assert.Contains(t, logOutput, "Highly privileged capability")
+			assert.Contains(t, logOutput, tt.cap)
+		})
+	}
+}
+
 func TestUnit_Config_Expression_HardenedValidations(t *testing.T) {
 	t.Parallel()
 	mfs := &MockFileSystem{WD: "/work"}
