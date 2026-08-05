@@ -27,7 +27,7 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Empty value", "EMPTY_SECRET", "", []string{"*"}, ""},
 		{"Invalid glob pattern (fail-closed)", "SECRET", "value", []string{"["}, "[REDACTED]"},
 		// New pre-analysis cases
-		{"Literal pattern case-insensitive mismatch", "DB_PASSWORD", "secret", []string{"db_password"}, "[REDACTED]"},
+		{"Literal pattern case-insensitive match", "DB_PASSWORD", "secret", []string{"db_password"}, "[REDACTED]"},
 		{"Suffix pattern exact", "SOME_SECRET_TOKEN", "pass", []string{"*_TOKEN"}, "[REDACTED]"},
 		{"Prefix pattern exact", "SECRET_KEY_SOME", "pass", []string{"SECRET_*"}, "[REDACTED]"},
 		{"Substring pattern exact", "SOME_SECRET_KEY_SOME", "pass", []string{"*_SECRET_*"}, "[REDACTED]"},

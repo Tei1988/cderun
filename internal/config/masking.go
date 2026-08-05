@@ -142,13 +142,13 @@ type preAnalyzedPattern struct {
 
 func preAnalyzePattern(p string) preAnalyzedPattern {
 	ap := preAnalyzedPattern{
-		raw:     p,
-		isASCII: isASCII(p),
+		raw:          p,
+		upperPattern: strings.ToUpper(p),
+		isASCII:      isASCII(p),
 	}
 
 	if !ap.isASCII {
 		ap.isGlob = true
-		ap.upperPattern = strings.ToUpper(p)
 		return ap
 	}
 
@@ -177,7 +177,6 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 		return ap
 	}
 
-	ap.upperPattern = strings.ToUpper(p)
 	return ap
 }
 
@@ -204,11 +203,7 @@ func matchPreAnalyzed(key string, keyIsASCII bool, ap *preAnalyzedPattern, upper
 			*upperKey = strings.ToUpper(key)
 		}
 	}
-	upperPat := ap.upperPattern
-	if upperPat == "" {
-		upperPat = strings.ToUpper(ap.raw)
-	}
-	matched, err := path.Match(upperPat, *upperKey)
+	matched, err := path.Match(ap.upperPattern, *upperKey)
 	if err != nil {
 		return true
 	}
