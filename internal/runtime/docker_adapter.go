@@ -67,6 +67,18 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		},
 	}
 
+	if len(config.Ulimits) > 0 {
+		ulimits := make([]*dockercontainer.Ulimit, len(config.Ulimits))
+		for i, u := range config.Ulimits {
+			ulimits[i] = &dockercontainer.Ulimit{
+				Name: u.Name,
+				Hard: u.Hard,
+				Soft: u.Soft,
+			}
+		}
+		hostConfig.Resources.Ulimits = ulimits
+	}
+
 	// Handle PortBindings
 	if len(config.Ports) > 0 {
 		exposedPorts, bindings, err := nat.ParsePortSpecs(config.Ports)

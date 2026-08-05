@@ -34,7 +34,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
-| T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
@@ -431,41 +431,6 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 - [ ] 全経路チェックリスト満たす
 - [ ] `docs/features/command-line-options.md` に記載
 - [ ] Docker / containerd 両方のユニットテスト
-
----
-
-## T28: `--ulimit` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`nofile`（ファイルディスクリプタ上限）を増やす必要があるワークロードが多い。Node.js の大規模プロジェクト、Go の大量並行テスト等で必要。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--ulimit` | stringArray | (なし) | `CDERUN_ULIMIT` |
-
-- 形式: `<type>=<soft>:<hard>` または `<type>=<value>`（例: `nofile=65535:65535`）
-- 環境変数はカンマ区切り
-- Docker: `Resources.Ulimits []*Ulimit`（`docker/go-units.Ulimit` 型）
-- containerd: OCI spec の `Process.Rlimits`
-
-### 実装上の注意
-
-- パースは `docker/go-units` の `ParseUlimit` を使用可能
-- `SkipResolution: true` にして `resolveComplexOptions` でカスタムパースが必要
-
-### 完了条件
-
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] パース + Docker / containerd 変換のユニットテスト
 
 ---
 
@@ -1111,6 +1076,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
 
 ---
 

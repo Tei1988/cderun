@@ -60,6 +60,16 @@ type ContainerConfig struct {
 
 	// Supplementary groups
 	GroupAdd []string `json:"group_add,omitempty" yaml:"group_add,omitempty"`
+
+	// Resources limits (ulimits)
+	Ulimits []Ulimit `json:"ulimits,omitempty" yaml:"ulimits,omitempty"`
+}
+
+// Ulimit represents a ulimit setting for a container.
+type Ulimit struct {
+	Name string `json:"name" yaml:"name"`
+	Hard int64  `json:"hard" yaml:"hard"`
+	Soft int64  `json:"soft" yaml:"soft"`
 }
 
 // Mount represents a mount point in the container (bind, volume, or tmpfs).

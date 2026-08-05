@@ -360,6 +360,19 @@ func TestUnit_Containerd_CreateContainer_Validation(t *testing.T) {
 			_, _ = rt.CreateContainer(context.Background(), conf)
 		})
 	})
+
+	t.Run("ulimits pass validation", func(t *testing.T) {
+		conf := &container.ContainerConfig{
+			Image: "alpine",
+			Ulimits: []container.Ulimit{
+				{Name: "nofile", Soft: 1024, Hard: 2048},
+			},
+		}
+		// Expect panic because rt.client is nil in this test context
+		assert.Panics(t, func() {
+			_, _ = rt.CreateContainer(context.Background(), conf)
+		})
+	})
 }
 
 func TestUnit_Containerd_ResizeContainerTTY_Validation(t *testing.T) {

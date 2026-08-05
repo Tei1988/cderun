@@ -123,6 +123,7 @@ type rootOptions struct {
 	cpus                  float64
 	devices               []string
 	groupAdd              []string
+	ulimits               []string
 	cderunPorts           []string
 	cderunPublishAll      bool
 	cderunExpose          []string
@@ -140,6 +141,7 @@ type rootOptions struct {
 	cderunMemory          string
 	cderunCPUs            float64
 	cderunDevices         []string
+	cderunUlimits         []string
 	sensitiveEnv          []string
 	cderunSensitiveEnv    []string
 	pullMaxRetries        int
@@ -391,6 +393,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunSensitiveEnv:    o.cderunSensitiveEnv,
 		GroupAdd:              o.groupAdd,
 		CderunGroupAdd:        o.cderunGroupAdd,
+		Ulimits:               o.ulimits,
+		CderunUlimits:         o.cderunUlimits,
 	}
 
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
@@ -563,6 +567,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		CPUs:       resolved.CPUs,
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,
+		Ulimits:    resolved.Ulimits,
 	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
@@ -687,6 +692,14 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
 		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
 		_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(maskedContainerConfig.GroupAdd, ", "))
+
+		var ulimits []string
+		for _, u := range maskedContainerConfig.Ulimits {
+			ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
+		}
+		if len(ulimits) > 0 {
+			_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
+		}
 
 		var devices []string
 		for _, d := range maskedContainerConfig.Devices {

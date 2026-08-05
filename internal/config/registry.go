@@ -199,6 +199,19 @@ var StringSliceOptions = []StringSliceOption{
 		},
 	},
 	{
+		Name:      "ulimit",
+		FieldName: "Ulimits",
+		EnvKey:    "CDERUN_ULIMIT",
+		Usage:     "Set ulimits (e.g. nofile=65535:65535)",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Ulimits
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Ulimits
+		},
+		SkipResolution: true, // resolved in resolveComplexOptions
+	},
+	{
 		Name:   "entrypoint",
 		EnvKey: "CDERUN_ENTRYPOINT",
 		Usage:  "Overwrite the default ENTRYPOINT of the image",
