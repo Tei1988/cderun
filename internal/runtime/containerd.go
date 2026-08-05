@@ -391,6 +391,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 
 	if !ok {
 		creator = cio.NullIO
+		r.logger.Warn("containerd runtime: StartContainer was called before AttachContainer. Falling back to NullIO; standard I/O will be discarded.")
 	}
 
 	task, err := container.NewTask(ctx, creator)
@@ -446,10 +447,6 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	r.mu.Lock()
-	delete(r.ioWait, containerID)
-	r.mu.Unlock()
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {

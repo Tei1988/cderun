@@ -89,6 +89,36 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+func TestUnit_Containerd_RemoveContainer_DoesNotDeleteIOWait(t *testing.T) {
+	// Setup runtime with a lazy nonexistent socket to avoid grpc panics on calls
+	rt, err := NewContainerdRuntime("/tmp/nonexistent-containerd.sock")
+	require.NoError(t, err)
+	defer rt.Close()
+
+	waitC := make(chan error, 1)
+	rt.mu.Lock()
+	rt.ioWait["test-container-id"] = waitC
+	rt.mu.Unlock()
+
+	// Calling RemoveContainer will fail to load the container over the fake socket connection,
+	// but it must NOT delete the ioWait map entry beforehand.
+	_ = rt.RemoveContainer(context.Background(), "test-container-id")
+
+	rt.mu.RLock()
+	_, ok := rt.ioWait["test-container-id"]
+	rt.mu.RUnlock()
+	assert.True(t, ok, "ioWait entry should still exist in the map after RemoveContainer call")
+
+	// Verify that notifying wait still works (the notify is not lost)
+	rt.notifyWait("test-container-id", nil)
+	select {
+	case err := <-waitC:
+		assert.NoError(t, err)
+	default:
+		t.Fatal("notifyWait did not successfully unblock the channel")
+	}
+}
+
 func TestUnit_Containerd_ValidateConfig(t *testing.T) {
 	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 
