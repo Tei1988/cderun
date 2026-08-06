@@ -810,6 +810,38 @@ func TestUnit_Config_ValidateNetworkName(t *testing.T) {
 	}
 }
 
+func TestUnit_Config_ValidateSecurityOpt(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"Empty security opt", "", false},
+		{"no-new-privileges", "no-new-privileges", false},
+		{"no-new-privileges with value", "no-new-privileges=true", false},
+		{"no-new-privileges with colon value", "no-new-privileges:true", false},
+		{"seccomp unconfined", "seccomp=unconfined", false},
+		{"seccomp profile path", "seccomp=/path/to/profile.json", false},
+		{"apparmor profile", "apparmor=unconfined", false},
+		{"apparmor profile with at", "apparmor=profile@name", false},
+		{"Invalid character spaces", "no-new-privileges spaces", true},
+		{"Invalid character dollar", "no-new-privileges$", true},
+		{"Invalid character null byte", "no-new-privileges\x00", true},
+		{"Invalid control character", "no-new-privileges\n", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSecurityOpt(tt.input)
+			if tt.wantErr {
+				require.Error(t, err, "input: %q", tt.input)
+			} else {
+				require.NoError(t, err, "input: %q", tt.input)
+			}
+		})
+	}
+}
+
 func TestUnit_Config_ValidateUserName(t *testing.T) {
 	tests := []struct {
 		name    string

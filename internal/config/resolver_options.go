@@ -113,6 +113,9 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		case "entrypoint":
 			p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
 			fastPathUsed = true
+		case "security-opt":
+			p1v, p2v = rv.cli.CderunSecurityOpt, rv.cli.SecurityOpt
+			fastPathUsed = true
 		}
 	}
 
@@ -145,6 +148,8 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 			rv.res.CapDrop = resolved
 		case "entrypoint":
 			rv.res.Entrypoint = resolved
+		case "security-opt":
+			rv.res.SecurityOpt = resolved
 		}
 		return nil
 	}

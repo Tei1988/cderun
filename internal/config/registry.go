@@ -228,6 +228,18 @@ var StringSliceOptions = []StringSliceOption{
 		},
 		SkipResolution: true, // resolved early in resolveEarly
 	},
+	{
+		Name:      "security-opt",
+		FieldName: "SecurityOpt",
+		EnvKey:    "CDERUN_SECURITY_OPT",
+		Usage:     "Security Options",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.SecurityOpt
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.SecurityOpt
+		},
+	},
 }
 
 var StringOptions = []StringOption{

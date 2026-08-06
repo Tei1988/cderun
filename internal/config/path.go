@@ -907,6 +907,32 @@ func ValidateAddHost(s string) error {
 	return nil
 }
 
+// ValidatePathChars ensures the string does not contain ASCII control characters (exported).
+func ValidatePathChars(s string) error {
+	return validatePathChars(s)
+}
+
+// ValidateSecurityOpt ensures the security option follows a safe format.
+func ValidateSecurityOpt(s string) error {
+	if s == "" {
+		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		isValid := (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			c == '=' || c == ':' || c == '_' || c == '-' || c == '/' || c == '.' || c == '@' || c == ','
+		if !isValid {
+			return fmt.Errorf("invalid security option format: %q", s)
+		}
+	}
+	return nil
+}
+
 // ValidateCapability ensures the Linux capability follows a safe format.
 func ValidateCapability(s string) error {
 	if s == "" {

@@ -60,6 +60,9 @@ type ContainerConfig struct {
 
 	// Supplementary groups
 	GroupAdd []string `json:"group_add,omitempty" yaml:"group_add,omitempty"`
+
+	// Security options
+	SecurityOpt []string `json:"security_opt,omitempty" yaml:"security_opt,omitempty"`
 }
 
 // Mount represents a mount point in the container (bind, volume, or tmpfs).

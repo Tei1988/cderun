@@ -341,6 +341,9 @@ func (rv *resolver) validateSlices() error {
 	if err := validateSliceElements(rv.res.SensitiveEnv, "sensitive-env", sensitiveEnvValidator); err != nil {
 		return err
 	}
+	if err := validateSliceElements(rv.res.SecurityOpt, "security-opt", ValidateSecurityOpt); err != nil {
+		return err
+	}
 
 	return nil
 }
