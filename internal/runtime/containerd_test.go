@@ -89,6 +89,39 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+func TestUnit_Containerd_SignalContainer_Validation(t *testing.T) {
+	rt := &ContainerdRuntime{}
+
+	invalidTests := []string{
+		"-9",
+		"SIGTERM; rm -rf /",
+		"SIGTERM\n",
+	}
+
+	for _, sig := range invalidTests {
+		t.Run(sig, func(t *testing.T) {
+			err := rt.SignalContainer(context.Background(), "test-id", sig)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid signal")
+		})
+	}
+
+	validTests := []string{
+		"SIGTERM",
+		"TERM",
+		"9",
+		"15",
+		"SIGINVALID",
+	}
+	for _, sig := range validTests {
+		t.Run("Valid:"+sig, func(t *testing.T) {
+			assert.Panics(t, func() {
+				_ = rt.SignalContainer(context.Background(), "test-id", sig)
+			})
+		})
+	}
+}
+
 func TestUnit_Containerd_ValidateConfig(t *testing.T) {
 	rt := &ContainerdRuntime{logger: logging.GetGlobalLogger()}
 

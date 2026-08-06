@@ -228,6 +228,37 @@ func TestUnit_Config_Resolver_PrivilegedCapWarnings_NonPrivileged(t *testing.T) 
 		assert.Contains(t, logOutput, "SYS_ADMIN")
 		assert.NotContains(t, logOutput, "Container is running in privileged mode")
 	})
+
+	t.Run("expanded highly privileged capabilities trigger warnings", func(t *testing.T) {
+		capsToTest := []string{
+			"SYS_CHROOT", "SYS_BOOT", "SYS_TIME", "SYSLOG",
+			"DAC_OVERRIDE", "DAC_READ_SEARCH", "LINUX_IMMUTABLE",
+			"IPC_LOCK", "IPC_OWNER", "SYS_TTY_CONFIG", "LEASE",
+			"AUDIT_CONTROL", "MAC_ADMIN", "MAC_OVERRIDE", "BPF",
+			"PERFMON", "CHECKPOINT_RESTORE", "SYS_NICE", "SYS_RESOURCE",
+		}
+		for _, capName := range capsToTest {
+			t.Run(capName, func(t *testing.T) {
+				var buf bytes.Buffer
+				logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+				logging.GetGlobalLogger().SetOutput(&buf)
+				defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+				cli := &CLIOptions{
+					Image:      ptr("alpine"),
+					Privileged: ptr(false),
+					CapAdd:     []string{capName},
+				}
+
+				_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+				require.NoError(t, err)
+
+				logOutput := buf.String()
+				assert.Contains(t, logOutput, "Highly privileged capability")
+				assert.Contains(t, logOutput, capName)
+			})
+		}
+	})
 }
 
 func TestUnit_Config_Resolver_EnvNullByteSecurity(t *testing.T) {
