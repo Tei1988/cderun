@@ -56,6 +56,8 @@ func TestUnit_Containerd_NotifyWait(t *testing.T) {
 	rt.notifyWait("unknown", err)
 }
 
+// TestUnit_Containerd_ParseSignal verifies signal support validation (distinguishing it from format validation).
+// Supported names are successfully mapped, while unsupported names like "SIGINVALID" are rejected.
 func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	tests := []struct {
 		sig     string
@@ -89,6 +91,8 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+// TestUnit_Containerd_SignalContainer_Validation verifies the format validation layer using signalRegex.
+// This is decoupled from signal support, checking format correctness without calling the daemon/client.
 func TestUnit_Containerd_SignalContainer_Validation(t *testing.T) {
 	rt := &ContainerdRuntime{}
 
@@ -99,25 +103,28 @@ func TestUnit_Containerd_SignalContainer_Validation(t *testing.T) {
 	}
 
 	for _, sig := range invalidTests {
-		t.Run(sig, func(t *testing.T) {
+		t.Run("Invalid:"+sig, func(t *testing.T) {
+			// Direct regex validation check
+			assert.False(t, signalRegex.MatchString(sig), "Format should be rejected by signalRegex: %q", sig)
+
+			// SignalContainer verification check
 			err := rt.SignalContainer(context.Background(), "test-id", sig)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "invalid signal")
 		})
 	}
 
-	validTests := []string{
+	acceptedFormatTests := []string{
 		"SIGTERM",
 		"TERM",
 		"9",
 		"15",
 		"SIGINVALID",
 	}
-	for _, sig := range validTests {
-		t.Run("Valid:"+sig, func(t *testing.T) {
-			assert.Panics(t, func() {
-				_ = rt.SignalContainer(context.Background(), "test-id", sig)
-			})
+	for _, sig := range acceptedFormatTests {
+		t.Run("AcceptedFormat:"+sig, func(t *testing.T) {
+			// Direct regex validation check
+			assert.True(t, signalRegex.MatchString(sig), "Format should be accepted by signalRegex: %q", sig)
 		})
 	}
 }
