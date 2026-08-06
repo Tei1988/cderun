@@ -1233,3 +1233,19 @@ func TestUnit_Docker_CreateContainer_ReadOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, mock.createHostConfig.ReadonlyRootfs)
 }
+
+func TestUnit_Docker_CreateContainer_Init(t *testing.T) {
+	t.Parallel()
+
+	mock := &mockDockerClient{}
+	runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+
+	config := &container.ContainerConfig{
+		Image: "test-image",
+		Init:  true,
+	}
+
+	_, err := runtime.CreateContainer(context.Background(), config)
+	require.NoError(t, err)
+	assert.True(t, *mock.createHostConfig.Init)
+}

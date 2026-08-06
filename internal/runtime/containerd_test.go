@@ -240,6 +240,13 @@ func TestUnit_Containerd_ValidateConfig(t *testing.T) {
 			errContains: "volume mount type is not supported",
 		},
 		{
+			name: "init process",
+			cfg: &container.ContainerConfig{
+				Init: true,
+			},
+			errContains: "containerd runtime: init is not supported yet",
+		},
+		{
 			name: "non-numeric group add",
 			cfg: &container.ContainerConfig{
 				GroupAdd: []string{"admin"},

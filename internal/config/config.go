@@ -58,6 +58,7 @@ type ConfigDefaults struct {
 	Remove          *bool          `yaml:"remove,omitempty"`
 	StrictEnv       *bool          `yaml:"strictEnv,omitempty"`
 	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
+	Init            *bool          `yaml:"init,omitempty"`
 	Workdir         string         `yaml:"workdir,omitempty"`
 	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
 	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
@@ -101,6 +102,7 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.Remove = copyBoolPtr(d.Remove)
 	res.StrictEnv = copyBoolPtr(d.StrictEnv)
 	res.ReadOnly = copyBoolPtr(d.ReadOnly)
+	res.Init = copyBoolPtr(d.Init)
 	res.MountSocket = copyBoolPtr(d.MountSocket)
 	res.MountCderun = copyBoolPtr(d.MountCderun)
 	res.MountAllTools = copyBoolPtr(d.MountAllTools)
@@ -197,6 +199,7 @@ type ToolConfig struct {
 	Remove          *bool          `yaml:"remove,omitempty"`
 	StrictEnv       *bool          `yaml:"strictEnv,omitempty"`
 	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
+	Init            *bool          `yaml:"init,omitempty"`
 	Workdir         string         `yaml:"workdir,omitempty"`
 	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
 	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
@@ -243,6 +246,7 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.Remove = copyBoolPtr(t.Remove)
 	res.StrictEnv = copyBoolPtr(t.StrictEnv)
 	res.ReadOnly = copyBoolPtr(t.ReadOnly)
+	res.Init = copyBoolPtr(t.Init)
 	res.MountSocket = copyBoolPtr(t.MountSocket)
 	res.MountCderun = copyBoolPtr(t.MountCderun)
 	res.MountAllTools = copyBoolPtr(t.MountAllTools)

@@ -59,12 +59,14 @@ type rootOptions struct {
 	image                 string
 	remove                bool
 	readOnly              bool
+	initFlag              bool
 	cderunTTY             bool
 	cderunInteractive     bool
 	cderunImage           string
 	cderunNetwork         string
 	cderunRemove          bool
 	cderunReadOnly        bool
+	cderunInit            bool
 	cderunRuntime         string
 	cderunSocketPath      string
 	cderunMountSocket     bool
@@ -306,6 +308,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunRemove:          opt(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
 		ReadOnly:              opt(cmd.Flags().Changed("read-only"), o.readOnly),
 		CderunReadOnly:        opt(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
+		Init:                  opt(cmd.Flags().Changed("init"), o.initFlag),
+		CderunInit:            opt(cmd.Flags().Changed("cderun-init"), o.cderunInit),
 		CderunTTY:             opt(cmd.Flags().Changed("cderun-tty"), o.cderunTTY),
 		CderunInteractive:     opt(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
 		CderunImage:           opt(cmd.Flags().Changed("cderun-image"), o.cderunImage),
@@ -541,6 +545,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Network:     resolved.Network,
 		Remove:      resolved.Remove,
 		ReadOnly:    resolved.ReadOnly,
+		Init:        resolved.Init,
 		Mounts:      resolved.Mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
@@ -658,6 +663,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
 		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
 		_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", maskedContainerConfig.ReadOnly)
+		_, _ = fmt.Fprintf(w, "Init: %v\n", maskedContainerConfig.Init)
 		var mounts []string
 		for _, m := range maskedContainerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))

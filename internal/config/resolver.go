@@ -22,6 +22,7 @@ type ResolvedConfig struct {
 	Network         string
 	Remove          bool
 	ReadOnly        bool
+	Init            bool
 	Mounts          []container.Mount
 	Env             []string
 	Workdir         string
@@ -74,12 +75,14 @@ type CLIOptions struct {
 	Network               *string
 	Remove                *bool
 	ReadOnly              *bool
+	Init                  *bool
 	CderunTTY             *bool
 	CderunInteractive     *bool
 	CderunImage           *string
 	CderunNetwork         *string
 	CderunRemove          *bool
 	CderunReadOnly        *bool
+	CderunInit            *bool
 	Runtime               *string
 	CderunRuntime         *string
 	SocketPath            *string

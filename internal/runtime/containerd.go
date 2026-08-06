@@ -129,6 +129,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: non-finite CPU limit %f is not supported", config.CPUs)
 	}
 
+	if config.Init {
+		return fmt.Errorf("containerd runtime: init is not supported yet")
+	}
+
 	if config.Memory < 0 {
 		return fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}

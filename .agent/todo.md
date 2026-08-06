@@ -31,7 +31,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -369,39 +369,6 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 - [ ] 全経路チェックリスト満たす
 - [ ] `docs/features/command-line-options.md` に記載
 - [ ] Docker / containerd 両方のユニットテスト
-
----
-
-## T25: `--init` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-コンテナの PID 1 問題。`--init` なしだとシグナルがアプリに届かずゾンビプロセスが残る場合がある。特に `cderun` はシグナルフォワーディングを行うが、コンテナ内プロセスが PID 1 としてシグナルを適切にハンドリングしない場合に問題になる。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--init` | bool | `false` | `CDERUN_INIT` |
-
-- Docker: `HostConfig.Init *bool`
-- containerd: tini 等の init バイナリをコンテナに注入する機構が必要。containerd 単体では直接サポートしないため、エラーまたは警告とする設計判断が必要
-
-### 実装上の注意
-
-- containerd での対応方針を設計時に決定すること（エラーにする / 警告のみ / tini バイナリマウント）
-
-### 完了条件
-
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker: `HostConfig.Init` に渡るテスト
-- [ ] containerd: 設計決定に基づいた挙動のテスト
 
 ---
 
@@ -1091,6 +1058,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--init` and `--cderun-init` flags, showing their default of `false` and mapped environment variable `CDERUN_INIT`.
 
 ---
 

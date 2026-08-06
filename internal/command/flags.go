@@ -196,6 +196,8 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 		return &o.remove, &o.cderunRemove
 	case "read-only":
 		return &o.readOnly, &o.cderunReadOnly
+	case "init":
+		return &o.initFlag, &o.cderunInit
 	case "publish-all":
 		return &o.publishAll, &o.cderunPublishAll
 	case "privileged":
