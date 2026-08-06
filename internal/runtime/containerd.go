@@ -470,6 +470,10 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 }
 
 func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if sig != "" && !signalRegex.MatchString(sig) {
+		return fmt.Errorf("invalid signal: %q", sig)
+	}
+
 	container, err := r.client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return err

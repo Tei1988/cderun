@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/containerd/errdefs"
 )
+
+var signalRegex = regexp.MustCompile(`^(?i)[A-Z0-9]+$`)
 
 // IsRetryablePullError returns true if the error from a pull operation is likely transient and worth retrying.
 func IsRetryablePullError(err error) bool {
