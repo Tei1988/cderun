@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMaskSensitiveEnv(t *testing.T) {
@@ -25,6 +26,13 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"No match", "SAFE_VAR", "value", []string{"*_PASSWORD"}, "value"},
 		{"Empty value", "EMPTY_SECRET", "", []string{"*"}, ""},
 		{"Invalid glob pattern (fail-closed)", "SECRET", "value", []string{"["}, "[REDACTED]"},
+		// New pre-analysis cases
+		{"Literal pattern case-insensitive match", "DB_PASSWORD", "secret", []string{"db_password"}, "[REDACTED]"},
+		{"Suffix pattern exact", "SOME_SECRET_TOKEN", "pass", []string{"*_TOKEN"}, "[REDACTED]"},
+		{"Prefix pattern exact", "SECRET_KEY_SOME", "pass", []string{"SECRET_*"}, "[REDACTED]"},
+		{"Substring pattern exact", "SOME_SECRET_KEY_SOME", "pass", []string{"*_SECRET_*"}, "[REDACTED]"},
+		{"Non-ASCII pattern fallback", "SECRET", "pass", []string{"SEC★"}, "pass"},
+		{"Unicode key matching patterns", "SEC★RET", "pass", []string{"SEC★RET"}, "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
@@ -55,6 +63,14 @@ func TestMaskSensitiveEnvList(t *testing.T) {
 		expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
 		got := MaskSensitiveEnvList(env, []string{"*_PASSWORD"})
 		assert.Equal(t, expected, got)
+	})
+
+	t.Run("Lazy allocation - nothing masked", func(t *testing.T) {
+		// If nothing is masked, returned slice must be identical to input (same pointer/address)
+		got := MaskSensitiveEnvList(env, []string{"NON_EXISTENT_PATTERN"})
+		assert.Equal(t, env, got)
+		// Check that the underlying slice is exactly the same
+		assert.Same(t, &env[0], &got[0])
 	})
 
 	// Verify non-destructive behavior
