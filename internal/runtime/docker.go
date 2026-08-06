@@ -390,16 +390,23 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		if sErr != nil {
 			d.logger.Trace("AttachContainer: stdin goroutine finished with error, draining output with grace period")
 			drainCtx, drainCancel := context.WithCancel(ctx)
-			timerChan := make(chan struct{})
+			sleepErrChan := make(chan error, 1)
 			go func() {
-				_ = d.sleepFunc(drainCtx, d.attachCloseWriteGrace)
-				close(timerChan)
+				sleepErrChan <- d.sleepFunc(drainCtx, d.attachCloseWriteGrace)
 			}()
 			select {
 			case <-outputDone:
 				d.logger.Trace("AttachContainer: output finished during stdin error drain grace period")
-			case <-timerChan:
-				d.logger.Trace("AttachContainer: drain grace period expired")
+			case sErrSleep := <-sleepErrChan:
+				if ctx.Err() != nil {
+					drainCancel()
+					return ctx.Err()
+				}
+				if sErrSleep != nil && !errors.Is(sErrSleep, context.Canceled) {
+					d.logger.Warn("AttachContainer: drain sleep failed: %v", sErrSleep)
+				} else {
+					d.logger.Trace("AttachContainer: drain grace period expired")
+				}
 			case <-ctx.Done():
 				drainCancel()
 				return ctx.Err()

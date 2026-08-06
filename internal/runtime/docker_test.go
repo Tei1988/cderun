@@ -1067,6 +1067,9 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 	})
 
 	t.Run("stdin error drains output during grace period", func(t *testing.T) {
+		// @jules: This test ensures that when a stdin error occurs, the output produced
+		// before or during the error is successfully copied and drained during the
+		// grace period, rather than being abruptly discarded.
 		conn := &mockConn{}
 		pr, pw := io.Pipe()
 		mock := &mockDockerClient{
@@ -1076,6 +1079,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 			},
 		}
 
+		drainStarted := make(chan struct{})
 		var slept atomic.Bool
 		runtime := &DockerRuntime{
 			logger:                logging.GetGlobalLogger(),
@@ -1083,8 +1087,13 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 			attachCloseWriteGrace: 50 * time.Millisecond,
 			sleepFunc: func(ctx context.Context, d time.Duration) error {
 				slept.Store(true)
-				time.Sleep(d)
-				return nil
+				close(drainStarted)
+				select {
+				case <-time.After(d):
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			},
 		}
 
@@ -1093,8 +1102,8 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 
 		go func() {
 			<-ready
-			// Wait for stdin failing reader to trigger stdin error
-			<-started
+			// Wait for the drain phase to start
+			<-drainStarted
 			// Write some output during the drain phase
 			_, _ = pw.Write([]byte("remaining output data"))
 			_ = pw.Close()
