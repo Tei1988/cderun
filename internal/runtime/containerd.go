@@ -187,6 +187,15 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			continue
 		}
 		if strings.HasPrefix(opt, "apparmor=") || strings.HasPrefix(opt, "apparmor:") {
+			var profile string
+			if strings.HasPrefix(opt, "apparmor=") {
+				profile = strings.TrimPrefix(opt, "apparmor=")
+			} else {
+				profile = strings.TrimPrefix(opt, "apparmor:")
+			}
+			if profile == "" {
+				return fmt.Errorf("containerd runtime: security option %q has an empty AppArmor profile", opt)
+			}
 			continue
 		}
 		return fmt.Errorf("containerd runtime: security option %q is not supported yet", opt)
@@ -375,24 +384,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	if len(config.SecurityOpt) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-			if s.Process == nil {
-				s.Process = &specs.Process{}
-			}
-			for _, opt := range config.SecurityOpt {
-				if opt == "no-new-privileges" || opt == "no-new-privileges:true" || opt == "no-new-privileges=true" {
-					s.Process.NoNewPrivileges = true
-				} else if opt == "no-new-privileges:false" || opt == "no-new-privileges=false" {
-					s.Process.NoNewPrivileges = false
-				} else if opt == "seccomp=unconfined" || opt == "seccomp:unconfined" {
-					if s.Linux != nil {
-						s.Linux.Seccomp = nil
-					}
-				} else if strings.HasPrefix(opt, "apparmor=") {
-					s.Process.ApparmorProfile = strings.TrimPrefix(opt, "apparmor=")
-				} else if strings.HasPrefix(opt, "apparmor:") {
-					s.Process.ApparmorProfile = strings.TrimPrefix(opt, "apparmor:")
-				}
-			}
+			applySecurityOptions(s, config.SecurityOpt)
 			return nil
 		})
 	}
@@ -719,4 +711,28 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 		args = append(args, config.Command...)
 	}
 	return args, nil
+}
+
+// applySecurityOptions applies config.SecurityOpt to specs.Spec.
+// @jules
+func applySecurityOptions(s *specs.Spec, opts []string) {
+	if s.Process == nil {
+		s.Process = &specs.Process{}
+	}
+	for _, opt := range opts {
+		if opt == "no-new-privileges" || opt == "no-new-privileges:true" || opt == "no-new-privileges=true" {
+			s.Process.NoNewPrivileges = true
+		} else if opt == "no-new-privileges:false" || opt == "no-new-privileges=false" {
+			s.Process.NoNewPrivileges = false
+		} else if opt == "seccomp=unconfined" || opt == "seccomp:unconfined" {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			s.Linux.Seccomp = nil
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor="); ok {
+			s.Process.ApparmorProfile = profile
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor:"); ok {
+			s.Process.ApparmorProfile = profile
+		}
+	}
 }
