@@ -714,7 +714,6 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 }
 
 // applySecurityOptions applies config.SecurityOpt to specs.Spec.
-// @jules
 func applySecurityOptions(s *specs.Spec, opts []string) {
 	if s.Process == nil {
 		s.Process = &specs.Process{}
