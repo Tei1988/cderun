@@ -67,7 +67,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T58 | ランタイム自動検出が substring マッチで誤検出し得る | 改善 | 低 | 小 | - | DONE |
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | DONE |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | DONE |
-| T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | - |
+| T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | DONE |
 | T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | - |
@@ -908,26 +908,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 ### 完了条件
 
 - T81にて完全に置換・解決済み。
-
----
-
-## T61: Docker attach: stdin エラー時に出力を drain せず切断する
-
-- 種別: 改善
-- 優先度: 低
-- 対象: `internal/runtime/docker.go:351-358`
-
-### 問題
-
-`<-stdinDone` 分岐で stdin エラーがあると即 return し、deferred `resp.Close()` が出力コピーを途中で殺すため、stdin 失敗前後にコンテナが出力したデータが失われ得る。
-
-### 方針
-
-stdin エラー時も短い猶予（既存の `attachCloseWriteGrace` パターン）で `outputDone` を drain してから stdin エラーを返す。
-
-### 完了条件
-
-- stdin エラー発生時に直前のコンテナ出力が失われないテスト
 
 ---
 

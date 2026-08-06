@@ -1065,6 +1065,48 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "output failed")
 	})
+
+	t.Run("stdin error drains output during grace period", func(t *testing.T) {
+		conn := &mockConn{}
+		pr, pw := io.Pipe()
+		mock := &mockDockerClient{
+			attachResp: types.HijackedResponse{
+				Conn:   conn,
+				Reader: bufio.NewReader(pr),
+			},
+		}
+
+		var slept atomic.Bool
+		runtime := &DockerRuntime{
+			logger:                logging.GetGlobalLogger(),
+			client:                mock,
+			attachCloseWriteGrace: 50 * time.Millisecond,
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				slept.Store(true)
+				time.Sleep(d)
+				return nil
+			},
+		}
+
+		started := make(chan struct{})
+		ready := make(chan struct{})
+
+		go func() {
+			<-ready
+			// Wait for stdin failing reader to trigger stdin error
+			<-started
+			// Write some output during the drain phase
+			_, _ = pw.Write([]byte("remaining output data"))
+			_ = pw.Close()
+		}()
+
+		var stdout bytes.Buffer
+		err := runtime.AttachContainer(context.Background(), "id", true, &syncFailingReader{started: started}, &stdout, io.Discard, ready)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "read error")
+		assert.True(t, slept.Load(), "should have triggered a sleep during output drain")
+		assert.Equal(t, "remaining output data", stdout.String(), "should have drained remaining output")
+	})
 }
 
 func TestUnit_Docker_Close(t *testing.T) {
