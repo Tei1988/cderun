@@ -67,6 +67,17 @@ func TestUnit_Config_Resolver_MountTargetTraversalSecurity(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "mount target is required")
 	})
+
+	t.Run("Mount source with empty path is rejected for bind type", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:  ptr("alpine"),
+			Mounts: []string{"type=bind,source=,target=/app"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "source path cannot be empty for bind mount")
+	})
 }
 
 func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
@@ -126,6 +137,39 @@ func TestUnit_Config_Resolver_DeviceDestinationTraversalSecurity(t *testing.T) {
 
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
+	})
+
+	t.Run("Device source with empty path is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{":/dev/sda"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid device config")
+	})
+
+	t.Run("Device source with traversal segments is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/../sda:/dev/sda"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device source cannot contain parent directory references")
+	})
+
+	t.Run("Device source with Windows-style traversal segments is rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Devices: []string{"/dev/..\\sda:/dev/sda"},
+		}
+
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device source cannot contain parent directory references")
 	})
 }
 

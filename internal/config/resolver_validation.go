@@ -410,6 +410,9 @@ func (rv *resolver) validateMountSecurity() error {
 		if err := validateContainerPath(m.Target, "mounts", i, "target", "target"); err != nil {
 			return err
 		}
+		if (m.Type == "bind" || m.Type == "") && m.Source == "" {
+			return fmt.Errorf("security validation failed for mounts[%d] (source): source path cannot be empty for bind mount", i)
+		}
 	}
 	return nil
 }
@@ -424,6 +427,12 @@ func (rv *resolver) validateDeviceSecurity() error {
 		}
 		if err := validateContainerPath(d.PathInContainer, "devices", i, "path-in-container", "destination"); err != nil {
 			return err
+		}
+		if d.PathOnHost == "" {
+			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): host path cannot be empty", i)
+		}
+		if HasParentTraversal(d.PathOnHost) {
+			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): host path cannot contain parent directory references: %q", i, d.PathOnHost)
 		}
 		if d.CgroupPermissions != "" {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
