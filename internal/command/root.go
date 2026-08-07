@@ -869,11 +869,11 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 				if forwardImmediate && activeRt != nil {
 					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
-					go func(s string, r runtime.ContainerRuntime, id string) {
-						if err := r.SignalContainer(ctx, id, s); err != nil {
-							o.logger.Warn("failed to forward signal %s: %v", s, err)
+					go func(signalName string, containerRuntime runtime.ContainerRuntime, containerID string) {
+						if err := containerRuntime.SignalContainer(ctxG, containerID, signalName); err != nil {
+							o.logger.Warn("failed to forward signal %s: %v", signalName, err)
 						} else {
-							o.logger.Debug("Successfully forwarded signal %s to container %s", s, id)
+							o.logger.Debug("Successfully forwarded signal %s to container %s", signalName, containerID)
 						}
 					}(sigName, activeRt, activeID)
 				}
