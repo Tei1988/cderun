@@ -260,6 +260,10 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if HasParentTraversal(dc.Destination.Raw) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", dc.Destination.Raw)
 	}
+	// Prevent parent directory references in device source raw inputs to avoid obfuscation/traversal
+	if HasParentTraversal(dc.Source.Raw) {
+		return container.DeviceMapping{}, fmt.Errorf("device source cannot contain parent directory references: %q", dc.Source.Raw)
+	}
 
 	host, err := dc.Source.Resolve(r)
 	if err != nil {
