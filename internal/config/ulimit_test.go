@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	t.Run("resolve ulimits from CLI (P2)", func(t *testing.T) {
 		res, err := resolveUlimits(nil, []string{"nofile=1024:2048", "nproc=4096"}, "", nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Len(t, res, 2)
+		require.Len(t, res, 2)
 		assert.Equal(t, "nofile", res[0].Name)
 		assert.Equal(t, int64(2048), res[0].Hard)
 		assert.Equal(t, int64(1024), res[0].Soft)
@@ -28,7 +27,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	t.Run("resolve ulimits from CLI override (P1 overrides P2)", func(t *testing.T) {
 		res, err := resolveUlimits([]string{"nofile=512:1024"}, []string{"nofile=1024:2048"}, "", nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Len(t, res, 1)
+		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
 		assert.Equal(t, int64(1024), res[0].Hard)
 		assert.Equal(t, int64(512), res[0].Soft)
@@ -42,7 +41,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 
 		res, err := resolveUlimits(nil, nil, "", nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Len(t, res, 2)
+		require.Len(t, res, 2)
 		assert.Equal(t, "nofile", res[0].Name)
 		assert.Equal(t, "nproc", res[1].Name)
 	})
@@ -56,7 +55,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 
 		res, err := resolveUlimits(nil, nil, "node", tools, nil, mfs)
 		require.NoError(t, err)
-		assert.Len(t, res, 1)
+		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
 		assert.Equal(t, int64(4096), res[0].Hard)
 		assert.Equal(t, int64(2048), res[0].Soft)
@@ -71,7 +70,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 
 		res, err := resolveUlimits(nil, nil, "sh", nil, global, mfs)
 		require.NoError(t, err)
-		assert.Len(t, res, 1)
+		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
 		assert.Equal(t, int64(8192), res[0].Hard)
 		assert.Equal(t, int64(4096), res[0].Soft)
@@ -81,7 +80,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 		_, err := resolveUlimits(nil, []string{"invalid-format"}, "", nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
-		require.True(t, errors.As(err, &cfgErr))
+		require.ErrorAs(t, err, &cfgErr)
 		assert.Equal(t, "ulimit", cfgErr.Field)
 		assert.Equal(t, "invalid-format", cfgErr.Value)
 	})
@@ -90,7 +89,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 		_, err := resolveUlimits(nil, []string{"nofile=-2:1024"}, "", nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
-		require.True(t, errors.As(err, &cfgErr))
+		require.ErrorAs(t, err, &cfgErr)
 		assert.Equal(t, "ulimit", cfgErr.Field)
 		assert.Equal(t, "nofile=-2:1024", cfgErr.Value)
 		assert.Contains(t, cfgErr.Err.Error(), "limit values must be at least -1")
