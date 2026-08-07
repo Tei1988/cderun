@@ -38,7 +38,7 @@ func TestIntegration_Command_Ulimits(t *testing.T) {
 		require.NoError(t, err)
 		cfg := mockRt.GetCreatedConfig()
 		require.NotNil(t, cfg)
-		assert.Len(t, cfg.Ulimits, 1)
+		require.Len(t, cfg.Ulimits, 1)
 		assert.Equal(t, "nofile", cfg.Ulimits[0].Name)
 		assert.Equal(t, int64(1024), cfg.Ulimits[0].Soft)
 		assert.Equal(t, int64(2048), cfg.Ulimits[0].Hard)

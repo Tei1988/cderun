@@ -53,6 +53,9 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		if err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
 		}
+		if parsed.Hard < -1 || parsed.Soft < -1 {
+			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: fmt.Errorf("limit values must be at least -1")}
+		}
 		res = append(res, container.Ulimit{
 			Name: parsed.Name,
 			Hard: parsed.Hard,
