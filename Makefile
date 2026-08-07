@@ -10,6 +10,7 @@ LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
 generate:
 	@echo "Generating option structures..."
 	@go generate ./...
+	@git diff --exit-code internal/config/cli_options.gen.go internal/command/root_flags.gen.go || (echo "Error: Generated option files differ from committed state. Please run 'make generate' and commit the updated files." && exit 1)
 
 .PHONY: test
 test: generate
