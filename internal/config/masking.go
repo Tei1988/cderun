@@ -3,6 +3,7 @@ package config
 import (
 	"path"
 	"strings"
+	"sync/atomic"
 )
 
 // MaskSensitiveEnv redacts sensitive environment variables based on key names and provided patterns.
@@ -140,6 +141,49 @@ type preAnalyzedPattern struct {
 	cleanPat     string
 }
 
+type analyzedPatternsCacheEntry struct {
+	patterns []string
+	analyzed []preAnalyzedPattern
+}
+
+var (
+	patternsCache atomic.Pointer[analyzedPatternsCacheEntry]
+)
+
+func getAnalyzedPatterns(patterns []string) []preAnalyzedPattern {
+	if len(patterns) == 0 {
+		return nil
+	}
+	cached := patternsCache.Load()
+	if cached != nil && len(cached.patterns) == len(patterns) {
+		match := true
+		for i, p := range patterns {
+			if cached.patterns[i] != p {
+				match = false
+				break
+			}
+		}
+		if match {
+			return cached.analyzed
+		}
+	}
+
+	analyzed := make([]preAnalyzedPattern, len(patterns))
+	for i, p := range patterns {
+		analyzed[i] = preAnalyzePattern(p)
+	}
+
+	patCopy := make([]string, len(patterns))
+	copy(patCopy, patterns)
+
+	patternsCache.Store(&analyzedPatternsCacheEntry{
+		patterns: patCopy,
+		analyzed: analyzed,
+	})
+
+	return analyzed
+}
+
 func preAnalyzePattern(p string) preAnalyzedPattern {
 	ap := preAnalyzedPattern{
 		raw:          p,
@@ -223,17 +267,7 @@ func MaskSensitiveEnv(key, value string, patterns []string) string {
 		return value
 	}
 
-	var localBuf [16]preAnalyzedPattern
-	var analyzed []preAnalyzedPattern
-	if len(patterns) <= 16 {
-		analyzed = localBuf[:len(patterns)]
-	} else {
-		analyzed = make([]preAnalyzedPattern, len(patterns))
-	}
-
-	for i, p := range patterns {
-		analyzed[i] = preAnalyzePattern(p)
-	}
+	analyzed := getAnalyzedPatterns(patterns)
 
 	keyIsASCII := isASCII(key)
 	var upperKey string
@@ -280,17 +314,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 		return res
 	}
 
-	var localBuf [16]preAnalyzedPattern
-	var analyzed []preAnalyzedPattern
-	if len(patterns) <= 16 {
-		analyzed = localBuf[:len(patterns)]
-	} else {
-		analyzed = make([]preAnalyzedPattern, len(patterns))
-	}
-
-	for i, p := range patterns {
-		analyzed[i] = preAnalyzePattern(p)
-	}
+	analyzed := getAnalyzedPatterns(patterns)
 
 	var res []string
 	for i, e := range env {
