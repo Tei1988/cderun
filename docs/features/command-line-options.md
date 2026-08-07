@@ -394,6 +394,64 @@ cderun --read-only alpine touch /test-write
 cderun --pid host alpine ps aux
 ```
 
+### `--init`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_INIT`
+- **Description**: Run an init process inside the container to forward signals and reap zombie processes.
+- **Details**:
+  - **Docker / Podman**: Maps to `Init` in the host configuration (e.g., standard `tini`).
+  - **containerd**: Directly rejected with a validation error ('containerd runtime: init is not supported yet') in the containerd adapter's `ValidateConfig` method to prevent silent failures.
+- **P1 Internal Override**: `--cderun-init` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine touch /test --cderun-init`).
+
+```bash
+cderun --init alpine ps aux
+```
+
+### `--security-opt`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_SECURITY_OPT`
+- **Description**: Configure container security options (such as `no-new-privileges`, `seccomp=unconfined`, and AppArmor profiles).
+- **Details**:
+  - **Docker / Podman**: Maps to `HostConfig.SecurityOpt` in the Docker adapter.
+  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions`. Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
+- **P1 Internal Override**: `--cderun-security-opt` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-security-opt=no-new-privileges`).
+
+```bash
+cderun --security-opt no-new-privileges alpine sh
+```
+
+### `--ulimit`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_ULIMIT`
+- **Description**: Configure process resource limits (ulimits) in container execution environments.
+- **Details**:
+  - **Specification Parsing**: Specifications (such as `nofile=1024:2048`) are parsed via the `github.com/docker/go-units` standard parser.
+  - **Docker / Podman**: Maps directly to `HostConfig.Resources.Ulimits` in the Docker adapter.
+  - **containerd**: Converted into standard POSIX OCI process rlimits (`specs.POSIXRlimit` inside `Process.Rlimits`) via custom `oci.SpecOpts` in the containerd adapter.
+- **P1 Internal Override**: `--cderun-ulimit` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine ulimit -n --cderun-ulimit=nofile=1024:2048`).
+
+```bash
+cderun --ulimit nofile=1024:2048 alpine ulimit -n
+```
+
+### `--shm-size`
+
+- **Type**: string
+- **Environment Variable**: `CDERUN_SHM_SIZE`
+- **Description**: Configure the size of `/dev/shm` for containers.
+- **Details**:
+  - **Docker / Podman**: Maps directly to `ShmSize` in the Docker host configuration.
+  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize`. It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+- **P1 Internal Override**: `--cderun-shm-size` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-shm-size=256m`).
+
+```bash
+cderun --shm-size 256m alpine df -h /dev/shm
+```
+
 ### `--cap-add`
 
 - **Type**: stringArray
