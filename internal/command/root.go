@@ -882,11 +882,13 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 				if forwardImmediate && activeRt != nil {
 					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
-					if err := activeRt.SignalContainer(ctx, activeID, sigName); err != nil {
-						o.logger.Warn("failed to forward signal %v: %v", sig, err)
-					} else {
-						o.logger.Debug("Successfully forwarded signal %v to container %s", sig, activeID)
-					}
+					go func(signalName string, containerRuntime runtime.ContainerRuntime, containerID string) {
+						if err := containerRuntime.SignalContainer(ctxG, containerID, signalName); err != nil {
+							o.logger.Warn("failed to forward signal %s: %v", signalName, err)
+						} else {
+							o.logger.Debug("Successfully forwarded signal %s to container %s", signalName, containerID)
+						}
+					}(sigName, activeRt, activeID)
 				}
 			case <-ctxG.Done():
 				return

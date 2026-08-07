@@ -210,8 +210,13 @@ func (r *ExpressionResolver) Resolve(v any) any {
 		}
 		return val
 	case map[string]any:
-		for k, v := range val {
-			val[k] = r.Resolve(v)
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
+			val[k] = r.Resolve(val[k])
 		}
 		return val
 	default:
