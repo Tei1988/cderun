@@ -64,6 +64,7 @@ type ResolvedConfig struct {
 	Devices         []container.DeviceMapping
 	SensitiveEnv    []string
 	GroupAdd        []string
+	Ulimits         []container.Ulimit
 }
 
 // CLIOptions represents values from CLI flags.
@@ -162,6 +163,8 @@ type CLIOptions struct {
 	CderunSensitiveEnv    []string
 	GroupAdd              []string
 	CderunGroupAdd        []string
+	Ulimits               []string
+	CderunUlimits         []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -697,6 +700,13 @@ func (rv *resolver) resolveComplexOptions() error {
 	if err != nil {
 		return err
 	}
+
+	// Resolve Ulimits
+	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

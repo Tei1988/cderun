@@ -8,6 +8,8 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
+
+	"github.com/docker/go-units"
 )
 
 // parseSlice parses a slice of string configs into type T using the provided parser.
@@ -25,6 +27,40 @@ func parseSlice[T any](slice []string, sourceLabel string, parser func(string, s
 			return nil, err
 		}
 		res[i] = v
+	}
+	return res, nil
+}
+
+func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, fs FileSystem) ([]container.Ulimit, error) {
+	raws, err := pickConfigs(
+		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
+		func(t ToolConfig) []string { return t.Ulimits },
+		global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
+		nil,
+		fs,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(raws) == 0 {
+		return []container.Ulimit{}, nil
+	}
+
+	res := make([]container.Ulimit, 0, len(raws))
+	for _, raw := range raws {
+		parsed, err := units.ParseUlimit(raw)
+		if err != nil {
+			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
+		}
+		if parsed.Hard < -1 || parsed.Soft < -1 {
+			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: fmt.Errorf("limit values must be at least -1")}
+		}
+		res = append(res, container.Ulimit{
+			Name: parsed.Name,
+			Hard: parsed.Hard,
+			Soft: parsed.Soft,
+		})
 	}
 	return res, nil
 }

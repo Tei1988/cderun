@@ -23,6 +23,7 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_CAP_DROP`
   - `CDERUN_ENTRYPOINT`
   - `CDERUN_SENSITIVE_ENV`
+  - `CDERUN_ULIMIT`
 
 *Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`).*
 
@@ -485,6 +486,18 @@ cderun -m 512m node
 
 ```bash
 cderun --cpus 1.5 node
+```
+
+### `--ulimit`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_ULIMIT`
+- **Description**: Set process resource limits (ulimits).
+- **Format**: `<type>=<soft>:<hard>` or `<type>=<value>` (e.g., `nofile=65535:65535`, `nofile=65535`).
+- **Validation**: Limit values (both soft and hard) must be at least `-1` (where `-1` represents unlimited).
+
+```bash
+cderun --ulimit nofile=65535:65535 node
 ```
 
 ### `--device`

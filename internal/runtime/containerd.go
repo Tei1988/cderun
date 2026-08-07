@@ -349,6 +349,25 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			return nil
 		})
 	}
+	if len(config.Ulimits) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Process == nil {
+				s.Process = &specs.Process{}
+			}
+			for _, u := range config.Ulimits {
+				rlimitType := strings.ToUpper(u.Name)
+				if !strings.HasPrefix(rlimitType, "RLIMIT_") {
+					rlimitType = "RLIMIT_" + rlimitType
+				}
+				s.Process.Rlimits = append(s.Process.Rlimits, specs.POSIXRlimit{
+					Type: rlimitType,
+					Hard: uint64(u.Hard),
+					Soft: uint64(u.Soft),
+				})
+			}
+			return nil
+		})
+	}
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
 	}
