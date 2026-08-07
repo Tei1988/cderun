@@ -412,11 +412,13 @@ cderun --init alpine ps aux
 ### `--security-opt`
 
 - **Type**: stringArray
+- **Default**: `none`
 - **Environment Variable**: `CDERUN_SECURITY_OPT`
 - **Description**: Configure container security options (such as `no-new-privileges`, `seccomp=unconfined`, and AppArmor profiles).
 - **Details**:
-  - **Docker / Podman**: Maps to `HostConfig.SecurityOpt` in the Docker adapter.
-  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions`. Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
+  - **Docker**: Maps directly to `HostConfig.SecurityOpt` in the Docker host configuration.
+  - **Podman**: Mapped to security options supported natively by the Podman engine.
+  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions` (@jules). Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
 - **P1 Internal Override**: `--cderun-security-opt` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-security-opt=no-new-privileges`).
 
 ```bash
@@ -426,11 +428,13 @@ cderun --security-opt no-new-privileges alpine sh
 ### `--ulimit`
 
 - **Type**: stringArray
+- **Default**: `none`
 - **Environment Variable**: `CDERUN_ULIMIT`
 - **Description**: Configure process resource limits (ulimits) in container execution environments.
 - **Details**:
   - **Specification Parsing**: Specifications (such as `nofile=1024:2048`) are parsed via the `github.com/docker/go-units` standard parser.
-  - **Docker / Podman**: Maps directly to `HostConfig.Resources.Ulimits` in the Docker adapter.
+  - **Docker**: Maps directly to `HostConfig.Resources.Ulimits` in the Docker host configuration.
+  - **Podman**: Mapped to ulimit configurations supported natively by the Podman engine.
   - **containerd**: Converted into standard POSIX OCI process rlimits (`specs.POSIXRlimit` inside `Process.Rlimits`) via custom `oci.SpecOpts` in the containerd adapter.
 - **P1 Internal Override**: `--cderun-ulimit` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine ulimit -n --cderun-ulimit=nofile=1024:2048`).
 
@@ -441,11 +445,13 @@ cderun --ulimit nofile=1024:2048 alpine ulimit -n
 ### `--shm-size`
 
 - **Type**: string
+- **Default**: `none`
 - **Environment Variable**: `CDERUN_SHM_SIZE`
 - **Description**: Configure the size of `/dev/shm` for containers.
 - **Details**:
-  - **Docker / Podman**: Maps directly to `ShmSize` in the Docker host configuration.
-  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize`. It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+  - **Docker**: Maps directly to `ShmSize` in the Docker host configuration.
+  - **Podman**: Mapped to size configuration supported natively by the Podman engine.
+  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize` (@jules). It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
 - **P1 Internal Override**: `--cderun-shm-size` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-shm-size=256m`).
 
 ```bash

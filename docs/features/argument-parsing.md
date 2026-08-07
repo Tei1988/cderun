@@ -95,12 +95,12 @@ In standard **Wrapper Mode**, `--cderun-` flags **must** be placed **after** the
 
 During preprocessing (`preprocessArgs`), the preprocessor scans the argument list behind the subcommand, extracts all `--cderun-` prefixed flags and their values, and prepends (hoists) them before the subcommand. This ensures that these configuration flags are parsed as `cderun` settings instead of being passed to the container command.
 
-#### Two-Phase Argument Rewriting Process
+#### Two-Step Argument Rewriting Process
 
-During program startup (particularly visible when running in Polyglot/Symlink Mode), `cderun` processes and rewrites `os.Args` in two distinct phases:
+During program startup (particularly visible when running in Polyglot/Symlink Mode), `cderun` processes and rewrites `os.Args` in two distinct steps:
 
-- **Phase 1 (Binary Invocation Rewrite)**: Emits the `"cderun"` command as `os.Args[0]` to normalize standard flag processing.
-- **Phase 2 (Hoisting & Subcommand Placement)**: Scans, extracts, and hoists only `--cderun-*` flags before the symlink-derived subcommand, while preserving the subcommand and all other remaining arguments in their exact original order.
+- **Rewrite step 1 (Binary Invocation Rewrite)**: Emits the `"cderun"` command as `os.Args[0]` to normalize standard flag processing.
+- **Rewrite step 2 (Hoisting & Subcommand Placement)**: Scans, extracts, and hoists only `--cderun-*` flags before the symlink-derived subcommand, while preserving the subcommand and all other remaining arguments in their exact original order.
 
 #### Flag Preprocessing and Adjacent Value Handling
 
