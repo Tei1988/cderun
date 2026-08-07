@@ -6,8 +6,13 @@ LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
            -X cderun/internal/version.Revision=$(REVISION) \
            -X cderun/internal/version.BuildDate=$(BUILD_DATE)
 
+.PHONY: generate
+generate:
+	@echo "Generating option structures..."
+	@go generate ./...
+
 .PHONY: test
-test:
+test: generate
 	@echo "Running all unit and integration tests..."
 	@go test -v ./...
 
@@ -64,7 +69,7 @@ coverage-html: coverage
 	@echo "Generated coverage.html"
 
 .PHONY: build
-build:
+build: generate
 	@echo "Building cderun..."
 	@go build -ldflags "$(LDFLAGS)" -o cderun main.go
 
