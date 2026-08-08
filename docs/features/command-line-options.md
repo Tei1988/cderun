@@ -510,6 +510,10 @@ cderun --cpus 1.5 node
 - **Description**: Set process resource limits (ulimits).
 - **Format**: `<type>=<soft>:<hard>` or `<type>=<value>` (e.g., `nofile=65535:65535`, `nofile=65535`).
 - **Validation**: Limit values (both soft and hard) must be at least `-1` (where `-1` represents unlimited).
+- **Runtime Details**:
+  - **Docker / Podman**: Maps directly to `HostConfig.Resources.Ulimits` in the host configuration.
+  - **containerd**: Converted into standard POSIX OCI process rlimits (`specs.POSIXRlimit` inside `Process.Rlimits`) via custom `oci.SpecOpts` in the containerd runtime adapter.
+- **P1 Internal Override**: `--cderun-ulimit` is the corresponding Phase 1 (P1) override, allowing you to override resource limits on a per-invocation basis.
 
 ```bash
 cderun --ulimit nofile=65535:65535 node

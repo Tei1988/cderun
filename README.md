@@ -232,6 +232,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
+- `--init`: Run an init process inside the container to forward signals and reap processes. Not supported under containerd. (Default: `false`)
 
 #### Network & Ports
 
@@ -252,6 +253,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
 - `--pid`: Configure the PID namespace for the container. Accepts `"host"` or `""` (private). Maps to `PidMode` in Docker host configuration, and appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`. (Default: `""`)
+- `--ulimit`: Set process resource limits (ulimits) in `<type>=<soft>:<hard>` or `<type>=<value>` format (e.g. `nofile=1024:2048`).
 - `--cap-add`: Add Linux capabilities.
 - `--cap-drop`: Drop Linux capabilities.
 - `--group-add`: Add supplementary groups to the container (group name or GID). Note: containerd only supports numeric GIDs.
