@@ -21,7 +21,7 @@ Upon program startup (at the very beginning of the `main` function), `cderun` in
    - **Case B: Base name is NOT `cderun`**
      The arguments are rewritten in a two-step process:
      - **Rewrite step 1 (Binary invocation rewrite)**: Emit the `cderun` command as `os.Args[0]`.
-     - **Rewrite step 2 (Hoisting & Subcommand placement)**: Hoist only `--cderun-*` flags before the symlink-derived subcommand, then preserve the subcommand and all remaining arguments in their original order.
+     - **Rewrite step 2 (Hoisting & Subcommand placement)**: Hoist only `--cderun-*` override flags and their associated space-separated values before the symlink-derived subcommand, then preserve the subcommand and all remaining arguments in their original order.
      The final structure of rewritten `os.Args` is:
      `os.Args = [ "cderun", ...hoisted_cderun_flags, <extracted_base_name>, ...original_arguments_excluding_hoisted_flags ]`
 
