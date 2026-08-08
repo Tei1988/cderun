@@ -1058,7 +1058,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
-- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--init` and `--cderun-init` flags, showing their default of `false` and mapped environment variable `CDERUN_INIT`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--init` and `--cderun-init` flags, showing their default of `false` and mapped environment variable `CDERUN_INIT`, and documenting that the containerd runtime does not support `Init: true` and reports a "containerd runtime: init is not supported yet" validation error.
 
 ---
 
