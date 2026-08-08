@@ -49,6 +49,9 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 
 	res := make([]container.Ulimit, 0, len(raws))
 	for _, raw := range raws {
+		if err := validatePathChars(raw); err != nil {
+			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
+		}
 		parsed, err := units.ParseUlimit(raw)
 		if err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
