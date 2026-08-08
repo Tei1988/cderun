@@ -232,7 +232,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
-- `--init`: Run an init process inside the container to forward signals and reap processes. Not supported under containerd. (Default: `false`)
+- `--init`: Run an init process inside the container to forward signals and reap processes. (Default: `false`)
 
 #### Network & Ports
 
