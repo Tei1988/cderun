@@ -21,6 +21,11 @@ type ContainerRuntime interface {
 	RemoveContainer(ctx context.Context, containerID string) error
 
 	// Container communication
+	//
+	// Note on order dependency:
+	// For containerd and similar adapters, AttachContainer must be called before StartContainer
+	// to register standard I/O handlers. Failing to do so can result in silent standard I/O discarding
+	// (such as falling back to cio.NullIO).
 	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
 	SignalContainer(ctx context.Context, containerID string, sig string) error

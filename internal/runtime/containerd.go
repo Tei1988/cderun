@@ -18,6 +18,7 @@ import (
 
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
@@ -30,9 +31,18 @@ const (
 	defaultNamespace = "cderun"
 )
 
+type containerdClient interface {
+	Close() error
+	Pull(ctx context.Context, ref string, opts ...client.RemoteOpt) (client.Image, error)
+	GetImage(ctx context.Context, ref string) (client.Image, error)
+	NewContainer(ctx context.Context, id string, opts ...client.NewContainerOpts) (client.Container, error)
+	LoadContainer(ctx context.Context, id string) (client.Container, error)
+	ImageService() images.Store
+}
+
 // ContainerdRuntime implements the ContainerRuntime interface using containerd.
 type ContainerdRuntime struct {
-	client    *client.Client
+	client    containerdClient
 	socket    string
 	namespace string
 	logger    *logging.Logger
@@ -409,6 +419,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 	r.mu.Unlock()
 
 	if !ok {
+		r.logger.Warn("StartContainer: no registered I/O creator found for container %s, falling back to NullIO. Make sure to call AttachContainer before StartContainer.", containerID)
 		creator = cio.NullIO
 	}
 
@@ -465,10 +476,6 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
 	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	r.mu.Lock()
-	delete(r.ioWait, containerID)
-	r.mu.Unlock()
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {
