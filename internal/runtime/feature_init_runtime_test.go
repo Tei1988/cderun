@@ -70,9 +70,6 @@ func TestUnit_Containerd_ValidateConfig_Init(t *testing.T) {
 		}
 
 		err := runtime.ValidateConfig(config)
-		// Should not fail because of Init (it might fail if image is empty, but we set it)
-		if err != nil {
-			assert.NotContains(t, err.Error(), "init is not supported yet")
-		}
+		require.NoError(t, err)
 	})
 }
