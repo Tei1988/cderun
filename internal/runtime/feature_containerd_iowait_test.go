@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_Containerd_RemoveContainer_NoIoWaitDelete(t *testing.T) {
@@ -17,28 +18,25 @@ func TestUnit_Containerd_RemoveContainer_NoIoWaitDelete(t *testing.T) {
 		ioWait: map[string]chan error{"c1": waitC},
 	}
 
-	// We expect a panic because rt.client is nil, but before the panic,
-	// RemoveContainer should notify the ioWait channel with an error,
-	// and NOT delete it directly.
-	defer func() {
-		_ = recover()
-		// Verify that waitC received the "removed" notification error
-		select {
-		case err := <-waitC:
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "was removed")
-		default:
-			t.Error("expected waitC to receive container removal notification")
-		}
+	// Because rt.client is nil, calling RemoveContainer should immediately return
+	// an explicit initialization error without notifying or deleting from ioWait.
+	err := rt.RemoveContainer(context.Background(), "c1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client is not initialized")
 
-		// Verify that "c1" is still in the map (it is deleted in AttachContainer's defer, not RemoveContainer)
-		rt.mu.RLock()
-		_, exists := rt.ioWait["c1"]
-		rt.mu.RUnlock()
-		assert.True(t, exists, "ioWait entry should not be deleted by RemoveContainer directly")
-	}()
+	// Verify that waitC was NOT written to (as it should bypass notification on early errors)
+	select {
+	case notifiedErr := <-waitC:
+		t.Fatalf("unexpected notification in waitC: %v", notifiedErr)
+	default:
+		// Success: no notification was sent
+	}
 
-	_ = rt.RemoveContainer(context.Background(), "c1")
+	// Verify that "c1" is still in the map (it is deleted in AttachContainer's defer, not RemoveContainer)
+	rt.mu.RLock()
+	_, exists := rt.ioWait["c1"]
+	rt.mu.RUnlock()
+	assert.True(t, exists, "ioWait entry should not be deleted by RemoveContainer directly")
 }
 
 func TestUnit_Containerd_AttachContainer_ClientNilError(t *testing.T) {
@@ -49,6 +47,6 @@ func TestUnit_Containerd_AttachContainer_ClientNilError(t *testing.T) {
 	}
 
 	err := rt.AttachContainer(context.Background(), "c1", false, nil, nil, nil, nil)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "client is not initialized")
 }
