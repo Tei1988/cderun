@@ -6,8 +6,14 @@ LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
            -X cderun/internal/version.Revision=$(REVISION) \
            -X cderun/internal/version.BuildDate=$(BUILD_DATE)
 
+.PHONY: generate
+generate:
+	@echo "Generating option structures..."
+	@go generate ./...
+	@git diff --exit-code internal/config/cli_options.gen.go internal/command/root_flags.gen.go || (echo "Error: Generated option files differ from committed state. Please run 'make generate' and commit the updated files." && exit 1)
+
 .PHONY: test
-test:
+test: generate
 	@echo "Running all unit and integration tests..."
 	@go test -v ./...
 
@@ -64,7 +70,7 @@ coverage-html: coverage
 	@echo "Generated coverage.html"
 
 .PHONY: build
-build:
+build: generate
 	@echo "Building cderun..."
 	@go build -ldflags "$(LDFLAGS)" -o cderun main.go
 

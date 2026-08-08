@@ -16,7 +16,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | --- | --- | --- | --- | --- | --- | --- |
 | T01 | TTY 経由実行でターミナルが強制終了する問題の調査 | 調査 | 高 | ? | - | - |
 | T05 | `CLIOptions` の `Set` フィールドをポインタ型に統一 | リファクタ | 高 | 中 | - | DONE |
-| T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - | - |
+| T06 | `--cderun-*` フラグのボイラープレートをコード生成化 | リファクタ | 中 | 大 | - | DONE |
 | T07 | `preprocessArgs` の引数ホイスト簡略化 | リファクタ | 中 | 中 | あり | DONE |
 | T09 | `AttachContainer`（Docker）の stdin エラー握りつぶし修正 | バグ | 低 | 小 | - | DONE |
 | T11 | 未知の `{{...}}` ディレクティブをエラーにする | 挙動変更 | 中 | 中 | あり | DONE |
@@ -159,29 +159,6 @@ func opt[T any] (changed bool, v T) *T {
 
 - `CLIOptions` から `FooSet` フィールドが全廃されている
 - 「未指定」「明示的にゼロ値を指定」（例: `--tty=false`）の区別が全オプションで維持されている（回帰テスト）
-
----
-
-## T06: `--cderun-*` フラグのボイラープレートをコード生成化
-
-- 種別: リファクタリング
-- 対象: `internal/config/registry.go`、`internal/command/flags.go`、`internal/config/resolver.go`
-
-### 問題
-
-すべてのフラグに通常版（`--tty`）と内部オーバーライド版（`--cderun-tty`）が存在し、`rootOptions`・`CLIOptions`・`flags.go` の 3 箇所に手書きで反映する必要がある。追加漏れや不整合が起きやすい。
-
-### 方針
-
-生成元はゼロから作る必要がない。`internal/config/registry.go` に既に `StringOptions` / `BoolOptions` / `IntOptions` / `Float64Options` / `StringSliceOptions` としてオプションのメタデータ（Name / FieldName / EnvKey / Shorthand / Getter）が一元化されている。これを **唯一の定義源（single source of truth）** として `go generate` で `flags.go` と `CLIOptions` を生成する。
-
-これにより `docs/guidelines/working-guide.md`（42-63 行目）の「新オプション追加チェックリスト」の大半を機械化できる（= AI エージェントの追加漏れ防止という本来の目的に直結）。
-
-### 完了条件
-
-- registry のメタデータ 1 箇所を変更すれば新オプションが追加できる状態になっている
-- 生成コードと手書きコードの境界が明確（生成ファイルにヘッダコメント）
-- `docs/guidelines/working-guide.md` のチェックリストを新手順に合わせて更新
 
 ---
 

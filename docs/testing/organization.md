@@ -67,6 +67,23 @@
 - 例: `TestIntegration_Docker_PortMapping`
 - 例: `TestScenario_ConfigResolution_ComplexOverrides`
 
+### 3.3. スコープ別テストファイルの分割とコンフリクト回避ルール (Scope-Specific Test Files)
+
+AIエージェントや複数の開発者が並列で開発を進める際、巨大な既存テストファイル（例: `resolver_test.go`, `root_test.go`）の末尾にテストを追記していくと、ほぼ確実に Git のマージコンフリクトが発生します。
+
+これを防止するため、以下の**「スコープ別テストファイルルール」**を徹底します：
+
+1. **既存の巨大ファイルへの追記禁止**
+   - 既存のテストケースそのものを修正・更新する場合を除き、新規追加するテストケースを `resolver_test.go` や `root_test.go` 等の末尾に追記することを禁止します。
+2. **スコープを絞った新規テストファイルの作成**
+   - 新機能の追加、バグ修正、特定のテーマに対するテストの追加を行う際は、必ずスコープが明確な新しいテストファイルを作成してください。
+   - 命名例:
+     - 新機能: `feature_shm_size_test.go`
+     - バグ修正: `bugfix_issue42_test.go`
+     - テーマ別: `resolver_robustness_test.go`, `command_extra_scenarios_test.go`
+3. **ファイル分離によるコンフリクト確率の低減**
+   - テストファイルを機能やチケット、タスク単位で細かく分離することにより、他の開発ブランチとの衝突の確率を大幅に低減し、スムーズに並行開発を進めやすくなります。
+
 ## 4. 改善計画
 
 ### 4.1. テスト容易性の向上 (Testability)

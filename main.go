@@ -1,3 +1,5 @@
+//go:generate go run scripts/gen_options.go
+
 package main
 
 import (
