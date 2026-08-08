@@ -376,6 +376,21 @@ cderun --privileged alpine ls /dev
 cderun --read-only alpine touch /test-write
 ```
 
+### `--init`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_INIT`
+- **Description**: Run an init process inside the container to forward signals and reap processes.
+- **Details**:
+  - **Docker / Podman**: Maps to `Init` in the host configuration.
+  - **containerd**: Not supported. Explicitly rejected with a `"containerd runtime: init is not supported yet"` validation error.
+- **P1 Internal Override**: `--cderun-init` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must use the equals-sign format or trailing toggle, and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine --cderun-init`).
+
+```bash
+cderun --init alpine ps aux
+```
+
 ### `--pid`
 
 - **Type**: string

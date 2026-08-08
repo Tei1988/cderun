@@ -125,6 +125,10 @@ func (r *ContainerdRuntime) Name() string {
 
 // ValidateConfig validates that the runtime supports the given container configuration.
 func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	if config.Init {
+		return fmt.Errorf("containerd runtime: init is not supported yet")
+	}
+
 	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
 		return fmt.Errorf("containerd runtime: non-finite CPU limit %f is not supported", config.CPUs)
 	}

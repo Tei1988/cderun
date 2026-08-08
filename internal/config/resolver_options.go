@@ -319,6 +319,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
 		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
 		fastPathUsed = true
+	case "init":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunInit)
+		p2Set, p2Val = getPtrVal(rv.cli.Init)
+		fastPathUsed = true
 	case "remove":
 		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
 		p2Set, p2Val = getPtrVal(rv.cli.Remove)
@@ -378,6 +382,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.Interactive = resolved
 		case "read-only":
 			rv.res.ReadOnly = resolved
+		case "init":
+			rv.res.Init = resolved
 		case "remove":
 			rv.res.Remove = resolved
 		case "diagnosis":

@@ -31,7 +31,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
@@ -375,10 +375,10 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker: `HostConfig.Init` に渡るテスト
-- [ ] containerd: 設計決定に基づいた挙動のテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker: `HostConfig.Init` に渡るテスト
+- [x] containerd: 設計決定に基づいた挙動のテスト
 
 ---
 
