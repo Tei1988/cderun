@@ -390,6 +390,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 	r.mu.Unlock()
 
 	if !ok {
+		r.logger.Warn("StartContainer: container standard I/O is falling back to NullIO because AttachContainer was not called beforehand for container %s", containerID)
 		creator = cio.NullIO
 	}
 
@@ -447,9 +448,9 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	r.mu.Lock()
-	delete(r.ioWait, containerID)
-	r.mu.Unlock()
+	// Notify any active AttachContainer that the container is being removed to prevent indefinite hangs,
+	// allowing AttachContainer to exit and perform its own cleanup (including deleting the ioWait map entry).
+	r.notifyWait(containerID, fmt.Errorf("container %s was removed", containerID))
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {
@@ -508,6 +509,10 @@ func (r *ContainerdRuntime) ResizeContainerTTY(ctx context.Context, containerID 
 }
 
 func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	if r.client == nil {
+		return fmt.Errorf("containerd client is not initialized")
+	}
+
 	var creator cio.Creator
 	if tty {
 		creator = cio.NewCreator(cio.WithStreams(stdin, stdout, stderr), cio.WithTerminal)
@@ -531,9 +536,11 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 
 	// Check if task is already ready (e.g., if StartContainer was called first)
 	taskAlreadyReady := false
-	if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
-		if _, err := container.Task(ctx, nil); err == nil {
-			taskAlreadyReady = true
+	if r.client != nil {
+		if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
+			if _, err := container.Task(ctx, nil); err == nil {
+				taskAlreadyReady = true
+			}
 		}
 	}
 
@@ -548,6 +555,9 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 			}
 		}
 
+		if r.client == nil {
+			return
+		}
 		container, err := r.client.LoadContainer(attachCtx, containerID)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
