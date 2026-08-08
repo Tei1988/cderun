@@ -66,6 +66,7 @@ type ResolvedConfig struct {
 	SensitiveEnv    []string
 	GroupAdd        []string
 	Ulimits         []container.Ulimit
+	Sysctls         map[string]string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -604,6 +605,31 @@ func (rv *resolver) resolveComplexOptions() error {
 
 	// Resolve Ulimits
 	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
+
+	// Resolve Sysctls
+	var rForSysctls *ExpressionResolver
+	hasSysctls := len(rv.cli.CderunSysctls) > 0 || len(rv.cli.Sysctls) > 0 || rv.fs.Getenv("CDERUN_SYSCTL") != ""
+	if !hasSysctls && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Sysctls) > 0 {
+			hasSysctls = true
+		}
+	}
+	if !hasSysctls && rv.global != nil && len(rv.global.Defaults.Sysctls) > 0 {
+		hasSysctls = true
+	}
+
+	if hasSysctls {
+		var err error
+		rForSysctls, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	rv.res.Sysctls, err = resolveSysctls(rv.cli.CderunSysctls, rv.cli.Sysctls, rv.subcommand, rv.tools, rv.global, rForSysctls, rv.fs)
 	if err != nil {
 		return err
 	}

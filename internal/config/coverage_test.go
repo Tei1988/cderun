@@ -832,6 +832,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 
 func saveAndReplaceBoolOptionsMap(t *testing.T, newMap map[string]BoolOption) {
 	t.Helper()
+	ensureRegistryMaps()
 	old := boolOptionsMap
 	boolOptionsMap = newMap
 	t.Cleanup(func() {

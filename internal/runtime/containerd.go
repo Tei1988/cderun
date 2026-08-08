@@ -389,6 +389,21 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		})
 	}
 
+	if len(config.Sysctls) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Sysctl == nil {
+				s.Linux.Sysctl = make(map[string]string)
+			}
+			for k, v := range config.Sysctls {
+				s.Linux.Sysctl[k] = v
+			}
+			return nil
+		})
+	}
+
 	_, err = r.client.NewContainer(ctx, id,
 		client.WithImage(img),
 		client.WithNewSnapshot(id, img),

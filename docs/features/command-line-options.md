@@ -24,6 +24,7 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_ENTRYPOINT`
   - `CDERUN_SENSITIVE_ENV`
   - `CDERUN_ULIMIT`
+  - `CDERUN_SYSCTL`
 
 *Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`).*
 
@@ -513,6 +514,21 @@ cderun --cpus 1.5 node
 
 ```bash
 cderun --ulimit nofile=65535:65535 node
+```
+
+### `--sysctl`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_SYSCTL`
+- **Description**: Configure kernel parameters (sysctl) at runtime.
+- **Format**: `key=value` (e.g., `net.ipv4.ip_forward=1`).
+- **Validation**: Param values must be in key=value format and support dynamic expression resolution.
+- **Details**:
+  - **Docker / Podman**: Maps directly to `Sysctls` map inside `HostConfig`.
+  - **containerd**: Maps directly to OCI specification's `Linux.Sysctl` (`map[string]string`).
+
+```bash
+cderun --sysctl net.ipv4.ip_forward=1 alpine sh
 ```
 
 ### `--device`
