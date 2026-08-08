@@ -238,7 +238,7 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 	}
 }
 
-func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
+func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 	switch name {
 	case "tty":
 		return &o.tty, &o.cderunTTY
@@ -271,7 +271,7 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 	}
 }
 
-func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
+func getStringPointers(o *rootOptions, name string) (base, override *string) {
 	switch name {
 	case "network":
 		return &o.network, &o.cderunNetwork
@@ -320,7 +320,7 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 	}
 }
 
-func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
+func getIntPointers(o *rootOptions, name string) (base, override *int) {
 	switch name {
 	case "pull-max-retries":
 		return &o.pullMaxRetries, &o.cderunPullMaxRetries
@@ -329,7 +329,7 @@ func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
 	}
 }
 
-func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
+func getFloat64Pointers(o *rootOptions, name string) (base, override *float64) {
 	switch name {
 	case "cpus":
 		return &o.cpus, &o.cderunCPUs
@@ -338,7 +338,7 @@ func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
 	}
 }
 
-func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
+func getStringSlicePointers(o *rootOptions, name string) (base, override *[]string) {
 	switch name {
 	case "env":
 		return &o.env, &o.cderunEnv

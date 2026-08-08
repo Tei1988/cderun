@@ -53,23 +53,30 @@ Standard Go Project Layout に準拠しつつ、小規模な構成をとりま�
 ### オプション追加の手順
 
 1. **`internal/config/registry.go` に定義を追加する（唯一の定義源）**
-   - オプションの型に応じて `BoolOptions` / `StringOptions` / `IntOptions` / `Float64Options` / `StringSliceOptions` のいずれかのスライスに新オプションのメタデータを追加します。
+
+  - オプションの型に応じて `BoolOptions` / `StringOptions` / `IntOptions` / `Float64Options` / `StringSliceOptions` のいずれかのスライスに新オプションのメタデータを追加します。
+
 2. **コード生成を実行する**
-   - ターミナルで `make generate`（または `go generate ./...`）を実行します。
-   - これにより、以下のファイルが自動的に生成・更新されます：
-     - `internal/config/cli_options.gen.go`（`CLIOptions` 構造体）
-     - `internal/command/root_flags.gen.go`（`rootFlags` 構造体、`buildCLIOptions` および各種ポインタマッピング関数）
-3. **P3〜P6、その他の手動部分を実装する**
-   - [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する
-   - [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
-   - [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
-   - [ ] **P6**: `resolver.go` のハードコードデフォルト値を設定する
-   - [ ] **ResolvedConfig**: `ResolvedConfig` 構造体（`resolver.go`）に結果フィールドを追加する
-   - [ ] **DeepCopy**: `ToolConfig.DeepCopy()` / `ConfigDefaults.DeepCopy()` に新フィールドのコピー処理を追加する（ポインタ型・スライス型の場合）
-   - [ ] **ドキュメント**: 以下のドキュメントを更新する
-     - `docs/features/argument-priority-logic.md`（P1/P2/P3 のフラグ・環境変数リスト）
-     - `docs/features/command-line-options.md`（オプションの説明）
-     - `docs/features/configuration-file-support.md`（YAMLスキーマ）
+
+  - ターミナルで `make generate`（または `go generate ./...`）を実行します。
+  - これにより、以下のファイルが自動的に生成・更新されます：
+
+    - `internal/config/cli_options.gen.go`（`CLIOptions` 構造体）
+    - `internal/command/root_flags.gen.go`（`rootFlags` 構造体、`buildCLIOptions` および各種ポインタマッピング関数）
+
+3. **P3〜P6、適切な手動部分を実装する**
+
+  - [ ] **P3**: `CDERUN_<NAME>` 環境変数を `resolver.go` の resolve 処理に追加する
+  - [ ] **P4**: `ToolConfig` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
+  - [ ] **P5**: `ConfigDefaults` 構造体（`config.go`）にフィールドを追加し、`resolver.go` で参照する
+  - [ ] **P6**: `resolver.go` のハードコードデフォルト値を設定する
+  - [ ] **ResolvedConfig**: `ResolvedConfig` 構造体（`resolver.go`）に結果フィールドを追加する
+  - [ ] **DeepCopy**: `ToolConfig.DeepCopy()` / `ConfigDefaults.DeepCopy()` に新フィールドのコピー処理を追加する（ポインタ型・スライス型の場合）
+  - [ ] **ドキュメント**: 以下のドキュメントを更新する
+
+    - `docs/features/argument-priority-logic.md`（P1/P2/P3 のフラグ・環境変数リスト）
+    - `docs/features/command-line-options.md`（オプションの説明）
+    - `docs/features/configuration-file-support.md`（YAMLスキーマ）
 
 ### 例外が許容されるケース
 

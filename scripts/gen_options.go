@@ -170,6 +170,7 @@ type CLIOptions struct {
 		return fmt.Errorf("failed to format CLIOptions source: %w. Raw:\n%s", err, buf.String())
 	}
 
+	//nolint:gosec // 0644 is intentional for standard generated options files
 	return os.WriteFile("internal/config/cli_options.gen.go", formatted, 0644)
 }
 
@@ -241,7 +242,7 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 	}
 }
 
-func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
+func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 	switch name {
 {{- range .}}
 	{{- if eq .Type "bool"}}
@@ -254,7 +255,7 @@ func getBoolPointers(o *rootOptions, name string) (p2, p1 *bool) {
 	}
 }
 
-func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
+func getStringPointers(o *rootOptions, name string) (base, override *string) {
 	switch name {
 {{- range .}}
 	{{- if eq .Type "string"}}
@@ -267,7 +268,7 @@ func getStringPointers(o *rootOptions, name string) (p2, p1 *string) {
 	}
 }
 
-func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
+func getIntPointers(o *rootOptions, name string) (base, override *int) {
 	switch name {
 {{- range .}}
 	{{- if eq .Type "int"}}
@@ -280,7 +281,7 @@ func getIntPointers(o *rootOptions, name string) (p2, p1 *int) {
 	}
 }
 
-func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
+func getFloat64Pointers(o *rootOptions, name string) (base, override *float64) {
 	switch name {
 {{- range .}}
 	{{- if eq .Type "float64"}}
@@ -293,7 +294,7 @@ func getFloat64Pointers(o *rootOptions, name string) (p2, p1 *float64) {
 	}
 }
 
-func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
+func getStringSlicePointers(o *rootOptions, name string) (base, override *[]string) {
 	switch name {
 {{- range .}}
 	{{- if eq .Type "[]string"}}
@@ -313,9 +314,9 @@ func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
-		cleanErr := strings.ReplaceAll(err.Error(), "\\", "/")
-		return fmt.Errorf("failed to format RootFlags source: %s. Raw:\n%s", cleanErr, buf.String())
+		return fmt.Errorf("failed to format RootFlags source: %w. Raw:\n%s", err, buf.String())
 	}
 
+	//nolint:gosec // 0644 is intentional for standard generated options files
 	return os.WriteFile("internal/command/root_flags.gen.go", formatted, 0644)
 }
