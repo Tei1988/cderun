@@ -628,6 +628,17 @@ var BoolOptions = []BoolOption{
 			return g.Defaults.ReadOnly
 		},
 	},
+	{
+		Name:   "init",
+		EnvKey: "CDERUN_INIT",
+		Usage:  "Run an init process inside the container to forward signals and reap processes",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Init
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Init
+		},
+	},
 }
 
 var (

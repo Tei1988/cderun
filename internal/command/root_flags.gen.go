@@ -35,6 +35,8 @@ type rootFlags struct {
 	cderunLogTimestamp    bool
 	readOnly              bool
 	cderunReadOnly        bool
+	init                  bool
+	cderunInit            bool
 	network               string
 	cderunNetwork         string
 	socketPath            string
@@ -163,6 +165,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunLogTimestamp:    optBool(cmd.Flags().Changed("cderun-log-timestamp"), o.cderunLogTimestamp),
 		ReadOnly:              optBool(cmd.Flags().Changed("read-only"), o.readOnly),
 		CderunReadOnly:        optBool(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
+		Init:                  optBool(cmd.Flags().Changed("init"), o.init),
+		CderunInit:            optBool(cmd.Flags().Changed("cderun-init"), o.cderunInit),
 		Network:               optStr(cmd.Flags().Changed("network"), o.network),
 		CderunNetwork:         optStr(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
 		SocketPath:            optStr(cmd.Flags().Changed("socket-path"), o.socketPath),
@@ -266,6 +270,8 @@ func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 		return &o.logTimestamp, &o.cderunLogTimestamp
 	case "read-only":
 		return &o.readOnly, &o.cderunReadOnly
+	case "init":
+		return &o.init, &o.cderunInit
 	default:
 		return nil, nil
 	}

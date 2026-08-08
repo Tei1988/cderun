@@ -22,6 +22,7 @@ type ResolvedConfig struct {
 	Network         string
 	Remove          bool
 	ReadOnly        bool
+	Init            bool
 	Mounts          []container.Mount
 	Env             []string
 	Workdir         string

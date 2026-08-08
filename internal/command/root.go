@@ -348,6 +348,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Network:     resolved.Network,
 		Remove:      resolved.Remove,
 		ReadOnly:    resolved.ReadOnly,
+		Init:        resolved.Init,
 		Mounts:      resolved.Mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
@@ -466,6 +467,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
 		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
 		_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", maskedContainerConfig.ReadOnly)
+		_, _ = fmt.Fprintf(w, "Init: %v\n", maskedContainerConfig.Init)
 		var mounts []string
 		for _, m := range maskedContainerConfig.Mounts {
 			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))

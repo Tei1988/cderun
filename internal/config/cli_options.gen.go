@@ -30,6 +30,8 @@ type CLIOptions struct {
 	CderunLogTimestamp    *bool
 	ReadOnly              *bool
 	CderunReadOnly        *bool
+	Init                  *bool
+	CderunInit            *bool
 	Network               *string
 	CderunNetwork         *string
 	SocketPath            *string
