@@ -64,6 +64,7 @@ type ResolvedConfig struct {
 	Devices         []container.DeviceMapping
 	SensitiveEnv    []string
 	GroupAdd        []string
+	Sysctls         map[string]string
 }
 
 // CLIOptions represents values from CLI flags.
@@ -162,6 +163,8 @@ type CLIOptions struct {
 	CderunSensitiveEnv    []string
 	GroupAdd              []string
 	CderunGroupAdd        []string
+	Sysctls               []string
+	CderunSysctls         []string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -697,6 +700,33 @@ func (rv *resolver) resolveComplexOptions() error {
 	if err != nil {
 		return err
 	}
+
+	// Resolve Sysctls
+	var rForSysctls *ExpressionResolver
+	hasSysctls := len(rv.cli.CderunSysctls) > 0 || len(rv.cli.Sysctls) > 0 || rv.fs.Getenv("CDERUN_SYSCTL") != ""
+	if !hasSysctls && rv.tools != nil {
+		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Sysctls) > 0 {
+			hasSysctls = true
+		}
+	}
+	if !hasSysctls && rv.global != nil && len(rv.global.Defaults.Sysctls) > 0 {
+		hasSysctls = true
+	}
+
+	if hasSysctls {
+		var err error
+		rForSysctls, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	var errSysctls error
+	rv.res.Sysctls, errSysctls = resolveSysctls(rv.cli.CderunSysctls, rv.cli.Sysctls, rv.subcommand, rv.tools, rv.global, rForSysctls, rv.fs)
+	if errSysctls != nil {
+		return errSysctls
+	}
+
 	return nil
 }
 

@@ -257,6 +257,8 @@ func getStringSlicePointers(o *rootOptions, name string) (p2, p1 *[]string) {
 		return &o.devices, &o.cderunDevices
 	case "sensitive-env":
 		return &o.sensitiveEnv, &o.cderunSensitiveEnv
+	case "sysctl":
+		return &o.sysctls, &o.cderunSysctls
 	default:
 		return nil, nil
 	}

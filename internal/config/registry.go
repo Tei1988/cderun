@@ -228,6 +228,19 @@ var StringSliceOptions = []StringSliceOption{
 		},
 		SkipResolution: true, // resolved early in resolveEarly
 	},
+	{
+		Name:      "sysctl",
+		FieldName: "Sysctls",
+		EnvKey:    "CDERUN_SYSCTL",
+		Usage:     "Configure kernel parameters at runtime",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.Sysctls
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.Sysctls
+		},
+		SkipResolution: true, // resolved in resolveComplexOptions
+	},
 }
 
 var StringOptions = []StringOption{

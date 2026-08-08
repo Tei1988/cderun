@@ -123,6 +123,7 @@ type rootOptions struct {
 	cpus                  float64
 	devices               []string
 	groupAdd              []string
+	sysctls               []string
 	cderunPorts           []string
 	cderunPublishAll      bool
 	cderunExpose          []string
@@ -140,6 +141,7 @@ type rootOptions struct {
 	cderunMemory          string
 	cderunCPUs            float64
 	cderunDevices         []string
+	cderunSysctls         []string
 	sensitiveEnv          []string
 	cderunSensitiveEnv    []string
 	pullMaxRetries        int
@@ -391,6 +393,8 @@ func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, too
 		CderunSensitiveEnv:    o.cderunSensitiveEnv,
 		GroupAdd:              o.groupAdd,
 		CderunGroupAdd:        o.cderunGroupAdd,
+		Sysctls:               o.sysctls,
+		CderunSysctls:         o.cderunSysctls,
 	}
 
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)
@@ -563,6 +567,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		CPUs:       resolved.CPUs,
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,
+		Sysctls:    resolved.Sysctls,
 	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {

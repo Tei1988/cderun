@@ -36,7 +36,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
 | T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -1091,6 +1091,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--sysctl` and `--cderun-sysctl` flags, showing their default of `(none)` (configured as key=value format) and mapped environment variable `CDERUN_SYSCTL`.
 
 ---
 

@@ -60,6 +60,9 @@ type ContainerConfig struct {
 
 	// Supplementary groups
 	GroupAdd []string `json:"group_add,omitempty" yaml:"group_add,omitempty"`
+
+	// Kernel parameters
+	Sysctls map[string]string `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 }
 
 // Mount represents a mount point in the container (bind, volume, or tmpfs).

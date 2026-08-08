@@ -108,5 +108,8 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		})
 	}
 
+	// Handle Sysctls
+	hostConfig.Sysctls = config.Sysctls
+
 	return containerConfig, hostConfig, nil, nil
 }

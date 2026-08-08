@@ -29,6 +29,57 @@ func parseSlice[T any](slice []string, sourceLabel string, parser func(string, s
 	return res, nil
 }
 
+func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
+	sysctls, err := pickConfigs(
+		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
+		func(t ToolConfig) []string { return t.Sysctls },
+		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		func(s, src string) (string, error) {
+			parts := strings.SplitN(s, "=", 2)
+			if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+				switch src {
+				case "override":
+					return "", fmt.Errorf("invalid sysctl config (override): %q", s)
+				case "env":
+					return "", fmt.Errorf("invalid sysctl config in CDERUN_SYSCTL: %q", s)
+				default:
+					return "", fmt.Errorf("invalid sysctl config: %q", s)
+				}
+			}
+			return s, nil
+		},
+		fs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(sysctls) == 0 {
+		return nil, nil
+	}
+
+	res := make(map[string]string, len(sysctls))
+	for _, item := range sysctls {
+		var resolved string
+		if r != nil && (strings.Contains(item, "{{") || strings.HasPrefix(item, "~")) {
+			var err error
+			resolved, err = r.ResolveString(item)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			resolved = item
+		}
+		parts := strings.SplitN(resolved, "=", 2)
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		if k == "" {
+			return nil, fmt.Errorf("invalid sysctl key: %q", resolved)
+		}
+		res[k] = v
+	}
+	return res, nil
+}
+
 func pickConfigs[T any](
 	p1 []string,
 	p2 []string,
