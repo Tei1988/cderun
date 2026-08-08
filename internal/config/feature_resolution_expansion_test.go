@@ -151,9 +151,10 @@ func TestUnit_Config_Resolver_StickyErrorPattern(t *testing.T) {
 	assert.Equal(t, "plain-text", val2)
 
 	// 3. Resolve function should also operate in safe fallback mode
+	expectedSlice := []any{"{{HOME}}", "hello"}
 	sliceInput := []any{"{{HOME}}", "hello"}
 	resolvedSlice := r.Resolve(sliceInput)
-	assert.Equal(t, sliceInput, resolvedSlice)
+	assert.Equal(t, expectedSlice, resolvedSlice)
 
 	// 4. Retained error is still the same original error
 	assert.Equal(t, firstErr, r.Error())
@@ -211,7 +212,7 @@ func TestUnit_Config_Resolver_DirectiveRestrictions(t *testing.T) {
 func TestUnit_Config_Resolver_UnderTheHoodSecurityMockFS(t *testing.T) {
 	t.Parallel()
 
-	mfs := &julesExprMockFS2{
+	mfs := &absErrorMockFileSystem{
 		MockFileSystem: MockFileSystem{
 			WD:      "/work",
 			HomeDir: "/home/user",
@@ -227,12 +228,12 @@ func TestUnit_Config_Resolver_UnderTheHoodSecurityMockFS(t *testing.T) {
 	assert.Contains(t, err.Error(), "simulated abs path error")
 }
 
-type julesExprMockFS2 struct {
+type absErrorMockFileSystem struct {
 	MockFileSystem
 	absErr error
 }
 
-func (m *julesExprMockFS2) Abs(path string) (string, error) {
+func (m *absErrorMockFileSystem) Abs(path string) (string, error) {
 	if m.absErr != nil {
 		return "", m.absErr
 	}

@@ -3,6 +3,10 @@ package command
 import (
 	"context"
 	"io"
+	"os"
+	"slices"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -175,12 +179,19 @@ func TestUnit_Command_Robustness_RapidSignalsDeadlockCheck(t *testing.T) {
 	t.Parallel()
 
 	// Since we are checking for deadlocks and hangs, we should use context timeouts
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	mockRuntime := &runtime.MockRuntime{
-		CreatedContainerID: "test-signal-hang-check",
+	waitChan := make(chan int)
+	startedChan := make(chan struct{})
+	mockRuntime := &signalRecordingMockRuntime{
+		waitChan:    waitChan,
+		startedChan: startedChan,
 	}
+	mockRuntime.CreatedContainerID = "test-signal-hang-check"
+
+	var capturedSigChan chan os.Signal
+	var sigChanMu sync.Mutex
 
 	args := []string{"cderun", "--image", "alpine", "sleep", "1"}
 	errChan := make(chan error, 1)
@@ -192,21 +203,53 @@ func TestUnit_Command_Robustness_RapidSignalsDeadlockCheck(t *testing.T) {
 			}
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return false }
+			o.setupSignals = func(sigChan chan os.Signal) {
+				sigChanMu.Lock()
+				capturedSigChan = sigChan
+				sigChanMu.Unlock()
+			}
+			o.stopSignalHandling = func(sigChan chan os.Signal) {}
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
 		})
 	}()
 
-	// Wait briefly for execution initialization
-	time.Sleep(50 * time.Millisecond)
+	// Wait for signals setup
+	require.Eventually(t, func() bool {
+		sigChanMu.Lock()
+		defer sigChanMu.Unlock()
+		return capturedSigChan != nil
+	}, 2*time.Second, 10*time.Millisecond)
 
-	// Since the run is simulated with a mock runtime, the waitChan or execution flow
-	// could be completed or waiting.
-	// We check if the execution was completed without deadlock.
+	// Wait deterministically for container startup to begin
+	select {
+	case <-startedChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Container did not start in time")
+	}
+
+	// Copy signal channel under mutex before sending
+	sigChanMu.Lock()
+	localSigChan := capturedSigChan
+	sigChanMu.Unlock()
+
+	// Inject multiple controlled signals through the command's signal path after startup
+	localSigChan <- syscall.SIGHUP
+
+	// Assert that mockRuntime records the first forwarded signal before errChan completes
+	assert.Eventually(t, func() bool {
+		sigs := mockRuntime.getSignals()
+		return slices.Contains(sigs, "SIGHUP")
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Send the second signal, which triggers rapid-consecutive cancellation
+	localSigChan <- syscall.SIGQUIT
+
+	// Verify that the context cancels and the execution exits cleanly
 	select {
 	case err := <-errChan:
-		// If completed immediately because of mock runtime behavior, it is fine
-		require.NoError(t, err)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
 	case <-ctx.Done():
 		t.Fatal("Execution context timed out / deadlock detected")
 	}
