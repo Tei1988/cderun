@@ -249,7 +249,7 @@ func TestUnit_Command_Robustness_RapidSignalsDeadlockCheck(t *testing.T) {
 	select {
 	case err := <-errChan:
 		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 	case <-ctx.Done():
 		t.Fatal("Execution context timed out / deadlock detected")
 	}
