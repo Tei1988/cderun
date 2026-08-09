@@ -410,20 +410,16 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 func (rv *resolver) resolveEarly() error {
 	// Early resolution (Diagnosis & StrictEnv)
 	// We call applyBoolOption directly which uses fast-paths.
-	if opt, ok := GetBoolOption("diagnosis"); ok {
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
-		}
-	} else {
+	if opt, ok := GetBoolOption("diagnosis"); !ok {
 		return fmt.Errorf("registry mismatch: early boolean option \"diagnosis\" not found")
+	} else if err := rv.applyBoolOption(opt); err != nil {
+		return err
 	}
 
-	if opt, ok := GetBoolOption("strict-env"); ok {
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
-		}
-	} else {
+	if opt, ok := GetBoolOption("strict-env"); !ok {
 		return fmt.Errorf("registry mismatch: early boolean option \"strict-env\" not found")
+	} else if err := rv.applyBoolOption(opt); err != nil {
+		return err
 	}
 
 	// Sensitive Env Resolution (needed for masking in debug logs during further resolution)
@@ -729,29 +725,16 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	// Resolve mount-all-tools (transitive trigger)
-	{
-		opt, _ := GetBoolOption("mount-all-tools")
-		p1Set, p1Val := getPtrVal(rv.cli.CderunMountAllTools)
-		p2Set, p2Val := getPtrVal(rv.cli.MountAllTools)
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		var err error
-		rv.res.MountAllTools, err = resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
+	var err error
+	rv.res.MountAllTools, err = rv.resolveBoolOption("mount-all-tools", rv.cli.CderunMountAllTools, rv.cli.MountAllTools)
+	if err != nil {
+		return err
 	}
 
 	var mountCderunSpecified bool
-	{
-		opt, _ := GetBoolOption("mount-cderun")
-		p1Set, p1Val := getPtrVal(rv.cli.CderunMountCderun)
-		p2Set, p2Val := getPtrVal(rv.cli.MountCderun)
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		var err error
-		rv.res.MountCderun, mountCderunSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
+	rv.res.MountCderun, mountCderunSpecified, err = rv.resolveBoolOptionInfo("mount-cderun", rv.cli.CderunMountCderun, rv.cli.MountCderun)
+	if err != nil {
+		return err
 	}
 	if !mountCderunSpecified {
 		rv.res.MountCderun = len(rv.res.MountTools) > 0 || rv.res.MountAllTools
@@ -772,16 +755,9 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	var mountSocketSpecified bool
-	{
-		opt, _ := GetBoolOption("mount-socket")
-		p1Set, p1Val := getPtrVal(rv.cli.CderunMountSocket)
-		p2Set, p2Val := getPtrVal(rv.cli.MountSocket)
-		def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-		var err error
-		rv.res.MountSocket, mountSocketSpecified, err = resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
+	rv.res.MountSocket, mountSocketSpecified, err = rv.resolveBoolOptionInfo("mount-socket", rv.cli.CderunMountSocket, rv.cli.MountSocket)
+	if err != nil {
+		return err
 	}
 	if !mountSocketSpecified {
 		rv.res.MountSocket = rv.res.MountCderun
