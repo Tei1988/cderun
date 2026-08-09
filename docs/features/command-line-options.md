@@ -377,7 +377,7 @@ cderun --privileged alpine ls /dev
 cderun --read-only alpine touch /test-write
 ```
 
-### `--init`
+### `--init` (Container Init Process)
 
 - **Type**: bool
 - **Default**: `false`
@@ -442,7 +442,7 @@ cderun --init alpine ps aux
 cderun --security-opt no-new-privileges alpine sh
 ```
 
-### `--ulimit`
+### `--ulimit` (Process Resource Limits)
 
 - **Type**: stringArray
 - **Default**: `none`
