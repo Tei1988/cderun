@@ -32,21 +32,21 @@ This updates the virtual PTY dimensions inside the container runtime to match th
 
 ---
 
-## Root Cause Analysis
+## Suspected Root Cause Analysis (Hypothesized Mechanisms)
 
-The abrupt termination/crash of macOS Terminal.app is caused by a race condition and geometry mismatch when cursor wrapping occurs under raw mode, exacerbated by boundary handling:
+While a definitive confirmation requires a full crash log or thread backtrace from macOS Terminal.app, the abrupt termination of the terminal emulator is strongly suspected/hypothesized to be caused by a geometry and stream synchronization mismatch when cursor wrapping occurs under raw mode, specifically exacerbated by the following mechanisms:
 
-### 1. DSR Cursor Position Query (Device Status Report) and Wrap Out-of-Bounds
+### 1. Hypothesized DSR/Wrap Race and Layout-Thread Mismatch
 
-- Fully-interactive CLI editors (such as `kiro-cli` or editors using Rust's `crossterm` / `termion` crates) periodically query the terminal state using the Device Status Report sequence (`\x1b[6n`) to get precise cursor coordinates.
-- If there is a transient mismatch where the container PTY is slightly larger/smaller than the physical host window, or if a resize event is in-flight, the editor can calculate coordinates based on stale geometry.
-- If a wrap sequence or rendering command is sent to macOS Terminal.app when the cursor is precisely at the right edge boundary (the auto-wrap DECAWM boundary) with misaligned row/column settings, the terminal's internal layout thread encounters a rendering buffer boundary mismatch, leading to an uncaught crash (SIGSEGV) in Terminal.app itself.
+- **Query-Resize Mismatch:** Fully-interactive CLI editors (such as `kiro-cli` or editors using Rust's `crossterm` / `termion` crates) periodically query the terminal state using the Device Status Report sequence (`\x1b[6n`) to obtain precise cursor coordinates.
+- **Race Condition:** If there is a transient mismatch where the container PTY is slightly larger/smaller than the physical host window, or if a resize event is in-flight, the editor may calculate rendering offsets based on stale geometry.
+- **Suspected Terminal Crash Trigger:** It is hypothesized that if a wrap sequence or rendering command is sent to macOS Terminal.app when the cursor is precisely at the right edge boundary (the auto-wrap DECAWM boundary) under raw mode with misaligned row/column settings, the terminal's internal layout thread may encounter a rendering buffer boundary mismatch, leading to an uncaught `SIGSEGV` or exception in Terminal.app itself.
 
-### 2. Zero-Geometry Division-by-Zero and Loop Flood
+### 2. Confirmed Zero-Geometry Loop and Suspected Flood Trigger
 
-- When window size is extremely small, or during layout/minimization transitions, `termGetSize` can temporarily return `0` for height or width.
-- `uint(h)` and `uint(w)` are passed to the PTY. If the column width is set to `0`, containerized applications enter division-by-zero panics or start an infinite drawing loop where they flood the standard stream with invalid positioning sequences like `\x1b[y;0H`.
-- Receipt of high-frequency corrupt sequences or invalid coordinate operations at the right edge wraps the rendering boundary in Terminal.app and triggers the emulator crash.
+- **Confirmed cderun Resize Behavior:** During window layout or minimization transitions, `termGetSize` can temporarily return `0` for height or width. Currently, `uint(h)` and `uint(w)` are passed directly to the PTY without non-zero validation.
+- **PTY Loop Behavior:** When the PTY column width is set to `0`, containerized applications are confirmed to enter division-by-zero loops or start a draw loop where they flood the standard output stream with invalid positioning sequences like `\x1b[y;0H`.
+- **Suspected Crash Trigger:** The receipt of high-frequency invalid drawing operations or corrupt sequences at the wrap boundaries is suspected to exceed the boundary tolerance of Terminal.app, triggering the app's termination.
 
 ---
 
