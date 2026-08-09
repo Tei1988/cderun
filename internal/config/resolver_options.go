@@ -78,75 +78,79 @@ func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 
 }
 
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
 	var p1v, p2v []string
 	var fastPathUsed bool
 
-	expected := expectedFieldIndices[opt.Name]
-	if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
-		switch opt.Name {
-		case "publish":
-			p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
-			fastPathUsed = true
-		case "expose":
-			p1v, p2v = rv.cli.CderunExpose, rv.cli.Expose
-			fastPathUsed = true
-		case "dns":
-			p1v, p2v = rv.cli.CderunDNS, rv.cli.DNS
-			fastPathUsed = true
-		case "add-host":
-			p1v, p2v = rv.cli.CderunAddHosts, rv.cli.AddHosts
-			fastPathUsed = true
-		case "group-add":
-			p1v, p2v = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
-			fastPathUsed = true
-		case "cap-add":
-			p1v, p2v = rv.cli.CderunCapAdd, rv.cli.CapAdd
-			fastPathUsed = true
-		case "cap-drop":
-			p1v, p2v = rv.cli.CderunCapDrop, rv.cli.CapDrop
-			fastPathUsed = true
-		case "entrypoint":
-			p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
-			fastPathUsed = true
-		}
-	}
-
-	def := OptionDef[[]string]{
-		EnvKey:       opt.EnvKey,
-		ToolGetter:   opt.ToolGetter,
-		GlobalGetter: opt.GlobalGetter,
+	switch opt.Name {
+	case "publish":
+		p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
+		fastPathUsed = true
+	case "expose":
+		p1v, p2v = rv.cli.CderunExpose, rv.cli.Expose
+		fastPathUsed = true
+	case "dns":
+		p1v, p2v = rv.cli.CderunDNS, rv.cli.DNS
+		fastPathUsed = true
+	case "add-host":
+		p1v, p2v = rv.cli.CderunAddHosts, rv.cli.AddHosts
+		fastPathUsed = true
+	case "group-add":
+		p1v, p2v = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
+		fastPathUsed = true
+	case "cap-add":
+		p1v, p2v = rv.cli.CderunCapAdd, rv.cli.CapAdd
+		fastPathUsed = true
+	case "cap-drop":
+		p1v, p2v = rv.cli.CderunCapDrop, rv.cli.CapDrop
+		fastPathUsed = true
+	case "entrypoint":
+		p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
-		rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
-		if err != nil {
-			return err
+		// Drift guard check (look up info/expected inside)
+		info, ok := fieldInfo[opt.Name]
+		expected := expectedFieldIndices[opt.Name]
+		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+			fastPathUsed = false
+		} else {
+			def := OptionDef[[]string]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+			}
+
+			rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
+			if err != nil {
+				return err
+			}
+			resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
+			switch opt.Name {
+			case "publish":
+				rv.res.Ports = resolved
+			case "expose":
+				rv.res.Expose = resolved
+			case "dns":
+				rv.res.DNS = resolved
+			case "add-host":
+				rv.res.AddHosts = resolved
+			case "group-add":
+				rv.res.GroupAdd = resolved
+			case "cap-add":
+				rv.res.CapAdd = resolved
+			case "cap-drop":
+				rv.res.CapDrop = resolved
+			case "entrypoint":
+				rv.res.Entrypoint = resolved
+			}
+			return nil
 		}
-		resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
-		switch opt.Name {
-		case "publish":
-			rv.res.Ports = resolved
-		case "expose":
-			rv.res.Expose = resolved
-		case "dns":
-			rv.res.DNS = resolved
-		case "add-host":
-			rv.res.AddHosts = resolved
-		case "group-add":
-			rv.res.GroupAdd = resolved
-		case "cap-add":
-			rv.res.CapAdd = resolved
-		case "cap-drop":
-			rv.res.CapDrop = resolved
-		case "entrypoint":
-			rv.res.Entrypoint = resolved
-		}
-		return nil
+	}
+
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
@@ -156,6 +160,12 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 
 	p1v, _ = rv.extractStringSliceValue(p1Val, p1Set)
 	p2v, _ = rv.extractStringSliceValue(p2Val, p2Set)
+
+	def := OptionDef[[]string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+	}
 
 	rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
 	if err != nil {
@@ -168,11 +178,6 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
 	var p1Set, p2Set bool
 	var p1Val, p2Val string
 	var fastPathUsed bool
@@ -230,50 +235,62 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	}
 
 	if fastPathUsed {
-		def := OptionDef[string]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
-			Fallback:     opt.Default,
-		}
-		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-		if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
-			r, err := rv.getR()
-			if err != nil {
-				return err
+		// Drift guard check (look up info/expected inside)
+		info, ok := fieldInfo[opt.Name]
+		expected := expectedFieldIndices[opt.Name]
+		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+			fastPathUsed = false
+		} else {
+			def := OptionDef[string]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+				Fallback:     opt.Default,
 			}
-			resolved = r.resolveString(resolved)
-			if err := r.Error(); err != nil {
-				return err
+			resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+			if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+				r, err := rv.getR()
+				if err != nil {
+					return err
+				}
+				resolved = r.resolveString(resolved)
+				if err := r.Error(); err != nil {
+					return err
+				}
 			}
+			switch opt.Name {
+			case "image":
+				rv.res.Image = resolved
+			case "pid":
+				rv.res.Pid = resolved
+			case "network":
+				rv.res.Network = resolved
+			case "workdir":
+				rv.res.Workdir = resolved
+			case "runtime":
+				rv.res.Runtime = resolved
+			case "user":
+				rv.res.User = resolved
+			case "log-level":
+				rv.res.LogLevel = resolved
+			case "log-format":
+				rv.res.LogFormat = resolved
+			case "hostname":
+				rv.res.Hostname = resolved
+			case "pull":
+				rv.res.Pull = resolved
+			case "dry-run-format":
+				rv.res.DryRunFormat = resolved
+			case "diagnosis-format":
+				rv.res.DiagnosisFormat = resolved
+			}
+			return nil
 		}
-		switch opt.Name {
-		case "image":
-			rv.res.Image = resolved
-		case "pid":
-			rv.res.Pid = resolved
-		case "network":
-			rv.res.Network = resolved
-		case "workdir":
-			rv.res.Workdir = resolved
-		case "runtime":
-			rv.res.Runtime = resolved
-		case "user":
-			rv.res.User = resolved
-		case "log-level":
-			rv.res.LogLevel = resolved
-		case "log-format":
-			rv.res.LogFormat = resolved
-		case "hostname":
-			rv.res.Hostname = resolved
-		case "pull":
-			rv.res.Pull = resolved
-		case "dry-run-format":
-			rv.res.DryRunFormat = resolved
-		case "diagnosis-format":
-			rv.res.DiagnosisFormat = resolved
-		}
-		return nil
+	}
+
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
@@ -296,11 +313,6 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 }
 
 func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
 	var p1Set, p2Set bool
 	var p1Val, p2Val bool
 	var fastPathUsed bool
@@ -366,46 +378,58 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	}
 
 	if fastPathUsed {
-		def := OptionDef[*bool]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
+		// Drift guard check (look up info/expected inside)
+		info, ok := fieldInfo[opt.Name]
+		expected := expectedFieldIndices[opt.Name]
+		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+			fastPathUsed = false
+		} else {
+			def := OptionDef[*bool]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+			}
+			resolved, err := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+			if err != nil {
+				return err
+			}
+			switch opt.Name {
+			case "tty":
+				rv.res.TTY = resolved
+			case "interactive":
+				rv.res.Interactive = resolved
+			case "read-only":
+				rv.res.ReadOnly = resolved
+			case "init":
+				rv.res.Init = resolved
+			case "remove":
+				rv.res.Remove = resolved
+			case "diagnosis":
+				rv.res.Diagnosis = resolved
+			case "strict-env":
+				rv.res.StrictEnv = resolved
+			case "privileged":
+				rv.res.Privileged = resolved
+			case "publish-all":
+				rv.res.PublishAll = resolved
+			case "log-timestamp":
+				rv.res.LogTimestamp = resolved
+			case "mount-socket":
+				rv.res.MountSocket = resolved
+			case "mount-cderun":
+				rv.res.MountCderun = resolved
+			case "mount-all-tools":
+				rv.res.MountAllTools = resolved
+			case "dry-run":
+				rv.res.DryRun = resolved
+			}
+			return nil
 		}
-		resolved, err := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
-		switch opt.Name {
-		case "tty":
-			rv.res.TTY = resolved
-		case "interactive":
-			rv.res.Interactive = resolved
-		case "read-only":
-			rv.res.ReadOnly = resolved
-		case "init":
-			rv.res.Init = resolved
-		case "remove":
-			rv.res.Remove = resolved
-		case "diagnosis":
-			rv.res.Diagnosis = resolved
-		case "strict-env":
-			rv.res.StrictEnv = resolved
-		case "privileged":
-			rv.res.Privileged = resolved
-		case "publish-all":
-			rv.res.PublishAll = resolved
-		case "log-timestamp":
-			rv.res.LogTimestamp = resolved
-		case "mount-socket":
-			rv.res.MountSocket = resolved
-		case "mount-cderun":
-			rv.res.MountCderun = resolved
-		case "mount-all-tools":
-			rv.res.MountAllTools = resolved
-		case "dry-run":
-			rv.res.DryRun = resolved
-		}
-		return nil
+	}
+
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
@@ -421,39 +445,43 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 }
 
 func (rv *resolver) applyIntOption(opt IntOption) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
 	var p1Set, p2Set bool
 	var p1Int, p2Int int
 	var fastPathUsed bool
 
 	if opt.Name == "pull-max-retries" {
-		expected := expectedFieldIndices["pull-max-retries"]
-		if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
-			p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
-			p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
-			fastPathUsed = true
-		}
+		p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
+		p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
-		def := OptionDef[*int]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
+		// Drift guard check (look up info/expected inside)
+		info, ok := fieldInfo[opt.Name]
+		expected := expectedFieldIndices[opt.Name]
+		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+			fastPathUsed = false
+		} else {
+			def := OptionDef[*int]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+			}
+			resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
+			if err != nil {
+				return err
+			}
+			switch opt.Name {
+			case "pull-max-retries":
+				rv.res.PullMaxRetries = resolved
+			}
+			return nil
 		}
-		resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
-		switch opt.Name {
-		case "pull-max-retries":
-			rv.res.PullMaxRetries = resolved
-		}
-		return nil
+	}
+
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)
@@ -476,39 +504,43 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 }
 
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	info, ok := fieldInfo[opt.Name]
-	if !ok {
-		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
-	}
-
 	var p1Set, p2Set bool
 	var p1Float, p2Float float64
 	var fastPathUsed bool
 
 	if opt.Name == "cpus" {
-		expected := expectedFieldIndices["cpus"]
-		if info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
-			p1Set, p1Float = getPtrVal(rv.cli.CderunCPUs)
-			p2Set, p2Float = getPtrVal(rv.cli.CPUs)
-			fastPathUsed = true
-		}
+		p1Set, p1Float = getPtrVal(rv.cli.CderunCPUs)
+		p2Set, p2Float = getPtrVal(rv.cli.CPUs)
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
-		def := OptionDef[*float64]{
-			EnvKey:       opt.EnvKey,
-			ToolGetter:   opt.ToolGetter,
-			GlobalGetter: opt.GlobalGetter,
+		// Drift guard check (look up info/expected inside)
+		info, ok := fieldInfo[opt.Name]
+		expected := expectedFieldIndices[opt.Name]
+		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+			fastPathUsed = false
+		} else {
+			def := OptionDef[*float64]{
+				EnvKey:       opt.EnvKey,
+				ToolGetter:   opt.ToolGetter,
+				GlobalGetter: opt.GlobalGetter,
+			}
+			resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
+			if err != nil {
+				return err
+			}
+			switch opt.Name {
+			case "cpus":
+				rv.res.CPUs = resolved
+			}
+			return nil
 		}
-		resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
-		if err != nil {
-			return err
-		}
-		switch opt.Name {
-		case "cpus":
-			rv.res.CPUs = resolved
-		}
-		return nil
+	}
+
+	info, ok := fieldInfo[opt.Name]
+	if !ok {
+		return fmt.Errorf("registry mismatch: info for option %q not found", opt.Name)
 	}
 
 	s1, p1v := getFieldInfo(rv.getCliVal(), info.p1ValIdx)

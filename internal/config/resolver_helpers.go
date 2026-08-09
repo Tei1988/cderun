@@ -248,8 +248,8 @@ func deduplicateEnv(env []string) []string {
 		return env
 	}
 	if len(env) <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 		hasDuplicates := false
 
@@ -314,8 +314,8 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 
 	if total <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 
 		for _, e := range base {

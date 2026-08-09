@@ -5,8 +5,6 @@ import (
 	"net"
 	"path"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -218,7 +216,7 @@ func (dc *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 		if a.Destination.IsEmpty() {
 			return fmt.Errorf("device destination is required at line %d", node.Line)
 		}
-		if a.Permissions != "" && !PermsRegex.MatchString(a.Permissions) {
+		if a.Permissions != "" && !isValidPerms(a.Permissions) {
 			return fmt.Errorf("invalid device permissions at line %d: %q", node.Line, a.Permissions)
 		}
 
@@ -358,7 +356,7 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	lastColon := strings.LastIndex(remainder, ":")
 	if lastColon != -1 {
 		perms := remainder[lastColon+1:]
-		if PermsRegex.MatchString(perms) {
+		if isValidPerms(perms) {
 			permissions = perms
 			containerPath = remainder[:lastColon]
 			// If there's another colon, it's malformed (we only support host:container:perms).
@@ -384,15 +382,43 @@ func ParseDeviceConfig(d string) (DeviceConfig, bool) {
 	}, true
 }
 
-var (
-	schemeRegex = regexp.MustCompile(`^[a-z]+://`)
-	PermsRegex  = regexp.MustCompile(`^[rwm]+$`)
+func hasScheme(s string) bool {
+	idx := strings.Index(s, "://")
+	if idx <= 0 {
+		return false
+	}
+	for i := 0; i < idx; i++ {
+		c := s[i]
+		if c < 'a' || c > 'z' {
+			return false
+		}
+	}
+	return true
+}
 
-	hostnameRegex  = regexp.MustCompile(`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`)
-	userPartRegex  = regexp.MustCompile(`^([a-z_][a-z0-9_-]*[$]?|[0-9]+)$`)
-	capRegex       = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
-	groupPartRegex = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_-]*[$]?|[0-9]+)$`)
-)
+func isValidPerms(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c != 'r' && c != 'w' && c != 'm' {
+			return false
+		}
+	}
+	return true
+}
+
+func isWinDrive(s string) bool {
+	if len(s) < 3 {
+		return false
+	}
+	c := s[0]
+	if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) && s[1] == ':' && (s[2] == '/' || s[2] == '\\') {
+		return true
+	}
+	return false
+}
 
 // ResolvePath resolves expressions, expands tilde, and handles relative paths.
 func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error) {
@@ -425,7 +451,7 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 	}
 
 	// If expanded value contains a scheme, return it as is
-	if schemeRegex.FindString(res) != "" {
+	if hasScheme(res) {
 		return res, nil
 	}
 
@@ -459,8 +485,6 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 
 	return absPath, nil
 }
-
-var winDriveRegex = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(v)
@@ -517,7 +541,7 @@ func SplitHostRemainder(s string) (string, string, bool) {
 		return "", "", false
 	}
 
-	if winDriveRegex.MatchString(s) {
+	if isWinDrive(s) {
 		nextSep := strings.Index(s[sepIdx+1:], ":")
 		if nextSep == -1 {
 			return "", "", false
@@ -596,7 +620,7 @@ func ValidateGroupAdd(s string) error {
 	if s == "" {
 		return nil
 	}
-	if !groupPartRegex.MatchString(s) {
+	if !isValidGroupPart(s) {
 		return fmt.Errorf("invalid supplementary group name or GID: %q", s)
 	}
 	return nil
@@ -750,6 +774,54 @@ func ValidateImageName(s string) error {
 	return nil
 }
 
+func isValidHostname(s string) bool {
+	if s == "" {
+		return false
+	}
+	if len(s) > 253 {
+		return false
+	}
+
+	start := 0
+	for {
+		end := strings.IndexByte(s[start:], '.')
+		var label string
+		if end == -1 {
+			label = s[start:]
+		} else {
+			label = s[start : start+end]
+		}
+
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+
+		// First and last char of label cannot be '-'
+		first := label[0]
+		if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9')) {
+			return false
+		}
+		last := label[len(label)-1]
+		if !((last >= 'a' && last <= 'z') || (last >= 'A' && last <= 'Z') || (last >= '0' && last <= '9')) {
+			return false
+		}
+
+		// Other characters must be alphanumerics or '-'
+		for i := 1; i < len(label)-1; i++ {
+			c := label[i]
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+				return false
+			}
+		}
+
+		if end == -1 {
+			break
+		}
+		start += end + 1
+	}
+	return true
+}
+
 // ValidateHostname ensures the hostname follows standard DNS label rules.
 func ValidateHostname(s string) error {
 	if s == "" {
@@ -758,7 +830,7 @@ func ValidateHostname(s string) error {
 	if len(s) > 253 {
 		return fmt.Errorf("hostname too long: %d characters (max 253)", len(s))
 	}
-	if !hostnameRegex.MatchString(s) {
+	if !isValidHostname(s) {
 		return fmt.Errorf("invalid hostname: %q", s)
 	}
 	return nil
@@ -786,19 +858,88 @@ func ValidateNetworkName(s string) error {
 	return nil
 }
 
+func isValidUserPart(s string) bool {
+	if s == "" {
+		return false
+	}
+	// Check if completely numeric
+	isNumeric := true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < '0' || c > '9' {
+			isNumeric = false
+			break
+		}
+	}
+	if isNumeric {
+		return true
+	}
+
+	// Check if it matches: ^[a-z_][a-z0-9_-]*[$]?$
+	first := s[0]
+	if !((first >= 'a' && first <= 'z') || first == '_') {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if i == len(s)-1 && c == '$' {
+			break
+		}
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+func isValidGroupPart(s string) bool {
+	if s == "" {
+		return false
+	}
+	// Check if completely numeric
+	isNumeric := true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < '0' || c > '9' {
+			isNumeric = false
+			break
+		}
+	}
+	if isNumeric {
+		return true
+	}
+
+	// Check if it matches: ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$
+	first := s[0]
+	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if i == len(s)-1 && c == '$' {
+			break
+		}
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+			return false
+		}
+	}
+	return true
+}
+
 // ValidateUserName ensures the user name (or user:group) is valid.
 func ValidateUserName(s string) error {
 	if s == "" {
 		return nil
 	}
-	parts := strings.Split(s, ":")
-	if len(parts) > 2 {
+	user, group, hasGroup := strings.Cut(s, ":")
+	if hasGroup && strings.Contains(group, ":") {
 		return fmt.Errorf("invalid user format: %q", s)
 	}
-	for _, p := range parts {
-		if !userPartRegex.MatchString(p) {
-			return fmt.Errorf("invalid user or group identifier: %q", p)
-		}
+	if !isValidUserPart(user) {
+		return fmt.Errorf("invalid user or group identifier: %q", user)
+	}
+	if hasGroup && !isValidUserPart(group) {
+		return fmt.Errorf("invalid user or group identifier: %q", group)
 	}
 	return nil
 }
@@ -911,6 +1052,23 @@ func ValidateAddHost(s string) error {
 	return nil
 }
 
+func isValidCapability(s string) bool {
+	if s == "" {
+		return false
+	}
+	first := s[0]
+	if first < 'A' || first > 'Z' {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // ValidateCapability ensures the Linux capability follows a safe format.
 func ValidateCapability(s string) error {
 	if s == "" {
@@ -919,13 +1077,24 @@ func ValidateCapability(s string) error {
 	if err := validatePathChars(s); err != nil {
 		return err
 	}
-	if !capRegex.MatchString(s) {
+	if !isValidCapability(s) {
 		return fmt.Errorf("invalid Linux capability: %q", s)
 	}
 	return nil
 }
 
-var workdirRegex = regexp.MustCompile(`^/[a-zA-Z0-9._\-/]*$`)
+func isValidWorkdirChars(s string) bool {
+	if len(s) == 0 || s[0] != '/' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-' || c == '/') {
+			return false
+		}
+	}
+	return true
+}
 
 // ValidateWorkdir ensures the working directory is a valid absolute path.
 func ValidateWorkdir(s string) error {
@@ -935,10 +1104,10 @@ func ValidateWorkdir(s string) error {
 	if !path.IsAbs(s) {
 		return fmt.Errorf("working directory must be an absolute path: %q", s)
 	}
-	if !workdirRegex.MatchString(s) {
+	if !isValidWorkdirChars(s) {
 		return fmt.Errorf("invalid characters in working directory: %q", s)
 	}
-	if slices.Contains(strings.Split(s, "/"), "..") {
+	if HasParentTraversal(s) {
 		return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
 	}
 	return nil
