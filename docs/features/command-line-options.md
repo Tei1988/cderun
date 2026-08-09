@@ -382,11 +382,11 @@ cderun --read-only alpine touch /test-write
 - **Type**: bool
 - **Default**: `false`
 - **Environment Variable**: `CDERUN_INIT`
-- **Description**: Run an init process inside the container to forward signals and reap processes.
+- **Description**: Run an init process inside the container to forward signals and reap zombie processes.
 - **Details**:
-  - **Docker / Podman**: Maps to `Init` in the host configuration.
-  - **containerd**: Not supported. Explicitly rejected with a `"containerd runtime: init is not supported yet"` validation error.
-- **P1 Internal Override**: `--cderun-init` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must use the equals-sign format or trailing toggle, and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine --cderun-init`).
+  - **Docker / Podman**: Maps to `Init` in the host configuration (e.g., standard `tini`).
+  - **containerd**: Not supported. Explicitly rejected with a validation error (`"containerd runtime: init is not supported yet"`) in the containerd adapter's `ValidateConfig` method to prevent silent failures.
+- **P1 Internal Override**: `--cderun-init` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle (e.g., `--cderun-init` or `--cderun-init=false`), and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine touch /test --cderun-init`).
 
 ```bash
 cderun --init alpine ps aux
@@ -409,21 +409,6 @@ cderun --init alpine ps aux
 ```bash
 # Share host PID namespace
 cderun --pid host alpine ps aux
-```
-
-### `--init`
-
-- **Type**: bool
-- **Default**: `false`
-- **Environment Variable**: `CDERUN_INIT`
-- **Description**: Run an init process inside the container to forward signals and reap zombie processes.
-- **Details**:
-  - **Docker / Podman**: Maps to `Init` in the host configuration (e.g., standard `tini`).
-  - **containerd**: Directly rejected with a validation error ('containerd runtime: init is not supported yet') in the containerd adapter's `ValidateConfig` method to prevent silent failures.
-- **P1 Internal Override**: `--cderun-init` is the corresponding Phase 1 (P1) internal override flag. It accepts a boolean toggle and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine touch /test --cderun-init`).
-
-```bash
-cderun --init alpine ps aux
 ```
 
 ### `--security-opt`

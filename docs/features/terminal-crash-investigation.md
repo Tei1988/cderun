@@ -54,10 +54,10 @@ The abrupt termination/crash of macOS Terminal.app is caused by a race condition
 
 1. **Environment:** macOS with Terminal.app.
 
-2. **Execution:** Run cderun with TTY/Interactive enabled:
+2. **Execution:** Run cderun with TTY/Interactive enabled to start an interactive shell:
 
    ```bash
-   cderun --tty --interactive --image=rust alpine
+   cderun --tty --interactive --image=rust sh
    ```
 
 3. **Trigger:** Inside the container, run a terminal editor like `kiro-cli` or execute a command that draws characters rapidly up to the exact column width of the window.
@@ -72,14 +72,14 @@ The abrupt termination/crash of macOS Terminal.app is caused by a race condition
 
 To harden the runner and protect the host terminal from crashing, we propose the following changes:
 
-### 1. Minimum Geometry Clamping
+### 1. Minimum Geometry Validation (Skip Invalid Geometry)
 
-Ensure that PTY size updates never pass `0` or negative values to the runtime:
+Ensure that PTY size updates never pass `0` or negative values to the runtime by validating the dimensions and skipping invalid sizes:
 
 ```go
 handleResize := func() {
   w, h, err := o.termGetSize(fd)
-  if err == nil && h > 0 && w > 0 { // Clamp to strictly positive integers
+  if err == nil && h > 0 && w > 0 { // Skip 0 or negative coordinates
     _ = rt.ResizeContainerTTY(ctx, containerID, uint(h), uint(w))
   }
 }
