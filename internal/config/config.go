@@ -628,6 +628,9 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 // resolveAbsolutePath resolves the provided path, expanding the home directory symbol (~) if present
 // and converting it to an absolute path.
 func (l *ConfigLoader) resolveAbsolutePath(path string) (string, error) {
+	if err := validatePathChars(path); err != nil {
+		return "", fmt.Errorf("security validation failed for config path: %w", err)
+	}
 	if strings.HasPrefix(path, "~") {
 		home, err := l.fs.UserHomeDir()
 		if err != nil {

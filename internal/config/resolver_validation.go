@@ -134,6 +134,9 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.Network == "host" {
 			logging.Warn("Container is running with host network mode enabled. This disables network isolation and may expose host network services to the container.")
 		}
+		if rv.res.Pid == "host" {
+			logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
+		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)

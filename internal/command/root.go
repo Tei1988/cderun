@@ -332,6 +332,12 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		fullCommand = append([]string{}, passthroughArgs...)
 	}
 
+	for i, arg := range fullCommand {
+		if strings.ContainsRune(arg, 0) {
+			return nil, fmt.Errorf("security validation failed: command argument [%d] contains null byte", i)
+		}
+	}
+
 	// Build ContainerConfig
 	containerConfig := &container.ContainerConfig{
 		Image:       resolved.Image,
