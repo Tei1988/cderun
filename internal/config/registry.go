@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"sync"
 )
 
 // StringOption defines a string-based configuration option.
@@ -647,76 +648,84 @@ var (
 	intOptionsMap         map[string]IntOption
 	float64OptionsMap     map[string]Float64Option
 	stringSliceOptionsMap map[string]StringSliceOption
+	registryOnce          sync.Once
 )
 
-func init() {
-	stringOptionsMap = make(map[string]StringOption, len(StringOptions))
-	for i := range StringOptions {
-		if StringOptions[i].FieldName == "" {
-			StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+func ensureRegistryMaps() {
+	registryOnce.Do(func() {
+		stringOptionsMap = make(map[string]StringOption, len(StringOptions))
+		for i := range StringOptions {
+			if StringOptions[i].FieldName == "" {
+				StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
+			}
+			stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
 		}
-		stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
-	}
 
-	boolOptionsMap = make(map[string]BoolOption, len(BoolOptions))
-	for i := range BoolOptions {
-		if BoolOptions[i].FieldName == "" {
-			BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+		boolOptionsMap = make(map[string]BoolOption, len(BoolOptions))
+		for i := range BoolOptions {
+			if BoolOptions[i].FieldName == "" {
+				BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+			}
+			boolOptionsMap[BoolOptions[i].Name] = BoolOptions[i]
 		}
-		boolOptionsMap[BoolOptions[i].Name] = BoolOptions[i]
-	}
 
-	intOptionsMap = make(map[string]IntOption, len(IntOptions))
-	for i := range IntOptions {
-		if IntOptions[i].FieldName == "" {
-			IntOptions[i].FieldName = PascalCase(IntOptions[i].Name)
+		intOptionsMap = make(map[string]IntOption, len(IntOptions))
+		for i := range IntOptions {
+			if IntOptions[i].FieldName == "" {
+				IntOptions[i].FieldName = PascalCase(IntOptions[i].Name)
+			}
+			intOptionsMap[IntOptions[i].Name] = IntOptions[i]
 		}
-		intOptionsMap[IntOptions[i].Name] = IntOptions[i]
-	}
 
-	float64OptionsMap = make(map[string]Float64Option, len(Float64Options))
-	for i := range Float64Options {
-		if Float64Options[i].FieldName == "" {
-			Float64Options[i].FieldName = PascalCase(Float64Options[i].Name)
+		float64OptionsMap = make(map[string]Float64Option, len(Float64Options))
+		for i := range Float64Options {
+			if Float64Options[i].FieldName == "" {
+				Float64Options[i].FieldName = PascalCase(Float64Options[i].Name)
+			}
+			float64OptionsMap[Float64Options[i].Name] = Float64Options[i]
 		}
-		float64OptionsMap[Float64Options[i].Name] = Float64Options[i]
-	}
 
-	stringSliceOptionsMap = make(map[string]StringSliceOption, len(StringSliceOptions))
-	for i := range StringSliceOptions {
-		if StringSliceOptions[i].FieldName == "" {
-			StringSliceOptions[i].FieldName = PascalCase(StringSliceOptions[i].Name)
+		stringSliceOptionsMap = make(map[string]StringSliceOption, len(StringSliceOptions))
+		for i := range StringSliceOptions {
+			if StringSliceOptions[i].FieldName == "" {
+				StringSliceOptions[i].FieldName = PascalCase(StringSliceOptions[i].Name)
+			}
+			stringSliceOptionsMap[StringSliceOptions[i].Name] = StringSliceOptions[i]
 		}
-		stringSliceOptionsMap[StringSliceOptions[i].Name] = StringSliceOptions[i]
-	}
+	})
 }
 
 // GetStringOption returns a string option by its kebab-case name.
 func GetStringOption(name string) (StringOption, bool) {
+	ensureRegistryMaps()
 	opt, ok := stringOptionsMap[name]
 	return opt, ok
 }
 
 // GetBoolOption returns a boolean option by its kebab-case name.
 func GetBoolOption(name string) (BoolOption, bool) {
+	ensureRegistryMaps()
 	opt, ok := boolOptionsMap[name]
 	return opt, ok
 }
 
 // GetIntOption returns an integer option by its kebab-case name.
 func GetIntOption(name string) (IntOption, bool) {
+	ensureRegistryMaps()
 	opt, ok := intOptionsMap[name]
 	return opt, ok
 }
 
 // GetFloat64Option returns a float64 option by its kebab-case name.
 func GetFloat64Option(name string) (Float64Option, bool) {
+	ensureRegistryMaps()
 	opt, ok := float64OptionsMap[name]
 	return opt, ok
 }
 
 // GetStringSliceOption returns a string slice option by its kebab-case name.
 func GetStringSliceOption(name string) (StringSliceOption, bool) {
+	ensureRegistryMaps()
 	opt, ok := stringSliceOptionsMap[name]
 	return opt, ok
 }

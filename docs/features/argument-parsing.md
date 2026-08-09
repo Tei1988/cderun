@@ -95,6 +95,19 @@ In standard **Wrapper Mode**, `--cderun-` flags **must** be placed **after** the
 
 During preprocessing (`preprocessArgs`), the preprocessor scans the argument list behind the subcommand, extracts all `--cderun-` prefixed flags and their values, and prepends (hoists) them before the subcommand. This ensures that these configuration flags are parsed as `cderun` settings instead of being passed to the container command.
 
+#### Two-Step Argument Rewriting Process
+
+During program startup (particularly visible when running in Polyglot/Symlink Mode), `cderun` processes and rewrites `os.Args` in two distinct steps:
+
+- **Rewrite step 1 (Binary Invocation Rewrite)**: Emits the `"cderun"` command as `os.Args[0]` to normalize standard flag processing.
+- **Rewrite step 2 (Hoisting & Subcommand Placement)**: Scans, extracts, and hoists only `--cderun-*` flags before the symlink-derived subcommand, while preserving the subcommand and all other remaining arguments in their exact original order.
+
+#### Flag Preprocessing and Adjacent Value Handling
+
+- **Space-Separated Value-Taking Flags**: If a value-taking `--cderun-` override flag (e.g., `--cderun-image`) is specified without an equals-sign, the preprocessor automatically consumes the next adjacent parameter as its value, hoisting both arguments together.
+- **Adjacent Flag Verification**: To prevent command structure corruption, if the next adjacent parameter is itself another `--cderun-` flag, preprocessing immediately aborts with a `"requires a value"` error.
+- **Boolean Override Flags**: Flags that act as boolean toggles (e.g., `--cderun-tty`, `--cderun-read-only`) do not consume subsequent adjacent parameters and are hoisted autonomously. However, they may accept inline boolean values using equals-sign format (e.g., `--cderun-tty=false`).
+
 #### Support for Space-Separated and Equals-Sign Formats for Value-Taking Flags
 
 To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`) can specify their value using either the space-separated format (e.g., `--cderun-image alpine`) or the equals-sign format (e.g., `--cderun-image=alpine`).
