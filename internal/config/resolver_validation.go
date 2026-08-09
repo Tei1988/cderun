@@ -62,12 +62,24 @@ var highlyPrivilegedCaps = map[string]bool{
 	"CAP_SYS_RESOURCE":        true,
 }
 
+var sensitiveMountPaths = []string{"/boot", "/dev", "/etc", "/proc", "/sys"}
+
 func isHighlyPrivilegedCapability(capName string) bool {
-	upperCap := strings.ToUpper(strings.TrimSpace(capName))
+	if highlyPrivilegedCaps[capName] {
+		return true
+	}
+	trimmed := strings.TrimSpace(capName)
+	if highlyPrivilegedCaps[trimmed] {
+		return true
+	}
+	upperCap := strings.ToUpper(trimmed)
 	return highlyPrivilegedCaps[upperCap]
 }
 
 func isHighlySensitiveDevice(p string) bool {
+	if !strings.HasPrefix(p, "/dev") {
+		return false
+	}
 	p = path.Clean(p)
 	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" {
 		return true
@@ -125,9 +137,8 @@ func (rv *resolver) validateSecurity() error {
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)
-				sensitivePaths := []string{"/boot", "/dev", "/etc", "/proc", "/sys"}
 				isSensitive := cleanSource == "/"
-				for _, p := range sensitivePaths {
+				for _, p := range sensitiveMountPaths {
 					if cleanSource == p || strings.HasPrefix(cleanSource, p+"/") {
 						isSensitive = true
 						break
@@ -438,7 +449,7 @@ func (rv *resolver) validateDeviceSecurity() error {
 			if err := validatePathChars(d.CgroupPermissions); err != nil {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): %w", i, err)
 			}
-			if !PermsRegex.MatchString(d.CgroupPermissions) {
+			if !isValidPerms(d.CgroupPermissions) {
 				return fmt.Errorf("security validation failed for devices[%d] (permissions): invalid cgroup permissions %q", i, d.CgroupPermissions)
 			}
 		}
