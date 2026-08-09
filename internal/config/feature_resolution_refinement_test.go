@@ -140,14 +140,17 @@ func TestUnit_Config_Resolver_MultipleAnchorsBoundaryValidation_Complex(t *testi
 	mfs := &MockFileSystem{
 		WD:      pwd,
 		HomeDir: home,
+		Env: map[string]string{
+			"PATH_SUFFIX": "/subdir",
+		},
 	}
 
 	t.Run("consecutive active anchors with boundary traversal", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		// Evaluates to "/home/user/../user/../../work" -> "/work" which escapes "/home/user" boundary.
-		_, err = ResolvePath("{{HOME}}/../user/../../work", pwd, r)
+		// Evaluates to "/home/user/subdir/../../work" -> "/work" which escapes the boundaries.
+		_, err = ResolvePath("{{HOME}}{{env:PATH_SUFFIX}}/../../work", pwd, r)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "path traversal detected")
 	})
@@ -197,7 +200,6 @@ func TestUnit_Config_Resolver_StrictVsLiteral_EdgeCases(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			r, err := NewExpressionResolverWithFS(nil, mfs)

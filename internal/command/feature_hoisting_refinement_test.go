@@ -201,9 +201,11 @@ func TestUnit_Command_ConsecutiveSignals_SIGHUP_Cancellation(t *testing.T) {
 
 	waitChan := make(chan int)
 	receivedChan := make(chan struct{})
+	startedChan := make(chan struct{})
 	mock := &refinementSignalCapturingRuntime{
 		waitChan:     waitChan,
 		receivedChan: receivedChan,
+		startedChan:  startedChan,
 	}
 	mock.CreatedContainerID = "sighup-consecutive-signals-test"
 
@@ -241,7 +243,13 @@ func TestUnit_Command_ConsecutiveSignals_SIGHUP_Cancellation(t *testing.T) {
 		return capturedSigChan != nil
 	}, 2*time.Second, 10*time.Millisecond)
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for deterministic container startup barrier
+	select {
+	case <-startedChan:
+		// State confirmed
+	case <-time.After(2 * time.Second):
+		t.Fatal("StartContainer was not executed in time")
+	}
 
 	// Send SIGHUP first
 	sigChanMu.Lock()
@@ -278,9 +286,20 @@ type refinementSignalCapturingRuntime struct {
 	runtime.MockRuntime
 	waitChan         chan int
 	receivedChan     chan struct{}
+	startedChan      chan struct{}
 	receivedOnce     sync.Once
+	startOnce        sync.Once
 	forwardedSignals []string
 	mu               sync.Mutex
+}
+
+func (m *refinementSignalCapturingRuntime) StartContainer(ctx context.Context, id string) error {
+	if m.startedChan != nil {
+		m.startOnce.Do(func() {
+			close(m.startedChan)
+		})
+	}
+	return m.MockRuntime.StartContainer(ctx, id)
 }
 
 func (m *refinementSignalCapturingRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
