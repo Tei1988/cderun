@@ -364,10 +364,22 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 				if !strings.HasPrefix(rlimitType, "RLIMIT_") {
 					rlimitType = "RLIMIT_" + rlimitType
 				}
+				var hardVal uint64
+				if u.Hard < 0 {
+					hardVal = math.MaxUint64
+				} else {
+					hardVal = uint64(u.Hard)
+				}
+				var softVal uint64
+				if u.Soft < 0 {
+					softVal = math.MaxUint64
+				} else {
+					softVal = uint64(u.Soft)
+				}
 				s.Process.Rlimits = append(s.Process.Rlimits, specs.POSIXRlimit{
 					Type: rlimitType,
-					Hard: uint64(u.Hard),
-					Soft: uint64(u.Soft),
+					Hard: hardVal,
+					Soft: softVal,
 				})
 			}
 			return nil

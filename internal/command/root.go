@@ -191,13 +191,6 @@ func (o *rootOptions) ensureHooks() {
 	}
 }
 
-func opt[T any](changed bool, v T) *T {
-	if !changed {
-		return nil
-	}
-	return &v
-}
-
 func (o *rootOptions) resolveSettings(cmd *cobra.Command, subcommand string, toolsCfg config.ToolsConfig, globalCfg *config.CDERunConfig) (*config.ResolvedConfig, error) {
 	cliOpts := buildCLIOptions(cmd, o)
 	return config.ResolveWithFS(subcommand, &cliOpts, toolsCfg, globalCfg, o.fs)

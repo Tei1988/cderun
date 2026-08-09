@@ -78,7 +78,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 				Soft: u.Soft,
 			}
 		}
-		hostConfig.Resources.Ulimits = ulimits
+		hostConfig.Ulimits = ulimits
 	}
 
 	// Handle PortBindings
