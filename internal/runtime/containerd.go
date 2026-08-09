@@ -359,29 +359,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			if s.Process == nil {
 				s.Process = &specs.Process{}
 			}
-			for _, u := range config.Ulimits {
-				rlimitType := strings.ToUpper(u.Name)
-				if !strings.HasPrefix(rlimitType, "RLIMIT_") {
-					rlimitType = "RLIMIT_" + rlimitType
-				}
-				var hardVal uint64
-				if u.Hard < 0 {
-					hardVal = math.MaxUint64
-				} else {
-					hardVal = uint64(u.Hard)
-				}
-				var softVal uint64
-				if u.Soft < 0 {
-					softVal = math.MaxUint64
-				} else {
-					softVal = uint64(u.Soft)
-				}
-				s.Process.Rlimits = append(s.Process.Rlimits, specs.POSIXRlimit{
-					Type: rlimitType,
-					Hard: hardVal,
-					Soft: softVal,
-				})
-			}
+			s.Process.Rlimits = append(s.Process.Rlimits, convertUlimits(config.Ulimits)...)
 			return nil
 		})
 	}
@@ -715,6 +693,35 @@ func parseSignal(sig string) (syscall.Signal, error) {
 		return s, nil
 	}
 	return 0, fmt.Errorf("unsupported signal: %q", sig)
+}
+
+// convertUlimits converts config Ulimits to specs.POSIXRlimit.
+func convertUlimits(ulimits []container.Ulimit) []specs.POSIXRlimit {
+	var rlimits []specs.POSIXRlimit
+	for _, u := range ulimits {
+		rlimitType := strings.ToUpper(u.Name)
+		if !strings.HasPrefix(rlimitType, "RLIMIT_") {
+			rlimitType = "RLIMIT_" + rlimitType
+		}
+		var hardVal uint64
+		if u.Hard < 0 {
+			hardVal = math.MaxUint64
+		} else {
+			hardVal = uint64(u.Hard)
+		}
+		var softVal uint64
+		if u.Soft < 0 {
+			softVal = math.MaxUint64
+		} else {
+			softVal = uint64(u.Soft)
+		}
+		rlimits = append(rlimits, specs.POSIXRlimit{
+			Type: rlimitType,
+			Hard: hardVal,
+			Soft: softVal,
+		})
+	}
+	return rlimits
 }
 
 func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, getSpec func(context.Context) (ocispec.Image, error)) ([]string, error) {
