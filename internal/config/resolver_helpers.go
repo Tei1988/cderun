@@ -65,6 +65,55 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
+func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
+	raws, err := pickConfigs(
+		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
+		func(t ToolConfig) []string { return t.Sysctls },
+		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		nil,
+		fs,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(raws) == 0 {
+		return nil, nil
+	}
+
+	res := make(map[string]string, len(raws))
+	for _, raw := range raws {
+		resolvedRaw := raw
+		if r != nil {
+			resolvedRaw = r.resolveString(raw)
+			if err := r.Error(); err != nil {
+				return nil, err
+			}
+		}
+
+		key, val, found := strings.Cut(resolvedRaw, "=")
+		if !found || strings.TrimSpace(key) == "" {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("sysctl parameter must be in key=value format"),
+			}
+		}
+
+		k := strings.TrimSpace(key)
+		if strings.ContainsRune(k, 0) || strings.ContainsRune(val, 0) {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("null byte injection detected"),
+			}
+		}
+
+		res[k] = val
+	}
+	return res, nil
+}
+
 func pickConfigs[T any](
 	p1 []string,
 	p2 []string,
@@ -199,8 +248,8 @@ func deduplicateEnv(env []string) []string {
 		return env
 	}
 	if len(env) <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 		hasDuplicates := false
 
@@ -265,8 +314,8 @@ func mergeEnv(base, p2, p1 []string) []string {
 	}
 
 	if total <= 8 {
-		keys := make([]string, 8)
-		vals := make([]string, 8)
+		var keys [8]string
+		var vals [8]string
 		size := 0
 
 		for _, e := range base {

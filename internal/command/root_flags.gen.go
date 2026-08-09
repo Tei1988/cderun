@@ -9,106 +9,108 @@ import (
 
 // rootFlags contains fields bound to cobra flag definitions.
 type rootFlags struct {
-	tty                   bool
-	cderunTTY             bool
-	interactive           bool
-	cderunInteractive     bool
-	mountSocket           bool
-	cderunMountSocket     bool
-	mountCderun           bool
-	cderunMountCderun     bool
-	mountAllTools         bool
-	cderunMountAllTools   bool
-	remove                bool
-	cderunRemove          bool
-	publishAll            bool
-	cderunPublishAll      bool
-	privileged            bool
-	cderunPrivileged      bool
-	strictEnv             bool
-	cderunStrictEnv       bool
-	dryRun                bool
-	cderunDryRun          bool
-	diagnosis             bool
-	cderunDiagnosis       bool
-	logTimestamp          bool
-	cderunLogTimestamp    bool
-	readOnly              bool
-	cderunReadOnly        bool
-	init                  bool
-	cderunInit            bool
-	network               string
-	cderunNetwork         string
-	socketPath            string
-	cderunSocketPath      string
-	mountSocketPath       string
-	cderunMountSocketPath string
-	mountCderunPath       string
-	cderunMountCderunPath string
-	image                 string
-	cderunImage           string
-	pid                   string
-	cderunPid             string
-	runtime               string
-	cderunRuntime         string
-	workdir               string
-	cderunWorkdir         string
-	mountTools            string
-	cderunMountTools      string
-	config                string
-	cderunConfig          string
-	toolConfig            string
-	cderunToolConfig      string
-	hostname              string
-	cderunHostname        string
-	user                  string
-	cderunUser            string
-	pull                  string
-	cderunPull            string
-	pullBackoffBase       string
-	cderunPullBackoffBase string
-	memory                string
-	cderunMemory          string
-	dryRunFormat          string
-	cderunDryRunFormat    string
-	diagnosisFormat       string
-	cderunDiagnosisFormat string
-	logLevel              string
-	cderunLogLevel        string
-	logFormat             string
-	cderunLogFormat       string
-	hangTimeout           string
-	cderunHangTimeout     string
-	pullMaxRetries        int
-	cderunPullMaxRetries  int
-	cpus                  float64
-	cderunCPUs            float64
-	env                   []string
-	cderunEnv             []string
-	mounts                []string
-	cderunMounts          []string
-	ports                 []string
-	cderunPorts           []string
-	expose                []string
-	cderunExpose          []string
-	dns                   []string
-	cderunDNS             []string
 	addHosts              []string
 	cderunAddHosts        []string
-	groupAdd              []string
-	cderunGroupAdd        []string
 	capAdd                []string
 	cderunCapAdd          []string
 	capDrop               []string
 	cderunCapDrop         []string
-	ulimits               []string
-	cderunUlimits         []string
-	entrypoint            []string
-	cderunEntrypoint      []string
+	config                string
+	cderunConfig          string
+	cpus                  float64
+	cderunCPUs            float64
 	devices               []string
 	cderunDevices         []string
+	diagnosis             bool
+	cderunDiagnosis       bool
+	diagnosisFormat       string
+	cderunDiagnosisFormat string
+	dns                   []string
+	cderunDNS             []string
+	dryRun                bool
+	cderunDryRun          bool
+	dryRunFormat          string
+	cderunDryRunFormat    string
+	entrypoint            []string
+	cderunEntrypoint      []string
+	env                   []string
+	cderunEnv             []string
+	expose                []string
+	cderunExpose          []string
+	groupAdd              []string
+	cderunGroupAdd        []string
+	hangTimeout           string
+	cderunHangTimeout     string
+	hostname              string
+	cderunHostname        string
+	image                 string
+	cderunImage           string
+	init                  bool
+	cderunInit            bool
+	interactive           bool
+	cderunInteractive     bool
+	logFormat             string
+	cderunLogFormat       string
+	logLevel              string
+	cderunLogLevel        string
+	logTimestamp          bool
+	cderunLogTimestamp    bool
+	memory                string
+	cderunMemory          string
+	mounts                []string
+	cderunMounts          []string
+	mountAllTools         bool
+	cderunMountAllTools   bool
+	mountCderun           bool
+	cderunMountCderun     bool
+	mountCderunPath       string
+	cderunMountCderunPath string
+	mountSocket           bool
+	cderunMountSocket     bool
+	mountSocketPath       string
+	cderunMountSocketPath string
+	mountTools            string
+	cderunMountTools      string
+	network               string
+	cderunNetwork         string
+	pid                   string
+	cderunPid             string
+	privileged            bool
+	cderunPrivileged      bool
+	ports                 []string
+	cderunPorts           []string
+	publishAll            bool
+	cderunPublishAll      bool
+	pull                  string
+	cderunPull            string
+	pullBackoffBase       string
+	cderunPullBackoffBase string
+	pullMaxRetries        int
+	cderunPullMaxRetries  int
+	readOnly              bool
+	cderunReadOnly        bool
+	remove                bool
+	cderunRemove          bool
+	runtime               string
+	cderunRuntime         string
 	sensitiveEnv          []string
 	cderunSensitiveEnv    []string
+	socketPath            string
+	cderunSocketPath      string
+	strictEnv             bool
+	cderunStrictEnv       bool
+	sysctls               []string
+	cderunSysctls         []string
+	toolConfig            string
+	cderunToolConfig      string
+	tty                   bool
+	cderunTTY             bool
+	ulimits               []string
+	cderunUlimits         []string
+	user                  string
+	cderunUser            string
+	workdir               string
+	cderunWorkdir         string
 }
 
 // buildCLIOptions dynamically builds and populates config.CLIOptions from command flags.
@@ -139,139 +141,141 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 	}
 
 	return config.CLIOptions{
-		TTY:                   optBool(cmd.Flags().Changed("tty"), o.tty),
-		CderunTTY:             optBool(cmd.Flags().Changed("cderun-tty"), o.cderunTTY),
-		Interactive:           optBool(cmd.Flags().Changed("interactive"), o.interactive),
-		CderunInteractive:     optBool(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
-		MountSocket:           optBool(cmd.Flags().Changed("mount-socket"), o.mountSocket),
-		CderunMountSocket:     optBool(cmd.Flags().Changed("cderun-mount-socket"), o.cderunMountSocket),
-		MountCderun:           optBool(cmd.Flags().Changed("mount-cderun"), o.mountCderun),
-		CderunMountCderun:     optBool(cmd.Flags().Changed("cderun-mount-cderun"), o.cderunMountCderun),
-		MountAllTools:         optBool(cmd.Flags().Changed("mount-all-tools"), o.mountAllTools),
-		CderunMountAllTools:   optBool(cmd.Flags().Changed("cderun-mount-all-tools"), o.cderunMountAllTools),
-		Remove:                optBool(cmd.Flags().Changed("remove"), o.remove),
-		CderunRemove:          optBool(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
-		PublishAll:            optBool(cmd.Flags().Changed("publish-all"), o.publishAll),
-		CderunPublishAll:      optBool(cmd.Flags().Changed("cderun-publish-all"), o.cderunPublishAll),
-		Privileged:            optBool(cmd.Flags().Changed("privileged"), o.privileged),
-		CderunPrivileged:      optBool(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
-		StrictEnv:             optBool(cmd.Flags().Changed("strict-env"), o.strictEnv),
-		CderunStrictEnv:       optBool(cmd.Flags().Changed("cderun-strict-env"), o.cderunStrictEnv),
-		DryRun:                optBool(cmd.Flags().Changed("dry-run"), o.dryRun),
-		CderunDryRun:          optBool(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
-		Diagnosis:             optBool(cmd.Flags().Changed("diagnosis"), o.diagnosis),
-		CderunDiagnosis:       optBool(cmd.Flags().Changed("cderun-diagnosis"), o.cderunDiagnosis),
-		LogTimestamp:          optBool(cmd.Flags().Changed("log-timestamp"), o.logTimestamp),
-		CderunLogTimestamp:    optBool(cmd.Flags().Changed("cderun-log-timestamp"), o.cderunLogTimestamp),
-		ReadOnly:              optBool(cmd.Flags().Changed("read-only"), o.readOnly),
-		CderunReadOnly:        optBool(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
-		Init:                  optBool(cmd.Flags().Changed("init"), o.init),
-		CderunInit:            optBool(cmd.Flags().Changed("cderun-init"), o.cderunInit),
-		Network:               optStr(cmd.Flags().Changed("network"), o.network),
-		CderunNetwork:         optStr(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
-		SocketPath:            optStr(cmd.Flags().Changed("socket-path"), o.socketPath),
-		CderunSocketPath:      optStr(cmd.Flags().Changed("cderun-socket-path"), o.cderunSocketPath),
-		MountSocketPath:       optStr(cmd.Flags().Changed("mount-socket-path"), o.mountSocketPath),
-		CderunMountSocketPath: optStr(cmd.Flags().Changed("cderun-mount-socket-path"), o.cderunMountSocketPath),
-		MountCderunPath:       optStr(cmd.Flags().Changed("mount-cderun-path"), o.mountCderunPath),
-		CderunMountCderunPath: optStr(cmd.Flags().Changed("cderun-mount-cderun-path"), o.cderunMountCderunPath),
-		Image:                 optStr(cmd.Flags().Changed("image"), o.image),
-		CderunImage:           optStr(cmd.Flags().Changed("cderun-image"), o.cderunImage),
-		Pid:                   optStr(cmd.Flags().Changed("pid"), o.pid),
-		CderunPid:             optStr(cmd.Flags().Changed("cderun-pid"), o.cderunPid),
-		Runtime:               optStr(cmd.Flags().Changed("runtime"), o.runtime),
-		CderunRuntime:         optStr(cmd.Flags().Changed("cderun-runtime"), o.cderunRuntime),
-		Workdir:               optStr(cmd.Flags().Changed("workdir"), o.workdir),
-		CderunWorkdir:         optStr(cmd.Flags().Changed("cderun-workdir"), o.cderunWorkdir),
-		MountTools:            optStr(cmd.Flags().Changed("mount-tools"), o.mountTools),
-		CderunMountTools:      optStr(cmd.Flags().Changed("cderun-mount-tools"), o.cderunMountTools),
-		Config:                optStr(cmd.Flags().Changed("config"), o.config),
-		CderunConfig:          optStr(cmd.Flags().Changed("cderun-config"), o.cderunConfig),
-		ToolConfig:            optStr(cmd.Flags().Changed("tool-config"), o.toolConfig),
-		CderunToolConfig:      optStr(cmd.Flags().Changed("cderun-tool-config"), o.cderunToolConfig),
-		Hostname:              optStr(cmd.Flags().Changed("hostname"), o.hostname),
-		CderunHostname:        optStr(cmd.Flags().Changed("cderun-hostname"), o.cderunHostname),
-		User:                  optStr(cmd.Flags().Changed("user"), o.user),
-		CderunUser:            optStr(cmd.Flags().Changed("cderun-user"), o.cderunUser),
-		Pull:                  optStr(cmd.Flags().Changed("pull"), o.pull),
-		CderunPull:            optStr(cmd.Flags().Changed("cderun-pull"), o.cderunPull),
-		PullBackoffBase:       optStr(cmd.Flags().Changed("pull-backoff-base"), o.pullBackoffBase),
-		CderunPullBackoffBase: optStr(cmd.Flags().Changed("cderun-pull-backoff-base"), o.cderunPullBackoffBase),
-		Memory:                optStr(cmd.Flags().Changed("memory"), o.memory),
-		CderunMemory:          optStr(cmd.Flags().Changed("cderun-memory"), o.cderunMemory),
-		DryRunFormat:          optStr(cmd.Flags().Changed("dry-run-format"), o.dryRunFormat),
-		CderunDryRunFormat:    optStr(cmd.Flags().Changed("cderun-dry-run-format"), o.cderunDryRunFormat),
-		DiagnosisFormat:       optStr(cmd.Flags().Changed("diagnosis-format"), o.diagnosisFormat),
-		CderunDiagnosisFormat: optStr(cmd.Flags().Changed("cderun-diagnosis-format"), o.cderunDiagnosisFormat),
-		LogLevel:              optStr(cmd.Flags().Changed("log-level"), o.logLevel),
-		CderunLogLevel:        optStr(cmd.Flags().Changed("cderun-log-level"), o.cderunLogLevel),
-		LogFormat:             optStr(cmd.Flags().Changed("log-format"), o.logFormat),
-		CderunLogFormat:       optStr(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
-		HangTimeout:           optStr(cmd.Flags().Changed("hang-timeout"), o.hangTimeout),
-		CderunHangTimeout:     optStr(cmd.Flags().Changed("cderun-hang-timeout"), o.cderunHangTimeout),
-		PullMaxRetries:        optInt(cmd.Flags().Changed("pull-max-retries"), o.pullMaxRetries),
-		CderunPullMaxRetries:  optInt(cmd.Flags().Changed("cderun-pull-max-retries"), o.cderunPullMaxRetries),
-		CPUs:                  optFloat(cmd.Flags().Changed("cpus"), o.cpus),
-		CderunCPUs:            optFloat(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
-		Env:                   o.env,
-		CderunEnv:             o.cderunEnv,
-		Mounts:                o.mounts,
-		CderunMounts:          o.cderunMounts,
-		Ports:                 o.ports,
-		CderunPorts:           o.cderunPorts,
-		Expose:                o.expose,
-		CderunExpose:          o.cderunExpose,
-		DNS:                   o.dns,
-		CderunDNS:             o.cderunDNS,
 		AddHosts:              o.addHosts,
 		CderunAddHosts:        o.cderunAddHosts,
-		GroupAdd:              o.groupAdd,
-		CderunGroupAdd:        o.cderunGroupAdd,
 		CapAdd:                o.capAdd,
 		CderunCapAdd:          o.cderunCapAdd,
 		CapDrop:               o.capDrop,
 		CderunCapDrop:         o.cderunCapDrop,
-		Ulimits:               o.ulimits,
-		CderunUlimits:         o.cderunUlimits,
-		Entrypoint:            o.entrypoint,
-		CderunEntrypoint:      o.cderunEntrypoint,
+		Config:                optStr(cmd.Flags().Changed("config"), o.config),
+		CderunConfig:          optStr(cmd.Flags().Changed("cderun-config"), o.cderunConfig),
+		CPUs:                  optFloat(cmd.Flags().Changed("cpus"), o.cpus),
+		CderunCPUs:            optFloat(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
 		Devices:               o.devices,
 		CderunDevices:         o.cderunDevices,
+		Diagnosis:             optBool(cmd.Flags().Changed("diagnosis"), o.diagnosis),
+		CderunDiagnosis:       optBool(cmd.Flags().Changed("cderun-diagnosis"), o.cderunDiagnosis),
+		DiagnosisFormat:       optStr(cmd.Flags().Changed("diagnosis-format"), o.diagnosisFormat),
+		CderunDiagnosisFormat: optStr(cmd.Flags().Changed("cderun-diagnosis-format"), o.cderunDiagnosisFormat),
+		DNS:                   o.dns,
+		CderunDNS:             o.cderunDNS,
+		DryRun:                optBool(cmd.Flags().Changed("dry-run"), o.dryRun),
+		CderunDryRun:          optBool(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
+		DryRunFormat:          optStr(cmd.Flags().Changed("dry-run-format"), o.dryRunFormat),
+		CderunDryRunFormat:    optStr(cmd.Flags().Changed("cderun-dry-run-format"), o.cderunDryRunFormat),
+		Entrypoint:            o.entrypoint,
+		CderunEntrypoint:      o.cderunEntrypoint,
+		Env:                   o.env,
+		CderunEnv:             o.cderunEnv,
+		Expose:                o.expose,
+		CderunExpose:          o.cderunExpose,
+		GroupAdd:              o.groupAdd,
+		CderunGroupAdd:        o.cderunGroupAdd,
+		HangTimeout:           optStr(cmd.Flags().Changed("hang-timeout"), o.hangTimeout),
+		CderunHangTimeout:     optStr(cmd.Flags().Changed("cderun-hang-timeout"), o.cderunHangTimeout),
+		Hostname:              optStr(cmd.Flags().Changed("hostname"), o.hostname),
+		CderunHostname:        optStr(cmd.Flags().Changed("cderun-hostname"), o.cderunHostname),
+		Image:                 optStr(cmd.Flags().Changed("image"), o.image),
+		CderunImage:           optStr(cmd.Flags().Changed("cderun-image"), o.cderunImage),
+		Init:                  optBool(cmd.Flags().Changed("init"), o.init),
+		CderunInit:            optBool(cmd.Flags().Changed("cderun-init"), o.cderunInit),
+		Interactive:           optBool(cmd.Flags().Changed("interactive"), o.interactive),
+		CderunInteractive:     optBool(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
+		LogFormat:             optStr(cmd.Flags().Changed("log-format"), o.logFormat),
+		CderunLogFormat:       optStr(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
+		LogLevel:              optStr(cmd.Flags().Changed("log-level"), o.logLevel),
+		CderunLogLevel:        optStr(cmd.Flags().Changed("cderun-log-level"), o.cderunLogLevel),
+		LogTimestamp:          optBool(cmd.Flags().Changed("log-timestamp"), o.logTimestamp),
+		CderunLogTimestamp:    optBool(cmd.Flags().Changed("cderun-log-timestamp"), o.cderunLogTimestamp),
+		Memory:                optStr(cmd.Flags().Changed("memory"), o.memory),
+		CderunMemory:          optStr(cmd.Flags().Changed("cderun-memory"), o.cderunMemory),
+		Mounts:                o.mounts,
+		CderunMounts:          o.cderunMounts,
+		MountAllTools:         optBool(cmd.Flags().Changed("mount-all-tools"), o.mountAllTools),
+		CderunMountAllTools:   optBool(cmd.Flags().Changed("cderun-mount-all-tools"), o.cderunMountAllTools),
+		MountCderun:           optBool(cmd.Flags().Changed("mount-cderun"), o.mountCderun),
+		CderunMountCderun:     optBool(cmd.Flags().Changed("cderun-mount-cderun"), o.cderunMountCderun),
+		MountCderunPath:       optStr(cmd.Flags().Changed("mount-cderun-path"), o.mountCderunPath),
+		CderunMountCderunPath: optStr(cmd.Flags().Changed("cderun-mount-cderun-path"), o.cderunMountCderunPath),
+		MountSocket:           optBool(cmd.Flags().Changed("mount-socket"), o.mountSocket),
+		CderunMountSocket:     optBool(cmd.Flags().Changed("cderun-mount-socket"), o.cderunMountSocket),
+		MountSocketPath:       optStr(cmd.Flags().Changed("mount-socket-path"), o.mountSocketPath),
+		CderunMountSocketPath: optStr(cmd.Flags().Changed("cderun-mount-socket-path"), o.cderunMountSocketPath),
+		MountTools:            optStr(cmd.Flags().Changed("mount-tools"), o.mountTools),
+		CderunMountTools:      optStr(cmd.Flags().Changed("cderun-mount-tools"), o.cderunMountTools),
+		Network:               optStr(cmd.Flags().Changed("network"), o.network),
+		CderunNetwork:         optStr(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
+		Pid:                   optStr(cmd.Flags().Changed("pid"), o.pid),
+		CderunPid:             optStr(cmd.Flags().Changed("cderun-pid"), o.cderunPid),
+		Privileged:            optBool(cmd.Flags().Changed("privileged"), o.privileged),
+		CderunPrivileged:      optBool(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
+		Ports:                 o.ports,
+		CderunPorts:           o.cderunPorts,
+		PublishAll:            optBool(cmd.Flags().Changed("publish-all"), o.publishAll),
+		CderunPublishAll:      optBool(cmd.Flags().Changed("cderun-publish-all"), o.cderunPublishAll),
+		Pull:                  optStr(cmd.Flags().Changed("pull"), o.pull),
+		CderunPull:            optStr(cmd.Flags().Changed("cderun-pull"), o.cderunPull),
+		PullBackoffBase:       optStr(cmd.Flags().Changed("pull-backoff-base"), o.pullBackoffBase),
+		CderunPullBackoffBase: optStr(cmd.Flags().Changed("cderun-pull-backoff-base"), o.cderunPullBackoffBase),
+		PullMaxRetries:        optInt(cmd.Flags().Changed("pull-max-retries"), o.pullMaxRetries),
+		CderunPullMaxRetries:  optInt(cmd.Flags().Changed("cderun-pull-max-retries"), o.cderunPullMaxRetries),
+		ReadOnly:              optBool(cmd.Flags().Changed("read-only"), o.readOnly),
+		CderunReadOnly:        optBool(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
+		Remove:                optBool(cmd.Flags().Changed("remove"), o.remove),
+		CderunRemove:          optBool(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
+		Runtime:               optStr(cmd.Flags().Changed("runtime"), o.runtime),
+		CderunRuntime:         optStr(cmd.Flags().Changed("cderun-runtime"), o.cderunRuntime),
 		SensitiveEnv:          o.sensitiveEnv,
 		CderunSensitiveEnv:    o.cderunSensitiveEnv,
+		SocketPath:            optStr(cmd.Flags().Changed("socket-path"), o.socketPath),
+		CderunSocketPath:      optStr(cmd.Flags().Changed("cderun-socket-path"), o.cderunSocketPath),
+		StrictEnv:             optBool(cmd.Flags().Changed("strict-env"), o.strictEnv),
+		CderunStrictEnv:       optBool(cmd.Flags().Changed("cderun-strict-env"), o.cderunStrictEnv),
+		Sysctls:               o.sysctls,
+		CderunSysctls:         o.cderunSysctls,
+		ToolConfig:            optStr(cmd.Flags().Changed("tool-config"), o.toolConfig),
+		CderunToolConfig:      optStr(cmd.Flags().Changed("cderun-tool-config"), o.cderunToolConfig),
+		TTY:                   optBool(cmd.Flags().Changed("tty"), o.tty),
+		CderunTTY:             optBool(cmd.Flags().Changed("cderun-tty"), o.cderunTTY),
+		Ulimits:               o.ulimits,
+		CderunUlimits:         o.cderunUlimits,
+		User:                  optStr(cmd.Flags().Changed("user"), o.user),
+		CderunUser:            optStr(cmd.Flags().Changed("cderun-user"), o.cderunUser),
+		Workdir:               optStr(cmd.Flags().Changed("workdir"), o.workdir),
+		CderunWorkdir:         optStr(cmd.Flags().Changed("cderun-workdir"), o.cderunWorkdir),
 	}
 }
 
 func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 	switch name {
-	case "tty":
-		return &o.tty, &o.cderunTTY
-	case "interactive":
-		return &o.interactive, &o.cderunInteractive
-	case "mount-socket":
-		return &o.mountSocket, &o.cderunMountSocket
-	case "mount-cderun":
-		return &o.mountCderun, &o.cderunMountCderun
-	case "mount-all-tools":
-		return &o.mountAllTools, &o.cderunMountAllTools
-	case "remove":
-		return &o.remove, &o.cderunRemove
-	case "publish-all":
-		return &o.publishAll, &o.cderunPublishAll
-	case "privileged":
-		return &o.privileged, &o.cderunPrivileged
-	case "strict-env":
-		return &o.strictEnv, &o.cderunStrictEnv
-	case "dry-run":
-		return &o.dryRun, &o.cderunDryRun
 	case "diagnosis":
 		return &o.diagnosis, &o.cderunDiagnosis
-	case "log-timestamp":
-		return &o.logTimestamp, &o.cderunLogTimestamp
-	case "read-only":
-		return &o.readOnly, &o.cderunReadOnly
+	case "dry-run":
+		return &o.dryRun, &o.cderunDryRun
 	case "init":
 		return &o.init, &o.cderunInit
+	case "interactive":
+		return &o.interactive, &o.cderunInteractive
+	case "log-timestamp":
+		return &o.logTimestamp, &o.cderunLogTimestamp
+	case "mount-all-tools":
+		return &o.mountAllTools, &o.cderunMountAllTools
+	case "mount-cderun":
+		return &o.mountCderun, &o.cderunMountCderun
+	case "mount-socket":
+		return &o.mountSocket, &o.cderunMountSocket
+	case "privileged":
+		return &o.privileged, &o.cderunPrivileged
+	case "publish-all":
+		return &o.publishAll, &o.cderunPublishAll
+	case "read-only":
+		return &o.readOnly, &o.cderunReadOnly
+	case "remove":
+		return &o.remove, &o.cderunRemove
+	case "strict-env":
+		return &o.strictEnv, &o.cderunStrictEnv
+	case "tty":
+		return &o.tty, &o.cderunTTY
 	default:
 		return nil, nil
 	}
@@ -279,48 +283,48 @@ func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 
 func getStringPointers(o *rootOptions, name string) (base, override *string) {
 	switch name {
-	case "network":
-		return &o.network, &o.cderunNetwork
-	case "socket-path":
-		return &o.socketPath, &o.cderunSocketPath
-	case "mount-socket-path":
-		return &o.mountSocketPath, &o.cderunMountSocketPath
-	case "mount-cderun-path":
-		return &o.mountCderunPath, &o.cderunMountCderunPath
-	case "image":
-		return &o.image, &o.cderunImage
-	case "pid":
-		return &o.pid, &o.cderunPid
-	case "runtime":
-		return &o.runtime, &o.cderunRuntime
-	case "workdir":
-		return &o.workdir, &o.cderunWorkdir
-	case "mount-tools":
-		return &o.mountTools, &o.cderunMountTools
 	case "config":
 		return &o.config, &o.cderunConfig
-	case "tool-config":
-		return &o.toolConfig, &o.cderunToolConfig
+	case "diagnosis-format":
+		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
+	case "dry-run-format":
+		return &o.dryRunFormat, &o.cderunDryRunFormat
+	case "hang-timeout":
+		return &o.hangTimeout, &o.cderunHangTimeout
 	case "hostname":
 		return &o.hostname, &o.cderunHostname
-	case "user":
-		return &o.user, &o.cderunUser
+	case "image":
+		return &o.image, &o.cderunImage
+	case "log-format":
+		return &o.logFormat, &o.cderunLogFormat
+	case "log-level":
+		return &o.logLevel, &o.cderunLogLevel
+	case "memory":
+		return &o.memory, &o.cderunMemory
+	case "mount-cderun-path":
+		return &o.mountCderunPath, &o.cderunMountCderunPath
+	case "mount-socket-path":
+		return &o.mountSocketPath, &o.cderunMountSocketPath
+	case "mount-tools":
+		return &o.mountTools, &o.cderunMountTools
+	case "network":
+		return &o.network, &o.cderunNetwork
+	case "pid":
+		return &o.pid, &o.cderunPid
 	case "pull":
 		return &o.pull, &o.cderunPull
 	case "pull-backoff-base":
 		return &o.pullBackoffBase, &o.cderunPullBackoffBase
-	case "memory":
-		return &o.memory, &o.cderunMemory
-	case "dry-run-format":
-		return &o.dryRunFormat, &o.cderunDryRunFormat
-	case "diagnosis-format":
-		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
-	case "log-level":
-		return &o.logLevel, &o.cderunLogLevel
-	case "log-format":
-		return &o.logFormat, &o.cderunLogFormat
-	case "hang-timeout":
-		return &o.hangTimeout, &o.cderunHangTimeout
+	case "runtime":
+		return &o.runtime, &o.cderunRuntime
+	case "socket-path":
+		return &o.socketPath, &o.cderunSocketPath
+	case "tool-config":
+		return &o.toolConfig, &o.cderunToolConfig
+	case "user":
+		return &o.user, &o.cderunUser
+	case "workdir":
+		return &o.workdir, &o.cderunWorkdir
 	default:
 		return nil, nil
 	}
@@ -346,32 +350,34 @@ func getFloat64Pointers(o *rootOptions, name string) (base, override *float64) {
 
 func getStringSlicePointers(o *rootOptions, name string) (base, override *[]string) {
 	switch name {
-	case "env":
-		return &o.env, &o.cderunEnv
-	case "mount":
-		return &o.mounts, &o.cderunMounts
-	case "publish":
-		return &o.ports, &o.cderunPorts
-	case "expose":
-		return &o.expose, &o.cderunExpose
-	case "dns":
-		return &o.dns, &o.cderunDNS
 	case "add-host":
 		return &o.addHosts, &o.cderunAddHosts
-	case "group-add":
-		return &o.groupAdd, &o.cderunGroupAdd
 	case "cap-add":
 		return &o.capAdd, &o.cderunCapAdd
 	case "cap-drop":
 		return &o.capDrop, &o.cderunCapDrop
-	case "ulimit":
-		return &o.ulimits, &o.cderunUlimits
-	case "entrypoint":
-		return &o.entrypoint, &o.cderunEntrypoint
 	case "device":
 		return &o.devices, &o.cderunDevices
+	case "dns":
+		return &o.dns, &o.cderunDNS
+	case "entrypoint":
+		return &o.entrypoint, &o.cderunEntrypoint
+	case "env":
+		return &o.env, &o.cderunEnv
+	case "expose":
+		return &o.expose, &o.cderunExpose
+	case "group-add":
+		return &o.groupAdd, &o.cderunGroupAdd
+	case "mount":
+		return &o.mounts, &o.cderunMounts
+	case "publish":
+		return &o.ports, &o.cderunPorts
 	case "sensitive-env":
 		return &o.sensitiveEnv, &o.cderunSensitiveEnv
+	case "sysctl":
+		return &o.sysctls, &o.cderunSysctls
+	case "ulimit":
+		return &o.ulimits, &o.cderunUlimits
 	default:
 		return nil, nil
 	}

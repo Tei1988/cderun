@@ -166,8 +166,7 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
@@ -185,7 +184,6 @@ func TestUnit_Command_Execution_AttachError_HangTimeoutWithTimeout(t *testing.T)
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 125, exitErr.Code)
 	assert.Contains(t, exitErr.Error(), "timeout waiting for container to exit after attach error")
-	cancel()
 }
 
 func TestUnit_Command_Execution_SIGKILLTimeout(t *testing.T) {
@@ -215,8 +213,7 @@ func TestUnit_Command_Execution_SIGKILLTimeout(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
@@ -277,8 +274,7 @@ func TestUnit_Command_Execution_SIGKILLFailure_NormalExit(t *testing.T) {
 	logger.Init("warn", "text", false)
 	logger.SetOutput(&stderrBuf)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--log-level", "warn", "--image", "alpine", "--hang-timeout", "50ms", "sh"}, func(o *rootOptions, cmd *cobra.Command) {
 		o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {

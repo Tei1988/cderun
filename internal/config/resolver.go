@@ -66,6 +66,7 @@ type ResolvedConfig struct {
 	SensitiveEnv    []string
 	GroupAdd        []string
 	Ulimits         []container.Ulimit
+	Sysctls         map[string]string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -356,9 +357,6 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		logging.Trace("Resolving configurations for tool: %s", subcommand)
 	}
 
-	if _, err := fs.UserHomeDir(); err != nil {
-		return nil, fmt.Errorf("failed to get user home directory: %w", err)
-	}
 	if _, err := fs.Getwd(); err != nil {
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
@@ -600,6 +598,45 @@ func (rv *resolver) resolveComplexOptions() error {
 
 	// Resolve Ulimits
 	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rv.fs)
+	if err != nil {
+		return err
+	}
+
+	// Resolve Sysctls
+	var rForSysctls *ExpressionResolver
+	rawSysctls, err := pickConfigs(
+		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Sysctls },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	if len(rawSysctls) > 0 {
+		needResolver := false
+		for _, raw := range rawSysctls {
+			if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
+				needResolver = true
+				break
+			}
+		}
+		if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+			needResolver = true
+		}
+
+		if needResolver {
+			var err error
+			rForSysctls, err = rv.getR()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	rv.res.Sysctls, err = resolveSysctls(rv.cli.CderunSysctls, rv.cli.Sysctls, rv.subcommand, rv.tools, rv.global, rForSysctls, rv.fs)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -132,6 +133,10 @@ func main() {
 			Default:     "nil",
 		})
 	}
+
+	slices.SortFunc(options, func(a, b OptionData) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	if err := generateCLIOptions(options); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating CLIOptions: %v\n", err)

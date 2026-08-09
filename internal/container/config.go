@@ -64,6 +64,9 @@ type ContainerConfig struct {
 
 	// Resources limits (ulimits)
 	Ulimits []Ulimit `json:"ulimits,omitempty" yaml:"ulimits,omitempty"`
+
+	// Kernel parameters (sysctl)
+	Sysctls map[string]string `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
 }
 
 // Ulimit represents a ulimit setting for a container.

@@ -11,6 +11,7 @@ import (
 	"cderun/internal/logging"
 	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +88,57 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestUnit_Containerd_ConvertUlimits(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    []container.Ulimit
+		expected []specs.POSIXRlimit
+	}{
+		{
+			name: "positive-value coverage",
+			input: []container.Ulimit{
+				{Name: "nofile", Soft: 1024, Hard: 2048},
+				{Name: "RLIMIT_NPROC", Soft: 4096, Hard: 8192},
+			},
+			expected: []specs.POSIXRlimit{
+				{Type: "RLIMIT_NOFILE", Soft: 1024, Hard: 2048},
+				{Type: "RLIMIT_NPROC", Soft: 4096, Hard: 8192},
+			},
+		},
+		{
+			name: "negative Soft and Hard values",
+			input: []container.Ulimit{
+				{Name: "nofile", Soft: -1, Hard: -1},
+				{Name: "memlock", Soft: -5, Hard: -10},
+			},
+			expected: []specs.POSIXRlimit{
+				{Type: "RLIMIT_NOFILE", Soft: math.MaxUint64, Hard: math.MaxUint64},
+				{Type: "RLIMIT_MEMLOCK", Soft: math.MaxUint64, Hard: math.MaxUint64},
+			},
+		},
+		{
+			name: "mixed positive and negative values",
+			input: []container.Ulimit{
+				{Name: "nofile", Soft: -1, Hard: 4096},
+				{Name: "nproc", Soft: 2048, Hard: -1},
+			},
+			expected: []specs.POSIXRlimit{
+				{Type: "RLIMIT_NOFILE", Soft: math.MaxUint64, Hard: 4096},
+				{Type: "RLIMIT_NPROC", Soft: 2048, Hard: math.MaxUint64},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := convertUlimits(tt.input)
+			assert.Equal(t, tt.expected, res)
 		})
 	}
 }

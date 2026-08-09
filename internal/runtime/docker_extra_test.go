@@ -46,8 +46,8 @@ func TestUnit_Docker_toDockerContainerConfig_Ulimits(t *testing.T) {
 	}
 	_, hostConfig, _, err := toDockerContainerConfig(config)
 	require.NoError(t, err)
-	require.Len(t, hostConfig.Resources.Ulimits, 1)
-	assert.Equal(t, "nofile", hostConfig.Resources.Ulimits[0].Name)
-	assert.Equal(t, int64(1024), hostConfig.Resources.Ulimits[0].Soft)
-	assert.Equal(t, int64(2048), hostConfig.Resources.Ulimits[0].Hard)
+	require.Len(t, hostConfig.Ulimits, 1)
+	assert.Equal(t, "nofile", hostConfig.Ulimits[0].Name)
+	assert.Equal(t, int64(1024), hostConfig.Ulimits[0].Soft)
+	assert.Equal(t, int64(2048), hostConfig.Ulimits[0].Hard)
 }
