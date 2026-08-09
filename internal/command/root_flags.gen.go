@@ -79,6 +79,8 @@ type rootFlags struct {
 	cderunLogFormat       string
 	hangTimeout           string
 	cderunHangTimeout     string
+	shmSize               string
+	cderunShmSize         string
 	pullMaxRetries        int
 	cderunPullMaxRetries  int
 	cpus                  float64
@@ -209,6 +211,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunLogFormat:       optStr(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
 		HangTimeout:           optStr(cmd.Flags().Changed("hang-timeout"), o.hangTimeout),
 		CderunHangTimeout:     optStr(cmd.Flags().Changed("cderun-hang-timeout"), o.cderunHangTimeout),
+		ShmSize:               optStr(cmd.Flags().Changed("shm-size"), o.shmSize),
+		CderunShmSize:         optStr(cmd.Flags().Changed("cderun-shm-size"), o.cderunShmSize),
 		PullMaxRetries:        optInt(cmd.Flags().Changed("pull-max-retries"), o.pullMaxRetries),
 		CderunPullMaxRetries:  optInt(cmd.Flags().Changed("cderun-pull-max-retries"), o.cderunPullMaxRetries),
 		CPUs:                  optFloat(cmd.Flags().Changed("cpus"), o.cpus),
@@ -321,6 +325,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.logFormat, &o.cderunLogFormat
 	case "hang-timeout":
 		return &o.hangTimeout, &o.cderunHangTimeout
+	case "shm-size":
+		return &o.shmSize, &o.cderunShmSize
 	default:
 		return nil, nil
 	}

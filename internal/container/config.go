@@ -53,8 +53,9 @@ type ContainerConfig struct {
 	Pull string `json:"pull,omitempty" yaml:"pull,omitempty"`
 
 	// Resources
-	Memory int64   `json:"memory,omitempty" yaml:"memory,omitempty"`
-	CPUs   float64 `json:"cpus,omitempty" yaml:"cpus,omitempty"`
+	Memory  int64   `json:"memory,omitempty" yaml:"memory,omitempty"`
+	ShmSize int64   `json:"shm_size,omitempty" yaml:"shm_size,omitempty"`
+	CPUs    float64 `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 
 	// Storage and Devices
 	Devices []DeviceMapping `json:"devices,omitempty" yaml:"devices,omitempty"`

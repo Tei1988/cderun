@@ -368,6 +368,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Entrypoint: resolved.Entrypoint,
 		Pull:       resolved.Pull,
 		Memory:     resolved.Memory,
+		ShmSize:    resolved.ShmSize,
 		CPUs:       resolved.CPUs,
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,
@@ -518,6 +519,9 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 
 		if maskedContainerConfig.Memory > 0 {
 			_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(maskedContainerConfig.Memory)))
+		}
+		if maskedContainerConfig.ShmSize > 0 {
+			_, _ = fmt.Fprintf(w, "ShmSize: %s\n", units.BytesSize(float64(maskedContainerConfig.ShmSize)))
 		}
 		if maskedContainerConfig.CPUs > 0 {
 			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))

@@ -74,6 +74,8 @@ type CLIOptions struct {
 	CderunLogFormat       *string
 	HangTimeout           *string
 	CderunHangTimeout     *string
+	ShmSize               *string
+	CderunShmSize         *string
 	PullMaxRetries        *int
 	CderunPullMaxRetries  *int
 	CPUs                  *float64

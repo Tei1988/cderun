@@ -475,6 +475,19 @@ var StringOptions = []StringOption{
 		},
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as duration)
 	},
+	{
+		Name:      "shm-size",
+		FieldName: "ShmSize",
+		EnvKey:    "CDERUN_SHM_SIZE",
+		Usage:     "Size of /dev/shm (e.g. 256m, 1g, 2147483648)",
+		ToolGetter: func(t ToolConfig) string {
+			return t.ShmSize
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.ShmSize
+		},
+		SkipResolution: true, // resolved in resolveCustomParsing (parsed as bytes)
+	},
 }
 
 var BoolOptions = []BoolOption{

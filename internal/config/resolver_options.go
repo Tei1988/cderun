@@ -587,6 +587,55 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 	return nil
 }
 
+func (rv *resolver) applyShmSizeOption(opt StringOption, target *int64) error {
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     opt.Default,
+	}
+
+	var p1Set, p2Set bool
+	var p1Val, p2Val string
+	switch opt.Name {
+	case "shm-size":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunShmSize)
+		p2Set, p2Val = getPtrVal(rv.cli.ShmSize)
+	default:
+		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
+		if err != nil {
+			return err
+		}
+		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
+	}
+
+	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		valStr = r.resolveString(valStr)
+		if err := r.Error(); err != nil {
+			return err
+		}
+	}
+
+	if valStr != "" {
+		bytes, err := units.RAMInBytes(valStr)
+		if err != nil {
+			if rv.r != nil {
+				if exprErr := rv.r.Error(); exprErr != nil {
+					return exprErr
+				}
+			}
+			return &InvalidConfigError{Field: opt.Name, Value: valStr, Err: err}
+		}
+		*target = bytes
+	}
+	return nil
+}
+
 func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 	def := OptionDef[string]{
 		EnvKey:       opt.EnvKey,

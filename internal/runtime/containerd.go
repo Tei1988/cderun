@@ -136,6 +136,9 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 	if config.Memory < 0 {
 		return fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
+	if config.ShmSize < 0 {
+		return fmt.Errorf("containerd runtime: negative shm-size %d is not supported", config.ShmSize)
+	}
 	if config.CPUs < 0 {
 		return fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
 	}
@@ -350,6 +353,40 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 				s.Root = &specs.Root{}
 			}
 			s.Root.Readonly = true
+			return nil
+		})
+	}
+	if config.ShmSize > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			found := false
+			shmSizeOpt := fmt.Sprintf("size=%d", config.ShmSize)
+			for i, m := range s.Mounts {
+				if m.Destination == "/dev/shm" {
+					found = true
+					// Replace or add size option
+					sizeIndex := -1
+					for idx, opt := range m.Options {
+						if strings.HasPrefix(opt, "size=") {
+							sizeIndex = idx
+							break
+						}
+					}
+					if sizeIndex != -1 {
+						s.Mounts[i].Options[sizeIndex] = shmSizeOpt
+					} else {
+						s.Mounts[i].Options = append(s.Mounts[i].Options, shmSizeOpt)
+					}
+					break
+				}
+			}
+			if !found {
+				s.Mounts = append(s.Mounts, specs.Mount{
+					Type:        "tmpfs",
+					Source:      "shm",
+					Destination: "/dev/shm",
+					Options:     []string{"nosuid", "nodev", "noexec", "mode=1777", shmSizeOpt},
+				})
+			}
 			return nil
 		})
 	}

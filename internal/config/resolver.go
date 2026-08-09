@@ -61,6 +61,7 @@ type ResolvedConfig struct {
 	PullMaxRetries  int
 	PullBackoffBase time.Duration
 	Memory          int64
+	ShmSize         int64
 	CPUs            float64
 	Devices         []container.DeviceMapping
 	SensitiveEnv    []string
@@ -869,6 +870,13 @@ func (rv *resolver) resolveCustomParsing() error {
 	// Resolve memory via registry
 	if opt, ok := GetStringOption("memory"); ok {
 		if err := rv.applyMemoryOption(opt, &rv.res.Memory); err != nil {
+			return err
+		}
+	}
+
+	// Resolve shm-size via registry
+	if opt, ok := GetStringOption("shm-size"); ok {
+		if err := rv.applyShmSizeOption(opt, &rv.res.ShmSize); err != nil {
 			return err
 		}
 	}
