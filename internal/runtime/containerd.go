@@ -427,6 +427,7 @@ func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID stri
 	r.mu.Unlock()
 
 	if !ok {
+		r.logger.Warn("StartContainer: container standard I/O is falling back to NullIO because AttachContainer was not called beforehand for container %s", containerID)
 		creator = cio.NullIO
 	}
 
@@ -481,12 +482,12 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 }
 
 func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
+	if r.client == nil {
+		return fmt.Errorf("containerd client is not initialized")
+	}
+
 	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	r.mu.Lock()
-	delete(r.ioWait, containerID)
-	r.mu.Unlock()
 
 	container, err := r.client.LoadContainer(cCtx, containerID)
 	if err != nil {
@@ -500,10 +501,21 @@ func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID str
 	if err == nil {
 		if _, delErr := task.Delete(cCtx, client.WithProcessKill); delErr != nil && !errdefs.IsNotFound(delErr) {
 			r.logger.Warn("failed to delete task during container removal (best-effort): %v", delErr)
+			r.notifyWait(containerID, fmt.Errorf("failed to delete task: %w", delErr))
+			return delErr
 		}
 	}
 
-	return container.Delete(cCtx, client.WithSnapshotCleanup)
+	err = container.Delete(cCtx, client.WithSnapshotCleanup)
+	if err != nil {
+		r.notifyWait(containerID, fmt.Errorf("failed to delete container: %w", err))
+		return err
+	}
+
+	// Notify any active AttachContainer that the container is being removed to prevent indefinite hangs,
+	// allowing AttachContainer to exit and perform its own cleanup (including deleting the ioWait map entry).
+	r.notifyWait(containerID, fmt.Errorf("container %s was removed", containerID))
+	return nil
 }
 
 func (r *ContainerdRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
@@ -554,7 +566,13 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 
 	waitC := make(chan error, 1)
 	r.mu.Lock()
+	if r.ioMap == nil {
+		r.ioMap = make(map[string]cio.Creator)
+	}
 	r.ioMap[containerID] = creator
+	if r.ioWait == nil {
+		r.ioWait = make(map[string]chan error)
+	}
 	r.ioWait[containerID] = waitC
 	if r.taskReady == nil {
 		r.taskReady = make(map[string]chan struct{})
@@ -566,15 +584,44 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 	}
 	r.mu.Unlock()
 
-	// Check if task is already ready (e.g., if StartContainer was called first)
-	taskAlreadyReady := false
-	if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
-		if _, err := container.Task(ctx, nil); err == nil {
-			taskAlreadyReady = true
+	attachCtx, cancelAttach := context.WithCancel(ctx)
+
+	defer func() {
+		cancelAttach()
+		r.mu.Lock()
+		delete(r.ioMap, containerID)
+		delete(r.ioWait, containerID)
+		if readyC, ok := r.taskReady[containerID]; ok {
+			select {
+			case <-readyC:
+				// Already closed
+			default:
+				close(readyC)
+			}
+			delete(r.taskReady, containerID)
+		}
+		r.mu.Unlock()
+	}()
+
+	if r.client == nil {
+		r.notifyWait(containerID, fmt.Errorf("containerd client is not initialized"))
+		select {
+		case err := <-waitC:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 
-	attachCtx, cancelAttach := context.WithCancel(ctx)
+	// Check if task is already ready (e.g., if StartContainer was called first)
+	taskAlreadyReady := false
+	if r.client != nil {
+		if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
+			if _, err := container.Task(ctx, nil); err == nil {
+				taskAlreadyReady = true
+			}
+		}
+	}
 
 	go func() {
 		if !taskAlreadyReady {
@@ -585,6 +632,10 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 			}
 		}
 
+		if r.client == nil {
+			r.notifyWait(containerID, fmt.Errorf("containerd client is not initialized"))
+			return
+		}
 		container, err := r.client.LoadContainer(attachCtx, containerID)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -611,23 +662,6 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		case <-attachCtx.Done():
 			return
 		}
-	}()
-
-	defer func() {
-		cancelAttach()
-		r.mu.Lock()
-		delete(r.ioMap, containerID)
-		delete(r.ioWait, containerID)
-		if readyC, ok := r.taskReady[containerID]; ok {
-			select {
-			case <-readyC:
-				// Already closed
-			default:
-				close(readyC)
-			}
-			delete(r.taskReady, containerID)
-		}
-		r.mu.Unlock()
 	}()
 
 	if ready != nil {
