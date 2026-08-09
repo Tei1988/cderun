@@ -679,7 +679,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 
 		// Expression resolver error
 		mfsError := &customMockFS{homeDirErr: assert.AnError}
-		_, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfsError)
+		_, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("{{HOME}}")}, nil, nil, mfsError)
 		require.Error(t, err)
 
 		// Expression error

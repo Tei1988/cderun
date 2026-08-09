@@ -372,6 +372,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Devices:    resolved.Devices,
 		GroupAdd:   resolved.GroupAdd,
 		Ulimits:    resolved.Ulimits,
+		Sysctls:    resolved.Sysctls,
 	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
@@ -504,6 +505,15 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		}
 		if len(ulimits) > 0 {
 			_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
+		}
+
+		var sysctls []string
+		for k, v := range maskedContainerConfig.Sysctls {
+			sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
+		}
+		sort.Strings(sysctls)
+		if len(sysctls) > 0 {
+			_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
 		}
 
 		var devices []string

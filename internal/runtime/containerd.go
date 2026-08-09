@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -385,6 +386,19 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 				s.Process = &specs.Process{}
 			}
 			s.Process.User.AdditionalGids = append(s.Process.User.AdditionalGids, validatedGids...)
+			return nil
+		})
+	}
+
+	if len(config.Sysctls) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Sysctl == nil {
+				s.Linux.Sysctl = make(map[string]string)
+			}
+			maps.Copy(s.Linux.Sysctl, config.Sysctls)
 			return nil
 		})
 	}
