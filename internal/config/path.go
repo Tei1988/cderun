@@ -938,7 +938,7 @@ func ValidateUserName(s string) error {
 	if !isValidUserPart(user) {
 		return fmt.Errorf("invalid user or group identifier: %q", user)
 	}
-	if hasGroup && !isValidUserPart(group) {
+	if hasGroup && !isValidGroupPart(group) {
 		return fmt.Errorf("invalid user or group identifier: %q", group)
 	}
 	return nil

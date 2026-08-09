@@ -111,10 +111,8 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
 		info, ok := fieldInfo[opt.Name]
-		expected := expectedFieldIndices[opt.Name]
-		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
-			fastPathUsed = false
-		} else {
+		expected, okExpected := expectedFieldIndices[opt.Name]
+		if ok && okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			def := OptionDef[[]string]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -237,10 +235,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
 		info, ok := fieldInfo[opt.Name]
-		expected := expectedFieldIndices[opt.Name]
-		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
-			fastPathUsed = false
-		} else {
+		expected, okExpected := expectedFieldIndices[opt.Name]
+		if ok && okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			def := OptionDef[string]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -380,10 +376,8 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
 		info, ok := fieldInfo[opt.Name]
-		expected := expectedFieldIndices[opt.Name]
-		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
-			fastPathUsed = false
-		} else {
+		expected, okExpected := expectedFieldIndices[opt.Name]
+		if ok && okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			def := OptionDef[*bool]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -458,10 +452,8 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
 		info, ok := fieldInfo[opt.Name]
-		expected := expectedFieldIndices[opt.Name]
-		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
-			fastPathUsed = false
-		} else {
+		expected, okExpected := expectedFieldIndices[opt.Name]
+		if ok && okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			def := OptionDef[*int]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -517,10 +509,8 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
 		info, ok := fieldInfo[opt.Name]
-		expected := expectedFieldIndices[opt.Name]
-		if !ok || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
-			fastPathUsed = false
-		} else {
+		expected, okExpected := expectedFieldIndices[opt.Name]
+		if ok && okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
 			def := OptionDef[*float64]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
