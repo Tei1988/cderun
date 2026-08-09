@@ -145,3 +145,37 @@ func TestUnit_Config_Sysctl_ParsingAndResolution(t *testing.T) {
 		assert.Equal(t, "sticky error", err.Error())
 	})
 }
+
+type sysctlTestErrorFS struct {
+	MockFileSystem
+}
+
+func (s *sysctlTestErrorFS) UserHomeDir() (string, error) {
+	return "", errors.New("user home dir error")
+}
+
+func TestUnit_Config_Sysctl_ResolverLevel_HomeDirFailure(t *testing.T) {
+	t.Run("resolve sysctls with literal values succeeds even when UserHomeDir fails", func(t *testing.T) {
+		errFS := &sysctlTestErrorFS{}
+		errFS.WD = "/app"
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Sysctls: []string{"net.ipv4.ip_forward=1"},
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, errFS)
+		require.NoError(t, err)
+		assert.Equal(t, "1", res.Sysctls["net.ipv4.ip_forward"])
+	})
+
+	t.Run("resolve sysctls with expression values fails when UserHomeDir fails", func(t *testing.T) {
+		errFS := &sysctlTestErrorFS{}
+		errFS.WD = "/app"
+		cli := &CLIOptions{
+			Image:   ptr("alpine"),
+			Sysctls: []string{"net.ipv4.ip_forward={{HOME}}"},
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, errFS)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "user home dir error")
+	})
+}

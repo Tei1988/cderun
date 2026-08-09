@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -397,9 +398,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			if s.Linux.Sysctl == nil {
 				s.Linux.Sysctl = make(map[string]string)
 			}
-			for k, v := range config.Sysctls {
-				s.Linux.Sysctl[k] = v
-			}
+			maps.Copy(s.Linux.Sysctl, config.Sysctls)
 			return nil
 		})
 	}
