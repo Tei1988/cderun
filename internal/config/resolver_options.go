@@ -182,55 +182,55 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 
 	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
-	case "image":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
-		p2Set, p2Val = getPtrVal(rv.cli.Image)
-		fastPathUsed = true
-	case "pid":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
-		p2Set, p2Val = getPtrVal(rv.cli.Pid)
-		fastPathUsed = true
-	case "network":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
-		p2Set, p2Val = getPtrVal(rv.cli.Network)
-		fastPathUsed = true
-	case "workdir":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
-		p2Set, p2Val = getPtrVal(rv.cli.Workdir)
-		fastPathUsed = true
-	case "runtime":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
-		p2Set, p2Val = getPtrVal(rv.cli.Runtime)
-		fastPathUsed = true
-	case "user":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
-		p2Set, p2Val = getPtrVal(rv.cli.User)
-		fastPathUsed = true
-	case "log-level":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
-		p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
-		fastPathUsed = true
-	case "log-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
-		fastPathUsed = true
-	case "hostname":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
-		p2Set, p2Val = getPtrVal(rv.cli.Hostname)
-		fastPathUsed = true
-	case "pull":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
-		p2Set, p2Val = getPtrVal(rv.cli.Pull)
-		fastPathUsed = true
-	case "dry-run-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
-		fastPathUsed = true
-	case "diagnosis-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
-		fastPathUsed = true
-	}
+		case "image":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
+			p2Set, p2Val = getPtrVal(rv.cli.Image)
+			fastPathUsed = true
+		case "pid":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
+			p2Set, p2Val = getPtrVal(rv.cli.Pid)
+			fastPathUsed = true
+		case "network":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
+			p2Set, p2Val = getPtrVal(rv.cli.Network)
+			fastPathUsed = true
+		case "workdir":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
+			p2Set, p2Val = getPtrVal(rv.cli.Workdir)
+			fastPathUsed = true
+		case "runtime":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
+			p2Set, p2Val = getPtrVal(rv.cli.Runtime)
+			fastPathUsed = true
+		case "user":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
+			p2Set, p2Val = getPtrVal(rv.cli.User)
+			fastPathUsed = true
+		case "log-level":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
+			p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
+			fastPathUsed = true
+		case "log-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
+			fastPathUsed = true
+		case "hostname":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
+			p2Set, p2Val = getPtrVal(rv.cli.Hostname)
+			fastPathUsed = true
+		case "pull":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
+			p2Set, p2Val = getPtrVal(rv.cli.Pull)
+			fastPathUsed = true
+		case "dry-run-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
+			fastPathUsed = true
+		case "diagnosis-format":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
+			p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
+			fastPathUsed = true
+		}
 
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
@@ -315,63 +315,63 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 
 	// Fast-path for common options to avoid reflection and redundant map lookups
 	switch opt.Name {
-	case "tty":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
-		p2Set, p2Val = getPtrVal(rv.cli.TTY)
-		fastPathUsed = true
-	case "interactive":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
-		p2Set, p2Val = getPtrVal(rv.cli.Interactive)
-		fastPathUsed = true
-	case "read-only":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
-		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
-		fastPathUsed = true
-	case "init":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunInit)
-		p2Set, p2Val = getPtrVal(rv.cli.Init)
-		fastPathUsed = true
-	case "remove":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
-		p2Set, p2Val = getPtrVal(rv.cli.Remove)
-		fastPathUsed = true
-	case "diagnosis":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
-		p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
-		fastPathUsed = true
-	case "strict-env":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
-		p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
-		fastPathUsed = true
-	case "privileged":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
-		p2Set, p2Val = getPtrVal(rv.cli.Privileged)
-		fastPathUsed = true
-	case "publish-all":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
-		p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
-		fastPathUsed = true
-	case "log-timestamp":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
-		p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
-		fastPathUsed = true
-	case "mount-socket":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
-		p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
-		fastPathUsed = true
-	case "mount-cderun":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
-		p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
-		fastPathUsed = true
-	case "mount-all-tools":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
-		p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
-		fastPathUsed = true
-	case "dry-run":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
-		fastPathUsed = true
-	}
+		case "tty":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
+			p2Set, p2Val = getPtrVal(rv.cli.TTY)
+			fastPathUsed = true
+		case "interactive":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
+			p2Set, p2Val = getPtrVal(rv.cli.Interactive)
+			fastPathUsed = true
+		case "read-only":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
+			p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
+			fastPathUsed = true
+		case "init":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunInit)
+			p2Set, p2Val = getPtrVal(rv.cli.Init)
+			fastPathUsed = true
+		case "remove":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
+			p2Set, p2Val = getPtrVal(rv.cli.Remove)
+			fastPathUsed = true
+		case "diagnosis":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
+			p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
+			fastPathUsed = true
+		case "strict-env":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
+			p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
+			fastPathUsed = true
+		case "privileged":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
+			p2Set, p2Val = getPtrVal(rv.cli.Privileged)
+			fastPathUsed = true
+		case "publish-all":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
+			p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
+			fastPathUsed = true
+		case "log-timestamp":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
+			p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
+			fastPathUsed = true
+		case "mount-socket":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
+			p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
+			fastPathUsed = true
+		case "mount-cderun":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
+			p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
+			fastPathUsed = true
+		case "mount-all-tools":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
+			p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
+			fastPathUsed = true
+		case "dry-run":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
+			p2Set, p2Val = getPtrVal(rv.cli.DryRun)
+			fastPathUsed = true
+		}
 
 	if fastPathUsed {
 		// Drift guard check (look up info/expected inside)
@@ -607,6 +607,40 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 		*target = d
 	}
 	return nil
+}
+
+// resolveBoolOption retrieves a registered boolean option by name, extracts priority values,
+// and resolves its final boolean value using the standard resolution chain.
+func (rv *resolver) resolveBoolOption(name string, p1, p2 *bool) (bool, error) {
+	opt, ok := GetBoolOption(name)
+	if !ok {
+		return false, fmt.Errorf("registry mismatch: boolean option %q not found", name)
+	}
+	p1Set, p1Val := getPtrVal(p1)
+	p2Set, p2Val := getPtrVal(p2)
+	def := OptionDef[*bool]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+	}
+	return resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
+}
+
+// resolveBoolOptionInfo retrieves a registered boolean option by name, extracts priority values,
+// and resolves its final boolean value along with whether it was explicitly specified.
+func (rv *resolver) resolveBoolOptionInfo(name string, p1, p2 *bool) (bool, bool, error) {
+	opt, ok := GetBoolOption(name)
+	if !ok {
+		return false, false, fmt.Errorf("registry mismatch: boolean option %q not found", name)
+	}
+	p1Set, p1Val := getPtrVal(p1)
+	p2Set, p2Val := getPtrVal(p2)
+	def := OptionDef[*bool]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+	}
+	return resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 }
 
 func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
