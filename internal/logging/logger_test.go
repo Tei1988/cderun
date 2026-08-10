@@ -173,3 +173,21 @@ func TestUnit_Logging_SanitizeLogString(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkSanitizeLogString_NoControl(b *testing.B) {
+	input := "hello world, this is a plain log message with no control characters"
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = SanitizeLogString(input)
+	}
+}
+
+func BenchmarkSanitizeLogString_WithControl(b *testing.B) {
+	input := "hello world, this is a log message\nwith control characters\r\n"
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = SanitizeLogString(input)
+	}
+}
