@@ -35,8 +35,8 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		return nil
 	}
 
-	var stackBuf [8]int
-	var allPairsBuf [8]anchorRange
+	var stackBuf [16]int
+	var allPairsBuf [16]anchorRange
 	stack := stackBuf[:0]
 	allPairs := allPairsBuf[:0]
 
@@ -247,11 +247,11 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	resolved := s
 	if hasExpr {
 		// Optimization: handle exact matches of magic words or simple directives (e.g. "{{HOME}}", "{{env:KEY}}")
-		if strings.HasPrefix(s, "{{") && strings.HasSuffix(s, "}}") {
+		if len(s) >= 4 && s[0] == '{' && s[1] == '{' && s[len(s)-2] == '}' && s[len(s)-1] == '}' {
 			content := strings.TrimSpace(s[2 : len(s)-2])
 			if !strings.Contains(content, "{{") && !strings.Contains(content, "}}") { // No nested expressions
 				res, err := r.resolveDirective(content)
-				if err == nil && !strings.HasPrefix(res, "{{") {
+				if err == nil && !(len(res) >= 2 && res[0] == '{' && res[1] == '{') {
 					resolved = res
 					hasExpr = false // Resolved
 				}
@@ -259,7 +259,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		if hasExpr {
-			var anchorBuf [8]anchorRange
+			var anchorBuf [16]anchorRange
 			ranges := scanAnchors(s, anchorBuf[:0])
 			if len(ranges) > 0 {
 				var arr [512]byte
@@ -279,7 +279,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 						var err error
 
 						// Escape mechanism: {{{{...}}}} -> {{...}}
-						if strings.HasPrefix(content, "{{") && strings.HasSuffix(content, "}}") {
+						if len(content) >= 4 && content[0] == '{' && content[1] == '{' && content[len(content)-2] == '}' && content[len(content)-1] == '}' {
 							res = content
 						} else {
 							// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
@@ -381,7 +381,7 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 			break
 		}
 	}
-	if isMagicWordCandidate || strings.Contains(content, ":") {
+	if isMagicWordCandidate || strings.IndexByte(content, ':') >= 0 {
 		return "", fmt.Errorf("unknown directive or magic word: %q", content)
 	}
 
