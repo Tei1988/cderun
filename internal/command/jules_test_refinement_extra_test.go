@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"slices"
@@ -243,9 +242,9 @@ func TestUnit_Command_ConsecutiveSignals_SIGQUIT_Cancellation(t *testing.T) {
 	select {
 	case <-done:
 		require.Error(t, execErr)
-		require.True(t, errors.Is(execErr, context.Canceled) || errors.Is(execErr, context.DeadlineExceeded))
+		require.ErrorIs(t, execErr, context.Canceled)
 		// Assert that the second signal triggered cancellation without being forwarded to the container
-		assert.Equal(t, 1, len(mock.getSignals()), "mock runtime should receive exactly one SIGQUIT because second signal cancels host context directly")
+		assert.Len(t, mock.getSignals(), 1, "mock runtime should receive exactly one SIGQUIT because second signal cancels host context directly")
 	case <-time.After(2 * time.Second):
 		t.Fatal("consecutive SIGQUIT signals failed to trigger host context cancellation")
 	}
