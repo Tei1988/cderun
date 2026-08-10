@@ -166,7 +166,7 @@ func TestUnit_Config_Resolver_TildeExpansion_EdgeCases(t *testing.T) {
 }
 
 // docs/features/value-resolution.md: Sticky Error Pattern
-// Verify that the Sticky Error pattern propagates correctly in a complex nested map,
+// Verify that the Sticky Error pattern propagates correctly in an ordered slice,
 // switching to safe fallback (no-op return) for any subsequent fields.
 func TestUnit_Config_Resolver_StickyError_ComplexNestedStructures(t *testing.T) {
 	t.Parallel()
@@ -179,34 +179,30 @@ func TestUnit_Config_Resolver_StickyError_ComplexNestedStructures(t *testing.T) 
 		},
 	}
 
-	t.Run("deep map triggers sticky error first and bypasses subsequent sibling resolution", func(t *testing.T) {
+	t.Run("ordered slice triggers sticky error and bypasses subsequent sibling resolution deterministically", func(t *testing.T) {
 		r, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
-		input := map[string]any{
-			"first_ok": "{{env:ENV_OK}}",
-			"nested": map[string]any{
-				"trigger_error": "{{BAD_DIRECTIVE:param}}",
-				"second_bypassed": "{{env:ENV_OK}}",
-			},
-			"lvl1_bypassed": "{{env:ENV_OK}}",
+		input := []any{
+			"{{env:ENV_OK}}",
+			"{{BAD_DIRECTIVE:param}}",
+			"{{env:ENV_OK}}",
 		}
 
 		resolved := r.Resolve(input)
 		require.Error(t, r.Error())
 		assert.Contains(t, r.Error().Error(), "unknown directive or magic word")
 
-		// First ok resolves successfully (or might be resolved before error depending on iteration sequence,
-		// but Go map iteration order is randomized).
-		// What's guaranteed: once the error is hit, any resolve step that runs *after* it must bypass evaluation.
-		// Since map iteration order is randomized, we check the final state of resolved.
-		// If trigger_error was evaluated, the error is recorded.
-		// Let's assert that "resolved" contains the un-evaluated trigger_error string, and the recorded error is present.
-		// Also, the map should be returned.
-		assert.NotNil(t, resolved)
-		resMap, ok := resolved.(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "{{BAD_DIRECTIVE:param}}", resMap["nested"].(map[string]any)["trigger_error"])
+		// The resolved output slice should:
+		// 1. Resolve first element before the error is hit.
+		// 2. Preserve second element as raw unmodified.
+		// 3. Keep third element unresolved after the error state.
+		expectedSlice := []any{
+			"value_ok",
+			"{{BAD_DIRECTIVE:param}}",
+			"{{env:ENV_OK}}",
+		}
+		assert.Equal(t, expectedSlice, resolved)
 	})
 }
 

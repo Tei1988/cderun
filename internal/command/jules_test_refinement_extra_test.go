@@ -28,10 +28,9 @@ import (
 func TestUnit_Command_Preprocessor_AdvancedAdjacentOverrides(t *testing.T) {
 	t.Parallel()
 
-	mockRuntime := &runtime.MockRuntime{}
-
 	t.Run("boolean overrides do not consume next arguments and hoist autonomously", func(t *testing.T) {
 		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
 		args := []string{
 			"cderun",
 			"sh",
@@ -64,6 +63,7 @@ func TestUnit_Command_Preprocessor_AdvancedAdjacentOverrides(t *testing.T) {
 
 	t.Run("mixing standard flags and P1 overrides maintains relative positions", func(t *testing.T) {
 		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
 		args := []string{
 			"cderun",
 			"--tty", // Standard flag (P2)
@@ -102,7 +102,6 @@ func TestUnit_Command_Preprocessor_AdvancedAdjacentOverrides(t *testing.T) {
 func TestUnit_Command_SymlinkMode_HoistingRestrictionsAndUnicode(t *testing.T) {
 	t.Parallel()
 
-	mockRuntime := &runtime.MockRuntime{}
 	mfs := &config.MockFileSystem{
 		WD: "/workspace",
 		Files: map[string][]byte{
@@ -111,6 +110,8 @@ func TestUnit_Command_SymlinkMode_HoistingRestrictionsAndUnicode(t *testing.T) {
 	}
 
 	t.Run("only cderun-prefixed flags are hoisted while standard flags remain passthrough", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
 		// Invoked as symlink node
 		args := []string{"./node", "--env", "FOO=bar", "app.js", "--cderun-image", "node:20-alpine"}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
@@ -136,6 +137,8 @@ func TestUnit_Command_SymlinkMode_HoistingRestrictionsAndUnicode(t *testing.T) {
 	})
 
 	t.Run("unclean symlink path resolved and CJK arguments preserved", func(t *testing.T) {
+		t.Parallel()
+		mockRuntime := &runtime.MockRuntime{}
 		args := []string{"./some_dir/../python", "-c", "print('こんにちは, Go!')"}
 		err := ExecuteContextWithOptions(context.Background(), args, func(o *rootOptions, cmd *cobra.Command) {
 			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
@@ -241,6 +244,8 @@ func TestUnit_Command_ConsecutiveSignals_SIGQUIT_Cancellation(t *testing.T) {
 	case <-done:
 		require.Error(t, execErr)
 		require.True(t, errors.Is(execErr, context.Canceled) || errors.Is(execErr, context.DeadlineExceeded))
+		// Assert that the second signal triggered cancellation without being forwarded to the container
+		assert.Equal(t, 1, len(mock.getSignals()), "mock runtime should receive exactly one SIGQUIT because second signal cancels host context directly")
 	case <-time.After(2 * time.Second):
 		t.Fatal("consecutive SIGQUIT signals failed to trigger host context cancellation")
 	}
