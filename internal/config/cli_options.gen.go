@@ -90,6 +90,8 @@ type CLIOptions struct {
 	CderunRuntime         *string
 	SensitiveEnv          []string
 	CderunSensitiveEnv    []string
+	ShmSize               *string
+	CderunShmSize         *string
 	SocketPath            *string
 	CderunSocketPath      *string
 	StrictEnv             *bool

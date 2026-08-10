@@ -95,6 +95,8 @@ type rootFlags struct {
 	cderunRuntime         string
 	sensitiveEnv          []string
 	cderunSensitiveEnv    []string
+	shmSize               string
+	cderunShmSize         string
 	socketPath            string
 	cderunSocketPath      string
 	strictEnv             bool
@@ -227,6 +229,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunRuntime:         optStr(cmd.Flags().Changed("cderun-runtime"), o.cderunRuntime),
 		SensitiveEnv:          o.sensitiveEnv,
 		CderunSensitiveEnv:    o.cderunSensitiveEnv,
+		ShmSize:               optStr(cmd.Flags().Changed("shm-size"), o.shmSize),
+		CderunShmSize:         optStr(cmd.Flags().Changed("cderun-shm-size"), o.cderunShmSize),
 		SocketPath:            optStr(cmd.Flags().Changed("socket-path"), o.socketPath),
 		CderunSocketPath:      optStr(cmd.Flags().Changed("cderun-socket-path"), o.cderunSocketPath),
 		StrictEnv:             optBool(cmd.Flags().Changed("strict-env"), o.strictEnv),
@@ -317,6 +321,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.pullBackoffBase, &o.cderunPullBackoffBase
 	case "runtime":
 		return &o.runtime, &o.cderunRuntime
+	case "shm-size":
+		return &o.shmSize, &o.cderunShmSize
 	case "socket-path":
 		return &o.socketPath, &o.cderunSocketPath
 	case "tool-config":

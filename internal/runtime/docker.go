@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/containerd/errdefs"
 	"io"
+
+	"github.com/docker/go-units"
 	"strings"
 	"sync"
 	"time"
@@ -125,6 +127,15 @@ func (d *DockerRuntime) Close() error {
 // ValidateConfig validates that the runtime supports the given container configuration.
 // Docker runtime natively supports all existing features, so this is a no-op.
 func (d *DockerRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	if config.ShmSize != "" {
+		bytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return fmt.Errorf("docker runtime: invalid shm-size: %w", err)
+		}
+		if bytes < 0 {
+			return fmt.Errorf("docker runtime: shm-size cannot be negative: %d", bytes)
+		}
+	}
 	return nil
 }
 

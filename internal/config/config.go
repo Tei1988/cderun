@@ -75,6 +75,7 @@ type ConfigDefaults struct {
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
 	Pid             string         `yaml:"pid,omitempty"`
+	ShmSize         string         `yaml:"shmSize,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
@@ -220,6 +221,7 @@ type ToolConfig struct {
 	User            string         `yaml:"user,omitempty"`
 	Privileged      *bool          `yaml:"privileged,omitempty"`
 	Pid             string         `yaml:"pid,omitempty"`
+	ShmSize         string         `yaml:"shmSize,omitempty"`
 	CapAdd          []string       `yaml:"capAdd,omitempty"`
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
