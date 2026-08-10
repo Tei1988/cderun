@@ -368,35 +368,13 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 
 	if config.ShmSize != "" {
 		shmBytes, err := units.RAMInBytes(config.ShmSize)
-		if err == nil {
-			opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-				shmSizeOpt := fmt.Sprintf("size=%d", shmBytes)
-				found := false
-				for i, m := range s.Mounts {
-					if m.Destination == "/dev/shm" {
-						var newOpts []string
-						for _, o := range m.Options {
-							if !strings.HasPrefix(o, "size=") {
-								newOpts = append(newOpts, o)
-							}
-						}
-						newOpts = append(newOpts, shmSizeOpt)
-						s.Mounts[i].Options = newOpts
-						found = true
-						break
-					}
-				}
-				if !found {
-					s.Mounts = append(s.Mounts, specs.Mount{
-						Type:        "tmpfs",
-						Source:      "shm",
-						Destination: "/dev/shm",
-						Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", shmSizeOpt},
-					})
-				}
-				return nil
-			})
+		if err != nil {
+			return "", fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
 		}
+		if shmBytes < 0 {
+			return "", fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", shmBytes)
+		}
+		opts = append(opts, getShmSizeSpecOpt(shmBytes))
 	}
 	if len(config.Ulimits) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
@@ -727,6 +705,36 @@ func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID st
 		return false, 0, err
 	}
 	return status.Status == client.Running, int(status.ExitStatus), nil
+}
+
+func getShmSizeSpecOpt(shmBytes int64) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		shmSizeOpt := fmt.Sprintf("size=%d", shmBytes)
+		found := false
+		for i, m := range s.Mounts {
+			if m.Destination == "/dev/shm" {
+				var newOpts []string
+				for _, o := range m.Options {
+					if !strings.HasPrefix(o, "size=") {
+						newOpts = append(newOpts, o)
+					}
+				}
+				newOpts = append(newOpts, shmSizeOpt)
+				s.Mounts[i].Options = newOpts
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "tmpfs",
+				Source:      "shm",
+				Destination: "/dev/shm",
+				Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", shmSizeOpt},
+			})
+		}
+		return nil
+	}
 }
 
 // normalizeCapabilities converts Docker-style capability names (e.g. "SYS_ADMIN")
