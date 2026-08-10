@@ -713,6 +713,9 @@ func getShmSizeSpecOpt(shmBytes int64) oci.SpecOpts {
 		found := false
 		for i, m := range s.Mounts {
 			if m.Destination == "/dev/shm" {
+				if m.Type != "tmpfs" {
+					return fmt.Errorf("containerd runtime: cannot set shm-size on a non-tmpfs mount at /dev/shm (found type %q)", m.Type)
+				}
 				var newOpts []string
 				for _, o := range m.Options {
 					if !strings.HasPrefix(o, "size=") {

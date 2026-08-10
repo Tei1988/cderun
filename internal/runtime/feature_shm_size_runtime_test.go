@@ -96,4 +96,21 @@ func TestUnit_Containerd_CreateContainer_ShmSize(t *testing.T) {
 		assert.NotContains(t, shmMounts[0].Options, "size=64m")
 		assert.Contains(t, shmMounts[0].Options, "nosuid")
 	})
+
+	// Test the custom oci.SpecOpts returned by getShmSizeSpecOpt for non-tmpfs mounts rejection
+	t.Run("rejection of non-tmpfs mount", func(t *testing.T) {
+		spec := &specs.Spec{
+			Mounts: []specs.Mount{
+				{Destination: "/dev/shm", Type: "bind", Options: []string{"rbind"}},
+			},
+		}
+
+		opt := getShmSizeSpecOpt(512 * 1024 * 1024) // 512m
+		err := opt(context.Background(), nil, nil, spec)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot set shm-size on a non-tmpfs mount")
+
+		// Verify size= was not applied to the bind mount
+		assert.NotContains(t, spec.Mounts[0].Options, "size=536870912")
+	})
 }
