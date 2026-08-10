@@ -112,6 +112,22 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 		}
 
+		if err := validatePathChars(k); err != nil {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("invalid character in sysctl key: %w", err),
+			}
+		}
+
+		if err := validatePathChars(val); err != nil {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("invalid character in sysctl value: %w", err),
+			}
+		}
+
 		res[k] = val
 	}
 	return res, nil
