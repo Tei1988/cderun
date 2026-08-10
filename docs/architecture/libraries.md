@@ -1,28 +1,34 @@
-# ライブラリと技術スタック
+# Libraries and Technology Stack
 
-このプロジェクトで使用する技術スタックとライブラリの選定基準です。
-新しい外部ライブラリを導入する際は、必ずユーザーの許可を得てから `go get` してください。
+This document describes the technology stack and selection criteria for libraries used in this project.
+When introducing a new external library, you must obtain user permission before running `go get`.
 
-## 1. 主要技術 (Core Technology)
+---
 
-- **言語:** Go (最新の安定版)
-- **モジュール管理:** Go Modules (`go.mod`)
+## 1. Core Technology
 
-## 2. 選定基準
+- **Language:** Go (latest stable version)
+- **Module Management:** Go Modules (`go.mod`)
 
-ライブラリ選定に迷った際は、以下の優先順位で判断してください。
+---
 
-1. **Go標準ライブラリ:** 標準パッケージで実現可能か？（依存関係を減らすため）
-1. **シンプルさ:** 機能に対してライブラリが過剰（Overkill）ではないか？
-1. **コミュニティ:** GitHubのスター数、メンテナンス頻度、ドキュメントの質は十分か？
+## 2. Selection Criteria
 
-## 3. 承認済みライブラリ
+When deciding which library to select, use the following priority order:
 
-現在プロジェクトで使用が承認されている主要ライブラリ：
+1. **Go Standard Library:** Can this be achieved using only standard packages? (to minimize dependencies)
+2. **Simplicity:** Is the library over-engineered (Overkill) for the required feature?
+3. **Community:** Are the GitHub star count, maintenance frequency, and documentation quality sufficient?
 
-- **CLIフレームワーク:** [cobra](https://github.com/spf13/cobra)
-- **コンテナランタイムAPI:** [moby (Docker)](https://github.com/moby/moby), [containerd/containerd/v2](https://github.com/containerd/containerd), [containerd/errdefs](https://github.com/containerd/errdefs)（containerd ランタイム対応で導入）
-- **OCI 仕様:** [opencontainers/image-spec](https://github.com/opencontainers/image-spec), [opencontainers/runtime-spec](https://github.com/opencontainers/runtime-spec)
-- **YAML & 設定ユーティリティ:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://dario.cat/mergo)
-- **ユーティリティ:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [go-connections](https://github.com/docker/go-connections), [x/term](https://golang.org/x/term)
-- **テスト:** [testify](https://github.com/stretchr/testify)
+---
+
+## 3. Approved Libraries
+
+The primary libraries whose usage is currently approved in the project:
+
+- **CLI Framework:** [cobra](https://github.com/spf13/cobra)
+- **Container Runtime API:** [moby (Docker)](https://github.com/moby/moby), [containerd/containerd/v2](https://github.com/containerd/containerd), [containerd/errdefs](https://github.com/containerd/errdefs) (introduced for containerd runtime support)
+- **OCI Specification:** [opencontainers/image-spec](https://github.com/opencontainers/image-spec), [opencontainers/runtime-spec](https://github.com/opencontainers/runtime-spec)
+- **YAML & Config Utilities:** [yaml.v3](https://gopkg.in/yaml.v3), [mergo](https://dario.cat/mergo)
+- **Utilities:** [uuid](https://github.com/google/uuid), [go-units](https://github.com/docker/go-units), [go-connections](https://github.com/docker/go-connections), [x/term](https://golang.org/x/term)
+- **Testing:** [testify](https://github.com/stretchr/testify)

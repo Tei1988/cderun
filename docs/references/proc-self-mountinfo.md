@@ -1,61 +1,61 @@
-# /proc/self/mountinfo 仕様書
+# /proc/self/mountinfo Specification
 
-Linuxシステムにおける `/proc/self/mountinfo` ファイルは、現在のプロセスが見ているマウント名前空間（Mount Namespace）内のマウントポイントに関する詳細情報を提供します。
-特に、コンテナ技術（DockerやKubernetesなど）や複雑なバインドマウントの状況をデバッグ・解析する際に、`/proc/mounts` よりも正確で詳細な情報が得られるため重宝されます。
+The `/proc/self/mountinfo` file in Linux systems provides detailed information about mount points within the mount namespace currently seen by the process.
+Especially when debugging or analyzing container technologies (such as Docker and Kubernetes) or complex bind mount situations, it is highly useful because it yields more precise and detailed information than `/proc/mounts`.
 
-## 1. 概要
+## 1. Overview
 
-本ファイルは、プロセスごとのマウント情報を行指向のテキスト形式で保持する。各行は単一のマウントポイントを表し、フィールドは空白（スペース）区切りで構成される。
+This file maintains mount information on a per-process basis in a line-oriented text format. Each line represents a single mount point, with fields separated by whitespace (spaces).
 
-## 2. データ構造フォーマット
+## 2. Data Structure Format
 
-1行あたりのデータフォーマットは以下の通りである。
+The data format per line is as follows:
 
 ```text
 36 35 98:0 / /mnt rw,noatime master:1 - ext3 /dev/root rw,errors=continue
 (1)(2)(3) (4) (5)     (6)      (7)   (8) (9)    (10)         (11)
 ```
 
-## 3. フィールド詳細定義
+## 3. Detailed Field Definitions
 
-各フィールドの意味は以下の通りである。
+The meaning of each field is as follows:
 
-| No. | フィールド名 | データ型 | 説明 | 例 |
+| No. | Field Name | Data Type | Description | Example |
 | :-- | :--- | :--- | :--- | :--- |
-| 1 | Mount ID | Integer | このマウントの一意なID。 | 36 |
-| 2 | Parent ID | Integer | 親マウントのID（自身がルートの場合は自身のID）。 | 35 |
-| 3 | Major:Minor | String | ファイルシステムのデバイス番号。 | 98:0 |
-| 4 | Root | Path | マウントされているファイルシステム内のルートディレクトリ。 | / または /var/lib |
-| 5 | Mount Point | Path | プロセスのルートからの相対パスでのマウントポイント。 | /mnt |
-| 6 | Mount Options | String | マウントごとのオプション。 | rw,noatime |
-| 7 | Optional Tags | String | マウントの伝播設定など（詳細は後述）。 | shared:1, master:1 |
-| 8 | Separator | Char | オプションフィールドの終了を示す区切り文字。 | - |
-| 9 | FS Type | String | ファイルシステムの種類。 | ext3, tmpfs, nfs |
-| 10 | Mount Source | String | ファイルシステム固有のマウント元情報。 | /dev/sda1 |
-| 11 | Superblock | String | スーパーブロックごとのオプション。 | rw,errors=continue |
+| 1 | Mount ID | Integer | A unique ID for this mount. | 36 |
+| 2 | Parent ID | Integer | The ID of the parent mount (its own ID if it is the root). | 35 |
+| 3 | Major:Minor | String | The major and minor device numbers of the file system. | 98:0 |
+| 4 | Root | Path | The root directory within the mounted file system. | / or /var/lib |
+| 5 | Mount Point | Path | The mount point relative to the process's root. | /mnt |
+| 6 | Mount Options | String | Per-mount options. | rw,noatime |
+| 7 | Optional Tags | String | Mount propagation settings, etc. (detailed below). | shared:1, master:1 |
+| 8 | Separator | Char | A separator indicating the end of the optional fields. | - |
+| 9 | FS Type | String | The file system type. | ext3, tmpfs, nfs |
+| 10 | Mount Source | String | File system-specific mount source information. | /dev/sda1 |
+| 11 | Superblock | String | Per-superblock options. | rw,errors=continue |
 
-## 4. 特記事項：Optional Tags（フィールド7）について
+## 4. Special Notes: Optional Tags (Field 7)
 
-フィールド7は可変長であり、以下のキーワードが含まれる場合がある。これらは主にマウントの**伝播（Propagation）**に関連する。
+Field 7 is variable-length and may contain the following keywords. These are primarily related to mount **propagation**:
 
-- **shared:X**: マウントがピアグループ X 内で共有されている。同じグループ内の他のマウントポイントへイベント（マウント/アンマウント）が伝播する。
-- **master:X**: マウントがピアグループ X のスレーブであり、マスターからの伝播を受けるが、逆は行わない。
-- **propagate_from:X**: スレーブであり、かつ共有されている場合の伝播元グループ。
-- **unbindable**: このマウントポイントをさらにバインドマウントすることはできない。
+- **shared:X**: The mount is shared within peer group X. Events (mount/unmount) propagate to other mount points in the same group.
+- **master:X**: The mount is a slave to peer group X, receiving propagation from the master, but not vice versa.
+- **propagate_from:X**: The propagation source group when the mount is both a slave and shared.
+- **unbindable**: This mount point cannot be further bind-mounted.
 
-※ このフィールドが存在しない場合、そのマウントは private（伝播しない/されない）であることを意味する。
+*Note: If this field is absent, it means the mount is private (does not propagate events to/from other mounts).*
 
-## 5. /proc/mounts との違い
+## 5. Differences from /proc/mounts
 
-従来の `/proc/mounts` (または `/etc/mtab`) と比較して、`mountinfo` には以下の利点がある。
+Compared to the traditional `/proc/mounts` (or `/etc/mtab`), `mountinfo` provides the following benefits:
 
-- **一意のID (Mount ID, Parent ID)**: マウントポイントの親子関係や、同じパスに重ねてマウント（オーバーレイ）された場合の順序を正確に追跡できる。
-- **ルートパスの特定 (Root)**: バインドマウントにおいて、「ファイルシステム全体のルート」をマウントしているのか、「特定のサブディレクトリ」だけをマウントしているのか（フィールド4）が判別可能。
-- **伝播属性の確認**: コンテナ環境で重要な shared や slave といった属性が確認できるのは mountinfo のみである。
+- **Unique IDs (Mount ID, Parent ID)**: Accurately tracks parent-child relationships of mount points and the sequence when stacked (overlay) mounts are applied on the same path.
+- **Root Path Identification (Root)**: For bind mounts, it determines whether the mount is the "entire root of the file system" or just a "specific subdirectory" (Field 4).
+- **Propagation Attribute Verification**: Only `mountinfo` allows verifying critical container-environment attributes like shared or slave.
 
-## 6. 解析時の注意点
+## 6. Parsing Considerations
 
-- **フィールド7の可変長**: パーサー（解析プログラム）を作成する際は、固定カラムとして扱わず、必ずセパレータ（- / フィールド8）を見つけて、そこから後半のフィールド（FS Type等）を特定する必要がある。
-- **エスケープ処理**: パス名にスペースや改行などが含まれる場合、それらは8進数形式（例: \040）でエスケープされる。
+- **Variable-Length Field 7**: When writing a parser (analysis program), do not treat fields as fixed columns; you must find the separator (`-` / Field 8) first, and identify the subsequent fields (FS Type, etc.) relative to it.
+- **Escape Processing**: Any spaces, newlines, or other special characters in path names are escaped in octal format (e.g., `\040` for spaces).
 
-この情報をもとに、特定のコンテナがどのホストディレクトリをマウントしているか調査したり、マウントが意図せず readonly になっている原因（マウントオプションかスーパーブロックオプションか）を切り分けたりすることが可能です。
+Based on this information, you can investigate which host directory a specific container mounts, or diagnose why a mount has unexpectedly become read-only (whether due to mount options or superblock options).
