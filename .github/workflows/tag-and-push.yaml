@@ -32,6 +32,13 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Release Credentials
+        run: |
+          if [ -z "${{ secrets.RELEASE_PAT }}" ]; then
+            echo "::error::Missing mandatory secrets.RELEASE_PAT. Pushing a tag using the default GITHUB_TOKEN will not trigger the release pipeline. Please configure the secrets.RELEASE_PAT Personal Access Token with repo/write scopes."
+            exit 1
+          fi
+
       - name: Setup Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
@@ -54,6 +61,8 @@ jobs:
           make test
 
       - name: Tag and Push
+        env:
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
           echo "Configuring git bot..."
           git config --global user.name "github-actions[bot]"
@@ -62,13 +71,9 @@ jobs:
           echo "Creating local tag: $RELEASE_VERSION"
           git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION triggered via GitHub Actions manual workflow"
 
-          # We authenticate with a dedicated release credential (such as secrets.RELEASE_PAT)
-          # so that pushing the tag successfully triggers the release.yaml pipeline.
-          # If secrets.RELEASE_PAT is not set, we fall back to GITHUB_TOKEN.
-          PUSH_TOKEN="${{ secrets.RELEASE_PAT }}"
-          if [ -z "$PUSH_TOKEN" ]; then
-            PUSH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-          fi
+          echo "Pushing tag to origin securely via HTTP authorization extraHeader..."
+          AUTH_HEADER="AUTHORIZATION: basic $(echo -n "x-access-token:$RELEASE_PAT" | base64 -w0)"
 
-          echo "Pushing tag to origin..."
-          git push "https://${{ github.actor }}:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$RELEASE_VERSION"
+          # We use `--no-verify` to completely bypass any local repository-controlled git hooks
+          # and override `http.extraHeader` config inline to prevent leaking tokens or using URL injection.
+          git -c "http.https://github.com/.extraHeader=$AUTH_HEADER" push --no-verify origin "$RELEASE_VERSION"
