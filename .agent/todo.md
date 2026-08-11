@@ -30,10 +30,10 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
-| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | WIP |
+| T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
+| T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -1017,6 +1017,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
 
 ---
 

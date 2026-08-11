@@ -318,6 +318,17 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
+		Name:   "shm-size",
+		EnvKey: "CDERUN_SHM_SIZE",
+		Usage:  "Size of /dev/shm (e.g. 512m, 1g, 2147483648)",
+		ToolGetter: func(t ToolConfig) string {
+			return t.ShmSize
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.ShmSize
+		},
+	},
+	{
 		Name:      "workdir",
 		Shorthand: "w",
 		EnvKey:    "CDERUN_WORKDIR",

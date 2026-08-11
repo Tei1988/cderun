@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"cderun/internal/logging"
+
+	"github.com/docker/go-units"
 )
 
 var highlyPrivilegedCaps = map[string]bool{
@@ -184,6 +186,27 @@ func (rv *resolver) validateCriticalFields() error {
 		return nil
 	}
 	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
+		return err
+	}
+
+	// shm-size
+	shmValidator := func(v string) error {
+		if v == "" {
+			return nil
+		}
+		if err := validatePathChars(v); err != nil {
+			return fmt.Errorf("security validation failed: %w", err)
+		}
+		bytes, err := units.RAMInBytes(v)
+		if err != nil {
+			return fmt.Errorf("invalid shm-size %q: %w", v, err)
+		}
+		if bytes < 0 {
+			return fmt.Errorf("shm-size cannot be negative: %d", bytes)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.ShmSize, "shm-size", shmValidator); err != nil {
 		return err
 	}
 

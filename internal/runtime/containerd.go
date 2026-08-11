@@ -18,6 +18,7 @@ import (
 	"cderun/internal/logging"
 
 	"github.com/containerd/containerd/v2/client"
+	"github.com/docker/go-units"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -128,6 +129,16 @@ func (r *ContainerdRuntime) Name() string {
 func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
 	if config.Init {
 		return fmt.Errorf("containerd runtime: init is not supported yet")
+	}
+
+	if config.ShmSize != "" {
+		bytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
+		}
+		if bytes < 0 {
+			return fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", bytes)
+		}
 	}
 
 	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
@@ -353,6 +364,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			s.Root.Readonly = true
 			return nil
 		})
+	}
+
+	if config.ShmSize != "" {
+		shmBytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return "", fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
+		}
+		if shmBytes < 0 {
+			return "", fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", shmBytes)
+		}
+		opts = append(opts, getShmSizeSpecOpt(shmBytes))
 	}
 	if len(config.Ulimits) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
@@ -683,6 +705,39 @@ func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID st
 		return false, 0, err
 	}
 	return status.Status == client.Running, int(status.ExitStatus), nil
+}
+
+func getShmSizeSpecOpt(shmBytes int64) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		shmSizeOpt := fmt.Sprintf("size=%d", shmBytes)
+		found := false
+		for i, m := range s.Mounts {
+			if m.Destination == "/dev/shm" {
+				if m.Type != "tmpfs" {
+					return fmt.Errorf("containerd runtime: cannot set shm-size on a non-tmpfs mount at /dev/shm (found type %q)", m.Type)
+				}
+				var newOpts []string
+				for _, o := range m.Options {
+					if !strings.HasPrefix(o, "size=") {
+						newOpts = append(newOpts, o)
+					}
+				}
+				newOpts = append(newOpts, shmSizeOpt)
+				s.Mounts[i].Options = newOpts
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "tmpfs",
+				Source:      "shm",
+				Destination: "/dev/shm",
+				Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", shmSizeOpt},
+			})
+		}
+		return nil
+	}
 }
 
 // normalizeCapabilities converts Docker-style capability names (e.g. "SYS_ADMIN")

@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"github.com/docker/go-units"
 )
 
 func toDockerContainerConfig(config *container.ContainerConfig) (
@@ -67,6 +68,14 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 			Memory:   config.Memory,
 			NanoCPUs: int64(config.CPUs * 1e9),
 		},
+	}
+
+	if config.ShmSize != "" {
+		shmBytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("invalid shm-size: %w", err)
+		}
+		hostConfig.ShmSize = shmBytes
 	}
 
 	if len(config.Ulimits) > 0 {
