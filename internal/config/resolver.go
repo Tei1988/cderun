@@ -434,12 +434,20 @@ func (rv *resolver) resolveEarly() error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		rForSens, err := rv.resolverForSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv)
-		if err != nil {
-			return err
+		vals := getWinningStringSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.fs)
+		var rForSens *ExpressionResolver
+		for _, v := range vals {
+			if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+				var err error
+				rForSens, err = rv.getR()
+				if err != nil {
+					return err
+				}
+				break
+			}
 		}
 
-		rv.res.SensitiveEnv = resolveStringSliceOpt(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rForSens, rv.fs)
+		rv.res.SensitiveEnv = resolveStringSliceOptWithVals(vals, rForSens)
 	}
 	return nil
 }

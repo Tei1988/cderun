@@ -135,6 +135,71 @@ func resolveBoolOptInfo(
 	return false, false, nil
 }
 
+// getWinningStringSlice resolves the winning []string slice from P1-P5.
+// P1/P2 are passed as slices directly. P3 env var is split by envSep.
+func getWinningStringSlice(
+	def OptionDef[[]string],
+	envSep string,
+	p1 []string, p2 []string,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
+	fs FileSystem,
+) []string {
+	if p1 != nil {
+		return p1
+	}
+	if p2 != nil {
+		return p2
+	}
+	if def.EnvKey != "" {
+		if env, ok := fs.LookupEnv(def.EnvKey); ok {
+			if envSep != "" && !strings.Contains(env, envSep) {
+				v := strings.TrimSpace(env)
+				if v == "" {
+					return []string{}
+				}
+				return []string{v}
+			}
+			vals := []string{}
+			for v := range strings.SplitSeq(env, envSep) {
+				v = strings.TrimSpace(v)
+				if v == "" {
+					continue
+				}
+				vals = append(vals, v)
+			}
+			return vals
+		}
+	}
+	if def.ToolGetter != nil && tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			return def.ToolGetter(tool)
+		}
+	}
+	if def.GlobalGetter != nil && global != nil {
+		return def.GlobalGetter(*global)
+	}
+	return nil
+}
+
+// resolveStringSliceOptWithVals resolves expressions/tildes on pre-extracted slice elements.
+func resolveStringSliceOptWithVals(
+	vals []string,
+	r *ExpressionResolver,
+) []string {
+	if vals == nil {
+		return nil
+	}
+	res := make([]string, 0, len(vals))
+	for _, v := range vals {
+		if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+			res = append(res, v)
+		} else {
+			res = append(res, r.resolveString(v))
+		}
+	}
+	return res
+}
+
 // resolveStringSliceOpt resolves a []string option through P1-P6.
 // P1/P2 are passed as slices directly (already parsed by Cobra).
 // P3 env var is split by the given separator.
@@ -145,43 +210,8 @@ func resolveStringSliceOpt(
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
-	var vals []string
-	if p1 != nil {
-		vals = p1
-	} else if p2 != nil {
-		vals = p2
-	} else if def.EnvKey != "" {
-		if env, ok := fs.LookupEnv(def.EnvKey); ok {
-			vals = []string{}
-			for v := range strings.SplitSeq(env, envSep) {
-				v = strings.TrimSpace(v)
-				if v == "" {
-					continue
-				}
-				vals = append(vals, v)
-			}
-		}
-	}
-	if vals == nil && def.ToolGetter != nil && tools != nil {
-		if tool, ok := tools[subcommand]; ok {
-			vals = def.ToolGetter(tool)
-		}
-	}
-	if vals == nil && def.GlobalGetter != nil && global != nil {
-		vals = def.GlobalGetter(*global)
-	}
-	var res []string
-	if vals != nil {
-		res = make([]string, 0, len(vals))
-		for _, v := range vals {
-			if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
-				res = append(res, v)
-			} else {
-				res = append(res, r.resolveString(v))
-			}
-		}
-	}
-	return res
+	vals := getWinningStringSlice(def, envSep, p1, p2, subcommand, tools, global, fs)
+	return resolveStringSliceOptWithVals(vals, r)
 }
 
 // resolveStringSliceCommaOpt resolves a comma-string option (e.g. --mount-tools)
