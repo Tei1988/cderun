@@ -36,6 +36,12 @@ func varName(name, fieldName string) string {
 	if fieldName == "CPUs" {
 		return "cpus"
 	}
+	if fieldName == "IPC" {
+		return "ipc"
+	}
+	if fieldName == "GPUs" {
+		return "gpus"
+	}
 	return strings.ToLower(fieldName[0:1]) + fieldName[1:]
 }
 

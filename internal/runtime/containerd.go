@@ -131,6 +131,36 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: init is not supported yet")
 	}
 
+	if config.GPUs != "" {
+		return fmt.Errorf("containerd runtime: gpus is not supported yet")
+	}
+
+	if config.Restart != "" && config.Restart != "no" {
+		return fmt.Errorf("containerd runtime: restart policy is not supported yet")
+	}
+
+	if len(config.DNSSearch) > 0 {
+		return fmt.Errorf("containerd runtime: dns-search is not supported yet")
+	}
+
+	if len(config.DNSOptions) > 0 {
+		return fmt.Errorf("containerd runtime: dns-option is not supported yet")
+	}
+
+	if config.IPC != "" && config.IPC != "host" && config.IPC != "private" {
+		return fmt.Errorf("containerd runtime: unsupported IPC namespace mode: %q", config.IPC)
+	}
+
+	for _, opt := range config.SecurityOpt {
+		if opt == "apparmor=" || opt == "apparmor:" {
+			return fmt.Errorf("containerd runtime: empty AppArmor profile is not supported")
+		}
+		if opt != "no-new-privileges" && opt != "seccomp=unconfined" &&
+			!strings.HasPrefix(opt, "apparmor=") && !strings.HasPrefix(opt, "apparmor:") {
+			return fmt.Errorf("containerd runtime: unsupported security option: %q", opt)
+		}
+	}
+
 	if config.ShmSize != "" {
 		bytes, err := units.RAMInBytes(config.ShmSize)
 		if err != nil {
@@ -390,6 +420,60 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 	if config.Pid == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.PIDNamespace))
+	}
+	if config.IPC == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.IPCNamespace))
+	}
+	if config.Cgroupns == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.CgroupNamespace))
+	}
+
+	if config.PidsLimit > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.Pids == nil {
+				s.Linux.Resources.Pids = &specs.LinuxPids{}
+			}
+			lim := config.PidsLimit
+			s.Linux.Resources.Pids.Limit = &lim
+			return nil
+		})
+	}
+
+	if config.CPUShares > 0 || config.CpusetCpus != "" || config.CpusetMems != "" {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.CPU == nil {
+				s.Linux.Resources.CPU = &specs.LinuxCPU{}
+			}
+			if config.CPUShares > 0 {
+				shares := uint64(config.CPUShares)
+				s.Linux.Resources.CPU.Shares = &shares
+			}
+			if config.CpusetCpus != "" {
+				s.Linux.Resources.CPU.Cpus = config.CpusetCpus
+			}
+			if config.CpusetMems != "" {
+				s.Linux.Resources.CPU.Mems = config.CpusetMems
+			}
+			return nil
+		})
+	}
+
+	if len(config.SecurityOpt) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			return applySecurityOptions(s, config.SecurityOpt)
+		})
 	}
 
 	if len(config.GroupAdd) > 0 {
@@ -827,4 +911,30 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 		args = append(args, config.Command...)
 	}
 	return args, nil
+}
+
+func applySecurityOptions(s *specs.Spec, securityOpts []string) error {
+	if len(securityOpts) == 0 {
+		return nil
+	}
+	if s.Process == nil {
+		s.Process = &specs.Process{}
+	}
+	for _, opt := range securityOpts {
+		if opt == "no-new-privileges" {
+			s.Process.NoNewPrivileges = true
+		} else if opt == "seccomp=unconfined" {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			s.Linux.Seccomp = nil
+		} else if strings.HasPrefix(opt, "apparmor=") {
+			profile := strings.TrimPrefix(opt, "apparmor=")
+			s.Process.ApparmorProfile = profile
+		} else if strings.HasPrefix(opt, "apparmor:") {
+			profile := strings.TrimPrefix(opt, "apparmor:")
+			s.Process.ApparmorProfile = profile
+		}
+	}
+	return nil
 }

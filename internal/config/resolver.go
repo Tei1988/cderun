@@ -68,6 +68,17 @@ type ResolvedConfig struct {
 	GroupAdd        []string
 	Ulimits         []container.Ulimit
 	Sysctls         map[string]string
+	IPC             string
+	SecurityOpt     []string
+	DNSSearch       []string
+	DNSOptions      []string
+	GPUs            string
+	Cgroupns        string
+	PidsLimit       int
+	CPUShares       int
+	CpusetCpus      string
+	CpusetMems      string
+	Restart         string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.

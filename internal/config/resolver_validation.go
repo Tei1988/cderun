@@ -139,6 +139,9 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.Pid == "host" {
 			logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
 		}
+		if rv.res.IPC == "host" {
+			logging.Warn("Container is running with host IPC namespace enabled. This disables process communication isolation and allows the container to share inter-process communication mechanisms with the host.")
+		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)
@@ -187,6 +190,74 @@ func (rv *resolver) validateCriticalFields() error {
 	}
 	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
 		return err
+	}
+
+	// ipc
+	ipcValidator := func(v string) error {
+		isContainerReference := strings.HasPrefix(v, "container:") &&
+			strings.TrimPrefix(v, "container:") != ""
+		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
+			return fmt.Errorf("unsupported ipc namespace: %q", v)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.IPC, "ipc", ipcValidator); err != nil {
+		return err
+	}
+
+	// cgroupns
+	cgroupnsValidator := func(v string) error {
+		if v != "" && v != "host" && v != "private" {
+			return fmt.Errorf("unsupported cgroup namespace: %q", v)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Cgroupns, "cgroupns", cgroupnsValidator); err != nil {
+		return err
+	}
+
+	// pids-limit
+	if rv.res.PidsLimit < -1 {
+		return &InvalidConfigError{
+			Field: "pids-limit",
+			Value: fmt.Sprintf("%d", rv.res.PidsLimit),
+			Err:   errors.New("pids limit cannot be less than -1"),
+		}
+	}
+
+	// cpu-shares
+	if rv.res.CPUShares < 0 {
+		return &InvalidConfigError{
+			Field: "cpu-shares",
+			Value: fmt.Sprintf("%d", rv.res.CPUShares),
+			Err:   errors.New("cpu shares cannot be negative"),
+		}
+	}
+
+	// restart
+	restartValidator := func(v string) error {
+		if v == "" {
+			return nil
+		}
+		parts := strings.Split(v, ":")
+		policy := parts[0]
+		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
+			return fmt.Errorf("unsupported restart policy: %q", v)
+		}
+		if policy != "no" && rv.res.Remove {
+			return fmt.Errorf("the --restart policy cannot be used when --remove is enabled")
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Restart, "restart", restartValidator); err != nil {
+		return err
+	}
+
+	// gpus characters check
+	if rv.res.GPUs != "" {
+		if err := validatePathChars(rv.res.GPUs); err != nil {
+			return fmt.Errorf("security validation failed: %w", err)
+		}
 	}
 
 	// shm-size
@@ -403,6 +474,15 @@ func (rv *resolver) validateSlices() error {
 		return err
 	}
 	if err := validateSliceElements(rv.res.GroupAdd, "group-add", ValidateGroupAdd); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.DNSSearch, "dns-search", ValidateHostname); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.DNSOptions, "dns-option", nil); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.SecurityOpt, "security-opt", nil); err != nil {
 		return err
 	}
 

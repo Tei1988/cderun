@@ -373,6 +373,19 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		GroupAdd:   resolved.GroupAdd,
 		Ulimits:    resolved.Ulimits,
 		Sysctls:    resolved.Sysctls,
+
+		// New Options
+		IPC:         resolved.IPC,
+		SecurityOpt: resolved.SecurityOpt,
+		DNSSearch:   resolved.DNSSearch,
+		DNSOptions:  resolved.DNSOptions,
+		GPUs:        resolved.GPUs,
+		Cgroupns:    resolved.Cgroupns,
+		PidsLimit:   int64(resolved.PidsLimit),
+		CPUShares:   int64(resolved.CPUShares),
+		CpusetCpus:  resolved.CpusetCpus,
+		CpusetMems:  resolved.CpusetMems,
+		Restart:     resolved.Restart,
 	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
@@ -497,6 +510,39 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		}
 		if maskedContainerConfig.ShmSize != "" {
 			_, _ = fmt.Fprintf(w, "ShmSize: %s\n", maskedContainerConfig.ShmSize)
+		}
+		if maskedContainerConfig.IPC != "" {
+			_, _ = fmt.Fprintf(w, "IPC: %s\n", maskedContainerConfig.IPC)
+		}
+		if len(maskedContainerConfig.SecurityOpt) > 0 {
+			_, _ = fmt.Fprintf(w, "SecurityOpt: %s\n", strings.Join(maskedContainerConfig.SecurityOpt, ", "))
+		}
+		if len(maskedContainerConfig.DNSSearch) > 0 {
+			_, _ = fmt.Fprintf(w, "DNSSearch: %s\n", strings.Join(maskedContainerConfig.DNSSearch, ", "))
+		}
+		if len(maskedContainerConfig.DNSOptions) > 0 {
+			_, _ = fmt.Fprintf(w, "DNSOptions: %s\n", strings.Join(maskedContainerConfig.DNSOptions, ", "))
+		}
+		if maskedContainerConfig.GPUs != "" {
+			_, _ = fmt.Fprintf(w, "GPUs: %s\n", maskedContainerConfig.GPUs)
+		}
+		if maskedContainerConfig.Cgroupns != "" {
+			_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", maskedContainerConfig.Cgroupns)
+		}
+		if maskedContainerConfig.PidsLimit > 0 {
+			_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", maskedContainerConfig.PidsLimit)
+		}
+		if maskedContainerConfig.CPUShares > 0 {
+			_, _ = fmt.Fprintf(w, "CPUShares: %d\n", maskedContainerConfig.CPUShares)
+		}
+		if maskedContainerConfig.CpusetCpus != "" {
+			_, _ = fmt.Fprintf(w, "CpusetCpus: %s\n", maskedContainerConfig.CpusetCpus)
+		}
+		if maskedContainerConfig.CpusetMems != "" {
+			_, _ = fmt.Fprintf(w, "CpusetMems: %s\n", maskedContainerConfig.CpusetMems)
+		}
+		if maskedContainerConfig.Restart != "" && maskedContainerConfig.Restart != "no" {
+			_, _ = fmt.Fprintf(w, "Restart: %s\n", maskedContainerConfig.Restart)
 		}
 		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
 		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))

@@ -55,6 +55,11 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		NetworkMode:     dockercontainer.NetworkMode(config.Network),
 		Privileged:      config.Privileged,
 		PidMode:         dockercontainer.PidMode(config.Pid),
+		IpcMode:         dockercontainer.IpcMode(config.IPC),
+		SecurityOpt:     config.SecurityOpt,
+		DNSSearch:       config.DNSSearch,
+		DNSOptions:      config.DNSOptions,
+		CgroupnsMode:    dockercontainer.CgroupnsMode(config.Cgroupns),
 		CapAdd:          config.CapAdd,
 		CapDrop:         config.CapDrop,
 		DNS:             config.DNS,
@@ -65,9 +70,40 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		Init:            &config.Init,
 		Sysctls:         config.Sysctls,
 		Resources: dockercontainer.Resources{
-			Memory:   config.Memory,
-			NanoCPUs: int64(config.CPUs * 1e9),
+			Memory:     config.Memory,
+			NanoCPUs:   int64(config.CPUs * 1e9),
+			CPUShares:  config.CPUShares,
+			CpusetCpus: config.CpusetCpus,
+			CpusetMems: config.CpusetMems,
 		},
+	}
+
+	if config.PidsLimit != 0 {
+		lim := config.PidsLimit
+		hostConfig.Resources.PidsLimit = &lim
+	}
+
+	if config.Restart != "" {
+		parts := strings.Split(config.Restart, ":")
+		policy := parts[0]
+		rp := dockercontainer.RestartPolicy{
+			Name: dockercontainer.RestartPolicyMode(policy),
+		}
+		if policy == "on-failure" && len(parts) > 1 {
+			var retries int
+			if _, err := fmt.Sscanf(parts[1], "%d", &retries); err == nil {
+				rp.MaximumRetryCount = retries
+			}
+		}
+		hostConfig.RestartPolicy = rp
+	}
+
+	if config.GPUs != "" {
+		reqs, err := parseGPUs(config.GPUs)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		hostConfig.Resources.DeviceRequests = reqs
 	}
 
 	if config.ShmSize != "" {
@@ -132,4 +168,37 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	}
 
 	return containerConfig, hostConfig, nil, nil
+}
+
+func parseGPUs(gpus string) ([]dockercontainer.DeviceRequest, error) {
+	if gpus == "" {
+		return nil, nil
+	}
+
+	req := dockercontainer.DeviceRequest{
+		Driver:       "nvidia",
+		Count:        -1, // default to all
+		Capabilities: [][]string{{"gpu"}},
+	}
+
+	if gpus != "all" {
+		parts := strings.Split(gpus, ",")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "device=") {
+				idsStr := strings.TrimPrefix(part, "device=")
+				ids := strings.Split(idsStr, ",")
+				req.DeviceIDs = ids
+				req.Count = 0
+			} else if strings.HasPrefix(part, "count=") {
+				countStr := strings.TrimPrefix(part, "count=")
+				var count int
+				if _, err := fmt.Sscanf(countStr, "%d", &count); err == nil {
+					req.Count = count
+				}
+			}
+		}
+	}
+
+	return []dockercontainer.DeviceRequest{req}, nil
 }
