@@ -2,9 +2,9 @@
 
 ## Concept
 
-> "All you need on your local machine is Docker or Podman."
+> "All you need on your local machine is Docker, Podman, or containerd."
 > `cderun` generates ephemeral containers for commands like `node`, `python`,
-> or `git` on demand using container runtimes (Docker/Podman). It keeps your
+> or `git` on demand using container runtimes (Docker/Podman/containerd). It keeps your
 > host clean and ensures reproducible environments defined in a single YAML file.
 
 ```text
@@ -371,7 +371,7 @@ When nested execution is triggered (via `--mount-cderun`, `--mount-tools`, etc.,
 
 ### 2. Reverse Path Resolution
 
-Because container runtimes (Docker/Podman) run on the base host, any nested mount requests must specify a host-accessible path. `cderun` translates container-local paths back to host paths using `hostContext.mounts` mapping.
+Because container runtimes (Docker/Podman/containerd) run on the base host, any nested mount requests must specify a host-accessible path. `cderun` translates container-local paths back to host paths using `hostContext.mounts` mapping.
 
 - **Matching Rule**: Matches target paths using a **longest-match** prefix-matching heuristic, falling back to the deepest nesting level to ensure correct base-host mapping.
 
@@ -557,7 +557,7 @@ make test
 go test ./...
 ```
 
-To run the End-to-End (E2E) tests which require a running Docker or Podman environment:
+To run the End-to-End (E2E) tests which require a running Docker, Podman, or containerd environment:
 
 ```bash
 go test -tags=runtime ./...

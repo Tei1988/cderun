@@ -19,7 +19,7 @@ test: generate
 
 .PHONY: test-runtime
 test-runtime:
-	@echo "Running tests that require a container runtime (Docker/Podman)..."
+	@echo "Running tests that require a container runtime (Docker/Podman/containerd)..."
 	@go test -v -tags=runtime ./...
 
 .PHONY: lint
