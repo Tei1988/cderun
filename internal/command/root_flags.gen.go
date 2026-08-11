@@ -19,7 +19,7 @@ type rootFlags struct {
 	cderunCgroupns        string
 	config                string
 	cderunConfig          string
-	cPUShares             int
+	cpuShares             int
 	cderunCPUShares       int
 	cpus                  float64
 	cderunCPUs            float64
@@ -35,9 +35,9 @@ type rootFlags struct {
 	cderunDiagnosisFormat string
 	dns                   []string
 	cderunDNS             []string
-	dNSOptions            []string
+	dnsOptions            []string
 	cderunDNSOptions      []string
-	dNSSearch             []string
+	dnsSearch             []string
 	cderunDNSSearch       []string
 	dryRun                bool
 	cderunDryRun          bool
@@ -175,7 +175,7 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunCgroupns:        optStr(cmd.Flags().Changed("cderun-cgroupns"), o.cderunCgroupns),
 		Config:                optStr(cmd.Flags().Changed("config"), o.config),
 		CderunConfig:          optStr(cmd.Flags().Changed("cderun-config"), o.cderunConfig),
-		CPUShares:             optInt(cmd.Flags().Changed("cpu-shares"), o.cPUShares),
+		CPUShares:             optInt(cmd.Flags().Changed("cpu-shares"), o.cpuShares),
 		CderunCPUShares:       optInt(cmd.Flags().Changed("cderun-cpu-shares"), o.cderunCPUShares),
 		CPUs:                  optFloat(cmd.Flags().Changed("cpus"), o.cpus),
 		CderunCPUs:            optFloat(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
@@ -191,9 +191,9 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunDiagnosisFormat: optStr(cmd.Flags().Changed("cderun-diagnosis-format"), o.cderunDiagnosisFormat),
 		DNS:                   o.dns,
 		CderunDNS:             o.cderunDNS,
-		DNSOptions:            o.dNSOptions,
+		DNSOptions:            o.dnsOptions,
 		CderunDNSOptions:      o.cderunDNSOptions,
-		DNSSearch:             o.dNSSearch,
+		DNSSearch:             o.dnsSearch,
 		CderunDNSSearch:       o.cderunDNSSearch,
 		DryRun:                optBool(cmd.Flags().Changed("dry-run"), o.dryRun),
 		CderunDryRun:          optBool(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
@@ -395,7 +395,7 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 func getIntPointers(o *rootOptions, name string) (base, override *int) {
 	switch name {
 	case "cpu-shares":
-		return &o.cPUShares, &o.cderunCPUShares
+		return &o.cpuShares, &o.cderunCPUShares
 	case "pids-limit":
 		return &o.pidsLimit, &o.cderunPidsLimit
 	case "pull-max-retries":
@@ -427,9 +427,9 @@ func getStringSlicePointers(o *rootOptions, name string) (base, override *[]stri
 	case "dns":
 		return &o.dns, &o.cderunDNS
 	case "dns-option":
-		return &o.dNSOptions, &o.cderunDNSOptions
+		return &o.dnsOptions, &o.cderunDNSOptions
 	case "dns-search":
-		return &o.dNSSearch, &o.cderunDNSSearch
+		return &o.dnsSearch, &o.cderunDNSSearch
 	case "entrypoint":
 		return &o.entrypoint, &o.cderunEntrypoint
 	case "env":

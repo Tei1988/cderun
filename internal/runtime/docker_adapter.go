@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 
 	"cderun/internal/container"
@@ -86,14 +87,35 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	if config.Restart != "" {
 		parts := strings.Split(config.Restart, ":")
 		policy := parts[0]
+		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
+			return nil, nil, nil, fmt.Errorf("invalid restart policy: %q", config.Restart)
+		}
+		if policy != "on-failure" {
+			if len(parts) > 1 {
+				return nil, nil, nil, fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, config.Restart)
+			}
+		} else {
+			if len(parts) > 2 {
+				return nil, nil, nil, fmt.Errorf("restart policy on-failure supports at most one retry suffix: %q", config.Restart)
+			}
+			if len(parts) == 2 {
+				suffix := parts[1]
+				if suffix == "" {
+					return nil, nil, nil, fmt.Errorf("restart policy on-failure has empty retry suffix: %q", config.Restart)
+				}
+				val, err := strconv.Atoi(suffix)
+				if err != nil || val < 0 {
+					return nil, nil, nil, fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", config.Restart)
+				}
+			}
+		}
+
 		rp := dockercontainer.RestartPolicy{
 			Name: dockercontainer.RestartPolicyMode(policy),
 		}
-		if policy == "on-failure" && len(parts) > 1 {
-			var retries int
-			if _, err := fmt.Sscanf(parts[1], "%d", &retries); err == nil {
-				rp.MaximumRetryCount = retries
-			}
+		if policy == "on-failure" && len(parts) == 2 {
+			retries, _ := strconv.Atoi(parts[1])
+			rp.MaximumRetryCount = retries
 		}
 		hostConfig.RestartPolicy = rp
 	}
@@ -175,29 +197,57 @@ func parseGPUs(gpus string) ([]dockercontainer.DeviceRequest, error) {
 		return nil, nil
 	}
 
-	req := dockercontainer.DeviceRequest{
-		Driver:       "nvidia",
-		Count:        -1, // default to all
-		Capabilities: [][]string{{"gpu"}},
+	if gpus == "all" {
+		req := dockercontainer.DeviceRequest{
+			Driver:       "nvidia",
+			Count:        -1, // Only use -1 for "all"
+			Capabilities: [][]string{{"gpu"}},
+		}
+		return []dockercontainer.DeviceRequest{req}, nil
 	}
 
-	if gpus != "all" {
-		parts := strings.Split(gpus, ",")
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if strings.HasPrefix(part, "device=") {
-				idsStr := strings.TrimPrefix(part, "device=")
-				ids := strings.Split(idsStr, ",")
-				req.DeviceIDs = ids
-				req.Count = 0
-			} else if strings.HasPrefix(part, "count=") {
-				countStr := strings.TrimPrefix(part, "count=")
-				var count int
-				if _, err := fmt.Sscanf(countStr, "%d", &count); err == nil {
-					req.Count = count
-				}
+	hasDevice := false
+	hasCount := false
+	var deviceIDs []string
+	countVal := 0
+
+	if strings.HasPrefix(gpus, "device=") {
+		hasDevice = true
+		idsStr := strings.TrimPrefix(gpus, "device=")
+		if idsStr == "" {
+			return nil, fmt.Errorf("empty device selector: %q", gpus)
+		}
+		deviceIDs = strings.Split(idsStr, ",")
+		for _, id := range deviceIDs {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				return nil, fmt.Errorf("malformed device ID in %q", gpus)
 			}
 		}
+	} else if strings.HasPrefix(gpus, "count=") {
+		hasCount = true
+		countStr := strings.TrimPrefix(gpus, "count=")
+		if countStr == "" {
+			return nil, fmt.Errorf("empty count selector: %q", gpus)
+		}
+		val, err := strconv.Atoi(countStr)
+		if err != nil || val <= 0 {
+			return nil, fmt.Errorf("invalid count value in %q", gpus)
+		}
+		countVal = val
+	} else {
+		return nil, fmt.Errorf("unknown gpu selector or malformed grammar: %q", gpus)
+	}
+
+	req := dockercontainer.DeviceRequest{
+		Driver:       "nvidia",
+		Capabilities: [][]string{{"gpu"}},
+	}
+	if hasDevice {
+		req.DeviceIDs = deviceIDs
+		req.Count = 0
+	} else if hasCount {
+		req.Count = countVal
 	}
 
 	return []dockercontainer.DeviceRequest{req}, nil

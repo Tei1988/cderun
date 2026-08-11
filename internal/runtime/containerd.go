@@ -151,6 +151,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: unsupported IPC namespace mode: %q", config.IPC)
 	}
 
+	if config.Cgroupns != "" && config.Cgroupns != "host" && config.Cgroupns != "private" {
+		return fmt.Errorf("containerd runtime: unsupported cgroup namespace mode: %q", config.Cgroupns)
+	}
+
 	for _, opt := range config.SecurityOpt {
 		if opt == "apparmor=" || opt == "apparmor:" {
 			return fmt.Errorf("containerd runtime: empty AppArmor profile is not supported")
@@ -426,9 +430,29 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 	if config.Cgroupns == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.CgroupNamespace))
+	} else if config.Cgroupns == "private" {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			found := false
+			for i, ns := range s.Linux.Namespaces {
+				if ns.Type == specs.CgroupNamespace {
+					s.Linux.Namespaces[i].Path = "" // No path means private/isolated
+					found = true
+					break
+				}
+			}
+			if !found {
+				s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
+					Type: specs.CgroupNamespace,
+				})
+			}
+			return nil
+		})
 	}
 
-	if config.PidsLimit > 0 {
+	if config.PidsLimit > 0 || config.PidsLimit == -1 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 			if s.Linux == nil {
 				s.Linux = &specs.Linux{}
@@ -440,6 +464,9 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 				s.Linux.Resources.Pids = &specs.LinuxPids{}
 			}
 			lim := config.PidsLimit
+			if lim == -1 {
+				lim = 0 // Map -1 to 0 (the supported equivalent in OCI for unlimited)
+			}
 			s.Linux.Resources.Pids.Limit = &lim
 			return nil
 		})

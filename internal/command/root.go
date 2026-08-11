@@ -529,7 +529,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		if maskedContainerConfig.Cgroupns != "" {
 			_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", maskedContainerConfig.Cgroupns)
 		}
-		if maskedContainerConfig.PidsLimit > 0 {
+		if maskedContainerConfig.PidsLimit != 0 {
 			_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", maskedContainerConfig.PidsLimit)
 		}
 		if maskedContainerConfig.CPUShares > 0 {

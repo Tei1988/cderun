@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
 	"cderun/internal/logging"
@@ -243,6 +244,25 @@ func (rv *resolver) validateCriticalFields() error {
 		policy := parts[0]
 		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
 			return fmt.Errorf("unsupported restart policy: %q", v)
+		}
+		if policy != "on-failure" {
+			if len(parts) > 1 {
+				return fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, v)
+			}
+		} else {
+			if len(parts) > 2 {
+				return fmt.Errorf("restart policy on-failure supports at most one retry suffix: %q", v)
+			}
+			if len(parts) == 2 {
+				suffix := parts[1]
+				if suffix == "" {
+					return fmt.Errorf("restart policy on-failure has empty retry suffix: %q", v)
+				}
+				val, err := strconv.Atoi(suffix)
+				if err != nil || val < 0 {
+					return fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", v)
+				}
+			}
 		}
 		if policy != "no" && rv.res.Remove {
 			return fmt.Errorf("the --restart policy cannot be used when --remove is enabled")
