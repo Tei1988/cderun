@@ -19,7 +19,7 @@ The masking behavior is controlled by the `sensitive-env` option, which can be d
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
-To maximize performance on key execution paths, `cderun` uses a custom, allocation-free, case-insensitive pattern matching algorithm called `fastMatchFold`. This optimized engine bypasses standard slow glob evaluations and string uppercase allocations for ASCII-only keys, supporting:
+To maximize performance on key execution paths, `cderun` uses custom, case-insensitive helper functions: `equalFoldASCII`, `hasSuffixFoldASCII`, `hasPrefixFoldASCII`, and `containsFoldASCII`. These ASCII comparison helpers avoid per-comparison allocations, although pattern analysis and fallback matching may allocate. They support:
 
 - Exact matches (e.g., `MY_API_KEY`)
 - Suffix wildcards (e.g., `DB_*`)
@@ -28,7 +28,7 @@ To maximize performance on key execution paths, `cderun` uses a custom, allocati
 
 #### Fail-Closed Logic
 
-`cderun` implements fail-closed logic for pattern matching. If a glob pattern is malformed (e.g., `[` without a closing bracket), `path.Match` will return an error. In this case, `cderun` redacts the value to prevent accidental exposure of potentially sensitive information.
+`cderun` implements fail-closed logic for pattern matching. While configuration validation rejects invalid patterns at startup, `matchPreAnalyzed` treats any runtime `path.Match` errors as positive matches that mask the value to prevent accidental exposure of potentially sensitive information.
 
 ```yaml
 defaults:

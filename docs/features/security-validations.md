@@ -133,13 +133,13 @@ To prevent relative-path container target hijacking, `cderun` strictly validates
 
 - The container target path must be absolute (e.g., `/var/run/docker.sock`).
 - Target paths cannot contain parent directory traversal (`..`) segments.
-- This verification is executed against raw user input via `validateMountSocketPathRaw` prior to options resolution, ensuring that any resolution errors or file lookup failures are caught immediately.
+- This verification is executed against raw user input via `validateMountSocketPathRaw` to validate path syntax before option resolution.
 
 ## Registry Mismatch Validation
 
 To prevent pulling and running unauthorized container images, `cderun` validates that the image specified on the command-line or environment variable matches the registry rules defined in the tools profile (`.tools.yaml`).
 
-The registry matching checks the hostname and repository namespace (e.g. `docker.io/library/node`), ignoring differing tags or digest suffixes. If a mismatch is identified (such as specifying a custom repository `private-reg.com` when `.tools.yaml` restricts the tool to `docker.io`), execution terminates with a `RegistryMismatchError` before contacting the daemon.
+The registry matching checks the hostname and repository namespace (e.g. `docker.io/library/node`), ignoring differing tags or digest suffixes. If a mismatch is identified (such as specifying a custom repository `private-reg.com/library/node` when `.tools.yaml` restricts the tool to `docker.io`), execution terminates with a `RegistryMismatchError` before contacting the daemon.
 
 ## Absolute Mount Targets
 
