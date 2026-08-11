@@ -137,6 +137,9 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.Pid == "host" {
 			logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
 		}
+		if rv.res.Ipc == "host" {
+			logging.Warn("Container is running with host IPC namespace enabled. This allows the container to access and interact with shared memory on the host.")
+		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)
@@ -184,6 +187,17 @@ func (rv *resolver) validateCriticalFields() error {
 		return nil
 	}
 	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
+		return err
+	}
+
+	// ipc
+	ipcValidator := func(v string) error {
+		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !strings.HasPrefix(v, "container:") {
+			return fmt.Errorf("unsupported ipc namespace: %q", v)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Ipc, "ipc", ipcValidator); err != nil {
 		return err
 	}
 

@@ -310,6 +310,17 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
+		Name:   "ipc",
+		EnvKey: "CDERUN_IPC",
+		Usage:  "IPC namespace to use",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Ipc
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.Ipc
+		},
+	},
+	{
 		Name:   "runtime",
 		EnvKey: "CDERUN_RUNTIME",
 		Usage:  "Container runtime to use (docker/podman/containerd)",

@@ -44,6 +44,8 @@ type CLIOptions struct {
 	CderunInit            *bool
 	Interactive           *bool
 	CderunInteractive     *bool
+	Ipc                   *string
+	CderunIpc             *string
 	LogFormat             *string
 	CderunLogFormat       *string
 	LogLevel              *string

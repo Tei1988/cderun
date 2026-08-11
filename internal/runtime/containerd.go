@@ -130,6 +130,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: init is not supported yet")
 	}
 
+	if config.Ipc != "" && config.Ipc != "private" && config.Ipc != "host" {
+		return fmt.Errorf("containerd runtime: unsupported IPC mode %q (only \"host\" and \"private\" are supported)", config.Ipc)
+	}
+
 	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
 		return fmt.Errorf("containerd runtime: non-finite CPU limit %f is not supported", config.CPUs)
 	}
@@ -368,6 +372,9 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 	if config.Pid == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.PIDNamespace))
+	}
+	if config.Ipc == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.IPCNamespace))
 	}
 
 	if len(config.GroupAdd) > 0 {

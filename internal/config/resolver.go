@@ -54,6 +54,7 @@ type ResolvedConfig struct {
 	AddHosts        []string
 	Privileged      bool
 	Pid             string
+	Ipc             string
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string

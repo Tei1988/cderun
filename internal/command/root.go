@@ -362,6 +362,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		AddHosts:   resolved.AddHosts,
 		Privileged: resolved.Privileged,
 		Pid:        resolved.Pid,
+		Ipc:        resolved.Ipc,
 		CapAdd:     resolved.CapAdd,
 		CapDrop:    resolved.CapDrop,
 		Entrypoint: resolved.Entrypoint,
@@ -493,6 +494,9 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
 		if maskedContainerConfig.Pid != "" {
 			_, _ = fmt.Fprintf(w, "Pid: %s\n", maskedContainerConfig.Pid)
+		}
+		if maskedContainerConfig.Ipc != "" {
+			_, _ = fmt.Fprintf(w, "Ipc: %s\n", maskedContainerConfig.Ipc)
 		}
 		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
 		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))

@@ -49,6 +49,8 @@ type rootFlags struct {
 	cderunInit            bool
 	interactive           bool
 	cderunInteractive     bool
+	ipc                   string
+	cderunIpc             string
 	logFormat             string
 	cderunLogFormat       string
 	logLevel              string
@@ -181,6 +183,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunInit:            optBool(cmd.Flags().Changed("cderun-init"), o.cderunInit),
 		Interactive:           optBool(cmd.Flags().Changed("interactive"), o.interactive),
 		CderunInteractive:     optBool(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
+		Ipc:                   optStr(cmd.Flags().Changed("ipc"), o.ipc),
+		CderunIpc:             optStr(cmd.Flags().Changed("cderun-ipc"), o.cderunIpc),
 		LogFormat:             optStr(cmd.Flags().Changed("log-format"), o.logFormat),
 		CderunLogFormat:       optStr(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
 		LogLevel:              optStr(cmd.Flags().Changed("log-level"), o.logLevel),
@@ -295,6 +299,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.hostname, &o.cderunHostname
 	case "image":
 		return &o.image, &o.cderunImage
+	case "ipc":
+		return &o.ipc, &o.cderunIpc
 	case "log-format":
 		return &o.logFormat, &o.cderunLogFormat
 	case "log-level":

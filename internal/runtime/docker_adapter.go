@@ -54,6 +54,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		NetworkMode:     dockercontainer.NetworkMode(config.Network),
 		Privileged:      config.Privileged,
 		PidMode:         dockercontainer.PidMode(config.Pid),
+		IpcMode:         dockercontainer.IpcMode(config.Ipc),
 		CapAdd:          config.CapAdd,
 		CapDrop:         config.CapDrop,
 		DNS:             config.DNS,

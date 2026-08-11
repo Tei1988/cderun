@@ -40,7 +40,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
 | T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | - |
 | T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
@@ -1013,6 +1013,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
+- [ ] @jules: Update `docs/features/command-line-options.md`, `docs/features/argument-priority-logic.md`, and `docs/features/configuration-file-support.md` to add information about `--ipc` and `--cderun-ipc` options, detailing format and validation rules.
 
 ---
 

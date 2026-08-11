@@ -190,6 +190,10 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
 			p2Set, p2Val = getPtrVal(rv.cli.Pid)
 			fastPathUsed = true
+		case "ipc":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunIpc)
+			p2Set, p2Val = getPtrVal(rv.cli.Ipc)
+			fastPathUsed = true
 		case "network":
 			p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
 			p2Set, p2Val = getPtrVal(rv.cli.Network)
@@ -259,6 +263,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 				rv.res.Image = resolved
 			case "pid":
 				rv.res.Pid = resolved
+			case "ipc":
+				rv.res.Ipc = resolved
 			case "network":
 				rv.res.Network = resolved
 			case "workdir":
