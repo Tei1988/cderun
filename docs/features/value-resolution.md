@@ -101,6 +101,7 @@ To prevent silent failures and typos (such as typing `{{HOM}}` instead of `{{HOM
 If you need to pass a literal string containing double braces to the container (such as passing a raw `{{HOME}}` string to `echo`), you can escape it by wrapping it inside an outer pair of braces:
 
 - `{{ {{HOME}} }}` → `{{HOME}}`
+- `{{{{HOME}}}}` → `{{HOME}}`
 - `{{ {{file:config}} }}` → `{{file:config}}`
 
 This escaping mechanism bypasses evaluation and also prevents strict resolution checks from failing on non-standard expressions.
@@ -146,7 +147,7 @@ To prevent string truncation and injection vulnerabilities in operating system a
 To prevent invalid or compromised configurations from propagating, the evaluation engine implements a **Sticky Error** pattern:
 
 1. The first resolution or security validation error encountered is captured and stored internally.
-2. For all subsequent evaluation steps, the resolver transitions to a safe, non-evaluating fallback state where raw input strings are returned unmodified.
+2. For all subsequent evaluation steps, the resolver transitions to a safe, non-evaluating fallback state where raw input strings are returned unmodified. Sibling expressions following a resolution failure remain unresolved.
 3. Upon completing the resolution sweep, the retained error is propagated to the calling sequence, cleanly aborting execution.
 
 ---

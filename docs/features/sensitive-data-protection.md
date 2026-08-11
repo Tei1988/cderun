@@ -1,10 +1,10 @@
 # Sensitive Data Protection
 
-cderun protects sensitive information from being accidentally leaked into logs or terminal output during dry-run and diagnosis modes.
+`cderun` protects sensitive information from being accidentally leaked into logs or terminal output during dry-run and diagnosis modes.
 
 ## Environment Variable Masking
 
-Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
+Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. `cderun` follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
 
 ### Configuration (`sensitive-env`)
 
@@ -19,9 +19,16 @@ The masking behavior is controlled by the `sensitive-env` option, which can be d
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
+To maximize performance on key execution paths, `cderun` uses a custom, allocation-free, case-insensitive pattern matching algorithm called `fastMatchFold`. This optimized engine bypasses standard slow glob evaluations and string uppercase allocations for ASCII-only keys, supporting:
+
+- Exact matches (e.g., `MY_API_KEY`)
+- Suffix wildcards (e.g., `DB_*`)
+- Prefix wildcards (e.g., `*_PASSWORD`)
+- Substring wildcards (e.g., `*SECRET*`)
+
 #### Fail-Closed Logic
 
-cderun implements fail-closed logic for pattern matching. If a glob pattern is malformed (e.g., `[` without a closing bracket), `path.Match` will return an error. In this case, cderun redacts the value to prevent accidental exposure of potentially sensitive information.
+`cderun` implements fail-closed logic for pattern matching. If a glob pattern is malformed (e.g., `[` without a closing bracket), `path.Match` will return an error. In this case, `cderun` redacts the value to prevent accidental exposure of potentially sensitive information.
 
 ```yaml
 defaults:
