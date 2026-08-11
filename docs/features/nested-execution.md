@@ -8,7 +8,7 @@
 
 ### Base Host (Level 0 Host)
 
-The physical machine or VM where the initial `cderun` command is executed. The actual container runtime engine (Docker/Podman) resides and operates here.
+The physical machine or VM where the initial `cderun` command is executed. The actual container runtime engine (Docker/Podman/containerd) resides and operates here.
 
 ### Execution Host
 
@@ -188,6 +188,6 @@ The Group ID (GID) of the container socket inside the macOS Linux VM might not m
 - **Solution**: Find the numeric GID of the socket inside the Linux VM and pass it using the `--cderun-group-add` flag (e.g., `--cderun-group-add=102`) or via the `groupAdd` array in YAML configurations. This grants the container user the necessary permissions to access the socket.
 
 > **⚠️ Security Warning**:
-> Sharing the container runtime socket (especially with rootful Docker or Podman) grants broad control over the host daemon, representing a high privilege operation. It can lead to container escape or host configuration exposures. This capability should only be shared with trusted container workloads.
+> Sharing the container runtime socket (especially with rootful Docker, Podman, or containerd) grants broad control over the host daemon, representing a high privilege operation. It can lead to container escape or host configuration exposures. This capability should only be shared with trusted container workloads.
 >
 > In contrast, sharing a rootless Podman socket restricts the impact strictly to the user-scoped daemon instance, significantly reducing the security blast radius compared to a rootful engine.
