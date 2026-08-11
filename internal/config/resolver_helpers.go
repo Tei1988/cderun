@@ -104,11 +104,18 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		}
 
 		k := strings.TrimSpace(key)
-		if strings.ContainsRune(k, 0) || strings.ContainsRune(val, 0) {
+		if err := validatePathChars(k); err != nil {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
-				Err:   fmt.Errorf("null byte injection detected"),
+				Err:   fmt.Errorf("security validation failed for sysctl key (null byte injection or invalid control characters): %w", err),
+			}
+		}
+		if err := validatePathChars(val); err != nil {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("security validation failed for sysctl value (null byte injection or invalid control characters): %w", err),
 			}
 		}
 
