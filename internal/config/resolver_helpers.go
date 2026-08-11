@@ -103,8 +103,7 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 		}
 
-		k := strings.TrimSpace(key)
-		if err := validatePathChars(k); err != nil {
+		if err := validatePathChars(key); err != nil {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
@@ -119,6 +118,7 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 		}
 
+		k := strings.TrimSpace(key)
 		res[k] = val
 	}
 	return res, nil

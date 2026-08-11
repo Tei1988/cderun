@@ -129,10 +129,6 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.MountSocket {
 			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
 			socketWarningLogged = true
-
-			if ContainsNumericGID(rv.res.GroupAdd) {
-				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
-			}
 		}
 
 		if rv.res.Privileged {
@@ -178,6 +174,10 @@ func (rv *resolver) validateSecurity() error {
 			if isHighlySensitiveDevice(d.PathOnHost) {
 				logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
 			}
+		}
+
+		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
+			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 		}
 	}
 	return nil
