@@ -457,6 +457,29 @@ func (rv *resolver) resolveStandardOptions() error {
 		}
 	}
 
+	if err := rv.resolveAndValidateImage(); err != nil {
+		return err
+	}
+
+	// Remaining Boolean options
+	for _, opt := range BoolOptions {
+		// Skip early options already resolved in resolveEarly
+		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
+			continue
+		}
+		// Skip transitive options handled in resolveTransitiveOptions
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+			continue
+		}
+
+		if err := rv.applyBoolOption(opt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) resolveAndValidateImage() error {
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
 		return &ImageNotFoundError{Tool: rv.subcommand}
 	}
@@ -509,22 +532,6 @@ func (rv *resolver) resolveStandardOptions() error {
 
 		if logging.DebugEnabled() {
 			logging.Debug("Resolved Image: %s", rv.res.Image)
-		}
-	}
-
-	// Remaining Boolean options
-	for _, opt := range BoolOptions {
-		// Skip early options already resolved in resolveEarly
-		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
-			continue
-		}
-		// Skip transitive options handled in resolveTransitiveOptions
-		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
-			continue
-		}
-
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
 		}
 	}
 	return nil

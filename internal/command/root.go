@@ -1302,50 +1302,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 	execName := filepath.Base(args[0])
 	isPolyglot := execName != "cderun"
 
-	// Find the subcommand index robustly by skipping flags and their arguments
-	subcmdIdx := -1
-	if isPolyglot {
-		subcmdIdx = 0
-	} else {
-		for i := 1; i < len(args); i++ {
-			arg := args[i]
-			if !strings.HasPrefix(arg, "-") {
-				subcmdIdx = i
-				break
-			}
-			// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
-			if strings.HasPrefix(arg, "--") {
-				name := strings.SplitN(arg[2:], "=", 2)[0]
-				f := cmd.PersistentFlags().Lookup(name)
-				if f == nil {
-					f = cmd.Flags().Lookup(name)
-				}
-				if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
-					// Flag exists, takes an argument, and no '=' used, so skip next argument.
-					i++
-				}
-			} else if len(arg) > 1 {
-				// Shorthand(s), e.g., -i, -it, -p 80:80
-				// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
-				lastChar := string(arg[len(arg)-1])
-				f := cmd.PersistentFlags().ShorthandLookup(lastChar)
-				if f == nil {
-					f = cmd.Flags().ShorthandLookup(lastChar)
-				}
-				if f != nil && f.NoOptDefVal == "" {
-					// Last shorthand takes an argument, skip next argument.
-					i++
-				}
-			}
-		}
-	}
+	subcmdIdx := findSubcommandIndex(cmd, args, isPolyglot)
 
-	// If not polyglot, check for P1 flags before the subcommand
 	if !isPolyglot && subcmdIdx != -1 {
-		for i := 1; i < subcmdIdx; i++ {
-			if strings.HasPrefix(args[i], "--cderun-") {
-				return nil, fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", args[i])
-			}
+		if err := checkPreSubcommandFlags(args, subcmdIdx); err != nil {
+			return nil, err
 		}
 	}
 
@@ -1356,9 +1317,70 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		processedArgs = append(processedArgs, args[0])
 	}
 
-	var overrides []string
-	var others []string
+	overrides, others, err := hoistOverrides(cmd, args, isPolyglot, subcmdIdx)
+	if err != nil {
+		return nil, err
+	}
 
+	processedArgs = append(processedArgs, overrides...)
+
+	if isPolyglot {
+		processedArgs = append(processedArgs, execName)
+	}
+
+	processedArgs = append(processedArgs, others...)
+
+	return processedArgs, nil
+}
+
+func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int {
+	if isPolyglot {
+		return 0
+	}
+
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") {
+			return i
+		}
+		// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
+		if strings.HasPrefix(arg, "--") {
+			name := strings.SplitN(arg[2:], "=", 2)[0]
+			f := cmd.PersistentFlags().Lookup(name)
+			if f == nil {
+				f = cmd.Flags().Lookup(name)
+			}
+			if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+				// Flag exists, takes an argument, and no '=' used, so skip next argument.
+				i++
+			}
+		} else if len(arg) > 1 {
+			// Shorthand(s), e.g., -i, -it, -p 80:80
+			// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
+			lastChar := string(arg[len(arg)-1])
+			f := cmd.PersistentFlags().ShorthandLookup(lastChar)
+			if f == nil {
+				f = cmd.Flags().ShorthandLookup(lastChar)
+			}
+			if f != nil && f.NoOptDefVal == "" {
+				// Last shorthand takes an argument, skip next argument.
+				i++
+			}
+		}
+	}
+	return -1
+}
+
+func checkPreSubcommandFlags(args []string, subcmdIdx int) error {
+	for i := 1; i < subcmdIdx; i++ {
+		if strings.HasPrefix(args[i], "--cderun-") {
+			return fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", args[i])
+		}
+	}
+	return nil
+}
+
+func hoistOverrides(cmd *cobra.Command, args []string, isPolyglot bool, subcmdIdx int) (overrides []string, others []string, err error) {
 	// Scan all arguments after the executable name
 	// In polyglot mode, everything after index 0 is after the subcommand.
 	// In standard mode, only arguments after subcmdIdx are considered for hoisting P1 overrides.
@@ -1389,7 +1411,7 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 						i++
 						continue
 					} else {
-						return nil, fmt.Errorf("cderun internal override flag %q requires a value", arg)
+						return nil, nil, fmt.Errorf("cderun internal override flag %q requires a value", arg)
 					}
 				}
 			}
@@ -1399,15 +1421,5 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		}
 	}
 
-	// Place --cderun-* overrides immediately after "cderun" so they are always parsed
-	processedArgs = append(processedArgs, overrides...)
-
-	if isPolyglot {
-		// In polyglot mode, the original executable name becomes the subcommand
-		processedArgs = append(processedArgs, execName)
-	}
-
-	processedArgs = append(processedArgs, others...)
-
-	return processedArgs, nil
+	return overrides, others, nil
 }
