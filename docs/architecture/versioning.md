@@ -17,21 +17,21 @@ This automatically embeds the Git tag, commit SHA, and build date and time into 
 
 The `internal/version` package maintains the following variables:
 
-- `Version`: Git tag (or `dev`)
-- `Revision`: Short Git commit SHA
-- `BuildDate`: ISO8601 formatted build date and time
+- `Version`: Dynamically retrieved from `git describe --tags --always --dirty` at build time. This value may contain a tag or commit identifier, along with an optional `-dirty` suffix if there are uncommitted local changes. The value `"dev"` is utilized strictly as a fallback when the command fails or Git is unavailable.
+- `Revision`: Short Git commit SHA.
+- `BuildDate`: ISO8601 formatted build date and time.
 
 These variables are overwritten via the `-ldflags` option during `go build`.
 
 ### 2. Local Build (`Makefile`)
 
-Running `make build` in the development environment internally executes the following command to inject the latest information retrieved from Git:
+Running `make build` in the development environment internally executes `go build` with `-ldflags` to inject the latest metadata. A sample of this command (using Makefile-expanded placeholder values) is shown below:
 
 ```bash
-go build -ldflags "-X github.com/cderun/cderun/internal/version.Version=v1.0.0 -X github.com/cderun/cderun/internal/version.Revision=abcdef -X github.com/cderun/cderun/internal/version.BuildDate=2026-06-04T12:00:00Z" -o cderun main.go
+go build -ldflags "-X cderun/internal/version.Version=v1.0.0 -X cderun/internal/version.Revision=abcdef -X cderun/internal/version.BuildDate=2026-06-04T12:00:00Z" -o cderun main.go
 ```
 
-Within the `Makefile`, information is retrieved as follows:
+Within the `Makefile`, metadata is retrieved dynamically as follows:
 
 ```makefile
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -55,10 +55,10 @@ Using the `--version` flag, you can view detailed version information:
 cderun --version
 ```
 
-Output Example:
+Output Example (matching `version.Info()`):
 
 ```text
-cderun version v1.0.0 (revision: abcdef, built: 2026-06-04T12:00:00Z)
+cderun version v1.0.0 (rev: abcdef, built at: 2026-06-04T12:00:00Z, linux/amd64)
 ```
 
 ### Local Development Behavior (`go run`)

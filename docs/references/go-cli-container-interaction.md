@@ -68,7 +68,7 @@ Signal handling in interactive applications is highly delicate. While Raw Mode s
 
 For most users, `Ctrl+C` means "abort the current operation", while `Ctrl+D` indicates "end of input (EOF)". In Raw Mode, when the user presses `Ctrl+C`, the application does not exit immediately; instead, it receives the raw byte `0x03` and writes it to the PTY Master. The line discipline on the PTY Slave interprets this byte and sends a `SIGINT` signal to the process running inside the container. This is how running commands can be aborted within the shell.
 
-Conversely, `Ctrl+D` is not a signal, but represents the end of the input stream (EOF). In Go, when `0x04` is read from `os.Stdin` or `io.Copy` returns `io.EOF`, the application must close the input stream.
+Conversely, `Ctrl+D` is not a signal, but represents the end of the input stream. Under raw mode, pressing `Ctrl+D` delivers the raw byte `0x04` to the input reader. Crucially, `os.Stdin.Read` does not return `io.EOF` for this character; instead, the reading loop or relay must explicitly scan for the `0x04` byte in its buffer. Once detected, the relay must close or half-close the container input (propagating the EOF to the containerized process). In contrast, a normal standard input EOF (such as a redirected file or pipe closure) causes the source reader to complete normally, after which `io.Copy` returns `nil` (indicating a successful copy to EOF) rather than `io.EOF`.
 
 ### Trapping and Forwarding SIGINT and SIGTERM
 
@@ -110,7 +110,7 @@ go func() {
 }()
 ```
 
-When this relay operates successfully, the kernel sends a `SIGWINCH` to the PTY Slave inside the container. The containerized process (e.g., `bash`) updates the `LINES` and `COLUMNS` environment variables or triggers screen re-rendering, preventing visual corruption.
+When the PTY size changes, the kernel sends a `SIGWINCH` signal to the terminal's foreground process group. Applications must trap this signal and query the new dimensions using `TIOCGWINSZ`. Note that the kernel itself does not automatically update the `LINES` or `COLUMNS` environment variables in the environment block of running processes; however, shells (such as `bash` or `zsh`) or advanced applications handle `SIGWINCH` internally to update their own tracking variables, adjust layout properties, or trigger screen re-rendering, preventing visual corruption.
 
 ---
 
@@ -141,41 +141,51 @@ To simplify cross-platform support, it is wise to choose a library that abstract
 
 Goroutine leaks are one of the most common bugs in interactive CLI tools. They are particularly prone to occur when using `io.Copy` for I/O relaying.
 
-### The io.Copy Blocking Problem
+### The io.Copy Blocking Problem & Shutdown Sequence
 
-`io.Copy` blocks until the reading source returns EOF or a write error occurs on the destination. When the containerized process exits, the `io.Copy` handling the host standard input (`os.Stdin`) remains blocked on a `Read` operation until the user presses a key. This causes the goroutine to linger and consume resources indefinitely after the process has terminated.
+`io.Copy` blocks until the reading source returns EOF or a write error occurs on the destination. When the containerized process exits, the `io.Copy` handling the host standard input (e.g., `os.Stdin` or a custom `syncReader`) remains blocked on an active `Read` operation until the user presses a key. This causes the input relay goroutine to linger and leak resources indefinitely. Even if the PTY Master or container connection is closed, the underlying read stream (such as `syncReader.inner.Read`) may remain blocked waiting for input.
 
-### Non-blocking I/O and Context Mitigations
+To prevent leaks and achieve a robust shutdown sequence, you must ensure both input-source cancellation and complete relay synchronization before returning:
 
-To prevent leaks and achieve robust termination, combine the following techniques:
+1. **Separately Close/Cancel the Stdin Source**: Explicitly cancel or close the input source wrapper (e.g. `stdin` / `syncReader`) used by `io.Copy(resp.Conn, stdin)`. This unblocks `Read` calls (like `syncReader.inner.Read`) that would otherwise remain suspended waiting for user keyboard activity.
+2. **Close the Connection or PTY**: Force-close the PTY Master file descriptor or the container connection (`resp.Conn`). This causes the active output relay (`io.Copy(os.Stdout, resp.Conn)`) to fail with a read or write error and terminate immediately.
+3. **Wait for Both Relay Goroutines**: Use synchronization primitives (such as `sync.WaitGroup` or completion channels) to wait for both the input and output relay goroutines to finish executing before returning.
+4. **Context Cancellation & Process-Exit**: Associate `context.Context` with long-running operations to ensure all related processes and background workers receive cancellation signals when the application terminates.
 
-1. **Force-Close on Process Exit**: Once `cmd.Wait()` detects process termination, immediately close the PTY Master file descriptor. This causes the `io.Copy` executing in other goroutines to detect a write error and exit.
-2. **Context Cancellation**: Associate `context.Context` with long-running operations to ensure all related processes stop when the application terminates.
-3. **Non-blocking Mode**: Use `syscall.SetNonblock` when necessary to configure timeouts on I/O operations, preventing infinite read blocks.
+### Non-blocking Mode
+
+While using non-blocking modes is helpful, note that invoking `syscall.SetNonblock` only enables the `O_NONBLOCK` file status flag on the descriptor; **it does not configure I/O timeouts**.
+
+When non-blocking mode is active, any read or write operation that cannot complete immediately returns an `EAGAIN` or `EWOULDBLOCK` error. Applications must handle these errors by implementing readiness checks (e.g., using `syscall.Select`, `epoll`, or Go's network poller) and retrying the operation once the descriptor is ready. To safely bound blocking reads, it is highly recommended to use descriptors that support deadlines (such as network connections with `SetDeadline`) or utilize explicit close/cancellation pathways to unblock sleeping readers.
 
 Additionally, during development, monitoring goroutine counts with `runtime.NumGoroutine()` or integrating tools like `uber-go/goleak` in the test suite helps identify leaks early.
 
 ### Exit Codes and Restoration
 
-For scripting and automation, it is crucial that the CLI tool accurately propagates the containerized process's exit code to the host. In Go, the exit status is analyzed via the result of `cmd.Wait()`:
+For scripting and automation, it is crucial that the CLI tool accurately propagates the containerized process's exit code to the host. In Go, you must analyze the result of `cmd.Wait()` to extract the exit status without invoking `os.Exit` immediately. This allows `defer` blocks to execute and deferred terminal and resource cleanups to complete normally. You should return the captured exit code back to the `main` function and perform the final process termination there:
 
 ```go
-err := cmd.Wait()
-if err != nil {
-    if exiterr, ok := err.(*exec.ExitError); ok {
-        // Retrieve the exit status of the containerized process
-        exitCode := exiterr.ExitCode()
-        os.Exit(exitCode)
+// runContainer executes the container execution loop and returns the exit code
+func runContainer(...) (int, error) {
+    // ...
+    err := cmd.Wait()
+    if err != nil {
+        if exiterr, ok := err.(*exec.ExitError); ok {
+            // Capture the exit status of the containerized process
+            return exiterr.ExitCode(), nil
+        }
+        return 1, err
     }
+    return 0, nil
 }
 ```
 
-Before calling `os.Exit`, the terminal must be restored to its normal state using `term.Restore`. The robust termination sequence should strictly follow:
+The robust termination sequence should strictly follow:
 
-1. Wait for process termination.
-2. Restore terminal settings.
-3. Release resources (close PTY, confirm goroutine termination).
-4. Call `os.Exit` with the retrieved exit code.
+1. Wait for process termination and capture the exit code.
+2. Complete deferred cleanups (e.g. restore terminal settings via `term.Restore`, release resources, close PTY, and confirm goroutine termination).
+3. Return the captured code to `main`.
+4. Call `os.Exit` with the retrieved exit code in `main` to terminate the process.
 
 ---
 
