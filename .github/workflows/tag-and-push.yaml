@@ -62,5 +62,13 @@ jobs:
           echo "Creating local tag: $RELEASE_VERSION"
           git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION triggered via GitHub Actions manual workflow"
 
+          # We authenticate with a dedicated release credential (such as secrets.RELEASE_PAT)
+          # so that pushing the tag successfully triggers the release.yaml pipeline.
+          # If secrets.RELEASE_PAT is not set, we fall back to GITHUB_TOKEN.
+          PUSH_TOKEN="${{ secrets.RELEASE_PAT }}"
+          if [ -z "$PUSH_TOKEN" ]; then
+            PUSH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          fi
+
           echo "Pushing tag to origin..."
-          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$RELEASE_VERSION"
+          git push "https://${{ github.actor }}:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$RELEASE_VERSION"
