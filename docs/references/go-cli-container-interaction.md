@@ -143,7 +143,7 @@ Goroutine leaks are one of the most common bugs in interactive CLI tools. They a
 
 ### The io.Copy Blocking Problem & Shutdown Sequence
 
-`io.Copy` blocks until the reading source returns EOF or a write error occurs on the destination. When the containerized process exits, the `io.Copy` handling the host standard input (e.g., `os.Stdin` or a custom `syncReader`) remains blocked on an active `Read` operation until the user presses a key. This causes the input relay goroutine to linger and leak resources indefinitely. Even if the PTY Master or container connection is closed, the underlying read stream (such as `syncReader.inner.Read`) may remain blocked waiting for input.
+`io.Copy` continues copying from source to destination until the source returns EOF, any other read error is encountered, or a destination write error occurs. When the containerized process exits, the `io.Copy` handling the host standard input (e.g., `os.Stdin` or a custom `syncReader`) remains blocked on an active `Read` operation until the user presses a key. This causes the input relay goroutine to linger and leak resources indefinitely. Even if the PTY Master or container connection is closed, the underlying read stream (such as `syncReader.inner.Read`) may remain blocked waiting for input.
 
 To prevent leaks and achieve a robust shutdown sequence, you must ensure both input-source cancellation and complete relay synchronization before returning:
 
@@ -165,8 +165,8 @@ Additionally, during development, monitoring goroutine counts with `runtime.NumG
 For scripting and automation, it is crucial that the CLI tool accurately propagates the containerized process's exit code to the host. In Go, you must analyze the result of `cmd.Wait()` to extract the exit status without invoking `os.Exit` immediately. This allows `defer` blocks to execute and deferred terminal and resource cleanups to complete normally. You should return the captured exit code back to the `main` function and perform the final process termination there:
 
 ```go
-// runContainer executes the container execution loop and returns the exit code
-func runContainer(...) (int, error) {
+// Pseudocode Example: runContainer executes the container execution loop and returns the exit code
+func runContainer(args ...string) (int, error) {
     // ...
     err := cmd.Wait()
     if err != nil {
