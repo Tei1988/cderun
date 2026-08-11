@@ -33,8 +33,10 @@ jobs:
           fi
 
       - name: Validate Release Credentials
+        env:
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
-          if [ -z "${{ secrets.RELEASE_PAT }}" ]; then
+          if [ -z "$RELEASE_PAT" ]; then
             echo "::error::Missing mandatory secrets.RELEASE_PAT. Pushing a tag using the default GITHUB_TOKEN will not trigger the release pipeline. Please configure the secrets.RELEASE_PAT Personal Access Token with repo/write scopes."
             exit 1
           fi
@@ -76,4 +78,5 @@ jobs:
 
           # We use `--no-verify` to completely bypass any local repository-controlled git hooks
           # and override `http.extraHeader` config inline to prevent leaking tokens or using URL injection.
-          git -c "http.https://github.com/.extraHeader=$AUTH_HEADER" push --no-verify origin "$RELEASE_VERSION"
+          # Explicitly push the fully qualified refspec to avoid any namespace inference issues.
+          git -c "http.https://github.com/.extraHeader=$AUTH_HEADER" push --no-verify origin "refs/tags/$RELEASE_VERSION:refs/tags/$RELEASE_VERSION"
