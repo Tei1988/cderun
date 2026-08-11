@@ -125,6 +125,12 @@ func (rv *resolver) validateSecurity() error {
 	}
 
 	if logging.Enabled(logging.WarnLevel) {
+		var socketWarningLogged bool
+		if rv.res.MountSocket {
+			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+			socketWarningLogged = true
+		}
+
 		if rv.res.Privileged {
 			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 			if len(found) > 0 {
@@ -152,6 +158,16 @@ func (rv *resolver) validateSecurity() error {
 				if isSensitive {
 					logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
 				}
+
+				// Hardening: Warn if a mount source matches a container runtime socket, or common container socket paths.
+				isSocket := cleanSource == path.Clean(rv.res.SocketPath) ||
+					strings.HasSuffix(cleanSource, "/docker.sock") ||
+					strings.HasSuffix(cleanSource, "/containerd.sock") ||
+					strings.HasSuffix(cleanSource, "/podman.sock")
+				if isSocket && !socketWarningLogged {
+					logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+					socketWarningLogged = true
+				}
 			}
 		}
 		for _, d := range rv.res.Devices {
@@ -159,14 +175,9 @@ func (rv *resolver) validateSecurity() error {
 				logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
 			}
 		}
-	}
-	if rv.res.MountSocket {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
 
-			if ContainsNumericGID(rv.res.GroupAdd) {
-				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
-			}
+		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
+			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 		}
 	}
 	return nil
