@@ -1,10 +1,10 @@
 # Sensitive Data Protection
 
-cderun protects sensitive information from being accidentally leaked into logs or terminal output during dry-run and diagnosis modes.
+`cderun` protects sensitive information from being accidentally leaked into logs or terminal output during dry-run and diagnosis modes.
 
 ## Environment Variable Masking
 
-Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. cderun follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
+Environment variable values are masked in non-execution contexts (dry-run and debug logs) to prevent credential leakage. `cderun` follows a "Secure by Default" approach where all environment variables are considered sensitive unless an explicit configuration is provided.
 
 ### Configuration (`sensitive-env`)
 
@@ -19,9 +19,16 @@ The masking behavior is controlled by the `sensitive-env` option, which can be d
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
+To maximize performance on key execution paths, `cderun` uses custom, case-insensitive helper functions: `equalFoldASCII`, `hasSuffixFoldASCII`, `hasPrefixFoldASCII`, and `containsFoldASCII`. These ASCII comparison helpers avoid per-comparison allocations, although pattern analysis and fallback matching may allocate. They support:
+
+- Exact matches (e.g., `MY_API_KEY`)
+- Suffix wildcards (e.g., `DB_*`)
+- Prefix wildcards (e.g., `*_PASSWORD`)
+- Substring wildcards (e.g., `*SECRET*`)
+
 #### Fail-Closed Logic
 
-cderun implements fail-closed logic for pattern matching. If a glob pattern is malformed (e.g., `[` without a closing bracket), `path.Match` will return an error. In this case, cderun redacts the value to prevent accidental exposure of potentially sensitive information.
+`cderun` implements fail-closed logic for pattern matching. While configuration validation rejects invalid patterns at startup, `matchPreAnalyzed` treats any runtime `path.Match` errors as positive matches that mask the value to prevent accidental exposure of potentially sensitive information.
 
 ```yaml
 defaults:
