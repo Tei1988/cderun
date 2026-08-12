@@ -68,6 +68,19 @@ type ContainerConfig struct {
 
 	// Kernel parameters (sysctl)
 	Sysctls map[string]string `json:"sysctls,omitempty" yaml:"sysctls,omitempty"`
+
+	// New Options (T34, T29, T32, T33, T35, T36, T37, T38, T39)
+	IPC         string            `json:"ipc,omitempty" yaml:"ipc,omitempty"`
+	SecurityOpt []string          `json:"security_opt,omitempty" yaml:"security_opt,omitempty"`
+	DNSSearch   []string          `json:"dns_search,omitempty" yaml:"dns_search,omitempty"`
+	DNSOptions  []string          `json:"dns_options,omitempty" yaml:"dns_options,omitempty"`
+	GPUs        string            `json:"gpus,omitempty" yaml:"gpus,omitempty"`
+	Cgroupns    string            `json:"cgroupns,omitempty" yaml:"cgroupns,omitempty"`
+	PidsLimit   int64             `json:"pids_limit,omitempty" yaml:"pids_limit,omitempty"`
+	CPUShares   int64             `json:"cpu_shares,omitempty" yaml:"cpu_shares,omitempty"`
+	CpusetCpus  string            `json:"cpuset_cpus,omitempty" yaml:"cpuset_cpus,omitempty"`
+	CpusetMems  string            `json:"cpuset_mems,omitempty" yaml:"cpuset_mems,omitempty"`
+	Restart     string            `json:"restart,omitempty" yaml:"restart,omitempty"`
 }
 
 // Ulimit represents a ulimit setting for a container.

@@ -15,10 +15,18 @@ type rootFlags struct {
 	cderunCapAdd          []string
 	capDrop               []string
 	cderunCapDrop         []string
+	cgroupns              string
+	cderunCgroupns        string
 	config                string
 	cderunConfig          string
+	cpuShares             int
+	cderunCPUShares       int
 	cpus                  float64
 	cderunCPUs            float64
+	cpusetCpus            string
+	cderunCpusetCpus      string
+	cpusetMems            string
+	cderunCpusetMems      string
 	devices               []string
 	cderunDevices         []string
 	diagnosis             bool
@@ -27,6 +35,10 @@ type rootFlags struct {
 	cderunDiagnosisFormat string
 	dns                   []string
 	cderunDNS             []string
+	dnsOptions            []string
+	cderunDNSOptions      []string
+	dnsSearch             []string
+	cderunDNSSearch       []string
 	dryRun                bool
 	cderunDryRun          bool
 	dryRunFormat          string
@@ -37,6 +49,8 @@ type rootFlags struct {
 	cderunEnv             []string
 	expose                []string
 	cderunExpose          []string
+	gpus                  string
+	cderunGPUs            string
 	groupAdd              []string
 	cderunGroupAdd        []string
 	hangTimeout           string
@@ -49,6 +63,8 @@ type rootFlags struct {
 	cderunInit            bool
 	interactive           bool
 	cderunInteractive     bool
+	ipc                   string
+	cderunIPC             string
 	logFormat             string
 	cderunLogFormat       string
 	logLevel              string
@@ -75,6 +91,8 @@ type rootFlags struct {
 	cderunNetwork         string
 	pid                   string
 	cderunPid             string
+	pidsLimit             int
+	cderunPidsLimit       int
 	privileged            bool
 	cderunPrivileged      bool
 	ports                 []string
@@ -91,8 +109,12 @@ type rootFlags struct {
 	cderunReadOnly        bool
 	remove                bool
 	cderunRemove          bool
+	restart               string
+	cderunRestart         string
 	runtime               string
 	cderunRuntime         string
+	securityOpt           []string
+	cderunSecurityOpt     []string
 	sensitiveEnv          []string
 	cderunSensitiveEnv    []string
 	shmSize               string
@@ -149,10 +171,18 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunCapAdd:          o.cderunCapAdd,
 		CapDrop:               o.capDrop,
 		CderunCapDrop:         o.cderunCapDrop,
+		Cgroupns:              optStr(cmd.Flags().Changed("cgroupns"), o.cgroupns),
+		CderunCgroupns:        optStr(cmd.Flags().Changed("cderun-cgroupns"), o.cderunCgroupns),
 		Config:                optStr(cmd.Flags().Changed("config"), o.config),
 		CderunConfig:          optStr(cmd.Flags().Changed("cderun-config"), o.cderunConfig),
+		CPUShares:             optInt(cmd.Flags().Changed("cpu-shares"), o.cpuShares),
+		CderunCPUShares:       optInt(cmd.Flags().Changed("cderun-cpu-shares"), o.cderunCPUShares),
 		CPUs:                  optFloat(cmd.Flags().Changed("cpus"), o.cpus),
 		CderunCPUs:            optFloat(cmd.Flags().Changed("cderun-cpus"), o.cderunCPUs),
+		CpusetCpus:            optStr(cmd.Flags().Changed("cpuset-cpus"), o.cpusetCpus),
+		CderunCpusetCpus:      optStr(cmd.Flags().Changed("cderun-cpuset-cpus"), o.cderunCpusetCpus),
+		CpusetMems:            optStr(cmd.Flags().Changed("cpuset-mems"), o.cpusetMems),
+		CderunCpusetMems:      optStr(cmd.Flags().Changed("cderun-cpuset-mems"), o.cderunCpusetMems),
 		Devices:               o.devices,
 		CderunDevices:         o.cderunDevices,
 		Diagnosis:             optBool(cmd.Flags().Changed("diagnosis"), o.diagnosis),
@@ -161,6 +191,10 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunDiagnosisFormat: optStr(cmd.Flags().Changed("cderun-diagnosis-format"), o.cderunDiagnosisFormat),
 		DNS:                   o.dns,
 		CderunDNS:             o.cderunDNS,
+		DNSOptions:            o.dnsOptions,
+		CderunDNSOptions:      o.cderunDNSOptions,
+		DNSSearch:             o.dnsSearch,
+		CderunDNSSearch:       o.cderunDNSSearch,
 		DryRun:                optBool(cmd.Flags().Changed("dry-run"), o.dryRun),
 		CderunDryRun:          optBool(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
 		DryRunFormat:          optStr(cmd.Flags().Changed("dry-run-format"), o.dryRunFormat),
@@ -171,6 +205,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunEnv:             o.cderunEnv,
 		Expose:                o.expose,
 		CderunExpose:          o.cderunExpose,
+		GPUs:                  optStr(cmd.Flags().Changed("gpus"), o.gpus),
+		CderunGPUs:            optStr(cmd.Flags().Changed("cderun-gpus"), o.cderunGPUs),
 		GroupAdd:              o.groupAdd,
 		CderunGroupAdd:        o.cderunGroupAdd,
 		HangTimeout:           optStr(cmd.Flags().Changed("hang-timeout"), o.hangTimeout),
@@ -183,6 +219,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunInit:            optBool(cmd.Flags().Changed("cderun-init"), o.cderunInit),
 		Interactive:           optBool(cmd.Flags().Changed("interactive"), o.interactive),
 		CderunInteractive:     optBool(cmd.Flags().Changed("cderun-interactive"), o.cderunInteractive),
+		IPC:                   optStr(cmd.Flags().Changed("ipc"), o.ipc),
+		CderunIPC:             optStr(cmd.Flags().Changed("cderun-ipc"), o.cderunIPC),
 		LogFormat:             optStr(cmd.Flags().Changed("log-format"), o.logFormat),
 		CderunLogFormat:       optStr(cmd.Flags().Changed("cderun-log-format"), o.cderunLogFormat),
 		LogLevel:              optStr(cmd.Flags().Changed("log-level"), o.logLevel),
@@ -209,6 +247,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunNetwork:         optStr(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
 		Pid:                   optStr(cmd.Flags().Changed("pid"), o.pid),
 		CderunPid:             optStr(cmd.Flags().Changed("cderun-pid"), o.cderunPid),
+		PidsLimit:             optInt(cmd.Flags().Changed("pids-limit"), o.pidsLimit),
+		CderunPidsLimit:       optInt(cmd.Flags().Changed("cderun-pids-limit"), o.cderunPidsLimit),
 		Privileged:            optBool(cmd.Flags().Changed("privileged"), o.privileged),
 		CderunPrivileged:      optBool(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
 		Ports:                 o.ports,
@@ -225,8 +265,12 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunReadOnly:        optBool(cmd.Flags().Changed("cderun-read-only"), o.cderunReadOnly),
 		Remove:                optBool(cmd.Flags().Changed("remove"), o.remove),
 		CderunRemove:          optBool(cmd.Flags().Changed("cderun-remove"), o.cderunRemove),
+		Restart:               optStr(cmd.Flags().Changed("restart"), o.restart),
+		CderunRestart:         optStr(cmd.Flags().Changed("cderun-restart"), o.cderunRestart),
 		Runtime:               optStr(cmd.Flags().Changed("runtime"), o.runtime),
 		CderunRuntime:         optStr(cmd.Flags().Changed("cderun-runtime"), o.cderunRuntime),
+		SecurityOpt:           o.securityOpt,
+		CderunSecurityOpt:     o.cderunSecurityOpt,
 		SensitiveEnv:          o.sensitiveEnv,
 		CderunSensitiveEnv:    o.cderunSensitiveEnv,
 		ShmSize:               optStr(cmd.Flags().Changed("shm-size"), o.shmSize),
@@ -287,18 +331,28 @@ func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 
 func getStringPointers(o *rootOptions, name string) (base, override *string) {
 	switch name {
+	case "cgroupns":
+		return &o.cgroupns, &o.cderunCgroupns
 	case "config":
 		return &o.config, &o.cderunConfig
+	case "cpuset-cpus":
+		return &o.cpusetCpus, &o.cderunCpusetCpus
+	case "cpuset-mems":
+		return &o.cpusetMems, &o.cderunCpusetMems
 	case "diagnosis-format":
 		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
 	case "dry-run-format":
 		return &o.dryRunFormat, &o.cderunDryRunFormat
+	case "gpus":
+		return &o.gpus, &o.cderunGPUs
 	case "hang-timeout":
 		return &o.hangTimeout, &o.cderunHangTimeout
 	case "hostname":
 		return &o.hostname, &o.cderunHostname
 	case "image":
 		return &o.image, &o.cderunImage
+	case "ipc":
+		return &o.ipc, &o.cderunIPC
 	case "log-format":
 		return &o.logFormat, &o.cderunLogFormat
 	case "log-level":
@@ -319,6 +373,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.pull, &o.cderunPull
 	case "pull-backoff-base":
 		return &o.pullBackoffBase, &o.cderunPullBackoffBase
+	case "restart":
+		return &o.restart, &o.cderunRestart
 	case "runtime":
 		return &o.runtime, &o.cderunRuntime
 	case "shm-size":
@@ -338,6 +394,10 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 
 func getIntPointers(o *rootOptions, name string) (base, override *int) {
 	switch name {
+	case "cpu-shares":
+		return &o.cpuShares, &o.cderunCPUShares
+	case "pids-limit":
+		return &o.pidsLimit, &o.cderunPidsLimit
 	case "pull-max-retries":
 		return &o.pullMaxRetries, &o.cderunPullMaxRetries
 	default:
@@ -366,6 +426,10 @@ func getStringSlicePointers(o *rootOptions, name string) (base, override *[]stri
 		return &o.devices, &o.cderunDevices
 	case "dns":
 		return &o.dns, &o.cderunDNS
+	case "dns-option":
+		return &o.dnsOptions, &o.cderunDNSOptions
+	case "dns-search":
+		return &o.dnsSearch, &o.cderunDNSSearch
 	case "entrypoint":
 		return &o.entrypoint, &o.cderunEntrypoint
 	case "env":
@@ -378,6 +442,8 @@ func getStringSlicePointers(o *rootOptions, name string) (base, override *[]stri
 		return &o.mounts, &o.cderunMounts
 	case "publish":
 		return &o.ports, &o.cderunPorts
+	case "security-opt":
+		return &o.securityOpt, &o.cderunSecurityOpt
 	case "sensitive-env":
 		return &o.sensitiveEnv, &o.cderunSensitiveEnv
 	case "sysctl":

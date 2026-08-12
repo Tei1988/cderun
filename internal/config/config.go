@@ -96,6 +96,17 @@ type ConfigDefaults struct {
 	GroupAdd        []string       `yaml:"groupAdd,omitempty"`
 	Ulimits         []string       `yaml:"ulimits,omitempty"`
 	Sysctls         []string       `yaml:"sysctls,omitempty"`
+	IPC             string         `yaml:"ipc,omitempty"`
+	SecurityOpt     []string       `yaml:"securityOpt,omitempty"`
+	DNSSearch       []string       `yaml:"dnsSearch,omitempty"`
+	DNSOptions      []string       `yaml:"dnsOptions,omitempty"`
+	GPUs            string         `yaml:"gpus,omitempty"`
+	Cgroupns        string         `yaml:"cgroupns,omitempty"`
+	PidsLimit       *int           `yaml:"pidsLimit,omitempty"`
+	CPUShares       *int           `yaml:"cpuShares,omitempty"`
+	CpusetCpus      string         `yaml:"cpusetCpus,omitempty"`
+	CpusetMems      string         `yaml:"cpusetMems,omitempty"`
+	Restart         string         `yaml:"restart,omitempty"`
 }
 
 func (d ConfigDefaults) DeepCopy() ConfigDefaults {
@@ -115,6 +126,8 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.Diagnosis = copyBoolPtr(d.Diagnosis)
 	res.CPUs = copyFloat64Ptr(d.CPUs)
 	res.PullMaxRetries = copyIntPtr(d.PullMaxRetries)
+	res.PidsLimit = copyIntPtr(d.PidsLimit)
+	res.CPUShares = copyIntPtr(d.CPUShares)
 
 	res.MountTools = copyStringSlice(d.MountTools)
 	res.Ports = copyStringSlice(d.Ports)
@@ -129,6 +142,9 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.GroupAdd = copyStringSlice(d.GroupAdd)
 	res.Ulimits = copyStringSlice(d.Ulimits)
 	res.Sysctls = copyStringSlice(d.Sysctls)
+	res.SecurityOpt = copyStringSlice(d.SecurityOpt)
+	res.DNSSearch = copyStringSlice(d.DNSSearch)
+	res.DNSOptions = copyStringSlice(d.DNSOptions)
 
 	if d.Devices != nil {
 		res.Devices = make([]DeviceConfig, len(d.Devices))
@@ -245,6 +261,17 @@ type ToolConfig struct {
 	GroupAdd        []string       `yaml:"groupAdd,omitempty"`
 	Ulimits         []string       `yaml:"ulimits,omitempty"`
 	Sysctls         []string       `yaml:"sysctls,omitempty"`
+	IPC             string         `yaml:"ipc,omitempty"`
+	SecurityOpt     []string       `yaml:"securityOpt,omitempty"`
+	DNSSearch       []string       `yaml:"dnsSearch,omitempty"`
+	DNSOptions      []string       `yaml:"dnsOptions,omitempty"`
+	GPUs            string         `yaml:"gpus,omitempty"`
+	Cgroupns        string         `yaml:"cgroupns,omitempty"`
+	PidsLimit       *int           `yaml:"pidsLimit,omitempty"`
+	CPUShares       *int           `yaml:"cpuShares,omitempty"`
+	CpusetCpus      string         `yaml:"cpusetCpus,omitempty"`
+	CpusetMems      string         `yaml:"cpusetMems,omitempty"`
+	Restart         string         `yaml:"restart,omitempty"`
 }
 
 func (t ToolConfig) DeepCopy() ToolConfig {
@@ -265,6 +292,8 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.Diagnosis = copyBoolPtr(t.Diagnosis)
 	res.CPUs = copyFloat64Ptr(t.CPUs)
 	res.PullMaxRetries = copyIntPtr(t.PullMaxRetries)
+	res.PidsLimit = copyIntPtr(t.PidsLimit)
+	res.CPUShares = copyIntPtr(t.CPUShares)
 
 	res.MountTools = copyStringSlice(t.MountTools)
 	res.Ports = copyStringSlice(t.Ports)
@@ -279,6 +308,9 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.GroupAdd = copyStringSlice(t.GroupAdd)
 	res.Ulimits = copyStringSlice(t.Ulimits)
 	res.Sysctls = copyStringSlice(t.Sysctls)
+	res.SecurityOpt = copyStringSlice(t.SecurityOpt)
+	res.DNSSearch = copyStringSlice(t.DNSSearch)
+	res.DNSOptions = copyStringSlice(t.DNSOptions)
 
 	if t.Devices != nil {
 		res.Devices = make([]DeviceConfig, len(t.Devices))
