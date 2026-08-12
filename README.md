@@ -231,6 +231,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
+- `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Note: containerd does not support restart policies.
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
 
 #### Network & Ports
@@ -241,17 +242,26 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--publish-all`, `-P`: Publish all exposed ports to random ports. (Default: `false`)
 - `--expose`: Expose a port or a range of ports.
 - `--dns`: Set custom DNS servers.
+- `--dns-option`: Set custom DNS options (e.g., `ndots:3`). Note: containerd does not support DNS options.
+- `--dns-search`: Set custom DNS search domains. Note: containerd does not support DNS search domains.
 - `--add-host`: Add a custom host-to-IP mapping (`host:ip`).
 
 #### Resources & Security
 
 - `--memory`, `-m`: Memory limit (e.g., `512m`, `1g`).
 - `--cpus`: Number of CPUs (float).
+- `--cpu-shares`: Limit container CPU access weight (relative weight).
+- `--cpuset-cpus`: CPUs in which to allow execution (e.g., `0-3`, `0,1`).
+- `--cpuset-mems`: Memory nodes (MEMs) in which to allow execution (e.g., `0-3`, `0,1`). Only effective on NUMA systems.
 - `--device`: Add a host device to the container.
+- `--gpus`: GPU devices to request (e.g., `all`, `count=2`, `device=0,1`). Note: containerd does not support GPU requests.
+- `--ipc`: Configure the IPC namespace mode (e.g., `host` or `private`). Note: containerd only supports `host` or `private`.
+- `--cgroupns`: Configure the cgroup namespace mode (e.g., `host` or `private`). Note: containerd only supports `host` or `private`.
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
 - `--pid`: Configure the PID namespace for the container. Accepts `"host"` or `""` (private). Maps to `PidMode` in Docker host configuration, and appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`. (Default: `""`)
+- `--pids-limit`: Limit the maximum number of active processes/threads inside the container (fork-bomb protection).
 - `--init`: Run an init process inside the container to forward signals and reap zombie processes. Maps to `Init` in the Docker host configuration, and is explicitly rejected with a validation error ('containerd runtime: init is not supported yet') in the containerd adapter's `ValidateConfig` method. (Default: `false`)
 - `--security-opt`: Configure security options (such as `no-new-privileges`, `seccomp=unconfined`, and AppArmor profiles). Maps directly to `HostConfig.SecurityOpt` in the Docker host configuration, or mapped supported profiles in Podman. In containerd, empty AppArmor profiles are strictly rejected (e.g., `apparmor=` or `apparmor:` with no profile name) and valid options are applied to the OCI spec via helper `applySecurityOptions` (@jules). (Default: none)
 - `--ulimit`: Configure process resource limits (ulimits) in container execution environments. Parses specifications (such as `nofile=1024:2048`) via the `go-units` standard parser. Maps directly to `HostConfig.Resources.Ulimits` in the Docker host configuration or Podman host configuration, and is converted into POSIX OCI process rlimits (`specs.POSIXRlimit` inside `Process.Rlimits`) via custom spec options in containerd. (Default: none)
