@@ -42,6 +42,14 @@ func TestUnit_Runtime_Docker_ResourceLimits_Mapping(t *testing.T) {
 		assert.Equal(t, 2, hostCfg.Resources.DeviceRequests[0].Count)
 	})
 
+	t.Run("valid count=-1 GPU selector", func(t *testing.T) {
+		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=-1"}
+		_, hostCfg, _, err := toDockerContainerConfig(cfgGpus)
+		require.NoError(t, err)
+		require.Len(t, hostCfg.Resources.DeviceRequests, 1)
+		assert.Equal(t, -1, hostCfg.Resources.DeviceRequests[0].Count)
+	})
+
 	t.Run("valid device= GPU selector", func(t *testing.T) {
 		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "device=0,1"}
 		_, hostCfg, _, err := toDockerContainerConfig(cfgGpus)
@@ -59,7 +67,14 @@ func TestUnit_Runtime_Docker_ResourceLimits_Mapping(t *testing.T) {
 	})
 
 	t.Run("malformed count value GPU selector", func(t *testing.T) {
-		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=-1"}
+		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=-2"}
+		_, _, _, err := toDockerContainerConfig(cfgGpus)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid count value")
+	})
+
+	t.Run("zero count value GPU selector", func(t *testing.T) {
+		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=0"}
 		_, _, _, err := toDockerContainerConfig(cfgGpus)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid count value")

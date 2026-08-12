@@ -90,6 +90,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
 			return nil, nil, nil, fmt.Errorf("invalid restart policy: %q", config.Restart)
 		}
+		retries := 0
 		if policy != "on-failure" {
 			if len(parts) > 1 {
 				return nil, nil, nil, fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, config.Restart)
@@ -107,15 +108,13 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 				if err != nil || val < 0 {
 					return nil, nil, nil, fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", config.Restart)
 				}
+				retries = val
 			}
 		}
 
 		rp := dockercontainer.RestartPolicy{
-			Name: dockercontainer.RestartPolicyMode(policy),
-		}
-		if policy == "on-failure" && len(parts) == 2 {
-			retries, _ := strconv.Atoi(parts[1])
-			rp.MaximumRetryCount = retries
+			Name:              dockercontainer.RestartPolicyMode(policy),
+			MaximumRetryCount: retries,
 		}
 		hostConfig.RestartPolicy = rp
 	}
@@ -231,7 +230,7 @@ func parseGPUs(gpus string) ([]dockercontainer.DeviceRequest, error) {
 			return nil, fmt.Errorf("empty count selector: %q", gpus)
 		}
 		val, err := strconv.Atoi(countStr)
-		if err != nil || val <= 0 {
+		if err != nil || (val < 1 && val != -1) {
 			return nil, fmt.Errorf("invalid count value in %q", gpus)
 		}
 		countVal = val
