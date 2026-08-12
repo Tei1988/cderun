@@ -1,0 +1,8 @@
+node:
+  image: alpine:latest
+  env:
+    - PROJECT_ROOT={{PWD}}
+    - MY_API_KEY={{env:SECRET_API_KEY}}
+    - USER_NAME={{env:SECRET_USER_NAME}}
+    - OAUTH_TOKEN={{env:SECRET_OAUTH_TOKEN}}
+    - PUBLIC_VAR={{env:PUBLIC_DATA}}
