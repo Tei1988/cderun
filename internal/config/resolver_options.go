@@ -106,6 +106,15 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	case "entrypoint":
 		p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
 		fastPathUsed = true
+	case "security-opt":
+		p1v, p2v = rv.cli.CderunSecurityOpt, rv.cli.SecurityOpt
+		fastPathUsed = true
+	case "dns-search":
+		p1v, p2v = rv.cli.CderunDNSSearch, rv.cli.DNSSearch
+		fastPathUsed = true
+	case "dns-option":
+		p1v, p2v = rv.cli.CderunDNSOptions, rv.cli.DNSOptions
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
@@ -141,6 +150,12 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 				rv.res.CapDrop = resolved
 			case "entrypoint":
 				rv.res.Entrypoint = resolved
+			case "security-opt":
+				rv.res.SecurityOpt = resolved
+			case "dns-search":
+				rv.res.DNSSearch = resolved
+			case "dns-option":
+				rv.res.DNSOptions = resolved
 			}
 			return nil
 		}
@@ -190,6 +205,10 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
 			p2Set, p2Val = getPtrVal(rv.cli.Pid)
 			fastPathUsed = true
+		case "shm-size":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunShmSize)
+			p2Set, p2Val = getPtrVal(rv.cli.ShmSize)
+			fastPathUsed = true
 		case "network":
 			p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
 			p2Set, p2Val = getPtrVal(rv.cli.Network)
@@ -230,6 +249,30 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
 			p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
 			fastPathUsed = true
+		case "ipc":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunIPC)
+			p2Set, p2Val = getPtrVal(rv.cli.IPC)
+			fastPathUsed = true
+		case "gpus":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunGPUs)
+			p2Set, p2Val = getPtrVal(rv.cli.GPUs)
+			fastPathUsed = true
+		case "cgroupns":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunCgroupns)
+			p2Set, p2Val = getPtrVal(rv.cli.Cgroupns)
+			fastPathUsed = true
+		case "cpuset-cpus":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunCpusetCpus)
+			p2Set, p2Val = getPtrVal(rv.cli.CpusetCpus)
+			fastPathUsed = true
+		case "cpuset-mems":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunCpusetMems)
+			p2Set, p2Val = getPtrVal(rv.cli.CpusetMems)
+			fastPathUsed = true
+		case "restart":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunRestart)
+			p2Set, p2Val = getPtrVal(rv.cli.Restart)
+			fastPathUsed = true
 		}
 
 	if fastPathUsed {
@@ -259,6 +302,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 				rv.res.Image = resolved
 			case "pid":
 				rv.res.Pid = resolved
+			case "shm-size":
+				rv.res.ShmSize = resolved
 			case "network":
 				rv.res.Network = resolved
 			case "workdir":
@@ -279,6 +324,18 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 				rv.res.DryRunFormat = resolved
 			case "diagnosis-format":
 				rv.res.DiagnosisFormat = resolved
+			case "ipc":
+				rv.res.IPC = resolved
+			case "gpus":
+				rv.res.GPUs = resolved
+			case "cgroupns":
+				rv.res.Cgroupns = resolved
+			case "cpuset-cpus":
+				rv.res.CpusetCpus = resolved
+			case "cpuset-mems":
+				rv.res.CpusetMems = resolved
+			case "restart":
+				rv.res.Restart = resolved
 			}
 			return nil
 		}
@@ -447,6 +504,14 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
 		p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
 		fastPathUsed = true
+	} else if opt.Name == "pids-limit" {
+		p1Set, p1Int = getPtrVal(rv.cli.CderunPidsLimit)
+		p2Set, p2Int = getPtrVal(rv.cli.PidsLimit)
+		fastPathUsed = true
+	} else if opt.Name == "cpu-shares" {
+		p1Set, p1Int = getPtrVal(rv.cli.CderunCPUShares)
+		p2Set, p2Int = getPtrVal(rv.cli.CPUShares)
+		fastPathUsed = true
 	}
 
 	if fastPathUsed {
@@ -466,6 +531,10 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 			switch opt.Name {
 			case "pull-max-retries":
 				rv.res.PullMaxRetries = resolved
+			case "pids-limit":
+				rv.res.PidsLimit = resolved
+			case "cpu-shares":
+				rv.res.CPUShares = resolved
 			}
 			return nil
 		}

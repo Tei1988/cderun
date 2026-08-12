@@ -79,6 +79,32 @@ var IntOptions = []IntOption{
 			return g.Defaults.PullMaxRetries
 		},
 	},
+	{
+		Name:      "pids-limit",
+		FieldName: "PidsLimit",
+		EnvKey:    "CDERUN_PIDS_LIMIT",
+		Usage:     "Tune container pids limit",
+		Default:   0,
+		ToolGetter: func(t ToolConfig) *int {
+			return t.PidsLimit
+		},
+		GlobalGetter: func(g CDERunConfig) *int {
+			return g.Defaults.PidsLimit
+		},
+	},
+	{
+		Name:      "cpu-shares",
+		FieldName: "CPUShares",
+		EnvKey:    "CDERUN_CPU_SHARES",
+		Usage:     "CPU shares (relative weight)",
+		Default:   0,
+		ToolGetter: func(t ToolConfig) *int {
+			return t.CPUShares
+		},
+		GlobalGetter: func(g CDERunConfig) *int {
+			return g.Defaults.CPUShares
+		},
+	},
 }
 
 var Float64Options = []Float64Option{
@@ -242,6 +268,42 @@ var StringSliceOptions = []StringSliceOption{
 		},
 		SkipResolution: true, // resolved early in resolveEarly
 	},
+	{
+		Name:      "security-opt",
+		FieldName: "SecurityOpt",
+		EnvKey:    "CDERUN_SECURITY_OPT",
+		Usage:     "Configure security options",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.SecurityOpt
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.SecurityOpt
+		},
+	},
+	{
+		Name:      "dns-search",
+		FieldName: "DNSSearch",
+		EnvKey:    "CDERUN_DNS_SEARCH",
+		Usage:     "Set custom DNS search domains",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.DNSSearch
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.DNSSearch
+		},
+	},
+	{
+		Name:      "dns-option",
+		FieldName: "DNSOptions",
+		EnvKey:    "CDERUN_DNS_OPTION",
+		Usage:     "Set DNS options",
+		ToolGetter: func(t ToolConfig) []string {
+			return t.DNSOptions
+		},
+		GlobalGetter: func(g CDERunConfig) []string {
+			return g.Defaults.DNSOptions
+		},
+	},
 }
 
 var StringOptions = []StringOption{
@@ -315,6 +377,17 @@ var StringOptions = []StringOption{
 		Usage:  "Container runtime to use (docker/podman/containerd)",
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Runtime
+		},
+	},
+	{
+		Name:   "shm-size",
+		EnvKey: "CDERUN_SHM_SIZE",
+		Usage:  "Size of /dev/shm (e.g. 512m, 1g, 2147483648)",
+		ToolGetter: func(t ToolConfig) string {
+			return t.ShmSize
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.ShmSize
 		},
 	},
 	{
@@ -475,6 +548,84 @@ var StringOptions = []StringOption{
 			return g.Defaults.HangTimeout
 		},
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as duration)
+	},
+	{
+		Name:      "ipc",
+		FieldName: "IPC",
+		EnvKey:    "CDERUN_IPC",
+		Usage:     "IPC namespace to use",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.IPC
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.IPC
+		},
+	},
+	{
+		Name:      "gpus",
+		FieldName: "GPUs",
+		EnvKey:    "CDERUN_GPUS",
+		Usage:     "GPU devices to request",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.GPUs
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.GPUs
+		},
+	},
+	{
+		Name:      "cgroupns",
+		FieldName: "Cgroupns",
+		EnvKey:    "CDERUN_CGROUPNS",
+		Usage:     "Cgroup namespace to use",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Cgroupns
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.Cgroupns
+		},
+	},
+	{
+		Name:      "cpuset-cpus",
+		FieldName: "CpusetCpus",
+		EnvKey:    "CDERUN_CPUSET_CPUS",
+		Usage:     "CPUs in which to allow execution (0-3, 0,1)",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.CpusetCpus
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.CpusetCpus
+		},
+	},
+	{
+		Name:      "cpuset-mems",
+		FieldName: "CpusetMems",
+		EnvKey:    "CDERUN_CPUSET_MEMS",
+		Usage:     "MEMs in which to allow execution (0-3, 0,1)",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.CpusetMems
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.CpusetMems
+		},
+	},
+	{
+		Name:      "restart",
+		FieldName: "Restart",
+		EnvKey:    "CDERUN_RESTART",
+		Usage:     "Restart policy to apply when a container exits",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Restart
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.Restart
+		},
 	},
 }
 
@@ -734,6 +885,8 @@ var initialisms = map[string]string{
 	"tty":  "TTY",
 	"dns":  "DNS",
 	"cpus": "CPUs",
+	"ipc":  "IPC",
+	"gpus": "GPUs",
 }
 
 // PascalCase converts kebab-case (e.g. "dry-run-format") to PascalCase (e.g. "DryRunFormat").

@@ -6,7 +6,7 @@ When executing `cderun` recursively (nested execution), the following host envir
 
 ### Base Host (Level 0)
 
-The physical computer or virtual machine where the initial `cderun` execution begins. This is where the container runtime engine (Docker or Podman) is physically running. This corresponds to nested context Level 0.
+The physical computer or virtual machine where the initial `cderun` execution begins. This is where the container runtime engine (Docker, Podman, or containerd) is physically running. This corresponds to nested context Level 0.
 
 ```bash
 # Executed on the Base Host (Level 0):

@@ -491,6 +491,9 @@ func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
+		if err := validatePathChars(defaultValue); err != nil {
+			return "", fmt.Errorf("security validation failed for env directive default value: %w", err)
+		}
 		return defaultValue, nil
 	}
 	return val, nil

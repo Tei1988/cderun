@@ -18,6 +18,7 @@ import (
 	"cderun/internal/logging"
 
 	"github.com/containerd/containerd/v2/client"
+	"github.com/docker/go-units"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -128,6 +129,50 @@ func (r *ContainerdRuntime) Name() string {
 func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
 	if config.Init {
 		return fmt.Errorf("containerd runtime: init is not supported yet")
+	}
+
+	if config.GPUs != "" {
+		return fmt.Errorf("containerd runtime: gpus is not supported yet")
+	}
+
+	if config.Restart != "" && config.Restart != "no" {
+		return fmt.Errorf("containerd runtime: restart policy is not supported yet")
+	}
+
+	if len(config.DNSSearch) > 0 {
+		return fmt.Errorf("containerd runtime: dns-search is not supported yet")
+	}
+
+	if len(config.DNSOptions) > 0 {
+		return fmt.Errorf("containerd runtime: dns-option is not supported yet")
+	}
+
+	if config.IPC != "" && config.IPC != "host" && config.IPC != "private" {
+		return fmt.Errorf("containerd runtime: unsupported IPC namespace mode: %q", config.IPC)
+	}
+
+	if config.Cgroupns != "" && config.Cgroupns != "host" && config.Cgroupns != "private" {
+		return fmt.Errorf("containerd runtime: unsupported cgroup namespace mode: %q", config.Cgroupns)
+	}
+
+	for _, opt := range config.SecurityOpt {
+		if opt == "apparmor=" || opt == "apparmor:" {
+			return fmt.Errorf("containerd runtime: empty AppArmor profile is not supported")
+		}
+		if opt != "no-new-privileges" && opt != "seccomp=unconfined" &&
+			!strings.HasPrefix(opt, "apparmor=") && !strings.HasPrefix(opt, "apparmor:") {
+			return fmt.Errorf("containerd runtime: unsupported security option: %q", opt)
+		}
+	}
+
+	if config.ShmSize != "" {
+		bytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
+		}
+		if bytes < 0 {
+			return fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", bytes)
+		}
 	}
 
 	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
@@ -354,6 +399,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			return nil
 		})
 	}
+
+	if config.ShmSize != "" {
+		shmBytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return "", fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
+		}
+		if shmBytes < 0 {
+			return "", fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", shmBytes)
+		}
+		opts = append(opts, getShmSizeSpecOpt(shmBytes))
+	}
 	if len(config.Ulimits) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 			if s.Process == nil {
@@ -368,6 +424,83 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 	if config.Pid == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.PIDNamespace))
+	}
+	if config.IPC == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.IPCNamespace))
+	}
+	if config.Cgroupns == "host" {
+		opts = append(opts, oci.WithHostNamespace(specs.CgroupNamespace))
+	} else if config.Cgroupns == "private" {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			found := false
+			for i, ns := range s.Linux.Namespaces {
+				if ns.Type == specs.CgroupNamespace {
+					s.Linux.Namespaces[i].Path = "" // No path means private/isolated
+					found = true
+					break
+				}
+			}
+			if !found {
+				s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
+					Type: specs.CgroupNamespace,
+				})
+			}
+			return nil
+		})
+	}
+
+	if config.PidsLimit > 0 || config.PidsLimit == -1 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.Pids == nil {
+				s.Linux.Resources.Pids = &specs.LinuxPids{}
+			}
+			lim := config.PidsLimit
+			if lim == -1 {
+				lim = 0 // Map -1 to 0 (the supported equivalent in OCI for unlimited)
+			}
+			s.Linux.Resources.Pids.Limit = &lim
+			return nil
+		})
+	}
+
+	if config.CPUShares > 0 || config.CpusetCpus != "" || config.CpusetMems != "" {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			if s.Linux.Resources == nil {
+				s.Linux.Resources = &specs.LinuxResources{}
+			}
+			if s.Linux.Resources.CPU == nil {
+				s.Linux.Resources.CPU = &specs.LinuxCPU{}
+			}
+			if config.CPUShares > 0 {
+				shares := uint64(config.CPUShares)
+				s.Linux.Resources.CPU.Shares = &shares
+			}
+			if config.CpusetCpus != "" {
+				s.Linux.Resources.CPU.Cpus = config.CpusetCpus
+			}
+			if config.CpusetMems != "" {
+				s.Linux.Resources.CPU.Mems = config.CpusetMems
+			}
+			return nil
+		})
+	}
+
+	if len(config.SecurityOpt) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			return applySecurityOptions(s, config.SecurityOpt)
+		})
 	}
 
 	if len(config.GroupAdd) > 0 {
@@ -685,6 +818,39 @@ func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID st
 	return status.Status == client.Running, int(status.ExitStatus), nil
 }
 
+func getShmSizeSpecOpt(shmBytes int64) oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+		shmSizeOpt := fmt.Sprintf("size=%d", shmBytes)
+		found := false
+		for i, m := range s.Mounts {
+			if m.Destination == "/dev/shm" {
+				if m.Type != "tmpfs" {
+					return fmt.Errorf("containerd runtime: cannot set shm-size on a non-tmpfs mount at /dev/shm (found type %q)", m.Type)
+				}
+				var newOpts []string
+				for _, o := range m.Options {
+					if !strings.HasPrefix(o, "size=") {
+						newOpts = append(newOpts, o)
+					}
+				}
+				newOpts = append(newOpts, shmSizeOpt)
+				s.Mounts[i].Options = newOpts
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "tmpfs",
+				Source:      "shm",
+				Destination: "/dev/shm",
+				Options:     []string{"nosuid", "noexec", "nodev", "mode=1777", shmSizeOpt},
+			})
+		}
+		return nil
+	}
+}
+
 // normalizeCapabilities converts Docker-style capability names (e.g. "SYS_ADMIN")
 // to the CAP_-prefixed form the OCI spec expects. Already-prefixed values are preserved.
 func normalizeCapabilities(caps []string) []string {
@@ -772,4 +938,30 @@ func resolveProcessArgs(ctx context.Context, config *container.ContainerConfig, 
 		args = append(args, config.Command...)
 	}
 	return args, nil
+}
+
+func applySecurityOptions(s *specs.Spec, securityOpts []string) error {
+	if len(securityOpts) == 0 {
+		return nil
+	}
+	if s.Process == nil {
+		s.Process = &specs.Process{}
+	}
+	for _, opt := range securityOpts {
+		if opt == "no-new-privileges" {
+			s.Process.NoNewPrivileges = true
+		} else if opt == "seccomp=unconfined" {
+			if s.Linux == nil {
+				s.Linux = &specs.Linux{}
+			}
+			s.Linux.Seccomp = nil
+		} else if strings.HasPrefix(opt, "apparmor=") {
+			profile := strings.TrimPrefix(opt, "apparmor=")
+			s.Process.ApparmorProfile = profile
+		} else if strings.HasPrefix(opt, "apparmor:") {
+			profile := strings.TrimPrefix(opt, "apparmor:")
+			s.Process.ApparmorProfile = profile
+		}
+	}
+	return nil
 }

@@ -404,7 +404,7 @@ cderun --init alpine ps aux
 - **Details**:
   - **Docker / Podman**: Maps to `PidMode` in the host configuration.
   - **containerd**: Appends `WithHostNamespace(specs.PIDNamespace)` to the containerd OCI spec options when configured as `"host"`.
-- **P1 Internal Override**: `--cderun-pid=<value>` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must use the equals-sign format unconditionally (e.g., `--cderun-pid=host`), and must be placed after the subcommand in Wrapper Mode.
+- **P1 Internal Override**: `--cderun-pid` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value (e.g., `host` or `""`), supporting both space-separated and equals-sign formats (e.g., `--cderun-pid host` or `--cderun-pid=host`), and must be placed after the subcommand in Wrapper Mode.
 
 ```bash
 # Share host PID namespace

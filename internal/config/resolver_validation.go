@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
 	"cderun/internal/logging"
+
+	"github.com/docker/go-units"
 )
 
 var highlyPrivilegedCaps = map[string]bool{
@@ -123,6 +126,12 @@ func (rv *resolver) validateSecurity() error {
 	}
 
 	if logging.Enabled(logging.WarnLevel) {
+		var socketWarningLogged bool
+		if rv.res.MountSocket {
+			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+			socketWarningLogged = true
+		}
+
 		if rv.res.Privileged {
 			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
 			if len(found) > 0 {
@@ -137,6 +146,9 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.Pid == "host" {
 			logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
 		}
+		if rv.res.IPC == "host" {
+			logging.Warn("Container is running with host IPC namespace enabled. This disables process communication isolation and allows the container to share inter-process communication mechanisms with the host.")
+		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)
@@ -150,6 +162,16 @@ func (rv *resolver) validateSecurity() error {
 				if isSensitive {
 					logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
 				}
+
+				// Hardening: Warn if a mount source matches a container runtime socket, or common container socket paths.
+				isSocket := cleanSource == path.Clean(rv.res.SocketPath) ||
+					strings.HasSuffix(cleanSource, "/docker.sock") ||
+					strings.HasSuffix(cleanSource, "/containerd.sock") ||
+					strings.HasSuffix(cleanSource, "/podman.sock")
+				if isSocket && !socketWarningLogged {
+					logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+					socketWarningLogged = true
+				}
 			}
 		}
 		for _, d := range rv.res.Devices {
@@ -157,14 +179,9 @@ func (rv *resolver) validateSecurity() error {
 				logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
 			}
 		}
-	}
-	if rv.res.MountSocket {
-		if logging.Enabled(logging.WarnLevel) {
-			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
 
-			if ContainsNumericGID(rv.res.GroupAdd) {
-				logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
-			}
+		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
+			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 		}
 	}
 	return nil
@@ -184,6 +201,114 @@ func (rv *resolver) validateCriticalFields() error {
 		return nil
 	}
 	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
+		return err
+	}
+
+	// ipc
+	ipcValidator := func(v string) error {
+		isContainerReference := strings.HasPrefix(v, "container:") &&
+			strings.TrimPrefix(v, "container:") != ""
+		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
+			return fmt.Errorf("unsupported ipc namespace: %q", v)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.IPC, "ipc", ipcValidator); err != nil {
+		return err
+	}
+
+	// cgroupns
+	cgroupnsValidator := func(v string) error {
+		if v != "" && v != "host" && v != "private" {
+			return fmt.Errorf("unsupported cgroup namespace: %q", v)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Cgroupns, "cgroupns", cgroupnsValidator); err != nil {
+		return err
+	}
+
+	// pids-limit
+	if rv.res.PidsLimit < -1 {
+		return &InvalidConfigError{
+			Field: "pids-limit",
+			Value: fmt.Sprintf("%d", rv.res.PidsLimit),
+			Err:   errors.New("pids limit cannot be less than -1"),
+		}
+	}
+
+	// cpu-shares
+	if rv.res.CPUShares < 0 {
+		return &InvalidConfigError{
+			Field: "cpu-shares",
+			Value: fmt.Sprintf("%d", rv.res.CPUShares),
+			Err:   errors.New("cpu shares cannot be negative"),
+		}
+	}
+
+	// restart
+	restartValidator := func(v string) error {
+		if v == "" {
+			return nil
+		}
+		parts := strings.Split(v, ":")
+		policy := parts[0]
+		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
+			return fmt.Errorf("unsupported restart policy: %q", v)
+		}
+		if policy != "on-failure" {
+			if len(parts) > 1 {
+				return fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, v)
+			}
+		} else {
+			if len(parts) > 2 {
+				return fmt.Errorf("restart policy on-failure supports at most one retry suffix: %q", v)
+			}
+			if len(parts) == 2 {
+				suffix := parts[1]
+				if suffix == "" {
+					return fmt.Errorf("restart policy on-failure has empty retry suffix: %q", v)
+				}
+				val, err := strconv.Atoi(suffix)
+				if err != nil || val < 0 {
+					return fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", v)
+				}
+			}
+		}
+		if policy != "no" && rv.res.Remove {
+			return fmt.Errorf("the --restart policy cannot be used when --remove is enabled")
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Restart, "restart", restartValidator); err != nil {
+		return err
+	}
+
+	// gpus characters check
+	if rv.res.GPUs != "" {
+		if err := validatePathChars(rv.res.GPUs); err != nil {
+			return fmt.Errorf("security validation failed: %w", err)
+		}
+	}
+
+	// shm-size
+	shmValidator := func(v string) error {
+		if v == "" {
+			return nil
+		}
+		if err := validatePathChars(v); err != nil {
+			return fmt.Errorf("security validation failed: %w", err)
+		}
+		bytes, err := units.RAMInBytes(v)
+		if err != nil {
+			return fmt.Errorf("invalid shm-size %q: %w", v, err)
+		}
+		if bytes < 0 {
+			return fmt.Errorf("shm-size cannot be negative: %d", bytes)
+		}
+		return nil
+	}
+	if err := validateField(rv.res.ShmSize, "shm-size", shmValidator); err != nil {
 		return err
 	}
 
@@ -380,6 +505,15 @@ func (rv *resolver) validateSlices() error {
 		return err
 	}
 	if err := validateSliceElements(rv.res.GroupAdd, "group-add", ValidateGroupAdd); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.DNSSearch, "dns-search", ValidateHostname); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.DNSOptions, "dns-option", nil); err != nil {
+		return err
+	}
+	if err := validateSliceElements(rv.res.SecurityOpt, "security-opt", nil); err != nil {
 		return err
 	}
 

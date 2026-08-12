@@ -10,10 +10,18 @@ type CLIOptions struct {
 	CderunCapAdd          []string
 	CapDrop               []string
 	CderunCapDrop         []string
+	Cgroupns              *string
+	CderunCgroupns        *string
 	Config                *string
 	CderunConfig          *string
+	CPUShares             *int
+	CderunCPUShares       *int
 	CPUs                  *float64
 	CderunCPUs            *float64
+	CpusetCpus            *string
+	CderunCpusetCpus      *string
+	CpusetMems            *string
+	CderunCpusetMems      *string
 	Devices               []string
 	CderunDevices         []string
 	Diagnosis             *bool
@@ -22,6 +30,10 @@ type CLIOptions struct {
 	CderunDiagnosisFormat *string
 	DNS                   []string
 	CderunDNS             []string
+	DNSOptions            []string
+	CderunDNSOptions      []string
+	DNSSearch             []string
+	CderunDNSSearch       []string
 	DryRun                *bool
 	CderunDryRun          *bool
 	DryRunFormat          *string
@@ -32,6 +44,8 @@ type CLIOptions struct {
 	CderunEnv             []string
 	Expose                []string
 	CderunExpose          []string
+	GPUs                  *string
+	CderunGPUs            *string
 	GroupAdd              []string
 	CderunGroupAdd        []string
 	HangTimeout           *string
@@ -44,6 +58,8 @@ type CLIOptions struct {
 	CderunInit            *bool
 	Interactive           *bool
 	CderunInteractive     *bool
+	IPC                   *string
+	CderunIPC             *string
 	LogFormat             *string
 	CderunLogFormat       *string
 	LogLevel              *string
@@ -70,6 +86,8 @@ type CLIOptions struct {
 	CderunNetwork         *string
 	Pid                   *string
 	CderunPid             *string
+	PidsLimit             *int
+	CderunPidsLimit       *int
 	Privileged            *bool
 	CderunPrivileged      *bool
 	Ports                 []string
@@ -86,10 +104,16 @@ type CLIOptions struct {
 	CderunReadOnly        *bool
 	Remove                *bool
 	CderunRemove          *bool
+	Restart               *string
+	CderunRestart         *string
 	Runtime               *string
 	CderunRuntime         *string
+	SecurityOpt           []string
+	CderunSecurityOpt     []string
 	SensitiveEnv          []string
 	CderunSensitiveEnv    []string
+	ShmSize               *string
+	CderunShmSize         *string
 	SocketPath            *string
 	CderunSocketPath      *string
 	StrictEnv             *bool

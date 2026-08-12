@@ -54,6 +54,7 @@ type ResolvedConfig struct {
 	AddHosts        []string
 	Privileged      bool
 	Pid             string
+	ShmSize         string
 	CapAdd          []string
 	CapDrop         []string
 	Entrypoint      []string
@@ -67,6 +68,17 @@ type ResolvedConfig struct {
 	GroupAdd        []string
 	Ulimits         []container.Ulimit
 	Sysctls         map[string]string
+	IPC             string
+	SecurityOpt     []string
+	DNSSearch       []string
+	DNSOptions      []string
+	GPUs            string
+	Cgroupns        string
+	PidsLimit       int
+	CPUShares       int
+	CpusetCpus      string
+	CpusetMems      string
+	Restart         string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.
@@ -456,6 +468,29 @@ func (rv *resolver) resolveStandardOptions() error {
 		}
 	}
 
+	if err := rv.resolveAndValidateImage(); err != nil {
+		return err
+	}
+
+	// Remaining Boolean options
+	for _, opt := range BoolOptions {
+		// Skip early options already resolved in resolveEarly
+		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
+			continue
+		}
+		// Skip transitive options handled in resolveTransitiveOptions
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+			continue
+		}
+
+		if err := rv.applyBoolOption(opt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) resolveAndValidateImage() error {
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
 		return &ImageNotFoundError{Tool: rv.subcommand}
 	}
@@ -508,22 +543,6 @@ func (rv *resolver) resolveStandardOptions() error {
 
 		if logging.DebugEnabled() {
 			logging.Debug("Resolved Image: %s", rv.res.Image)
-		}
-	}
-
-	// Remaining Boolean options
-	for _, opt := range BoolOptions {
-		// Skip early options already resolved in resolveEarly
-		if opt.Name == "diagnosis" || opt.Name == "strict-env" {
-			continue
-		}
-		// Skip transitive options handled in resolveTransitiveOptions
-		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
-			continue
-		}
-
-		if err := rv.applyBoolOption(opt); err != nil {
-			return err
 		}
 	}
 	return nil

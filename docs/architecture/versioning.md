@@ -1,59 +1,72 @@
-# バージョン情報の管理
+# Version Management
 
-`cderun` では、Git の情報に基づいた動的なバージョン管理を行っています。
+`cderun` performs dynamic version management based on Git information.
 
-## 概要
+---
 
-以前は `internal/command/version.go` にバージョン番号をハードコードしていましたが、現在はビルド時に `ldflags` を使用して情報を注入する方式に移行しました。
-これにより、Git タグ、コミット SHA、およびビルド日時が自動的にバイナリに組み込まれます。
+## Overview
 
-## 実装の詳細
+Previously, the version number was hardcoded in `internal/command/version.go`, but it has now migrated to a system that injects information using `ldflags` at build time.
+This automatically embeds the Git tag, commit SHA, and build date and time into the binary.
 
-### 1. バージョン情報の保持 (`internal/version`)
+---
 
-`internal/version` パッケージが、以下の変数を保持しています。
+## Implementation Details
 
-- `Version`: Git タグ（または `dev`）
-- `Revision`: 短縮 Git コミット SHA
-- `BuildDate`: ISO8601 形式のビルド日時
+### 1. Retention of Version Info (`internal/version`)
 
-これらの変数は、`go build` 時に `-ldflags` オプションを通じて上書きされます。
+The `internal/version` package maintains the following variables:
 
-### 2. ローカルビルド (`Makefile`)
+- `Version`: Dynamically retrieved from `git describe --tags --always --dirty` at build time. This value may contain a tag or commit identifier, along with an optional `-dirty` suffix if there are uncommitted local changes. The value `"dev"` is utilized strictly as a fallback when the command fails or Git is unavailable.
+- `Revision`: Short Git commit SHA.
+- `BuildDate`: ISO8601 formatted build date and time.
 
-開発環境で `make build` を実行すると、以下のコマンドが内部で実行され、Git から取得した最新情報が注入されます。
+These variables are overwritten via the `-ldflags` option during `go build`.
 
-```bash
-make build
-```
+### 2. Local Build (`Makefile`)
 
-`Makefile` 内では以下のように情報を取得しています。
-
-- `VERSION`: `git describe --tags --always --dirty`
-- `REVISION`: `git rev-parse --short HEAD`
-- `BUILD_DATE`: `date -u +%Y-%m-%dT%H:%M:%SZ`
-
-### 3. リリースビルド (`GoReleaser`)
-
-正式なリリースバイナリは `GoReleaser` によって作成されます。`.goreleaser.yaml` の `ldflags` セクションにて、GoReleaser が提供する変数を `internal/version` の各変数にマッピングしています。
-
-## 利用方法
-
-### バイナリのバージョン確認
-
-`--version` フラグを使用することで、詳細なバージョン情報を確認できます。
+Running `make build` in the development environment internally executes `go build` with `-ldflags` to inject the latest metadata. A sample of this command (using Makefile-expanded placeholder values) is shown below:
 
 ```bash
-$ ./cderun --version
-cderun version 0.0.2 (rev: abc1234, built at: 2026-03-02T12:34:56Z, linux/amd64)
+go build -ldflags "-X cderun/internal/version.Version=v1.0.0 -X cderun/internal/version.Revision=abcdef -X cderun/internal/version.BuildDate=2026-06-04T12:00:00Z" -o cderun main.go
 ```
 
-### 開発時の挙動 (`go run`)
+Within the `Makefile`, metadata is retrieved dynamically as follows:
 
-`ldflags` を指定せずに `go run main.go` 等で実行した場合、以下のフォールバック値が使用されます。
+```makefile
+VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+REVISION   ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+```
+
+### 3. Release Build (`GoReleaser`)
+
+Official release binaries are created by `GoReleaser`. In the `ldflags` section of `.goreleaser.yaml`, variables provided by GoReleaser are mapped to the respective variables in `internal/version`.
+
+---
+
+## Usage
+
+### Check Binary Version
+
+Using the `--version` flag, you can view detailed version information:
+
+```bash
+cderun --version
+```
+
+Output Example (matching `version.Info()`):
+
+```text
+cderun version v1.0.0 (rev: abcdef, built at: 2026-06-04T12:00:00Z, linux/amd64)
+```
+
+### Local Development Behavior (`go run`)
+
+When executing via `go run main.go` or similar without specifying `ldflags`, the following fallback values are used:
 
 - `Version`: `dev`
 - `Revision`: `unknown`
 - `BuildDate`: `unknown`
 
-これにより、そのバイナリが正式なビルド手順を経ていないことを識別できます。
+This allows identifying that the binary has not gone through the official build procedure.
