@@ -139,7 +139,7 @@ func pickConfigs[T any](
 	if envKey != "" {
 		if env, ok := fs.LookupEnv(envKey); ok {
 			var res []T
-			if envSep != "" && !strings.Contains(env, envSep) {
+			if envSep == "" || !strings.Contains(env, envSep) {
 				s := strings.TrimSpace(env)
 				if s != "" {
 					var v T
@@ -157,6 +157,8 @@ func pickConfigs[T any](
 						}
 					}
 					res = []T{v}
+				} else {
+					res = []T{}
 				}
 			} else {
 				for s := range strings.SplitSeq(env, envSep) {

@@ -152,7 +152,7 @@ func getWinningStringSlice(
 	}
 	if def.EnvKey != "" {
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
-			if envSep != "" && !strings.Contains(env, envSep) {
+			if envSep == "" || !strings.Contains(env, envSep) {
 				v := strings.TrimSpace(env)
 				if v == "" {
 					return []string{}
@@ -172,7 +172,9 @@ func getWinningStringSlice(
 	}
 	if def.ToolGetter != nil && tools != nil {
 		if tool, ok := tools[subcommand]; ok {
-			return def.ToolGetter(tool)
+			if v := def.ToolGetter(tool); v != nil {
+				return v
+			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
