@@ -231,7 +231,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
-- `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Note: containerd does not support restart policies.
+- `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Configuring any non-`no` restart policy requires setting `--remove=false` due to default removal behavior and resolver constraints. Note: containerd does not support restart policies.
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
 
 #### Network & Ports
@@ -255,8 +255,8 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--cpuset-mems`: Memory nodes (MEMs) in which to allow execution (e.g., `0-3`, `0,1`). Only effective on NUMA systems.
 - `--device`: Add a host device to the container.
 - `--gpus`: GPU devices to request (e.g., `all`, `count=2`, `device=0,1`). Note: containerd does not support GPU requests.
-- `--ipc`: Configure the IPC namespace mode (e.g., `host` or `private`). Note: containerd only supports `host` or `private`.
-- `--cgroupns`: Configure the cgroup namespace mode (e.g., `host` or `private`). Note: containerd only supports `host` or `private`.
+- `--ipc`: Configure the IPC namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
+- `--cgroupns`: Configure the cgroup namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)

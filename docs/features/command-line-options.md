@@ -274,9 +274,9 @@ cderun --remove=false node app.js
 - **Environment Variable**: `CDERUN_RESTART`
 - **Description**: Configure the container's restart policy when the container exits.
 - **Details**:
-  - **Docker**: Maps directly to `HostConfig.RestartPolicy`. Supported formats are `<policy>` or `<policy>:<max-retries>` (e.g., `on-failure:5`). Policies include `no`, `always`, `unless-stopped`, and `on-failure`.
-  - **containerd**: Not supported. Since containerd does not provide automatic daemon-level process/container restart management, any non-`"no"` or non-empty restart policies are explicitly rejected with a validation error (`"containerd runtime: restart is not supported yet"`).
-  - **Mutual Exclusion**: In `cderun`, the default behavior is `--remove=true`. `--remove=true` and `--restart` are mutually exclusive. Under Docker adapter, specifying both or an invalid policy name/retry count format triggers validation errors.
+  - **Docker**: Maps directly to `HostConfig.RestartPolicy`. Supported policies include `no`, `always`, `unless-stopped`, and `on-failure`. A retry count suffix (e.g., `:5` in `on-failure:5`) is valid **only** with the `on-failure` policy.
+  - **containerd**: Not supported. Since containerd does not provide automatic daemon-level process/container restart management, any non-`"no"` or non-empty restart policies are explicitly rejected with a validation error containing `"restart policy is not supported yet"`.
+  - **Mutual Exclusion**: The default removal behavior is `--remove=true`. `--remove=true` conflicts only with restart policies other than empty or `"no"`. To use active restart policies (like `always` or `on-failure`), you must explicitly configure `--remove=false`.
 - **P1 Internal Override**: `--cderun-restart` is the corresponding Phase 1 (P1) internal override flag. It accepts a string policy and must be placed after the subcommand in Wrapper Mode.
 
 ```bash
@@ -451,7 +451,7 @@ cderun --init alpine ps aux
 ### `--ipc`
 
 - **Type**: string
-- **Default**: `""` (private PID/IPC namespace or runtime default)
+- **Default**: `""` (private IPC namespace or runtime default)
 - **Environment Variable**: `CDERUN_IPC`
 - **Description**: Configure the IPC namespace for the container.
 - **Details**:
