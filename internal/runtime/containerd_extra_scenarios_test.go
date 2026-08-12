@@ -20,6 +20,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockImage struct {
@@ -36,7 +37,6 @@ type mockContainer struct {
 	id     string
 	task   client.Task
 	spec   *specs.Spec
-	image  client.Image
 	delErr error
 }
 
@@ -174,7 +174,7 @@ func TestUnit_Containerd_PullImage_Mock(t *testing.T) {
 	t.Run("PullImage - Policy never returns immediately", func(t *testing.T) {
 		rt := &ContainerdRuntime{}
 		err := rt.PullImage(context.Background(), "ubuntu", "never", 3, 1*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("PullImage - Pulls when missing and not found locally", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestUnit_Containerd_PullImage_Mock(t *testing.T) {
 
 		rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 		err := rt.PullImage(context.Background(), "ubuntu", "missing", 3, 1*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, pullCalled)
 	})
 
@@ -215,7 +215,7 @@ func TestUnit_Containerd_PullImage_Mock(t *testing.T) {
 
 		rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 		err := rt.PullImage(context.Background(), "ubuntu", "missing", 3, 1*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, pullCalled)
 	})
 
@@ -237,7 +237,7 @@ func TestUnit_Containerd_PullImage_Mock(t *testing.T) {
 			sleepFunc: func(ctx context.Context, d time.Duration) error { return nil },
 		}
 		err := rt.PullImage(context.Background(), "ubuntu", "always", 3, 1*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 3, attempts)
 	})
 
@@ -256,7 +256,7 @@ func TestUnit_Containerd_PullImage_Mock(t *testing.T) {
 			sleepFunc: func(ctx context.Context, d time.Duration) error { return nil },
 		}
 		err := rt.PullImage(context.Background(), "ubuntu", "always", 3, 1*time.Millisecond)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "some fatal error")
 		assert.Equal(t, 1, attempts)
 	})
@@ -313,7 +313,7 @@ func TestUnit_Containerd_CreateContainer_Mock(t *testing.T) {
 		}
 
 		id, err := rt.CreateContainer(context.Background(), config)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, id)
 		assert.True(t, containerCreated)
 	})
@@ -338,7 +338,7 @@ func TestUnit_Containerd_StartContainer_Mock(t *testing.T) {
 		}
 
 		err := rt.StartContainer(context.Background(), "c1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("StartContainer - Fallback to NullIO warning", func(t *testing.T) {
@@ -357,7 +357,7 @@ func TestUnit_Containerd_StartContainer_Mock(t *testing.T) {
 		}
 
 		err := rt.StartContainer(context.Background(), "c2")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -374,7 +374,7 @@ func TestUnit_Containerd_WaitContainer_Mock(t *testing.T) {
 
 	rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 	code, err := rt.WaitContainer(context.Background(), "c1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 42, code)
 }
 
@@ -392,13 +392,19 @@ func TestUnit_Containerd_RemoveContainer_Mock(t *testing.T) {
 
 		rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 		err := rt.RemoveContainer(context.Background(), "c1")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("RemoveContainer - uninitialized client error", func(t *testing.T) {
-		rt := &ContainerdRuntime{client: nil}
+		var typedNil *mockContainerdClient
+		rt := &ContainerdRuntime{client: typedNil}
+
 		err := rt.RemoveContainer(context.Background(), "c1")
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "client is not initialized")
+
+		err = rt.AttachContainer(context.Background(), "c1", false, nil, nil, nil, nil)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "client is not initialized")
 	})
 }
@@ -416,7 +422,7 @@ func TestUnit_Containerd_SignalContainer_Mock(t *testing.T) {
 
 	rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 	err := rt.SignalContainer(context.Background(), "c1", "TERM")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestUnit_Containerd_ResizeContainerTTY_Mock(t *testing.T) {
@@ -432,7 +438,7 @@ func TestUnit_Containerd_ResizeContainerTTY_Mock(t *testing.T) {
 
 	rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 	err := rt.ResizeContainerTTY(context.Background(), "c1", 24, 80)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestUnit_Containerd_InspectContainer_Mock(t *testing.T) {
@@ -454,7 +460,7 @@ func TestUnit_Containerd_InspectContainer_Mock(t *testing.T) {
 
 	rt := &ContainerdRuntime{client: mClient, logger: logging.GetGlobalLogger()}
 	running, code, err := rt.InspectContainer(context.Background(), "c1")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, running)
 	assert.Equal(t, 0, code)
 }
