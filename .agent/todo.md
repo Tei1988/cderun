@@ -68,7 +68,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | DONE |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | DONE |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | DONE |
-| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
+| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | DONE |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | DONE |
@@ -834,29 +834,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T62: containerd: `ioWait` 削除の競合と attach 順序契約の明文化
-
-- 種別: 改善（保守性・潜在競合）
-- 優先度: 低
-- 対象: `internal/runtime/containerd.go:339-341`（`RemoveContainer` の `ioWait` 削除）、`containerd.go:278-284, 403-407, 448-453`、`internal/runtime/interface.go:23`
-
-### 問題
-
-1. `RemoveContainer` が `r.ioWait[containerID]` を削除するが、このエントリは `AttachContainer` が登録・削除の所有権を持つ。attach が `waitC` でブロック中に Remove が走ると `notifyWait` が no-op になり ctx キャンセルでしか抜けられない。現在の呼び出し順（defer LIFO）では顕在化しないが、T22 の prune が任意 ID に `RemoveContainer` を呼ぶと踏む
-2. containerd の `AttachContainer` は `StartContainer` より先に呼ばれないと `cio.NullIO` にフォールバックして全 IO が黙って捨てられるが、この順序前提が `ContainerRuntime` インターフェースに文書化されていない（Docker は順序不問）
-
-### 方針
-
-- `containerd.go:339-341` の削除処理を除去する（ioMap/ioWait の所有権は Attach/Start 側に置く）
-- `interface.go` の `AttachContainer` に順序契約をコメントで明記し、containerd の `StartContainer` が `NullIO` フォールバックする際は warn ログを出す
-
-### 完了条件
-
-- attach 中に Remove しても notify が失われないテスト
-- インターフェースコメントと warn ログの追加
-
----
-
 ## T69: registry 駆動の優先順位マトリクステスト生成（L1）
 
 - 種別: テスト基盤
@@ -1090,7 +1067,6 @@ gRPCソケット経由での実デーモンへの依存を断ち切り、contain
 - [ ] `ContainerdRuntime` をリファクタリングし、上記インターフェースを介した呼び出しに置き換える。
 - [ ] テスト用モック（例: `containerd_mock_test.go`）を新設して、正常系・異常系、特に spec 調整などの詳細ロジックをテストし、containerd パッケージのカバレッジを90%以上に引き上げる。
 
----
 ---
 
 ## T86: ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加
