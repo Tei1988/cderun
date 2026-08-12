@@ -146,26 +146,49 @@ func pickConfigs[T any](
 	if envKey != "" {
 		if env, ok := fs.LookupEnv(envKey); ok {
 			var res []T
-			for s := range strings.SplitSeq(env, envSep) {
-				s = strings.TrimSpace(s)
-				if s == "" {
-					continue
-				}
-				var v T
-				if parser == nil {
-					if sv, ok := any(s).(T); ok {
-						v = sv
+			if envSep == "" || !strings.Contains(env, envSep) {
+				s := strings.TrimSpace(env)
+				if s != "" {
+					var v T
+					if parser == nil {
+						if sv, ok := any(s).(T); ok {
+							v = sv
+						} else {
+							return nil, errors.New("parser required for non-string types")
+						}
 					} else {
-						return nil, errors.New("parser required for non-string types")
+						var err error
+						v, err = parser(s, "env")
+						if err != nil {
+							return nil, err
+						}
 					}
+					res = []T{v}
 				} else {
-					var err error
-					v, err = parser(s, "env")
-					if err != nil {
-						return nil, err
-					}
+					res = []T{}
 				}
-				res = append(res, v)
+			} else {
+				for s := range strings.SplitSeq(env, envSep) {
+					s = strings.TrimSpace(s)
+					if s == "" {
+						continue
+					}
+					var v T
+					if parser == nil {
+						if sv, ok := any(s).(T); ok {
+							v = sv
+						} else {
+							return nil, errors.New("parser required for non-string types")
+						}
+					} else {
+						var err error
+						v, err = parser(s, "env")
+						if err != nil {
+							return nil, err
+						}
+					}
+					res = append(res, v)
+				}
 			}
 			return res, nil
 		}
