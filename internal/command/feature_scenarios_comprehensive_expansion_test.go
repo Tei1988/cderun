@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -133,13 +134,19 @@ func TestUnit_Command_SIGHUP_Forwarding_And_Teardown(t *testing.T) {
 
 	waitChan := make(chan int)
 	receivedChan := make(chan struct{})
+	startedChan := make(chan struct{})
 	mock := &sighupSignalCapturingRuntime{
 		waitChan:     waitChan,
 		receivedChan: receivedChan,
+		startedChan:  startedChan,
 	}
 	mock.CreatedContainerID = "sighup-forwarding-test"
 
 	var capturedSigChan chan os.Signal
+	var sigChanMu sync.Mutex
+
+	var stopSignalCount int
+	var stopSignalMu sync.Mutex
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -154,9 +161,15 @@ func TestUnit_Command_SIGHUP_Forwarding_And_Teardown(t *testing.T) {
 			o.exitFunc = func(code int) {}
 			o.isTerminal = func(fd int) bool { return false }
 			o.setupSignals = func(sigChan chan os.Signal) {
+				sigChanMu.Lock()
 				capturedSigChan = sigChan
+				sigChanMu.Unlock()
 			}
-			o.stopSignalHandling = func(sigChan chan os.Signal) {}
+			o.stopSignalHandling = func(sigChan chan os.Signal) {
+				stopSignalMu.Lock()
+				stopSignalCount++
+				stopSignalMu.Unlock()
+			}
 			cmd.SetOut(io.Discard)
 			cmd.SetErr(io.Discard)
 		})
@@ -165,13 +178,24 @@ func TestUnit_Command_SIGHUP_Forwarding_And_Teardown(t *testing.T) {
 
 	// Wait for signal handler to capture channel.
 	require.Eventually(t, func() bool {
+		sigChanMu.Lock()
+		defer sigChanMu.Unlock()
 		return capturedSigChan != nil
 	}, 2*time.Second, 10*time.Millisecond)
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for deterministic container startup barrier
+	select {
+	case <-startedChan:
+		// State confirmed
+	case <-time.After(2 * time.Second):
+		t.Fatal("StartContainer was not executed in time")
+	}
 
-	// Send SIGHUP
-	capturedSigChan <- syscall.SIGHUP
+	// Send SIGHUP directly once the barrier is satisfied
+	sigChanMu.Lock()
+	localSigChan := capturedSigChan
+	sigChanMu.Unlock()
+	localSigChan <- syscall.SIGHUP
 
 	// Wait for the mock's SignalContainer call to be entered
 	select {
@@ -184,7 +208,7 @@ func TestUnit_Command_SIGHUP_Forwarding_And_Teardown(t *testing.T) {
 	// Verify SIGHUP is recorded in the mock runtime
 	assert.Contains(t, mock.getSignals(), "SIGHUP")
 
-	// Release blocked call
+	// Release blocked call to trigger teardown
 	cancel()
 
 	select {
@@ -194,6 +218,12 @@ func TestUnit_Command_SIGHUP_Forwarding_And_Teardown(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("teardown failed after context cancellation")
 	}
+
+	// Assert that teardown invoked the stopSignalHandling callback
+	stopSignalMu.Lock()
+	count := stopSignalCount
+	stopSignalMu.Unlock()
+	assert.Equal(t, 1, count, "stopSignalHandling should be called exactly once during teardown")
 }
 
 // sighupSignalCapturingRuntime is a mock runtime that records SIGHUP signals.
@@ -201,12 +231,30 @@ type sighupSignalCapturingRuntime struct {
 	runtime.MockRuntime
 	waitChan         chan int
 	receivedChan     chan struct{}
+	startedChan      chan struct{}
+	startOnce        sync.Once
+	receivedOnce     sync.Once
 	forwardedSignals []string
+	mu               sync.Mutex
+}
+
+func (m *sighupSignalCapturingRuntime) StartContainer(ctx context.Context, id string) error {
+	if m.startedChan != nil {
+		m.startOnce.Do(func() {
+			close(m.startedChan)
+		})
+	}
+	return m.MockRuntime.StartContainer(ctx, id)
 }
 
 func (m *sighupSignalCapturingRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
 	m.forwardedSignals = append(m.forwardedSignals, sig)
-	close(m.receivedChan)
+	m.mu.Unlock()
+
+	m.receivedOnce.Do(func() {
+		close(m.receivedChan)
+	})
 	return nil
 }
 
@@ -220,5 +268,9 @@ func (m *sighupSignalCapturingRuntime) WaitContainer(ctx context.Context, contai
 }
 
 func (m *sighupSignalCapturingRuntime) getSignals() []string {
-	return m.forwardedSignals
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sigs := make([]string, len(m.forwardedSignals))
+	copy(sigs, m.forwardedSignals)
+	return sigs
 }
