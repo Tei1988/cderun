@@ -1183,3 +1183,59 @@ func isNamedVolume(s string) bool {
 	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
 }
+
+// ValidateDNSOption ensures the DNS option format is safe and valid.
+// Allowed characters are restricted to [a-zA-Z0-9.:_-] to prevent control characters or injection.
+func ValidateDNSOption(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == ':' || c == '_' || c == '-') {
+			return fmt.Errorf("invalid characters in DNS option: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateSecurityOpt restricts characters in security options to a safe alphanumeric and separator set.
+func ValidateSecurityOpt(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '=' || c == ':' || c == '/' || c == '-' || c == '_' || c == '.' || c == '\\') {
+			return fmt.Errorf("invalid characters in security option: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateSysctlKey ensures the sysctl key contains only safe, standard characters.
+func ValidateSysctlKey(s string) error {
+	if s == "" {
+		return fmt.Errorf("sysctl key cannot be empty")
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-') {
+			return fmt.Errorf("invalid characters in sysctl key: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateSysctlValue restricts the sysctl value to standard safe characters, spaces, and separators.
+func ValidateSysctlValue(s string) error {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == ' ' || c == '.' || c == '_' || c == '-' || c == ',') {
+			return fmt.Errorf("invalid characters in sysctl value: %q", s)
+		}
+	}
+	return nil
+}

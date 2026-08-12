@@ -217,3 +217,173 @@ func TestSecurityEnhancement_ValidateSecurity_ManualSocketBindWarning(t *testing
 		assert.Contains(t, logOutput, "Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged.")
 	})
 }
+
+func TestSecurityEnhancement_DNSOption_Validation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		opt     string
+		wanterr bool
+	}{
+		{"ndots:5", false},
+		{"timeout:2", false},
+		{"attempts:3", false},
+		{"rotate", false},
+		{"single-request-reopen", false},
+		{"ndots:5 ", true},
+		{"timeout:2; rm -rf", true},
+		{"ndots:5\n", true},
+		{"attempts:3\t", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.opt, func(t *testing.T) {
+			err := ValidateDNSOption(tt.opt)
+			if tt.wanterr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSecurityEnhancement_SecurityOpt_Validation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		opt     string
+		wanterr bool
+	}{
+		{"no-new-privileges", false},
+		{"seccomp=unconfined", false},
+		{"apparmor=unconfined", false},
+		{"label:disable", false},
+		{"no-new-privileges; rm -rf", true},
+		{"seccomp=unconfined ", true},
+		{"seccomp=unconfined\n", true},
+		{"label:disable\t", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.opt, func(t *testing.T) {
+			err := ValidateSecurityOpt(tt.opt)
+			if tt.wanterr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSecurityEnhancement_Sysctl_KeyAndValue_Validation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ValidateSysctlKey", func(t *testing.T) {
+		tests := []struct {
+			key     string
+			wanterr bool
+		}{
+			{"net.ipv4.ip_forward", false},
+			{"kernel.shmmax", false},
+			{"net.ipv4.ip_forward ", true},
+			{"net.ipv4.ip_forward; rm", true},
+			{"net.ipv4.ip_forward\n", true},
+			{"", true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.key, func(t *testing.T) {
+				err := ValidateSysctlKey(tt.key)
+				if tt.wanterr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
+	t.Run("ValidateSysctlValue", func(t *testing.T) {
+		tests := []struct {
+			val     string
+			wanterr bool
+		}{
+			{"1", false},
+			{"65536 65536", false},
+			{"1,2,3", false},
+			{"1; rm -rf", true},
+			{"1\n", true},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.val, func(t *testing.T) {
+				err := ValidateSysctlValue(tt.val)
+				if tt.wanterr {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+}
+
+func TestSecurityEnhancement_HighlySensitiveDevices_And_MountPaths(t *testing.T) {
+	fs := &MockFileSystem{}
+
+	t.Run("New highly sensitive devices are correctly classified", func(t *testing.T) {
+		assert.True(t, isHighlySensitiveDevice("/dev/vda"))
+		assert.True(t, isHighlySensitiveDevice("/dev/vdb1"))
+		assert.True(t, isHighlySensitiveDevice("/dev/dm-0"))
+		assert.True(t, isHighlySensitiveDevice("/dev/msr"))
+		assert.True(t, isHighlySensitiveDevice("/dev/cpu/0/msr"))
+		assert.False(t, isHighlySensitiveDevice("/dev/null"))
+		assert.False(t, isHighlySensitiveDevice("/dev/zero"))
+	})
+
+	t.Run("/run and /var/run emit security warnings", func(t *testing.T) {
+		origLevel := logging.GetGlobalLogger().GetLevel()
+		defer logging.GetGlobalLogger().SetLevel(origLevel)
+		origWriter := logging.GetGlobalLogger().GetWriter()
+		defer logging.GetGlobalLogger().SetOutput(origWriter)
+
+		var buf bytes.Buffer
+		logging.GetGlobalLogger().SetLevel(logging.WarnLevel)
+		logging.GetGlobalLogger().SetOutput(&buf)
+
+		cli := &CLIOptions{}
+		resolved := &ResolvedConfig{
+			Image:   "alpine",
+			Runtime: "docker",
+			Mounts: []container.Mount{
+				{
+					Type:     "bind",
+					Source:   "/var/run/custom",
+					Target:   "/run/custom",
+					ReadOnly: false,
+				},
+				{
+					Type:     "bind",
+					Source:   "/run/foo",
+					Target:   "/run/foo",
+					ReadOnly: false,
+				},
+			},
+		}
+
+		rv := &resolver{
+			cli: cli,
+			res: resolved,
+			fs:  fs,
+		}
+
+		err := rv.validateSecurity()
+		require.NoError(t, err)
+
+		logOutput := buf.String()
+		assert.Contains(t, logOutput, "Mounting highly sensitive host path \"/var/run/custom\" into the container reduces host security isolation")
+		assert.Contains(t, logOutput, "Mounting highly sensitive host path \"/run/foo\" into the container reduces host security isolation")
+	})
+}
