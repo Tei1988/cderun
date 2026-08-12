@@ -21,7 +21,7 @@ func TestUnit_Docker_toDockerContainerConfig_ShmSize(t *testing.T) {
 	assert.Equal(t, int64(268435456), hostConfig.ShmSize)
 }
 
-func TestUnit_Containerd_CreateContainer_ShmSize(t *testing.T) {
+func TestUnit_Containerd_ShmSize(t *testing.T) {
 	// Verify that the config validation works as expected
 	cfg := &container.ContainerConfig{
 		ShmSize: "512m",
