@@ -103,6 +103,14 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 			}
 		}
 
+		if key != strings.TrimSpace(key) {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("security validation failed for sysctl key: leading or trailing whitespace detected"),
+			}
+		}
+
 		if err := validatePathChars(key); err != nil {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
@@ -119,6 +127,21 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		}
 
 		k := strings.TrimSpace(key)
+		if err := ValidateSysctlKey(k); err != nil {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("security validation failed for sysctl key (null byte injection or invalid control characters): %w", err),
+			}
+		}
+		if err := ValidateSysctlValue(val); err != nil {
+			return nil, &InvalidConfigError{
+				Field: "sysctl",
+				Value: raw,
+				Err:   fmt.Errorf("security validation failed for sysctl value (null byte injection or invalid control characters): %w", err),
+			}
+		}
+
 		res[k] = val
 	}
 	return res, nil
