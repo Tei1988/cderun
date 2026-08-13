@@ -68,7 +68,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | DONE |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | DONE |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | DONE |
-| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
+| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | DONE |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | DONE |
@@ -834,29 +834,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T62: containerd: `ioWait` 削除の競合と attach 順序契約の明文化
-
-- 種別: 改善（保守性・潜在競合）
-- 優先度: 低
-- 対象: `internal/runtime/containerd.go:339-341`（`RemoveContainer` の `ioWait` 削除）、`containerd.go:278-284, 403-407, 448-453`、`internal/runtime/interface.go:23`
-
-### 問題
-
-1. `RemoveContainer` が `r.ioWait[containerID]` を削除するが、このエントリは `AttachContainer` が登録・削除の所有権を持つ。attach が `waitC` でブロック中に Remove が走ると `notifyWait` が no-op になり ctx キャンセルでしか抜けられない。現在の呼び出し順（defer LIFO）では顕在化しないが、T22 の prune が任意 ID に `RemoveContainer` を呼ぶと踏む
-2. containerd の `AttachContainer` は `StartContainer` より先に呼ばれないと `cio.NullIO` にフォールバックして全 IO が黙って捨てられるが、この順序前提が `ContainerRuntime` インターフェースに文書化されていない（Docker は順序不問）
-
-### 方針
-
-- `containerd.go:339-341` の削除処理を除去する（ioMap/ioWait の所有権は Attach/Start 側に置く）
-- `interface.go` の `AttachContainer` に順序契約をコメントで明記し、containerd の `StartContainer` が `NullIO` フォールバックする際は warn ログを出す
-
-### 完了条件
-
-- attach 中に Remove しても notify が失われないテスト
-- インターフェースコメントと warn ログの追加
-
----
-
 ## T69: registry 駆動の優先順位マトリクステスト生成（L1）
 
 - 種別: テスト基盤
@@ -1071,40 +1048,3 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
-
----
-
-## T84: containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上
-
-- 種別: 改善
-- 優先度: 中
-- 仕様変更: なし
-
-### 目的
-
-gRPCソケット経由での実デーモンへの依存を断ち切り、containerdのアダプタ内のすべてのロジック（OCI spec の調整、tmpfs マウント構築、Capabilities 変換、Ulimits posix rlimits 変換、shm-size tmpfs mount書き換えなど）をゼロ・デーモン環境でテスト可能にする。
-
-### 完了条件
-
-- [ ] `internal/runtime/containerd.go` 内にクライアント操作やコンテナ操作を抽象化するプライベートインターフェース（例: `containerdClient`, `containerdContainer`, `containerdTask` など）を導入する。
-- [ ] `ContainerdRuntime` をリファクタリングし、上記インターフェースを介した呼び出しに置き換える。
-- [ ] テスト用モック（例: `containerd_mock_test.go`）を新設して、正常系・異常系、特に spec 調整などの詳細ロジックをテストし、containerd パッケージのカバレッジを90%以上に引き上げる。
-
----
----
-
-## T86: ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加
-
-- 種別: テスト
-- 優先度: 低
-- 仕様変更: なし
-
-### 目的
-
-複数のマージ、式解決、マスキング（globとプレースホルダー）、フラグホイストなどのルールが高度に絡まり合った「複合シナリオ」を定義し、設定解決エンジンの回帰バグを完全にガードする。
-
-### 完了条件
-
-- [ ] `testdata/dryrun/` 配下に「複合設定解決（例: `scenario_i_complex_resolution`）」などの新シナリオフォルダを追加する。
-- [ ] テスト用引数、環境変数、ツール設定ファイルを適切に準備し、複雑な優先順位・マージ・式解決が期待通りのJSON出力に落とし込まれることをアサートする。
-- [ ] 完了条件のシナリオにおいて、**マスキング（globおよびプレースホルダー挙動を含む）**と**フラグのhoisting**を検証する期待JSON出力のゴールデンチェック（ゴールデンファイル比較による検証）が必須要件として含まれており、仕様の不変性が厳格にアサートされていること。
