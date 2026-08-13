@@ -94,6 +94,22 @@ func TestSecurityEnhancement_ResolveSysctls_ControlCharValidation(t *testing.T) 
 		assert.Contains(t, cfgErr.Err.Error(), "security validation failed for sysctl key")
 	})
 
+	t.Run("Sysctl key with leading space is rejected", func(t *testing.T) {
+		_, err := resolveSysctls([]string{" net.ipv4.ip_forward=1"}, nil, "test", nil, nil, nil, fs)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "sysctl", cfgErr.Field)
+		assert.Contains(t, cfgErr.Err.Error(), "leading or trailing whitespace detected")
+	})
+
+	t.Run("Sysctl key with trailing space is rejected", func(t *testing.T) {
+		_, err := resolveSysctls([]string{"net.ipv4.ip_forward =1"}, nil, "test", nil, nil, nil, fs)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "sysctl", cfgErr.Field)
+		assert.Contains(t, cfgErr.Err.Error(), "leading or trailing whitespace detected")
+	})
+
 	t.Run("Safe sysctls succeed", func(t *testing.T) {
 		res, err := resolveSysctls([]string{"net.ipv4.ip_forward=1"}, nil, "test", nil, nil, nil, fs)
 		require.NoError(t, err)
@@ -223,7 +239,7 @@ func TestSecurityEnhancement_DNSOption_Validation(t *testing.T) {
 
 	tests := []struct {
 		opt     string
-		wanterr bool
+		wantErr bool
 	}{
 		{"ndots:5", false},
 		{"timeout:2", false},
@@ -239,7 +255,7 @@ func TestSecurityEnhancement_DNSOption_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.opt, func(t *testing.T) {
 			err := ValidateDNSOption(tt.opt)
-			if tt.wanterr {
+			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
@@ -253,12 +269,13 @@ func TestSecurityEnhancement_SecurityOpt_Validation(t *testing.T) {
 
 	tests := []struct {
 		opt     string
-		wanterr bool
+		wantErr bool
 	}{
 		{"no-new-privileges", false},
 		{"seccomp=unconfined", false},
 		{"apparmor=unconfined", false},
 		{"label:disable", false},
+		{"label=level:s0:c123,c456", false},
 		{"no-new-privileges; rm -rf", true},
 		{"seccomp=unconfined ", true},
 		{"seccomp=unconfined\n", true},
@@ -268,7 +285,7 @@ func TestSecurityEnhancement_SecurityOpt_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.opt, func(t *testing.T) {
 			err := ValidateSecurityOpt(tt.opt)
-			if tt.wanterr {
+			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
@@ -283,7 +300,7 @@ func TestSecurityEnhancement_Sysctl_KeyAndValue_Validation(t *testing.T) {
 	t.Run("ValidateSysctlKey", func(t *testing.T) {
 		tests := []struct {
 			key     string
-			wanterr bool
+			wantErr bool
 		}{
 			{"net.ipv4.ip_forward", false},
 			{"kernel.shmmax", false},
@@ -296,7 +313,7 @@ func TestSecurityEnhancement_Sysctl_KeyAndValue_Validation(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.key, func(t *testing.T) {
 				err := ValidateSysctlKey(tt.key)
-				if tt.wanterr {
+				if tt.wantErr {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
@@ -308,7 +325,7 @@ func TestSecurityEnhancement_Sysctl_KeyAndValue_Validation(t *testing.T) {
 	t.Run("ValidateSysctlValue", func(t *testing.T) {
 		tests := []struct {
 			val     string
-			wanterr bool
+			wantErr bool
 		}{
 			{"1", false},
 			{"65536 65536", false},
@@ -320,7 +337,7 @@ func TestSecurityEnhancement_Sysctl_KeyAndValue_Validation(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.val, func(t *testing.T) {
 				err := ValidateSysctlValue(tt.val)
-				if tt.wanterr {
+				if tt.wantErr {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
