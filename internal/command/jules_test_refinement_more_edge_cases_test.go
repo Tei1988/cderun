@@ -168,16 +168,16 @@ func TestUnit_Command_Signal_NameValidationRules(t *testing.T) {
 
 		// Safe alphanumeric signal
 		err := rtInstance.SignalContainer(context.Background(), "container-123", "SIGTERM")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Invalid signal with control chars / semicolons
 		err2 := rtInstance.SignalContainer(context.Background(), "container-123", "SIGTERM; rm -rf /")
-		assert.Error(t, err2)
+		require.Error(t, err2)
 		assert.Contains(t, err2.Error(), "invalid signal")
 
 		// Invalid signal with whitespaces
 		err3 := rtInstance.SignalContainer(context.Background(), "container-123", "SIG INT")
-		assert.Error(t, err3)
+		require.Error(t, err3)
 		assert.Contains(t, err3.Error(), "invalid signal")
 	})
 }
