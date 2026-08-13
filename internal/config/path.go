@@ -1183,3 +1183,31 @@ func isNamedVolume(s string) bool {
 	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
 }
+
+// ValidateCpuset restricts cpuset specification to a safe format of integers, commas, and hyphens.
+func ValidateCpuset(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || c == ',' || c == '-') {
+			return fmt.Errorf("invalid characters in cpuset: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateGPUs ensures the GPUs option contains only standard safe characters: alphanumerics, comma, equals, and hyphens.
+func ValidateGPUs(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ',' || c == '=' || c == '-') {
+			return fmt.Errorf("invalid characters in GPUs configuration: %q", s)
+		}
+	}
+	return nil
+}

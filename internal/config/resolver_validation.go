@@ -284,11 +284,19 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// gpus characters check
-	if rv.res.GPUs != "" {
-		if err := validatePathChars(rv.res.GPUs); err != nil {
-			return fmt.Errorf("security validation failed: %w", err)
-		}
+	// gpus configuration validation
+	if err := validateField(rv.res.GPUs, "gpus", ValidateGPUs); err != nil {
+		return err
+	}
+
+	// cpuset-cpus validation
+	if err := validateField(rv.res.CpusetCpus, "cpuset-cpus", ValidateCpuset); err != nil {
+		return err
+	}
+
+	// cpuset-mems validation
+	if err := validateField(rv.res.CpusetMems, "cpuset-mems", ValidateCpuset); err != nil {
+		return err
 	}
 
 	// shm-size
