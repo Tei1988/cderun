@@ -538,11 +538,20 @@ cderun --ulimit nofile=1024:2048 alpine ulimit -n
 - **Type**: string
 - **Default**: `none`
 - **Environment Variable**: `CDERUN_SHM_SIZE`
-- **Description**: Configure the size of `/dev/shm` for containers.
+- **Description**: Configure the size of the shared memory partition (`/dev/shm`) for containers.
 - **Details**:
-  - **Docker**: Maps directly to `ShmSize` in the Docker host configuration.
-  - **Podman**: Mapped to size configuration supported natively by the Podman engine.
-  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize` (@jules). It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+  - **Shared Memory Allocation**: Controls the size of the ephemeral `/dev/shm` partition mounted inside the container. If unspecified or set to `"none"`, memory size limits are determined by the container engine defaults (e.g., Docker defaults shared memory to 64MB, which is often insufficient for modern multi-threaded apps, databases, or browsers like Puppeteer/Chrome).
+  - **Supported Formats**: The size string is parsed using `github.com/docker/go-units`'s standard RAM in bytes parser (`RAMInBytes`). It accepts positive integers with standard binary/SI size suffix specifiers:
+    - Bytes (e.g., `2147483648` or `2048b`)
+    - Kilobytes (e.g., `1024k` or `1024kb`)
+    - Megabytes (e.g., `256m` or `256mb`)
+    - Gigabytes (e.g., `1g` or `1gb`)
+    - *Note: Fractional or decimal formats (e.g., `1.5g`) are invalid and will trigger verification errors. Size values must be at least 0.*
+  - **Docker / Podman**: Directly maps to `ShmSize` (in bytes) inside the Docker/Podman Host Configuration.
+  - **containerd**: Dynamically manages the `/dev/shm` tmpfs mount within the OCI specification. The containerd adapter's helper function `UpdateShmSize` (@jules) guarantees complete, safe precedence by:
+    1. Parsing the configured `shmSize` value and verifying it is positive.
+    2. Removing any pre-existing mounts targeted at `/dev/shm` to avoid duplicate mount point definitions.
+    3. Constructing and appending a single, clean tmpfs mount specifically bound to `/dev/shm` with correct OCI size mount options.
 - **P1 Internal Override**: `--cderun-shm-size` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-shm-size=256m`).
 
 ```bash
