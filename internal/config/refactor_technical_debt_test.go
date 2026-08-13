@@ -7,6 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	inTest = true
+}
+
 func TestUnit_Refactor_DriftGuards(t *testing.T) {
 	// First, let's verify that the expected indices match the current indices.
 	initFieldInfo()
