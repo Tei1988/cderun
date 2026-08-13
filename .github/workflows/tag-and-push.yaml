@@ -1,0 +1,82 @@
+name: Tag and Push (Manual Release Trigger)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The release version tag to create (e.g. v0.0.7)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag-and-push:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate Version Format
+        run: |
+          # Enforces strict SemVer 2.0.0 grammar with an mandatory 'v' prefix
+          SEMVER_REGEX="^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))(\.((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))|)*)?(\+([0-9a-zA-Z-]+)(\.[0-9a-zA-Z-]+)*)?$"
+          if [[ ! "$RELEASE_VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "::error::Invalid version format: '$RELEASE_VERSION'. Must match strict SemVer 2.0.0 grammar with a 'v' prefix (e.g., v0.0.7, v1.0.0-alpha.1)"
+            exit 1
+          fi
+
+      - name: Validate Release Credentials
+        env:
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+        run: |
+          if [ -z "$RELEASE_PAT" ]; then
+            echo "::error::Missing mandatory secrets.RELEASE_PAT. Pushing a tag using the default GITHUB_TOKEN will not trigger the release pipeline. Please configure the secrets.RELEASE_PAT Personal Access Token with repo/write scopes."
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check if Tag Already Exists
+        run: |
+          if git show-ref --verify --quiet refs/tags/"$RELEASE_VERSION"; then
+            echo "::error::Tag $RELEASE_VERSION already exists in the repository."
+            exit 1
+          fi
+
+      - name: Verify Generated Options
+        run: |
+          make generate
+
+      - name: Run Tests
+        run: |
+          make test
+
+      - name: Tag and Push
+        env:
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
+        run: |
+          echo "Configuring git bot..."
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          echo "Creating local tag: $RELEASE_VERSION"
+          git tag -a "$RELEASE_VERSION" -m "Release $RELEASE_VERSION triggered via GitHub Actions manual workflow"
+
+          echo "Pushing tag to origin securely via HTTP authorization extraHeader..."
+          AUTH_HEADER="AUTHORIZATION: basic $(echo -n "x-access-token:$RELEASE_PAT" | base64 -w0)"
+
+          # We use `--no-verify` to completely bypass any local repository-controlled git hooks
+          # and override `http.extraHeader` config inline to prevent leaking tokens or using URL injection.
+          # Explicitly push the fully qualified refspec to avoid any namespace inference issues.
+          git -c "http.https://github.com/.extraHeader=$AUTH_HEADER" push --no-verify origin "refs/tags/$RELEASE_VERSION:refs/tags/$RELEASE_VERSION"

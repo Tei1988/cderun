@@ -267,6 +267,22 @@ cderun --runtime podman node app.js
 cderun --remove=false node app.js
 ```
 
+### `--restart`
+
+- **Type**: string
+- **Default**: `""` (no restart policy)
+- **Environment Variable**: `CDERUN_RESTART`
+- **Description**: Configure the container's restart policy when the container exits.
+- **Details**:
+  - **Docker**: Maps directly to `HostConfig.RestartPolicy`. Supported policies include `no`, `always`, `unless-stopped`, and `on-failure`. A retry count suffix (e.g., `:5` in `on-failure:5`) is valid **only** with the `on-failure` policy.
+  - **containerd**: Not supported. Since containerd does not provide automatic daemon-level process/container restart management, any non-`"no"` or non-empty restart policies are explicitly rejected with a validation error containing `"restart policy is not supported yet"`.
+  - **Mutual Exclusion**: The default removal behavior is `--remove=true`. `--remove=true` conflicts only with restart policies other than empty or `"no"`. To use active restart policies (like `always` or `on-failure`), you must explicitly configure `--remove=false`.
+- **P1 Internal Override**: `--cderun-restart` is the corresponding Phase 1 (P1) internal override flag. It accepts a string policy and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --remove=false --restart on-failure:5 node app.js
+```
+
 ### `--publish`, `-p`
 
 - **Type**: stringArray
@@ -318,6 +334,32 @@ cderun --hostname my-container alpine hostname
 cderun --dns 8.8.8.8 alpine ping google.com
 ```
 
+### `--dns-option`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_DNS_OPTION`
+- **Description**: Set custom DNS options (e.g., `ndots:3`).
+- **Runtime Limitations**:
+  - **Docker**: Supported and mapped directly to `HostConfig.DNSOptions`.
+  - **containerd**: Not supported. Explicitly rejected with a validation error (`"containerd runtime: dns_options is not supported yet"`) inside `ValidateConfig` to prevent silent misconfigurations.
+
+```bash
+cderun --dns-option ndots:3 alpine cat /etc/resolv.conf
+```
+
+### `--dns-search`
+
+- **Type**: stringArray
+- **Environment Variable**: `CDERUN_DNS_SEARCH`
+- **Description**: Set custom DNS search domains.
+- **Runtime Limitations**:
+  - **Docker**: Supported and mapped directly to `HostConfig.DNSSearch`.
+  - **containerd**: Not supported. Explicitly rejected with a validation error (`"containerd runtime: dns_search is not supported yet"`) inside `ValidateConfig` to prevent silent misconfigurations.
+
+```bash
+cderun --dns-search example.com alpine ping my-service
+```
+
 ### `--add-host`
 
 - **Type**: stringArray
@@ -350,6 +392,20 @@ cderun -u 1000:1000 alpine whoami
 
 ```bash
 cderun --group-add 1001 --group-add 1002 alpine id
+```
+
+### `--gpus`
+
+- **Type**: string
+- **Default**: `""`
+- **Environment Variable**: `CDERUN_GPUS`
+- **Description**: GPU devices to request from the container runtime (e.g., `all`, `count=2`, `device=0,1`).
+- **Runtime Limitations**:
+  - **Docker**: Supported and parsed into standard Docker `DeviceRequests`.
+  - **containerd**: Not supported. Explicitly rejected with a validation error (`"containerd runtime: gpus is not supported yet"`) inside `ValidateConfig` to prevent silent misconfigurations.
+
+```bash
+cderun --gpus all nvidia/cuda nvidia-smi
 ```
 
 ### `--privileged`
@@ -392,6 +448,22 @@ cderun --read-only alpine touch /test-write
 cderun --init alpine ps aux
 ```
 
+### `--ipc`
+
+- **Type**: string
+- **Default**: `""` (private IPC namespace or runtime default)
+- **Environment Variable**: `CDERUN_IPC`
+- **Description**: Configure the IPC namespace for the container.
+- **Details**:
+  - **Docker**: Maps directly to `HostConfig.IpcMode`. Supported modes include `host`, `private`, `shareable`, `none`, and `container:<id>`.
+  - **containerd**: Supports `"host"`, `"private"`, or `""` (empty). Any other values (such as empty `container:` or `container:<id>`) are strictly rejected with an explicit validation error (`"containerd runtime: unsupported IPC namespace mode: %q"`). If set to `"host"`, containerd configures the OCI spec to share the host's IPC namespace.
+- **P1 Internal Override**: `--cderun-ipc` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+# Share host IPC namespace
+cderun --ipc host alpine ipcs
+```
+
 ### `--pid`
 
 - **Type**: string
@@ -409,6 +481,21 @@ cderun --init alpine ps aux
 ```bash
 # Share host PID namespace
 cderun --pid host alpine ps aux
+```
+
+### `--pids-limit`
+
+- **Type**: int64
+- **Default**: `0` (no limit)
+- **Environment Variable**: `CDERUN_PIDS_LIMIT`
+- **Description**: Limit the maximum number of active processes/threads inside the container (fork-bomb protection).
+- **Details**:
+  - **Docker**: Maps to `HostConfig.Resources.PidsLimit`.
+  - **containerd**: Maps to OCI spec limit `Linux.Resources.Pids.Limit` (applies if value is greater than 0 or equals -1).
+- **P1 Internal Override**: `--cderun-pids-limit` is the corresponding Phase 1 (P1) internal override flag. It accepts an integer value and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --pids-limit 100 alpine forkbomb
 ```
 
 ### `--security-opt`
@@ -478,6 +565,21 @@ cderun --cap-add SYS_ADMIN alpine mount ...
 - **Type**: stringArray
 - **Environment Variable**: `CDERUN_CAP_DROP`
 - **Description**: Drop Linux capabilities.
+
+### `--cgroupns`
+
+- **Type**: string
+- **Default**: `""` (private cgroup namespace or runtime default)
+- **Environment Variable**: `CDERUN_CGROUPNS`
+- **Description**: Configure the cgroup namespace for the container.
+- **Details**:
+  - **Docker**: Maps directly to `HostConfig.CgroupnsMode`. Supported modes are `host` and `private`.
+  - **containerd**: Supports `"host"`, `"private"`, or `""` (empty). Any other values are strictly rejected with an explicit validation error (`"containerd runtime: unsupported cgroup namespace mode: %q"`). If set to `"host"` or `"private"`, containerd configures/appends the OCI spec namespaces accordingly.
+- **P1 Internal Override**: `--cderun-cgroupns` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --cgroupns private alpine ls -la
+```
 
 ### `--sensitive-env`
 
@@ -553,6 +655,51 @@ cderun -m 512m node
 
 ```bash
 cderun --cpus 1.5 node
+```
+
+### `--cpu-shares`
+
+- **Type**: int64
+- **Default**: `0` (relative default weights)
+- **Environment Variable**: `CDERUN_CPU_SHARES`
+- **Description**: Limit container CPU access weight (relative weight).
+- **Details**:
+  - **Docker**: Maps to `HostConfig.Resources.CPUShares`.
+  - **containerd**: Maps to OCI spec limit `Linux.Resources.CPU.Shares = uint64(CPUShares)` (applies if value is greater than 0).
+- **P1 Internal Override**: `--cderun-cpu-shares` is the corresponding Phase 1 (P1) internal override flag. It accepts an integer value and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --cpu-shares 512 alpine sh
+```
+
+### `--cpuset-cpus`
+
+- **Type**: string
+- **Default**: `""`
+- **Environment Variable**: `CDERUN_CPUSET_CPUS`
+- **Description**: CPUs in which to allow execution (e.g., `0-3`, `0,1`).
+- **Details**:
+  - **Docker**: Maps to `HostConfig.Resources.CpusetCpus`.
+  - **containerd**: Maps to OCI spec field `Linux.Resources.CPU.Cpus`.
+- **P1 Internal Override**: `--cderun-cpuset-cpus` is the corresponding Phase 1 (P1) internal override flag. It accepts a string and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --cpuset-cpus "0,1" alpine sh
+```
+
+### `--cpuset-mems`
+
+- **Type**: string
+- **Default**: `""`
+- **Environment Variable**: `CDERUN_CPUSET_MEMS`
+- **Description**: Memory nodes (MEMs) in which to allow execution (e.g., `0-3`, `0,1`). Only effective on NUMA systems.
+- **Details**:
+  - **Docker**: Maps to `HostConfig.Resources.CpusetMems`.
+  - **containerd**: Maps to OCI spec field `Linux.Resources.CPU.Mems`.
+- **P1 Internal Override**: `--cderun-cpuset-mems` is the corresponding Phase 1 (P1) internal override flag. It accepts a string and must be placed after the subcommand in Wrapper Mode.
+
+```bash
+cderun --cpuset-mems "0" alpine sh
 ```
 
 ### `--sysctl`

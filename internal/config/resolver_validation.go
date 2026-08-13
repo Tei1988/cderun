@@ -65,7 +65,7 @@ var highlyPrivilegedCaps = map[string]bool{
 	"CAP_SYS_RESOURCE":        true,
 }
 
-var sensitiveMountPaths = []string{"/boot", "/dev", "/etc", "/proc", "/sys"}
+var sensitiveMountPaths = []string{"/boot", "/dev", "/etc", "/proc", "/sys", "/run", "/var/run"}
 
 func isHighlyPrivilegedCapability(capName string) bool {
 	if highlyPrivilegedCaps[capName] {
@@ -84,7 +84,7 @@ func isHighlySensitiveDevice(p string) bool {
 		return false
 	}
 	p = path.Clean(p)
-	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" {
+	if p == "/dev/mem" || p == "/dev/kmem" || p == "/dev/port" || p == "/dev/msr" {
 		return true
 	}
 	if strings.HasPrefix(p, "/dev/sd") {
@@ -97,6 +97,15 @@ func isHighlySensitiveDevice(p string) bool {
 		return true
 	}
 	if strings.HasPrefix(p, "/dev/mapper/") {
+		return true
+	}
+	if strings.HasPrefix(p, "/dev/vd") {
+		return true
+	}
+	if strings.HasPrefix(p, "/dev/dm-") {
+		return true
+	}
+	if strings.HasPrefix(p, "/dev/cpu/") {
 		return true
 	}
 	return false
@@ -510,10 +519,10 @@ func (rv *resolver) validateSlices() error {
 	if err := validateSliceElements(rv.res.DNSSearch, "dns-search", ValidateHostname); err != nil {
 		return err
 	}
-	if err := validateSliceElements(rv.res.DNSOptions, "dns-option", nil); err != nil {
+	if err := validateSliceElements(rv.res.DNSOptions, "dns-option", ValidateDNSOption); err != nil {
 		return err
 	}
-	if err := validateSliceElements(rv.res.SecurityOpt, "security-opt", nil); err != nil {
+	if err := validateSliceElements(rv.res.SecurityOpt, "security-opt", ValidateSecurityOpt); err != nil {
 		return err
 	}
 

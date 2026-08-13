@@ -18,7 +18,7 @@ jobs:
       with:
         go-version-file: go.mod
     - name: Run unit tests
-      run: go test -v -coverprofile=coverage.out -covermode=atomic ./...
+      run: go test -v -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /scripts)
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
@@ -38,7 +38,7 @@ jobs:
         go-version-file: go.mod
     - name: Install containerd
       run: |
-        VERSION=2.2.2
+        VERSION=2.2.3
         TARBALL="containerd-${VERSION}-linux-amd64.tar.gz"
         URL="https://github.com/containerd/containerd/releases/download/v${VERSION}/${TARBALL}"
         wget -q "$URL"

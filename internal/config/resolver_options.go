@@ -43,32 +43,7 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 }
 
 func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 []string, p2 []string) (*ExpressionResolver, error) {
-	var vals []string
-	if p1 != nil {
-		vals = p1
-	} else if p2 != nil {
-		vals = p2
-	} else if def.EnvKey != "" {
-		if env, ok := rv.fs.LookupEnv(def.EnvKey); ok {
-			vals = []string{}
-			for v := range strings.SplitSeq(env, envSep) {
-				v = strings.TrimSpace(v)
-				if v == "" {
-					continue
-				}
-				vals = append(vals, v)
-			}
-		}
-	}
-	if vals == nil && def.ToolGetter != nil && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok {
-			vals = def.ToolGetter(tool)
-		}
-	}
-	if vals == nil && def.GlobalGetter != nil && rv.global != nil {
-		vals = def.GlobalGetter(*rv.global)
-	}
-
+	vals := getWinningStringSlice(def, envSep, p1, p2, rv.subcommand, rv.tools, rv.global, rv.fs)
 	for _, v := range vals {
 		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
 			return rv.getR()
@@ -128,11 +103,19 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 				GlobalGetter: opt.GlobalGetter,
 			}
 
-			rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
-			if err != nil {
-				return err
+			vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
+			var rForSlice *ExpressionResolver
+			for _, v := range vals {
+				if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+					var err error
+					rForSlice, err = rv.getR()
+					if err != nil {
+						return err
+					}
+					break
+				}
 			}
-			resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
+			resolved := resolveStringSliceOptWithVals(vals, rForSlice)
 			switch opt.Name {
 			case "publish":
 				rv.res.Ports = resolved
@@ -180,12 +163,20 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	rForSlice, err := rv.resolverForSlice(def, ",", p1v, p2v)
-	if err != nil {
-		return err
+	vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
+	var rForSlice *ExpressionResolver
+	for _, v := range vals {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+			var err error
+			rForSlice, err = rv.getR()
+			if err != nil {
+				return err
+			}
+			break
+		}
 	}
 
-	resolved := resolveStringSliceOpt(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rForSlice, rv.fs)
+	resolved := resolveStringSliceOptWithVals(vals, rForSlice)
 	rv.getResVal().Field(info.targetIdx).Set(reflect.ValueOf(resolved))
 	return nil
 }

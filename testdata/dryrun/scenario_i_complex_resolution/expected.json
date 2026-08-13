@@ -1,0 +1,22 @@
+{
+  "command": [
+    "--",
+    "app.js"
+  ],
+  "env": [
+    "PROJECT_ROOT={{PWD}}",
+    "MY_API_KEY=[REDACTED]",
+    "USER_NAME=[REDACTED]",
+    "OAUTH_TOKEN=[REDACTED]",
+    "PUBLIC_VAR=visible_data"
+  ],
+  "image": "alpine:3.19.1",
+  "interactive": false,
+  "mounts": [],
+  "network": "host",
+  "pull": "missing",
+  "remove": true,
+  "tty": true,
+  "user": "",
+  "workdir": "{{HOME}}/workspace"
+}
