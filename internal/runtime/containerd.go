@@ -955,11 +955,9 @@ func applySecurityOptions(s *specs.Spec, securityOpts []string) error {
 				s.Linux = &specs.Linux{}
 			}
 			s.Linux.Seccomp = nil
-		} else if strings.HasPrefix(opt, "apparmor=") {
-			profile := strings.TrimPrefix(opt, "apparmor=")
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor="); ok {
 			s.Process.ApparmorProfile = profile
-		} else if strings.HasPrefix(opt, "apparmor:") {
-			profile := strings.TrimPrefix(opt, "apparmor:")
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor:"); ok {
 			s.Process.ApparmorProfile = profile
 		}
 	}
