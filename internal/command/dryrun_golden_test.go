@@ -146,6 +146,14 @@ func runGoldenTest(t *testing.T, dir string) {
 		t.Fatalf("Dry-run produced no output in %s. Args: %v, Error: %v", dir, args, err)
 	}
 
+	// For scenario_i_complex_resolution, verify that dynamic expressions resolved to expected concrete paths before normalization
+	if strings.Contains(dir, "scenario_i_complex_resolution") {
+		require.Contains(t, output, "PROJECT_ROOT=" + mfs.WD, "PROJECT_ROOT must resolve to concrete path before normalization")
+		require.Contains(t, output, "\"workdir\": \"" + mfs.HomeDir + "/workspace\"", "workdir must resolve to concrete path before normalization")
+		require.NotContains(t, output, "{{PWD}}", "un-normalized output should not contain unresolved {{PWD}}")
+		require.NotContains(t, output, "{{HOME}}", "un-normalized output should not contain unresolved {{HOME}}")
+	}
+
 	// Normalize output (replace dynamic paths)
 	normalized := normalizeGoldenOutput(output)
 

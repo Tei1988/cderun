@@ -1,0 +1,14 @@
+[
+  "--dry-run",
+  "--dry-run-format=json",
+  "--sensitive-env", "*API*",
+  "--sensitive-env", "USER_*",
+  "--sensitive-env", "*TOKEN*",
+  "node",
+  "--cderun-network=host",
+  "--cderun-tty=true",
+  "--",
+  "app.js",
+  "--cderun-image", "alpine:{{file:custom-version}}",
+  "--cderun-workdir", "{{HOME}}/workspace"
+]
