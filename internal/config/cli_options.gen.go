@@ -88,6 +88,10 @@ type CLIOptions struct {
 	CderunPid             *string
 	PidsLimit             *int
 	CderunPidsLimit       *int
+	Prefetch              *string
+	CderunPrefetch        *string
+	PrefetchAll           *bool
+	CderunPrefetchAll     *bool
 	Privileged            *bool
 	CderunPrivileged      *bool
 	Ports                 []string

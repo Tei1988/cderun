@@ -27,7 +27,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
-| T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
+| T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -205,41 +205,6 @@ containerd のインテグレーションテストジョブはあるが、Docker
 
 - Docker / Podman それぞれのインテグレーションテストジョブが追加され、CI がグリーン
 - ジョブ構成は既存 containerd ジョブと一貫した形式
-
----
-
-## T21: イメージ事前取得フラグ（`--prefetch`）
-
-- 種別: 機能追加
-- 対象: `internal/command/`、`internal/config/registry.go`
-- 仕様変更: あり → `docs/features/` に新規仕様ドキュメントを作成（Document-First）
-
-### 目的
-
-オフライン環境への持ち込みや CI ウォームアップのため、コンテナを実行せずにイメージだけ事前取得するフラグを追加する。
-
-```bash
-cderun --prefetch-all          # .tools.yaml の全イメージを取得して終了
-cderun --prefetch node,go      # 指定ツールのイメージのみ取得して終了
-```
-
-### 設計上の決定事項
-
-- `--pull` はすでに pull ポリシー（always/missing/never、`registry.go:331-341`）で使用済みのため別名にする
-- 実装は `--diagnosis`（`registry.go:539-543`）と同パターン（`handlePrefetch` を追加、設定ロード → `PullImage` を呼ぶだけ）
-- サブコマンド方式は「`pull` というツールを実行する」と解釈されるため **不可**。フラグ方式が適切
-
-### 仕様化しておくべき点（docs に明記すること）
-
-1. pull ポリシーとの整合 — prefetch は `missing` 相当で良いか、`--pull always` 併用で強制再取得を許すか
-2. **exit code** — 1 つでもイメージ取得に失敗したら非 0 で終了する（オフライン持ち込み前の検証としてはこれが重要）
-3. 既存の `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
-4. オフライン用途では tag が動く（`latest` 等）と持ち込み後に意図と違うイメージになるため、`--diagnosis` 等で digest を表示できると再現性の確認に役立つ
-
-### 完了条件
-
-- 仕様ドキュメントが先に作成され、実装が一致している
-- 全イメージ / 指定ツールの両モードが動作し、失敗時に非 0 で終了するテストがある
 
 ---
 
@@ -995,6 +960,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
 - [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--prefetch` and `--prefetch-all` flags, explaining stand-alone image prefetching and template expression support mapped to CDERUN_PREFETCH and CDERUN_PREFETCH_ALL.
 
 ---
 

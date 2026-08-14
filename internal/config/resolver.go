@@ -39,6 +39,8 @@ type ResolvedConfig struct {
 	DryRunFormat    string
 	Diagnosis       bool
 	DiagnosisFormat string
+	PrefetchAll     bool
+	Prefetch        string
 	LogLevel        string
 	LogFormat       string
 	LogTimestamp    bool

@@ -462,6 +462,92 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	})
 }
 
+func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig) error {
+	o.ensureHooks()
+
+	// Re-initialize logger with fully resolved settings so logging levels/formats are correct
+	if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	o.logger.SetOutput(cmd.ErrOrStderr())
+
+	// Build expression resolver to resolve any {{env:...}} expressions in tool images
+	var hostCtx *config.HostContext
+	if resolved.HostContext != nil {
+		hostCtx = resolved.HostContext
+	}
+	r, err := config.NewExpressionResolverWithFS(hostCtx, o.fs)
+	if err != nil {
+		return fmt.Errorf("failed to create expression resolver: %w", err)
+	}
+
+	// Determine the list of tools to prefetch
+	var toolsToPrefetch []string
+	if resolved.PrefetchAll {
+		for toolName := range toolsCfg {
+			toolsToPrefetch = append(toolsToPrefetch, toolName)
+		}
+	} else if resolved.Prefetch != "" {
+		parts := strings.Split(resolved.Prefetch, ",")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			toolsToPrefetch = append(toolsToPrefetch, part)
+		}
+	}
+
+	if len(toolsToPrefetch) == 0 {
+		return fmt.Errorf("no tools specified for prefetch")
+	}
+
+	// Sort tool names for deterministic output
+	sort.Strings(toolsToPrefetch)
+
+	// Resolve image strings and check for missing/unconfigured tools
+	var imagesToPull []string
+	for _, toolName := range toolsToPrefetch {
+		tool, ok := toolsCfg[toolName]
+		if !ok {
+			return fmt.Errorf("tool %q is not defined in tools configuration", toolName)
+		}
+		if tool.Image == "" {
+			return fmt.Errorf("tool %q does not have an image configured", toolName)
+		}
+
+		// Resolve the image string
+		resolvedImg, err := r.ResolveString(tool.Image)
+		if err != nil {
+			return fmt.Errorf("failed to resolve image for tool %q: %w", toolName, err)
+		}
+		imagesToPull = append(imagesToPull, resolvedImg)
+	}
+
+	// Initialize Runtime
+	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
+	if err != nil {
+		return &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+	}
+	defer func() {
+		if closeErr := rt.Close(); closeErr != nil {
+			o.logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}()
+
+	// Pull each image
+	for _, img := range imagesToPull {
+		o.logger.Info("Prefetching image %s...", img)
+		err := rt.PullImage(cmd.Context(), img, resolved.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase)
+		if err != nil {
+			return fmt.Errorf("failed to prefetch image %s: %w", img, err)
+		}
+	}
+
+	o.logger.Info("Successfully prefetched all images.")
+	return nil
+}
+
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	o.ensureHooks()
 
@@ -1218,6 +1304,10 @@ intended for the subcommand.`,
 
 		if resolved.Diagnosis {
 			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
+		}
+
+		if resolved.PrefetchAll || resolved.Prefetch != "" {
+			return o.handlePrefetch(cmd, resolved, toolsCfg)
 		}
 
 		if subcommand == "" {
