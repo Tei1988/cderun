@@ -67,3 +67,41 @@ jobs:
         export CDERUN_RUNTIME=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
         go test -v ./internal/runtime/...
+
+  runtime-test-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Run Docker integration tests
+      run: |
+        export CDERUN_RUNTIME=docker
+        export CDERUN_SOCKET_PATH=/var/run/docker.sock
+        go test -v ./internal/runtime/...
+
+  runtime-test-podman:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Install and start Podman service
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+        podman system service --time=0 unix:///tmp/podman.sock &
+        sleep 2
+    - name: Run Podman integration tests
+      run: |
+        export CDERUN_RUNTIME=podman
+        export CDERUN_SOCKET_PATH=/tmp/podman.sock
+        go test -v ./internal/runtime/...
