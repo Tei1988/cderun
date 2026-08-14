@@ -27,7 +27,7 @@ func TestUnit_Feature_SliceSharing_Regression(t *testing.T) {
 	// 6. Explicitly validate the rest of the input slice's backing array capacity
 	// to detect and prove there is absolutely no backing-array aliasing
 	inputFullBackingSlice := input[:cap(input)]
-	assert.Equal(t, "", inputFullBackingSlice[1], "Backing-array aliasing detected! Element 1 in input backing-array was modified.")
+	assert.Empty(t, inputFullBackingSlice[1], "Backing-array aliasing detected! Element 1 in input backing-array was modified.")
 
 	// 7. Validate nilness and non-nil empty slice preservation
 	var nilSlice []string
