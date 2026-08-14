@@ -959,6 +959,8 @@ func applySecurityOptions(s *specs.Spec, securityOpts []string) error {
 			s.Process.ApparmorProfile = profile
 		} else if profile, ok := strings.CutPrefix(opt, "apparmor:"); ok {
 			s.Process.ApparmorProfile = profile
+		} else {
+			return fmt.Errorf("containerd runtime: unsupported security option: %q", opt)
 		}
 	}
 	return nil
