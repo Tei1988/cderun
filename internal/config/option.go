@@ -207,7 +207,9 @@ func resolveStringSliceOptWithVals(
 		}
 	}
 	if !needResolution {
-		return append([]string(nil), vals...)
+		res := make([]string, len(vals))
+		copy(res, vals)
+		return res
 	}
 
 	res := make([]string, 0, len(vals))
