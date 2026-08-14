@@ -77,7 +77,7 @@ node:
 	assert.Len(t, mockRuntime.PulledImages, 2)
 	assert.Contains(t, mockRuntime.PulledImages, "golang:1.22-alpine")
 	assert.Contains(t, mockRuntime.PulledImages, "node:20-slim")
-	assert.Contains(t, mockRuntime.PullPolicies, "missing") // default policy
+	assert.ElementsMatch(t, []string{"missing", "missing"}, mockRuntime.PullPolicies)
 }
 
 func TestUnit_Command_Prefetch_Specific(t *testing.T) {
@@ -120,7 +120,7 @@ python:
 	assert.Contains(t, mockRuntime.PulledImages, "node:20-slim")
 	assert.Contains(t, mockRuntime.PulledImages, "python:3.11-alpine")
 	assert.NotContains(t, mockRuntime.PulledImages, "golang:1.22-alpine")
-	assert.Contains(t, mockRuntime.PullPolicies, "always") // explicitly specified policy
+	assert.ElementsMatch(t, []string{"always", "always"}, mockRuntime.PullPolicies)
 }
 
 func TestUnit_Command_Prefetch_TemplateResolution(t *testing.T) {

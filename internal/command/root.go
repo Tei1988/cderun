@@ -488,8 +488,7 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 			toolsToPrefetch = append(toolsToPrefetch, toolName)
 		}
 	} else if resolved.Prefetch != "" {
-		parts := strings.Split(resolved.Prefetch, ",")
-		for _, part := range parts {
+		for part := range strings.SplitSeq(resolved.Prefetch, ",") {
 			part = strings.TrimSpace(part)
 			if part == "" {
 				continue
