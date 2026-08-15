@@ -230,7 +230,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
 - `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
-- `--prefetch`: Prefetch specified tool images (comma-separated list) defined in `.tools.yaml`. Supports template expressions (e.g., `{{env:...}}`).
+- `--prefetch`: Prefetch specified tool images defined in `.tools.yaml`. Accepts a comma-separated list of tool names as a scalar string flag (e.g., `--prefetch node,python`). Supports template expressions (e.g., `{{env:...}}`).
 - `--prefetch-all`: Prefetch all tool images defined in `.tools.yaml`. (Default: `false`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Configuring any non-`no` restart policy requires setting `--remove=false` due to default removal behavior and resolver constraints. Note: containerd does not support restart policies.
@@ -478,8 +478,7 @@ Key variables include:
 
 **Note on List-type Options:**
 
-- **CLI Flags (P1/P2)**: List-type flags must be repeated for each item.
-  - Example: `--env A=1 --env B=2`
+- **CLI Flags (P1/P2)**: List-type flags must be repeated for each item (e.g., `--env A=1 --env B=2`). Scalar string flags that accept multiple values (such as `--prefetch` and `--mount-tools`) use comma-separated values instead (e.g., `--prefetch node,python`).
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
   - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`, `CDERUN_PREFETCH`
