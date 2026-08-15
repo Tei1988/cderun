@@ -18,8 +18,8 @@ func TestUnit_Refactor_DriftGuards(t *testing.T) {
 	for name, info := range fieldInfo {
 		expected, exists := expectedFieldIndices[name]
 		require.True(t, exists, "expected index for %s should exist", name)
-		assert.Equal(t, info.p1ValIdx, expected.p1ValIdx, "p1 index drift for option: %s", name)
-		assert.Equal(t, info.p2ValIdx, expected.p2ValIdx, "p2 index drift for option: %s", name)
+		assert.Equal(t, expected.p1ValIdx, info.p1ValIdx, "p1 index drift for option: %s", name)
+		assert.Equal(t, expected.p2ValIdx, info.p2ValIdx, "p2 index drift for option: %s", name)
 	}
 }
 

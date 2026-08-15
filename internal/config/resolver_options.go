@@ -42,16 +42,6 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 	return info, p1Set, p1Val, p2Set, p2Val, nil
 }
 
-func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 []string, p2 []string) (*ExpressionResolver, error) {
-	vals := getWinningStringSlice(def, envSep, p1, p2, rv.subcommand, rv.tools, rv.global, rv.fs)
-	for _, v := range vals {
-		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
-			return rv.getR()
-		}
-	}
-	return nil, nil
-}
-
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	var p1v, p2v []string
 	var fastPathUsed bool
@@ -522,15 +512,16 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	var p1Int, p2Int int
 	var fastPathUsed bool
 
-	if opt.Name == "pull-max-retries" {
+	switch opt.Name {
+	case "pull-max-retries":
 		p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
 		p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
 		fastPathUsed = true
-	} else if opt.Name == "pids-limit" {
+	case "pids-limit":
 		p1Set, p1Int = getPtrVal(rv.cli.CderunPidsLimit)
 		p2Set, p2Int = getPtrVal(rv.cli.PidsLimit)
 		fastPathUsed = true
-	} else if opt.Name == "cpu-shares" {
+	case "cpu-shares":
 		p1Set, p1Int = getPtrVal(rv.cli.CderunCPUShares)
 		p2Set, p2Int = getPtrVal(rv.cli.CPUShares)
 		fastPathUsed = true
