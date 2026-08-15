@@ -749,6 +749,9 @@ func ValidateImageName(s string) error {
 	if s == "" {
 		return nil
 	}
+	if HasParentTraversal(s) {
+		return fmt.Errorf("invalid image name: %q (contains parent directory references)", s)
+	}
 	// Manual check: ^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$
 	// Rejects multiple @ symbols
 	atCount := 0
@@ -839,6 +842,33 @@ func ValidateHostname(s string) error {
 // ValidateNetworkName ensures the network name follows Docker-compatible rules.
 func ValidateNetworkName(s string) error {
 	if s == "" {
+		return nil
+	}
+	if HasParentTraversal(s) {
+		return fmt.Errorf("invalid network name: %q (contains parent directory references)", s)
+	}
+	if target, ok := strings.CutPrefix(s, "container:"); ok {
+		if target == "" {
+			return fmt.Errorf("invalid network name: empty container reference in %q", s)
+		}
+		for i := 0; i < len(target); i++ {
+			c := target[i]
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-') {
+				return fmt.Errorf("invalid character in container network reference: %q", target)
+			}
+		}
+		return nil
+	}
+	if target, ok := strings.CutPrefix(s, "ns:"); ok {
+		if target == "" {
+			return fmt.Errorf("invalid network name: empty namespace path in %q", s)
+		}
+		if !path.IsAbs(target) {
+			return fmt.Errorf("network namespace path must be an absolute path: %q", target)
+		}
+		if err := validatePathChars(target); err != nil {
+			return err
+		}
 		return nil
 	}
 	// Manual check: ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$
@@ -1190,6 +1220,9 @@ func ValidateDNSOption(s string) error {
 	if s == "" {
 		return nil
 	}
+	if HasParentTraversal(s) {
+		return fmt.Errorf("invalid DNS option: %q (contains parent directory references)", s)
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == ':' || c == '_' || c == '-') {
@@ -1203,6 +1236,9 @@ func ValidateDNSOption(s string) error {
 func ValidateSecurityOpt(s string) error {
 	if s == "" {
 		return nil
+	}
+	if HasParentTraversal(s) {
+		return fmt.Errorf("invalid security option: %q (contains parent directory references)", s)
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]

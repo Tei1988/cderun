@@ -204,10 +204,22 @@ func (rv *resolver) validateCriticalFields() error {
 
 	// pid
 	pidValidator := func(v string) error {
-		if v != "" && v != "host" {
-			return fmt.Errorf("unsupported pid namespace: %q", v)
+		if v == "" || v == "host" {
+			return nil
 		}
-		return nil
+		if target, ok := strings.CutPrefix(v, "container:"); ok {
+			if target == "" {
+				return fmt.Errorf("invalid pid namespace: empty container reference in %q", v)
+			}
+			for i := 0; i < len(target); i++ {
+				c := target[i]
+				if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-') {
+					return fmt.Errorf("invalid character in container pid reference: %q", target)
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("unsupported pid namespace: %q", v)
 	}
 	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
 		return err
