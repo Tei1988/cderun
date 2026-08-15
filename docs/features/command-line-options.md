@@ -507,7 +507,7 @@ cderun --pids-limit 100 alpine forkbomb
 - **Details**:
   - **Docker**: Maps directly to `HostConfig.SecurityOpt` in the Docker host configuration.
   - **Podman**: Mapped to security options supported natively by the Podman engine.
-  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions` (@jules). Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
+  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions`. Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
 - **P1 Internal Override**: `--cderun-security-opt` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-security-opt=no-new-privileges`).
 
 ```bash
@@ -538,11 +538,21 @@ cderun --ulimit nofile=1024:2048 alpine ulimit -n
 - **Type**: string
 - **Default**: `none`
 - **Environment Variable**: `CDERUN_SHM_SIZE`
-- **Description**: Configure the size of `/dev/shm` for containers.
+- **Description**: Configure the size of the shared memory partition (`/dev/shm`) for containers.
 - **Details**:
-  - **Docker**: Maps directly to `ShmSize` in the Docker host configuration.
-  - **Podman**: Mapped to size configuration supported natively by the Podman engine.
-  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize` (@jules). It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+  - **Shared Memory Allocation**: Controls the size of the ephemeral `/dev/shm` partition mounted inside the container. If unspecified or set to `"none"`, memory size limits are determined by the container engine defaults (e.g., Docker defaults shared memory to 64MB, which is often insufficient for modern multi-threaded apps, databases, or browsers like Puppeteer/Chrome).
+  - **Supported Formats**: The size string is parsed using `github.com/docker/go-units`'s standard RAM in bytes parser (`RAMInBytes`), which uses binary multipliers (e.g., `1g` and `1gb` equal `1,073,741,824` bytes, or 1024^3). It accepts non-negative numeric values, including zero and fractional sizes (such as `1.5g`):
+    - Bytes (e.g., `2147483648` or `2048b`)
+    - Kilobytes (e.g., `1024k` or `1024kb`)
+    - Megabytes (e.g., `256m` or `256mb`)
+    - Gigabytes (e.g., `1g` or `1gb`)
+    - *Note: Invalid format inputs will trigger validation errors. Size values must be non-negative (at least 0).*
+  - **Docker / Podman**: Directly maps to `ShmSize` (in bytes) inside the Docker/Podman Host Configuration.
+  - **containerd**: Dynamically manages the `/dev/shm` tmpfs mount within the OCI specification using the helper spec opt `getShmSizeSpecOpt`:
+    1. Scans existing container mounts. If a `/dev/shm` mount exists:
+       - If it is not a `tmpfs` mount, it returns a validation error.
+       - If it is a `tmpfs` mount, it preserves all other existing mount options while replacing any existing `size=` options with the new size option.
+    2. If no `/dev/shm` mount exists, it appends a new `tmpfs` mount specifically for `/dev/shm` configured with the specified size and default mounting options (`nosuid`, `noexec`, `nodev`, `mode=1777`).
 - **P1 Internal Override**: `--cderun-shm-size` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-shm-size=256m`).
 
 ```bash

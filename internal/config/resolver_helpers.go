@@ -210,7 +210,13 @@ func pickConfigs[T any](
 							return nil, err
 						}
 					}
+					if res == nil {
+						res = make([]T, 0, 4)
+					}
 					res = append(res, v)
+				}
+				if res == nil {
+					res = []T{}
 				}
 			}
 			return res, nil
