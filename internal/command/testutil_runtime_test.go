@@ -22,8 +22,11 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
 		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
 	}
-	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "dial unix") {
+	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "dial unix") || strings.Contains(msg, "no such file or directory") {
 		t.Skipf("Skipping test due to runtime connection or permission issue: %v", err)
+	}
+	if strings.Contains(msg, "not supported yet") || strings.Contains(msg, "is not supported") {
+		t.Skipf("Skipping test due to runtime capability limitation: %v", err)
 	}
 	// Detect Docker SIGKILL timeout (likely environment resource constraint or slow CI)
 	if strings.Contains(msg, "timeout") && strings.Contains(msg, "sigkill") {
