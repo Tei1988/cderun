@@ -27,7 +27,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
 | T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
-| T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | - |
+| T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -68,7 +68,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T59 | クリーンアップ用 `RemoveContainer` にタイムアウトがない | 改善 | 低 | 小 | - | DONE |
 | T60 | duration オプションが式解決エラーを握りつぶす | 改善 | 低 | 小 | - | DONE |
 | T61 | Docker attach: stdin エラー時に出力を drain せず切断する | 改善 | 低 | 小 | - | DONE |
-| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | - |
+| T62 | containerd: `ioWait` 削除の競合と attach 順序契約の明文化 | 改善 | 低 | 小 | - | DONE |
 | T63 | CI と `docs/testing/` のカバレッジ・パイプライン乖離の解消 | CI | 中 | 中 | - | DONE |
 | T64 | CLI help / Makefile の文字列修正（containerd・mask-all 反映） | クリーンアップ | 低 | 小 | - | DONE |
 | T65 | dead code 削除・小規模クリーンアップ一括 | クリーンアップ | 低 | 小 | - | DONE |
@@ -205,41 +205,6 @@ containerd のインテグレーションテストジョブはあるが、Docker
 
 - Docker / Podman それぞれのインテグレーションテストジョブが追加され、CI がグリーン
 - ジョブ構成は既存 containerd ジョブと一貫した形式
-
----
-
-## T21: イメージ事前取得フラグ（`--prefetch`）
-
-- 種別: 機能追加
-- 対象: `internal/command/`、`internal/config/registry.go`
-- 仕様変更: あり → `docs/features/` に新規仕様ドキュメントを作成（Document-First）
-
-### 目的
-
-オフライン環境への持ち込みや CI ウォームアップのため、コンテナを実行せずにイメージだけ事前取得するフラグを追加する。
-
-```bash
-cderun --prefetch-all          # .tools.yaml の全イメージを取得して終了
-cderun --prefetch node,go      # 指定ツールのイメージのみ取得して終了
-```
-
-### 設計上の決定事項
-
-- `--pull` はすでに pull ポリシー（always/missing/never、`registry.go:331-341`）で使用済みのため別名にする
-- 実装は `--diagnosis`（`registry.go:539-543`）と同パターン（`handlePrefetch` を追加、設定ロード → `PullImage` を呼ぶだけ）
-- サブコマンド方式は「`pull` というツールを実行する」と解釈されるため **不可**。フラグ方式が適切
-
-### 仕様化しておくべき点（docs に明記すること）
-
-1. pull ポリシーとの整合 — prefetch は `missing` 相当で良いか、`--pull always` 併用で強制再取得を許すか
-2. **exit code** — 1 つでもイメージ取得に失敗したら非 0 で終了する（オフライン持ち込み前の検証としてはこれが重要）
-3. 既存の `pullMaxRetries` / `pullBackoffBase`（`registry.go:343-354`）はそのまま再利用可能
-4. オフライン用途では tag が動く（`latest` 等）と持ち込み後に意図と違うイメージになるため、`--diagnosis` 等で digest を表示できると再現性の確認に役立つ
-
-### 完了条件
-
-- 仕様ドキュメントが先に作成され、実装が一致している
-- 全イメージ / 指定ツールの両モードが動作し、失敗時に非 0 で終了するテストがある
 
 ---
 
@@ -834,29 +799,6 @@ main 側で choke point のバリデーションが実装済みを確認（`inte
 
 ---
 
-## T62: containerd: `ioWait` 削除の競合と attach 順序契約の明文化
-
-- 種別: 改善（保守性・潜在競合）
-- 優先度: 低
-- 対象: `internal/runtime/containerd.go:339-341`（`RemoveContainer` の `ioWait` 削除）、`containerd.go:278-284, 403-407, 448-453`、`internal/runtime/interface.go:23`
-
-### 問題
-
-1. `RemoveContainer` が `r.ioWait[containerID]` を削除するが、このエントリは `AttachContainer` が登録・削除の所有権を持つ。attach が `waitC` でブロック中に Remove が走ると `notifyWait` が no-op になり ctx キャンセルでしか抜けられない。現在の呼び出し順（defer LIFO）では顕在化しないが、T22 の prune が任意 ID に `RemoveContainer` を呼ぶと踏む
-2. containerd の `AttachContainer` は `StartContainer` より先に呼ばれないと `cio.NullIO` にフォールバックして全 IO が黙って捨てられるが、この順序前提が `ContainerRuntime` インターフェースに文書化されていない（Docker は順序不問）
-
-### 方針
-
-- `containerd.go:339-341` の削除処理を除去する（ioMap/ioWait の所有権は Attach/Start 側に置く）
-- `interface.go` の `AttachContainer` に順序契約をコメントで明記し、containerd の `StartContainer` が `NullIO` フォールバックする際は warn ログを出す
-
-### 完了条件
-
-- attach 中に Remove しても notify が失われないテスト
-- インターフェースコメントと warn ログの追加
-
----
-
 ## T69: registry 駆動の優先順位マトリクステスト生成（L1）
 
 - 種別: テスト基盤
@@ -1018,6 +960,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
+- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--prefetch` and `--prefetch-all` flags, explaining stand-alone image prefetching and template expression support mapped to CDERUN_PREFETCH and CDERUN_PREFETCH_ALL.
 
 ---
 
@@ -1071,40 +1014,3 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
-
----
-
-## T84: containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上
-
-- 種別: 改善
-- 優先度: 中
-- 仕様変更: なし
-
-### 目的
-
-gRPCソケット経由での実デーモンへの依存を断ち切り、containerdのアダプタ内のすべてのロジック（OCI spec の調整、tmpfs マウント構築、Capabilities 変換、Ulimits posix rlimits 変換、shm-size tmpfs mount書き換えなど）をゼロ・デーモン環境でテスト可能にする。
-
-### 完了条件
-
-- [ ] `internal/runtime/containerd.go` 内にクライアント操作やコンテナ操作を抽象化するプライベートインターフェース（例: `containerdClient`, `containerdContainer`, `containerdTask` など）を導入する。
-- [ ] `ContainerdRuntime` をリファクタリングし、上記インターフェースを介した呼び出しに置き換える。
-- [ ] テスト用モック（例: `containerd_mock_test.go`）を新設して、正常系・異常系、特に spec 調整などの詳細ロジックをテストし、containerd パッケージのカバレッジを90%以上に引き上げる。
-
----
----
-
-## T86: ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加
-
-- 種別: テスト
-- 優先度: 低
-- 仕様変更: なし
-
-### 目的
-
-複数のマージ、式解決、マスキング（globとプレースホルダー）、フラグホイストなどのルールが高度に絡まり合った「複合シナリオ」を定義し、設定解決エンジンの回帰バグを完全にガードする。
-
-### 完了条件
-
-- [ ] `testdata/dryrun/` 配下に「複合設定解決（例: `scenario_i_complex_resolution`）」などの新シナリオフォルダを追加する。
-- [ ] テスト用引数、環境変数、ツール設定ファイルを適切に準備し、複雑な優先順位・マージ・式解決が期待通りのJSON出力に落とし込まれることをアサートする。
-- [ ] 完了条件のシナリオにおいて、**マスキング（globおよびプレースホルダー挙動を含む）**と**フラグのhoisting**を検証する期待JSON出力のゴールデンチェック（ゴールデンファイル比較による検証）が必須要件として含まれており、仕様の不変性が厳格にアサートされていること。

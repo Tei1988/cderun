@@ -158,6 +158,9 @@ func (rv *resolver) validateSecurity() error {
 		if rv.res.IPC == "host" {
 			logging.Warn("Container is running with host IPC namespace enabled. This disables process communication isolation and allows the container to share inter-process communication mechanisms with the host.")
 		}
+		if rv.res.Cgroupns == "host" {
+			logging.Warn("Container is running with host cgroup namespace enabled. This reduces container isolation by exposing host-side control groups layout and limits.")
+		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
 				cleanSource := path.Clean(m.Source)
@@ -294,10 +297,18 @@ func (rv *resolver) validateCriticalFields() error {
 	}
 
 	// gpus characters check
-	if rv.res.GPUs != "" {
-		if err := validatePathChars(rv.res.GPUs); err != nil {
-			return fmt.Errorf("security validation failed: %w", err)
-		}
+	if err := validateField(rv.res.GPUs, "gpus", ValidateGPUs); err != nil {
+		return err
+	}
+
+	// cpuset-cpus characters check
+	if err := validateField(rv.res.CpusetCpus, "cpuset-cpus", ValidateCpuset); err != nil {
+		return err
+	}
+
+	// cpuset-mems characters check
+	if err := validateField(rv.res.CpusetMems, "cpuset-mems", ValidateCpuset); err != nil {
+		return err
 	}
 
 	// shm-size

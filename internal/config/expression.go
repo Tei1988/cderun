@@ -251,7 +251,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			content := strings.TrimSpace(s[2 : len(s)-2])
 			if !strings.Contains(content, "{{") && !strings.Contains(content, "}}") { // No nested expressions
 				res, err := r.resolveDirective(content)
-				if err == nil && !(len(res) >= 2 && res[0] == '{' && res[1] == '{') {
+				if err == nil && (len(res) < 2 || res[0] != '{' || res[1] != '{') {
 					resolved = res
 					hasExpr = false // Resolved
 				}

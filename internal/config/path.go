@@ -387,7 +387,7 @@ func hasScheme(s string) bool {
 	if idx <= 0 {
 		return false
 	}
-	for i := 0; i < idx; i++ {
+	for i := range idx {
 		c := s[i]
 		if c < 'a' || c > 'z' {
 			return false
@@ -615,6 +615,34 @@ func validatePathChars(s string) error {
 	return nil
 }
 
+// ValidateCpuset restricts cpuset configurations to standard digits, commas, and hyphens.
+func ValidateCpuset(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || c == ',' || c == '-') {
+			return fmt.Errorf("invalid characters in cpuset: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateGPUs restricts `--gpus` configuration to alphanumerics, commas, equals, and hyphens.
+func ValidateGPUs(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ',' || c == '=' || c == '-') {
+			return fmt.Errorf("invalid characters in gpus option: %q", s)
+		}
+	}
+	return nil
+}
+
 // ValidateGroupAdd ensures the supplementary group name or GID is safe.
 func ValidateGroupAdd(s string) error {
 	if s == "" {
@@ -798,18 +826,18 @@ func isValidHostname(s string) bool {
 
 		// First and last char of label cannot be '-'
 		first := label[0]
-		if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || (first >= '0' && first <= '9')) {
+		if (first < 'a' || first > 'z') && (first < 'A' || first > 'Z') && (first < '0' || first > '9') {
 			return false
 		}
 		last := label[len(label)-1]
-		if !((last >= 'a' && last <= 'z') || (last >= 'A' && last <= 'Z') || (last >= '0' && last <= '9')) {
+		if (last < 'a' || last > 'z') && (last < 'A' || last > 'Z') && (last < '0' || last > '9') {
 			return false
 		}
 
 		// Other characters must be alphanumerics or '-'
 		for i := 1; i < len(label)-1; i++ {
 			c := label[i]
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' {
 				return false
 			}
 		}
@@ -877,7 +905,7 @@ func isValidUserPart(s string) bool {
 
 	// Check if it matches: ^[a-z_][a-z0-9_-]*[$]?$
 	first := s[0]
-	if !((first >= 'a' && first <= 'z') || first == '_') {
+	if (first < 'a' || first > 'z') && first != '_' {
 		return false
 	}
 	for i := 1; i < len(s); i++ {
@@ -885,7 +913,7 @@ func isValidUserPart(s string) bool {
 		if i == len(s)-1 && c == '$' {
 			break
 		}
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != '-' {
 			return false
 		}
 	}
@@ -911,7 +939,7 @@ func isValidGroupPart(s string) bool {
 
 	// Check if it matches: ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$
 	first := s[0]
-	if !((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_') {
+	if (first < 'a' || first > 'z') && (first < 'A' || first > 'Z') && first != '_' {
 		return false
 	}
 	for i := 1; i < len(s); i++ {
@@ -919,7 +947,7 @@ func isValidGroupPart(s string) bool {
 		if i == len(s)-1 && c == '$' {
 			break
 		}
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '-' {
 			return false
 		}
 	}
@@ -1062,7 +1090,7 @@ func isValidCapability(s string) bool {
 	}
 	for i := 1; i < len(s); i++ {
 		c := s[i]
-		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
 			return false
 		}
 	}
@@ -1089,7 +1117,7 @@ func isValidWorkdirChars(s string) bool {
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-' || c == '/') {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '.' && c != '_' && c != '-' && c != '/' {
 			return false
 		}
 	}

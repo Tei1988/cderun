@@ -8,6 +8,7 @@ import (
 	"io"
 	"maps"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"cderun/internal/logging"
 
 	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/docker/go-units"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
@@ -32,9 +34,18 @@ const (
 	defaultNamespace = "cderun"
 )
 
+type containerdClient interface {
+	ImageService() images.Store
+	Pull(ctx context.Context, ref string, opts ...client.RemoteOpt) (client.Image, error)
+	GetImage(ctx context.Context, ref string) (client.Image, error)
+	NewContainer(ctx context.Context, id string, opts ...client.NewContainerOpts) (client.Container, error)
+	LoadContainer(ctx context.Context, id string) (client.Container, error)
+	Close() error
+}
+
 // ContainerdRuntime implements the ContainerRuntime interface using containerd.
 type ContainerdRuntime struct {
-	client    *client.Client
+	client    containerdClient
 	socket    string
 	namespace string
 	logger    *logging.Logger
@@ -604,8 +615,19 @@ func (r *ContainerdRuntime) WaitContainer(ctx context.Context, containerID strin
 	}
 }
 
-func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
+func (r *ContainerdRuntime) isClientNil() bool {
 	if r.client == nil {
+		return true
+	}
+	rv := reflect.ValueOf(r.client)
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return true
+	}
+	return false
+}
+
+func (r *ContainerdRuntime) RemoveContainer(ctx context.Context, containerID string) error {
+	if r.isClientNil() {
 		return fmt.Errorf("containerd client is not initialized")
 	}
 
@@ -726,7 +748,7 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 		r.mu.Unlock()
 	}()
 
-	if r.client == nil {
+	if r.isClientNil() {
 		r.notifyWait(containerID, fmt.Errorf("containerd client is not initialized"))
 		select {
 		case err := <-waitC:
@@ -738,7 +760,7 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 
 	// Check if task is already ready (e.g., if StartContainer was called first)
 	taskAlreadyReady := false
-	if r.client != nil {
+	if !r.isClientNil() {
 		if container, err := r.client.LoadContainer(ctx, containerID); err == nil {
 			if _, err := container.Task(ctx, nil); err == nil {
 				taskAlreadyReady = true
@@ -755,7 +777,7 @@ func (r *ContainerdRuntime) AttachContainer(ctx context.Context, containerID str
 			}
 		}
 
-		if r.client == nil {
+		if r.isClientNil() {
 			r.notifyWait(containerID, fmt.Errorf("containerd client is not initialized"))
 			return
 		}
@@ -955,12 +977,12 @@ func applySecurityOptions(s *specs.Spec, securityOpts []string) error {
 				s.Linux = &specs.Linux{}
 			}
 			s.Linux.Seccomp = nil
-		} else if strings.HasPrefix(opt, "apparmor=") {
-			profile := strings.TrimPrefix(opt, "apparmor=")
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor="); ok {
 			s.Process.ApparmorProfile = profile
-		} else if strings.HasPrefix(opt, "apparmor:") {
-			profile := strings.TrimPrefix(opt, "apparmor:")
+		} else if profile, ok := strings.CutPrefix(opt, "apparmor:"); ok {
 			s.Process.ApparmorProfile = profile
+		} else {
+			return fmt.Errorf("containerd runtime: unsupported security option: %q", opt)
 		}
 	}
 	return nil
