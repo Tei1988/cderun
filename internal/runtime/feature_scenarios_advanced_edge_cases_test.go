@@ -87,6 +87,7 @@ func TestUnit_Runtime_DockerAdapter_ToDockerContainerConfig(t *testing.T) {
 	require.NotNil(t, containerConfig)
 	require.NotNil(t, hostConfig)
 
+	assert.Equal(t, "alpine:latest", containerConfig.Image)
 	assert.Equal(t, int64(536870912), hostConfig.ShmSize) // 512m
 	assert.Equal(t, "host", string(hostConfig.IpcMode))
 	assert.Equal(t, "host", string(hostConfig.PidMode))
@@ -102,6 +103,8 @@ func TestUnit_Runtime_DockerAdapter_ToDockerContainerConfig(t *testing.T) {
 
 	require.Len(t, hostConfig.DeviceRequests, 1)
 	assert.Equal(t, "nvidia", hostConfig.DeviceRequests[0].Driver)
+	assert.Equal(t, -1, hostConfig.DeviceRequests[0].Count)
+	assert.Equal(t, [][]string{{"gpu"}}, hostConfig.DeviceRequests[0].Capabilities)
 }
 
 // TestUnit_Runtime_MockRuntime_Lifecycle_Scenarios tests MockRuntime lifecycle and signal validation.

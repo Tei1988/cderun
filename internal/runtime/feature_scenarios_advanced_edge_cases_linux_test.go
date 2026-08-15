@@ -95,7 +95,6 @@ func TestUnit_Runtime_Containerd_ValidateConfig_EdgeCases(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := rt.ValidateConfig(tc.config)

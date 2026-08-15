@@ -160,7 +160,10 @@ func TestScenario_Command_DryRun_ComplexOptions_JSONOutput(t *testing.T) {
 	// Verify image resolution and fields in dry-run snapshot
 	assert.Equal(t, "alpine:latest", dryRunData["image"])
 	assert.Equal(t, "512m", dryRunData["shm_size"])
-	assert.Equal(t, float64(100), dryRunData["pids_limit"])
+
+	pidsLimit, ok := dryRunData["pids_limit"].(float64)
+	require.True(t, ok)
+	assert.InEpsilon(t, float64(100), pidsLimit, 0.0001)
 
 	sysctls, ok := dryRunData["sysctls"].(map[string]any)
 	require.True(t, ok)
@@ -182,9 +185,9 @@ func TestScenario_Command_DryRun_ComplexOptions_JSONOutput(t *testing.T) {
 	assert.True(t, foundMaskedSecret, "SECRET_KEY must be masked as [REDACTED] in dry-run output, got: %v", envArray)
 }
 
-// TestScenario_Command_Signal_Handling_And_Interruption tests signal callback execution during teardown.
+// TestScenario_Command_PreCanceled_Context_And_Interruption tests pre-canceled context handling prior to command execution.
 // References: docs/features/command-line-options.md
-func TestScenario_Command_Signal_Handling_And_Interruption(t *testing.T) {
+func TestScenario_Command_PreCanceled_Context_And_Interruption(t *testing.T) {
 	t.Parallel()
 
 	mfs := &config.MockFileSystem{

@@ -87,12 +87,11 @@ func TestUnit_Config_SecurityOpt_And_DNSOption_Validation(t *testing.T) {
 	}
 
 	for _, tc := range testCasesDNS {
-		tc := tc
 		t.Run("dns_opt_"+tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateDNSOption(tc.opt)
 			if tc.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -114,12 +113,11 @@ func TestUnit_Config_SecurityOpt_And_DNSOption_Validation(t *testing.T) {
 	}
 
 	for _, tc := range testCasesSec {
-		tc := tc
 		t.Run("security_opt_"+tc.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateSecurityOpt(tc.opt)
 			if tc.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -147,10 +145,10 @@ func TestUnit_Config_Sysctl_Validation_And_Resolution(t *testing.T) {
 		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
 		assert.NoError(t, ValidateSysctlKey("kernel.shmmax"))
 
-		assert.Error(t, ValidateSysctlKey(""))
-		assert.Error(t, ValidateSysctlKey("net.ipv4.ip_forward\x00"))
-		assert.Error(t, ValidateSysctlKey("net.ipv4.ip forward")) // space in key
-		assert.Error(t, ValidateSysctlKey("net.ipv4.ip_forward\n"))
+		require.Error(t, ValidateSysctlKey(""))
+		require.Error(t, ValidateSysctlKey("net.ipv4.ip_forward\x00"))
+		require.Error(t, ValidateSysctlKey("net.ipv4.ip forward")) // space in key
+		require.Error(t, ValidateSysctlKey("net.ipv4.ip_forward\n"))
 	})
 
 	t.Run("ValidateSysctlValue edge cases", func(t *testing.T) {
@@ -158,8 +156,8 @@ func TestUnit_Config_Sysctl_Validation_And_Resolution(t *testing.T) {
 		assert.NoError(t, ValidateSysctlValue("1"))
 		assert.NoError(t, ValidateSysctlValue("68719476736"))
 
-		assert.Error(t, ValidateSysctlValue("1\x00"))
-		assert.Error(t, ValidateSysctlValue("1\n"))
+		require.Error(t, ValidateSysctlValue("1\x00"))
+		require.Error(t, ValidateSysctlValue("1\n"))
 	})
 
 	t.Run("resolveSysctls with expression resolution", func(t *testing.T) {
@@ -175,7 +173,7 @@ func TestUnit_Config_Sysctl_Validation_And_Resolution(t *testing.T) {
 		t.Parallel()
 		p1 := []string{"net.ipv4.ip_forward\n=1"}
 		_, err := resolveSysctls(p1, nil, "", ToolsConfig{}, &CDERunConfig{}, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -197,7 +195,6 @@ func TestUnit_Config_SensitiveDevice_And_Security_Warnings(t *testing.T) {
 	}
 
 	for _, dev := range sensitiveDevices {
-		dev := dev
 		t.Run("sensitive_dev_"+dev, func(t *testing.T) {
 			t.Parallel()
 			assert.True(t, isHighlySensitiveDevice(dev), "device %s should be flagged as highly sensitive", dev)
@@ -213,7 +210,6 @@ func TestUnit_Config_SensitiveDevice_And_Security_Warnings(t *testing.T) {
 	}
 
 	for _, dev := range safeDevices {
-		dev := dev
 		t.Run("safe_dev_"+dev, func(t *testing.T) {
 			t.Parallel()
 			assert.False(t, isHighlySensitiveDevice(dev), "device %s should not be flagged as highly sensitive", dev)
@@ -277,7 +273,7 @@ func TestUnit_Config_EnvMasking_And_Resolution(t *testing.T) {
 		t.Parallel()
 		unresolvedEnv := []string{"UNSET_VAR_XYZ_ABSENT"}
 		_, err := resolveEnvValues(unresolvedEnv, nil, true, r, mfs)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("resolveEnvValues with non-strict mode fallback to host lookup or empty", func(t *testing.T) {
@@ -300,9 +296,9 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateCpuset("0,2,4"))
 		assert.NoError(t, ValidateCpuset("0-3,5,7-8"))
 
-		assert.Error(t, ValidateCpuset("0-3a"))
-		assert.Error(t, ValidateCpuset("0-3\n"))
-		assert.Error(t, ValidateCpuset("0-3\x00"))
+		require.Error(t, ValidateCpuset("0-3a"))
+		require.Error(t, ValidateCpuset("0-3\n"))
+		require.Error(t, ValidateCpuset("0-3\x00"))
 	})
 
 	t.Run("ValidateGPUs boundary checks", func(t *testing.T) {
@@ -312,9 +308,9 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateGPUs("device=0,1"))
 		assert.NoError(t, ValidateGPUs("1"))
 
-		assert.Error(t, ValidateGPUs("all; rm -rf /"))
-		assert.Error(t, ValidateGPUs("count=2\n"))
-		assert.Error(t, ValidateGPUs("device=0\x00"))
+		require.Error(t, ValidateGPUs("all; rm -rf /"))
+		require.Error(t, ValidateGPUs("count=2\n"))
+		require.Error(t, ValidateGPUs("device=0\x00"))
 	})
 
 	t.Run("ValidateGroupAdd boundary checks", func(t *testing.T) {
@@ -323,9 +319,9 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateGroupAdd("docker"))
 		assert.NoError(t, ValidateGroupAdd("audio"))
 
-		assert.Error(t, ValidateGroupAdd("docker;bad"))
-		assert.Error(t, ValidateGroupAdd("1000\n"))
-		assert.Error(t, ValidateGroupAdd("docker\x00"))
+		require.Error(t, ValidateGroupAdd("docker;bad"))
+		require.Error(t, ValidateGroupAdd("1000\n"))
+		require.Error(t, ValidateGroupAdd("docker\x00"))
 	})
 
 	t.Run("ValidateUserName boundary checks", func(t *testing.T) {
@@ -335,9 +331,9 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateUserName("1000:1000"))
 		assert.NoError(t, ValidateUserName("root:Admin"))
 
-		assert.Error(t, ValidateUserName("root\x00"))
-		assert.Error(t, ValidateUserName("root\n"))
-		assert.Error(t, ValidateUserName("user:group:extra"))
+		require.Error(t, ValidateUserName("root\x00"))
+		require.Error(t, ValidateUserName("root\n"))
+		require.Error(t, ValidateUserName("user:group:extra"))
 	})
 
 	t.Run("ValidateCapability boundary checks", func(t *testing.T) {
@@ -346,9 +342,9 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateCapability("CAP_SYS_ADMIN"))
 		assert.NoError(t, ValidateCapability("NET_ADMIN"))
 
-		assert.Error(t, ValidateCapability("SYS_ADMIN\x00"))
-		assert.Error(t, ValidateCapability("SYS_ADMIN\n"))
-		assert.Error(t, ValidateCapability("SYS_ADMIN; rm -rf /"))
+		require.Error(t, ValidateCapability("SYS_ADMIN\x00"))
+		require.Error(t, ValidateCapability("SYS_ADMIN\n"))
+		require.Error(t, ValidateCapability("SYS_ADMIN; rm -rf /"))
 	})
 
 	t.Run("ValidateWorkdir boundary checks", func(t *testing.T) {
@@ -356,9 +352,10 @@ func TestUnit_Config_PathValidation_Boundary_Formats(t *testing.T) {
 		assert.NoError(t, ValidateWorkdir("/app"))
 		assert.NoError(t, ValidateWorkdir("/workspace/project_1"))
 
-		assert.Error(t, ValidateWorkdir("/app\x00"))
-		assert.Error(t, ValidateWorkdir("/app\n"))
-		assert.Error(t, ValidateWorkdir("relative/path")) // workdir must be absolute
+		require.Error(t, ValidateWorkdir("/app\x00"))
+		require.Error(t, ValidateWorkdir("/app\n"))
+		require.Error(t, ValidateWorkdir("relative/path"))        // workdir must be absolute
+		require.Error(t, ValidateWorkdir("/workspace/../etc")) // parent traversal rejected
 	})
 }
 
