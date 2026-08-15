@@ -230,6 +230,8 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
 - `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
+- `--prefetch`: Prefetch specified tool images (comma-separated list) defined in `.tools.yaml`. Supports template expressions (e.g., `{{env:...}}`).
+- `--prefetch-all`: Prefetch all tool images defined in `.tools.yaml`. (Default: `false`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Configuring any non-`no` restart policy requires setting `--remove=false` due to default removal behavior and resolver constraints. Note: containerd does not support restart policies.
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
@@ -460,6 +462,8 @@ Key variables include:
 - `CDERUN_RUNTIME`: Container runtime to use (docker/podman/containerd).
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
+- `CDERUN_PREFETCH`: Prefetch specified tool images (comma-separated list).
+- `CDERUN_PREFETCH_ALL`: Prefetch all tool images defined in `.tools.yaml`.
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
@@ -478,7 +482,7 @@ Key variables include:
   - Example: `--env A=1 --env B=2`
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
-  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`, `CDERUN_PREFETCH`
 
 ---
 
