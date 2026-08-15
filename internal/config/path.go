@@ -615,6 +615,34 @@ func validatePathChars(s string) error {
 	return nil
 }
 
+// ValidateCpuset restricts cpuset configurations to standard digits, commas, and hyphens.
+func ValidateCpuset(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || c == ',' || c == '-') {
+			return fmt.Errorf("invalid characters in cpuset: %q", s)
+		}
+	}
+	return nil
+}
+
+// ValidateGPUs restricts `--gpus` configuration to alphanumerics, commas, equals, and hyphens.
+func ValidateGPUs(s string) error {
+	if s == "" {
+		return nil
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ',' || c == '=' || c == '-') {
+			return fmt.Errorf("invalid characters in gpus option: %q", s)
+		}
+	}
+	return nil
+}
+
 // ValidateGroupAdd ensures the supplementary group name or GID is safe.
 func ValidateGroupAdd(s string) error {
 	if s == "" {
