@@ -507,7 +507,7 @@ cderun --pids-limit 100 alpine forkbomb
 - **Details**:
   - **Docker**: Maps directly to `HostConfig.SecurityOpt` in the Docker host configuration.
   - **Podman**: Mapped to security options supported natively by the Podman engine.
-  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions` (@jules). Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
+  - **containerd**: Mutated in `CreateContainer` via a named helper `applySecurityOptions`. Empty AppArmor profiles (such as `apparmor=` or `apparmor:` with no profile name) are strictly rejected with explicit validation errors. Options like `seccomp=unconfined` initialize `s.Linux` if nil to prevent silent specification mutation failures.
 - **P1 Internal Override**: `--cderun-security-opt` is the corresponding Phase 1 (P1) internal override flag. It accepts string values and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-security-opt=no-new-privileges`).
 
 ```bash
@@ -542,7 +542,7 @@ cderun --ulimit nofile=1024:2048 alpine ulimit -n
 - **Details**:
   - **Docker**: Maps directly to `ShmSize` in the Docker host configuration.
   - **Podman**: Mapped to size configuration supported natively by the Podman engine.
-  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize` (@jules). It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
+  - **containerd**: Dynamically updates the `/dev/shm` tmpfs mount in the containerd OCI specification using the helper function `UpdateShmSize`. It gives the configured `shmSize` complete precedence over any existing `/dev/shm` mounts by removing every matching mount first, then appending a single sanitized tmpfs mount with the configured size.
 - **P1 Internal Override**: `--cderun-shm-size` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value and must be placed after the subcommand in Wrapper Mode (e.g., `cderun alpine sh --cderun-shm-size=256m`).
 
 ```bash

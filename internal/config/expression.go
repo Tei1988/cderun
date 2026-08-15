@@ -376,7 +376,7 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 	isMagicWordCandidate := len(content) > 0
 	for i := 0; i < len(content); i++ {
 		c := content[i]
-		if (c < 'A' || c > 'Z') && c != '_' && (c < '0' || c > '9') {
+		if !(c >= 'A' && c <= 'Z') && c != '_' && !(c >= '0' && c <= '9') {
 			isMagicWordCandidate = false
 			break
 		}

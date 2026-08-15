@@ -42,16 +42,6 @@ func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, 
 	return info, p1Set, p1Val, p2Set, p2Val, nil
 }
 
-func (rv *resolver) resolverForSlice(def OptionDef[[]string], envSep string, p1 []string, p2 []string) (*ExpressionResolver, error) {
-	vals := getWinningStringSlice(def, envSep, p1, p2, rv.subcommand, rv.tools, rv.global, rv.fs)
-	for _, v := range vals {
-		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
-			return rv.getR()
-		}
-	}
-	return nil, nil
-}
-
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	var p1v, p2v []string
 	var fastPathUsed bool
