@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -143,7 +142,7 @@ func TestUnit_Command_StdinAndSignals_Robustness(t *testing.T) {
 		assert.Empty(t, stdout.String())
 	})
 
-	t.Run("consecutive rapid signal context cancellation", func(t *testing.T) {
+	t.Run("pre-canceled context handling", func(t *testing.T) {
 		// Verify that cancelling the parent execution context triggers an immediate, graceful return.
 		ctx, cancel := context.WithCancel(context.Background())
 		mock := runtime.NewMockRuntime()
@@ -159,8 +158,7 @@ func TestUnit_Command_StdinAndSignals_Robustness(t *testing.T) {
 			o.exitFunc = func(code int) {}
 		})
 
-		// Should fail or complete with context.Canceled error
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, context.Canceled))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 }

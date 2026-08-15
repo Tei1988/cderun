@@ -41,7 +41,7 @@ func TestUnit_Config_Resolver_ExtremeNestedAndEscaped(t *testing.T) {
 		_, err = r.ResolveString("{{env:UNSET_VAR:-{{UNKNOWN_MAGIC_KEY}}}}")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown directive or magic word")
-		assert.True(t, r.Error() != nil)
+		require.Error(t, r.Error())
 	})
 
 	t.Run("preserves double-brace escaping inside multi-layer templates", func(t *testing.T) {
@@ -188,7 +188,7 @@ func TestUnit_Config_Resolver_OptionsReflectionAndDrift(t *testing.T) {
 
 		err = rv.applyFloat64Option(Float64Option{Name: "cpus", Default: 0.0})
 		require.NoError(t, err)
-		assert.Equal(t, 2.5, resConfig.CPUs)
+		assert.InDelta(t, 2.5, resConfig.CPUs, 1e-9)
 	})
 
 	t.Run("resolves duration and memory options correctly with defaults and dynamic values", func(t *testing.T) {
