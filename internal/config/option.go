@@ -159,19 +159,13 @@ func getWinningStringSlice(
 				}
 				return []string{v}
 			}
-			var vals []string
+			vals := []string{}
 			for v := range strings.SplitSeq(env, envSep) {
 				v = strings.TrimSpace(v)
 				if v == "" {
 					continue
 				}
-				if vals == nil {
-					vals = make([]string, 0, 4)
-				}
 				vals = append(vals, v)
-			}
-			if vals == nil {
-				return []string{}
 			}
 			return vals
 		}
@@ -197,21 +191,6 @@ func resolveStringSliceOptWithVals(
 	if vals == nil {
 		return nil
 	}
-
-	// Fast-path: check if any element actually requires resolution
-	needResolution := false
-	for _, v := range vals {
-		if r != nil && (strings.Contains(v, "{{") || strings.HasPrefix(v, "~")) {
-			needResolution = true
-			break
-		}
-	}
-	if !needResolution {
-		res := make([]string, len(vals))
-		copy(res, vals)
-		return res
-	}
-
 	res := make([]string, 0, len(vals))
 	for _, v := range vals {
 		if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
@@ -248,30 +227,12 @@ func resolveStringSliceCommaOpt(
 ) []string {
 	var vals []string
 	if p1Set {
-		if p1Val == "" {
-			vals = []string{}
-		} else if !strings.Contains(p1Val, ",") {
-			vals = []string{p1Val}
-		} else {
-			vals = strings.Split(p1Val, ",")
-		}
+		vals = strings.Split(p1Val, ",")
 	} else if p2Set {
-		if p2Val == "" {
-			vals = []string{}
-		} else if !strings.Contains(p2Val, ",") {
-			vals = []string{p2Val}
-		} else {
-			vals = strings.Split(p2Val, ",")
-		}
+		vals = strings.Split(p2Val, ",")
 	} else if def.EnvKey != "" {
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
-			if env == "" {
-				vals = []string{}
-			} else if !strings.Contains(env, ",") {
-				vals = []string{env}
-			} else {
-				vals = strings.Split(env, ",")
-			}
+			vals = strings.Split(env, ",")
 		}
 	}
 	if vals == nil && def.ToolGetter != nil && tools != nil {

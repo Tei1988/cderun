@@ -93,10 +93,6 @@ type rootFlags struct {
 	cderunPid             string
 	pidsLimit             int
 	cderunPidsLimit       int
-	prefetch              string
-	cderunPrefetch        string
-	prefetchAll           bool
-	cderunPrefetchAll     bool
 	privileged            bool
 	cderunPrivileged      bool
 	ports                 []string
@@ -253,10 +249,6 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunPid:             optStr(cmd.Flags().Changed("cderun-pid"), o.cderunPid),
 		PidsLimit:             optInt(cmd.Flags().Changed("pids-limit"), o.pidsLimit),
 		CderunPidsLimit:       optInt(cmd.Flags().Changed("cderun-pids-limit"), o.cderunPidsLimit),
-		Prefetch:              optStr(cmd.Flags().Changed("prefetch"), o.prefetch),
-		CderunPrefetch:        optStr(cmd.Flags().Changed("cderun-prefetch"), o.cderunPrefetch),
-		PrefetchAll:           optBool(cmd.Flags().Changed("prefetch-all"), o.prefetchAll),
-		CderunPrefetchAll:     optBool(cmd.Flags().Changed("cderun-prefetch-all"), o.cderunPrefetchAll),
 		Privileged:            optBool(cmd.Flags().Changed("privileged"), o.privileged),
 		CderunPrivileged:      optBool(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
 		Ports:                 o.ports,
@@ -320,8 +312,6 @@ func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 		return &o.mountCderun, &o.cderunMountCderun
 	case "mount-socket":
 		return &o.mountSocket, &o.cderunMountSocket
-	case "prefetch-all":
-		return &o.prefetchAll, &o.cderunPrefetchAll
 	case "privileged":
 		return &o.privileged, &o.cderunPrivileged
 	case "publish-all":
@@ -379,8 +369,6 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.network, &o.cderunNetwork
 	case "pid":
 		return &o.pid, &o.cderunPid
-	case "prefetch":
-		return &o.prefetch, &o.cderunPrefetch
 	case "pull":
 		return &o.pull, &o.cderunPull
 	case "pull-backoff-base":

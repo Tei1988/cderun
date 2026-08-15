@@ -89,8 +89,6 @@ type ConfigDefaults struct {
 	DryRunFormat    string         `yaml:"dryRunFormat,omitempty"`
 	Diagnosis       *bool          `yaml:"diagnosis,omitempty"`
 	DiagnosisFormat string         `yaml:"diagnosisFormat,omitempty"`
-	PrefetchAll     *bool          `yaml:"prefetchAll,omitempty"`
-	Prefetch        string         `yaml:"prefetch,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
@@ -126,7 +124,6 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.Privileged = copyBoolPtr(d.Privileged)
 	res.DryRun = copyBoolPtr(d.DryRun)
 	res.Diagnosis = copyBoolPtr(d.Diagnosis)
-	res.PrefetchAll = copyBoolPtr(d.PrefetchAll)
 	res.CPUs = copyFloat64Ptr(d.CPUs)
 	res.PullMaxRetries = copyIntPtr(d.PullMaxRetries)
 	res.PidsLimit = copyIntPtr(d.PidsLimit)
@@ -257,8 +254,6 @@ type ToolConfig struct {
 	DryRunFormat    string         `yaml:"dryRunFormat,omitempty"`
 	Diagnosis       *bool          `yaml:"diagnosis,omitempty"`
 	DiagnosisFormat string         `yaml:"diagnosisFormat,omitempty"`
-	PrefetchAll     *bool          `yaml:"prefetchAll,omitempty"`
-	Prefetch        string         `yaml:"prefetch,omitempty"`
 	Devices         []DeviceConfig `yaml:"devices,omitempty"`
 	Mounts          []MountConfig  `yaml:"mounts,omitempty"`
 	Env             []string       `yaml:"env,omitempty"`
@@ -295,7 +290,6 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.LogTimestamp = copyBoolPtr(t.LogTimestamp)
 	res.DryRun = copyBoolPtr(t.DryRun)
 	res.Diagnosis = copyBoolPtr(t.Diagnosis)
-	res.PrefetchAll = copyBoolPtr(t.PrefetchAll)
 	res.CPUs = copyFloat64Ptr(t.CPUs)
 	res.PullMaxRetries = copyIntPtr(t.PullMaxRetries)
 	res.PidsLimit = copyIntPtr(t.PidsLimit)

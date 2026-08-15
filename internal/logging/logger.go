@@ -259,31 +259,6 @@ func SanitizeLogString(s string) string {
 		return s
 	}
 
-	// Fast stack-allocated path for common small messages (up to 64 bytes)
-	// Each control character is escaped to 4 bytes. If len(s) <= 64, the maximum
-	// possible size is 4 * 64 = 256 bytes, which easily fits in our 256-byte stack buffer.
-	if len(s) <= 64 {
-		var buf [256]byte
-		w := 0
-		for i := 0; i < len(s); i++ {
-			c := s[i]
-			if c == '\t' {
-				buf[w] = c
-				w++
-			} else if c < 32 || c == 127 {
-				buf[w] = '\\'
-				buf[w+1] = 'x'
-				buf[w+2] = hexChars[c>>4]
-				buf[w+3] = hexChars[c&0x0f]
-				w += 4
-			} else {
-				buf[w] = c
-				w++
-			}
-		}
-		return string(buf[:w])
-	}
-
 	var builder strings.Builder
 	builder.Grow(len(s) + 8)
 	for i := 0; i < len(s); i++ {

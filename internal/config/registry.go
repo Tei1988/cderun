@@ -16,7 +16,6 @@ type StringOption struct {
 	ToolGetter     func(ToolConfig) string
 	GlobalGetter   func(CDERunConfig) string
 	SkipResolution bool // If true, only used for flag registration or handled specially in ResolveWithFS
-	info           optionFields
 }
 
 // BoolOption defines a boolean configuration option.
@@ -29,7 +28,6 @@ type BoolOption struct {
 	EnvKey       string
 	ToolGetter   func(ToolConfig) *bool
 	GlobalGetter func(CDERunConfig) *bool
-	info         optionFields
 }
 
 // IntOption defines an integer configuration option.
@@ -42,7 +40,6 @@ type IntOption struct {
 	EnvKey       string
 	ToolGetter   func(ToolConfig) *int
 	GlobalGetter func(CDERunConfig) *int
-	info         optionFields
 }
 
 // Float64Option defines a float64 configuration option.
@@ -55,7 +52,6 @@ type Float64Option struct {
 	EnvKey       string
 	ToolGetter   func(ToolConfig) *float64
 	GlobalGetter func(CDERunConfig) *float64
-	info         optionFields
 }
 
 // StringSliceOption defines a string slice configuration option.
@@ -68,7 +64,6 @@ type StringSliceOption struct {
 	ToolGetter     func(ToolConfig) []string
 	GlobalGetter   func(CDERunConfig) []string
 	SkipResolution bool // If true, only used for flag registration or handled specially in ResolveWithFS
-	info           optionFields
 }
 
 var IntOptions = []IntOption{
@@ -480,17 +475,6 @@ var StringOptions = []StringOption{
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as duration)
 	},
 	{
-		Name:   "prefetch",
-		EnvKey: "CDERUN_PREFETCH",
-		Usage:  "Prefetch specified tool images (comma-separated list)",
-		ToolGetter: func(t ToolConfig) string {
-			return t.Prefetch
-		},
-		GlobalGetter: func(g CDERunConfig) string {
-			return g.Defaults.Prefetch
-		},
-	},
-	{
 		Name:      "memory",
 		Shorthand: "m",
 		EnvKey:    "CDERUN_MEMORY",
@@ -783,17 +767,6 @@ var BoolOptions = []BoolOption{
 		},
 		GlobalGetter: func(g CDERunConfig) *bool {
 			return g.Logging.Timestamp
-		},
-	},
-	{
-		Name:   "prefetch-all",
-		EnvKey: "CDERUN_PREFETCH_ALL",
-		Usage:  "Prefetch all images defined in .tools.yaml",
-		ToolGetter: func(t ToolConfig) *bool {
-			return t.PrefetchAll
-		},
-		GlobalGetter: func(g CDERunConfig) *bool {
-			return g.Defaults.PrefetchAll
 		},
 	},
 	{

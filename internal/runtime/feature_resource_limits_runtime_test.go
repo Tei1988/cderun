@@ -24,39 +24,39 @@ func TestUnit_Runtime_Docker_ResourceLimits_Mapping(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "host", string(hostCfg.CgroupnsMode))
-	require.NotNil(t, hostCfg.PidsLimit)
-	assert.Equal(t, int64(100), *hostCfg.PidsLimit)
-	assert.Equal(t, int64(512), hostCfg.CPUShares)
-	assert.Equal(t, "0,1", hostCfg.CpusetCpus)
-	assert.Equal(t, "0", hostCfg.CpusetMems)
+	require.NotNil(t, hostCfg.Resources.PidsLimit)
+	assert.Equal(t, int64(100), *hostCfg.Resources.PidsLimit)
+	assert.Equal(t, int64(512), hostCfg.Resources.CPUShares)
+	assert.Equal(t, "0,1", hostCfg.Resources.CpusetCpus)
+	assert.Equal(t, "0", hostCfg.Resources.CpusetMems)
 
-	require.Len(t, hostCfg.DeviceRequests, 1)
-	assert.Equal(t, "nvidia", hostCfg.DeviceRequests[0].Driver)
-	assert.Equal(t, -1, hostCfg.DeviceRequests[0].Count)
+	require.Len(t, hostCfg.Resources.DeviceRequests, 1)
+	assert.Equal(t, "nvidia", hostCfg.Resources.DeviceRequests[0].Driver)
+	assert.Equal(t, -1, hostCfg.Resources.DeviceRequests[0].Count)
 
 	t.Run("valid count= GPU selector", func(t *testing.T) {
 		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=2"}
 		_, hostCfg, _, err := toDockerContainerConfig(cfgGpus)
 		require.NoError(t, err)
-		require.Len(t, hostCfg.DeviceRequests, 1)
-		assert.Equal(t, 2, hostCfg.DeviceRequests[0].Count)
+		require.Len(t, hostCfg.Resources.DeviceRequests, 1)
+		assert.Equal(t, 2, hostCfg.Resources.DeviceRequests[0].Count)
 	})
 
 	t.Run("valid count=-1 GPU selector", func(t *testing.T) {
 		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "count=-1"}
 		_, hostCfg, _, err := toDockerContainerConfig(cfgGpus)
 		require.NoError(t, err)
-		require.Len(t, hostCfg.DeviceRequests, 1)
-		assert.Equal(t, -1, hostCfg.DeviceRequests[0].Count)
+		require.Len(t, hostCfg.Resources.DeviceRequests, 1)
+		assert.Equal(t, -1, hostCfg.Resources.DeviceRequests[0].Count)
 	})
 
 	t.Run("valid device= GPU selector", func(t *testing.T) {
 		cfgGpus := &container.ContainerConfig{Image: "alpine", GPUs: "device=0,1"}
 		_, hostCfg, _, err := toDockerContainerConfig(cfgGpus)
 		require.NoError(t, err)
-		require.Len(t, hostCfg.DeviceRequests, 1)
-		assert.Equal(t, 0, hostCfg.DeviceRequests[0].Count)
-		assert.Equal(t, []string{"0", "1"}, hostCfg.DeviceRequests[0].DeviceIDs)
+		require.Len(t, hostCfg.Resources.DeviceRequests, 1)
+		assert.Equal(t, 0, hostCfg.Resources.DeviceRequests[0].Count)
+		assert.Equal(t, []string{"0", "1"}, hostCfg.Resources.DeviceRequests[0].DeviceIDs)
 	})
 
 	t.Run("invalid grammar GPU selector", func(t *testing.T) {

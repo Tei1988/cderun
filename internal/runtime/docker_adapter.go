@@ -81,7 +81,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 
 	if config.PidsLimit != 0 {
 		lim := config.PidsLimit
-		hostConfig.PidsLimit = &lim
+		hostConfig.Resources.PidsLimit = &lim
 	}
 
 	if config.Restart != "" {
@@ -124,7 +124,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		hostConfig.DeviceRequests = reqs
+		hostConfig.Resources.DeviceRequests = reqs
 	}
 
 	if config.ShmSize != "" {
