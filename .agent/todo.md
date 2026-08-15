@@ -959,7 +959,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
-- [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
+- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
 - [ ] @jules: Update `docs/features/command-line-options.md` to add information about `--prefetch` and `--prefetch-all` flags, explaining stand-alone image prefetching and template expression support mapped to CDERUN_PREFETCH and CDERUN_PREFETCH_ALL.
 
 ---
