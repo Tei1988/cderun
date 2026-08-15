@@ -96,6 +96,7 @@ var (
 	fieldInfo            map[string]optionFields
 	expectedFieldIndices map[string]optionFields
 	fieldOnce            sync.Once
+	inTest               bool
 
 	autoDetectMu           sync.RWMutex
 	autoDetectedRuntime    string
@@ -112,14 +113,14 @@ func initFieldInfo() {
 	fieldInfo = make(map[string]optionFields)
 	expectedFieldIndices = make(map[string]optionFields)
 
-	process := func(name, fieldName string) {
+	process := func(name, fieldName string) optionFields {
 		if fieldName == "" {
 			fieldName = PascalCase(name)
 		}
 
 		targetField, ok := resType.FieldByName(fieldName)
 		if !ok {
-			return
+			return optionFields{p1ValIdx: -1, p2ValIdx: -1, targetIdx: -1}
 		}
 
 		info := optionFields{
@@ -142,22 +143,23 @@ func initFieldInfo() {
 			fieldInfo[name] = info
 			expectedFieldIndices[name] = info
 		}
+		return info
 	}
 
-	for _, opt := range StringOptions {
-		process(opt.Name, opt.FieldName)
+	for i := range StringOptions {
+		StringOptions[i].info = process(StringOptions[i].Name, StringOptions[i].FieldName)
 	}
-	for _, opt := range BoolOptions {
-		process(opt.Name, opt.FieldName)
+	for i := range BoolOptions {
+		BoolOptions[i].info = process(BoolOptions[i].Name, BoolOptions[i].FieldName)
 	}
-	for _, opt := range IntOptions {
-		process(opt.Name, opt.FieldName)
+	for i := range IntOptions {
+		IntOptions[i].info = process(IntOptions[i].Name, IntOptions[i].FieldName)
 	}
-	for _, opt := range Float64Options {
-		process(opt.Name, opt.FieldName)
+	for i := range Float64Options {
+		Float64Options[i].info = process(Float64Options[i].Name, Float64Options[i].FieldName)
 	}
-	for _, opt := range StringSliceOptions {
-		process(opt.Name, opt.FieldName)
+	for i := range StringSliceOptions {
+		StringSliceOptions[i].info = process(StringSliceOptions[i].Name, StringSliceOptions[i].FieldName)
 	}
 }
 
