@@ -148,13 +148,26 @@ func TestExpressionResolver_StickyErrorPropagationInStructures(t *testing.T) {
 		},
 	}
 
-	_ = resolver.Resolve(input)
+	resolved := resolver.Resolve(input)
 	require.Error(t, resolver.Error())
 	assert.Contains(t, resolver.Error().Error(), "file not found")
 
+	// Verify resolution stops after encountering the sticky file error, preserving unresolved expressions
+	resolvedMap, ok := resolved.(map[string]any)
+	require.True(t, ok)
+	nestedMap, ok := resolvedMap["nested_map"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "{{HOME}}/nested", nestedMap["key"])
+
+	nestedSlice, ok := resolvedMap["nested_slice"].([]any)
+	require.True(t, ok)
+	require.Len(t, nestedSlice, 2)
+	assert.Equal(t, "{{HOME}}/slice1", nestedSlice[0])
+	assert.Equal(t, "{{HOME}}/slice2", nestedSlice[1])
+
 	// Verify sticky error prevents further resolution when called again
 	resString, err2 := resolver.ResolveString("{{HOME}}/should_not_resolve")
-	assert.Error(t, err2)
+	require.Error(t, err2)
 	assert.Equal(t, "{{HOME}}/should_not_resolve", resString)
 }
 
@@ -166,17 +179,20 @@ func TestExpressionResolver_UnknownDirectivesAndEscapes(t *testing.T) {
 		HomeDir: "/home/user",
 	}
 
-	resolver, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
-
 	t.Run("unknown uppercase directive returns error", func(t *testing.T) {
-		_, err := resolver.ResolveString("{{UNKNOWN_MAGIC_WORD}}")
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		_, err = r.ResolveString("{{UNKNOWN_MAGIC_WORD}}")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown directive or magic word")
 	})
 
 	t.Run("unknown colon directive returns error", func(t *testing.T) {
-		_, err := resolver.ResolveString("{{custom_prefix:value}}")
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		_, err = r.ResolveString("{{custom_prefix:value}}")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown directive or magic word")
 	})

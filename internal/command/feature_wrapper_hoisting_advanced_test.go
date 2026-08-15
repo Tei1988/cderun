@@ -85,6 +85,10 @@ func TestUnit_Command_AdvancedWrapperHoisting_DoubleDashAndIntermixed(t *testing
 		output := outBuf.String()
 		assert.Contains(t, output, "alpine:edge")
 		assert.Contains(t, output, "echo dry")
+
+		// Verify dry-run mode recorded no container creation or execution
+		assert.Nil(t, mockRuntime.GetCreatedConfig())
+		assert.Empty(t, mockRuntime.GetStartedContainerID())
 	})
 }
 
