@@ -67,7 +67,13 @@ func TestUnit_Config_SecurityHardening_PIDNamespace(t *testing.T) {
 	r.res.Pid = "container:"
 	err := r.validateCriticalFields()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "empty container reference")
+	assert.Contains(t, err.Error(), "empty or invalid container reference")
+
+	// Invalid parent traversal container reference
+	r.res.Pid = "container:.."
+	err = r.validateCriticalFields()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty or invalid container reference")
 
 	// Invalid character in container PID reference
 	r.res.Pid = "container:target;injection"
@@ -105,7 +111,7 @@ func TestUnit_Config_SecurityHardening_ParentTraversal(t *testing.T) {
 
 	t.Run("ValidateDNSOption with traversal", func(t *testing.T) {
 		t.Parallel()
-		assert.NoError(t, ValidateDNSOption("ndots:2"))
+		require.NoError(t, ValidateDNSOption("ndots:2"))
 		err := ValidateDNSOption("ndots:2/..")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "contains parent directory references")

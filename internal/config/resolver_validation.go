@@ -208,12 +208,12 @@ func (rv *resolver) validateCriticalFields() error {
 			return nil
 		}
 		if target, ok := strings.CutPrefix(v, "container:"); ok {
-			if target == "" {
-				return fmt.Errorf("invalid pid namespace: empty container reference in %q", v)
+			if target == "" || target == ".." || target == "." {
+				return fmt.Errorf("invalid pid namespace: empty or invalid container reference in %q", v)
 			}
 			for i := 0; i < len(target); i++ {
 				c := target[i]
-				if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-') {
+				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
 					return fmt.Errorf("invalid character in container pid reference: %q", target)
 				}
 			}

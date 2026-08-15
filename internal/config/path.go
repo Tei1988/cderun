@@ -848,12 +848,12 @@ func ValidateNetworkName(s string) error {
 		return fmt.Errorf("invalid network name: %q (contains parent directory references)", s)
 	}
 	if target, ok := strings.CutPrefix(s, "container:"); ok {
-		if target == "" {
-			return fmt.Errorf("invalid network name: empty container reference in %q", s)
+		if target == "" || target == ".." || target == "." {
+			return fmt.Errorf("invalid network name: empty or invalid container reference in %q", s)
 		}
 		for i := 0; i < len(target); i++ {
 			c := target[i]
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-') {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
 				return fmt.Errorf("invalid character in container network reference: %q", target)
 			}
 		}
