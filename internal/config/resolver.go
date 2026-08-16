@@ -264,37 +264,37 @@ func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val
 }
 
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
-	var p1Set, p2Set bool
-	var p1ValStr, p2ValStr string
+	var overrideSet, cliSet bool
+	var overrideValStr, cliValStr string
 
 	switch name {
 	case "socket-path":
-		p1Set, p1ValStr = getPtrVal(rv.cli.CderunSocketPath)
-		p2Set, p2ValStr = getPtrVal(rv.cli.SocketPath)
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.SocketPath)
 	case "mount-socket-path":
-		p1Set, p1ValStr = getPtrVal(rv.cli.CderunMountSocketPath)
-		p2Set, p2ValStr = getPtrVal(rv.cli.MountSocketPath)
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountSocketPath)
 	case "mount-cderun-path":
-		p1Set, p1ValStr = getPtrVal(rv.cli.CderunMountCderunPath)
-		p2Set, p2ValStr = getPtrVal(rv.cli.MountCderunPath)
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountCderunPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountCderunPath)
 	default:
 		_, s1, v1, s2, v2, err := fetchFieldAndParams(name, rv.getCliVal())
 		if err != nil {
 			return "", err
 		}
-		p1Set, p1ValStr, p2Set, p2ValStr = s1, v1.String(), s2, v2.String()
+		overrideSet, overrideValStr, cliSet, cliValStr = s1, v1.String(), s2, v2.String()
 	}
 
-	if !rv.hasPathToResolve(p1Set, p1ValStr, p2Set, p2ValStr, envKey, tGetter, gGetter, fallback) {
+	if !rv.hasPathToResolve(overrideSet, overrideValStr, cliSet, cliValStr, envKey, tGetter, gGetter, fallback) {
 		return "", nil
 	}
 
 	// Find the winning raw path
 	var raw string
-	if p1Set {
-		raw = p1ValStr
-	} else if p2Set {
-		raw = p2ValStr
+	if overrideSet {
+		raw = overrideValStr
+	} else if cliSet {
+		raw = cliValStr
 	} else if env := rv.fs.Getenv(envKey); env != "" {
 		raw = env
 	} else {
@@ -340,8 +340,8 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 	}
 
 	return resolveConfigPath(
-		p1Set, p1ValStr,
-		p2Set, p2ValStr,
+		overrideSet, overrideValStr,
+		cliSet, cliValStr,
 		envKey,
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
