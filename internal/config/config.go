@@ -610,9 +610,7 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 		loadedPaths = append(loadedPaths, path)
 	}
 
-	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
-		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
-	}
+	slices.Reverse(loadedPaths)
 
 	return &merged, loadedPaths, nil
 }
@@ -658,9 +656,7 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		loadedPaths = append(loadedPaths, path)
 	}
 
-	for i, j := 0, len(loadedPaths)-1; i < j; i, j = i+1, j-1 {
-		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
-	}
+	slices.Reverse(loadedPaths)
 
 	return merged, loadedPaths, nil
 }

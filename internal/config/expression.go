@@ -70,9 +70,7 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	}
 
 	// Reverse to maintain original order
-	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
-		res[i], res[j] = res[j], res[i]
-	}
+	slices.Reverse(res)
 
 	return res
 }
