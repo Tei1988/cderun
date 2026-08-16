@@ -585,7 +585,7 @@ func ContainsNumericGID(groups []string) bool {
 
 // HasParentTraversal checks if a path contains parent directory traversal ("..") segments.
 func HasParentTraversal(s string) bool {
-	if s == "" {
+	if !strings.Contains(s, "..") {
 		return false
 	}
 	idx := 0
@@ -609,7 +609,7 @@ func validatePathChars(s string) error {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c <= 31 || c == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", c, i)
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", rune(c), i)
 		}
 	}
 	return nil
