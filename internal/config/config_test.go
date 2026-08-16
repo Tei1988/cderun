@@ -83,7 +83,7 @@ defaults:
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/project/.cderun.yaml", paths[0])
-		assert.Equal(t, "docker", cfg.Runtime)
+		assert.Equal(t, "docker", cfg.Engine)
 		assert.True(t, *cfg.Defaults.TTY)
 	})
 
@@ -102,7 +102,7 @@ defaults:
 		assert.NotNil(t, cfg)
 		require.NotEmpty(t, paths)
 		assert.Equal(t, "/home/user/.config/cderun/.cderun.yaml", paths[0])
-		assert.Equal(t, "podman", cfg.Runtime)
+		assert.Equal(t, "podman", cfg.Engine)
 	})
 
 	t.Run("found in run dir", func(t *testing.T) {
@@ -303,7 +303,7 @@ defaults:
 		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, []string{"/custom/cderun.yaml"}, paths)
-		assert.Equal(t, "podman", cfg.Runtime)
+		assert.Equal(t, "podman", cfg.Engine)
 		assert.True(t, *cfg.Defaults.TTY)
 	})
 
@@ -611,7 +611,7 @@ func TestUnit_Config_DeepCopy(t *testing.T) {
 	t.Run("CDERunConfig DeepCopy", func(t *testing.T) {
 		tty := true
 		orig := CDERunConfig{
-			Runtime: "docker",
+			Engine:  "docker",
 			Defaults: ConfigDefaults{
 				TTY: &tty,
 				Env: []string{"A=1"},

@@ -24,7 +24,7 @@ func TestUnit_Root_InitContainer_ExtraErrors(t *testing.T) {
 				return nil, errors.New("factory failed")
 			},
 		}
-		resolved := &config.ResolvedConfig{Runtime: "docker"}
+		resolved := &config.ResolvedConfig{Engine: "docker"}
 		_, _, _, err := opts.initContainer(context.Background(), resolved, nil)
 		require.Error(t, err)
 		var rtErr *config.RuntimeInitError

@@ -372,11 +372,32 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
-		Name:   "runtime",
-		EnvKey: "CDERUN_RUNTIME",
-		Usage:  "Container runtime to use (docker/podman/containerd)",
+		Name:   "engine",
+		EnvKey: "CDERUN_ENGINE",
+		Usage:  "Container engine to use (docker/podman/containerd)",
+		Default: "docker",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Engine
+		},
 		GlobalGetter: func(g CDERunConfig) string {
-			return g.Runtime
+			if g.Engine != "" {
+				return g.Engine
+			}
+			return g.Defaults.Engine
+		},
+	},
+	{
+		Name:   "runtime",
+		EnvKey: "CDERUN_OCI_RUNTIME",
+		Usage:  "OCI runtime to use",
+		ToolGetter: func(t ToolConfig) string {
+			return t.Runtime
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			if g.Runtime != "" {
+				return g.Runtime
+			}
+			return g.Defaults.Runtime
 		},
 	},
 	{

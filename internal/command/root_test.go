@@ -304,10 +304,10 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 	})
 
-	t.Run("returns error for unsupported runtime", func(t *testing.T) {
-		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
+	t.Run("returns error for unsupported engine", func(t *testing.T) {
+		_, err := executeCommand("--image", "alpine", "--engine", "invalid", "sh")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unsupported runtime: \"invalid\"")
+		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -499,7 +499,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
+			Engine:          "docker",
 			SocketPath:      "/var/run/docker.sock",
 			Diagnosis:       true,
 			DiagnosisFormat: "json",
@@ -524,7 +524,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
+			Engine:          "docker",
 			SocketPath:      "/var/run/docker.sock",
 			Diagnosis:       true,
 			DiagnosisFormat: "yaml",
@@ -549,7 +549,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
+			Engine:          "docker",
 			SocketPath:      "/var/run/docker.sock",
 			Diagnosis:       true,
 			DiagnosisFormat: "simple",
@@ -573,7 +573,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 			fs: mfs,
 		}
 		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
+			Engine:          "docker",
 			SocketPath:      "/nonexistent/socket",
 			Diagnosis:       true,
 			DiagnosisFormat: "simple",
@@ -593,7 +593,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		}
 		opts := &rootOptions{fs: mfs}
 		resolved := &config.ResolvedConfig{
-			Runtime:         "docker",
+			Engine:          "docker",
 			SocketPath:      "/var/run/docker.sock",
 			Diagnosis:       true,
 			DiagnosisFormat: "json",

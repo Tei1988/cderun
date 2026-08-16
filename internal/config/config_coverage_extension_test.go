@@ -24,7 +24,7 @@ func TestUnit_Config_LoadCDERunConfig_FromPath_Hierarchical(t *testing.T) {
 		cfg, paths, err := loader.LoadCDERunConfig()
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
-		assert.Equal(t, "podman", cfg.Runtime)
+		assert.Equal(t, "podman", cfg.Engine)
 		assert.Equal(t, "info", cfg.Logging.Level)
 		assert.Len(t, paths, 2)
 	})

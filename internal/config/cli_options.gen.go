@@ -38,6 +38,8 @@ type CLIOptions struct {
 	CderunDryRun          *bool
 	DryRunFormat          *string
 	CderunDryRunFormat    *string
+	Engine                *string
+	CderunEngine          *string
 	Entrypoint            []string
 	CderunEntrypoint      []string
 	Env                   []string

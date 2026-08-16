@@ -131,7 +131,7 @@ func TestUnit_Config_LoadFromPath_Direct(t *testing.T) {
 	loader := NewConfigLoaderWithFS(mfs)
 	cfg, paths, err := loader.LoadCDERunConfigFromPath("custom.yaml")
 	require.NoError(t, err)
-	assert.Equal(t, "podman", cfg.Runtime)
+	assert.Equal(t, "podman", cfg.Engine)
 	assert.Equal(t, []string{"/app/custom.yaml"}, paths)
 }
 
@@ -190,7 +190,7 @@ func TestUnit_Config_ConfigLoader_Exhaustive(t *testing.T) {
 		loader := NewConfigLoaderWithFS(mfs)
 		cfg, _, err := loader.LoadCDERunConfigFromPath("~/custom.yaml")
 		require.NoError(t, err)
-		assert.Equal(t, "docker", cfg.Runtime)
+		assert.Equal(t, "docker", cfg.Engine)
 	})
 }
 

@@ -439,7 +439,7 @@ func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpl
 func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	o.ensureHooks()
 	info := diagnosticsInfo{}
-	info.Runtime.Name = resolved.Runtime
+	info.Runtime.Name = resolved.Engine
 	info.Runtime.Socket = resolved.SocketPath
 	if _, err := o.fs.Stat(resolved.SocketPath); err == nil {
 		info.Runtime.Status = "accessible"
@@ -851,9 +851,9 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 	o.logContainerConfig(resolved, cc)
 
 	// Initialize Runtime
-	rt, err = o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
+	rt, err = o.runtimeFactory(resolved.Engine, resolved.SocketPath, o.logger)
 	if err != nil {
-		err = &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+		err = &config.RuntimeInitError{Runtime: resolved.Engine, Err: err}
 		return
 	}
 

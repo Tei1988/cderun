@@ -11,12 +11,15 @@ import (
 	"strings"
 	"sync"
 
+	"cderun/internal/logging"
+
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
 )
 
 type CDERunConfig struct {
-	Runtime     string         `yaml:"runtime"`
+	Engine      string         `yaml:"engine,omitempty"`
+	Runtime     string         `yaml:"runtime,omitempty"` // Deprecated alias
 	SocketPath  ConfigPath     `yaml:"socketPath"`
 	Defaults    ConfigDefaults `yaml:"defaults"`
 	Logging     LoggingConfig  `yaml:"logging"`
@@ -80,6 +83,8 @@ type ConfigDefaults struct {
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
+	Engine          string         `yaml:"engine,omitempty"`
+	Runtime         string         `yaml:"runtime,omitempty"`
 	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
 	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
@@ -242,6 +247,8 @@ type ToolConfig struct {
 	CapDrop         []string       `yaml:"capDrop,omitempty"`
 	Entrypoint      []string       `yaml:"entrypoint,omitempty"`
 	Pull            string         `yaml:"pull,omitempty"`
+	Engine          string         `yaml:"engine,omitempty"`
+	Runtime         string         `yaml:"runtime,omitempty"`
 	PullMaxRetries  *int           `yaml:"pullMaxRetries,omitempty"`
 	PullBackoffBase string         `yaml:"pullBackoffBase,omitempty"`
 	Memory          string         `yaml:"memory,omitempty"`
@@ -597,8 +604,29 @@ func (l *ConfigLoader) LoadCDERunConfig() (*CDERunConfig, []string, error) {
 			return nil, nil, fmt.Errorf("failed to set base directory for %q: %w", path, err)
 		}
 
+		migrateLegacyRuntime(&layer.Engine, &layer.Runtime, path)
+		migrateLegacyRuntime(&layer.Defaults.Engine, &layer.Defaults.Runtime, path)
+
+		oldEngine := merged.Engine
+		oldRuntime := merged.Runtime
+		oldDefEngine := merged.Defaults.Engine
+		oldDefRuntime := merged.Defaults.Runtime
+
 		if err := mergo.Merge(&merged, &layer, mergo.WithOverride); err != nil {
 			return nil, nil, fmt.Errorf("failed to merge config from %q: %w", path, err)
+		}
+
+		if layer.Engine == "" {
+			merged.Engine = oldEngine
+		}
+		if layer.Runtime == "" {
+			merged.Runtime = oldRuntime
+		}
+		if layer.Defaults.Engine == "" {
+			merged.Defaults.Engine = oldDefEngine
+		}
+		if layer.Defaults.Runtime == "" {
+			merged.Defaults.Runtime = oldDefRuntime
 		}
 
 		loadedPaths = append(loadedPaths, path)
@@ -656,6 +684,11 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 		loadedPaths[i], loadedPaths[j] = loadedPaths[j], loadedPaths[i]
 	}
 
+	for k, v := range merged {
+		migrateLegacyRuntime(&v.Engine, &v.Runtime, fmt.Sprintf("tool %s", k))
+		merged[k] = v
+	}
+
 	return merged, loadedPaths, nil
 }
 
@@ -695,6 +728,8 @@ func (l *ConfigLoader) LoadCDERunConfigFromPath(path string) (*CDERunConfig, []s
 	if err := unmarshalStrict(data, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal config file %q: %w", absPath, err)
 	}
+	migrateLegacyRuntime(&cfg.Engine, &cfg.Runtime, absPath)
+	migrateLegacyRuntime(&cfg.Defaults.Engine, &cfg.Defaults.Runtime, absPath)
 
 	baseDir := filepath.Dir(absPath)
 	if err := cfg.SetBaseDir(baseDir); err != nil {
@@ -724,6 +759,7 @@ func (l *ConfigLoader) LoadToolsConfigFromPath(path string) (ToolsConfig, []stri
 	baseDir := filepath.Dir(absPath)
 	for k, v := range cfg {
 		v.SetBaseDir(baseDir)
+		migrateLegacyRuntime(&v.Engine, &v.Runtime, fmt.Sprintf("tool %s in %s", k, absPath))
 		cfg[k] = v
 	}
 
@@ -744,4 +780,18 @@ func copyIntPtr(i *int) *int {
 	}
 	res := *i
 	return &res
+}
+
+func isContainerEngineValue(v string) bool {
+	return v == "docker" || v == "podman" || v == "containerd"
+}
+
+func migrateLegacyRuntime(engine *string, runtime *string, contextMsg string) {
+	if *runtime != "" && isContainerEngineValue(*runtime) {
+		if *engine == "" {
+			*engine = *runtime
+		}
+		*runtime = "" // Clear legacy engine value so it doesn't pollute OCI runtime field
+		logging.Warn("config warning: 'runtime' key with container engine value %q in %s is deprecated and will be removed in a future release; use 'engine' instead.", *engine, contextMsg)
+	}
 }

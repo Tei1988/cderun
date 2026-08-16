@@ -176,7 +176,7 @@ func TestUnit_Root_LoadConfigs_Coverage(t *testing.T) {
 
 		_, globalCfg, _, _, err := o.loadConfigs(cmd)
 		require.NoError(t, err)
-		assert.Equal(t, "podman", globalCfg.Runtime)
+		assert.Equal(t, "podman", globalCfg.Engine)
 	})
 
 	t.Run("CDERUN_TOOL_CONFIG environment variable", func(t *testing.T) {

@@ -43,6 +43,8 @@ type rootFlags struct {
 	cderunDryRun          bool
 	dryRunFormat          string
 	cderunDryRunFormat    string
+	engine                string
+	cderunEngine          string
 	entrypoint            []string
 	cderunEntrypoint      []string
 	env                   []string
@@ -199,6 +201,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunDryRun:          optBool(cmd.Flags().Changed("cderun-dry-run"), o.cderunDryRun),
 		DryRunFormat:          optStr(cmd.Flags().Changed("dry-run-format"), o.dryRunFormat),
 		CderunDryRunFormat:    optStr(cmd.Flags().Changed("cderun-dry-run-format"), o.cderunDryRunFormat),
+		Engine:                optStr(cmd.Flags().Changed("engine"), o.engine),
+		CderunEngine:          optStr(cmd.Flags().Changed("cderun-engine"), o.cderunEngine),
 		Entrypoint:            o.entrypoint,
 		CderunEntrypoint:      o.cderunEntrypoint,
 		Env:                   o.env,
@@ -343,6 +347,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.diagnosisFormat, &o.cderunDiagnosisFormat
 	case "dry-run-format":
 		return &o.dryRunFormat, &o.cderunDryRunFormat
+	case "engine":
+		return &o.engine, &o.cderunEngine
 	case "gpus":
 		return &o.gpus, &o.cderunGPUs
 	case "hang-timeout":

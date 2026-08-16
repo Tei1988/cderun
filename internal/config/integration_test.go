@@ -25,7 +25,7 @@ func TestIntegration_Config_Load_MockFS(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, cfg)
 	assert.NotEmpty(t, paths)
-	assert.Equal(t, "docker", cfg.Runtime)
+	assert.Equal(t, "docker", cfg.Engine)
 }
 
 func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
@@ -63,7 +63,7 @@ func TestIntegration_Config_Merge_Hierarchical(t *testing.T) {
 		// Then: Configs should be merged correctly (child overrides parent)
 		require.NoError(t, err)
 		require.Len(t, paths, 2)
-		assert.Equal(t, "docker", cfg.Runtime)          // From parent
+		assert.Equal(t, "docker", cfg.Engine)           // From parent
 		assert.True(t, *cfg.Defaults.TTY)               // From child (overridden)
 		assert.Equal(t, "bridge", cfg.Defaults.Network) // From parent
 	})

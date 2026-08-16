@@ -27,6 +27,7 @@ type ResolvedConfig struct {
 	Env             []string
 	Workdir         string
 	User            string
+	Engine          string
 	Runtime         string
 	SocketPath      string
 	MountSocket     bool
