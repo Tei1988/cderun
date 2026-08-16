@@ -230,6 +230,8 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
 - `--pull-max-retries`: Maximum number of retries for image pull (1 or greater). (Default: `3`)
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
+- `--prefetch`: Prefetch specified tool images defined in `.tools.yaml` (comma-separated list, e.g., `node,python`) in stand-alone mode.
+- `--prefetch-all`: Prefetch images for all tools defined in `.tools.yaml` in stand-alone mode. (Default: `false`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Configuring any non-`no` restart policy requires setting `--remove=false` due to default removal behavior and resolver constraints. Note: containerd does not support restart policies.
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
