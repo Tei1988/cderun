@@ -615,6 +615,17 @@ func validatePathChars(s string) error {
 	return nil
 }
 
+// ValidateMountType ensures the mount type is one of the supported types (bind, volume, tmpfs).
+func ValidateMountType(t string) error {
+	if t == "" {
+		return nil
+	}
+	if t != "bind" && t != "volume" && t != "tmpfs" {
+		return fmt.Errorf("unsupported mount type: %q (supported: bind, volume, tmpfs)", t)
+	}
+	return nil
+}
+
 // ValidateCpuset restricts cpuset configurations to standard digits, commas, and hyphens.
 func ValidateCpuset(s string) error {
 	if s == "" {
@@ -675,6 +686,9 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	processBoundary := func(anchorRaw, anchorPath string) error {
 		if anchorPath == "" {
 			return fmt.Errorf("anchor path is empty for %q", anchorRaw)
+		}
+		if err := validatePathChars(anchorPath); err != nil {
+			return fmt.Errorf("security validation failed for anchor path %q: %w", anchorPath, err)
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)

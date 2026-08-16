@@ -525,6 +525,10 @@ func (rv *resolver) resolveAndValidateImage() error {
 				}
 
 				if cliImage != "" {
+					if err := validatePathChars(cliImage); err != nil {
+						return fmt.Errorf("security validation failed for CLI image: %w", err)
+					}
+
 					var errCLI, errCfg error
 					resolvedCLIImage := cliImage
 					resolvedCfgImage := tool.Image
