@@ -83,13 +83,13 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 				// Special handling for pid which only allows "host" or ""
 				if opt.Name == "pid" {
 					cliP1 := makeCLI()
-					setP1String(cliP1, fieldName, "host")
+					setP1String(t, cliP1, fieldName, "host")
 					res, err := ResolveWithFS("sh", cliP1, nil, nil, &MockFileSystem{})
 					require.NoError(t, err)
 					assert.Equal(t, "host", res.Pid, "P1 should set host pid")
 
 					cliP2 := makeCLI()
-					setP2String(cliP2, fieldName, "host")
+					setP2String(t, cliP2, fieldName, "host")
 					res, err = ResolveWithFS("sh", cliP2, nil, nil, &MockFileSystem{})
 					require.NoError(t, err)
 					assert.Equal(t, "host", res.Pid, "P2 should set host pid")
@@ -99,12 +99,12 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 					require.NoError(t, err)
 					assert.Equal(t, "host", res.Pid, "P3 should set host pid")
 
-					toolsP4 := createToolsConfigWithString(opt.Name, fieldName, "host")
+					toolsP4 := createToolsConfigWithString(t, fieldName, "host")
 					res, err = ResolveWithFS("sh", makeCLI(), toolsP4, nil, &MockFileSystem{})
 					require.NoError(t, err)
 					assert.Equal(t, "host", res.Pid, "P4 should set host pid")
 
-					globalP5 := createGlobalConfigWithString(opt.Name, fieldName, "host")
+					globalP5 := createGlobalConfigWithString(t, opt.Name, fieldName, "host")
 					res, err = ResolveWithFS("sh", makeCLI(), nil, globalP5, &MockFileSystem{})
 					require.NoError(t, err)
 					assert.Equal(t, "host", res.Pid, "P5 should set host pid")
@@ -113,37 +113,40 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 				// Test P1 > P2 > P3 > P4 > P5
 				cliP1 := makeCLI()
-				setP1String(cliP1, fieldName, p1Val)
-				setP2String(cliP1, fieldName, p2Val)
+				setP1String(t, cliP1, fieldName, p1Val)
+				setP2String(t, cliP1, fieldName, p2Val)
 
 				mfs := &MockFileSystem{Env: map[string]string{opt.EnvKey: p3Val}}
-				tools := createToolsConfigWithString(opt.Name, fieldName, p4Val)
-				global := createGlobalConfigWithString(opt.Name, fieldName, p5Val)
+				var tools ToolsConfig
+				if opt.ToolGetter != nil {
+					tools = createToolsConfigWithString(t, fieldName, p4Val)
+				}
+				global := createGlobalConfigWithString(t, opt.Name, fieldName, p5Val)
 
 				// Test P1 wins over all
 				res, err := ResolveWithFS("sh", cliP1, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p1Val, getStringResult(res, fieldName), "P1 should win for "+opt.Name)
+				assert.Equal(t, p1Val, getStringResult(t, res, fieldName), "P1 should win for "+opt.Name)
 
 				// Test P2 wins over P3, P4, P5
 				cliP2 := makeCLI()
-				setP2String(cliP2, fieldName, p2Val)
+				setP2String(t, cliP2, fieldName, p2Val)
 				res, err = ResolveWithFS("sh", cliP2, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p2Val, getStringResult(res, fieldName), "P2 should win for "+opt.Name)
+				assert.Equal(t, p2Val, getStringResult(t, res, fieldName), "P2 should win for "+opt.Name)
 
 				// Test P3 wins over P4, P5
 				cliEmpty := makeCLI()
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p3Val, getStringResult(res, fieldName), "P3 should win for "+opt.Name)
+				assert.Equal(t, p3Val, getStringResult(t, res, fieldName), "P3 should win for "+opt.Name)
 
 				// Test P4 wins over P5 (if ToolGetter is supported)
 				if opt.ToolGetter != nil {
 					mfsNoEnv := &MockFileSystem{}
 					res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfsNoEnv)
 					require.NoError(t, err)
-					assert.Equal(t, p4Val, getStringResult(res, fieldName), "P4 should win for "+opt.Name)
+					assert.Equal(t, p4Val, getStringResult(t, res, fieldName), "P4 should win for "+opt.Name)
 				}
 
 				// Test P5 wins over default
@@ -155,9 +158,9 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 					assert.Equal(t, p5Val, res.Runtime, "P5 should win for runtime")
 				} else {
 					mfsNoEnv := &MockFileSystem{}
-					res, err := ResolveWithFS("sh", cliEmpty, nil, global, mfsNoEnv)
+					res, err = ResolveWithFS("sh", cliEmpty, nil, global, mfsNoEnv)
 					require.NoError(t, err)
-					assert.Equal(t, p5Val, getStringResult(res, fieldName), "P5 should win for "+opt.Name)
+					assert.Equal(t, p5Val, getStringResult(t, res, fieldName), "P5 should win for "+opt.Name)
 				}
 			})
 		}
@@ -179,45 +182,51 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 				// P1 vs P2
 				cliP1 := &CLIOptions{Image: ptr("alpine")}
-				setP1Bool(cliP1, fieldName, winVal)
-				setP2Bool(cliP1, fieldName, loseVal)
+				setP1Bool(t, cliP1, fieldName, winVal)
+				setP2Bool(t, cliP1, fieldName, loseVal)
 
 				mfs := &MockFileSystem{Env: map[string]string{opt.EnvKey: boolToString(loseVal)}}
-				tools := createToolsConfigWithBool(opt.Name, fieldName, loseVal)
-				global := createGlobalConfigWithBool(opt.Name, fieldName, loseVal)
+				var tools ToolsConfig
+				if opt.ToolGetter != nil {
+					tools = createToolsConfigWithBool(t, fieldName, loseVal)
+				}
+				global := createGlobalConfigWithBool(t, opt.Name, fieldName, loseVal)
 
 				res, err := ResolveWithFS("sh", cliP1, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, winVal, getBoolResult(res, fieldName), "P1 should win for "+opt.Name)
+				assert.Equal(t, winVal, getBoolResult(t, res, fieldName), "P1 should win for "+opt.Name)
 
 				// P2 vs P3
 				cliP2 := &CLIOptions{Image: ptr("alpine")}
-				setP2Bool(cliP2, fieldName, winVal)
+				setP2Bool(t, cliP2, fieldName, winVal)
 				mfsP3 := &MockFileSystem{Env: map[string]string{opt.EnvKey: boolToString(loseVal)}}
 				res, err = ResolveWithFS("sh", cliP2, tools, global, mfsP3)
 				require.NoError(t, err)
-				assert.Equal(t, winVal, getBoolResult(res, fieldName), "P2 should win for "+opt.Name)
+				assert.Equal(t, winVal, getBoolResult(t, res, fieldName), "P2 should win for "+opt.Name)
 
 				// P3 vs P4
 				cliEmpty := &CLIOptions{Image: ptr("alpine")}
 				mfsP3Win := &MockFileSystem{Env: map[string]string{opt.EnvKey: boolToString(winVal)}}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfsP3Win)
 				require.NoError(t, err)
-				assert.Equal(t, winVal, getBoolResult(res, fieldName), "P3 should win for "+opt.Name)
+				assert.Equal(t, winVal, getBoolResult(t, res, fieldName), "P3 should win for "+opt.Name)
 
 				// P4 vs P5
 				mfsEmpty := &MockFileSystem{}
-				toolsWin := createToolsConfigWithBool(opt.Name, fieldName, winVal)
-				globalLose := createGlobalConfigWithBool(opt.Name, fieldName, loseVal)
+				var toolsWin ToolsConfig
+				if opt.ToolGetter != nil {
+					toolsWin = createToolsConfigWithBool(t, fieldName, winVal)
+				}
+				globalLose := createGlobalConfigWithBool(t, opt.Name, fieldName, loseVal)
 				res, err = ResolveWithFS("sh", cliEmpty, toolsWin, globalLose, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, winVal, getBoolResult(res, fieldName), "P4 should win for "+opt.Name)
+				assert.Equal(t, winVal, getBoolResult(t, res, fieldName), "P4 should win for "+opt.Name)
 
 				// P5 vs Default
-				globalWin := createGlobalConfigWithBool(opt.Name, fieldName, winVal)
+				globalWin := createGlobalConfigWithBool(t, opt.Name, fieldName, winVal)
 				res, err = ResolveWithFS("sh", cliEmpty, nil, globalWin, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, winVal, getBoolResult(res, fieldName), "P5 should win for "+opt.Name)
+				assert.Equal(t, winVal, getBoolResult(t, res, fieldName), "P5 should win for "+opt.Name)
 			})
 		}
 	})
@@ -234,40 +243,43 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 				// P1 vs P2
 				cliP1 := &CLIOptions{Image: ptr("alpine")}
-				setP1Int(cliP1, fieldName, p1Val)
-				setP2Int(cliP1, fieldName, p2Val)
+				setP1Int(t, cliP1, fieldName, p1Val)
+				setP2Int(t, cliP1, fieldName, p2Val)
 
 				mfs := &MockFileSystem{Env: map[string]string{opt.EnvKey: "30"}}
-				tools := createToolsConfigWithInt(opt.Name, fieldName, p4Val)
-				global := createGlobalConfigWithInt(opt.Name, fieldName, p5Val)
+				var tools ToolsConfig
+				if opt.ToolGetter != nil {
+					tools = createToolsConfigWithInt(t, fieldName, p4Val)
+				}
+				global := createGlobalConfigWithInt(t, fieldName, p5Val)
 
 				res, err := ResolveWithFS("sh", cliP1, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p1Val, getIntResult(res, fieldName), "P1 should win for "+opt.Name)
+				assert.Equal(t, p1Val, getIntResult(t, res, fieldName), "P1 should win for "+opt.Name)
 
 				// P2 vs P3
 				cliP2 := &CLIOptions{Image: ptr("alpine")}
-				setP2Int(cliP2, fieldName, p2Val)
+				setP2Int(t, cliP2, fieldName, p2Val)
 				res, err = ResolveWithFS("sh", cliP2, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p2Val, getIntResult(res, fieldName), "P2 should win for "+opt.Name)
+				assert.Equal(t, p2Val, getIntResult(t, res, fieldName), "P2 should win for "+opt.Name)
 
 				// P3 vs P4
 				cliEmpty := &CLIOptions{Image: ptr("alpine")}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p3Val, getIntResult(res, fieldName), "P3 should win for "+opt.Name)
+				assert.Equal(t, p3Val, getIntResult(t, res, fieldName), "P3 should win for "+opt.Name)
 
 				// P4 vs P5
 				mfsEmpty := &MockFileSystem{}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, p4Val, getIntResult(res, fieldName), "P4 should win for "+opt.Name)
+				assert.Equal(t, p4Val, getIntResult(t, res, fieldName), "P4 should win for "+opt.Name)
 
 				// P5 vs Default
 				res, err = ResolveWithFS("sh", cliEmpty, nil, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, p5Val, getIntResult(res, fieldName), "P5 should win for "+opt.Name)
+				assert.Equal(t, p5Val, getIntResult(t, res, fieldName), "P5 should win for "+opt.Name)
 			})
 		}
 	})
@@ -284,40 +296,43 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 				// P1 vs P2
 				cliP1 := &CLIOptions{Image: ptr("alpine")}
-				setP1Float64(cliP1, fieldName, p1Val)
-				setP2Float64(cliP1, fieldName, p2Val)
+				setP1Float64(t, cliP1, fieldName, p1Val)
+				setP2Float64(t, cliP1, fieldName, p2Val)
 
 				mfs := &MockFileSystem{Env: map[string]string{opt.EnvKey: "3.5"}}
-				tools := createToolsConfigWithFloat64(opt.Name, fieldName, p4Val)
-				global := createGlobalConfigWithFloat64(opt.Name, fieldName, p5Val)
+				var tools ToolsConfig
+				if opt.ToolGetter != nil {
+					tools = createToolsConfigWithFloat64(t, fieldName, p4Val)
+				}
+				global := createGlobalConfigWithFloat64(t, fieldName, p5Val)
 
 				res, err := ResolveWithFS("sh", cliP1, tools, global, mfs)
 				require.NoError(t, err)
-				assert.InDelta(t, p1Val, getFloat64Result(res, fieldName), 1e-9, "P1 should win for "+opt.Name)
+				assert.InDelta(t, p1Val, getFloat64Result(t, res, fieldName), 1e-9, "P1 should win for "+opt.Name)
 
 				// P2 vs P3
 				cliP2 := &CLIOptions{Image: ptr("alpine")}
-				setP2Float64(cliP2, fieldName, p2Val)
+				setP2Float64(t, cliP2, fieldName, p2Val)
 				res, err = ResolveWithFS("sh", cliP2, tools, global, mfs)
 				require.NoError(t, err)
-				assert.InDelta(t, p2Val, getFloat64Result(res, fieldName), 1e-9, "P2 should win for "+opt.Name)
+				assert.InDelta(t, p2Val, getFloat64Result(t, res, fieldName), 1e-9, "P2 should win for "+opt.Name)
 
 				// P3 vs P4
 				cliEmpty := &CLIOptions{Image: ptr("alpine")}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfs)
 				require.NoError(t, err)
-				assert.InDelta(t, p3Val, getFloat64Result(res, fieldName), 1e-9, "P3 should win for "+opt.Name)
+				assert.InDelta(t, p3Val, getFloat64Result(t, res, fieldName), 1e-9, "P3 should win for "+opt.Name)
 
 				// P4 vs P5
 				mfsEmpty := &MockFileSystem{}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.InDelta(t, p4Val, getFloat64Result(res, fieldName), 1e-9, "P4 should win for "+opt.Name)
+				assert.InDelta(t, p4Val, getFloat64Result(t, res, fieldName), 1e-9, "P4 should win for "+opt.Name)
 
 				// P5 vs Default
 				res, err = ResolveWithFS("sh", cliEmpty, nil, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.InDelta(t, p5Val, getFloat64Result(res, fieldName), 1e-9, "P5 should win for "+opt.Name)
+				assert.InDelta(t, p5Val, getFloat64Result(t, res, fieldName), 1e-9, "P5 should win for "+opt.Name)
 			})
 		}
 	})
@@ -347,40 +362,43 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 				// P1 vs P2
 				cliP1 := &CLIOptions{Image: ptr("alpine")}
-				setP1Slice(cliP1, fieldName, p1Val)
-				setP2Slice(cliP1, fieldName, p2Val)
+				setP1Slice(t, cliP1, fieldName, p1Val)
+				setP2Slice(t, cliP1, fieldName, p2Val)
 
 				mfs := &MockFileSystem{Env: map[string]string{opt.EnvKey: p3Val}}
-				tools := createToolsConfigWithSlice(opt.Name, fieldName, p4Val)
-				global := createGlobalConfigWithSlice(opt.Name, fieldName, p5Val)
+				var tools ToolsConfig
+				if opt.ToolGetter != nil {
+					tools = createToolsConfigWithSlice(t, fieldName, p4Val)
+				}
+				global := createGlobalConfigWithSlice(t, fieldName, p5Val)
 
 				res, err := ResolveWithFS("sh", cliP1, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p1Val, getSliceResult(res, fieldName), "P1 should win for "+opt.Name)
+				assert.Equal(t, p1Val, getSliceResult(t, res, fieldName), "P1 should win for "+opt.Name)
 
 				// P2 vs P3
 				cliP2 := &CLIOptions{Image: ptr("alpine")}
-				setP2Slice(cliP2, fieldName, p2Val)
+				setP2Slice(t, cliP2, fieldName, p2Val)
 				res, err = ResolveWithFS("sh", cliP2, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p2Val, getSliceResult(res, fieldName), "P2 should win for "+opt.Name)
+				assert.Equal(t, p2Val, getSliceResult(t, res, fieldName), "P2 should win for "+opt.Name)
 
 				// P3 vs P4
 				cliEmpty := &CLIOptions{Image: ptr("alpine")}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfs)
 				require.NoError(t, err)
-				assert.Equal(t, p3Expected, getSliceResult(res, fieldName), "P3 should win for "+opt.Name)
+				assert.Equal(t, p3Expected, getSliceResult(t, res, fieldName), "P3 should win for "+opt.Name)
 
 				// P4 vs P5
 				mfsEmpty := &MockFileSystem{}
 				res, err = ResolveWithFS("sh", cliEmpty, tools, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, p4Val, getSliceResult(res, fieldName), "P4 should win for "+opt.Name)
+				assert.Equal(t, p4Val, getSliceResult(t, res, fieldName), "P4 should win for "+opt.Name)
 
 				// P5 vs Default
 				res, err = ResolveWithFS("sh", cliEmpty, nil, global, mfsEmpty)
 				require.NoError(t, err)
-				assert.Equal(t, p5Val, getSliceResult(res, fieldName), "P5 should win for "+opt.Name)
+				assert.Equal(t, p5Val, getSliceResult(t, res, fieldName), "P5 should win for "+opt.Name)
 			})
 		}
 	})
@@ -388,114 +406,105 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 
 // Reflection helpers for matrix test execution
 
-func setP1String(cli *CLIOptions, fieldName string, val string) {
+func setP1String(t *testing.T, cli *CLIOptions, fieldName string, val string) {
 	v := reflect.ValueOf(cli).Elem().FieldByName("Cderun" + fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field Cderun"+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field Cderun"+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func setP2String(cli *CLIOptions, fieldName string, val string) {
+func setP2String(t *testing.T, cli *CLIOptions, fieldName string, val string) {
 	v := reflect.ValueOf(cli).Elem().FieldByName(fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func getStringResult(res *ResolvedConfig, fieldName string) string {
+func getStringResult(t *testing.T, res *ResolvedConfig, fieldName string) string {
 	v := reflect.ValueOf(res).Elem().FieldByName(fieldName)
-	if v.IsValid() {
-		return v.String()
-	}
-	return ""
+	require.True(t, v.IsValid(), "result field "+fieldName+" must be valid")
+	return v.String()
 }
 
-func setP1Bool(cli *CLIOptions, fieldName string, val bool) {
+func setP1Bool(t *testing.T, cli *CLIOptions, fieldName string, val bool) {
 	v := reflect.ValueOf(cli).Elem().FieldByName("Cderun" + fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field Cderun"+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field Cderun"+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func setP2Bool(cli *CLIOptions, fieldName string, val bool) {
+func setP2Bool(t *testing.T, cli *CLIOptions, fieldName string, val bool) {
 	v := reflect.ValueOf(cli).Elem().FieldByName(fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func getBoolResult(res *ResolvedConfig, fieldName string) bool {
+func getBoolResult(t *testing.T, res *ResolvedConfig, fieldName string) bool {
 	v := reflect.ValueOf(res).Elem().FieldByName(fieldName)
-	if v.IsValid() {
-		return v.Bool()
-	}
-	return false
+	require.True(t, v.IsValid(), "result field "+fieldName+" must be valid")
+	return v.Bool()
 }
 
-func setP1Int(cli *CLIOptions, fieldName string, val int) {
+func setP1Int(t *testing.T, cli *CLIOptions, fieldName string, val int) {
 	v := reflect.ValueOf(cli).Elem().FieldByName("Cderun" + fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field Cderun"+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field Cderun"+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func setP2Int(cli *CLIOptions, fieldName string, val int) {
+func setP2Int(t *testing.T, cli *CLIOptions, fieldName string, val int) {
 	v := reflect.ValueOf(cli).Elem().FieldByName(fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func getIntResult(res *ResolvedConfig, fieldName string) int {
+func getIntResult(t *testing.T, res *ResolvedConfig, fieldName string) int {
 	v := reflect.ValueOf(res).Elem().FieldByName(fieldName)
-	if v.IsValid() {
-		return int(v.Int())
-	}
-	return 0
+	require.True(t, v.IsValid(), "result field "+fieldName+" must be valid")
+	return int(v.Int())
 }
 
-func setP1Float64(cli *CLIOptions, fieldName string, val float64) {
+func setP1Float64(t *testing.T, cli *CLIOptions, fieldName string, val float64) {
 	v := reflect.ValueOf(cli).Elem().FieldByName("Cderun" + fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field Cderun"+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field Cderun"+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func setP2Float64(cli *CLIOptions, fieldName string, val float64) {
+func setP2Float64(t *testing.T, cli *CLIOptions, fieldName string, val float64) {
 	v := reflect.ValueOf(cli).Elem().FieldByName(fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	require.True(t, v.IsValid(), "field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 }
 
-func getFloat64Result(res *ResolvedConfig, fieldName string) float64 {
+func getFloat64Result(t *testing.T, res *ResolvedConfig, fieldName string) float64 {
 	v := reflect.ValueOf(res).Elem().FieldByName(fieldName)
-	if v.IsValid() {
-		return v.Float()
-	}
-	return 0.0
+	require.True(t, v.IsValid(), "result field "+fieldName+" must be valid")
+	return v.Float()
 }
 
-func setP1Slice(cli *CLIOptions, fieldName string, val []string) {
+func setP1Slice(t *testing.T, cli *CLIOptions, fieldName string, val []string) {
 	v := reflect.ValueOf(cli).Elem().FieldByName("Cderun" + fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(val))
-	}
+	require.True(t, v.IsValid(), "field Cderun"+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field Cderun"+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(val))
 }
 
-func setP2Slice(cli *CLIOptions, fieldName string, val []string) {
+func setP2Slice(t *testing.T, cli *CLIOptions, fieldName string, val []string) {
 	v := reflect.ValueOf(cli).Elem().FieldByName(fieldName)
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(val))
-	}
+	require.True(t, v.IsValid(), "field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(val))
 }
 
-func getSliceResult(res *ResolvedConfig, fieldName string) []string {
+func getSliceResult(t *testing.T, res *ResolvedConfig, fieldName string) []string {
 	v := reflect.ValueOf(res).Elem().FieldByName(fieldName)
-	if v.IsValid() && !v.IsNil() {
-		return v.Interface().([]string)
-	}
-	return nil
+	require.True(t, v.IsValid(), "result field "+fieldName+" must be valid")
+	require.False(t, v.IsNil(), "result field "+fieldName+" must not be nil")
+	return v.Interface().([]string)
 }
 
 func boolToString(b bool) string {
@@ -505,19 +514,16 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func createToolsConfigWithString(optName, fieldName string, val string) ToolsConfig {
+func createToolsConfigWithString(t *testing.T, fieldName string, val string) ToolsConfig {
 	tc := ToolConfig{}
-	v := reflect.ValueOf(&tc).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.SetString(val)
-	}
+	v := reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ToolConfig field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ToolConfig field "+fieldName+" must be settable")
+	v.SetString(val)
 	return ToolsConfig{"sh": tc}
 }
 
-func createGlobalConfigWithString(optName, fieldName string, val string) *CDERunConfig {
+func createGlobalConfigWithString(t *testing.T, optName, fieldName string, val string) *CDERunConfig {
 	cfg := &CDERunConfig{}
 	if optName == "log-level" || optName == "log-format" {
 		if optName == "log-level" {
@@ -531,141 +537,85 @@ func createGlobalConfigWithString(optName, fieldName string, val string) *CDERun
 		cfg.Runtime = val
 		return cfg
 	}
-	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.SetString(val)
-	}
+	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ConfigDefaults field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ConfigDefaults field "+fieldName+" must be settable")
+	v.SetString(val)
 	return cfg
 }
 
-func createToolsConfigWithBool(optName, fieldName string, val bool) ToolsConfig {
+func createToolsConfigWithBool(t *testing.T, fieldName string, val bool) ToolsConfig {
 	tc := ToolConfig{}
-	v := reflect.ValueOf(&tc).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ToolConfig field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ToolConfig field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return ToolsConfig{"sh": tc}
 }
 
-func createGlobalConfigWithBool(optName, fieldName string, val bool) *CDERunConfig {
+func createGlobalConfigWithBool(t *testing.T, optName, fieldName string, val bool) *CDERunConfig {
 	cfg := &CDERunConfig{}
 	if optName == "log-timestamp" {
 		cfg.Logging.Timestamp = &val
 		return cfg
 	}
-	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ConfigDefaults field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ConfigDefaults field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return cfg
 }
 
-func createToolsConfigWithInt(optName, fieldName string, val int) ToolsConfig {
+func createToolsConfigWithInt(t *testing.T, fieldName string, val int) ToolsConfig {
 	tc := ToolConfig{}
-	v := reflect.ValueOf(&tc).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ToolConfig field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ToolConfig field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return ToolsConfig{"sh": tc}
 }
 
-func createGlobalConfigWithInt(optName, fieldName string, val int) *CDERunConfig {
+func createGlobalConfigWithInt(t *testing.T, fieldName string, val int) *CDERunConfig {
 	cfg := &CDERunConfig{}
-	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ConfigDefaults field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ConfigDefaults field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return cfg
 }
 
-func createToolsConfigWithFloat64(optName, fieldName string, val float64) ToolsConfig {
+func createToolsConfigWithFloat64(t *testing.T, fieldName string, val float64) ToolsConfig {
 	tc := ToolConfig{}
-	v := reflect.ValueOf(&tc).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ToolConfig field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ToolConfig field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return ToolsConfig{"sh": tc}
 }
 
-func createGlobalConfigWithFloat64(optName, fieldName string, val float64) *CDERunConfig {
+func createGlobalConfigWithFloat64(t *testing.T, fieldName string, val float64) *CDERunConfig {
 	cfg := &CDERunConfig{}
-	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(&val))
-	}
+	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ConfigDefaults field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ConfigDefaults field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(&val))
 	return cfg
 }
 
-func createToolsConfigWithSlice(optName, fieldName string, val []string) ToolsConfig {
+func createToolsConfigWithSlice(t *testing.T, fieldName string, val []string) ToolsConfig {
 	tc := ToolConfig{}
-	v := reflect.ValueOf(&tc).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(val))
-	}
+	v := reflect.ValueOf(&tc).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ToolConfig field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ToolConfig field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(val))
 	return ToolsConfig{"sh": tc}
 }
 
-func createGlobalConfigWithSlice(optName, fieldName string, val []string) *CDERunConfig {
+func createGlobalConfigWithSlice(t *testing.T, fieldName string, val []string) *CDERunConfig {
 	cfg := &CDERunConfig{}
-	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(uncapitalize(fieldName))
-	if !v.IsValid() {
-		v = reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
-	}
-	if v.IsValid() && v.CanSet() {
-		v.Set(reflect.ValueOf(val))
-	}
+	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)
+	require.True(t, v.IsValid(), "ConfigDefaults field "+fieldName+" must be valid")
+	require.True(t, v.CanSet(), "ConfigDefaults field "+fieldName+" must be settable")
+	v.Set(reflect.ValueOf(val))
 	return cfg
-}
-
-func uncapitalize(s string) string {
-	if s == "" {
-		return ""
-	}
-	if s == "TTY" {
-		return "tty"
-	}
-	if s == "DNS" {
-		return "dns"
-	}
-	if s == "CPUs" {
-		return "cpus"
-	}
-	if s == "IPC" {
-		return "ipc"
-	}
-	if s == "GPUs" {
-		return "gpus"
-	}
-	return uncapitalizeStandard(s)
-}
-
-func uncapitalizeStandard(s string) string {
-	if len(s) == 0 {
-		return ""
-	}
-	return string(s[0]+('a'-'A')) + s[1:]
 }
