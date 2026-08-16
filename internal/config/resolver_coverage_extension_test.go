@@ -586,9 +586,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			{
 				name: "Invalid runtime",
 				cli: CLIOptions{
-					Image: ptr("alpine"), Runtime: ptr("rkt")},
+					Image: ptr("alpine"), Engine: ptr("rkt")},
 				wantErr:     true,
-				errContains: "unsupported runtime: \"rkt\"",
+				errContains: "unsupported engine: \"rkt\"",
 			},
 			{
 				name: "Invalid dry-run-format",

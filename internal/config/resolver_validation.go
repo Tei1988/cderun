@@ -332,14 +332,19 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// runtime
-	runtimeValidator := func(v string) error {
+	// engine
+	engineValidator := func(v string) error {
 		if v != "docker" && v != "podman" && v != "containerd" {
-			return fmt.Errorf("unsupported runtime: %q", v)
+			return fmt.Errorf("unsupported engine: %q", v)
 		}
 		return nil
 	}
-	if err := validateField(rv.res.Runtime, "runtime", runtimeValidator); err != nil {
+	if err := validateField(rv.res.Engine, "engine", engineValidator); err != nil {
+		return err
+	}
+
+	// runtime (OCI runtime)
+	if err := validateField(rv.res.Runtime, "runtime", nil); err != nil {
 		return err
 	}
 

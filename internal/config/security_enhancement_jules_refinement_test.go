@@ -120,6 +120,7 @@ func TestSecurityEnhancement_ValidateSecurity_ManualSocketBindWarning(t *testing
 		cli := &CLIOptions{}
 		resolved := &ResolvedConfig{
 			Image:      "alpine",
+			Engine:     "docker",
 			Runtime:    "docker",
 			SocketPath: "/var/run/docker.sock",
 			Mounts: []container.Mount{
@@ -155,6 +156,7 @@ func TestSecurityEnhancement_ValidateSecurity_ManualSocketBindWarning(t *testing
 		cli := &CLIOptions{}
 		resolved := &ResolvedConfig{
 			Image:       "alpine",
+			Engine:      "docker",
 			Runtime:     "docker",
 			SocketPath:  "/var/run/docker.sock",
 			MountSocket: true,
@@ -191,6 +193,7 @@ func TestSecurityEnhancement_ValidateSecurity_ManualSocketBindWarning(t *testing
 		cli := &CLIOptions{}
 		resolved := &ResolvedConfig{
 			Image:      "alpine",
+			Engine:     "docker",
 			Runtime:    "docker",
 			SocketPath: "/var/run/docker.sock",
 			GroupAdd:   []string{"1001"}, // Numeric group GID

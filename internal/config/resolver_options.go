@@ -208,9 +208,28 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
 			p2Set, p2Val = getPtrVal(rv.cli.Workdir)
 			fastPathUsed = true
+		case "engine":
+			p1Set, p1Val = getPtrVal(rv.cli.CderunEngine)
+			p2Set, p2Val = getPtrVal(rv.cli.Engine)
+			if !p1Set && !p2Set {
+				rP1Set, rP1Val := getPtrVal(rv.cli.CderunRuntime)
+				rP2Set, rP2Val := getPtrVal(rv.cli.Runtime)
+				if rP1Set && isContainerEngineValue(rP1Val) {
+					p1Set, p1Val = true, rP1Val
+				} else if rP2Set && isContainerEngineValue(rP2Val) {
+					p2Set, p2Val = true, rP2Val
+				}
+			}
+			fastPathUsed = true
 		case "runtime":
 			p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
 			p2Set, p2Val = getPtrVal(rv.cli.Runtime)
+			if p1Set && isContainerEngineValue(p1Val) {
+				p1Set, p1Val = false, ""
+			}
+			if p2Set && isContainerEngineValue(p2Val) {
+				p2Set, p2Val = false, ""
+			}
 			fastPathUsed = true
 		case "user":
 			p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
@@ -299,6 +318,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 				rv.res.Network = resolved
 			case "workdir":
 				rv.res.Workdir = resolved
+			case "engine":
+				rv.res.Engine = resolved
 			case "runtime":
 				rv.res.Runtime = resolved
 			case "user":

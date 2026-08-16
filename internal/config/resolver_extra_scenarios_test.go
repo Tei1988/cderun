@@ -151,7 +151,7 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "docker", res.Engine)
 		assert.Equal(t, "/my-podman-dir/docker.sock", res.SocketPath)
 	})
 
@@ -167,7 +167,7 @@ func TestUnit_Config_Resolver_SocketPathAutoDetectionBaseNameOnly(t *testing.T) 
 
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "podman", res.Engine)
 		assert.Equal(t, "/my-docker-dir/podman.sock", res.SocketPath)
 	})
 
@@ -297,13 +297,13 @@ func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
 		assert.NotEmpty(t, cachedSocketPath, "Cache globals should be initialized since a socket exists")
 		assert.Equal(t, firstExistingRuntime, cachedRuntime, "Cached runtime should match first existing container socket")
 		assert.Equal(t, firstExistingSocketPath, cachedSocketPath, "Cached socket path should match first existing container socket")
-		assert.Equal(t, cachedRuntime, res.Runtime, "Resolved runtime should match cached runtime")
+		assert.Equal(t, cachedRuntime, res.Engine, "Resolved runtime should match cached runtime")
 		assert.Equal(t, cachedSocketPath, res.SocketPath, "Resolved socket path should match cached socket path")
 	} else {
 		// Assert that cache remains empty if no socket exists, avoiding flaky failures in clean runner environments.
 		assert.Empty(t, cachedRuntime, "Cache globals should remain empty if no socket exists")
 		assert.Empty(t, cachedSocketPath, "Cache globals should remain empty if no socket exists")
-		assert.Equal(t, "docker", res.Runtime, "Fell back to default runtime")
+		assert.Equal(t, "docker", res.Engine, "Fell back to default runtime")
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath, "Fell back to default socket path")
 	}
 }

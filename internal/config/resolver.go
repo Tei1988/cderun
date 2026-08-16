@@ -688,15 +688,38 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		}
 	}
 
-	if rv.res.Runtime == "" {
+	// Resolve Engine using P1-P5
+	p1Set, p1Val := getPtrVal(rv.cli.CderunEngine)
+	p2Set, p2Val := getPtrVal(rv.cli.Engine)
+	if !p1Set && !p2Set {
+		// Migration check for legacy --runtime / --cderun-runtime CLI flags
+		rP1Set, rP1Val := getPtrVal(rv.cli.CderunRuntime)
+		rP2Set, rP2Val := getPtrVal(rv.cli.Runtime)
+		if rP1Set && isContainerEngineValue(rP1Val) {
+			p1Set, p1Val = true, rP1Val
+		} else if rP2Set && isContainerEngineValue(rP2Val) {
+			p2Set, p2Val = true, rP2Val
+		}
+	}
+
+	opt, _ := GetStringOption("engine")
+	def := OptionDef[string]{
+		EnvKey:       opt.EnvKey,
+		ToolGetter:   opt.ToolGetter,
+		GlobalGetter: opt.GlobalGetter,
+		Fallback:     "", // Empty fallback so we can perform socket path inference / auto-detection
+	}
+	rv.res.Engine = resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+
+	if rv.res.Engine == "" {
 		if rv.res.SocketPath != "" {
 			base := path.Base(rv.res.SocketPath)
 			if strings.Contains(base, "podman") {
-				rv.res.Runtime = "podman"
+				rv.res.Engine = "podman"
 			} else if strings.Contains(base, "containerd") {
-				rv.res.Runtime = "containerd"
+				rv.res.Engine = "containerd"
 			} else {
-				rv.res.Runtime = "docker"
+				rv.res.Engine = "docker"
 			}
 		} else {
 			if _, isReal := rv.fs.(RealFileSystem); isReal {
@@ -706,12 +729,12 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 				autoDetectMu.RUnlock()
 
 				if cachedRuntime != "" {
-					rv.res.Runtime = cachedRuntime
+					rv.res.Engine = cachedRuntime
 					rv.res.SocketPath = cachedSocketPath
 				} else {
 					autoDetectMu.Lock()
 					if autoDetectedRuntime != "" {
-						rv.res.Runtime = autoDetectedRuntime
+						rv.res.Engine = autoDetectedRuntime
 						rv.res.SocketPath = autoDetectedSocketPath
 					} else {
 						var detectedRuntime string
@@ -731,7 +754,7 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 						if detectedRuntime != "" {
 							autoDetectedRuntime = detectedRuntime
 							autoDetectedSocketPath = detectedSocketPath
-							rv.res.Runtime = detectedRuntime
+							rv.res.Engine = detectedRuntime
 							rv.res.SocketPath = detectedSocketPath
 						}
 					}
@@ -739,26 +762,26 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 				}
 			} else {
 				if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-					rv.res.Runtime = "docker"
+					rv.res.Engine = "docker"
 					rv.res.SocketPath = "/var/run/docker.sock"
 				} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-					rv.res.Runtime = "containerd"
+					rv.res.Engine = "containerd"
 					rv.res.SocketPath = "/run/containerd/containerd.sock"
 				} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-					rv.res.Runtime = "podman"
+					rv.res.Engine = "podman"
 					rv.res.SocketPath = "/run/podman/podman.sock"
 				}
 			}
 
-			if rv.res.Runtime == "" {
-				rv.res.Runtime = "docker"
+			if rv.res.Engine == "" {
+				rv.res.Engine = "docker"
 				rv.res.SocketPath = "/var/run/docker.sock"
 			}
 		}
 	}
 
 	if rv.res.SocketPath == "" {
-		switch rv.res.Runtime {
+		switch rv.res.Engine {
 		case "podman":
 			rv.res.SocketPath = "/run/podman/podman.sock"
 		case "containerd":

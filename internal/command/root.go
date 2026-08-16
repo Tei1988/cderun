@@ -400,11 +400,12 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 }
 
 type diagnosticsInfo struct {
-	Runtime struct {
+	Engine struct {
 		Name   string `json:"name" yaml:"name"`
 		Socket string `json:"socket" yaml:"socket"`
 		Status string `json:"status" yaml:"status"`
-	} `json:"runtime" yaml:"runtime"`
+	} `json:"engine" yaml:"engine"`
+	Runtime string `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 	Configs struct {
 		Global []string `json:"global" yaml:"global"`
 		Tools  []string `json:"tools" yaml:"tools"`
@@ -439,13 +440,14 @@ func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpl
 func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
 	o.ensureHooks()
 	info := diagnosticsInfo{}
-	info.Runtime.Name = resolved.Engine
-	info.Runtime.Socket = resolved.SocketPath
+	info.Engine.Name = resolved.Engine
+	info.Engine.Socket = resolved.SocketPath
 	if _, err := o.fs.Stat(resolved.SocketPath); err == nil {
-		info.Runtime.Status = "accessible"
+		info.Engine.Status = "accessible"
 	} else {
-		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
+		info.Engine.Status = fmt.Sprintf("not found or inaccessible: %v", err)
 	}
+	info.Runtime = resolved.Runtime
 	info.Configs.Global = globalPaths
 	info.Configs.Tools = toolsPaths
 	for toolName := range toolsCfg {
@@ -454,8 +456,11 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	sort.Strings(info.AvailableTools)
 
 	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
+		_, _ = fmt.Fprintf(w, "Engine: %s (%s)\n", info.Engine.Name, info.Engine.Socket)
+		_, _ = fmt.Fprintf(w, "Engine Status: %s\n", info.Engine.Status)
+		if info.Runtime != "" {
+			_, _ = fmt.Fprintf(w, "OCI Runtime: %s\n", info.Runtime)
+		}
 		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
 		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
 		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))

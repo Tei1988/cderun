@@ -372,7 +372,7 @@ func TestUnit_Config_Resolver_FastPathAndFallbacks_Robustness(t *testing.T) {
 		require.NoError(t, err)
 
 		// Defaults from StringOptions/BoolOptions should be resolved
-		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "docker", res.Engine)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 		assert.False(t, res.TTY)
 		assert.False(t, res.Interactive)

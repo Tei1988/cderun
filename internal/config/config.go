@@ -667,10 +667,20 @@ func (l *ConfigLoader) LoadToolsConfig() (ToolsConfig, []string, error) {
 
 		for k, v := range layer {
 			v.SetBaseDir(baseDir)
+			migrateLegacyRuntime(&v.Engine, &v.Runtime, fmt.Sprintf("tool %s in %s", k, path))
 
 			if existing, ok := merged[k]; ok {
+				oldEngine := existing.Engine
+				oldRuntime := existing.Runtime
+
 				if err := mergo.Merge(&existing, &v, mergo.WithOverride); err != nil {
 					return nil, nil, fmt.Errorf("failed to merge tool config for %q from %q: %w", k, path, err)
+				}
+				if v.Engine == "" {
+					existing.Engine = oldEngine
+				}
+				if v.Runtime == "" {
+					existing.Runtime = oldRuntime
 				}
 				merged[k] = existing
 			} else {

@@ -60,10 +60,10 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 		{
 			name: "unsupported runtime",
 			cli: &CLIOptions{
-				Image:   ptr("alpine"),
-				Runtime: ptr("rkt"),
+				Image:  ptr("alpine"),
+				Engine: ptr("rkt"),
 			},
-			wantErr: "security validation failed for \"runtime\": unsupported runtime: \"rkt\"",
+			wantErr: "security validation failed for \"engine\": unsupported engine: \"rkt\"",
 		},
 		{
 			name: "unsupported log level",

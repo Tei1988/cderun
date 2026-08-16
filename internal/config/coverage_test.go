@@ -782,7 +782,7 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	cli := CLIOptions{Image: ptr("a")}
 	res, err := ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "docker", res.Engine)
 	assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 	assert.Equal(t, "/var/run/docker.sock", res.MountSocketPath) // Fallback to SocketPath
 
@@ -792,22 +792,22 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "podman", res.Engine)
 	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
-	// Case 3: Explicit Runtime Podman without SocketPath
-	cli = CLIOptions{Image: ptr("a"), Runtime: ptr("podman")}
+	// Case 3: Explicit Engine Podman without SocketPath
+	cli = CLIOptions{Image: ptr("a"), Engine: ptr("podman")}
 	mfs = &MockFileSystem{}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "podman", res.Engine)
 	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 	// Case 4: Explicit SocketPath with podman in it
 	cli = CLIOptions{Image: ptr("a"), SocketPath: ptr("/tmp/podman.sock")}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "podman", res.Engine)
 	assert.Equal(t, "/tmp/podman.sock", res.SocketPath)
 
 	// Case 5: unix:// prefix removal
@@ -820,13 +820,13 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	cli = CLIOptions{Image: ptr("a"), SocketPath: ptr("/home/podman-migration/docker.sock")}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "docker", res.Engine)
 	assert.Equal(t, "/home/podman-migration/docker.sock", res.SocketPath)
 
 	cli = CLIOptions{Image: ptr("a"), SocketPath: ptr("/home/containerd-test/docker.sock")}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "docker", res.Runtime)
+	assert.Equal(t, "docker", res.Engine)
 	assert.Equal(t, "/home/containerd-test/docker.sock", res.SocketPath)
 }
 

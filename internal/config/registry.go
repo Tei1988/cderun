@@ -377,14 +377,33 @@ var StringOptions = []StringOption{
 		Usage:  "Container engine to use (docker/podman/containerd)",
 		Default: "docker",
 		ToolGetter: func(t ToolConfig) string {
-			return t.Engine
+			if t.Engine != "" {
+				return t.Engine
+			}
+			if isContainerEngineValue(t.Runtime) {
+				return t.Runtime
+			}
+			return ""
 		},
 		GlobalGetter: func(g CDERunConfig) string {
 			if g.Engine != "" {
 				return g.Engine
 			}
-			return g.Defaults.Engine
+			if isContainerEngineValue(g.Runtime) {
+				return g.Runtime
+			}
+			if g.Defaults.Engine != "" {
+				return g.Defaults.Engine
+			}
+			if isContainerEngineValue(g.Defaults.Runtime) {
+				return g.Defaults.Runtime
+			}
+			if g.Runtime != "" {
+				return g.Runtime
+			}
+			return ""
 		},
+		SkipResolution: true, // resolved in resolveRuntimeAndSocket
 	},
 	{
 		Name:   "runtime",

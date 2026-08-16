@@ -44,6 +44,11 @@ func resolveStringOpt(
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
 			s = env
 			found = true
+		} else if def.EnvKey == "CDERUN_ENGINE" {
+			if legacyEnv, ok := fs.LookupEnv("CDERUN_RUNTIME"); ok && isContainerEngineValue(legacyEnv) {
+				s = legacyEnv
+				found = true
+			}
 		}
 	}
 

@@ -307,20 +307,20 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 	t.Run("returns error for unsupported engine", func(t *testing.T) {
 		_, err := executeCommand("--image", "alpine", "--engine", "invalid", "sh")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unsupported runtime \"invalid\"")
+		require.ErrorContains(t, err, "unsupported engine: \"invalid\"")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
 		output, err := executeCommand("--diagnosis")
 		require.NoError(t, err)
-		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "engine:")
 		assert.Contains(t, output, "configs:")
 	})
 
 	t.Run("diagnosis mode works with subcommand and takes precedence", func(t *testing.T) {
 		output, err := executeCommand("--diagnosis", "node", "--version")
 		require.NoError(t, err)
-		assert.Contains(t, output, "runtime:")
+		assert.Contains(t, output, "engine:")
 		assert.Contains(t, output, "configs:")
 		assert.NotContains(t, output, "image: node") // Should not be container config dry-run
 	})
@@ -559,8 +559,8 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 
 		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"})
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Runtime: docker (/var/run/docker.sock)")
-		assert.Contains(t, out.String(), "Runtime Status: accessible")
+		assert.Contains(t, out.String(), "Engine: docker (/var/run/docker.sock)")
+		assert.Contains(t, out.String(), "Engine Status: accessible")
 		assert.Contains(t, out.String(), "Global Config: /etc/cderun.yaml")
 		assert.Contains(t, out.String(), "Tools Config: .tools.yaml")
 		assert.Contains(t, out.String(), "Available Tools: node")
@@ -583,7 +583,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 
 		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
+		assert.Contains(t, out.String(), "Engine Status: not found or inaccessible")
 	})
 
 	t.Run("JSON format exhaustive", func(t *testing.T) {

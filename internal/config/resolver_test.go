@@ -296,7 +296,7 @@ func TestUnit_Resolver_AutoDetection(t *testing.T) {
 		}
 		res, err := Resolve("node", &cli, nil, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "podman", res.Engine)
 	})
 
 	t.Run("Default socket for runtime", func(t *testing.T) {
@@ -541,7 +541,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		}
 		res, err := ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "docker", res.Engine)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
 		// podman.sock exists
@@ -551,25 +551,25 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "podman", res.Engine)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 		// specified podman but no socket, should use default podman socket
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Runtime: ptr("podman")}, nil, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Engine: ptr("podman")}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Runtime)
+		assert.Equal(t, "podman", res.Engine)
 		assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 		// SocketPath explicit containerd
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), SocketPath: ptr("/run/containerd/containerd.sock")}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "containerd", res.Engine)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
 		// specified docker but no socket
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Runtime: ptr("docker")}, nil, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Engine: ptr("docker")}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "docker", res.Engine)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
 		// containerd.sock exists
@@ -579,7 +579,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "containerd", res.Engine)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
 		// Priority: docker > containerd > podman
@@ -593,7 +593,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "docker", res.Runtime)
+		assert.Equal(t, "docker", res.Engine)
 		assert.Equal(t, "/var/run/docker.sock", res.SocketPath)
 
 		// Priority: containerd > podman
@@ -606,20 +606,20 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		}
 		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "containerd", res.Engine)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
 		// specified containerd but no socket
-		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Runtime: ptr("containerd")}, nil, nil, &MockFileSystem{})
+		res, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine"), Engine: ptr("containerd")}, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "containerd", res.Engine)
 		assert.Equal(t, "/run/containerd/containerd.sock", res.SocketPath)
 
 		// specified unknown runtime (e.g. from global)
-		global := &CDERunConfig{Runtime: "unknown"}
+		global := &CDERunConfig{Engine: "unknown"}
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, global, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported runtime: \"unknown\"")
+		assert.Contains(t, err.Error(), "unsupported engine: \"unknown\"")
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {
