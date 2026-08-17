@@ -27,9 +27,10 @@ func TestSecurityEnhancement_ValidateMountType(t *testing.T) {
 func TestSecurityEnhancement_MountTypeInResolver(t *testing.T) {
 	t.Parallel()
 
-	mfs := &MockFileSystem{
-		Files: map[string][]byte{
-			"/workspace/.tools.yaml": []byte(`
+	t.Run("invalid mount type rejected", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/workspace/.tools.yaml": []byte(`
 testtool:
   image: alpine
   mounts:
@@ -37,18 +38,55 @@ testtool:
       source: /workspace
       target: /app
 `),
-		},
-		Env: map[string]string{},
-		WD:  "/workspace",
-	}
+			},
+			Env: map[string]string{},
+			WD:  "/workspace",
+		}
 
-	loader := NewConfigLoaderWithFS(mfs)
-	tools, _, err := loader.LoadToolsConfigFromPath("/workspace/.tools.yaml")
-	require.NoError(t, err)
+		loader := NewConfigLoaderWithFS(mfs)
+		tools, _, err := loader.LoadToolsConfigFromPath("/workspace/.tools.yaml")
+		require.NoError(t, err)
 
-	_, err = ResolveWithFS("testtool", &CLIOptions{}, tools, nil, mfs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported mount type")
+		_, err = ResolveWithFS("testtool", &CLIOptions{}, tools, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported mount type")
+	})
+
+	t.Run("empty mount type normalizes to bind in MountConfig.Resolve and Resolver", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/workspace/.tools.yaml": []byte(`
+testtool:
+  image: alpine
+  mounts:
+    - source: /workspace
+      target: /app
+`),
+			},
+			Env: map[string]string{},
+			WD:  "/workspace",
+		}
+
+		loader := NewConfigLoaderWithFS(mfs)
+		tools, _, err := loader.LoadToolsConfigFromPath("/workspace/.tools.yaml")
+		require.NoError(t, err)
+
+		res, err := ResolveWithFS("testtool", &CLIOptions{}, tools, nil, mfs)
+		require.NoError(t, err)
+		require.Len(t, res.Mounts, 1)
+		assert.Equal(t, "bind", res.Mounts[0].Type)
+
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		mc := MountConfig{
+			Source: ConfigPath{Raw: "/workspace", BaseDir: "/workspace"},
+			Target: ConfigPath{Raw: "/app"},
+		}
+		resolvedMount, err := mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "bind", resolvedMount.Type)
+	})
 }
 
 func TestSecurityEnhancement_DirectiveTraversalRejections(t *testing.T) {
@@ -88,20 +126,56 @@ func TestSecurityEnhancement_DirectiveTraversalRejections(t *testing.T) {
 func TestSecurityEnhancement_ResolvedEnvControlCharValidation(t *testing.T) {
 	t.Parallel()
 
-	mfs := &MockFileSystem{
-		Files: map[string][]byte{},
-		Env: map[string]string{
-			"BAD_VAR": "val\x00inject",
-		},
-		WD: "/workspace",
-	}
+	t.Run("null byte injection rejected", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{},
+			Env: map[string]string{
+				"BAD_VAR": "val\x00inject",
+			},
+			WD: "/workspace",
+		}
 
-	r, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
 
-	_, err = r.ResolveString("{{env:BAD_VAR}}")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "security validation failed for resolved environment variable value")
+		_, err = r.ResolveString("{{env:BAD_VAR}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for resolved environment variable value")
+	})
+
+	t.Run("C1 control character U+0085 rejected", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{},
+			Env: map[string]string{
+				"C1_VAR": "val\u0085inject",
+			},
+			WD: "/workspace",
+		}
+
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		_, err = r.ResolveString("{{env:C1_VAR}}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed for resolved environment variable value")
+	})
+
+	t.Run("allowlisted LF CR TAB preserved and accepted", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{},
+			Env: map[string]string{
+				"VALID_VAR": "line1\nline2\r\ttabbed",
+			},
+			WD: "/workspace",
+		}
+
+		r, err := NewExpressionResolverWithFS(nil, mfs)
+		require.NoError(t, err)
+
+		val, err := r.ResolveString("{{env:VALID_VAR}}")
+		require.NoError(t, err)
+		assert.Equal(t, "line1\nline2\r\ttabbed", val)
+	})
 }
 
 func TestSecurityEnhancement_CLIImageControlCharValidation(t *testing.T) {

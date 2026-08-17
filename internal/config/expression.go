@@ -496,8 +496,13 @@ func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 		}
 		return defaultValue, nil
 	}
-	if err := validatePathChars(val); err != nil {
-		return "", fmt.Errorf("security validation failed for resolved environment variable value %q: %w", key, err)
+	if strings.ContainsRune(val, 0) {
+		return "", fmt.Errorf("security validation failed for resolved environment variable value %q: null byte injection detected", key)
+	}
+	for pos, r := range val {
+		if (r <= 0x1f && r != '\n' && r != '\r' && r != '\t') || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return "", fmt.Errorf("security validation failed for resolved environment variable value %q: invalid control character %U at position %d", key, r, pos)
+		}
 	}
 	return val, nil
 }

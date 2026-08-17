@@ -563,6 +563,11 @@ func (rv *resolver) validateEnvSecurity() error {
 		if strings.ContainsRune(val, 0) {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
+		for pos, r := range val {
+			if (r <= 0x1f && r != '\n' && r != '\r' && r != '\t') || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character %U at position %d", i, r, pos)
+			}
+		}
 	}
 	return nil
 }
