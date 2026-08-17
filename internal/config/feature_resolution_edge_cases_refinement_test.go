@@ -16,7 +16,7 @@ func TestUnit_Config_ExpressionEdgeCases_Refinement(t *testing.T) {
 		mfs := &MockFileSystem{
 			WD:      "/workspace/project",
 			HomeDir: "/home/user",
-			Env:     map[string]string{"APP_ENV": "production"},
+			Env:     map[string]string{"APP_ENV": "production", "NESTED_KEY": "APP_ENV"},
 		}
 
 		hostCtx := &HostContext{
@@ -24,20 +24,21 @@ func TestUnit_Config_ExpressionEdgeCases_Refinement(t *testing.T) {
 			HomeDir:    mfs.HomeDir,
 		}
 
-		// File directive for missing relative file returns error on a new resolver
+		// Double-brace escaping resolution: {{{{escaped_val}}}} -> {{escaped_val}}
 		r1, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
-		_, err = r1.ResolveString("{{file:nonexistent.txt}}")
-		assert.Error(t, err)
+		res1, err := r1.ResolveString("Value is {{{{escaped_val}}}}")
+		require.NoError(t, err)
+		assert.Equal(t, "Value is {{escaped_val}}", res1)
 
-		// Env with fallback default on a new resolver
+		// Nested expression resolution: {{env:UNSET_VAR:-{{env:APP_ENV}}}}
 		r2, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
-		res2, err := r2.ResolveString("{{env:UNSET_VAR:-fallback_val}}")
+		res2, err := r2.ResolveString("{{env:UNSET_VAR:-{{env:APP_ENV}}}}")
 		require.NoError(t, err)
-		assert.Equal(t, "fallback_val", res2)
+		assert.Equal(t, "production", res2)
 
-		// Env existing on a new resolver
+		// Direct existing env resolution
 		r3, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 		res3, err := r3.ResolveString("{{env:APP_ENV:-staging}}")
@@ -53,17 +54,25 @@ func TestUnit_Config_ExpressionEdgeCases_Refinement(t *testing.T) {
 			HomeDir: "/home/user",
 		}
 
-		hostCtx := &HostContext{
-			WorkingDir: mfs.WD,
-			HomeDir:    mfs.HomeDir,
+		tools := ToolsConfig{
+			"python": ToolConfig{Image: "python:3.11"},
 		}
 
+		// With strictEnv = true, resolving missing environment variable yields error
+		optsStrict := CLIOptions{
+			Env:       []string{"MISSING_ENV_VAR"},
+			StrictEnv: ptr(true),
+		}
+		_, err := ResolveWithFS("python", &optsStrict, tools, nil, mfs)
+		require.Error(t, err)
+
+		// With strictEnv = false (default), missing env expression evaluates without error
+		hostCtx := &HostContext{WorkingDir: mfs.WD, HomeDir: mfs.HomeDir}
 		r, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
-		// Without strict mode, missing env without default gives empty string
 		res, err := r.ResolveString("{{env:MISSING_ENV_VAR}}")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "", res)
 	})
 }
@@ -153,28 +162,28 @@ func TestUnit_Config_PathAndSecurityValidation_Refinement(t *testing.T) {
 	t.Run("sysctl_key_value_validation", func(t *testing.T) {
 		t.Parallel()
 
-		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
-		assert.NoError(t, ValidateSysctlValue("1"))
+		require.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
+		require.NoError(t, ValidateSysctlValue("1"))
 
 		// Reject null byte or control chars
-		assert.Error(t, ValidateSysctlKey("net.ipv4.\x00ip_forward"))
-		assert.Error(t, ValidateSysctlValue("1\r\n"))
+		require.Error(t, ValidateSysctlKey("net.ipv4.\x00ip_forward"))
+		require.Error(t, ValidateSysctlValue("1\r\n"))
 	})
 
 	t.Run("dns_option_validation", func(t *testing.T) {
 		t.Parallel()
 
-		assert.NoError(t, ValidateDNSOption("ndots:5"))
-		assert.NoError(t, ValidateDNSOption("timeout:2"))
-		assert.Error(t, ValidateDNSOption("ndots:5\x00"))
-		assert.Error(t, ValidateDNSOption("ndots:5; rm -rf /"))
+		require.NoError(t, ValidateDNSOption("ndots:5"))
+		require.NoError(t, ValidateDNSOption("timeout:2"))
+		require.Error(t, ValidateDNSOption("ndots:5\x00"))
+		require.Error(t, ValidateDNSOption("ndots:5; rm -rf /"))
 	})
 
 	t.Run("security_opt_validation", func(t *testing.T) {
 		t.Parallel()
 
-		assert.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
-		assert.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
-		assert.Error(t, ValidateSecurityOpt("seccomp=\x00unconfined"))
+		require.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
+		require.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
+		require.Error(t, ValidateSecurityOpt("seccomp=\x00unconfined"))
 	})
 }

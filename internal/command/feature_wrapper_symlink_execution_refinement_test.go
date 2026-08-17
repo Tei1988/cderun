@@ -63,9 +63,7 @@ func TestUnit_Command_WrapperModeHoisting_Refinement(t *testing.T) {
 
 		cmdArgs, ok := dryRunOutput["command"].([]any)
 		require.True(t, ok)
-		assert.Contains(t, cmdArgs, "script.js")
-		assert.Contains(t, cmdArgs, "extra_arg1")
-		assert.Contains(t, cmdArgs, "extra_arg2")
+		assert.Equal(t, []any{"script.js", "--", "extra_arg1", "extra_arg2"}, cmdArgs)
 	})
 
 	t.Run("symlink_mode_non_prefixed_passthrough", func(t *testing.T) {
