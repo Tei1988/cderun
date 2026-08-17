@@ -133,7 +133,18 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 		mc.Source.BaseDir = baseDir
 	}
 }
+func ValidateMountType(t string) error {
+	if t == "" || t == "bind" || t == "volume" || t == "tmpfs" {
+		return nil
+	}
+	return fmt.Errorf("unsupported mount type: %q (allowed: bind, volume, tmpfs)", t)
+}
+
 func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
+	if err := ValidateMountType(mc.Type); err != nil {
+		return container.Mount{}, err
+	}
+
 	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
 	if HasParentTraversal(mc.Target.Raw) {
 		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", mc.Target.Raw)
@@ -675,6 +686,9 @@ func validateAnchorBoundaries(original, resolved string, r *ExpressionResolver, 
 	processBoundary := func(anchorRaw, anchorPath string) error {
 		if anchorPath == "" {
 			return fmt.Errorf("anchor path is empty for %q", anchorRaw)
+		}
+		if err := validatePathChars(anchorPath); err != nil {
+			return fmt.Errorf("invalid character in resolved anchor path for %q: %w", anchorRaw, err)
 		}
 
 		absAnchor, err := fs.Abs(anchorPath)

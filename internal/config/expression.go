@@ -390,7 +390,7 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	if err := validatePathChars(filename); err != nil {
 		return "", fmt.Errorf("invalid character in file directive parameter: %w", err)
 	}
-	if filepath.IsAbs(filename) || !filepath.IsLocal(filename) || strings.ContainsAny(filename, "/\\") {
+	if filename == "." || filename == ".." || HasParentTraversal(filename) || filepath.IsAbs(filename) || !filepath.IsLocal(filename) || strings.ContainsAny(filename, "/\\") {
 		return "", fmt.Errorf("only a single file name is allowed in file directive: %q", filename)
 	}
 
@@ -459,7 +459,7 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	if err := validatePathChars(name); err != nil {
 		return "", fmt.Errorf("invalid character in find_dir directive parameter: %w", err)
 	}
-	if filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\") {
+	if name == "." || name == ".." || HasParentTraversal(name) || filepath.IsAbs(name) || !filepath.IsLocal(name) || strings.ContainsAny(name, "/\\") {
 		return "", fmt.Errorf("only a single file or directory name is allowed in find_dir directive: %q", name)
 	}
 

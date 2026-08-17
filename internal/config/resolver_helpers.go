@@ -533,6 +533,12 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 		if strings.ContainsRune(val, 0) {
 			return nil, fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
+		for j := 0; j < len(val); j++ {
+			c := val[j]
+			if (c <= 31 && c != '\n' && c != '\r' && c != '\t') || c == 127 {
+				return nil, fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, c, j)
+			}
+		}
 
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.
 		final := ""
