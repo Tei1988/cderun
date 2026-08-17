@@ -919,7 +919,18 @@ var initialisms = map[string]string{
 // PascalCase converts kebab-case (e.g. "dry-run-format") to PascalCase (e.g. "DryRunFormat").
 // It respects known initialisms (e.g. "tty" -> "TTY").
 func PascalCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	if strings.IndexByte(s, '-') == -1 {
+		if val, ok := initialisms[strings.ToLower(s)]; ok {
+			return val
+		}
+		return strings.ToUpper(s[:1]) + s[1:]
+	}
+
 	var builder strings.Builder
+	builder.Grow(len(s))
 	for part := range strings.SplitSeq(s, "-") {
 		if part == "" {
 			continue
