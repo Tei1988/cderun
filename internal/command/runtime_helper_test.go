@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 )
@@ -65,14 +66,18 @@ func findCderunBinary() (string, error) {
 	}
 
 	curr := wd
+	var rootDir string
 	for {
 		path := filepath.Join(curr, "cderun")
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			// If already absolute, return directly. Otherwise call filepath.Abs.
 			if filepath.IsAbs(path) {
 				return path, nil
 			}
 			return filepath.Abs(path)
+		}
+
+		if _, err := os.Stat(filepath.Join(curr, "go.mod")); err == nil {
+			rootDir = curr
 		}
 
 		parent := filepath.Dir(curr)
@@ -80,6 +85,14 @@ func findCderunBinary() (string, error) {
 			break
 		}
 		curr = parent
+	}
+
+	if rootDir != "" {
+		tmpBinary := filepath.Join(os.TempDir(), "cderun-test-bin")
+		cmd := exec.Command("go", "build", "-o", tmpBinary, filepath.Join(rootDir, "main.go"))
+		if err := cmd.Run(); err == nil {
+			return tmpBinary, nil
+		}
 	}
 
 	return "", fmt.Errorf("cderun binary not found in %q or its ancestors", wd)
