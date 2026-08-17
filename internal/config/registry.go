@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 )
 
 // StringOption defines a string-based configuration option.
@@ -926,7 +928,8 @@ func PascalCase(s string) string {
 		if val, ok := initialisms[strings.ToLower(s)]; ok {
 			return val
 		}
-		return strings.ToUpper(s[:1]) + s[1:]
+		r, size := utf8.DecodeRuneInString(s)
+		return string(unicode.ToUpper(r)) + s[size:]
 	}
 
 	var builder strings.Builder
@@ -939,8 +942,9 @@ func PascalCase(s string) string {
 			builder.WriteString(val)
 			continue
 		}
-		builder.WriteString(strings.ToUpper(part[0:1]))
-		builder.WriteString(part[1:])
+		r, size := utf8.DecodeRuneInString(part)
+		builder.WriteRune(unicode.ToUpper(r))
+		builder.WriteString(part[size:])
 	}
 	return builder.String()
 }

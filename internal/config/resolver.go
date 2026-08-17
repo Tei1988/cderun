@@ -692,13 +692,13 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 	if rv.res.Runtime == "" {
 		if rv.res.SocketPath != "" {
-			sp := rv.res.SocketPath
-			if idx := strings.LastIndexByte(sp, '/'); idx != -1 {
-				sp = sp[idx+1:]
+			socketName := strings.TrimRight(rv.res.SocketPath, "/")
+			if idx := strings.LastIndexByte(socketName, '/'); idx != -1 {
+				socketName = socketName[idx+1:]
 			}
-			if strings.Contains(sp, "podman") {
+			if strings.Contains(socketName, "podman") {
 				rv.res.Runtime = "podman"
-			} else if strings.Contains(sp, "containerd") {
+			} else if strings.Contains(socketName, "containerd") {
 				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"
