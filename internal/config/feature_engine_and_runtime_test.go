@@ -14,7 +14,7 @@ func TestUnit_Config_EngineAndRuntimeResolution(t *testing.T) {
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "podman", res.Engine)
-		assert.Equal(t, "", res.Runtime)
+		assert.Empty(t, res.Runtime)
 	})
 
 	t.Run("legacy CDERUN_RUNTIME env fallback to engine", func(t *testing.T) {
@@ -25,7 +25,7 @@ func TestUnit_Config_EngineAndRuntimeResolution(t *testing.T) {
 		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "containerd", res.Engine)
-		assert.Equal(t, "", res.Runtime)
+		assert.Empty(t, res.Runtime)
 	})
 
 	t.Run("OCI runtime resolved from CDERUN_OCI_RUNTIME", func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestUnit_Config_EngineAndRuntimeResolution(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "node:20", node.Image)
 		assert.Equal(t, "podman", node.Engine)
-		assert.Equal(t, "", node.Runtime)
+		assert.Empty(t, node.Runtime)
 		assert.True(t, *node.TTY)
 	})
 

@@ -691,13 +691,15 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 	// Resolve Engine using P1-P5
 	p1Set, p1Val := getPtrVal(rv.cli.CderunEngine)
 	p2Set, p2Val := getPtrVal(rv.cli.Engine)
-	if !p1Set && !p2Set {
-		// Migration check for legacy --runtime / --cderun-runtime CLI flags
+	if !p1Set {
 		rP1Set, rP1Val := getPtrVal(rv.cli.CderunRuntime)
-		rP2Set, rP2Val := getPtrVal(rv.cli.Runtime)
 		if rP1Set && isContainerEngineValue(rP1Val) {
 			p1Set, p1Val = true, rP1Val
-		} else if rP2Set && isContainerEngineValue(rP2Val) {
+		}
+	}
+	if !p2Set {
+		rP2Set, rP2Val := getPtrVal(rv.cli.Runtime)
+		if rP2Set && isContainerEngineValue(rP2Val) {
 			p2Set, p2Val = true, rP2Val
 		}
 	}
