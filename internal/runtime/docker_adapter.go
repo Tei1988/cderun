@@ -273,6 +273,10 @@ func buildDockerMounts(mounts []container.Mount) ([]mount.Mount, error) {
 	}
 	res := make([]mount.Mount, len(mounts))
 	for i, m := range mounts {
+		if m.Optional {
+			return nil, fmt.Errorf("docker runtime: optional mount is not supported")
+		}
+
 		var mType mount.Type
 		switch m.Type {
 		case "bind":

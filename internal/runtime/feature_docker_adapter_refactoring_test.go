@@ -171,6 +171,15 @@ func TestUnit_DockerAdapter_BuildDockerMounts_InvalidType(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid mount type")
 }
 
+func TestUnit_DockerAdapter_BuildDockerMounts_OptionalMountUnsupported(t *testing.T) {
+	t.Parallel()
+	_, err := buildDockerMounts([]container.Mount{
+		{Type: "bind", Source: "/s", Target: "/t", Optional: true},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "docker runtime: optional mount is not supported")
+}
+
 func TestUnit_DockerAdapter_ToDockerContainerConfig_ShmSizeAndPortBindingErrors(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid shm-size", func(t *testing.T) {
