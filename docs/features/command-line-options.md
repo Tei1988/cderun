@@ -26,8 +26,9 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_SENSITIVE_ENV`
   - `CDERUN_ULIMIT`
   - `CDERUN_SYSCTL`
+  - `CDERUN_PREFETCH`
 
-*Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`).*
+*Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`). An exception is scalar string options like `--prefetch` (and `--mount-tools`), which are registered as scalar string flags whose handlers split comma-separated values (e.g., `--prefetch node,python`).*
 
 ---
 
@@ -674,6 +675,32 @@ cderun --pull always node
 - **Default**: `1s`
 - **Environment Variable**: `CDERUN_PULL_BACKOFF_BASE`
 - **Description**: Base exponential backoff duration for retry delays (e.g., `1s`, `500ms`).
+
+### `--prefetch`
+
+- **Type**: string (comma-separated list)
+- **Default**: `""`
+- **Environment Variable**: `CDERUN_PREFETCH`
+- **Description**: Prefetch specified tool images defined in `.tools.yaml`.
+- **Details**: Stand-alone image prefetching operation. Resolves dynamic expressions (such as `{{env:...}}`) in tool image definitions, initializes the configured container runtime, and pulls the image(s) prior to execution using configured pull retry and backoff settings. If a specified tool is missing or has no image configured, prefetching fails with an explicit error. Note that `--prefetch` is a scalar string flag (not a `stringArray`), whose handler splits comma-separated values (e.g., `--prefetch node,python`) rather than repeating the flag.
+- **P1 Internal Override**: `--cderun-prefetch` is the corresponding Phase 1 (P1) internal override flag. It accepts a comma-separated list of tool names (e.g. `--cderun-prefetch=node,python`).
+
+```bash
+cderun --prefetch node,python
+```
+
+### `--prefetch-all`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_PREFETCH_ALL`
+- **Description**: Prefetch all tool images defined in `.tools.yaml`.
+- **Details**: Stand-alone image prefetching operation. Scans all tools configured in `.tools.yaml`, resolves dynamic template expressions in their image strings, and pulls all tool images sequentially using the configured pull policy and retry settings.
+- **P1 Internal Override**: `--cderun-prefetch-all` is the corresponding Phase 1 (P1) internal override flag.
+
+```bash
+cderun --prefetch-all
+```
 
 ### `--memory`, `-m`
 
