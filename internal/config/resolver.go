@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -706,10 +705,13 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 	if rv.res.Runtime == "" {
 		if rv.res.SocketPath != "" {
-			base := path.Base(rv.res.SocketPath)
-			if strings.Contains(base, "podman") {
+			socketName := strings.TrimRight(rv.res.SocketPath, "/")
+			if idx := strings.LastIndexByte(socketName, '/'); idx != -1 {
+				socketName = socketName[idx+1:]
+			}
+			if strings.Contains(socketName, "podman") {
 				rv.res.Runtime = "podman"
-			} else if strings.Contains(base, "containerd") {
+			} else if strings.Contains(socketName, "containerd") {
 				rv.res.Runtime = "containerd"
 			} else {
 				rv.res.Runtime = "docker"

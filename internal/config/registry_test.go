@@ -17,6 +17,8 @@ func TestPascalCase(t *testing.T) {
 		{"dns", "DNS"},
 		{"cpus", "CPUs"},
 		{"pull-backoff-base", "PullBackoffBase"},
+		{"äpple", "Äpple"},
+		{"üä-öß", "ÜäÖß"},
 	}
 
 	for _, tt := range tests {

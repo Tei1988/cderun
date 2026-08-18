@@ -96,9 +96,13 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	}
 
 	if fastPathUsed {
-		// Drift guard check (look up expected inside)
-		expected, okExpected := expectedFieldIndices[opt.Name]
-		if okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		// Drift guard check (avoid map lookup when not in test)
+		driftOk := !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1
+		if !driftOk {
+			expected, okExpected := expectedFieldIndices[opt.Name]
+			driftOk = okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+		}
+		if driftOk {
 			def := OptionDef[[]string]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -279,9 +283,13 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	}
 
 	if fastPathUsed {
-		// Drift guard check (look up expected inside)
-		expected, okExpected := expectedFieldIndices[opt.Name]
-		if okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		// Drift guard check (avoid map lookup when not in test)
+		driftOk := !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1
+		if !driftOk {
+			expected, okExpected := expectedFieldIndices[opt.Name]
+			driftOk = okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+		}
+		if driftOk {
 			def := OptionDef[string]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -445,9 +453,13 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	}
 
 	if fastPathUsed {
-		// Drift guard check (look up expected inside)
-		expected, okExpected := expectedFieldIndices[opt.Name]
-		if okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		// Drift guard check (avoid map lookup when not in test)
+		driftOk := !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1
+		if !driftOk {
+			expected, okExpected := expectedFieldIndices[opt.Name]
+			driftOk = okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+		}
+		if driftOk {
 			def := OptionDef[*bool]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -541,9 +553,13 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	}
 
 	if fastPathUsed {
-		// Drift guard check (look up expected inside)
-		expected, okExpected := expectedFieldIndices[opt.Name]
-		if okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		// Drift guard check (avoid map lookup when not in test)
+		driftOk := !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1
+		if !driftOk {
+			expected, okExpected := expectedFieldIndices[opt.Name]
+			driftOk = okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+		}
+		if driftOk {
 			def := OptionDef[*int]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
@@ -613,9 +629,13 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	}
 
 	if fastPathUsed {
-		// Drift guard check (look up expected inside)
-		expected, okExpected := expectedFieldIndices[opt.Name]
-		if okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx {
+		// Drift guard check (avoid map lookup when not in test)
+		driftOk := !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1
+		if !driftOk {
+			expected, okExpected := expectedFieldIndices[opt.Name]
+			driftOk = okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+		}
+		if driftOk {
 			def := OptionDef[*float64]{
 				EnvKey:       opt.EnvKey,
 				ToolGetter:   opt.ToolGetter,
