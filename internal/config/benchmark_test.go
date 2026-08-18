@@ -51,18 +51,24 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 
 func BenchmarkExpressionResolver_ResolveString_MultipleExpressions(b *testing.B) {
 	mfs := &MockFileSystem{
-		HomeDir: "/home/user",
-		WD:      "/app",
+		HomeDir: "/home/user/very/long/path/for/benchmark/testing/directory/structure",
+		WD:      "/app/workdir/path/for/benchmark/testing/directory/structure",
 		Env: map[string]string{
-			"USER": "testuser",
+			"VAR1": "val1",
+			"VAR2": "val2",
+			"VAR3": "val3",
+			"VAR4": "val4",
+			"VAR5": "val5",
+			"VAR6": "val6",
 		},
 	}
 	r, err := NewExpressionResolverWithFS(nil, mfs)
 	if err != nil {
 		b.Fatalf("NewExpressionResolverWithFS failed: %v", err)
 	}
-	input := "prefix-{{HOME}}-{{PWD}}-{{env:USER:-default}}-suffix"
+	input := "p1-{{HOME}}-p2-{{PWD}}-p3-{{env:VAR1}}-p4-{{env:VAR2}}-p5-{{env:VAR3}}-p6-{{env:VAR4}}-p7-{{env:VAR5}}-p8-{{env:VAR6}}-suffix"
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = r.ResolveString(input)
