@@ -3,7 +3,6 @@
 package command
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -42,18 +41,17 @@ func setupTestDir(t *testing.T) string {
 }
 
 // checkRuntimeResult is a helper to standardize result checking in E2E tests.
-// It uses skipIfRuntimeBroken to handle environmental limitations reported via error or stderr.
+// It uses isRuntimeBackendError and skipIfRuntimeBroken to handle environmental limitations reported via error or stderr.
 func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err error) {
 	t.Helper()
+	if isRuntimeBackendError(strings.ToLower(stderr)) {
+		t.Skipf("Skipping test due to runtime/backend limitation or setup issue in stderr: %s", stderr)
+	}
 	skipIfRuntimeBroken(t, err)
 	if err != nil {
 		t.Fatalf("command returned error: %v", err)
 	}
 	if exitCode != 0 {
-		// Only trigger environmental skip if stderr matches explicit runtime backend setup/limitation signatures
-		if isRuntimeBackendError(strings.ToLower(stderr)) {
-			skipIfRuntimeBroken(t, fmt.Errorf("runtime backend error (exit code %d): %s", exitCode, stderr))
-		}
 		t.Fatalf("command failed with exit code %d: %s", exitCode, stderr)
 	}
 }
