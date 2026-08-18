@@ -580,6 +580,9 @@ func (rv *resolver) validateEnvSecurity() error {
 
 func (rv *resolver) validateMountSecurity() error {
 	for i, m := range rv.res.Mounts {
+		if err := ValidateMountType(m.Type); err != nil {
+			return fmt.Errorf("security validation failed for mounts[%d] (type): %w", i, err)
+		}
 		if err := validatePathChars(m.Source); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): %w", i, err)
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
@@ -532,6 +533,11 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 
 		if strings.ContainsRune(val, 0) {
 			return nil, fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
+		}
+		for pos, r := range val {
+			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+				return nil, fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+			}
 		}
 
 		// Optimization: if key and val are unchanged, reuse the original string if it's already in key=val format.
