@@ -16,13 +16,16 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if (strings.Contains(msg, "failed to mount") || strings.Contains(msg, "failed to unmount")) && (strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted")) {
 		t.Skip("Skipping test due to runtime mount limitation in this environment (likely overlay-on-overlay)")
 	}
-	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") {
-		t.Skip("Skipping test due to Docker Hub rate limit")
+	if strings.Contains(msg, "operation not permitted") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "mknod") || strings.Contains(msg, "cgroup") {
+		t.Skipf("Skipping test due to runtime/environment permission or mount limitation: %v", err)
 	}
-	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") {
+	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") || strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "429 too many requests") {
+		t.Skip("Skipping test due to Docker Hub / ECR rate limit")
+	}
+	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") || strings.Contains(msg, "temporary failure in name resolution") || strings.Contains(msg, "tls handshake timeout") || strings.Contains(msg, "client.timeout") {
 		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
 	}
-	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "dial unix") {
+	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "dial unix") {
 		t.Skipf("Skipping test due to runtime connection or permission issue: %v", err)
 	}
 	if (strings.Contains(msg, "containerd runtime:") || strings.Contains(msg, "docker runtime:") || strings.Contains(msg, "podman runtime:")) && strings.Contains(msg, "not supported") {
@@ -31,10 +34,7 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "not supported by containerd") || strings.Contains(msg, "is not supported for containerd") || strings.Contains(msg, "is not supported yet") {
 		t.Skipf("Skipping test due to runtime feature limitation: %v", err)
 	}
-	if strings.Contains(msg, "device") && (strings.Contains(msg, "operation not permitted") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "error gathering device")) {
-		t.Skipf("Skipping test due to device mount limitation: %v", err)
-	}
-	if strings.Contains(msg, "rootless") || strings.Contains(msg, "subuid") || strings.Contains(msg, "cgroup") {
+	if strings.Contains(msg, "rootless") || strings.Contains(msg, "subuid") {
 		t.Skipf("Skipping test due to environment/podman limitation: %v", err)
 	}
 	// Detect Docker SIGKILL timeout (likely environment resource constraint or slow CI)

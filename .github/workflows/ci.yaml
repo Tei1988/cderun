@@ -57,8 +57,10 @@ jobs:
         go-version-file: go.mod
     - name: Install and start Podman
       run: |
-        sudo apt-get update
-        sudo apt-get install -y podman
+        if ! command -v podman >/dev/null 2>&1; then
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::Http::Timeout="10"
+          sudo apt-get install -y --no-install-recommends podman
+        fi
         mkdir -p /tmp/podman
         SOCKET_PATH="/tmp/podman/podman.sock"
         podman system service --time=0 "unix://$SOCKET_PATH" > /tmp/podman.log 2>&1 &
