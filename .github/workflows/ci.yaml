@@ -43,7 +43,7 @@ jobs:
       run: |
         export CDERUN_RUNTIME=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
-        go test -v -tags=runtime ./internal/runtime/...
+        go test -v -tags=runtime ./internal/runtime/... ./internal/command/...
 
   runtime-test-podman:
     runs-on: ubuntu-latest
@@ -62,17 +62,24 @@ jobs:
         mkdir -p /tmp/podman
         SOCKET_PATH="/tmp/podman/podman.sock"
         podman system service --time=0 "unix://$SOCKET_PATH" > /tmp/podman.log 2>&1 &
+        SUCCESS=false
         for i in $(seq 1 30); do
           if podman --url "unix://$SOCKET_PATH" system info >/dev/null 2>&1; then
+            SUCCESS=true
             break
           fi
           sleep 1
         done
+        if [ "$SUCCESS" = "false" ]; then
+          echo "Podman service failed to start. Logs:"
+          cat /tmp/podman.log
+          exit 1
+        fi
     - name: Run Podman integration tests
       run: |
         export CDERUN_RUNTIME=podman
         export CDERUN_SOCKET_PATH="/tmp/podman/podman.sock"
-        go test -v -tags=runtime ./internal/runtime/...
+        go test -v -tags=runtime ./internal/runtime/... ./internal/command/...
 
   runtime-test-containerd:
     runs-on: ubuntu-latest
@@ -114,4 +121,4 @@ jobs:
       run: |
         export CDERUN_RUNTIME=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -v -tags=runtime ./internal/runtime/...
+        go test -v -tags=runtime ./internal/runtime/... ./internal/command/...
