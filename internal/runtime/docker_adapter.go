@@ -36,20 +36,11 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		ExposedPorts: make(nat.PortSet),
 	}
 
-	// Handle ExposedPorts
-	for _, port := range config.Expose {
-		proto := "tcp"
-		portNum := port
-		if parts := strings.SplitN(port, "/", 2); len(parts) == 2 {
-			portNum = parts[0]
-			proto = parts[1]
-		}
-		p, err := nat.NewPort(proto, portNum)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("invalid expose port %q: %w", port, err)
-		}
-		containerConfig.ExposedPorts[p] = struct{}{}
+	exposedPorts, err := buildDockerExposedPorts(config.Expose)
+	if err != nil {
+		return nil, nil, nil, err
 	}
+	containerConfig.ExposedPorts = exposedPorts
 
 	hostConfig := &dockercontainer.HostConfig{
 		AutoRemove:      config.Remove,
@@ -85,36 +76,9 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	}
 
 	if config.Restart != "" {
-		parts := strings.Split(config.Restart, ":")
-		policy := parts[0]
-		if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
-			return nil, nil, nil, fmt.Errorf("invalid restart policy: %q", config.Restart)
-		}
-		retries := 0
-		if policy != "on-failure" {
-			if len(parts) > 1 {
-				return nil, nil, nil, fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, config.Restart)
-			}
-		} else {
-			if len(parts) > 2 {
-				return nil, nil, nil, fmt.Errorf("restart policy on-failure supports at most one retry suffix: %q", config.Restart)
-			}
-			if len(parts) == 2 {
-				suffix := parts[1]
-				if suffix == "" {
-					return nil, nil, nil, fmt.Errorf("restart policy on-failure has empty retry suffix: %q", config.Restart)
-				}
-				val, err := strconv.Atoi(suffix)
-				if err != nil || val < 0 {
-					return nil, nil, nil, fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", config.Restart)
-				}
-				retries = val
-			}
-		}
-
-		rp := dockercontainer.RestartPolicy{
-			Name:              dockercontainer.RestartPolicyMode(policy),
-			MaximumRetryCount: retries,
+		rp, err := parseDockerRestartPolicy(config.Restart)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 		hostConfig.RestartPolicy = rp
 	}
@@ -136,15 +100,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	}
 
 	if len(config.Ulimits) > 0 {
-		ulimits := make([]*dockercontainer.Ulimit, len(config.Ulimits))
-		for i, u := range config.Ulimits {
-			ulimits[i] = &dockercontainer.Ulimit{
-				Name: u.Name,
-				Hard: u.Hard,
-				Soft: u.Soft,
-			}
-		}
-		hostConfig.Ulimits = ulimits
+		hostConfig.Ulimits = buildDockerUlimits(config.Ulimits)
 	}
 
 	// Handle PortBindings
@@ -157,36 +113,13 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		maps.Copy(containerConfig.ExposedPorts, exposedPorts)
 	}
 
-	// Handle Devices
-	for _, dev := range config.Devices {
-		dMapping := dockercontainer.DeviceMapping{
-			PathOnHost:        dev.PathOnHost,
-			PathInContainer:   dev.PathInContainer,
-			CgroupPermissions: dev.CgroupPermissions,
-		}
-		hostConfig.Devices = append(hostConfig.Devices, dMapping)
-	}
+	hostConfig.Devices = buildDockerDevices(config.Devices)
 
-	for _, m := range config.Mounts {
-		var mType mount.Type
-		switch m.Type {
-		case "bind":
-			mType = mount.TypeBind
-		case "volume":
-			mType = mount.TypeVolume
-		case "tmpfs":
-			mType = mount.TypeTmpfs
-		default:
-			return nil, nil, nil, fmt.Errorf("invalid mount type %q", m.Type)
-		}
-
-		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
-			Type:     mType,
-			Source:   m.Source,
-			Target:   m.Target,
-			ReadOnly: m.ReadOnly,
-		})
+	mounts, err := buildDockerMounts(config.Mounts)
+	if err != nil {
+		return nil, nil, nil, err
 	}
+	hostConfig.Mounts = mounts
 
 	return containerConfig, hostConfig, nil, nil
 }
@@ -250,4 +183,118 @@ func parseGPUs(gpus string) ([]dockercontainer.DeviceRequest, error) {
 	}
 
 	return []dockercontainer.DeviceRequest{req}, nil
+}
+
+func buildDockerExposedPorts(expose []string) (nat.PortSet, error) {
+	exposedPorts := make(nat.PortSet)
+	for _, port := range expose {
+		proto := "tcp"
+		portNum := port
+		if parts := strings.SplitN(port, "/", 2); len(parts) == 2 {
+			portNum = parts[0]
+			proto = parts[1]
+		}
+		p, err := nat.NewPort(proto, portNum)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expose port %q: %w", port, err)
+		}
+		exposedPorts[p] = struct{}{}
+	}
+	return exposedPorts, nil
+}
+
+func parseDockerRestartPolicy(restart string) (dockercontainer.RestartPolicy, error) {
+	parts := strings.Split(restart, ":")
+	policy := parts[0]
+	if policy != "no" && policy != "always" && policy != "on-failure" && policy != "unless-stopped" {
+		return dockercontainer.RestartPolicy{}, fmt.Errorf("invalid restart policy: %q", restart)
+	}
+	retries := 0
+	if policy != "on-failure" {
+		if len(parts) > 1 {
+			return dockercontainer.RestartPolicy{}, fmt.Errorf("restart policy %q does not support retry suffix: %q", policy, restart)
+		}
+	} else {
+		if len(parts) > 2 {
+			return dockercontainer.RestartPolicy{}, fmt.Errorf("restart policy on-failure supports at most one retry suffix: %q", restart)
+		}
+		if len(parts) == 2 {
+			suffix := parts[1]
+			if suffix == "" {
+				return dockercontainer.RestartPolicy{}, fmt.Errorf("restart policy on-failure has empty retry suffix: %q", restart)
+			}
+			val, err := strconv.Atoi(suffix)
+			if err != nil || val < 0 {
+				return dockercontainer.RestartPolicy{}, fmt.Errorf("restart policy on-failure retry suffix must be a non-negative integer: %q", restart)
+			}
+			retries = val
+		}
+	}
+
+	return dockercontainer.RestartPolicy{
+		Name:              dockercontainer.RestartPolicyMode(policy),
+		MaximumRetryCount: retries,
+	}, nil
+}
+
+func buildDockerUlimits(ulimits []container.Ulimit) []*dockercontainer.Ulimit {
+	if len(ulimits) == 0 {
+		return nil
+	}
+	res := make([]*dockercontainer.Ulimit, len(ulimits))
+	for i, u := range ulimits {
+		res[i] = &dockercontainer.Ulimit{
+			Name: u.Name,
+			Hard: u.Hard,
+			Soft: u.Soft,
+		}
+	}
+	return res
+}
+
+func buildDockerDevices(devices []container.DeviceMapping) []dockercontainer.DeviceMapping {
+	if len(devices) == 0 {
+		return nil
+	}
+	res := make([]dockercontainer.DeviceMapping, len(devices))
+	for i, dev := range devices {
+		res[i] = dockercontainer.DeviceMapping{
+			PathOnHost:        dev.PathOnHost,
+			PathInContainer:   dev.PathInContainer,
+			CgroupPermissions: dev.CgroupPermissions,
+		}
+	}
+	return res
+}
+
+func buildDockerMounts(mounts []container.Mount) ([]mount.Mount, error) {
+	if len(mounts) == 0 {
+		return nil, nil
+	}
+	res := make([]mount.Mount, len(mounts))
+	for i, m := range mounts {
+		if m.Optional {
+			return nil, fmt.Errorf("docker runtime: optional mount is not supported")
+		}
+
+		var mType mount.Type
+		switch m.Type {
+		case "bind":
+			mType = mount.TypeBind
+		case "volume":
+			mType = mount.TypeVolume
+		case "tmpfs":
+			mType = mount.TypeTmpfs
+		default:
+			return nil, fmt.Errorf("invalid mount type %q", m.Type)
+		}
+
+		res[i] = mount.Mount{
+			Type:     mType,
+			Source:   m.Source,
+			Target:   m.Target,
+			ReadOnly: m.ReadOnly,
+		}
+	}
+	return res, nil
 }
