@@ -158,6 +158,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 		return fmt.Errorf("containerd runtime: dns-option is not supported yet")
 	}
 
+	if config.Pid != "" && config.Pid != "host" && config.Pid != "private" {
+		return fmt.Errorf("containerd runtime: unsupported PID namespace mode: %q", config.Pid)
+	}
+
 	if config.IPC != "" && config.IPC != "host" && config.IPC != "private" {
 		return fmt.Errorf("containerd runtime: unsupported IPC namespace mode: %q", config.IPC)
 	}
