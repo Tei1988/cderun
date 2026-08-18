@@ -150,9 +150,10 @@ All mount configurations must specify an absolute path for the `Target` (contain
 
 ## Environment Variable & Parameter Validation
 
-When validating environment variables, `cderun` applies character checks strictly to the **key** portion (the part before the first `=`). This prevents the use of control characters in variable names while allowing legitimate multiline values or complex strings (such as PEM certificates) in the values themselves.
+When validating generic `KEY=VALUE` environment variable entries (`--env`), `cderun` applies character checks strictly to the **key** portion (the part before the first `=`). This prevents the use of control characters in variable names while allowing legitimate multiline values or complex strings (such as PEM certificates) in the environment variable values themselves.
 
-Additionally, specific parameter validators enforce strict security constraints on networking and runtime options:
+Additionally, specific parameter validators enforce strict character allowlists on networking and kernel parameter options:
 
-- **DNS Options (`ValidateDNSOption`)**: Ensures custom DNS options (e.g., `ndots:3`) contain only safe ASCII characters, rejecting null bytes and control characters.
-- **Sysctl Parameters (`ValidateSysctlKey` & `ValidateSysctlValue`)**: Validates kernel parameter keys and values configured via `--sysctl` (e.g., `net.ipv4.ip_forward=1`) against ASCII control characters, null bytes, and malicious injection vectors before applying configuration settings.
+- **DNS Options (`ValidateDNSOption`)**: Ensures custom DNS options (e.g., `ndots:3`) contain only ASCII alphanumerics, dots (`.`), colons (`:`), underscores (`_`), and hyphens (`-`), and explicitly rejects parent directory references (`..`).
+- **Sysctl Keys (`ValidateSysctlKey`)**: Enforces non-empty sysctl keys consisting exclusively of ASCII alphanumerics, dots (`.`), underscores (`_`), and hyphens (`-`).
+- **Sysctl Values (`ValidateSysctlValue`)**: Restricts sysctl values to ASCII alphanumerics, spaces (` `), dots (`.`), underscores (`_`), hyphens (`-`), and commas (`,`).
