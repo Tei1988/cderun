@@ -296,7 +296,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 							}
 						} else {
 							if !sbInitialized {
-								needed := len(s) + 128
+								needed := len(s) + len(ranges)*64
 								if needed > len(arr) {
 									buf = make([]byte, 0, needed)
 								}

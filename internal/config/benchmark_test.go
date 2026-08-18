@@ -49,6 +49,26 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 	}
 }
 
+func BenchmarkExpressionResolver_ResolveString_MultipleExpressions(b *testing.B) {
+	mfs := &MockFileSystem{
+		HomeDir: "/home/user",
+		WD:      "/app",
+		Env: map[string]string{
+			"USER": "testuser",
+		},
+	}
+	r, err := NewExpressionResolverWithFS(nil, mfs)
+	if err != nil {
+		b.Fatalf("NewExpressionResolverWithFS failed: %v", err)
+	}
+	input := "prefix-{{HOME}}-{{PWD}}-{{env:USER:-default}}-suffix"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = r.ResolveString(input)
+	}
+}
+
 func BenchmarkExpressionResolver_ResolveString_MagicOnly(b *testing.B) {
 	mfs := &MockFileSystem{
 		HomeDir: "/home/user",
