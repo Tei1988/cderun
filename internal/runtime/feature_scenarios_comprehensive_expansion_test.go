@@ -55,8 +55,8 @@ func TestUnit_RuntimeAdapters_ComprehensiveEdgeCases(t *testing.T) {
 		_, hostCfg, _, err := toDockerContainerConfig(cfg)
 		require.NoError(t, err)
 		require.NotNil(t, hostCfg)
-		assert.NotEmpty(t, hostCfg.Resources.DeviceRequests)
-		assert.Equal(t, []string{"gpu"}, hostCfg.Resources.DeviceRequests[0].Capabilities[0])
+		assert.NotEmpty(t, hostCfg.DeviceRequests)
+		assert.Equal(t, []string{"gpu"}, hostCfg.DeviceRequests[0].Capabilities[0])
 	})
 
 	t.Run("ContainerdValidateConfigUnsupportedOptions", func(t *testing.T) {

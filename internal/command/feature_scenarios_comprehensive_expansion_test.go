@@ -21,13 +21,15 @@ func TestUnit_CommandExecution_ComprehensiveEdgeCases(t *testing.T) {
 		var stderr bytes.Buffer
 
 		rawArgs := []string{
+			"cderun",
 			"sh",
-			"-c",
-			"echo hello",
 			"--cderun-dry-run",
 			"--cderun-dry-run-format=json",
 			"--cderun-image=busybox:latest",
 			"--cderun-remove=false",
+			"--",
+			"-c",
+			"echo hello",
 		}
 
 		err := ExecuteContextWithOptions(context.Background(), rawArgs, func(o *rootOptions, cmd *cobra.Command) {
@@ -37,12 +39,24 @@ func TestUnit_CommandExecution_ComprehensiveEdgeCases(t *testing.T) {
 		require.NoError(t, err)
 
 		// Parse dry-run JSON output
-		var dryRunOutput map[string]interface{}
+		var dryRunOutput map[string]any
 		err = json.Unmarshal(stdout.Bytes(), &dryRunOutput)
 		require.NoError(t, err)
 
 		assert.Equal(t, "busybox:latest", dryRunOutput["image"])
 		assert.Equal(t, false, dryRunOutput["remove"])
+
+		// Verify forwarded command contains exact command arguments including double-dash divider without --cderun-* options
+		cmdVal, ok := dryRunOutput["command"]
+		require.True(t, ok)
+
+		var strCmd []string
+		if cmdSlice, ok := cmdVal.([]any); ok {
+			for _, v := range cmdSlice {
+				strCmd = append(strCmd, v.(string))
+			}
+		}
+		assert.Equal(t, []string{"--", "-c", "echo hello"}, strCmd)
 	})
 
 	t.Run("SymlinkModeNonPrefixedOptionPassthrough", func(t *testing.T) {
@@ -52,6 +66,7 @@ func TestUnit_CommandExecution_ComprehensiveEdgeCases(t *testing.T) {
 		var stderr bytes.Buffer
 
 		rawArgs := []string{
+			"cderun",
 			"python",
 			"-m",
 			"http.server",
@@ -67,7 +82,7 @@ func TestUnit_CommandExecution_ComprehensiveEdgeCases(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		var dryRunOutput map[string]interface{}
+		var dryRunOutput map[string]any
 		err = json.Unmarshal(stdout.Bytes(), &dryRunOutput)
 		require.NoError(t, err)
 
@@ -76,7 +91,7 @@ func TestUnit_CommandExecution_ComprehensiveEdgeCases(t *testing.T) {
 		require.True(t, ok)
 
 		var strCmd []string
-		if cmdSlice, ok := cmdVal.([]interface{}); ok {
+		if cmdSlice, ok := cmdVal.([]any); ok {
 			for _, v := range cmdSlice {
 				strCmd = append(strCmd, v.(string))
 			}
