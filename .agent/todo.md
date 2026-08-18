@@ -76,7 +76,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T67 | 早期ロガー初期化がフォーマット指定を無視し、不正レベルを黙殺する | 改善 | 低 | 小 | - | DONE |
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別およびT81ホイスト動作） | テスト | 中 | 小 | - | DONE |
-| T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | - |
+| T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | DONE |
 | T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
@@ -258,10 +258,6 @@ cderun --prune
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
 
-### `internal/config/resolver_test.go` 内の `ptr` 関数の重複定義によるコンパイルエラー
-
-- **内容**: `internal/config/resolver_test.go` において、`ptr` ヘルパー関数が 11 行目と 1035 行目に二重に定義されており、テストコンパイル時にエラー (`ptr redeclared in this block`) が発生する状態になっている。
-- **対応**: 1035 行目の重複する `ptr` 関数定義を削除することを推奨。 (Recorded by Jules)
 
 ---
 
