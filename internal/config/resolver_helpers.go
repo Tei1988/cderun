@@ -31,7 +31,7 @@ func parseSlice[T any](slice []string, sourceLabel string, parser func(string, s
 	return res, nil
 }
 
-func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, fs FileSystem) ([]container.Ulimit, error) {
+func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
 	raws, err := pickConfigs(
 		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
 		func(t ToolConfig) []string { return t.Ulimits },
@@ -49,10 +49,18 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 
 	res := make([]container.Ulimit, 0, len(raws))
 	for _, raw := range raws {
-		if err := validatePathChars(raw); err != nil {
+		resolvedRaw := raw
+		if r != nil {
+			resolvedRaw = r.resolveString(raw)
+			if err := r.Error(); err != nil {
+				return nil, err
+			}
+		}
+
+		if err := validatePathChars(resolvedRaw); err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
 		}
-		parsed, err := units.ParseUlimit(raw)
+		parsed, err := units.ParseUlimit(resolvedRaw)
 		if err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
 		}
