@@ -46,6 +46,19 @@ func TestUnit_Config_SecurityEnhancements_MountConfigResolveTypeValidation(t *te
 		assert.Equal(t, "/tmp/data", m.Target)
 	})
 
+	t.Run("empty mount type resolves as bind", func(t *testing.T) {
+		mc := MountConfig{
+			Type:   "",
+			Source: ConfigPath{Raw: "/host/src"},
+			Target: ConfigPath{Raw: "/app/dst"},
+		}
+		m, err := mc.Resolve(r)
+		require.NoError(t, err)
+		assert.Equal(t, "bind", m.Type)
+		assert.Equal(t, "/host/src", m.Source)
+		assert.Equal(t, "/app/dst", m.Target)
+	})
+
 	t.Run("invalid mount type rejected during resolve", func(t *testing.T) {
 		mc := MountConfig{
 			Type:   "overlay",
@@ -86,10 +99,20 @@ func TestUnit_Config_SecurityEnhancements_EnvValuesControlCharacterValidation(t 
 
 	mfs := &MockFileSystem{WD: "/workspace", HomeDir: "/workspace/home"}
 
-	t.Run("env value with control character rejected", func(t *testing.T) {
+	t.Run("env value with C0 control character rejected", func(t *testing.T) {
 		cli := &CLIOptions{
 			Image: ptr("alpine"),
 			Env:   []string{"FOO=bar\x01baz"},
+		}
+		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid control character")
+	})
+
+	t.Run("env value with C1 control character rejected", func(t *testing.T) {
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+			Env:   []string{"FOO=bar\u0085baz"},
 		}
 		_, err := ResolveWithFS("sh", cli, nil, nil, mfs)
 		require.Error(t, err)

@@ -145,13 +145,18 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		return container.Mount{}, err
 	}
 
+	mountType := mc.Type
+	if mountType == "" {
+		mountType = "bind"
+	}
+
 	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
 	if HasParentTraversal(mc.Target.Raw) {
 		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", mc.Target.Raw)
 	}
 
 	source := ""
-	if mc.Type == "bind" {
+	if mountType == "bind" {
 		s, err := mc.Source.Resolve(r)
 		if err != nil {
 			return container.Mount{}, err
@@ -178,7 +183,7 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	}
 
 	return container.Mount{
-		Type:     mc.Type,
+		Type:     mountType,
 		Source:   source,
 		Target:   target,
 		ReadOnly: mc.ReadOnly,
