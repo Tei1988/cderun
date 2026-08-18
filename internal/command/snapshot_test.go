@@ -264,9 +264,6 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
 	})
-
-	// TODO: clarify why ResolvePath returns empty string and whether this subtest should be skipped or re-enabled.
-	// This case is difficult to trigger with the current filepath.Join logic in createSnapshot.
 }
 
 func TestUnit_Snapshot_ReadMountInfo_Error(t *testing.T) {
