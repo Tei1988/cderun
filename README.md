@@ -481,7 +481,7 @@ Key variables include:
 - **CLI Flags (P1/P2)**: List-type flags must be repeated for each item (e.g., `--env A=1 --env B=2`). Scalar string flags that accept multiple values (such as `--prefetch` and `--mount-tools`) use comma-separated values instead (e.g., `--prefetch node,python`).
 - **Environment Variables (P3)**: Use specific separators depending on the variable.
   - **Semicolon (`;`)**: `CDERUN_ENV`, `CDERUN_MOUNT`
-  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SENSITIVE_ENV`, `CDERUN_PREFETCH`
+  - **Comma (`,`)**: All other list-type variables, including `CDERUN_GROUP_ADD`, `CDERUN_MOUNT_TOOLS`, `CDERUN_DEVICE`, `CDERUN_PUBLISH`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_DNS_SEARCH`, `CDERUN_DNS_OPTION`, `CDERUN_ADD_HOST`, `CDERUN_CAP_ADD`, `CDERUN_CAP_DROP`, `CDERUN_ENTRYPOINT`, `CDERUN_SECURITY_OPT`, `CDERUN_SENSITIVE_ENV`, `CDERUN_ULIMIT`, `CDERUN_SYSCTL`, `CDERUN_PREFETCH`
 
 ---
 
