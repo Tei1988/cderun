@@ -67,6 +67,8 @@ To prevent invalid or unsafe resource configurations:
 - **CPU and Memory Limits**:
   - Memory setting strings (e.g., `-500MB`) are processed via standard RAM parsing which inherently rejects negative values.
   - The direct `containerd` adapter explicitly validates that resource settings (`CPUs` and `Memory`) are non-negative, rejecting any negative values with clear validation errors before container execution.
+- **Cpuset Validation**: `ValidateCpuset` restricts CPU and memory node set specifications (`--cpuset-cpus` and `--cpuset-mems`) strictly to numbers, commas, and hyphens (e.g., `0-3,5`), rejecting any parameter injection or malformed characters.
+- **GPU Specification Validation**: `ValidateGPUs` restricts GPU requests (`--gpus`) to alphanumeric characters, commas, equals signs, and hyphens (e.g., `all`, `count=2`, `device=0,1`), blocking parameter injection attempts.
 
 ## Privileged Mode & Capability Warnings
 
@@ -102,6 +104,7 @@ To encourage privilege minimization and maintain robust container isolation:
 
 - **Host Network Mode Warning**: When host network namespace sharing is enabled (`--network host` or `network: host` in config files), `cderun` emits a `Warn` level security log. Bypassing network namespace isolation exposes the host's loopback and network services to the container, which should be restricted to trusted workloads.
 - **Host PID Namespace Sharing**: Configuring the PID namespace to `"host"` (`--pid host` or `pid: host` in config files) disables process isolation. This allows processes running inside the container to view and interact with all processes on the host. `cderun` emits a visible `Warn` level security warning when host PID namespace sharing is activated.
+- **Host Cgroup Namespace Sharing**: Configuring the cgroup namespace to `"host"` (`--cgroupns host` or `cgroupns: host` in config files) exposes the host system's cgroup hierarchy to the container. `cderun` emits a visible `Warn` level security log when host cgroup namespace sharing is activated.
 - **Sensitive Bind Mounts**: Bind mounts that expose highly sensitive host directories (including `/`, `/boot`, `/dev`, `/etc`, `/proc`, and `/sys` or their subdirectories) are scanned. If a container is configured with any of these host-side paths as a mount source, a visible warning is logged at the `Warn` level to flag the risk and help users mitigate potential container escapes or host configuration exposure.
 
 ## Socket-Mounting and Numeric GID Access Warnings
@@ -145,6 +148,11 @@ The registry matching checks the hostname and repository namespace (e.g. `docker
 
 All mount configurations must specify an absolute path for the `Target` (container-side path). Relative paths in mount targets are ambiguous and potentially dangerous, so they are rejected during resolution.
 
-## Environment Variable Validation
+## Environment Variable & Parameter Validation
 
 When validating environment variables, `cderun` applies character checks strictly to the **key** portion (the part before the first `=`). This prevents the use of control characters in variable names while allowing legitimate multiline values or complex strings (such as PEM certificates) in the values themselves.
+
+Additionally, specific parameter validators enforce strict security constraints on networking and runtime options:
+
+- **DNS Options (`ValidateDNSOption`)**: Ensures custom DNS options (e.g., `ndots:3`) contain only safe ASCII characters, rejecting null bytes and control characters.
+- **Sysctl Parameters (`ValidateSysctlKey` & `ValidateSysctlValue`)**: Validates kernel parameter keys and values configured via `--sysctl` (e.g., `net.ipv4.ip_forward=1`) against ASCII control characters, null bytes, and malicious injection vectors before applying configuration settings.

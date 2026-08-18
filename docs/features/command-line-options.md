@@ -18,6 +18,8 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_PUBLISH`
   - `CDERUN_EXPOSE`
   - `CDERUN_DNS`
+  - `CDERUN_DNS_SEARCH`
+  - `CDERUN_DNS_OPTION`
   - `CDERUN_ADD_HOST`
   - `CDERUN_CAP_ADD`
   - `CDERUN_CAP_DROP`
@@ -25,6 +27,7 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_SENSITIVE_ENV`
   - `CDERUN_ULIMIT`
   - `CDERUN_SYSCTL`
+  - `CDERUN_SECURITY_OPT`
 
 *Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`).*
 
