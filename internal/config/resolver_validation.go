@@ -479,15 +479,14 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateMountSocketPathRaw() error {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams("mount-socket-path", rv.getCliVal())
-	if err != nil {
-		return err
-	}
+	overrideSet, overrideValStr := getPtrVal(rv.cli.CderunMountSocketPath)
+	cliSet, cliValStr := getPtrVal(rv.cli.MountSocketPath)
+
 	var raw string
-	if p1Set {
-		raw = p1Val.String()
-	} else if p2Set {
-		raw = p2Val.String()
+	if overrideSet {
+		raw = overrideValStr
+	} else if cliSet {
+		raw = cliValStr
 	} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
 		raw = env
 	} else {

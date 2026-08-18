@@ -268,24 +268,37 @@ func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val
 }
 
 func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
-	_, p1Set, p1Val, p2Set, p2Val, err := fetchFieldAndParams(name, rv.getCliVal())
-	if err != nil {
-		return "", err
+	var overrideSet, cliSet bool
+	var overrideValStr, cliValStr string
+
+	switch name {
+	case "socket-path":
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.SocketPath)
+	case "mount-socket-path":
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountSocketPath)
+	case "mount-cderun-path":
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountCderunPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountCderunPath)
+	default:
+		_, s1, v1, s2, v2, err := fetchFieldAndParams(name, rv.getCliVal())
+		if err != nil {
+			return "", err
+		}
+		overrideSet, overrideValStr, cliSet, cliValStr = s1, v1.String(), s2, v2.String()
 	}
 
-	p1ValStr := p1Val.String()
-	p2ValStr := p2Val.String()
-
-	if !rv.hasPathToResolve(p1Set, p1ValStr, p2Set, p2ValStr, envKey, tGetter, gGetter, fallback) {
+	if !rv.hasPathToResolve(overrideSet, overrideValStr, cliSet, cliValStr, envKey, tGetter, gGetter, fallback) {
 		return "", nil
 	}
 
 	// Find the winning raw path
 	var raw string
-	if p1Set {
-		raw = p1ValStr
-	} else if p2Set {
-		raw = p2ValStr
+	if overrideSet {
+		raw = overrideValStr
+	} else if cliSet {
+		raw = cliValStr
 	} else if env := rv.fs.Getenv(envKey); env != "" {
 		raw = env
 	} else {
@@ -331,8 +344,8 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 	}
 
 	return resolveConfigPath(
-		p1Set, p1ValStr,
-		p2Set, p2ValStr,
+		overrideSet, overrideValStr,
+		cliSet, cliValStr,
 		envKey,
 		subcommand, tools, tGetter,
 		rv.global, gGetter,
