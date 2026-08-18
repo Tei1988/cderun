@@ -19,13 +19,13 @@ func TestUnit_Config_SecurityControlChars_And_UlimitExpressions(t *testing.T) {
 		require.Error(t, errC1)
 		assert.Contains(t, errC1.Error(), "invalid character in path or configuration")
 
-		errC1_NEL := validatePathChars("test\u0085path")
-		require.Error(t, errC1_NEL)
-		assert.Contains(t, errC1_NEL.Error(), "invalid character in path or configuration")
+		errC1NEL := validatePathChars("test\u0085path")
+		require.Error(t, errC1NEL)
+		assert.Contains(t, errC1NEL.Error(), "invalid character in path or configuration")
 
-		errC1_9F := validatePathChars("test\u009Fpath")
-		require.Error(t, errC1_9F)
-		assert.Contains(t, errC1_9F.Error(), "invalid character in path or configuration")
+		errC19F := validatePathChars("test\u009Fpath")
+		require.Error(t, errC19F)
+		assert.Contains(t, errC19F.Error(), "invalid character in path or configuration")
 
 		// Invalid UTF-8 sequence
 		errInvalidUTF8 := validatePathChars("test\xffpath")
