@@ -5,6 +5,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -49,8 +50,10 @@ func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err e
 		t.Fatalf("command returned error: %v", err)
 	}
 	if exitCode != 0 {
-		// If the command failed but it might be due to environmental mount issues reported in stderr
-		skipIfRuntimeBroken(t, fmt.Errorf("exit code %d: %s", exitCode, stderr))
+		// Only trigger environmental skip if stderr matches explicit runtime backend setup/limitation signatures
+		if isRuntimeBackendError(strings.ToLower(stderr)) {
+			skipIfRuntimeBroken(t, fmt.Errorf("runtime backend error (exit code %d): %s", exitCode, stderr))
+		}
 		t.Fatalf("command failed with exit code %d: %s", exitCode, stderr)
 	}
 }
