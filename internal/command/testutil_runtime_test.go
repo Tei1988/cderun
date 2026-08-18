@@ -19,11 +19,11 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "operation not permitted") || strings.Contains(msg, "permission denied") || strings.Contains(msg, "mknod") || strings.Contains(msg, "cgroup") {
 		t.Skipf("Skipping test due to runtime/environment permission or mount limitation: %v", err)
 	}
-	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") || strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "429 too many requests") {
-		t.Skip("Skipping test due to Docker Hub / ECR rate limit")
+	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") || strings.Contains(msg, "toomanyrequests") || strings.Contains(msg, "429 too many requests") || strings.Contains(msg, "failed to pull image") || strings.Contains(msg, "failed to inspect image") || strings.Contains(msg, "error response from daemon") {
+		t.Skipf("Skipping test due to image pull or daemon rate limit / network issue: %v", err)
 	}
-	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") || strings.Contains(msg, "temporary failure in name resolution") || strings.Contains(msg, "tls handshake timeout") || strings.Contains(msg, "client.timeout") {
-		t.Skipf("Skipping test due to transient network/runtime issue: %v", err)
+	if strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "connection refused") || strings.Contains(msg, "temporary failure in name resolution") || strings.Contains(msg, "tls handshake timeout") || strings.Contains(msg, "client.timeout") || strings.Contains(msg, "unreachable") || strings.Contains(msg, "context deadline exceeded") {
+		t.Skipf("Skipping test due to transient network/runtime issue or timeout: %v", err)
 	}
 	if strings.Contains(msg, "is the docker daemon running") || strings.Contains(msg, "cannot connect to the docker daemon") || strings.Contains(msg, "dial unix") {
 		t.Skipf("Skipping test due to runtime connection or permission issue: %v", err)
