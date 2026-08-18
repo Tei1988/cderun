@@ -19,12 +19,12 @@ import (
 	"cderun/internal/logging"
 
 	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/docker/go-units"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
+	"github.com/docker/go-units"
 	"github.com/google/uuid"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -291,13 +291,6 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		return "", err
 	}
 
-	var quota int64
-	var period uint64
-	if config.CPUs > 0 {
-		period = 100000
-		quota = int64(config.CPUs * float64(period))
-	}
-
 	var validatedGids []uint32
 	if len(config.GroupAdd) > 0 {
 		validatedGids = make([]uint32, 0, len(config.GroupAdd))
@@ -323,27 +316,24 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		return "", err
 	}
 
-	opts := []oci.SpecOpts{
-		oci.WithDefaultSpec(),
-		oci.WithImageConfig(img),
+	opts, err := buildOCISpecOpts(img, config, args, validatedGids)
+	if err != nil {
+		return "", err
 	}
 
-	if len(args) > 0 {
-		opts = append(opts, oci.WithProcessArgs(args...))
+	_, err = r.client.NewContainer(ctx, id,
+		client.WithImage(img),
+		client.WithNewSnapshot(id, img),
+		client.WithNewSpec(opts...),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create: %w", err)
 	}
-	if config.TTY {
-		opts = append(opts, oci.WithTTY)
-	}
-	if config.User != "" {
-		opts = append(opts, oci.WithUser(config.User))
-	}
-	if config.Workdir != "" {
-		opts = append(opts, oci.WithProcessCwd(config.Workdir))
-	}
-	if len(config.Env) > 0 {
-		opts = append(opts, oci.WithEnv(config.Env))
-	}
+	return id, nil
+}
 
+func buildContainerdMountSpecOpts(config *container.ContainerConfig) []oci.SpecOpts {
+	var opts []oci.SpecOpts
 	for _, m := range config.Mounts {
 		mountType := m.Type
 		if mountType == "" {
@@ -374,62 +364,11 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			},
 		}))
 	}
+	return opts
+}
 
-	if config.Privileged {
-		opts = append(opts, oci.WithPrivileged)
-	}
-	if len(config.CapAdd) > 0 {
-		opts = append(opts, oci.WithAddedCapabilities(normalizeCapabilities(config.CapAdd)))
-	}
-	if len(config.CapDrop) > 0 {
-		opts = append(opts, oci.WithDroppedCapabilities(normalizeCapabilities(config.CapDrop)))
-	}
-	if config.Memory > 0 {
-		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
-	}
-	if config.CPUs > 0 {
-		opts = append(opts, oci.WithCPUCFS(quota, period))
-	}
-
-	if config.Devices != nil {
-		for _, d := range config.Devices {
-			opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
-		}
-	}
-
-	if config.Hostname != "" {
-		opts = append(opts, oci.WithHostname(config.Hostname))
-	}
-
-	if config.ReadOnly {
-		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-			if s.Root == nil {
-				s.Root = &specs.Root{}
-			}
-			s.Root.Readonly = true
-			return nil
-		})
-	}
-
-	if config.ShmSize != "" {
-		shmBytes, err := units.RAMInBytes(config.ShmSize)
-		if err != nil {
-			return "", fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
-		}
-		if shmBytes < 0 {
-			return "", fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", shmBytes)
-		}
-		opts = append(opts, getShmSizeSpecOpt(shmBytes))
-	}
-	if len(config.Ulimits) > 0 {
-		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-			if s.Process == nil {
-				s.Process = &specs.Process{}
-			}
-			s.Process.Rlimits = append(s.Process.Rlimits, convertUlimits(config.Ulimits)...)
-			return nil
-		})
-	}
+func buildContainerdNamespaceSpecOpts(config *container.ContainerConfig) []oci.SpecOpts {
+	var opts []oci.SpecOpts
 	if config.Network == "host" {
 		opts = append(opts, oci.WithHostNamespace(specs.NetworkNamespace))
 	}
@@ -461,6 +400,17 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 			}
 			return nil
 		})
+	}
+	return opts
+}
+
+func buildContainerdResourceSpecOpts(config *container.ContainerConfig, quota int64, period uint64) []oci.SpecOpts {
+	var opts []oci.SpecOpts
+	if config.Memory > 0 {
+		opts = append(opts, oci.WithMemoryLimit(uint64(config.Memory)))
+	}
+	if config.CPUs > 0 {
+		opts = append(opts, oci.WithCPUCFS(quota, period))
 	}
 
 	if config.PidsLimit > 0 || config.PidsLimit == -1 {
@@ -508,6 +458,95 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		})
 	}
 
+	return opts
+}
+
+func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args []string, validatedGids []uint32) ([]oci.SpecOpts, error) {
+	var quota int64
+	var period uint64
+	if config.CPUs > 0 {
+		period = 100000
+		quota = int64(config.CPUs * float64(period))
+	}
+
+	opts := []oci.SpecOpts{
+		oci.WithDefaultSpec(),
+		oci.WithImageConfig(img),
+	}
+
+	if len(args) > 0 {
+		opts = append(opts, oci.WithProcessArgs(args...))
+	}
+	if config.TTY {
+		opts = append(opts, oci.WithTTY)
+	}
+	if config.User != "" {
+		opts = append(opts, oci.WithUser(config.User))
+	}
+	if config.Workdir != "" {
+		opts = append(opts, oci.WithProcessCwd(config.Workdir))
+	}
+	if len(config.Env) > 0 {
+		opts = append(opts, oci.WithEnv(config.Env))
+	}
+
+	opts = append(opts, buildContainerdMountSpecOpts(config)...)
+
+	if config.Privileged {
+		opts = append(opts, oci.WithPrivileged)
+	}
+	if len(config.CapAdd) > 0 {
+		opts = append(opts, oci.WithAddedCapabilities(normalizeCapabilities(config.CapAdd)))
+	}
+	if len(config.CapDrop) > 0 {
+		opts = append(opts, oci.WithDroppedCapabilities(normalizeCapabilities(config.CapDrop)))
+	}
+
+	opts = append(opts, buildContainerdResourceSpecOpts(config, quota, period)...)
+
+	if config.Devices != nil {
+		for _, d := range config.Devices {
+			opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+		}
+	}
+
+	if config.Hostname != "" {
+		opts = append(opts, oci.WithHostname(config.Hostname))
+	}
+
+	if config.ReadOnly {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Root == nil {
+				s.Root = &specs.Root{}
+			}
+			s.Root.Readonly = true
+			return nil
+		})
+	}
+
+	if config.ShmSize != "" {
+		shmBytes, err := units.RAMInBytes(config.ShmSize)
+		if err != nil {
+			return nil, fmt.Errorf("containerd runtime: invalid shm-size: %w", err)
+		}
+		if shmBytes < 0 {
+			return nil, fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", shmBytes)
+		}
+		opts = append(opts, getShmSizeSpecOpt(shmBytes))
+	}
+
+	if len(config.Ulimits) > 0 {
+		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+			if s.Process == nil {
+				s.Process = &specs.Process{}
+			}
+			s.Process.Rlimits = append(s.Process.Rlimits, convertUlimits(config.Ulimits)...)
+			return nil
+		})
+	}
+
+	opts = append(opts, buildContainerdNamespaceSpecOpts(config)...)
+
 	if len(config.SecurityOpt) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 			return applySecurityOptions(s, config.SecurityOpt)
@@ -537,15 +576,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		})
 	}
 
-	_, err = r.client.NewContainer(ctx, id,
-		client.WithImage(img),
-		client.WithNewSnapshot(id, img),
-		client.WithNewSpec(opts...),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to create: %w", err)
-	}
-	return id, nil
+	return opts, nil
 }
 
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
