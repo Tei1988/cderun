@@ -10,8 +10,8 @@ Value resolution is recursively applied down configuration trees. This ensures t
 
 ### Resolution Targets
 
-- **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution.
-- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively.
+- **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution. Supported across CLI flags and YAML properties (e.g., `--image`, `--workdir`, `--shm-size`, `--prefetch`).
+- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively (e.g., `--env`, `--mount`, `--ulimit`, `--sysctl`, `--security-opt`, `--dns`).
 - **Maps (`map[string]any` / `map[string]string`)**: Values of each key-value pair are recursively resolved.
 
 ---
@@ -85,9 +85,9 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 
 | Directive | Description |
 | :--- | :--- |
-| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. |
-| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. |
+| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. |
+| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. |
+| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version}}}}`). |
 
 ### 3. Unrecognized and Unknown Expressions
 
