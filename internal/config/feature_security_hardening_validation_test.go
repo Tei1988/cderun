@@ -11,14 +11,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func setupTestLogger(t *testing.T, level string) *bytes.Buffer {
+	t.Helper()
+	g := logging.GetGlobalLogger()
+	origWriter := g.GetWriter()
+	origLevel := g.GetLevel().LowerString()
+	origFormat := g.GetFormat()
+	origTimestamp := g.GetTimestamp()
+
+	buf := &bytes.Buffer{}
+	logging.SetOutput(buf)
+	err := logging.Init(level, "text", false)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		logging.SetOutput(origWriter)
+		err := logging.Init(origLevel, origFormat, origTimestamp)
+		require.NoError(t, err)
+	})
+
+	return buf
+}
+
 func TestSecurityHardening_ValidationEnhancements(t *testing.T) {
 	t.Run("sensitive mount path /root warning", func(t *testing.T) {
-		buf := &bytes.Buffer{}
-		logging.SetOutput(buf)
-		_ = logging.Init("warn", "text", false)
-		defer func() {
-			_ = logging.Init("error", "text", false)
-		}()
+		buf := setupTestLogger(t, "warn")
 
 		mfs := &MockFileSystem{}
 		r := &resolver{
@@ -39,12 +56,7 @@ func TestSecurityHardening_ValidationEnhancements(t *testing.T) {
 	})
 
 	t.Run("relaxed security options warning", func(t *testing.T) {
-		buf := &bytes.Buffer{}
-		logging.SetOutput(buf)
-		_ = logging.Init("warn", "text", false)
-		defer func() {
-			_ = logging.Init("error", "text", false)
-		}()
+		buf := setupTestLogger(t, "warn")
 
 		mfs := &MockFileSystem{}
 		r := &resolver{
@@ -68,12 +80,7 @@ func TestSecurityHardening_ValidationEnhancements(t *testing.T) {
 	})
 
 	t.Run("sensitive disk device warnings", func(t *testing.T) {
-		buf := &bytes.Buffer{}
-		logging.SetOutput(buf)
-		_ = logging.Init("warn", "text", false)
-		defer func() {
-			_ = logging.Init("error", "text", false)
-		}()
+		buf := setupTestLogger(t, "warn")
 
 		mfs := &MockFileSystem{}
 		r := &resolver{
