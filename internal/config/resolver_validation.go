@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"cderun/internal/logging"
 
@@ -65,7 +66,7 @@ var highlyPrivilegedCaps = map[string]bool{
 	"CAP_SYS_RESOURCE":        true,
 }
 
-var sensitiveMountPaths = []string{"/boot", "/dev", "/etc", "/proc", "/sys", "/run", "/var/run"}
+var sensitiveMountPaths = []string{"/boot", "/dev", "/etc", "/proc", "/root", "/sys", "/run", "/var/run"}
 
 func isHighlyPrivilegedCapability(capName string) bool {
 	if highlyPrivilegedCaps[capName] {
@@ -106,6 +107,9 @@ func isHighlySensitiveDevice(p string) bool {
 		return true
 	}
 	if strings.HasPrefix(p, "/dev/cpu/") {
+		return true
+	}
+	if strings.HasPrefix(p, "/dev/hd") || strings.HasPrefix(p, "/dev/xvd") || strings.HasPrefix(p, "/dev/mmcblk") || strings.HasPrefix(p, "/dev/sg") {
 		return true
 	}
 	return false
@@ -194,6 +198,13 @@ func (rv *resolver) validateSecurity() error {
 
 		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
 			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
+		}
+
+		for _, opt := range rv.res.SecurityOpt {
+			lowerOpt := strings.ToLower(opt)
+			if lowerOpt == "seccomp=unconfined" || lowerOpt == "apparmor=unconfined" || lowerOpt == "label=disable" || lowerOpt == "label:disable" || lowerOpt == "systempaths=unconfined" || lowerOpt == "no-new-privileges=false" {
+				logging.Warn("Container security profile or restriction is explicitly relaxed or disabled (%s). Ensure this is intended as it reduces security isolation.", opt)
+			}
 		}
 	}
 	return nil
@@ -573,6 +584,11 @@ func (rv *resolver) validateEnvSecurity() error {
 		}
 		if strings.ContainsRune(val, 0) {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
+		}
+		for pos, r := range val {
+			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+			}
 		}
 	}
 	return nil

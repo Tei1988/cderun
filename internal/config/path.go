@@ -1302,6 +1302,9 @@ func ValidateSysctlKey(s string) error {
 	if s == "" {
 		return fmt.Errorf("sysctl key cannot be empty")
 	}
+	if strings.HasPrefix(s, ".") || strings.HasSuffix(s, ".") || strings.Contains(s, "..") {
+		return fmt.Errorf("invalid sysctl key: leading, trailing, or consecutive dots detected in %q", s)
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-') {

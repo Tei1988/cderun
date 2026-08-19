@@ -1,0 +1,126 @@
+package config
+
+import (
+	"bytes"
+	"testing"
+
+	"cderun/internal/container"
+	"cderun/internal/logging"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestSecurityHardening_ValidationEnhancements(t *testing.T) {
+	t.Run("sensitive mount path /root warning", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		logging.SetOutput(buf)
+		_ = logging.Init("warn", "text", false)
+		defer func() {
+			_ = logging.Init("error", "text", false)
+		}()
+
+		mfs := &MockFileSystem{}
+		r := &resolver{
+			fs:  mfs,
+			cli: &CLIOptions{},
+			res: &ResolvedConfig{
+				Image:   "alpine",
+				Runtime: "docker",
+				Mounts: []container.Mount{
+					{Type: "bind", Source: "/root/secret", Target: "/app"},
+				},
+			},
+		}
+
+		err := r.validateSecurity()
+		require.NoError(t, err)
+		assert.Contains(t, buf.String(), "Mounting highly sensitive host path \"/root/secret\" into the container reduces host security isolation")
+	})
+
+	t.Run("relaxed security options warning", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		logging.SetOutput(buf)
+		_ = logging.Init("warn", "text", false)
+		defer func() {
+			_ = logging.Init("error", "text", false)
+		}()
+
+		mfs := &MockFileSystem{}
+		r := &resolver{
+			fs:  mfs,
+			cli: &CLIOptions{},
+			res: &ResolvedConfig{
+				Image:       "alpine",
+				Runtime:     "docker",
+				SecurityOpt: []string{"seccomp=unconfined", "apparmor=unconfined", "label=disable", "systempaths=unconfined", "no-new-privileges=false"},
+			},
+		}
+
+		err := r.validateSecurity()
+		require.NoError(t, err)
+		out := buf.String()
+		assert.Contains(t, out, "seccomp=unconfined")
+		assert.Contains(t, out, "apparmor=unconfined")
+		assert.Contains(t, out, "label=disable")
+		assert.Contains(t, out, "systempaths=unconfined")
+		assert.Contains(t, out, "no-new-privileges=false")
+	})
+
+	t.Run("sensitive disk device warnings", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		logging.SetOutput(buf)
+		_ = logging.Init("warn", "text", false)
+		defer func() {
+			_ = logging.Init("error", "text", false)
+		}()
+
+		mfs := &MockFileSystem{}
+		r := &resolver{
+			fs:  mfs,
+			cli: &CLIOptions{},
+			res: &ResolvedConfig{
+				Image:   "alpine",
+				Runtime: "docker",
+				Devices: []container.DeviceMapping{
+					{PathOnHost: "/dev/hda1", PathInContainer: "/dev/xda", CgroupPermissions: "rwm"},
+					{PathOnHost: "/dev/xvda", PathInContainer: "/dev/xdb", CgroupPermissions: "rwm"},
+					{PathOnHost: "/dev/mmcblk0", PathInContainer: "/dev/xdc", CgroupPermissions: "rwm"},
+					{PathOnHost: "/dev/sg0", PathInContainer: "/dev/xdd", CgroupPermissions: "rwm"},
+				},
+			},
+		}
+
+		err := r.validateSecurity()
+		require.NoError(t, err)
+		out := buf.String()
+		assert.Contains(t, out, "/dev/hda1")
+		assert.Contains(t, out, "/dev/xvda")
+		assert.Contains(t, out, "/dev/mmcblk0")
+		assert.Contains(t, out, "/dev/sg0")
+	})
+
+	t.Run("env value control character rejection", func(t *testing.T) {
+		mfs := &MockFileSystem{}
+		r := &resolver{
+			fs:  mfs,
+			cli: &CLIOptions{},
+			res: &ResolvedConfig{
+				Image:   "alpine",
+				Runtime: "docker",
+				Env:     []string{"BAD_VAR=hello\x07world"},
+			},
+		}
+
+		err := r.validateSecurity()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid control character")
+	})
+
+	t.Run("sysctl key dot format validation", func(t *testing.T) {
+		assert.Error(t, ValidateSysctlKey(".net.ipv4.ip_forward"))
+		assert.Error(t, ValidateSysctlKey("net.ipv4.ip_forward."))
+		assert.Error(t, ValidateSysctlKey("net..ipv4.ip_forward"))
+		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
+	})
+}
