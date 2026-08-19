@@ -40,14 +40,14 @@ func TestFeature_Command_DryRunFormattingAndHoisting(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		var dryRunData map[string]interface{}
+		var dryRunData map[string]any
 		err = json.Unmarshal(outBuf.Bytes(), &dryRunData)
 		require.NoError(t, err, "Output should be valid JSON: %s", outBuf.String())
 
 		assert.Equal(t, "python:latest", dryRunData["image"])
-		cmdList, ok := dryRunData["command"].([]interface{})
+		cmdList, ok := dryRunData["command"].([]any)
 		require.True(t, ok)
-		assert.Equal(t, []interface{}{"-c", "print('hello')"}, cmdList)
+		assert.Equal(t, []any{"-c", "print('hello')"}, cmdList)
 	})
 
 	t.Run("Wrapper Mode argument hoisting with double dash divider", func(t *testing.T) {

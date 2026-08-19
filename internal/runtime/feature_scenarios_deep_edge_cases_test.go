@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cderun/internal/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,15 +16,56 @@ func TestFeature_Runtime_DockerAdapterGPUAndConfigParsing(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
-			name      string
-			input     string
-			expectErr bool
+			name               string
+			input              string
+			expectErr          bool
+			expectedDriver     string
+			expectedCount      int
+			expectedCaps       [][]string
+			expectedDeviceIDs  []string
+			expectedReqsLength int
 		}{
-			{"all GPUs", "all", false},
-			{"count GPUs", "count=2", false},
-			{"device ID list", "device=0,1", false},
-			{"empty input", "", false},
-			{"invalid format", "invalid_format", true},
+			{
+				name:               "all GPUs",
+				input:              "all",
+				expectErr:          false,
+				expectedDriver:     "nvidia",
+				expectedCount:      -1,
+				expectedCaps:       [][]string{{"gpu"}},
+				expectedDeviceIDs:  nil,
+				expectedReqsLength: 1,
+			},
+			{
+				name:               "count GPUs",
+				input:              "count=2",
+				expectErr:          false,
+				expectedDriver:     "nvidia",
+				expectedCount:      2,
+				expectedCaps:       [][]string{{"gpu"}},
+				expectedDeviceIDs:  nil,
+				expectedReqsLength: 1,
+			},
+			{
+				name:               "device ID list",
+				input:              "device=0,1",
+				expectErr:          false,
+				expectedDriver:     "nvidia",
+				expectedCount:      0,
+				expectedCaps:       [][]string{{"gpu"}},
+				expectedDeviceIDs:  []string{"0", "1"},
+				expectedReqsLength: 1,
+			},
+			{
+				name:               "empty input",
+				input:              "",
+				expectErr:          false,
+				expectedReqsLength: 0,
+			},
+			{
+				name:      "invalid format",
+				input:     "invalid_format",
+				expectErr: true,
+			},
 		}
 
 		for _, tt := range tests {
@@ -35,10 +77,13 @@ func TestFeature_Runtime_DockerAdapterGPUAndConfigParsing(t *testing.T) {
 					assert.Error(t, err)
 				} else {
 					require.NoError(t, err)
-					if tt.input != "" {
-						assert.Len(t, reqs, 1)
-					} else {
-						assert.Nil(t, reqs)
+					assert.Len(t, reqs, tt.expectedReqsLength)
+					if tt.expectedReqsLength > 0 {
+						req := reqs[0]
+						assert.Equal(t, tt.expectedDriver, req.Driver)
+						assert.Equal(t, tt.expectedCount, req.Count)
+						assert.Equal(t, tt.expectedCaps, req.Capabilities)
+						assert.Equal(t, tt.expectedDeviceIDs, req.DeviceIDs)
 					}
 				}
 			})
@@ -70,7 +115,14 @@ func TestFeature_Runtime_DockerAdapterGPUAndConfigParsing(t *testing.T) {
 		assert.Equal(t, int64(512), hostConfig.Resources.CPUShares)
 		assert.Equal(t, "0-1", hostConfig.Resources.CpusetCpus)
 		assert.Equal(t, "0", hostConfig.Resources.CpusetMems)
-		assert.Len(t, hostConfig.Resources.DeviceRequests, 1)
+		require.Len(t, hostConfig.Resources.DeviceRequests, 1)
+
+		expectedGPUReq := dockercontainer.DeviceRequest{
+			Driver:       "nvidia",
+			Count:        -1,
+			Capabilities: [][]string{{"gpu"}},
+		}
+		assert.Equal(t, expectedGPUReq, hostConfig.Resources.DeviceRequests[0])
 		assert.Equal(t, "1", hostConfig.Sysctls["net.ipv4.ip_forward"])
 	})
 }
