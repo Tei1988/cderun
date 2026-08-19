@@ -37,9 +37,9 @@ func TestUnit_Config_IsDriftOk(t *testing.T) {
 	fieldOnce.Do(initFieldInfo)
 
 	t.Run("matches expectedFieldIndices", func(t *testing.T) {
-		if expected, ok := expectedFieldIndices["network"]; ok {
-			assert.True(t, isDriftOk("network", expected))
-		}
+		expected, ok := expectedFieldIndices["network"]
+		require.True(t, ok, "expectedFieldIndices should contain 'network' entry")
+		assert.True(t, isDriftOk("network", expected))
 	})
 
 	t.Run("drift mismatch returns false", func(t *testing.T) {
