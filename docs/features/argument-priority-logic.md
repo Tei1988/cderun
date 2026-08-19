@@ -76,7 +76,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `shmSize: ""` (Empty string uses container engine default, e.g. Docker 64MB; zero or empty produces no adapter overrides)
   - `ipc: ""` (Empty string defaults to private IPC namespace; `"host"` shares host IPC namespace)
   - `cgroupns: ""` (Empty string uses runtime default cgroup namespace mode; `"host"` or `"private"` configures cgroup namespace explicitly)
-  - `pidsLimit: 0` (Zero or negative represents no pids limit override)
+  - `pidsLimit: 0` (`0` skips the adapter override; `-1` explicitly requests unlimited pids, passed directly to Docker and mapped by containerd to OCI unlimited)
   - `cpuShares: 0` (Zero represents relative default CPU weight with no adapter override)
   - `restart: ""` (Empty string represents no restart policy)
   - `prefetchAll: false` (`false` disables automatic tool image prefetching on invocation)
