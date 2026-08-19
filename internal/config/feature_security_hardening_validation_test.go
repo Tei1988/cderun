@@ -108,19 +108,20 @@ func TestSecurityHardening_ValidationEnhancements(t *testing.T) {
 			res: &ResolvedConfig{
 				Image:   "alpine",
 				Runtime: "docker",
-				Env:     []string{"BAD_VAR=hello\x07world"},
+				Env:     []string{"GOOD_VAR=ok", "BAD_VAR=hello\x07world"},
 			},
 		}
 
 		err := r.validateSecurity()
 		require.Error(t, err)
+		assert.Contains(t, err.Error(), "env[1]")
 		assert.Contains(t, err.Error(), "invalid control character")
 	})
 
 	t.Run("sysctl key dot format validation", func(t *testing.T) {
-		assert.Error(t, ValidateSysctlKey(".net.ipv4.ip_forward"))
-		assert.Error(t, ValidateSysctlKey("net.ipv4.ip_forward."))
-		assert.Error(t, ValidateSysctlKey("net..ipv4.ip_forward"))
+		require.Error(t, ValidateSysctlKey(".net.ipv4.ip_forward"))
+		require.Error(t, ValidateSysctlKey("net.ipv4.ip_forward."))
+		require.Error(t, ValidateSysctlKey("net..ipv4.ip_forward"))
 		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
 	})
 }
