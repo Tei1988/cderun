@@ -68,18 +68,18 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
 - **Default Values**:
   - `tty: false`
   - `interactive: false`
-  - `network: bridge`
+  - `network: bridge` (Default network for Docker/Podman engines; note that direct containerd adapter requires `--network host` as `bridge` is rejected)
   - `remove: true`
   - `readOnly: false`
-  - `init: false`
-  - `pid: ""` (private PID namespace)
-  - `shmSize: ""` (runtime default)
-  - `ipc: ""` (private IPC namespace or runtime default)
-  - `cgroupns: ""` (runtime default)
-  - `pidsLimit: 0` (unlimited)
-  - `cpuShares: 0`
-  - `restart: ""` (no restart policy)
-  - `prefetchAll: false`
+  - `init: false` (Docker/Podman tini init; rejected by containerd adapter)
+  - `pid: ""` (Empty string defaults to private PID namespace or runtime default; `"host"` shares host PID namespace)
+  - `shmSize: ""` (Empty string uses container engine default, e.g. Docker 64MB; zero or empty produces no adapter overrides)
+  - `ipc: ""` (Empty string defaults to private IPC namespace; `"host"` shares host IPC namespace)
+  - `cgroupns: ""` (Empty string uses runtime default cgroup namespace mode; `"host"` or `"private"` configures cgroup namespace explicitly)
+  - `pidsLimit: 0` (Zero or negative represents no pids limit override)
+  - `cpuShares: 0` (Zero represents relative default CPU weight with no adapter override)
+  - `restart: ""` (Empty string represents no restart policy)
+  - `prefetchAll: false` (`false` disables automatic tool image prefetching on invocation)
   - `runtime`: None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
   - `pull: missing`
   - `pullMaxRetries: 3`

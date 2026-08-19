@@ -11,8 +11,17 @@ Value resolution is recursively applied down configuration trees. This ensures t
 ### Resolution Targets
 
 - **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution. Supported across CLI flags and YAML properties (e.g., `--image`, `--workdir`, `--shm-size`, `--prefetch`).
-- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively (e.g., `--env`, `--mount`, `--ulimit`, `--sysctl`, `--security-opt`, `--dns`).
+- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively (e.g., `--env`, `--mount`, `--ulimit`, `--sysctl`, `--security-opt`, `--dns`, `--entrypoint`).
 - **Maps (`map[string]any` / `map[string]string`)**: Values of each key-value pair are recursively resolved.
+
+### Sequence Splitting vs Expression Resolution Order
+
+Options that support comma-separated list values follow a deterministic order depending on whether they are scalar string options or string-slice options:
+
+1. **Scalar Comma-Separated Options (e.g., `--prefetch`)**:
+   Dynamic expression resolution occurs **first** on the full scalar string (e.g. `{{env:TOOLS}}` resolving to `"node,python"`). The resulting resolved string is subsequently split by commas into discrete tool names.
+2. **String-Slice Options via Environment Variables (e.g., `CDERUN_ENTRYPOINT`, `CDERUN_CAP_ADD`, `CDERUN_DNS`)**:
+   Separation occurs **first**: the environment variable string is split into slice elements using its designated separator (comma or semicolon). Dynamic expressions within each resulting element are then evaluated recursively. When passed as repeated CLI flags (e.g., `--entrypoint /bin/sh --entrypoint -c`), Cobra constructs the slice directly and each element undergoes expression evaluation individually.
 
 ---
 
