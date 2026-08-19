@@ -115,14 +115,14 @@ func TestFeature_Runtime_DockerAdapterGPUAndConfigParsing(t *testing.T) {
 		assert.Equal(t, int64(512), hostConfig.Resources.CPUShares)
 		assert.Equal(t, "0-1", hostConfig.Resources.CpusetCpus)
 		assert.Equal(t, "0", hostConfig.Resources.CpusetMems)
-		require.Len(t, hostConfig.Resources.DeviceRequests, 1)
+		require.Len(t, hostConfig.DeviceRequests, 1)
 
 		expectedGPUReq := dockercontainer.DeviceRequest{
 			Driver:       "nvidia",
 			Count:        -1,
 			Capabilities: [][]string{{"gpu"}},
 		}
-		assert.Equal(t, expectedGPUReq, hostConfig.Resources.DeviceRequests[0])
+		assert.Equal(t, expectedGPUReq, hostConfig.DeviceRequests[0])
 		assert.Equal(t, "1", hostConfig.Sysctls["net.ipv4.ip_forward"])
 	})
 }

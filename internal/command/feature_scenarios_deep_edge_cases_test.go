@@ -56,7 +56,7 @@ func TestFeature_Command_DryRunFormattingAndHoisting(t *testing.T) {
 		outBuf := new(bytes.Buffer)
 		errBuf := new(bytes.Buffer)
 
-		args := []string{"cderun", "python", "-c", "import sys", "--cderun-dry-run", "--", "--cderun-workdir=/tmp"}
+		args := []string{"cderun", "python", "-c", "import sys", "--cderun-dry-run", "--cderun-dry-run-format=simple", "--", "--cderun-workdir=/tmp"}
 		ctx := context.Background()
 
 		err := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
@@ -68,8 +68,8 @@ func TestFeature_Command_DryRunFormattingAndHoisting(t *testing.T) {
 		require.NoError(t, err)
 
 		output := outBuf.String()
-		assert.Contains(t, output, "workdir: /tmp")
-		assert.Contains(t, output, "python:latest")
+		assert.Contains(t, output, "Workdir: /tmp")
+		assert.Contains(t, output, "Image: python:latest")
 	})
 
 	t.Run("Symlink mode non-prefixed flag passthrough", func(t *testing.T) {
