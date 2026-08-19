@@ -67,8 +67,7 @@ func TestUnit_CommandExecution_AdvancedScenarios(t *testing.T) {
 		var stderr bytes.Buffer
 
 		rawArgs := []string{
-			"cderun",
-			"python",
+			"./python",
 			"-c",
 			"import sys; print(sys.version)",
 			"--cderun-dry-run",

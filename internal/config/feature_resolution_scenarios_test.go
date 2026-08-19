@@ -189,13 +189,16 @@ func TestUnit_ConfigResolution_AdvancedScenarios(t *testing.T) {
 		}
 
 		// Valid PidsLimit (-1, 0, 100) and invalid (-2)
-		optsPidsLimitValid := &config.CLIOptions{
-			Image:     ptr("alpine"),
-			PidsLimit: ptr(100),
+		validPidsLimits := []int{-1, 0, 100}
+		for _, limit := range validPidsLimits {
+			opts := &config.CLIOptions{
+				Image:     ptr("alpine"),
+				PidsLimit: ptr(limit),
+			}
+			resPids, err := config.ResolveWithFS("sh", opts, nil, nil, mfs)
+			require.NoError(t, err, "expected valid pids-limit: %d", limit)
+			assert.Equal(t, limit, resPids.PidsLimit)
 		}
-		resPids, err := config.ResolveWithFS("sh", optsPidsLimitValid, nil, nil, mfs)
-		require.NoError(t, err)
-		assert.Equal(t, 100, resPids.PidsLimit)
 
 		optsPidsLimitInvalid := &config.CLIOptions{
 			Image:     ptr("alpine"),
@@ -242,7 +245,7 @@ func TestUnit_ConfigResolution_AdvancedScenarios(t *testing.T) {
 			"PUBLIC_CONFIG=normal_value",
 		}, maskedCustom)
 
-		// Secure-by-default (Mask-all when patterns slice is nil/empty)
+		// Secure-by-default (Mask-all when patterns slice is nil)
 		maskedDefault := config.MaskSensitiveEnvList(envList, nil)
 		assert.Equal(t, []string{
 			"API_KEY=[REDACTED]",
@@ -250,5 +253,9 @@ func TestUnit_ConfigResolution_AdvancedScenarios(t *testing.T) {
 			"DB_PASS=[REDACTED]",
 			"PUBLIC_CONFIG=[REDACTED]",
 		}, maskedDefault)
+
+		// Mode 2: non-nil but empty patterns slice []string{} explicitly disables masking (NO environment variables masked)
+		maskedEmptySlice := config.MaskSensitiveEnvList(envList, []string{})
+		assert.Equal(t, envList, maskedEmptySlice)
 	})
 }
