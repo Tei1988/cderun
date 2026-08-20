@@ -296,7 +296,12 @@ func (r *ExpressionResolver) resolveString(s string) string {
 							}
 						} else {
 							if !sbInitialized {
-								needed := len(s) + 128
+								// Bounded allowance (16 bytes per range or expansion delta) so short ranges fit within 512B stack buffer
+								expansion := len(res) - (rng.end - rng.start)
+								if expansion < 16 {
+									expansion = 16
+								}
+								needed := len(s) + len(ranges)*expansion
 								if needed > len(arr) {
 									buf = make([]byte, 0, needed)
 								}
