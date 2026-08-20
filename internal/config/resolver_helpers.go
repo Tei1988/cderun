@@ -368,6 +368,27 @@ func deduplicateEnv(env []string) []string {
 	return res
 }
 
+func addEnvSmall(keys *[8]string, vals *[8]string, size *int, env []string) {
+	for _, e := range env {
+		key, _, _ := strings.Cut(e, "=")
+		foundIdx := -1
+		for j := 0; j < *size; j++ {
+			if keys[j] == key {
+				foundIdx = j
+				break
+			}
+		}
+		if foundIdx >= 0 && foundIdx < 8 {
+			//nolint:gosec // false positive G602: bounds checked above
+			vals[foundIdx] = e
+		} else if *size < 8 {
+			keys[*size] = key
+			vals[*size] = e
+			(*size)++
+		}
+	}
+}
+
 func mergeEnv(base, p2, p1 []string) []string {
 	total := len(base) + len(p2) + len(p1)
 	if total == 0 {
@@ -389,62 +410,9 @@ func mergeEnv(base, p2, p1 []string) []string {
 		var vals [8]string
 		size := 0
 
-		for _, e := range base {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
-
-		for _, e := range p2 {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
-
-		for _, e := range p1 {
-			key, _, _ := strings.Cut(e, "=")
-			foundIdx := -1
-			for j := 0; j < size; j++ {
-				if keys[j] == key {
-					foundIdx = j
-					break
-				}
-			}
-			if foundIdx >= 0 && foundIdx < 8 {
-				//nolint:gosec // false positive G602: bounds checked above
-				vals[foundIdx] = e
-			} else {
-				keys[size] = key
-				vals[size] = e
-				size++
-			}
-		}
+		addEnvSmall(&keys, &vals, &size, base)
+		addEnvSmall(&keys, &vals, &size, p2)
+		addEnvSmall(&keys, &vals, &size, p1)
 
 		res := make([]string, size)
 		copy(res, vals[:size])

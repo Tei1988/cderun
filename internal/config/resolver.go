@@ -433,6 +433,28 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 	return rv.res, nil
 }
 
+func needsResolver(raws []string, global *CDERunConfig) bool {
+	if len(raws) == 0 {
+		return false
+	}
+	if global != nil && global.HostContext != nil && global.HostContext.Level > 0 {
+		return true
+	}
+	for _, raw := range raws {
+		if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
+			return true
+		}
+	}
+	return false
+}
+
+func (rv *resolver) getResolverIfNeeded(raws []string) (*ExpressionResolver, error) {
+	if needsResolver(raws, rv.global) {
+		return rv.getR()
+	}
+	return nil, nil
+}
+
 func (rv *resolver) resolveEarly() error {
 	// Early resolution (Diagnosis & StrictEnv)
 	// We call applyBoolOption directly which uses fast-paths.
@@ -462,16 +484,9 @@ func (rv *resolver) resolveEarly() error {
 		}
 
 		vals := getWinningStringSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.fs)
-		var rForSens *ExpressionResolver
-		for _, v := range vals {
-			if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
-				var err error
-				rForSens, err = rv.getR()
-				if err != nil {
-					return err
-				}
-				break
-			}
+		rForSens, err := rv.resolveStringSliceOptionResolver(vals)
+		if err != nil {
+			return err
 		}
 
 		rv.res.SensitiveEnv = resolveStringSliceOptWithVals(vals, rForSens)
@@ -640,7 +655,6 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	// Resolve Ulimits
-	var rForUlimits *ExpressionResolver
 	rawUlimits, err := pickConfigs(
 		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Ulimits },
@@ -652,25 +666,9 @@ func (rv *resolver) resolveComplexOptions() error {
 		return err
 	}
 
-	if len(rawUlimits) > 0 {
-		needResolver := false
-		for _, raw := range rawUlimits {
-			if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
-				needResolver = true
-				break
-			}
-		}
-		if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
-			needResolver = true
-		}
-
-		if needResolver {
-			var err error
-			rForUlimits, err = rv.getR()
-			if err != nil {
-				return err
-			}
-		}
+	rForUlimits, err := rv.getResolverIfNeeded(rawUlimits)
+	if err != nil {
+		return err
 	}
 
 	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rForUlimits, rv.fs)
@@ -679,7 +677,6 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	// Resolve Sysctls
-	var rForSysctls *ExpressionResolver
 	rawSysctls, err := pickConfigs(
 		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Sysctls },
@@ -691,25 +688,9 @@ func (rv *resolver) resolveComplexOptions() error {
 		return err
 	}
 
-	if len(rawSysctls) > 0 {
-		needResolver := false
-		for _, raw := range rawSysctls {
-			if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
-				needResolver = true
-				break
-			}
-		}
-		if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
-			needResolver = true
-		}
-
-		if needResolver {
-			var err error
-			rForSysctls, err = rv.getR()
-			if err != nil {
-				return err
-			}
-		}
+	rForSysctls, err := rv.getResolverIfNeeded(rawSysctls)
+	if err != nil {
+		return err
 	}
 
 	rv.res.Sysctls, err = resolveSysctls(rv.cli.CderunSysctls, rv.cli.Sysctls, rv.subcommand, rv.tools, rv.global, rForSysctls, rv.fs)

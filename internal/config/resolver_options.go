@@ -65,6 +65,34 @@ func isDriftOk(name string, info optionFields) bool {
 	return okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
 }
 
+func (rv *resolver) resolveStringOptionWithExpressions(def OptionDef[string], p1Set bool, p1Val string, p2Set bool, p2Val string) (string, error) {
+	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
+	if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return "", err
+		}
+		resolved = r.resolveString(resolved)
+		if err := r.Error(); err != nil {
+			return "", err
+		}
+	} else if rv.r != nil {
+		if err := rv.r.Error(); err != nil {
+			return "", err
+		}
+	}
+	return resolved, nil
+}
+
+func (rv *resolver) resolveStringSliceOptionResolver(vals []string) (*ExpressionResolver, error) {
+	for _, v := range vals {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+			return rv.getR()
+		}
+	}
+	return nil, nil
+}
+
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	var p1v, p2v []string
 	var fastPathUsed bool
@@ -118,16 +146,9 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		}
 
 		vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
-		var rForSlice *ExpressionResolver
-		for _, v := range vals {
-			if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
-				var err error
-				rForSlice, err = rv.getR()
-				if err != nil {
-					return err
-				}
-				break
-			}
+		rForSlice, err := rv.resolveStringSliceOptionResolver(vals)
+		if err != nil {
+			return err
 		}
 		resolved := resolveStringSliceOptWithVals(vals, rForSlice)
 		switch opt.Name {
@@ -174,16 +195,9 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	}
 
 	vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
-	var rForSlice *ExpressionResolver
-	for _, v := range vals {
-		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
-			var err error
-			rForSlice, err = rv.getR()
-			if err != nil {
-				return err
-			}
-			break
-		}
+	rForSlice, err := rv.resolveStringSliceOptionResolver(vals)
+	if err != nil {
+		return err
 	}
 
 	resolved := resolveStringSliceOptWithVals(vals, rForSlice)
@@ -288,16 +302,9 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			GlobalGetter: opt.GlobalGetter,
 			Fallback:     opt.Default,
 		}
-		resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-		if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
-			r, err := rv.getR()
-			if err != nil {
-				return err
-			}
-			resolved = r.resolveString(resolved)
-			if err := r.Error(); err != nil {
-				return err
-			}
+		resolved, err := rv.resolveStringOptionWithExpressions(def, p1Set, p1Val, p2Set, p2Val)
+		if err != nil {
+			return err
 		}
 		switch opt.Name {
 		case "image":
@@ -350,16 +357,9 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Val, p2Val = p1v.String(), p2v.String()
 	def := OptionDef[string]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter, Fallback: opt.Default}
-	resolved := resolveStringOpt(def, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
-		r, err := rv.getR()
-		if err != nil {
-			return err
-		}
-		resolved = r.resolveString(resolved)
-		if err := r.Error(); err != nil {
-			return err
-		}
+	resolved, err := rv.resolveStringOptionWithExpressions(def, s1, p1Val, s2, p2Val)
+	if err != nil {
+		return err
 	}
 	rv.getResVal().Field(info.targetIdx).SetString(resolved)
 	return nil
@@ -644,20 +644,9 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
-		r, err := rv.getR()
-		if err != nil {
-			return err
-		}
-		valStr = r.resolveString(valStr)
-		if err := r.Error(); err != nil {
-			return err
-		}
-	} else if rv.r != nil {
-		if err := rv.r.Error(); err != nil {
-			return err
-		}
+	valStr, err := rv.resolveStringOptionWithExpressions(def, p1Set, p1Val, p2Set, p2Val)
+	if err != nil {
+		return err
 	}
 
 	if valStr != "" {
@@ -732,16 +721,9 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
 	}
 
-	valStr := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
-	if strings.Contains(valStr, "{{") || strings.HasPrefix(valStr, "~") {
-		r, err := rv.getR()
-		if err != nil {
-			return err
-		}
-		valStr = r.resolveString(valStr)
-		if err := r.Error(); err != nil {
-			return err
-		}
+	valStr, err := rv.resolveStringOptionWithExpressions(def, p1Set, p1Val, p2Set, p2Val)
+	if err != nil {
+		return err
 	}
 
 	if valStr != "" {
