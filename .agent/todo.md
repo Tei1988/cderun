@@ -92,7 +92,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T83 | コンテナ起動成否によるログ重要度再分類およびアタッチ・終了関連 of ロジック・テスト修正 | 改善 | 高 | 中 | - | DONE |
 | T84 | containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上 | 改善 | 中 | 大 | - | - |
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
-| T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | - |
+| T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | - |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
@@ -1020,55 +1020,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
-
----
-
-## T87: Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線
-
-- 種別: 機能 / アーキテクチャ拡張
-- 優先度: 中
-- 規模: 中
-- 対象:
-  - 新規: `internal/runtime/controlsocket/`（仮）配下にサーバー・クライアント実装
-  - `internal/command/root.go`（Nested Execution のスナップショット生成・マウント処理）
-  - `internal/config/resolver.go`（新規フラグ `--mount-cderun-socket` の追加）
-- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`（新規作成済み・本タスクの実装により内容を確定させること）
-
-### 背景
-
-現在の Nested Execution（`docs/features/nested-execution.md`）は、Docker/Podman/containerd などランタイム本体の生ソケット（`/var/run/docker.sock` 等）をコンテナ内にマウントし、ネストした `cderun` がそのソケットに直接ダイヤルしてランタイム API を叩く構成になっている。この構成には次の3つの問題がある。
-
-1. ネストした `cderun` がホスト側のランタイム実装（Docker/Podman/containerd のクライアントライブラリ）を自前で持つ必要があり、バックエンドと密結合している。
-2. Apple `container`（XPC）や WSL Containers（WinRT/COM）のように、そもそもGoバイナリからダイヤル可能なポータブルなソケット/ワイヤプロトコルを公開していないランタイムでは、Nested Execution 自体が原理的に成立しない。
-3. 生のランタイムソケットをマウントすることは、コンテナにホストデーモンへの無制限アクセス権を渡すことに等しく、権限を絞り込む手段が存在しない（`nested-execution.md` 内のセキュリティ警告を参照）。
-
-これを解決する Nested Execution Control Socket は規模が大きいため、**T87〜T90 の4フェーズに分割する**（`docs/features/nested-execution-control-socket.md` の Rollout Phases 節に対応）。**`--mount-cderun-socket` はロールアウト全期間を通じて experimental 扱いとし、T90 完了・全エンジンでのパリティ確認をもって初めて experimental を外す**（同仕様の Experimental Status During Rollout 節を参照）。experimental の間もフェーズ間の互換性は保証しないが、実際にどちらの経路（生ソケット / Control Socket）が使われたかは `--diagnosis` やdebugログで必ず判別できるようにすること（黙殺しない、という既存の原則を experimental 期間中も外さない）。
-
-### 方針（Phase 1 スコープ）
-
-詳細仕様は `docs/features/nested-execution-control-socket.md` を正とする。Phase 1 で実装する範囲は以下のみ:
-
-- Base Host の `cderun` プロセスが、実行木ごとに `cderun` 独自の Control Socket（`cderun.sock`）を既存のスナップショットディレクトリ内に生成し、コンテナにマウントする。
-- ハンドシェイクと Version Compatibility Contract（プロトコルバージョンのみで互換性判定、本体バージョンは不問だが構造化ログに記録）を実装する。
-- Base Host 側は既に `WaitContainer` でブロックしながら実行木の終了を待っているため、新たに常駐デーモンを追加する必要はなく、その待機期間中だけ goroutine で accept ループを回せばよい。
-- **Phase 1 の時点では `--mount-cderun-socket` を指定してもコンテナ実行の挙動そのものは変わらない**（実際の `ContainerConfig` RPC ディスパッチは T88 以降で実装する）。ソケットの生成・マウント・ハンドシェイクまでが疎通していればよい。
-- 後方互換のため、既存の `--mount-socket`（生ソケットマウント）はデフォルト動作のまま維持する。`--mount-cderun` からの自動有効化は本タスクの範囲では行わない。
-
-### 完了条件（Phase 1）
-
-- `--mount-cderun-socket` フラグが実装され、Control Socket の生成・マウント・ネスト先からの接続（ハンドシェイクの成功/失敗を含む）が確認できる。
-- Control Socket のプロトコルバージョン不一致時に、`docs/features/nested-execution-control-socket.md` の Version Compatibility Contract に従い、黙殺・ダウングレードせず明示的なエラーを返す。
-- 互換性判定は Control Protocol バージョンのみで行い、`cderun` 本体のリリースバージョン一致は要求しない。ただしハンドシェイク時に双方の本体バージョンを構造化ログに記録すること。
-- ソケットファイルと accept ループが、正常終了・エラー終了・シグナル強制終了のいずれの経路でも確実にクリーンアップされる（T41 と同種のリークを作り込まないこと。回帰テストを含める）。
-- 既存の `--mount-socket` の挙動・デフォルトが変更されていない（本タスクは追加のみで破壊的変更を含まない）。
-- Control Protocol のリクエストスキーマに engine/adapter 選択用のフィールドが**存在しない**こと（「指定されても無視する」ではなく、そもそも型として表現できない設計になっていること）。どのアダプタが応答するかは Base Host が Control Socket 作成時に1回だけ決定する。
-- `--mount-cderun-socket` が `command-line-options.md` 等のドキュメントに **experimental** として明記されている。
-- `docs/features/nested-execution-control-socket.md` の「Open Questions for Implementation」セクションが、実装時に確定した内容で更新されている。
-
-### スコープ外（明示）
-
-- **リモート/クロスホスト利用は本タスクの範囲外**。Control Socket はあくまで Base Host のファイルシステム/マウント名前空間に閉じた Unix ドメインソケットとする。理由は `docs/features/nested-execution-control-socket.md` の Non-Goals セクションに詳述（マウント解決がパス付け替えからデータ転送に変わる、書き込み反映の仕様が未定義、信頼境界が消失する、既存ツールとの守備範囲重複、の4点）。実装中にリモート化を見据えた抽象化を先回りして入れないこと。
-- **実際の `ContainerConfig` RPC ディスパッチ（create/start/wait/remove/attach/signal/resize）は本タスクの範囲外**。T88〜T90 で実装する。
 
 ---
 
