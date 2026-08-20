@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,11 +85,17 @@ func TestUnit_Logging_LevelString(t *testing.T) {
 
 func TestUnit_Logging_LevelParse(t *testing.T) {
 	assert.Equal(t, ErrorLevel, ParseLevel("error"))
+	assert.Equal(t, ErrorLevel, ParseLevel("ERROR"))
 	assert.Equal(t, WarnLevel, ParseLevel("warn"))
+	assert.Equal(t, WarnLevel, ParseLevel("WaRn"))
 	assert.Equal(t, WarnLevel, ParseLevel("warning"))
+	assert.Equal(t, WarnLevel, ParseLevel("WARNING"))
 	assert.Equal(t, InfoLevel, ParseLevel("info"))
+	assert.Equal(t, InfoLevel, ParseLevel("INFO"))
 	assert.Equal(t, DebugLevel, ParseLevel("debug"))
+	assert.Equal(t, DebugLevel, ParseLevel("DeBuG"))
 	assert.Equal(t, TraceLevel, ParseLevel("trace"))
+	assert.Equal(t, TraceLevel, ParseLevel("TrAcE"))
 	assert.Equal(t, InfoLevel, ParseLevel("unknown"))
 }
 
@@ -180,6 +187,34 @@ func BenchmarkSanitizeLogString_NoControl(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = SanitizeLogString(input)
+	}
+}
+
+func BenchmarkLogger_FormatText(b *testing.B) {
+	logger := NewLogger()
+	now := time.Now()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.formatText(InfoLevel, "Container finished execution with exit code 0", now)
+	}
+}
+
+func BenchmarkLogger_ParseLevel(b *testing.B) {
+	levels := []string{"error", "warn", "warning", "info", "debug", "trace"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseLevel(levels[i%len(levels)])
+	}
+}
+
+func BenchmarkLogger_ParseLevel_MixedCase(b *testing.B) {
+	levels := []string{"ERROR", "WaRn", "WARNING", "INFO", "DeBuG", "TrAcE"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseLevel(levels[i%len(levels)])
 	}
 }
 
