@@ -195,6 +195,14 @@ func (rv *resolver) validateSecurity() error {
 		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
 			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
 		}
+		for _, opt := range rv.res.SecurityOpt {
+			optLower := strings.ToLower(opt)
+			if optLower == "seccomp=unconfined" || optLower == "apparmor=unconfined" ||
+				optLower == "label=disable" || optLower == "systempaths=unconfined" ||
+				optLower == "no-new-privileges=false" {
+				logging.Warn("Security option %q disables default container security isolation. Please ensure this is intended.", opt)
+			}
+		}
 	}
 	return nil
 }
@@ -573,6 +581,14 @@ func (rv *resolver) validateEnvSecurity() error {
 		}
 		if strings.ContainsRune(val, 0) {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
+		}
+		for pos, r := range val {
+			if r < 32 && r != '\n' && r != '\r' && r != '\t' {
+				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+			}
+			if r == 127 {
+				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character DEL at position %d", i, pos)
+			}
 		}
 	}
 	return nil
