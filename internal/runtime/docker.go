@@ -319,12 +319,11 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	}
 	defer resp.Close()
 
-	var stdinErr error
-	var stdinMu sync.Mutex
+	var errState stdinErrorState
 	stdinDone := make(chan struct{})
 
 	if stdin != nil {
-		go d.copyStdinToContainer(ctx, containerID, stdin, resp, &stdinMu, &stdinErr, stdinDone)
+		go d.copyStdinToContainer(ctx, containerID, stdin, resp, &errState, stdinDone)
 	} else {
 		close(stdinDone)
 	}
@@ -336,7 +335,24 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 		close(ready)
 	}
 
-	return d.handleAttachStreamSync(ctx, resp, &stdinMu, &stdinErr, stdinDone, outputDone)
+	return d.handleAttachStreamSync(ctx, resp, &errState, stdinDone, outputDone)
+}
+
+type stdinErrorState struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (s *stdinErrorState) Set(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.err = err
+}
+
+func (s *stdinErrorState) Get() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.err
 }
 
 func (d *DockerRuntime) copyStdinToContainer(
@@ -344,8 +360,7 @@ func (d *DockerRuntime) copyStdinToContainer(
 	containerID string,
 	stdin io.Reader,
 	resp types.HijackedResponse,
-	stdinMu *sync.Mutex,
-	stdinErr *error,
+	errState *stdinErrorState,
 	stdinDone chan struct{},
 ) {
 	defer close(stdinDone)
@@ -353,9 +368,7 @@ func (d *DockerRuntime) copyStdinToContainer(
 	n, err := io.Copy(resp.Conn, stdin)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
-			stdinMu.Lock()
-			*stdinErr = err
-			stdinMu.Unlock()
+			errState.Set(err)
 		}
 		d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, err)
 		return
@@ -401,29 +414,22 @@ func (d *DockerRuntime) streamContainerOutput(
 func (d *DockerRuntime) handleAttachStreamSync(
 	ctx context.Context,
 	resp types.HijackedResponse,
-	stdinMu *sync.Mutex,
-	stdinErr *error,
+	errState *stdinErrorState,
 	stdinDone <-chan struct{},
 	outputDone <-chan error,
 ) error {
-	getStdinErr := func() error {
-		stdinMu.Lock()
-		defer stdinMu.Unlock()
-		return *stdinErr
-	}
-
 	select {
 	case err := <-outputDone:
 		d.logger.Trace("AttachContainer: output goroutine finished")
 		if err == nil {
-			if sErr := getStdinErr(); sErr != nil {
+			if sErr := errState.Get(); sErr != nil {
 				d.logger.Trace("AttachContainer: output finished but returning pending stdin error")
 				return sErr
 			}
 		}
 		return err
 	case <-stdinDone:
-		if sErr := getStdinErr(); sErr != nil {
+		if sErr := errState.Get(); sErr != nil {
 			d.logger.Trace("AttachContainer: stdin goroutine finished with error, draining output with grace period")
 			drainCtx, drainCancel := context.WithCancel(ctx)
 			defer drainCancel()
