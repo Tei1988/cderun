@@ -324,80 +324,109 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 	stdinDone := make(chan struct{})
 
 	if stdin != nil {
-		go func() {
-			d.logger.Debug("Starting to copy STDIN to container %s", containerID)
-			var n int64
-			var err error
-			n, err = io.Copy(resp.Conn, stdin)
-			if err != nil {
-				if !errors.Is(err, context.Canceled) {
-					stdinMu.Lock()
-					stdinErr = err
-					stdinMu.Unlock()
-				}
-				d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, err)
-			} else {
-				d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
-				if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
-					d.logger.Trace("Calling CloseWrite on container %s connection", containerID)
-					if err := resp.CloseWrite(); err != nil {
-						d.logger.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
-					}
-				}
-			}
-			close(stdinDone)
-		}()
+		go d.copyStdinToContainer(ctx, containerID, stdin, resp, &stdinMu, &stdinErr, stdinDone)
 	} else {
 		close(stdinDone)
 	}
 
 	outputDone := make(chan error, 1)
-	d.logger.Debug("Starting to copy output from container %s", containerID)
-	go func() {
-		var err error
-		var n int64
-		d.logger.Debug("Output goroutine started")
-		if tty {
-			d.logger.Trace("Starting raw IO copy (TTY=true)")
-			n, err = io.Copy(stdout, resp.Reader)
-		} else {
-			d.logger.Trace("Starting multiplexed StdCopy (TTY=false)")
-			n, err = stdcopy.StdCopy(stdout, stderr, resp.Reader)
-		}
-		d.logger.Trace("Output copy from container %s finished: n=%d, err=%v", containerID, n, err)
-
-		if err != nil {
-			d.logger.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
-		} else {
-			d.logger.Debug("Output copy from container %s finished: %d bytes", containerID, n)
-		}
-		outputDone <- err
-	}()
+	go d.streamContainerOutput(containerID, tty, stdout, stderr, resp.Reader, outputDone)
 
 	if ready != nil {
 		close(ready)
+	}
+
+	return d.handleAttachStreamSync(ctx, resp, &stdinMu, &stdinErr, stdinDone, outputDone)
+}
+
+func (d *DockerRuntime) copyStdinToContainer(
+	ctx context.Context,
+	containerID string,
+	stdin io.Reader,
+	resp types.HijackedResponse,
+	stdinMu *sync.Mutex,
+	stdinErr *error,
+	stdinDone chan struct{},
+) {
+	defer close(stdinDone)
+	d.logger.Debug("Starting to copy STDIN to container %s", containerID)
+	n, err := io.Copy(resp.Conn, stdin)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			stdinMu.Lock()
+			*stdinErr = err
+			stdinMu.Unlock()
+		}
+		d.logger.Debug("STDIN copy to container %s finished with error: %v", containerID, err)
+		return
+	}
+
+	d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+	if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
+		d.logger.Trace("Calling CloseWrite on container %s connection", containerID)
+		if err := resp.CloseWrite(); err != nil {
+			d.logger.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+		}
+	}
+}
+
+func (d *DockerRuntime) streamContainerOutput(
+	containerID string,
+	tty bool,
+	stdout, stderr io.Writer,
+	reader io.Reader,
+	outputDone chan<- error,
+) {
+	d.logger.Debug("Starting to copy output from container %s", containerID)
+	d.logger.Debug("Output goroutine started")
+	var err error
+	var n int64
+	if tty {
+		d.logger.Trace("Starting raw IO copy (TTY=true)")
+		n, err = io.Copy(stdout, reader)
+	} else {
+		d.logger.Trace("Starting multiplexed StdCopy (TTY=false)")
+		n, err = stdcopy.StdCopy(stdout, stderr, reader)
+	}
+	d.logger.Trace("Output copy from container %s finished: n=%d, err=%v", containerID, n, err)
+
+	if err != nil {
+		d.logger.Debug("Output copy from container %s finished after %d bytes with error: %v", containerID, n, err)
+	} else {
+		d.logger.Debug("Output copy from container %s finished: %d bytes", containerID, n)
+	}
+	outputDone <- err
+}
+
+func (d *DockerRuntime) handleAttachStreamSync(
+	ctx context.Context,
+	resp types.HijackedResponse,
+	stdinMu *sync.Mutex,
+	stdinErr *error,
+	stdinDone <-chan struct{},
+	outputDone <-chan error,
+) error {
+	getStdinErr := func() error {
+		stdinMu.Lock()
+		defer stdinMu.Unlock()
+		return *stdinErr
 	}
 
 	select {
 	case err := <-outputDone:
 		d.logger.Trace("AttachContainer: output goroutine finished")
 		if err == nil {
-			stdinMu.Lock()
-			sErr := stdinErr
-			stdinMu.Unlock()
-			if sErr != nil {
+			if sErr := getStdinErr(); sErr != nil {
 				d.logger.Trace("AttachContainer: output finished but returning pending stdin error")
 				return sErr
 			}
 		}
 		return err
 	case <-stdinDone:
-		stdinMu.Lock()
-		sErr := stdinErr
-		stdinMu.Unlock()
-		if sErr != nil {
+		if sErr := getStdinErr(); sErr != nil {
 			d.logger.Trace("AttachContainer: stdin goroutine finished with error, draining output with grace period")
 			drainCtx, drainCancel := context.WithCancel(ctx)
+			defer drainCancel()
 			sleepErrChan := make(chan error, 1)
 			go func() {
 				sleepErrChan <- d.sleepFunc(drainCtx, d.attachCloseWriteGrace)
@@ -407,7 +436,6 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 				d.logger.Trace("AttachContainer: output finished during stdin error drain grace period")
 			case sErrSleep := <-sleepErrChan:
 				if ctx.Err() != nil {
-					drainCancel()
 					return ctx.Err()
 				}
 				if sErrSleep != nil && !errors.Is(sErrSleep, context.Canceled) {
@@ -416,10 +444,8 @@ func (d *DockerRuntime) AttachContainer(ctx context.Context, containerID string,
 					d.logger.Trace("AttachContainer: drain grace period expired")
 				}
 			case <-ctx.Done():
-				drainCancel()
 				return ctx.Err()
 			}
-			drainCancel()
 			return sErr
 		}
 		select {
