@@ -13,7 +13,7 @@ Settings are resolved in the following priority order, from highest to lowest:
 - **Definition**: Dedicated flags designed to force-override the behavior of `cderun`. These flags enable specifying settings on the `cderun` side even when using symbolic links (Polyglot Mode) without conflicting with the arguments of wrapped tools.
 - **Flag Names**: All supported standard `cderun` options have a corresponding P1 counterpart prefixed with `--cderun-`.
   - **Key P1 Flags**:
-    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-network`, `--cderun-runtime`, `--cderun-strict-env`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-prefetch`, `--cderun-prefetch-all`, `--cderun-remove`, `--cderun-restart`, `--cderun-hang-timeout`
+    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-network`, `--cderun-engine`, `--cderun-runtime`, `--cderun-strict-env`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-prefetch`, `--cderun-prefetch-all`, `--cderun-remove`, `--cderun-restart`, `--cderun-hang-timeout`
     - **Mounting & Isolation**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-socket-path`
     - **Networking & Ports**: `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-dns-option`, `--cderun-dns-search`, `--cderun-add-host`
     - **Resources & Security**: `--cderun-memory`, `--cderun-cpus`, `--cderun-cpu-shares`, `--cderun-cpuset-cpus`, `--cderun-cpuset-mems`, `--cderun-device`, `--cderun-gpus`, `--cderun-ipc`, `--cderun-cgroupns`, `--cderun-sensitive-env`, `--cderun-privileged`, `--cderun-read-only`, `--cderun-pid`, `--cderun-pids-limit`, `--cderun-init`, `--cderun-security-opt`, `--cderun-ulimit`, `--cderun-shm-size`, `--cderun-sysctl`, `--cderun-cap-add`, `--cderun-cap-drop`
@@ -31,7 +31,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
 
 - **Definition**: Standard CLI options explicitly provided by the user at execution time. These must be placed **before** the subcommand.
 - **Flag Names**:
-  - `--tty`, `--interactive`, `--image`, `--network`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--remove`, `--config`, `--tool-config`
+  - `--tty`, `--interactive`, `--image`, `--network`, `--engine`, `--runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--remove`, `--config`, `--tool-config`
   - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--dns-option`, `--dns-search`, `--add-host`, `--user`, `--group-add`, `--privileged`, `--read-only`, `--init`, `--pid`, `--pids-limit`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--pull-max-retries`, `--pull-backoff-base`, `--prefetch`, `--prefetch-all`, `--strict-env`, `--sensitive-env`, `--memory`, `--cpus`, `--cpu-shares`, `--cpuset-cpus`, `--cpuset-mems`, `--device`, `--gpus`, `--ipc`, `--cgroupns`, `--security-opt`, `--ulimit`, `--shm-size`, `--sysctl`, `--restart`, `--hang-timeout`
   - `--dry-run`, `--dry-run-format`, `--diagnosis`, `--diagnosis-format`, `--log-level`, `--log-format`, `--log-timestamp`
 - **Condition**: Applied only when explicitly specified by the user on the command line. Otherwise, the resolution proceeds to P3 and below.
@@ -40,7 +40,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
 
 - **Definition**: Settings applied globally across the execution host environment.
 - **Key Variables**:
-  - **Configuration & Execution**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`, `CDERUN_RESTART`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`, `CDERUN_PREFETCH`, `CDERUN_PREFETCH_ALL`
+  - **Configuration & Execution**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_ENGINE`, `CDERUN_RUNTIME` (legacy alias for engine), `CDERUN_OCI_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_REMOVE`, `CDERUN_RESTART`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`, `CDERUN_PREFETCH`, `CDERUN_PREFETCH_ALL`
   - **I/O & TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_ENV`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`, `CDERUN_GROUP_ADD`
   - **Networking**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_DNS_OPTION`, `CDERUN_DNS_SEARCH`, `CDERUN_ADD_HOST`
   - **Mounting & Tools**: `CDERUN_MOUNT`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_ALL_TOOLS`
@@ -80,7 +80,12 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `cpuShares: 0` (Zero represents relative default CPU weight with no adapter override)
   - `restart: ""` (Empty string represents no restart policy)
   - `prefetchAll: false` (`false` disables automatic tool image prefetching on invocation)
-  - `runtime`: None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
+  - `engine`: None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
+  - `runtime`: "" (OCI runtime override; empty string uses container daemon default, e.g. `runc`, `crun`, or `nvidia`)
+  - `cpusetCpus`: "" (Empty string skips cpuset CPU core restrictions)
+  - `cpusetMems`: "" (Empty string skips NUMA memory node restrictions)
+  - `gpus`: "" (Empty string skips GPU device requests)
+  - `sysctls`: nil (Empty/nil map skips sysctl kernel parameter overrides)
   - `pull: missing`
   - `pullMaxRetries: 3`
   - `pullBackoffBase: 1s`

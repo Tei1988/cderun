@@ -60,6 +60,21 @@ To enforce secure device mounting, cgroup permissions for any device specified v
 
 This ensures that only valid permission flags (read `r`, write `w`, and mknod `m`) are specified, preventing any parameter injection or malformed input.
 
+## CPU Set & GPU Configuration Validation
+
+To prevent runtime parameter injection and ensure strict formatting rules:
+
+- **CPU Sets (`ValidateCpuset`)**: Restricts `--cpuset-cpus` and `--cpuset-mems` configurations strictly to digits, commas, and hyphens (e.g. `0-3,5`), rejecting command injection or malformed range specifications.
+- **GPU Specifications (`ValidateGPUs`)**: Restricts `--gpus` parameters strictly to alphanumerics, commas, equals signs, and hyphens (e.g. `all`, `"device=0,1"`, `"count=2"`), ensuring safe option passing to container runtime adapters.
+
+## DNS Option & Sysctl Parameter Validation
+
+To prevent parameter injection in network and kernel sysctl configurations:
+
+- **DNS Options (`ValidateDNSOption`)**: Restricts `--dns-option` configuration parameters strictly to safe ASCII characters, preventing header or resolv.conf configuration injection.
+- **Sysctl Key Validation (`ValidateSysctlKey`)**: Validates sysctl keys (e.g. `net.ipv4.ip_forward`) to ensure they consist strictly of alphanumerics, dots, hyphens, and underscores. Rejects keys with leading or trailing dots, as well as keys with consecutive dots (`..`) to prevent path escape or kernel parameter injection.
+- **Sysctl Value Validation (`ValidateSysctlValue`)**: Restricts sysctl values to safe ASCII characters.
+
 ## Resource Settings Validation
 
 To prevent invalid or unsafe resource configurations:
@@ -102,7 +117,20 @@ To encourage privilege minimization and maintain robust container isolation:
 
 - **Host Network Mode Warning**: When host network namespace sharing is enabled (`--network host` or `network: host` in config files), `cderun` emits a `Warn` level security log. Bypassing network namespace isolation exposes the host's loopback and network services to the container, which should be restricted to trusted workloads.
 - **Host PID Namespace Sharing**: Configuring the PID namespace to `"host"` (`--pid host` or `pid: host` in config files) disables process isolation. This allows processes running inside the container to view and interact with all processes on the host. `cderun` emits a visible `Warn` level security warning when host PID namespace sharing is activated.
-- **Sensitive Bind Mounts**: Bind mounts that expose highly sensitive host directories (including `/`, `/boot`, `/dev`, `/etc`, `/proc`, and `/sys` or their subdirectories) are scanned. If a container is configured with any of these host-side paths as a mount source, a visible warning is logged at the `Warn` level to flag the risk and help users mitigate potential container escapes or host configuration exposure.
+- **Host Cgroup Namespace Sharing**: Sharing the host cgroup namespace (`--cgroupns host` or `cgroupns: host` in config files) exposes host cgroup hierarchies to the container process. `cderun` emits a `Warn` level security log when host cgroup namespace sharing is activated.
+- **Sensitive Bind Mounts**: Bind mounts that expose highly sensitive host directories (including `/`, `/boot`, `/dev`, `/etc`, `/proc`, `/sys`, `/root`, `/run`, and `/var/run` or their subdirectories) are scanned. If a container is configured with any of these host-side paths as a mount source, a visible warning is logged at the `Warn` level to flag the risk and help users mitigate potential container escapes or host configuration exposure.
+
+## Unconfined Security Option Warnings
+
+When security options (`--security-opt` or `securityOpt:` in config files) explicitly disable standard container isolation mechanisms, `cderun` logs a `Warn` level security warning.
+
+Monitored unconfined security options include:
+
+- `seccomp=unconfined` (disabling syscall filtering)
+- `apparmor=unconfined` (disabling AppArmor security profiles)
+- `label=disable` (disabling SELinux container labeling)
+- `systempaths=unconfined` (disabling mask for sensitive `/proc` and `/sys` paths)
+- `no-new-privileges=false` (permitting privilege escalation via suid binaries)
 
 ## Socket-Mounting and Numeric GID Access Warnings
 
@@ -121,10 +149,18 @@ Sensitive devices scanned include:
 - `/dev/mem` (physical memory access)
 - `/dev/kmem` (kernel memory access)
 - `/dev/port` (I/O port access)
-- Block devices with prefixes:
+- `/dev/msr` (Model-Specific Registers)
+- `/dev/cpu/*` (CPU interface devices)
+- Block and storage devices with prefixes:
   - `/dev/sd*` (SCSI disk devices)
   - `/dev/nvme*` (NVMe storage devices)
   - `/dev/loop*` (loopback block devices)
+  - `/dev/vd*` (VirtIO block devices)
+  - `/dev/dm-*` (Device Mapper devices)
+  - `/dev/hd*` (IDE disk devices)
+  - `/dev/xvd*` (Xen virtual disk devices)
+  - `/dev/mmcblk*` (MMC/SD card storage devices)
+  - `/dev/sg*` (SCSI generic raw devices)
   - `/dev/mapper/*` (logical volume mappings)
 
 ## Socket Mount Target Path Validation (`validateMountSocketPathRaw`)

@@ -57,13 +57,28 @@ The `ContainerRuntime` interface governs:
 
 ---
 
+## Engine vs OCI Runtime Specification
+
+`cderun` decouples the container engine selection from the underlying OCI runtime specification:
+
+- **Container Engine (`--engine`, `CDERUN_ENGINE`, `engine:` in YAML)**: Specifies which container daemon engine to connect to (`docker`, `podman`, or `containerd`). Default is `docker`.
+- **OCI Runtime (`--runtime`, `CDERUN_OCI_RUNTIME`, `runtime:` in YAML)**: Specifies the lower-level OCI runtime binary (e.g. `runc`, `crun`, `nvidia`, `kata`).
+
+### Backward Compatibility and Migration
+
+For backward compatibility with older configurations:
+
+- `CDERUN_RUNTIME` serves as a deprecated fallback alias for `CDERUN_ENGINE` when no explicit `CDERUN_ENGINE` is set.
+- Legacy `runtime:` YAML configuration entries containing container engine values (`docker`, `podman`, `containerd`) are automatically migrated to `engine:` at configuration load time and emit a deprecation warning.
+- Docker engine passes the OCI runtime directly to `HostConfig.Runtime` (e.g., when specifying `--runtime nvidia`). Direct `containerd` adapter validates OCI runtime requests and rejects unsupported custom runtimes with an explicit validation error.
+
 ## Engine Selection
 
 ### Resolution Priority Sequence
 
-1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` settings.
-2. **Environment Variables (P3)**: `CDERUN_RUNTIME` or `CDERUN_SOCKET_PATH`.
-3. **Configuration Files (P5)**: `runtime` or `socketPath` keys inside `.cderun.yaml`.
+1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--engine` or `--socket-path` settings.
+2. **Environment Variables (P3)**: `CDERUN_ENGINE` (or legacy `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
+3. **Configuration Files (P5)**: `engine` (or legacy `runtime`) or `socketPath` keys inside `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 
