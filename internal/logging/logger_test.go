@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -180,6 +181,25 @@ func BenchmarkSanitizeLogString_NoControl(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = SanitizeLogString(input)
+	}
+}
+
+func BenchmarkLogger_FormatText(b *testing.B) {
+	logger := NewLogger()
+	now := time.Now()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = logger.formatText(InfoLevel, "Container finished execution with exit code 0", now)
+	}
+}
+
+func BenchmarkLogger_ParseLevel(b *testing.B) {
+	levels := []string{"error", "warn", "warning", "info", "debug", "trace"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseLevel(levels[i%len(levels)])
 	}
 }
 
