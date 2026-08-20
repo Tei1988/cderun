@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,6 +165,16 @@ func TestUnit_Logging_SanitizeLogString(t *testing.T) {
 			name:     "unicode is untouched",
 			input:    "こんにちは",
 			expected: "こんにちは",
+		},
+		{
+			name:     "exact 256 bytes boundary input with control characters",
+			input:    strings.Repeat("a", 254) + "\r\n",
+			expected: strings.Repeat("a", 254) + "\\x0d\\x0a",
+		},
+		{
+			name:     "exact 257 bytes boundary input with control characters",
+			input:    strings.Repeat("a", 255) + "\r\n",
+			expected: strings.Repeat("a", 255) + "\\x0d\\x0a",
 		},
 	}
 
