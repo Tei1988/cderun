@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"testing"
 
 	"cderun/internal/config"
+	"cderun/internal/logging"
 	"cderun/internal/runtime"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -72,28 +74,28 @@ func TestFeature_Command_DryRunFormattingAndHoisting(t *testing.T) {
 		assert.Contains(t, output, "Image: python:latest")
 	})
 
-	t.Run("Symlink mode non-prefixed flag passthrough", func(t *testing.T) {
+	t.Run("Symlink mode non-prefixed flag passthrough execution", func(t *testing.T) {
 		t.Parallel()
 
-		outBuf := new(bytes.Buffer)
-		errBuf := new(bytes.Buffer)
-
 		mockRT := &runtime.MockRuntime{}
-
-		args := []string{"/usr/local/bin/python", "-v", "--version", "--cderun-dry-run"}
+		args := []string{"/usr/local/bin/python", "-v", "--version"}
 		ctx := context.Background()
 
-		err := ExecuteContextWithOptions(ctx, args, withMockRuntime(mockRT, func(o *rootOptions, cmd *cobra.Command) {
+		err := ExecuteContextWithOptions(ctx, args, func(o *rootOptions, cmd *cobra.Command) {
+			o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+				return mockRT, nil
+			}
+			o.exitFunc = func(code int) {}
 			o.fs = mfs
 			o.configLoader = config.NewConfigLoaderWithFS(mfs)
-			cmd.SetOut(outBuf)
-			cmd.SetErr(errBuf)
-		}))
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+		})
 		require.NoError(t, err)
 
-		output := outBuf.String()
-		assert.Contains(t, output, "python:latest")
-		assert.Contains(t, output, "-v")
-		assert.Contains(t, output, "--version")
+		cfg := mockRT.GetCreatedConfig()
+		require.NotNil(t, cfg)
+		assert.Equal(t, "python:latest", cfg.Image)
+		assert.Equal(t, []string{"-v", "--version"}, cfg.Command)
 	})
 }

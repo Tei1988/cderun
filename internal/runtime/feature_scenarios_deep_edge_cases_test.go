@@ -77,7 +77,7 @@ func TestFeature_Runtime_DockerAdapterGPUAndConfigParsing(t *testing.T) {
 					assert.Error(t, err)
 				} else {
 					require.NoError(t, err)
-					assert.Len(t, reqs, tt.expectedReqsLength)
+					require.Len(t, reqs, tt.expectedReqsLength)
 					if tt.expectedReqsLength > 0 {
 						req := reqs[0]
 						assert.Equal(t, tt.expectedDriver, req.Driver)
