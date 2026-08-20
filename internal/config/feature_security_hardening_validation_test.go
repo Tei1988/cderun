@@ -73,6 +73,21 @@ func TestValidateEnvSecurity_ControlChars(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid control character DEL")
 	})
+
+	t.Run("C1 control char in env value rejected", func(t *testing.T) {
+		t.Parallel()
+		rv := &resolver{
+			res: &ResolvedConfig{
+				Image: "alpine:latest",
+				Env: []string{
+					"FOO=bar\u0085baz",
+				},
+			},
+		}
+		err := rv.validateEnvSecurity()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid C1 control character")
+	})
 }
 
 func TestValidateSecurity_UnconfinedWarnings(t *testing.T) {
@@ -99,7 +114,7 @@ func TestValidateSecurity_UnconfinedWarnings(t *testing.T) {
 	}
 
 	err := rv.validateSecurity()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	out := buf.String()
 	assert.Contains(t, out, "seccomp=unconfined")

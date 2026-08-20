@@ -589,6 +589,9 @@ func (rv *resolver) validateEnvSecurity() error {
 			if r == 127 {
 				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character DEL at position %d", i, pos)
 			}
+			if r >= 0x80 && r <= 0x9f {
+				return fmt.Errorf("security validation failed for env[%d] (value): invalid C1 control character %q at position %d", i, r, pos)
+			}
 		}
 	}
 	return nil
