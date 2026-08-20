@@ -70,7 +70,7 @@ make link-check     # ドキュメント内リンクの検証
 1. **English in Source Code:**
    本プロジェクトは public な OSS のため、**ソースコード内のコメント・識別子・エラーメッセージ・ログメッセージはすべて英語**で記述してください（`docs/` 配下および `.agent/todo.md` は日本語で構いません）。
 1. **Runtime Adapter Conversion Contract:**
-   `ContainerConfig` は Docker CLI 互換のユーザー入力形式を保持する中間表現です。Docker デーモンは値を暗黙に正規化しますが、OCI spec を直接組み立てるランタイム（containerd）では**変換責務がアダプタ側にあります**。ランタイムアダプタで `ContainerConfig` のフィールドを消費する際は、(a) 必ずネイティブ表現へ変換する、(b) 未対応なら明示エラーを返す、の二択とし、**素通し・黙殺を禁止**します（例: capability は `CAP_` プレフィックス形式へ正規化が必要）。
+   ランタイムアダプタが `ContainerConfig` を消費する際の変換規約（素通し・黙殺の禁止など）は仕様として `docs/features/direct-container-execution.md` の Conversion Contract セクションに定義されています。**実装時はそちらを正とし、本項目はその存在を示すポインタです**。
 1. **Pragmatic Documentation:**
    実装上の制約や技術的な理由でfeaturesドキュメントと矛盾が生じる場合、ドキュメントを修正して実装と一致させることが許可されます。
    ただし、変更理由を明確に記録し、ユーザーに報告してください。
