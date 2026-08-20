@@ -259,11 +259,11 @@ func SanitizeLogString(s string) string {
 		return s
 	}
 
-	// Fast stack-allocated path for common small messages (up to 64 bytes)
-	// Each control character is escaped to 4 bytes. If len(s) <= 64, the maximum
-	// possible size is 4 * 64 = 256 bytes, which easily fits in our 256-byte stack buffer.
-	if len(s) <= 64 {
-		var buf [256]byte
+	// Fast stack-allocated path for common messages (up to 256 bytes)
+	// Each control character is escaped to 4 bytes. If len(s) <= 256, the maximum
+	// possible size is 4 * 256 = 1024 bytes, which fits in a 1KB stack buffer.
+	if len(s) <= 256 {
+		var buf [1024]byte
 		w := 0
 		for i := 0; i < len(s); i++ {
 			c := s[i]

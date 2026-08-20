@@ -183,6 +183,15 @@ func BenchmarkSanitizeLogString_NoControl(b *testing.B) {
 	}
 }
 
+func BenchmarkSanitizeLogString_WithControl_Large(b *testing.B) {
+	input := "hello world, this is a longer log message (120 bytes) containing control characters like\nline feeds\r\nand tabs\tto test buffer stack allocation."
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = SanitizeLogString(input)
+	}
+}
+
 func BenchmarkSanitizeLogString_WithControl(b *testing.B) {
 	input := "hello world, this is a log message\nwith control characters\r\n"
 	b.ReportAllocs()
