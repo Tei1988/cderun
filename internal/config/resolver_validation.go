@@ -570,6 +570,9 @@ func (rv *resolver) validateSlices() error {
 	return nil
 }
 
+// validateEnvSecurity verifies that environment variable keys and values contain safe characters.
+// Position offsets reported in validation error messages represent 0-based UTF-8 byte indices
+// within the environment variable value string.
 func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
 		key, val, _ := strings.Cut(e, "=")

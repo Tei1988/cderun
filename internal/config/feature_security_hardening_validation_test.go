@@ -88,6 +88,23 @@ func TestValidateEnvSecurity_ControlChars(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid C1 control character")
 		assert.Contains(t, err.Error(), "position 3")
 	})
+
+	t.Run("C1 control char with multibyte prefix reports byte offset position", func(t *testing.T) {
+		t.Parallel()
+		// "日" is 3 UTF-8 bytes (\xe6\x97\xa5), so \u0085 starts at UTF-8 byte offset position 3
+		rv := &resolver{
+			res: &ResolvedConfig{
+				Image: "alpine:latest",
+				Env: []string{
+					"FOO=日\u0085baz",
+				},
+			},
+		}
+		err := rv.validateEnvSecurity()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid C1 control character")
+		assert.Contains(t, err.Error(), "position 3")
+	})
 }
 
 func TestValidateSecurity_UnconfinedWarnings(t *testing.T) {
