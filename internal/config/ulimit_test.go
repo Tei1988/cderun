@@ -13,7 +13,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	}
 
 	t.Run("resolve ulimits from CLI (P2)", func(t *testing.T) {
-		res, err := resolveUlimits(nil, []string{"nofile=1024:2048", "nproc=4096"}, "", nil, nil, mfs)
+		res, err := resolveUlimits(nil, []string{"nofile=1024:2048", "nproc=4096"}, "", nil, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 2)
 		assert.Equal(t, "nofile", res[0].Name)
@@ -25,7 +25,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	})
 
 	t.Run("resolve ulimits from CLI override (P1 overrides P2)", func(t *testing.T) {
-		res, err := resolveUlimits([]string{"nofile=512:1024"}, []string{"nofile=1024:2048"}, "", nil, nil, mfs)
+		res, err := resolveUlimits([]string{"nofile=512:1024"}, []string{"nofile=1024:2048"}, "", nil, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
@@ -39,7 +39,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 		}
 		defer func() { mfs.Env = nil }()
 
-		res, err := resolveUlimits(nil, nil, "", nil, nil, mfs)
+		res, err := resolveUlimits(nil, nil, "", nil, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 2)
 		assert.Equal(t, "nofile", res[0].Name)
@@ -53,7 +53,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 			},
 		}
 
-		res, err := resolveUlimits(nil, nil, "node", tools, nil, mfs)
+		res, err := resolveUlimits(nil, nil, "node", tools, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
@@ -68,7 +68,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 			},
 		}
 
-		res, err := resolveUlimits(nil, nil, "sh", nil, global, mfs)
+		res, err := resolveUlimits(nil, nil, "sh", nil, global, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res, 1)
 		assert.Equal(t, "nofile", res[0].Name)
@@ -77,7 +77,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	})
 
 	t.Run("resolve ulimits with invalid value errors out", func(t *testing.T) {
-		_, err := resolveUlimits(nil, []string{"invalid-format"}, "", nil, nil, mfs)
+		_, err := resolveUlimits(nil, []string{"invalid-format"}, "", nil, nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
 		require.ErrorAs(t, err, &cfgErr)
@@ -86,7 +86,7 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 	})
 
 	t.Run("resolve ulimits with limit values below -1 errors out", func(t *testing.T) {
-		_, err := resolveUlimits(nil, []string{"nofile=-2:1024"}, "", nil, nil, mfs)
+		_, err := resolveUlimits(nil, []string{"nofile=-2:1024"}, "", nil, nil, nil, mfs)
 		require.Error(t, err)
 		var cfgErr *InvalidConfigError
 		require.ErrorAs(t, err, &cfgErr)

@@ -640,7 +640,40 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	// Resolve Ulimits
-	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rv.fs)
+	var rForUlimits *ExpressionResolver
+	rawUlimits, err := pickConfigs(
+		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Ulimits },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	if len(rawUlimits) > 0 {
+		needResolver := false
+		for _, raw := range rawUlimits {
+			if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
+				needResolver = true
+				break
+			}
+		}
+		if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+			needResolver = true
+		}
+
+		if needResolver {
+			var err error
+			rForUlimits, err = rv.getR()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rForUlimits, rv.fs)
 	if err != nil {
 		return err
 	}
