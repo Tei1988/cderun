@@ -189,6 +189,7 @@ cderun --image "node:{{env:NODE_VERSION:-20-alpine}}" node --version
 - **Environment Variable**: `CDERUN_ENV`
 - **Description**: Set or pass through environment variables.
 - **Format**: `KEY=value` (explicit setting) or `KEY` (passthrough from host).
+- **Validation**: Scanned for null bytes (`\x00`) and unescaped C0/C1 control characters to prevent header/shell injection.
 - **Note**: Supports dynamic resolution expressions (e.g., `{{PWD}}`).
 
 ```bash
