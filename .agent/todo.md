@@ -35,17 +35,17 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
-| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | - |
-| T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
-| T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
+| T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | DONE |
+| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | DONE |
+| T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | DONE |
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | DONE |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
@@ -90,7 +90,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T81 | 引数ホイストにおけるダブルダッシュ（`--`）の制限廃止、およびイコール指定（`=`）制約の廃止（スペース区切りのサポート） | 改善 | 高 | 中 | あり | DONE |
 | T82 | デフォルトログレベルのerror化 | 改善 | 高 | 小 | - | DONE |
 | T83 | コンテナ起動成否によるログ重要度再分類およびアタッチ・終了関連 of ロジック・テスト修正 | 改善 | 高 | 中 | - | DONE |
-| T84 | containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上 | 改善 | 中 | 大 | - | - |
+| T84 | containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上 | 改善 | 中 | 大 | - | DONE |
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
 | T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | - |
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | - |
@@ -295,9 +295,9 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -357,9 +357,9 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -392,10 +392,10 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker: `SecurityOpt` に渡るテスト
-- [ ] containerd: サポート範囲のテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker: `SecurityOpt` に渡るテスト
+- [x] containerd: サポート範囲のテスト
 
 ---
 
@@ -428,9 +428,9 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] パース + Docker / containerd 変換のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] パース + Docker / containerd 変換のユニットテスト
 
 ---
 
@@ -483,11 +483,11 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 
 ### 完了条件
 
-- [ ] `--engine` で docker/podman/containerd を指定可能
-- [ ] `--runtime` で OCI ランタイムを指定可能（Docker のみ。containerd はエラー）
-- [ ] `CDERUN_RUNTIME` が非推奨警告付きで動作する移行テスト
-- [ ] `.cderun.yaml` の `runtime:` キーが非推奨警告付きで動作するテスト
-- [ ] 全ドキュメント更新
+- [x] `--engine` で docker/podman/containerd を指定可能
+- [x] `--runtime` で OCI ランタイムを指定可能（Docker のみ。containerd はエラー）
+- [x] `CDERUN_RUNTIME` が非推奨警告付きで動作する移行テスト
+- [x] `.cderun.yaml` の `runtime:` キーが非推奨警告付きで動作するテスト
+- [x] 全ドキュメント更新
 
 ---
 
@@ -514,9 +514,9 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -543,9 +543,9 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -573,9 +573,9 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -608,10 +608,10 @@ ML ワークロードで NVIDIA GPU をコンテナにパススルーする。`d
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker: `DeviceRequests` に変換されるユニットテスト
-- [ ] containerd: 未サポートエラーのテスト（T16 と連携）
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker: `DeviceRequests` に変換されるユニットテスト
+- [x] containerd: 未サポートエラーのテスト（T16 と連携）
 
 ---
 
@@ -638,9 +638,9 @@ cgroup v2 環境でのネームスペース分離を制御。Docker Engine 20.10
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] Docker / containerd 両方のユニットテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
@@ -734,11 +734,11 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 
 ### 完了条件
 
-- [ ] 全経路チェックリスト満たす
-- [ ] `docs/features/command-line-options.md` に記載
-- [ ] `--remove=true` + `--restart` の排他バリデーションテスト
-- [ ] Docker: `RestartPolicy` に変換されるテスト
-- [ ] containerd: 未サポートエラーのテスト
+- [x] 全経路チェックリスト満たす
+- [x] `docs/features/command-line-options.md` に記載
+- [x] `--remove=true` + `--restart` の排他バリデーションテスト
+- [x] Docker: `RestartPolicy` に変換されるテスト
+- [x] containerd: 未サポートエラーのテスト
 
 ---
 
