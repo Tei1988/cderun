@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"io"
 	"testing"
 
 	"cderun/internal/logging"
@@ -87,14 +86,24 @@ func TestValidateEnvSecurity_ControlChars(t *testing.T) {
 		err := rv.validateEnvSecurity()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid C1 control character")
+		assert.Contains(t, err.Error(), "position 3")
 	})
 }
 
 func TestValidateSecurity_UnconfinedWarnings(t *testing.T) {
 	var buf bytes.Buffer
+	logger := logging.GetGlobalLogger()
+	origLevel := logger.GetLevel()
+	origFormat := logger.GetFormat()
+	origTimestamp := logger.GetTimestamp()
+	origWriter := logger.GetWriter()
+	defer func() {
+		_ = logger.Init(origLevel.LowerString(), origFormat, origTimestamp)
+		logger.SetOutput(origWriter)
+	}()
+
 	logging.Init("warn", "text", false)
 	logging.SetOutput(&buf)
-	defer logging.SetOutput(io.Discard)
 
 	rv := &resolver{
 		cli: &CLIOptions{},
