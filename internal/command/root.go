@@ -536,14 +536,14 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 
 	// Pull each image
 	for _, img := range imagesToPull {
-		o.logger.Info("Prefetching image %s...", img)
+		o.logger.Debug("Prefetching image %s...", img)
 		err := rt.PullImage(cmd.Context(), img, resolved.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase)
 		if err != nil {
 			return fmt.Errorf("failed to prefetch image %s: %w", img, err)
 		}
 	}
 
-	o.logger.Info("Successfully prefetched all images.")
+	o.logger.Debug("Successfully prefetched all images.")
 	return nil
 }
 
