@@ -41,6 +41,8 @@ func TestUnit_Runtime_Robustness_MockLifecycle(t *testing.T) {
 
 	err = mock.RemoveContainer(ctx, id)
 	require.NoError(t, err)
+
+	require.NoError(t, mock.Close())
 }
 
 func TestUnit_Runtime_Robustness_DockerAdapterGPUAndRestart(t *testing.T) {
@@ -49,6 +51,7 @@ func TestUnit_Runtime_Robustness_DockerAdapterGPUAndRestart(t *testing.T) {
 	reqs, err := parseGPUs("all")
 	require.NoError(t, err)
 	require.Len(t, reqs, 1)
+	require.NotEmpty(t, reqs[0].Capabilities)
 	assert.Equal(t, []string{"gpu"}, reqs[0].Capabilities[0])
 
 	policy, err := parseDockerRestartPolicy("on-failure:5")
