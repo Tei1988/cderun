@@ -2,20 +2,24 @@
 
 ## Overview
 
-Tool Mounting is a feature that enables executing host-configured tools seamlessly within a container. By mounting the `cderun` binary inside the container under multiple tool-specific names, `cderun` leverages its Polyglot Entry Point functionality to run tools recursively without requiring local installations inside the container.
+Tool Mounting is a feature that enables executing host-configured tools seamlessly within a container. By mounting the `cderun` binary inside the container under tool-specific names (e.g., `/usr/local/bin/node`, `/usr/local/bin/python`), `cderun` leverages its [Polyglot Entry Point](./polyglot-entry.md) functionality to run nested tools recursively on demand without requiring local software installations inside the container base image.
+
+---
 
 ## Prerequisites
 
-- A tools configuration file (`.tools.yaml`) must exist with the target tools defined.
+- A tools configuration file (`.tools.yaml`) must exist and define the target tools.
+- Specifying `--mount-tools` or `--mount-all-tools` transitively and automatically enables both `--mount-cderun` and `--mount-socket`. This behavior follows the [Transitive Auto-enablement](./argument-priority-logic.md#transitive-auto-enablement) priority rules.
 
-Specifying `--mount-tools` or `--mount-all-tools` transitively and automatically enables both `--mount-cderun` and `--mount-socket`. This behavior follows the [Transitive Auto-enablement](./argument-priority-logic.md#transitive-auto-enablement) priority rules.
+---
 
-## Options
+## Command-Line Options
 
 ### `--mount-all-tools`
 
 - **Type**: bool
 - **Default**: `false`
+- **Environment Variable**: `CDERUN_MOUNT_ALL_TOOLS`
 - **Description**: Mount all tools configured inside `.tools.yaml` into the container.
 
 **Example**:
@@ -26,7 +30,7 @@ cderun --mount-all-tools sh
 
 **Underlying Behavior**:
 
-If `.tools.yaml` defines `node`, `python`, and `gemini-cli`, the container runs with the following bind mounts:
+If `.tools.yaml` defines `node`, `python`, and `git`, the container is created with read-only bind mounts mapping the host `cderun` binary to each tool name under `/usr/local/bin/`:
 
 ```bash
 docker run --rm \
@@ -34,7 +38,7 @@ docker run --rm \
   --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/cderun,readonly \
   --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/node,readonly \
   --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/python,readonly \
-  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/gemini-cli,readonly \
+  --mount type=bind,source=<host-cderun-path>,target=/usr/local/bin/git,readonly \
   alpine:latest
 ```
 
@@ -44,14 +48,15 @@ docker run --rm \
 # Inside the container shell:
 node --version    # Executed via cderun as 'node'
 python script.py  # Executed via cderun as 'python'
-gemini-cli ask    # Executed via cderun as 'gemini-cli'
+git status        # Executed via cderun as 'git'
 ```
 
 ### `--mount-tools`
 
-- **Type**: string
+- **Type**: string (comma-separated list)
 - **Default**: `""`
-- **Description**: Mount only specified tools into the container (comma-separated list).
+- **Environment Variable**: `CDERUN_MOUNT_TOOLS`
+- **Description**: Mount only specified tools into the container. Accepts a comma-separated scalar string list (e.g., `--mount-tools node,python`).
 
 **Example**:
 
@@ -74,50 +79,58 @@ docker run --rm \
 
 ```bash
 # Inside the container shell:
-python --version  # OK
-node --version    # OK
-gemini-cli ask    # Error: gemini-cli is not mounted inside the container
+python --version  # OK (mounted)
+node --version    # OK (mounted)
+git status        # Error: git is not mounted inside the container (or uses container's native binary if present)
 ```
 
-## Implementation Details
+---
 
-### Target Directory
+## Technical Implementation Details
 
-Tools are mounted as read-only executables inside the `/usr/local/bin/` directory:
+### Target Directory Placement
+
+Tool wrappers are mounted as read-only executable files inside the `/usr/local/bin/` directory inside the container:
 
 ```text
 /usr/local/bin/
 ├── cderun       -> <host-cderun-path>
 ├── node         -> <host-cderun-path>
 ├── python       -> <host-cderun-path>
-└── gemini-cli   -> <host-cderun-path>
+└── git          -> <host-cderun-path>
 ```
 
-### Polyglot Entry Point Invocation
+### Polyglot Entry Point Integration
 
-Due to the Polyglot Entry Point architecture of `cderun`, invoking the tool binary name automatically sets the lookup key:
+Due to `cderun`'s [Polyglot Entry Point](./polyglot-entry.md) architecture, invoking a mounted tool wrapper binary by name automatically triggers `os.Args` rewriting and sets the tool name as the subcommand lookup key:
 
 ```bash
-# Invoking 'node' inside the container:
+# Executing 'node --version' inside the container:
 node --version
 
-# Translates internally to:
+# Rewritten internally to:
 cderun node --version
 ```
 
-### Tool Validation
+### Validation and Error Handling
 
-If a tool specified in `--mount-tools` is missing from the active `.tools.yaml` configuration, the execution immediately fails:
+If a tool specified in `--mount-tools` is missing from the active `.tools.yaml` configuration, `cderun` aborts execution immediately during transitive option resolution with an explicit error:
 
 ```bash
 cderun --mount-tools unknown-tool alpine sh
 Error: tool "unknown-tool" not found in .tools.yaml
-available tools: node, python, gemini-cli
+available tools: node, python, git
 ```
+
+### Context Propagation & Snapshotting
+
+When spawning a container with tool mounting enabled, `cderun` automatically constructs a temporary execution snapshot (`/tmp/cderun-snap-<uuid>/`) containing `.cderun.yaml` and `.tools.yaml` configuration snapshots, along with `hostContext` metadata. This snapshot directory is mounted at `/run/cderun/` inside the container to ensure nested `cderun` invocations preserve full configuration context and reverse path resolution capabilities.
+
+---
 
 ## Practical Scenarios
 
-### Uniform Development Environments
+### Uniform Development Workspaces
 
 ```bash
 # Boot an Ubuntu workspace with all tools mounted
@@ -128,38 +141,13 @@ cderun --mount-all-tools \
 # Inside the Ubuntu container:
 node --version
 python --version
-gemini-cli ask
+git --version
 ```
 
-### CI/CD Pipeline Isolation
+### CI/CD Pipeline Task Isolation
 
 ```bash
-# Selectively mount node and docker wrappers
-cderun --mount-tools node,docker \
-  sh -c '
-    node --version
-    docker build -t myapp .
-    docker push myapp
-  '
-```
-
-**Note**: Commands such as `npm` or `npx` must be explicitly defined in `.tools.yaml` to be mounted and executed:
-
-```yaml
-# .tools.yaml
-node:
-  image: node:20-alpine
-
-npm:
-  image: node:20-alpine
-
-npx:
-  image: node:20-alpine
-```
-
-This setup enables seamless command flows:
-
-```bash
+# Selectively mount node, npm, and npx wrappers
 cderun --mount-tools node,npm,npx \
   sh -c '
     node --version
@@ -168,15 +156,11 @@ cderun --mount-tools node,npm,npx \
   '
 ```
 
-## Limitations
+---
 
-1. **Daemon Dependency**: Execution requires mounting the host's container engine socket inside the container (transitively managed via `--mount-socket`).
-2. **Read-Only Mounts**: Mounted tool binaries are strictly read-only.
-3. **Path Collisions**: Any tool with a colliding name already installed inside the container's base image will be shadowed (masked) in `/usr/local/bin/` by the mounted binary while the bind mount is active. The original tool binary inside the image itself remains unmodified.
-4. **Binary Architecture**: The mounted `cderun` binary must match the target container's CPU architecture and operating system (as the host binary is mounted directly). On macOS hosts, a Linux-compatible `cderun` binary must be compiled and specified via `--mount-cderun-path`.
+## Limitations & Best Practices
 
-## Key Benefits
-
-- **High Flexibility**: Mount only the subset of tools required for a given script or pipeline.
-- **Zero Install Footprint**: Execute developer tools instantly without polluting container base images.
-- **Unified Interface**: All nested tool execution passes through the native `cderun` pipeline for uniform settings and logging.
+1. **Container Engine Dependency**: Execution requires mounting the host's container engine socket inside the container (transitively managed via `--mount-socket`).
+2. **Read-Only Binaries**: Mounted tool binaries are strictly read-only (`readonly` bind mounts).
+3. **Binary Shadowing**: Any executable with a colliding name already installed inside the container's base image will be shadowed (masked) in `/usr/local/bin/` by the mounted binary. The original binary inside the container image remains unmodified on disk.
+4. **Platform & CPU Architecture Compatibility**: The mounted `cderun` binary must match the target container's CPU architecture and operating system (Linux). On macOS hosts, a Linux-compatible `cderun` binary must be compiled and specified via `--mount-cderun-path` (e.g. `--mount-cderun-path ./cderun_linux_arm64`).
