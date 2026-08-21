@@ -1,6 +1,7 @@
 package controlsocket
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,6 +84,15 @@ func (c *Client) handshake(ctx context.Context) error {
 
 // Ping sends a ping frame and waits for a pong response to verify connection responsiveness.
 func (c *Client) Ping(ctx context.Context) error {
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := c.conn.SetDeadline(deadline); err != nil {
+			return fmt.Errorf("failed to set deadline for ping: %w", err)
+		}
+		defer func() {
+			_ = c.conn.SetDeadline(time.Time{})
+		}()
+	}
+
 	reqFrame := RequestFrame{Type: MsgPing}
 	data, err := json.Marshal(reqFrame)
 	if err != nil {
@@ -105,6 +115,9 @@ func (c *Client) Ping(ctx context.Context) error {
 
 	if !resp.Success {
 		return fmt.Errorf("ping failed: %s", resp.Error)
+	}
+	if !bytes.Equal(resp.Payload, []byte("pong")) {
+		return fmt.Errorf("unexpected ping response payload %q, expected %q", string(resp.Payload), "pong")
 	}
 	return nil
 }

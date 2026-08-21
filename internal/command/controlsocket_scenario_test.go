@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -52,8 +54,10 @@ func TestUnit_Snapshot_ControlSocket_Creation(t *testing.T) {
 	expectedHostSocketPath := filepath.Join(hostDir, "cderun.sock")
 	assert.Equal(t, expectedHostSocketPath, snapshotCfg.HostContext.ControlSocket)
 
-	// Test client connection and ping over created control socket
-	ctx := context.Background()
+	// Test client connection and ping over created control socket with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	client, err := controlsocket.Connect(ctx, socketPath)
 	require.NoError(t, err)
 	defer client.Close()
@@ -83,14 +87,71 @@ func TestUnit_Command_MountCderunSocket_MountConfig(t *testing.T) {
 	createdConfig := mockRt.GetCreatedConfig()
 	require.NotNil(t, createdConfig)
 
-	// Verify that /run/cderun/cderun.sock is mounted into the container
+	// Verify that /run/cderun/cderun.sock is mounted into the container with matching source
 	var foundSocketMount bool
 	for _, m := range createdConfig.Mounts {
 		if m.Target == "/run/cderun/cderun.sock" {
 			foundSocketMount = true
 			assert.Equal(t, "bind", m.Type)
 			assert.False(t, m.ReadOnly)
+			assert.True(t, strings.HasSuffix(m.Source, "cderun.sock"), "expected mount source to end with cderun.sock, got: %s", m.Source)
 		}
 	}
 	assert.True(t, foundSocketMount, "expected /run/cderun/cderun.sock to be mounted in container config")
+}
+
+func TestUnit_Command_MountCderunSocket_RealFS_Integration(t *testing.T) {
+	realFS := config.RealFileSystem{}
+	localOpts := defaultOptions()
+	localOpts.fs = realFS
+	localOpts.configLoader = config.NewConfigLoaderWithFS(realFS)
+
+	mockRt := runtime.NewMockRuntime()
+	mockRt.CreatedContainerID = "container-real-fs-123"
+
+	var pingErr error
+	var socketPathChecked string
+
+	mockRt.WaitFunc = func(ctx context.Context, id string) (int, error) {
+		cfg := mockRt.GetCreatedConfig()
+		if cfg != nil {
+			for _, m := range cfg.Mounts {
+				if m.Target == "/run/cderun/cderun.sock" {
+					socketPathChecked = m.Source
+					break
+				}
+			}
+		}
+
+		if socketPathChecked != "" {
+			if _, err := os.Stat(socketPathChecked); err != nil {
+				pingErr = err
+				return 1, err
+			}
+
+			client, err := controlsocket.Connect(ctx, socketPathChecked)
+			if err != nil {
+				pingErr = err
+				return 1, err
+			}
+			defer client.Close()
+
+			pingErr = client.Ping(ctx)
+		}
+		return 0, nil
+	}
+
+	localOpts.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
+		return mockRt, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := ExecuteContextWithOptions(ctx, []string{"cderun", "--mount-cderun-socket", "--image=alpine", "sh"}, func(o *rootOptions, c *cobra.Command) {
+		*o = localOpts
+	})
+	require.NoError(t, err)
+	require.NoError(t, pingErr, "expected control socket ping inside container execution lifecycle to succeed")
+	require.NotEmpty(t, socketPathChecked, "expected control socket mount source path to be set")
 }

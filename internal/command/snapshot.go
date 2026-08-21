@@ -56,6 +56,19 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 		return "", "", nil, fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
+	var ctrlServer *controlsocket.Server
+	var success bool
+	defer func() {
+		if !success {
+			if ctrlServer != nil {
+				_ = ctrlServer.Close()
+			}
+			if err := cleanupSnapshot(fs, snapshotDir); err != nil {
+				logger.Debug("failed to cleanup snapshot directory %s: %v", snapshotDir, err)
+			}
+		}
+	}()
+
 	// When running inside a container (level > 0), snapshotDir is a container-local path.
 	// Resolve it to a host path for SnapshotDir, which is used as a mount source.
 	hostSnapshotDir := snapshotDir
@@ -76,7 +89,6 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 
 	hostCtx.SnapshotDir = hostSnapshotDir
 
-	var ctrlServer *controlsocket.Server
 	if mountCderunSocket {
 		containerSocketPath := filepath.Join(snapshotDir, "cderun.sock")
 		hostSocketPath := filepath.Join(hostSnapshotDir, "cderun.sock")
@@ -89,19 +101,6 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 			}
 		}
 	}
-
-	// Ensure cleanup of the snapshot directory and control socket server if any subsequent step fails.
-	var success bool
-	defer func() {
-		if !success {
-			if ctrlServer != nil {
-				_ = ctrlServer.Close()
-			}
-			if err := cleanupSnapshot(fs, snapshotDir); err != nil {
-				logger.Debug("failed to cleanup snapshot directory %s: %v", snapshotDir, err)
-			}
-		}
-	}()
 
 	exePath, err := fs.Executable()
 	if err == nil {

@@ -66,10 +66,10 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 
 // WriteFrame writes a payload prefixed with a 4-byte big-endian length header to w.
 func WriteFrame(w io.Writer, payload []byte) error {
-	length := uint32(len(payload))
-	if length > MaxFrameSize {
-		return fmt.Errorf("payload length %d exceeds maximum allowed size %d", length, MaxFrameSize)
+	if uint64(len(payload)) > uint64(MaxFrameSize) {
+		return fmt.Errorf("payload length %d exceeds maximum allowed size %d", len(payload), MaxFrameSize)
 	}
+	length := uint32(len(payload))
 
 	if err := binary.Write(w, binary.BigEndian, length); err != nil {
 		return fmt.Errorf("failed to write frame length header: %w", err)

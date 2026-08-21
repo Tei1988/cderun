@@ -85,11 +85,15 @@ func (s *Server) acceptLoop() {
 			}
 		}
 
-		s.trackConn(conn, true)
+		if !s.registerConn(conn) {
+			_ = conn.Close()
+			continue
+		}
+
 		s.wg.Add(1)
 		go func(c net.Conn) {
 			defer s.wg.Done()
-			defer s.trackConn(c, false)
+			defer s.unregisterConn(c)
 			defer c.Close()
 
 			s.handleConn(c)
@@ -97,14 +101,22 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-func (s *Server) trackConn(c net.Conn, add bool) {
+func (s *Server) registerConn(c net.Conn) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if add {
+	select {
+	case <-s.closed:
+		return false
+	default:
 		s.conns[c] = struct{}{}
-	} else {
-		delete(s.conns, c)
+		return true
 	}
+}
+
+func (s *Server) unregisterConn(c net.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.conns, c)
 }
 
 func (s *Server) handleConn(conn net.Conn) {
