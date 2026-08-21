@@ -30,7 +30,7 @@ func TestUnit_Snapshot_PathResolutionInNestedExecution(t *testing.T) {
 		},
 	}
 
-	containerDir, hostDir, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, config.ToolsConfig{}, nil, reader)
+	containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, config.ToolsConfig{}, nil, reader, false)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -62,7 +62,7 @@ func TestUnit_Snapshot_ConfigurationImmutability(t *testing.T) {
 		{Type: "bind", Source: "/h2", Target: "/c2"},
 	}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
+	containerDir, _, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil, false)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -85,7 +85,7 @@ func TestUnit_Snapshot_InitializationWithNilHostContext(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
+	containerDir, _, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil, false)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -102,7 +102,7 @@ func TestUnit_Snapshot_DirectoryAndFilePermissions(t *testing.T) {
 	toolsCfg := config.ToolsConfig{}
 	currentMounts := []container.Mount{}
 
-	containerDir, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil)
+	containerDir, _, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, toolsCfg, currentMounts, nil, false)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })
@@ -207,7 +207,7 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 			MockFileSystem: &config.MockFileSystem{},
 			mkdirErr:       os.ErrPermission,
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil)
+		_, _, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create snapshot directory")
 	})
@@ -217,7 +217,7 @@ func TestUnit_Snapshot_Errors(t *testing.T) {
 			MockFileSystem: &config.MockFileSystem{},
 			writeErr:       os.ErrPermission,
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil)
+		_, _, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, nil, nil, nil, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write .cderun.yaml to snapshot")
 	})
@@ -242,7 +242,7 @@ func TestUnit_Snapshot_WriteFile_ToolsConfig_Failure(t *testing.T) {
 		return mfs.MockFileSystem.WriteFile(path, data, perm)
 	}
 
-	_, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, config.ToolsConfig{"node": {}}, nil, nil)
+	_, _, _, err := createSnapshot(logging.NewLogger(), mfs, &config.CDERunConfig{}, config.ToolsConfig{"node": {}}, nil, nil, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to write .tools.yaml to snapshot")
 }
@@ -260,7 +260,7 @@ func TestUnit_Snapshot_Nested_ResolutionFailures(t *testing.T) {
 				Level: 1, // Will be incremented to 2
 			},
 		}
-		_, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil, nil)
+		_, _, _, err := createSnapshot(logging.NewLogger(), mfs, globalCfg, nil, nil, nil, false)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to resolve snapshot directory")
 	})
@@ -291,7 +291,7 @@ func TestUnit_Snapshot_Log_Failures(t *testing.T) {
 	logger.Init("debug", "text", false)
 	logger.SetOutput(&logBuf)
 
-	containerDir, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil)
+	containerDir, _, _, err := createSnapshot(logger, mfs, &config.CDERunConfig{}, nil, nil, nil, false)
 	require.NoError(t, err)
 	if containerDir != "" {
 		t.Cleanup(func() { _ = cleanupSnapshot(mfs, containerDir) })

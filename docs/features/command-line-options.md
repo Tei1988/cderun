@@ -148,6 +148,20 @@ cderun --mount-cderun alpine sh
 cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 ```
 
+### `--mount-cderun-socket`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET`
+- **Description**: Mount cderun Control Socket (`cderun.sock`) into the container for scoped nested execution (experimental).
+- **Note**:
+  - Creates a dedicated Control Socket inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`) and mounts it to `/run/cderun/cderun.sock` inside the child container.
+  - Currently documented as **experimental** during phased rollout (see `docs/features/nested-execution-control-socket.md`).
+
+```bash
+cderun --mount-cderun-socket alpine sh
+```
+
 ### `--mount-tools`
 
 - **Type**: string (comma-separated list)

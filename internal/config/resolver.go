@@ -30,9 +30,10 @@ type ResolvedConfig struct {
 	SocketPath      string
 	MountSocket     bool
 	MountSocketPath string
-	MountCderun     bool
-	MountCderunPath string
-	MountTools      []string
+	MountCderun       bool
+	MountCderunPath   string
+	MountCderunSocket bool
+	MountTools        []string
 	MountAllTools   bool
 	DryRun          bool
 	DryRunFormat    string
@@ -503,7 +504,7 @@ func (rv *resolver) resolveStandardOptions() error {
 			continue
 		}
 		// Skip transitive options handled in resolveTransitiveOptions
-		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-cderun-socket" || opt.Name == "mount-all-tools" {
 			continue
 		}
 
@@ -869,6 +870,13 @@ func (rv *resolver) resolveTransitiveOptions() error {
 			return errPath
 		}
 	}
+
+	var mountCderunSocketSpecified bool
+	rv.res.MountCderunSocket, mountCderunSocketSpecified, err = rv.resolveBoolOptionInfo("mount-cderun-socket", rv.cli.CderunMountCderunSocket, rv.cli.MountCderunSocket)
+	if err != nil {
+		return err
+	}
+	_ = mountCderunSocketSpecified
 
 	var mountSocketSpecified bool
 	rv.res.MountSocket, mountSocketSpecified, err = rv.resolveBoolOptionInfo("mount-socket", rv.cli.CderunMountSocket, rv.cli.MountSocket)
