@@ -37,14 +37,14 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | DONE |
-| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
+| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | DONE |
 | T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
+| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
 | T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | DONE |
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | DONE |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
