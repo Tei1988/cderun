@@ -64,14 +64,14 @@ This ensures that only valid permission flags (read `r`, write `w`, and mknod `m
 
 To prevent runtime parameter injection and ensure strict formatting rules:
 
-- **CPU Sets (`ValidateCpuset`)**: Restricts `--cpuset-cpus` and `--cpuset-mems` configurations strictly to digits, commas, and hyphens (e.g. `0-3,5`), rejecting command injection or malformed range specifications.
+- **CPU Sets (`ValidateCpuset`)**: Restricts `--cpuset-cpus` and `--cpuset-mems` configurations strictly to character-level checks (digits, commas, and hyphens, e.g. `0-3,5`), rejecting command injection or invalid non-cpuset characters.
 - **GPU Specifications (`ValidateGPUs`)**: Restricts `--gpus` parameters strictly to alphanumerics, commas, equals signs, and hyphens (e.g. `all`, `"device=0,1"`, `"count=2"`), ensuring safe option passing to container runtime adapters.
 
 ## DNS Option & Sysctl Parameter Validation
 
 To prevent parameter injection in network and kernel sysctl configurations:
 
-- **DNS Options (`ValidateDNSOption`)**: Restricts `--dns-option` configuration parameters strictly to safe ASCII characters, preventing header or resolv.conf configuration injection.
+- **DNS Options (`ValidateDNSOption`)**: Restricts `--dns-option` configuration parameters strictly to safe ASCII characters, preventing resolv.conf configuration injection.
 - **Sysctl Key Validation (`ValidateSysctlKey`)**: Validates sysctl keys (e.g. `net.ipv4.ip_forward`) to ensure they consist strictly of alphanumerics, dots, hyphens, and underscores. Rejects keys with leading or trailing dots, as well as keys with consecutive dots (`..`) to prevent path escape or kernel parameter injection.
 - **Sysctl Value Validation (`ValidateSysctlValue`)**: Restricts sysctl values to safe ASCII characters.
 
