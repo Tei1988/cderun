@@ -643,10 +643,19 @@ func ValidateCpuset(s string) error {
 	if s == "" {
 		return nil
 	}
+	if strings.HasPrefix(s, ",") || strings.HasPrefix(s, "-") || strings.HasSuffix(s, ",") || strings.HasSuffix(s, "-") {
+		return fmt.Errorf("invalid cpuset syntax: leading or trailing separator in %q", s)
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if !((c >= '0' && c <= '9') || c == ',' || c == '-') {
 			return fmt.Errorf("invalid characters in cpuset: %q", s)
+		}
+		if i > 0 {
+			prev := s[i-1]
+			if (prev == ',' || prev == '-') && (c == ',' || c == '-') {
+				return fmt.Errorf("invalid cpuset syntax: consecutive separators in %q", s)
+			}
 		}
 	}
 	return nil
@@ -657,10 +666,20 @@ func ValidateGPUs(s string) error {
 	if s == "" {
 		return nil
 	}
+	if strings.HasPrefix(s, ",") || strings.HasPrefix(s, "=") || strings.HasPrefix(s, "-") ||
+		strings.HasSuffix(s, ",") || strings.HasSuffix(s, "=") || strings.HasSuffix(s, "-") {
+		return fmt.Errorf("invalid gpus option syntax: leading or trailing separator in %q", s)
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == ',' || c == '=' || c == '-') {
 			return fmt.Errorf("invalid characters in gpus option: %q", s)
+		}
+		if i > 0 {
+			prev := s[i-1]
+			if (prev == ',' || prev == '=' || prev == '-') && (c == ',' || c == '=' || c == '-') {
+				return fmt.Errorf("invalid gpus option syntax: consecutive separators in %q", s)
+			}
 		}
 	}
 	return nil
@@ -806,6 +825,9 @@ func ValidateImageName(s string) error {
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid image name: %q (contains parent directory references)", s)
 	}
+	if strings.HasSuffix(s, "/") || strings.HasSuffix(s, ":") || strings.HasSuffix(s, "@") {
+		return fmt.Errorf("invalid image name: %q (trailing separator)", s)
+	}
 	// Manual check: ^[a-zA-Z0-9][a-zA-Z0-9._\-/:@]*$
 	// Rejects multiple @ symbols
 	atCount := 0
@@ -822,6 +844,10 @@ func ValidateImageName(s string) error {
 			}
 			if c == '@' {
 				atCount++
+			}
+			prev := s[i-1]
+			if (prev == '/' && c == '/') || (prev == ':' && c == ':') || (prev == '@' && c == '@') {
+				return fmt.Errorf("invalid image name: %q (consecutive separators)", s)
 			}
 		}
 	}
@@ -1126,6 +1152,9 @@ func ValidateAddHost(s string) error {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid add-host format: %q (expected host:ip)", s)
+	}
+	if parts[0] == "" {
+		return fmt.Errorf("invalid add-host format: %q (empty host)", s)
 	}
 	if err := ValidateHostname(parts[0]); err != nil {
 		return fmt.Errorf("invalid host in add-host: %w", err)

@@ -89,29 +89,29 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 
 	t.Run("registry mismatch validation with expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{
-			Env: map[string]string{"CDERUN_IMAGE": "my-reg.com/node:{{env:UNKNOWN}}"},
+			Env: map[string]string{"CDERUN_IMAGE": "my-reg.com/node-app:tag-{{env:UNKNOWN}}"},
 		}
 		tools := ToolsConfig{
 			// The registry check logic uses ResolveString which sets the sticky error if it fails.
 			// However, ResolveWithFS calls validateImageRegistryMatch which uses r.ResolveString.
 			// If r.ResolveString fails, it returns the error, BUT validateImageRegistryMatch
 			// only fails if both errCLI and errCfg are nil.
-			"node": ToolConfig{Image: "my-reg.com/node:18"},
+			"node": ToolConfig{Image: "my-reg.com/node-app:18"},
 		}
 		res, err := ResolveWithFS("node", nil, tools, nil, mfs)
 		require.NoError(t, err)
-		assert.Contains(t, res.Image, "my-reg.com/node:")
+		assert.Contains(t, res.Image, "my-reg.com/node-app:tag-")
 	})
 
 	t.Run("registry mismatch validation with config expression error", func(t *testing.T) {
 		mfs := &MockFileSystem{}
 		tools := ToolsConfig{
-			"node": ToolConfig{Image: "my-reg.com/node:{{env:UNKNOWN}}"},
+			"node": ToolConfig{Image: "my-reg.com/node-app:tag-{{env:UNKNOWN}}"},
 		}
-		cli := &CLIOptions{Image: ptr("my-reg.com/node:20")}
+		cli := &CLIOptions{Image: ptr("my-reg.com/node-app:20")}
 		res, err := ResolveWithFS("node", cli, tools, nil, mfs)
 		require.NoError(t, err)
-		assert.Equal(t, "my-reg.com/node:20", res.Image)
+		assert.Equal(t, "my-reg.com/node-app:20", res.Image)
 	})
 
 	t.Run("negative duration in tool config", func(t *testing.T) {
