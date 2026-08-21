@@ -70,15 +70,16 @@ func WithContainerdLogger(l *logging.Logger) ContainerdRuntimeOption {
 	}
 }
 
+// WithContainerdClient sets a custom containerdClient implementation (useful for testing).
+func WithContainerdClient(c containerdClient) ContainerdRuntimeOption {
+	return func(rt *ContainerdRuntime) {
+		rt.client = c
+	}
+}
+
 // NewContainerdRuntime creates a new containerd runtime instance.
 func NewContainerdRuntime(socket string, opts ...ContainerdRuntimeOption) (*ContainerdRuntime, error) {
-	c, err := client.New(socket, client.WithDefaultNamespace(defaultNamespace))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to containerd: %w", err)
-	}
-
 	rt := &ContainerdRuntime{
-		client:    c,
 		socket:    socket,
 		namespace: defaultNamespace,
 		sleepFunc: SleepFunc,
@@ -89,6 +90,14 @@ func NewContainerdRuntime(socket string, opts ...ContainerdRuntimeOption) (*Cont
 
 	for _, opt := range opts {
 		opt(rt)
+	}
+
+	if rt.client == nil {
+		c, err := client.New(socket, client.WithDefaultNamespace(defaultNamespace))
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to containerd: %w", err)
+		}
+		rt.client = c
 	}
 
 	if rt.logger == nil {
