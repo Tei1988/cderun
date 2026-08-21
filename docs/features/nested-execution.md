@@ -2,6 +2,8 @@
 
 `cderun` supports running itself inside a container recursively. This capability is referred to as "Nested Execution" or "Recursive Execution".
 
+> **Evolution in progress**: This document describes the current mechanism, which mounts the underlying container engine's raw socket (Mechanism 2 below) into the child. See [Nested Execution Control Socket](./nested-execution-control-socket.md) for the planned `cderun`-native control plane that will replace this, enabling runtime-agnostic and scoped nested invocations.
+
 ---
 
 ## Terminology

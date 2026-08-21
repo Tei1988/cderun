@@ -30,9 +30,10 @@ type ResolvedConfig struct {
 	SocketPath      string
 	MountSocket     bool
 	MountSocketPath string
-	MountCderun     bool
-	MountCderunPath string
-	MountTools      []string
+	MountCderun       bool
+	MountCderunPath   string
+	MountCderunSocket bool
+	MountTools        []string
 	MountAllTools   bool
 	DryRun          bool
 	DryRunFormat    string
@@ -503,7 +504,7 @@ func (rv *resolver) resolveStandardOptions() error {
 			continue
 		}
 		// Skip transitive options handled in resolveTransitiveOptions
-		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-all-tools" {
+		if opt.Name == "mount-socket" || opt.Name == "mount-cderun" || opt.Name == "mount-cderun-socket" || opt.Name == "mount-all-tools" {
 			continue
 		}
 
@@ -640,7 +641,40 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	// Resolve Ulimits
-	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rv.fs)
+	var rForUlimits *ExpressionResolver
+	rawUlimits, err := pickConfigs(
+		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
+		func(t ToolConfig) []string { return t.Ulimits },
+		rv.global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
+		nil,
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	if len(rawUlimits) > 0 {
+		needResolver := false
+		for _, raw := range rawUlimits {
+			if strings.Contains(raw, "{{") || strings.HasPrefix(raw, "~") {
+				needResolver = true
+				break
+			}
+		}
+		if !needResolver && rv.global != nil && rv.global.HostContext != nil && rv.global.HostContext.Level > 0 {
+			needResolver = true
+		}
+
+		if needResolver {
+			var err error
+			rForUlimits, err = rv.getR()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rForUlimits, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -836,6 +870,13 @@ func (rv *resolver) resolveTransitiveOptions() error {
 			return errPath
 		}
 	}
+
+	var mountCderunSocketSpecified bool
+	rv.res.MountCderunSocket, mountCderunSocketSpecified, err = rv.resolveBoolOptionInfo("mount-cderun-socket", rv.cli.CderunMountCderunSocket, rv.cli.MountCderunSocket)
+	if err != nil {
+		return err
+	}
+	_ = mountCderunSocketSpecified
 
 	var mountSocketSpecified bool
 	rv.res.MountSocket, mountSocketSpecified, err = rv.resolveBoolOptionInfo("mount-socket", rv.cli.CderunMountSocket, rv.cli.MountSocket)

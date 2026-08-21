@@ -8,15 +8,16 @@ import (
 	"cderun/internal/config"
 	"cderun/internal/container"
 	"cderun/internal/logging"
+	"cderun/internal/runtime/controlsocket"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
-// createSnapshot creates a snapshot directory and returns (containerDir, hostDir, error).
+// createSnapshot creates a snapshot directory and returns (containerDir, hostDir, ctrlServer, error).
 // containerDir is the path inside the current container (used for file I/O and cleanup).
 // hostDir is the resolved host path (used as mount source for the next container).
-func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount, reader mountInfoReader) (string, string, error) {
+func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount, reader mountInfoReader, mountCderunSocket bool) (string, string, *controlsocket.Server, error) {
 	id := uuid.New().String()
 	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
 
@@ -52,13 +53,16 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 
 	// MkdirAll uses the container-local path; this works because we are running inside the container.
 	if err := fs.MkdirAll(snapshotDir, 0o700); err != nil {
-		return "", "", fmt.Errorf("failed to create snapshot directory: %w", err)
+		return "", "", nil, fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
-	// Ensure cleanup of the snapshot directory if any subsequent step fails.
+	var ctrlServer *controlsocket.Server
 	var success bool
 	defer func() {
 		if !success {
+			if ctrlServer != nil {
+				_ = ctrlServer.Close()
+			}
 			if err := cleanupSnapshot(fs, snapshotDir); err != nil {
 				logger.Debug("failed to cleanup snapshot directory %s: %v", snapshotDir, err)
 			}
@@ -71,19 +75,32 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	if globalCfg.HostContext != nil && globalCfg.HostContext.Level > 0 {
 		r, err := config.NewExpressionResolverWithFS(&hostCtx, fs)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to create expression resolver: %w", err)
+			return "", "", nil, fmt.Errorf("failed to create expression resolver: %w", err)
 		}
 		resolvedSnapshotDir, err := config.ResolvePath(snapshotDir, "", r)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to resolve snapshot directory to host path: %w", err)
+			return "", "", nil, fmt.Errorf("failed to resolve snapshot directory to host path: %w", err)
 		}
 		if resolvedSnapshotDir == "" {
-			return "", "", fmt.Errorf("failed to resolve snapshot directory: empty result")
+			return "", "", nil, fmt.Errorf("failed to resolve snapshot directory: empty result")
 		}
 		hostSnapshotDir = resolvedSnapshotDir
 	}
 
 	hostCtx.SnapshotDir = hostSnapshotDir
+
+	if mountCderunSocket {
+		containerSocketPath := filepath.Join(snapshotDir, "cderun.sock")
+		hostSocketPath := filepath.Join(hostSnapshotDir, "cderun.sock")
+		hostCtx.ControlSocket = hostSocketPath
+
+		if _, isReal := fs.(config.RealFileSystem); isReal {
+			ctrlServer = controlsocket.NewServer(containerSocketPath, logger)
+			if err := ctrlServer.Start(); err != nil {
+				return "", "", nil, fmt.Errorf("failed to start control socket server: %w", err)
+			}
+		}
+	}
 
 	exePath, err := fs.Executable()
 	if err == nil {
@@ -120,23 +137,23 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	// Save .cderun.yaml
 	cderunData, err := yaml.Marshal(snapshotCfg)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal cderun config: %w", err)
+		return "", "", nil, fmt.Errorf("failed to marshal cderun config: %w", err)
 	}
 	if err := fs.WriteFile(filepath.Join(snapshotDir, ".cderun.yaml"), cderunData, 0o600); err != nil {
-		return "", "", fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
+		return "", "", nil, fmt.Errorf("failed to write .cderun.yaml to snapshot: %w", err)
 	}
 
 	// Save .tools.yaml
 	toolsData, err := yaml.Marshal(snapshotToolsCfg)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal tools config: %w", err)
+		return "", "", nil, fmt.Errorf("failed to marshal tools config: %w", err)
 	}
 	if err := fs.WriteFile(filepath.Join(snapshotDir, ".tools.yaml"), toolsData, 0o600); err != nil {
-		return "", "", fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
+		return "", "", nil, fmt.Errorf("failed to write .tools.yaml to snapshot: %w", err)
 	}
 
 	success = true
-	return snapshotDir, hostSnapshotDir, nil
+	return snapshotDir, hostSnapshotDir, ctrlServer, nil
 }
 
 func cleanupSnapshot(fs config.FileSystem, snapshotDir string) error {

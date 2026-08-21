@@ -820,6 +820,17 @@ var BoolOptions = []BoolOption{
 			return g.Defaults.Init
 		},
 	},
+	{
+		Name:   "mount-cderun-socket",
+		EnvKey: "CDERUN_MOUNT_CDERUN_SOCKET",
+		Usage:  "Mount cderun Control Socket into container for nested execution (experimental)",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.MountCderunSocket
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.MountCderunSocket
+		},
+	},
 }
 
 var (

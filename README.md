@@ -278,6 +278,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--mount`: Attach a filesystem mount (`type=bind,source=...,target=...[,readonly][,optional]`). The `optional` parameter skips bind mounts if the source path is missing on the host.
 - `--mount-socket`: Mount the container runtime socket into the container. (Default: `false`)
 - `--mount-cderun`: Mount the `cderun` binary into the container. (Enables `--mount-socket` automatically)
+- `--mount-cderun-socket`: Mount cderun Control Socket (`cderun.sock`) into container for nested execution (experimental). (Default: `false`)
 - `--mount-tools`: Mount specified tools (comma-separated) defined in `.tools.yaml` into the container.
 - `--mount-all-tools`: Mount all tools defined in `.tools.yaml` into the container.
 - `--socket-path`: Path to the runtime socket on the host.

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"cderun/internal/container"
 
@@ -620,12 +622,17 @@ func HasParentTraversal(s string) bool {
 	}
 }
 
-// validatePathChars ensures the string does not contain ASCII control characters.
+// validatePathChars ensures the string does not contain C0 or C1 control characters or invalid UTF-8 sequences.
 func validatePathChars(s string) error {
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c <= 31 || c == 127 {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", rune(c), i)
+	for pos, r := range s {
+		if r == utf8.RuneError {
+			_, width := utf8.DecodeRuneInString(s[pos:])
+			if width == 1 {
+				return fmt.Errorf("invalid character in path or configuration: invalid UTF-8 encoding (position %d)", pos)
+			}
+		}
+		if unicode.IsControl(r) {
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, pos)
 		}
 	}
 	return nil
@@ -1301,6 +1308,9 @@ func ValidateSecurityOpt(s string) error {
 func ValidateSysctlKey(s string) error {
 	if s == "" {
 		return fmt.Errorf("sysctl key cannot be empty")
+	}
+	if strings.HasPrefix(s, ".") || strings.HasSuffix(s, ".") || strings.Contains(s, "..") {
+		return fmt.Errorf("invalid sysctl key: leading, trailing, or consecutive dots detected in %q", s)
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]

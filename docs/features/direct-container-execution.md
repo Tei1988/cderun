@@ -62,6 +62,19 @@ The common abstraction interface that normalizes the differences between each co
 - **Podman Implementation**: Implemented via the Docker-compatible local API of Podman, sharing the core Docker client library infrastructure.
 - **Translation Logic**: Maps the abstract `ContainerConfig` into runtime-specific configurations (such as Docker's `Config`, `HostConfig`, and `NetworkingConfig`).
 
+### Conversion Contract
+
+`ContainerConfig` is an intermediate representation that preserves the Docker CLI-compatible shape of user input. The Docker daemon itself implicitly normalizes many of these values, but runtimes that assemble an OCI spec directly (containerd) must perform that normalization in the adapter — the conversion responsibility sits on the adapter, not the daemon.
+
+When a runtime adapter consumes a `ContainerConfig` field, exactly two outcomes are permitted:
+
+1. **Convert it to the runtime's native representation.** For example, capability names must be normalized to the `CAP_`-prefixed form the runtime expects.
+2. **Return an explicit error** if the field or value is unsupported by that runtime (see the containerd limitations in [Multi-Runtime Support](./multi-runtime-support.md)).
+
+**Silent pass-through and silent drop are both prohibited.** An adapter must never forward a field unmodified on the assumption the underlying runtime "probably" accepts the same shape Docker does, and must never ignore a field it does not know how to translate. Either behavior turns a configuration gap into a silent correctness or security bug (see [T45](../../.agent/todo.md) for a historical incident where unsupported fields were silently dropped by the containerd adapter).
+
+This contract applies to every current and future `ContainerRuntime` implementation, including adapters reached indirectly through the [Nested Execution Control Socket](./nested-execution-control-socket.md).
+
 ## Execution Flow
 
 ### Basic Execution Sequence
@@ -79,6 +92,7 @@ By utilizing direct container engine APIs over raw socket mounts, `cderun` execu
 
 - **Shared Runtime Socket**: Containers can mount the host's runtime socket, allowing nested `cderun` executions to spawn companion sibling containers directly on the host rather than requiring nested Docker-in-Docker daemons.
 - **Environment Inheritance**: Current execution host environment variables are mounted or injected directly into the `ContainerConfig` of the child container.
+- **Planned Evolution**: See [Nested Execution Control Socket](./nested-execution-control-socket.md) for a `cderun`-native control plane that projects this same `ContainerConfig` / `ContainerRuntime` abstraction over a socket the Base Host itself owns, instead of requiring nested `cderun` to dial the engine's raw socket directly.
 
 ## Roadmap
 

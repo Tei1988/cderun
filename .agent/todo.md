@@ -92,6 +92,11 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T83 | コンテナ起動成否によるログ重要度再分類およびアタッチ・終了関連 of ロジック・テスト修正 | 改善 | 高 | 中 | - | DONE |
 | T84 | containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上 | 改善 | 中 | 大 | - | - |
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
+| T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
+| T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | - |
+| T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
+| T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 
 依存関係・統合の注意:
 
@@ -102,6 +107,11 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T70 は T20 と統合実装を推奨**（CI の実ランタイムジョブをコンフォーマンススイートの器として作る）。T40/T45/T51 の再現ケースを必ず含めること
 - **テスト系タスク（T69〜T72）に着手する前に `docs/testing/strategy.md` を必ず読むこと**。推奨着手順は T79 → T69 → T70 → T71 → T72（T68 は実装済み）
 - **T79 は T81 においてダブルダッシュ（`--`）のホイスト制限を廃止した仕様に基づいてゴールデンテストを更新すること** (更新済み)
+- **T87 → T88 → T89 は厳密な直列依存**（各フェーズは前フェーズの完了を前提とする）。規模が大きいため1タスクにまとめず、フェーズごとに1PRとすること
+- **T90 は T87 完了後、T88 の直後（T89 と並行可）に着手を推奨**。CLIベースエンジン（nerdctl）を選んだユーザーが他フェーズの完了まで待たされてNested Executionを使えない、という事態を避けるための前倒し。T88 が確立するControl Socketディスパッチの配線パターンを流用したほうが手戻りが少ないため、T88 より前に着手するのは非推奨（逆順・並行実装はコンフリクトしやすい）
+- **T91 は T89 完了が前提**。T90 の完了は必須ではないが、テスト基盤（敵対的テストのハーネス等）を流用できるため T90 の後が望ましい
+- **Apple `container` / WSL Containers 等、ワイヤプロトコルを公開しないランタイムへの nested execution 対応は T88（できれば T89）の完了が前提条件**。T91（全APIベースエンジンパリティ）の完了を待つ必要はない。**採用方針はCLIラッパー方式（`container`/`wslc.exe`をシェルアウト）で、T90で定義する構築技法（`--`挿入・`--flag=value`結合形）・argv構造自己チェック・**そのCLI実バイナリに対する敵対的テスト**（nerdctlで通ったことは他CLIの安全性の根拠にならない。`--`の意味はcobra/pflag等、各CLI内部の引数解析ライブラリ依存のため、アダプタごとに独立して検証が必要）を実装すればControl Socket対応できる。サイドカー方式（`apple/containerization` Swift package や `Microsoft.WSL.Containers` NuGet を直接リンク）は検討したが、プラットフォームごとの別ツールチェーン・署名等の運用コストが見合わないため不採用（`docs/features/nested-execution-control-socket.md` の Relationship to Multi-Runtime Support 節に理由を記録済み。CLIすら提供しない将来のランタイムが出た場合のみ再検討）**
+- **T31（`--runtime`→`--engine`リネーム、engine値の`docker-compat-api`/`containerd-api`/`nerdctl`整理）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T31が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を両タスクが触るため、並行実装はコンフリクトしやすい
 
 ---
 
@@ -1010,3 +1020,110 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
+
+---
+
+## T88: Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通
+
+- 種別: 機能
+- 優先度: 中
+- 規模: 中
+- 前提: T87 完了
+- 対象: T87 で実装した Control Socket サーバー・クライアントに RPC ディスパッチを追加
+- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
+
+### 方針
+
+- `CreateContainer` / `StartContainer` / `WaitContainer` / `RemoveContainer` を Control Socket 経由で Docker アダプタにディスパッチする。
+- TTY なし・非 interactive な実行のみを対象とする（Attach/Signal/Resize は T89）。
+- ネスト先の `cderun` は、`hostContext.controlSocket` が存在する場合、これらのライフサイクル呼び出しについて生のランタイムソケットではなく Control Socket を使用するようクライアント側を実装する。
+
+### 完了条件
+
+- `--mount-cderun-socket` 指定時、Docker エンジンにおいて非 interactive なネスト実行が Control Socket 経由で実際に動作する（統合テストを含む）。
+- 生ソケット経由（`--mount-socket`）との実行結果（exit code 等）が同等であることを確認するテストがある。
+- どちらの経路が使われたかが `--diagnosis` / debug ログで判別できる。
+
+---
+
+## T89: Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize）
+
+- 種別: 機能
+- 優先度: 中
+- 規模: 中
+- 前提: T88 完了
+- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
+
+### 背景
+
+Attach/シグナル/exit code 周りは過去に最もバグが集中してきた領域（T43, T52, T61, T62 等）であるため、T88 の非対話実行とは独立したタスクとして切り出す。
+
+### 方針
+
+- `AttachContainer`（stdin/stdout/stderr の多重化ストリーミング）、`SignalContainer`、`ResizeContainerTTY` を Control Socket 経由で Docker アダプタにディスパッチする。
+
+### 完了条件
+
+- `--mount-cderun-socket` 指定時、TTY ありの interactive なネスト実行が Control Socket 経由で動作する（stdin 入力、シグナル転送、ウィンドウリサイズを含む）。
+- 生ソケット経由との比較で、シグナル配送・TTY リサイズ・異常終了時の挙動に退行がないことを確認するテストがある。
+
+---
+
+## T90: Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応
+
+- 種別: 機能 / セキュリティ
+- 優先度: 中
+- 規模: 中
+- 前提: T87 完了（T88 の直後に着手することを推奨。ディスパッチ配線パターンの流用のため。逆順・並行での実装はコンフリクトしやすい）
+- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
+
+### 背景
+
+CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple containerやWSL Containersのような将来のCLIラッパー実装も含めて「その方式を選んだ時点でNested Executionを諦める」ことになってしまう。当初の方針検討でCLIベースの統合を志向していた経緯があるため、一律禁止ではなく、安全性を検証可能な形で条件付き許可する。また、これをT90（最終フェーズ）まで先送りすると、nerdctlエンジンを選んだユーザーは他フェーズが終わるまでNested Executionが一切使えず実質的な禁止になってしまうため、T88の直後（Docherと同時期）に前倒しする。
+
+### 方針
+
+`nerdctl`は`ContainerConfig`を最終的にargvへ変換する過程で**引数インジェクション**（CWE-88）のリスクを持つ。例えば`Image`フィールドの値を`alpine:latest`ではなく`--privileged`にされると、nerdctlのcobra/pflagパーサーがこれをフラグとして解釈し、`ContainerConfig`のどこにも`Privileged: true`と書かれていないのに特権コンテナが起動してしまう。これはシェルインジェクションとは別問題で、`exec.Command`でシェルを介さず実行しても防げない（argvがどう構築されたかではなく、受け取り側nerdctl自身のパーサーがargvトークンをどう分類するかの問題であるため）。
+
+対策は「構築技法」と「検証」を分けて考える:
+
+- **構築技法**（2つ）:
+  1. image/command/argsのような末尾の位置引数群の直前に`--`を挿入する（`kubectl exec POD -- CMD ARGS...`と同じパターン。cobra/pflagの標準機能）
+  2. env/labelなどフラグの値として渡すものは`--flag=value`の結合形にし、2トークンに分けない
+- **主たる検証**: 実行直前に、構築したargvの`--`より前の部分が、cderunが意図した固定パターンと**完全一致**しているかを自己チェックする。これは構築技法が正しく適用されたことを信じるのではなく、結果そのものを検証するもので、`--`の挿入忘れや結合形の実装ミスなど、構築技法側のあらゆる実装ミスを一括で検知できる。一致しなければ実行せず明示エラーとする。
+- **重要な限界**: 上記の自己チェックは「cderunが意図通りargvを組み立てたか」は保証するが、「nerdctlが実際に`--`以降を位置引数として扱うか」は別問題である。`--`が「以降は一切フラグ解析しない」という意味を持つかどうかは**nerdctl内部が使っている引数解析ライブラリ（cobra/pflag）の実装依存**であり、OS/POSIXレベルの普遍的な保証ではない。nerdctlはkubectl/docker CLIと同じcobra/pflag基盤なので信頼性は高いが、これは**nerdctl固有の話**であり、将来別のCLI（Apple containerの`ArgumentParser`ベースCLIやwslc.exe等）に一般化してはならない。
+- したがって、**nerdctl実バイナリに対する敵対的テスト**（`--privileged`や`--mount=...`をimage/command/args/env等の各フィールドに仕込み、実際に無害化されることを実プロセスの起動結果で確認する）を必須の完了条件とする。cderun自身の構築ロジックの単体テストだけでは不十分。
+- 3層すべて（構築技法2つ＋自己チェック）を1つの共有ヘルパーとして実装し、将来の別CLIアダプタでも再利用できるようにする（ただし敵対的テストは新しいアダプタごとに必ずゼロからやり直す）。
+- Base Host の設定エンジンが`nerdctl`で、かつ上記の構築技法・自己チェック・敵対的テストのいずれかを満たしていない場合、Control Socket は黙ってフォールバックしたり劣化動作を許容したりせず、**明示的なエラーで起動・マウントを拒否する**。
+
+### 完了条件
+
+- `nerdctl`アダプタで、Control Socket経由の`CreateContainer`/`StartContainer`/`WaitContainer`/`RemoveContainer`（非対話）が動作する。
+- 構築技法（`--`挿入・`--flag=value`結合形）が共有ヘルパーとして実装されている。
+- 実行直前のargv構造自己チェック（`--`より前が意図した固定パターンと完全一致するか）が実装され、不一致時は実行せず明示エラーになることを確認するテストがある。
+- **nerdctl実バイナリに対する敵対的テスト**が存在し、`--privileged`等の危険な値をimage/command/args/env等の各フィールドに仕込んでも実際に特権化されない等、実プロセスの起動結果で無害化を確認している。
+- 生ソケット経由（Docker実行）との比較で、機能的に同等なユースケース（非対話実行）が動作することを確認するテストがある。
+- どの経路（API/CLI/生ソケット）が使われたかが `--diagnosis` / debug ログで判別できる。
+
+---
+
+## T91: Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証
+
+- 種別: 機能 / セキュリティ
+- 優先度: 中
+- 規模: 中
+- 前提: T89 完了（T90 の完了は必須ではないが、テスト基盤の再利用のため T90 の後が望ましい）
+- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
+
+### 方針
+
+- `containerd-api` アダプタへのディスパッチを追加し、`docker-compat-api`系（Docker/Podman）と合わせて Control Socket が API ベースエンジン全体で機能パリティに達するようにする。
+- Security Model 節で定義した「親の許可した設定を上限とする」権限スコープ制御（inherited-ceiling モデル）を実装する。
+- macOS 上での動作制約（`nested-execution.md` の VM GID 問題）が Control Socket 経由では発生しないことを検証・記録する。
+
+### 完了条件
+
+- Docker/Podman（`docker-compat-api`）・containerd（`containerd-api`）で Control Socket 経由のネスト実行が Phase 2/3 と同等に動作する。
+- ネスト先からの要求が親の `ContainerConfig` を超える権限（イメージ・マウント・capability 等）を要求した場合に拒否されることを確認するテストがある。
+- macOS 環境での検証結果が `docs/features/nested-execution-control-socket.md` に記録されている。
+- 本フェーズの完了をもって `--mount-cderun-socket` の experimental 表記を外すかどうかを判断する（`docs/features/nested-execution-control-socket.md` の Compatibility and Migration 節の手順に従う）。

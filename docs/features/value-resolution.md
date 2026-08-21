@@ -10,9 +10,18 @@ Value resolution is recursively applied down configuration trees. This ensures t
 
 ### Resolution Targets
 
-- **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution.
-- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively.
+- **Strings**: Evaluated directly for expression expansion, tilde expansion, and relative-to-absolute path resolution. Supported across CLI flags and YAML properties (e.g., `--image`, `--workdir`, `--shm-size`, `--prefetch`).
+- **Slices (`[]any` / `[]string`)**: Each element is parsed and resolved recursively (e.g., `--env`, `--mount`, `--ulimit`, `--sysctl`, `--security-opt`, `--dns`, `--entrypoint`).
 - **Maps (`map[string]any` / `map[string]string`)**: Values of each key-value pair are recursively resolved.
+
+### Sequence Splitting vs Expression Resolution Order
+
+Options that support comma-separated list values follow a deterministic order depending on whether they are scalar string options or string-slice options:
+
+1. **Scalar Comma-Separated Options (e.g., `--prefetch`)**:
+   Dynamic expression resolution occurs **first** on the full scalar string (e.g. `{{env:TOOLS}}` resolving to `"node,python"`). The resulting resolved string is subsequently split by commas into discrete tool names.
+2. **String-Slice Options via Environment Variables (e.g., `CDERUN_ENTRYPOINT`, `CDERUN_CAP_ADD`, `CDERUN_DNS`)**:
+   Separation occurs **first**: the environment variable string is split into slice elements using its designated separator (comma or semicolon). Dynamic expressions within each resulting element are then evaluated recursively. When passed as repeated CLI flags (e.g., `--entrypoint /bin/sh --entrypoint -c`), Cobra constructs the slice directly and each element undergoes expression evaluation individually.
 
 ---
 
@@ -85,9 +94,9 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 
 | Directive | Description |
 | :--- | :--- |
-| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. |
-| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. |
+| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. |
+| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. |
+| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version}}}}`). |
 
 ### 3. Unrecognized and Unknown Expressions
 

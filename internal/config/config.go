@@ -60,10 +60,11 @@ type ConfigDefaults struct {
 	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
 	Init            *bool          `yaml:"init,omitempty"`
 	Workdir         string         `yaml:"workdir,omitempty"`
-	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
-	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
+	MountCderun       *bool          `yaml:"mountCderun,omitempty"`
+	MountCderunPath   ConfigPath     `yaml:"mountCderunPath,omitempty"`
+	MountCderunSocket *bool          `yaml:"mountCderunSocket,omitempty"`
+	MountSocket       *bool          `yaml:"mountSocket,omitempty"`
+	MountSocketPath   ConfigPath     `yaml:"mountSocketPath,omitempty"`
 	MountTools      []string       `yaml:"mountTools,omitempty"`
 	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports,omitempty"`
@@ -121,6 +122,7 @@ func (d ConfigDefaults) DeepCopy() ConfigDefaults {
 	res.Init = copyBoolPtr(d.Init)
 	res.MountSocket = copyBoolPtr(d.MountSocket)
 	res.MountCderun = copyBoolPtr(d.MountCderun)
+	res.MountCderunSocket = copyBoolPtr(d.MountCderunSocket)
 	res.MountAllTools = copyBoolPtr(d.MountAllTools)
 	res.PublishAll = copyBoolPtr(d.PublishAll)
 	res.Privileged = copyBoolPtr(d.Privileged)
@@ -192,12 +194,13 @@ func (l LoggingConfig) DeepCopy() LoggingConfig {
 }
 
 type HostContext struct {
-	Level       int            `yaml:"level"`
-	SnapshotDir string         `yaml:"snapshotDir"`
-	BinPath     string         `yaml:"binPath"`
-	WorkingDir  string         `yaml:"workingDir"`
-	HomeDir     string         `yaml:"homeDir"`
-	Mounts      []MountMapping `yaml:"mounts"`
+	Level         int            `yaml:"level"`
+	SnapshotDir   string         `yaml:"snapshotDir"`
+	ControlSocket string         `yaml:"controlSocket,omitempty"`
+	BinPath       string         `yaml:"binPath"`
+	WorkingDir    string         `yaml:"workingDir"`
+	HomeDir       string         `yaml:"homeDir"`
+	Mounts        []MountMapping `yaml:"mounts"`
 }
 
 func (h HostContext) DeepCopy() HostContext {
@@ -225,10 +228,11 @@ type ToolConfig struct {
 	ReadOnly        *bool          `yaml:"readOnly,omitempty"`
 	Init            *bool          `yaml:"init,omitempty"`
 	Workdir         string         `yaml:"workdir,omitempty"`
-	MountSocket     *bool          `yaml:"mountSocket,omitempty"`
-	MountSocketPath ConfigPath     `yaml:"mountSocketPath,omitempty"`
-	MountCderun     *bool          `yaml:"mountCderun,omitempty"`
-	MountCderunPath ConfigPath     `yaml:"mountCderunPath,omitempty"`
+	MountSocket       *bool          `yaml:"mountSocket,omitempty"`
+	MountSocketPath   ConfigPath     `yaml:"mountSocketPath,omitempty"`
+	MountCderun       *bool          `yaml:"mountCderun,omitempty"`
+	MountCderunPath   ConfigPath     `yaml:"mountCderunPath,omitempty"`
+	MountCderunSocket *bool          `yaml:"mountCderunSocket,omitempty"`
 	MountTools      []string       `yaml:"mountTools,omitempty"`
 	MountAllTools   *bool          `yaml:"mountAllTools,omitempty"`
 	Ports           []string       `yaml:"ports,omitempty"`
@@ -289,6 +293,7 @@ func (t ToolConfig) DeepCopy() ToolConfig {
 	res.Init = copyBoolPtr(t.Init)
 	res.MountSocket = copyBoolPtr(t.MountSocket)
 	res.MountCderun = copyBoolPtr(t.MountCderun)
+	res.MountCderunSocket = copyBoolPtr(t.MountCderunSocket)
 	res.MountAllTools = copyBoolPtr(t.MountAllTools)
 	res.PublishAll = copyBoolPtr(t.PublishAll)
 	res.Privileged = copyBoolPtr(t.Privileged)

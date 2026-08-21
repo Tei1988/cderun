@@ -13,7 +13,7 @@ func init() {
 
 func TestUnit_Refactor_DriftGuards(t *testing.T) {
 	// First, let's verify that the expected indices match the current indices.
-	initFieldInfo()
+	fieldOnce.Do(initFieldInfo)
 
 	for name, info := range fieldInfo {
 		expected, exists := expectedFieldIndices[name]

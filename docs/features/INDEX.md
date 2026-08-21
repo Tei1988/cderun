@@ -63,13 +63,16 @@ This directory contains the detailed technical and functional specifications for
 2. **[Nested Execution (Recursive Containers)](./nested-execution.md)**
    - Details how `cderun` executes itself inside a container recursively, including snapshotting, reverse path resolution, and macOS VM GID setup.
 
-3. **[Dry-Run Mode](./dry-run-mode.md)**
+3. **[Nested Execution Control Socket](./nested-execution-control-socket.md)**
+   - Specifies a `cderun`-native control plane that replaces raw engine socket mounting for nested execution, enabling runtime-agnostic and scoped nested invocations.
+
+4. **[Dry-Run Mode](./dry-run-mode.md)**
    - Details previewing container configuration without execution, outputting in YAML, JSON, or Simple text format.
 
-4. **[Logging & Debugging](./logging-debugging.md)**
+5. **[Logging & Debugging](./logging-debugging.md)**
    - Documents trace, debug, info, warn, and error levels, JSON/text formats, early initialization, and sanitized logging.
 
-5. **[Interactive Terminal UX](./interactive-terminal.md)**
+6. **[Interactive Terminal UX](./interactive-terminal.md)**
    - Details TTY allocation, Unix signal forwarding (SIGINT/SIGTERM), and terminal size (winch) synchronization.
 
 ### Management & System Diagnostics

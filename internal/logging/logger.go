@@ -22,18 +22,30 @@ const (
 )
 
 func ParseLevel(s string) Level {
-	switch strings.ToLower(s) {
-	case "error":
-		return ErrorLevel
-	case "warn", "warning":
-		return WarnLevel
-	case "debug":
-		return DebugLevel
-	case "trace":
-		return TraceLevel
-	default:
-		return InfoLevel
+	switch len(s) {
+	case 4:
+		if strings.EqualFold(s, "warn") {
+			return WarnLevel
+		}
+		if strings.EqualFold(s, "info") {
+			return InfoLevel
+		}
+	case 5:
+		if strings.EqualFold(s, "error") {
+			return ErrorLevel
+		}
+		if strings.EqualFold(s, "debug") {
+			return DebugLevel
+		}
+		if strings.EqualFold(s, "trace") {
+			return TraceLevel
+		}
+	case 7:
+		if strings.EqualFold(s, "warning") {
+			return WarnLevel
+		}
 	}
+	return InfoLevel
 }
 
 var (
@@ -169,11 +181,23 @@ func (l *Logger) formatJSON(level Level, message string, now time.Time) []byte {
 }
 
 func (l *Logger) formatText(level Level, message string, now time.Time) string {
-	ts := ""
+	lvlStr := level.String()
+	needed := len(lvlStr) + len(message) + 4
 	if l.timestamp {
-		ts = now.Format("2006-01-02 15:04:05") + " "
+		needed += 20 // len("2006-01-02 15:04:05 ") == 20
 	}
-	return fmt.Sprintf("%s[%s] %s\n", ts, level.String(), message)
+	var builder strings.Builder
+	builder.Grow(needed)
+	if l.timestamp {
+		builder.WriteString(now.Format("2006-01-02 15:04:05"))
+		builder.WriteByte(' ')
+	}
+	builder.WriteByte('[')
+	builder.WriteString(lvlStr)
+	builder.WriteString("] ")
+	builder.WriteString(message)
+	builder.WriteByte('\n')
+	return builder.String()
 }
 
 func (l *Logger) log(level Level, msg string, args ...any) {
@@ -181,7 +205,12 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 		return
 	}
 
-	message := fmt.Sprintf(msg, args...)
+	var message string
+	if len(args) == 0 {
+		message = msg
+	} else {
+		message = fmt.Sprintf(msg, args...)
+	}
 	message = SanitizeLogString(message)
 	now := time.Now()
 

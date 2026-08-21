@@ -26,6 +26,7 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/runtime"
+	"cderun/internal/runtime/controlsocket"
 	"cderun/internal/version"
 )
 
@@ -536,14 +537,14 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 
 	// Pull each image
 	for _, img := range imagesToPull {
-		o.logger.Info("Prefetching image %s...", img)
+		o.logger.Debug("Prefetching image %s...", img)
 		err := rt.PullImage(cmd.Context(), img, resolved.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase)
 		if err != nil {
 			return fmt.Errorf("failed to prefetch image %s: %w", img, err)
 		}
 	}
 
-	o.logger.Info("Successfully prefetched all images.")
+	o.logger.Debug("Successfully prefetched all images.")
 	return nil
 }
 
@@ -1336,14 +1337,15 @@ intended for the subcommand.`,
 
 		// Create snapshot if nested execution support is requested or already active
 		var snapshotDir string
-		explicitNested := resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0
+		var ctrlServer *controlsocket.Server
+		explicitNested := resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 || resolved.MountCderunSocket
 		if explicitNested || (globalCfg != nil && globalCfg.HostContext != nil) {
 			o.logger.Debug("Creating execution snapshot for nested support...")
 			// Ensure globalCfg is initialized for snapshot if it was nil
 			if globalCfg == nil {
 				globalCfg = &config.CDERunConfig{}
 			}
-			sDir, hostDir, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts, o.mountInfoReader)
+			sDir, hostDir, server, err := createSnapshot(o.logger, o.fs, globalCfg, toolsCfg, containerConfig.Mounts, o.mountInfoReader, resolved.MountCderunSocket)
 			if err != nil {
 				if explicitNested {
 					return fmt.Errorf("failed to create snapshot for nested execution: %w", err)
@@ -1351,7 +1353,14 @@ intended for the subcommand.`,
 				o.logger.Warn("failed to create snapshot: %v", err)
 			} else {
 				snapshotDir = sDir
+				ctrlServer = server
 				defer func() {
+					if ctrlServer != nil {
+						o.logger.Trace("Closing control socket server")
+						if err := ctrlServer.Close(); err != nil {
+							o.logger.Warn("failed to close control socket server: %v", err)
+						}
+					}
 					o.logger.Trace("Cleaning up snapshot: %s", snapshotDir)
 					if err := cleanupSnapshot(o.fs, snapshotDir); err != nil {
 						o.logger.Warn("failed to cleanup snapshot: %v", err)
@@ -1364,6 +1373,16 @@ intended for the subcommand.`,
 					Target:   "/run/cderun",
 					ReadOnly: true,
 				})
+
+				if resolved.MountCderunSocket {
+					hostSocketPath := filepath.Join(hostDir, "cderun.sock")
+					containerConfig.Mounts = append(containerConfig.Mounts, container.Mount{
+						Type:     "bind",
+						Source:   hostSocketPath,
+						Target:   "/run/cderun/cderun.sock",
+						ReadOnly: false,
+					})
+				}
 			}
 		}
 
