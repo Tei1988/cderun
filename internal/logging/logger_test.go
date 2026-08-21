@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -172,6 +173,16 @@ func TestUnit_Logging_SanitizeLogString(t *testing.T) {
 			input:    "こんにちは",
 			expected: "こんにちは",
 		},
+		{
+			name:     "exact 256 bytes boundary input with control characters",
+			input:    strings.Repeat("a", 254) + "\r\n",
+			expected: strings.Repeat("a", 254) + "\\x0d\\x0a",
+		},
+		{
+			name:     "exact 257 bytes boundary input with control characters",
+			input:    strings.Repeat("a", 255) + "\r\n",
+			expected: strings.Repeat("a", 255) + "\\x0d\\x0a",
+		},
 	}
 
 	for _, tt := range tests {
@@ -190,6 +201,25 @@ func BenchmarkSanitizeLogString_NoControl(b *testing.B) {
 	}
 }
 
+func BenchmarkSanitizeLogString_WithControl_Large(b *testing.B) {
+	b.Run("Exact256Bytes", func(b *testing.B) {
+		input := strings.Repeat("a", 254) + "\r\n"
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = SanitizeLogString(input)
+		}
+	})
+
+	b.Run("Exact257Bytes", func(b *testing.B) {
+		input := strings.Repeat("a", 255) + "\r\n"
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = SanitizeLogString(input)
+		}
+	})
+}
 func BenchmarkLogger_FormatText(b *testing.B) {
 	logger := NewLogger()
 	now := time.Now()
