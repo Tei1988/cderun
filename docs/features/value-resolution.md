@@ -147,9 +147,9 @@ Because container-side paths—such as the target directories in mount configs (
 
 This ensures that relative target directories are not silently mapped to host directories. During evaluation, container target paths must be absolute and non-empty, and relative inputs will be correctly detected and rejected.
 
-### 3. Null-Byte & Control Character Injections Guard
+### 3. Null-Byte, Control Character, and Invalid UTF-8 Injections Guard
 
-To prevent string truncation and injection vulnerabilities in operating system, terminal, and container execution APIs, the engine scans environmental keys, values, and paths for null bytes (`\x00`) and unescaped C0/C1 control characters (via `unicode.IsControl`). The presence of any null byte or control character triggers an immediate security validation error.
+To prevent string truncation and injection vulnerabilities in operating system, terminal, and container execution APIs, the engine scans environmental keys, values, and paths for null bytes (`\x00`), unescaped C0/C1 control characters (via `unicode.IsControl`), and invalid UTF-8 byte sequences. The presence of any null byte, control character, or invalid UTF-8 sequence triggers an immediate security validation error.
 
 ### 4. "Sticky Error" Pattern
 

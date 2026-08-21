@@ -355,7 +355,7 @@ To maintain strict security boundaries, any path resolved via expressions or til
 
 To prevent string truncation and security injection attacks during environment transmission and config handling:
 
-- **Null Byte & Control Character Rejection**: Environmental keys, values, and paths are strictly scanned for null bytes (`\x00`) and unescaped C0/C1 control characters. If invalid UTF-8 byte sequences or control characters are detected, the engine raises an immediate security validation error.
+- **Null Byte, Control Character & Invalid UTF-8 Rejection**: Environmental keys, values, and paths are strictly scanned for null bytes (`\x00`), unescaped C0/C1 control characters, and invalid UTF-8 byte sequences. The presence of any null byte, control character, or invalid UTF-8 sequence triggers an immediate security validation error.
 - **Container Target Path Safety**: Target paths in mount configurations (e.g. `mc.Target`) and destination paths in device mappings inside the container must be non-empty and absolute. Because these are container-side paths, they are NOT processed by host-side relative path resolution (e.g. `SetBaseDir` does not apply to them) to guarantee that relative container paths are correctly caught and rejected instead of leaking base host directories.
 
 ### 6. "Sticky Error" Pattern
