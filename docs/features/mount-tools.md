@@ -81,7 +81,7 @@ docker run --rm \
 # Inside the container shell:
 python --version  # OK (mounted)
 node --version    # OK (mounted)
-git status        # Error: git is not mounted inside the container (or uses container's native binary if present)
+git status        # Uses container's native git binary when available; otherwise reports command not found / git not mounted
 ```
 
 ---
