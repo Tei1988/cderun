@@ -84,7 +84,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `cpusetCpus`: "" (Empty string skips cpuset CPU core restrictions)
   - `cpusetMems`: "" (Empty string skips NUMA memory node restrictions)
   - `gpus`: "" (Empty string skips GPU device requests)
-  - `sysctls`: nil (Empty/nil map skips sysctl kernel parameter overrides)
+  - `sysctls`: nil (Empty/nil list skips sysctl kernel parameter overrides)
   - `pull: missing`
   - `pullMaxRetries: 3`
   - `pullBackoffBase: 1s`
