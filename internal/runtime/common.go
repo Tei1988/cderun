@@ -13,6 +13,30 @@ import (
 
 var signalRegex = regexp.MustCompile(`^(?i)[A-Z0-9]+$`)
 
+var retryablePullMessages = []string{
+	"connection refused",
+	"connection reset",
+	"timeout",
+	"deadline exceeded",
+	"unexpected eof",
+	"i/o timeout",
+	"tls handshake timeout",
+	"client.timeout exceeded",
+	"rate limit exceeded",
+	"toomanyrequests",
+	"rate exceeded",
+	"rate limit",
+	"data limit exceeded",
+}
+
+var refreshableAuthKeywords = []string{
+	"token expired",
+	"expired token",
+	"refresh token",
+	"reauthenticate",
+	"token refresh",
+}
+
 // IsRetryablePullError returns true if the error from a pull operation is likely transient and worth retrying.
 func IsRetryablePullError(err error) bool {
 	if err == nil {
@@ -49,23 +73,7 @@ func IsRetryablePullError(err error) bool {
 	}
 
 	msg := strings.ToLower(err.Error())
-	retryableMessages := []string{
-		"connection refused",
-		"connection reset",
-		"timeout",
-		"deadline exceeded",
-		"unexpected eof",
-		"i/o timeout",
-		"tls handshake timeout",
-		"client.timeout exceeded",
-		"rate limit exceeded",
-		"toomanyrequests",
-		"rate exceeded",
-		"rate limit",
-		"data limit exceeded",
-	}
-
-	for _, m := range retryableMessages {
+	for _, m := range retryablePullMessages {
 		if strings.Contains(msg, m) {
 			return true
 		}
@@ -81,14 +89,7 @@ func IsTemporaryAuthError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	// Only return true for transient/refreshable conditions.
-	refreshableKeywords := []string{
-		"token expired",
-		"expired token",
-		"refresh token",
-		"reauthenticate",
-		"token refresh",
-	}
-	for _, kw := range refreshableKeywords {
+	for _, kw := range refreshableAuthKeywords {
 		if strings.Contains(msg, kw) {
 			return true
 		}
