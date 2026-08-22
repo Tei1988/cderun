@@ -439,7 +439,7 @@ If no engine is explicitly specified, `cderun` checks for socket files in the fo
 
 Matches are isolated to the path's base name to avoid misdetection in nested paths. If no socket is found, it defaults to `docker` at `/var/run/docker.sock`.
 
-### 2. containerd Runtime Limitations
+### 2. containerd Runtime Limitations & Compatibility Matrix
 
 Direct containerd integration operates natively via the containerd gRPC API. Please note the following constraints:
 
@@ -448,6 +448,8 @@ Direct containerd integration operates natively via the containerd gRPC API. Ple
 - **Ports & DNS**: Port mapping (`--publish`), exposure (`--expose`), custom DNS (`--dns`), and host mapping (`--add-host`) are not supported.
 - **Mounts**: Named volume-type mounts are not supported (use `bind` or `tmpfs` mounts).
 - **Adaptation Contract**: The containerd adapter enforces a strict contract to validate and convert Docker-compatible fields (e.g. mapping capabilities like `SYS_ADMIN` to `CAP_SYS_ADMIN`), returning explicit errors for unsupported fields rather than passing them through silently.
+
+For a detailed feature comparison table across Docker, Podman, and direct containerd, see the [Container Runtime Compatibility Matrix](docs/features/command-line-options.md#container-runtime-compatibility-matrix).
 
 ---
 

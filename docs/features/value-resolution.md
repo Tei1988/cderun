@@ -199,6 +199,43 @@ The `source` path is resolved to `/home/user/project/src`.
 
 Values are evaluated according to the following strict sequence:
 
+```text
+  Raw Input String (CLI / Env / YAML)
+                 │
+                 ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 1: Null-Byte & UTF-8 / Control-Char Check │ ── Invalid ──> Immediate Security Error
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 2: Evaluate {{...}} Dynamic Expressions  │ ── Error ────> Store Sticky Error
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 3: Anchor Boundary Safety Verification    │ ── Escapes ──> Store Sticky Error
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 4: Expand Leading Tilde (~ / ~/)         │
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 5: Convert Relative Paths (./ or ../)    │
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+ ┌───────────────────────────────────────────────┐
+ │ Step 6: Path Cleaning & Normalization         │
+ └──────────────────────┬────────────────────────┘
+                        │
+                        ▼
+            Final Resolved Value / Target
+```
+
 1. **cderun Expressions**: Evaluate double-brace `{{...}}` expressions.
 2. **Tilde Expansion**: Resolve leading tildes to home directories.
 3. **Relative Path Resolution**: Convert remaining relative paths (`./` or `../`) to absolute paths based on configuration or CLI contexts.
