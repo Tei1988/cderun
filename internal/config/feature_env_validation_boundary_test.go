@@ -30,8 +30,7 @@ func TestUnit_ResolveEnvValues_ControlCharacterBoundaryValidation(t *testing.T) 
 		res, err := resolveEnvValues(input, nil, false, nil, fs)
 		require.Error(t, err)
 		assert.Nil(t, res)
-		assert.Contains(t, err.Error(), "security validation failed for env[0] (value): invalid control character")
-		assert.Contains(t, err.Error(), "position 3")
+		assert.EqualError(t, err, "security validation failed for env[0] (value): invalid control character '\\x01' at position 3")
 	})
 
 	t.Run("rejected ASCII DEL character (0x7f) with exact byte position and error message", func(t *testing.T) {
@@ -40,8 +39,7 @@ func TestUnit_ResolveEnvValues_ControlCharacterBoundaryValidation(t *testing.T) 
 		res, err := resolveEnvValues(input, nil, false, nil, fs)
 		require.Error(t, err)
 		assert.Nil(t, res)
-		assert.Contains(t, err.Error(), "security validation failed for env[0] (value): invalid control character")
-		assert.Contains(t, err.Error(), "position 2")
+		assert.EqualError(t, err, "security validation failed for env[0] (value): invalid control character '\\x7f' at position 2")
 	})
 
 	t.Run("rejected C1 Unicode control characters with exact byte position", func(t *testing.T) {
@@ -50,8 +48,7 @@ func TestUnit_ResolveEnvValues_ControlCharacterBoundaryValidation(t *testing.T) 
 		res, err := resolveEnvValues(input, nil, false, nil, fs)
 		require.Error(t, err)
 		assert.Nil(t, res)
-		assert.Contains(t, err.Error(), "security validation failed for env[0] (value): invalid control character")
-		assert.Contains(t, err.Error(), "position 4")
+		assert.EqualError(t, err, "security validation failed for env[0] (value): invalid control character '\\u0080' at position 4")
 	})
 
 	t.Run("byte offset position tracking with preceding multibyte UTF-8 characters", func(t *testing.T) {
@@ -60,7 +57,6 @@ func TestUnit_ResolveEnvValues_ControlCharacterBoundaryValidation(t *testing.T) 
 		res, err := resolveEnvValues(input, nil, false, nil, fs)
 		require.Error(t, err)
 		assert.Nil(t, res)
-		assert.Contains(t, err.Error(), "security validation failed for env[0] (value): invalid control character")
-		assert.Contains(t, err.Error(), "position 4")
+		assert.EqualError(t, err, "security validation failed for env[0] (value): invalid control character '\\x01' at position 4")
 	})
 }
