@@ -658,6 +658,12 @@ func ValidateCpuset(s string) error {
 			}
 		}
 	}
+	for part := range strings.SplitSeq(s, ",") {
+		hyphenCount := strings.Count(part, "-")
+		if hyphenCount > 1 {
+			return fmt.Errorf("invalid cpuset syntax: multiple range delimiters in segment %q", part)
+		}
+	}
 	return nil
 }
 
@@ -846,7 +852,8 @@ func ValidateImageName(s string) error {
 				atCount++
 			}
 			prev := s[i-1]
-			if (prev == '/' && c == '/') || (prev == ':' && c == ':') || (prev == '@' && c == '@') {
+			isSep := func(b byte) bool { return b == '/' || b == ':' || b == '@' }
+			if isSep(prev) && isSep(c) {
 				return fmt.Errorf("invalid image name: %q (consecutive separators)", s)
 			}
 		}
