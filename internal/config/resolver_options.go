@@ -288,6 +288,10 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunRestart)
 		p2Set, p2Val = getPtrVal(rv.cli.Restart)
 		fastPathUsed = true
+	case "prefetch":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPrefetch)
+		p2Set, p2Val = getPtrVal(rv.cli.Prefetch)
+		fastPathUsed = true
 	}
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
@@ -345,6 +349,8 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 			rv.res.CpusetMems = resolved
 		case "restart":
 			rv.res.Restart = resolved
+		case "prefetch":
+			rv.res.Prefetch = resolved
 		}
 		return nil
 	}
@@ -428,6 +434,14 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
 		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
 		fastPathUsed = true
+	case "prefetch-all":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunPrefetchAll)
+		p2Set, p2Val = getPtrVal(rv.cli.PrefetchAll)
+		fastPathUsed = true
+	case "mount-cderun-socket":
+		p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderunSocket)
+		p2Set, p2Val = getPtrVal(rv.cli.MountCderunSocket)
+		fastPathUsed = true
 	}
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
@@ -474,6 +488,10 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			rv.res.MountAllTools = resolved
 		case "dry-run":
 			rv.res.DryRun = resolved
+		case "prefetch-all":
+			rv.res.PrefetchAll = resolved
+		case "mount-cderun-socket":
+			rv.res.MountCderunSocket = resolved
 		}
 		return nil
 	}
