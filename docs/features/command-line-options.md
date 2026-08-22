@@ -8,9 +8,9 @@ This document provides a comprehensive reference of all command-line options sup
 
 The table below summarizes support for key `cderun` configuration features across container execution engines:
 
-| Feature / Option Flag | Docker | Podman | containerd (Direct API) | Notes / Adapter Behavior |
+| Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | Notes / Adapter Behavior |
 | :--- | :---: | :---: | :---: | :--- |
-| **TTY / Interactive** (`--tty`, `-i`) | ✅ | ✅ | ✅ | Full PTY and raw stream I/O synchronization |
+| **TTY / Interactive** (`--tty`, `-i`) | ✅ | ✅ | ✅ | Full PTY and raw stream I/O synchronization. Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
 | **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
 | **Expose Ports** (`--expose`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |
 | **DNS Servers** (`--dns`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |

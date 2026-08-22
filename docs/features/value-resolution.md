@@ -203,36 +203,36 @@ Values are evaluated according to the following strict sequence:
   Raw Input String (CLI / Env / YAML)
                  │
                  ▼
- ┌───────────────────────────────────────────────┐
- │ Step 1: Null-Byte & UTF-8 / Control-Char Check │ ── Invalid ──> Immediate Security Error
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
- ┌───────────────────────────────────────────────┐
- │ Step 2: Evaluate {{...}} Dynamic Expressions  │ ── Error ────> Store Sticky Error
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
- ┌───────────────────────────────────────────────┐
- │ Step 3: Anchor Boundary Safety Verification    │ ── Escapes ──> Store Sticky Error
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
- ┌───────────────────────────────────────────────┐
- │ Step 4: Expand Leading Tilde (~ / ~/)         │
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
- ┌───────────────────────────────────────────────┐
- │ Step 5: Convert Relative Paths (./ or ../)    │
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
- ┌───────────────────────────────────────────────┐
- │ Step 6: Path Cleaning & Normalization         │
- └──────────────────────┬────────────────────────┘
-                        │
-                        ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 1: Null-Byte & UTF-8 / Control-Char Check   │ ── Invalid ──> Immediate Security Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 2: Evaluate {{...}} Dynamic Expressions     │ ── Error ────> Store Sticky Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 3: Expand Leading Tilde (~ / ~/)            │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 4: Convert Relative Paths (./ or ../)       │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 5: Path Cleaning & Normalization (Clean)    │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 6: Anchor Boundary Safety Verification      │ ── Escapes ──> Store Sticky Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
             Final Resolved Value / Target
 ```
 
@@ -240,6 +240,7 @@ Values are evaluated according to the following strict sequence:
 2. **Tilde Expansion**: Resolve leading tildes to home directories.
 3. **Relative Path Resolution**: Convert remaining relative paths (`./` or `../`) to absolute paths based on configuration or CLI contexts.
 4. **Path Cleaning**: Normalize paths by removing redundant separators and parent traversals (e.g., `/home/user/project/../src` -> `/home/user/src`).
+5. **Anchor Boundary Safety Verification**: Verify cleaned path against anchor boundaries (`validateAnchorBoundaries`), raising a sticky error if escaping anchor root.
 
 ---
 
