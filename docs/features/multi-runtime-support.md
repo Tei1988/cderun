@@ -59,6 +59,8 @@ The `ContainerRuntime` interface governs:
 
 ## Engine Selection
 
+Container engine selection (`docker`, `podman`, or `containerd`) is determined automatically via socket detection (scanning for Docker, containerd, or Podman sockets, with Docker as the default fallback when no active socket is found) or explicitly configured via `--runtime`.
+
 ### Resolution Priority Sequence
 
 1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` settings.
