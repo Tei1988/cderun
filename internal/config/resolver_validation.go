@@ -216,6 +216,26 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
+	// prefetch
+	prefetchValidator := func(v string) error {
+		if v == "" {
+			return nil
+		}
+		for part := range strings.SplitSeq(v, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if err := ValidateToolName(part); err != nil {
+				return fmt.Errorf("invalid tool name in prefetch: %w", err)
+			}
+		}
+		return nil
+	}
+	if err := validateField(rv.res.Prefetch, "prefetch", prefetchValidator); err != nil {
+		return err
+	}
+
 	// pid
 	pidValidator := func(v string) error {
 		if v == "" || v == "host" {
