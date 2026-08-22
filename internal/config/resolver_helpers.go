@@ -156,6 +156,17 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
+func parseEnvItem[T any](s string, parser func(string, string) (T, error)) (T, error) {
+	if parser == nil {
+		if sv, ok := any(s).(T); ok {
+			return sv, nil
+		}
+		var zero T
+		return zero, errors.New("parser required for non-string types")
+	}
+	return parser(s, "env")
+}
+
 func pickConfigs[T any](
 	p1 []string,
 	p2 []string,
@@ -181,19 +192,9 @@ func pickConfigs[T any](
 			if envSep == "" || !strings.Contains(env, envSep) {
 				s := strings.TrimSpace(env)
 				if s != "" {
-					var v T
-					if parser == nil {
-						if sv, ok := any(s).(T); ok {
-							v = sv
-						} else {
-							return nil, errors.New("parser required for non-string types")
-						}
-					} else {
-						var err error
-						v, err = parser(s, "env")
-						if err != nil {
-							return nil, err
-						}
+					v, err := parseEnvItem(s, parser)
+					if err != nil {
+						return nil, err
 					}
 					res = []T{v}
 				} else {
@@ -205,19 +206,9 @@ func pickConfigs[T any](
 					if s == "" {
 						continue
 					}
-					var v T
-					if parser == nil {
-						if sv, ok := any(s).(T); ok {
-							v = sv
-						} else {
-							return nil, errors.New("parser required for non-string types")
-						}
-					} else {
-						var err error
-						v, err = parser(s, "env")
-						if err != nil {
-							return nil, err
-						}
+					v, err := parseEnvItem(s, parser)
+					if err != nil {
+						return nil, err
 					}
 					if res == nil {
 						res = make([]T, 0, 4)
