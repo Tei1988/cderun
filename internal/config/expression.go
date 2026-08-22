@@ -260,7 +260,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 			var anchorBuf [16]anchorRange
 			ranges := scanAnchors(s, anchorBuf[:0])
 			if len(ranges) > 0 {
-				var arr [512]byte
+				var arr [2048]byte
 				buf := arr[:0]
 				last := 0
 				sbInitialized := false

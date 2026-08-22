@@ -510,9 +510,19 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 		if strings.ContainsRune(val, 0) {
 			return nil, fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
-		for pos, r := range val {
-			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
-				return nil, fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+		hasControlOrNonASCII := false
+		for j := 0; j < len(val); j++ {
+			b := val[j]
+			if (b < 0x20 && b != '\n' && b != '\r' && b != '\t') || b == 0x7f || b >= 0x80 {
+				hasControlOrNonASCII = true
+				break
+			}
+		}
+		if hasControlOrNonASCII {
+			for pos, r := range val {
+				if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+					return nil, fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+				}
 			}
 		}
 
