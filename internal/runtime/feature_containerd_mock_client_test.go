@@ -192,12 +192,12 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 	// 1. PullImage tests
 	t.Run("PullImage Success", func(t *testing.T) {
 		err := rt.PullImage(ctx, "alpine:latest", "always", 0, 10*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("PullImage Missing Exists", func(t *testing.T) {
 		err := rt.PullImage(ctx, "alpine:latest", "missing", 0, 10*time.Millisecond)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("PullImage Error", func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 	// 3. StartContainer & InspectContainer tests
 	t.Run("StartContainer and InspectContainer", func(t *testing.T) {
 		err := rt.StartContainer(ctx, containerID)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		running, exitCode, err := rt.InspectContainer(ctx, containerID)
 		require.NoError(t, err)
@@ -244,10 +244,10 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 	// 4. Signal & Resize TTY tests
 	t.Run("SignalContainer and ResizeContainerTTY", func(t *testing.T) {
 		err := rt.SignalContainer(ctx, containerID, "SIGTERM")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = rt.ResizeContainerTTY(ctx, containerID, 24, 80)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	// 5. WaitContainer tests
@@ -260,12 +260,12 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 	// 6. RemoveContainer tests
 	t.Run("RemoveContainer Success", func(t *testing.T) {
 		err := rt.RemoveContainer(ctx, containerID)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("RemoveContainer Nonexistent Is Ignored", func(t *testing.T) {
 		err := rt.RemoveContainer(ctx, "nonexistent-id")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
