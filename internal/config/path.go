@@ -544,7 +544,13 @@ func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string,
 func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string, error) {
 	host, remainder, ok := SplitHostRemainder(d)
 	if !ok {
+		if HasParentTraversal(d) {
+			return "", fmt.Errorf("device source cannot contain parent directory references: %q", d)
+		}
 		return ResolvePath(d, baseDir, r)
+	}
+	if HasParentTraversal(host) {
+		return "", fmt.Errorf("device source cannot contain parent directory references: %q", host)
 	}
 	resolvedHost, err := ResolvePath(host, baseDir, r)
 	if err != nil {
