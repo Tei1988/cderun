@@ -173,7 +173,7 @@ func TestScenario_Command_ZeroHangTimeoutBlocking(t *testing.T) {
 		done := make(chan struct{})
 
 		go func() {
-			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-hang-timeout=0"}, func(o *rootOptions, cmd *cobra.Command) {
+			execErr = ExecuteContextWithOptions(ctx, []string{"cderun", "--image", "alpine", "sh", "--cderun-hang-timeout=0s"}, func(o *rootOptions, cmd *cobra.Command) {
 				o.runtimeFactory = func(name, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 					return mock, nil
 				}
