@@ -16,14 +16,18 @@ func TestUnit_DockerRuntime_DrainOutputOnStdinError(t *testing.T) {
 	t.Run("output done during grace period", func(t *testing.T) {
 		rt := &DockerRuntime{
 			logger:                logging.GetGlobalLogger(),
-			attachCloseWriteGrace: 100 * time.Millisecond,
+			attachCloseWriteGrace: 1 * time.Second,
 			sleepFunc:             SleepFunc,
 		}
 
 		ctx := context.Background()
 		stdinErr := errors.New("stdin broken pipe")
 		outputDone := make(chan error, 1)
-		outputDone <- nil
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			outputDone <- nil
+		}()
 
 		err := rt.drainOutputOnStdinError(ctx, stdinErr, outputDone)
 		assert.Equal(t, stdinErr, err)
@@ -52,10 +56,13 @@ func TestUnit_DockerRuntime_DrainOutputOnStdinError(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // canceled context
-
 		stdinErr := errors.New("stdin write error")
 		outputDone := make(chan error, 1)
+
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			cancel()
+		}()
 
 		err := rt.drainOutputOnStdinError(ctx, stdinErr, outputDone)
 		assert.ErrorIs(t, err, context.Canceled)
