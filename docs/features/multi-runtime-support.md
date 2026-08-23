@@ -57,15 +57,39 @@ The `ContainerRuntime` interface governs:
 
 ---
 
-## Engine Selection
+## Engine and OCI Runtime Selection
 
-Container engine selection (`docker`, `podman`, or `containerd`) is determined automatically via socket detection (scanning for Docker, containerd, or Podman sockets, with Docker as the default fallback when no active socket is found) or explicitly configured via `--runtime`.
+`cderun` explicitly decouples container engine selection (`--engine`) from lower-level OCI runtime specification (`--runtime`).
 
-### Resolution Priority Sequence
+### 1. Container Engine Selection (`--engine`)
 
-1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` settings.
-2. **Environment Variables (P3)**: `CDERUN_RUNTIME` or `CDERUN_SOCKET_PATH`.
-3. **Configuration Files (P5)**: `runtime` or `socketPath` keys inside `.cderun.yaml`.
+The container engine (`docker`, `podman`, or `containerd`) controls which container daemon `cderun` communicates with.
+
+- **Option Flag**: `--engine` (P2) / `--cderun-engine` (P1)
+- **Environment Variable**: `CDERUN_ENGINE` (P3) (Note: `CDERUN_RUNTIME` is supported as a deprecated alias)
+- **Configuration Key**: `engine:` inside `.cderun.yaml`
+- **Default Value**: `docker`
+
+#### Automatic Legacy Migration
+
+Existing configuration files or environment settings using `runtime:` or `CDERUN_RUNTIME` with engine values (`docker`, `podman`, `containerd`) are automatically migrated via `migrateLegacyRuntime` to `Engine` with a deprecation warning emitted at runtime.
+
+### 2. OCI Runtime Specification (`--runtime`)
+
+The OCI runtime controls the low-level execution engine (such as `runc`, `crun`, `nvidia`, or `kata`) managed by the underlying container engine.
+
+- **Option Flag**: `--runtime` (P2) / `--cderun-runtime` (P1)
+- **Environment Variable**: `CDERUN_OCI_RUNTIME` (P3)
+- **Configuration Key**: `runtime:` inside `.cderun.yaml`
+- **Default Value**: `""` (Engine default)
+
+*Note: Docker and Podman map `--runtime` to their respective HostConfig runtime options. The direct `containerd` adapter validates OCI runtime options and explicitly rejects unsupported custom runtimes.*
+
+### Resolution Priority Sequence for Engine Selection
+
+1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--engine` or `--socket-path` settings.
+2. **Environment Variables (P3)**: `CDERUN_ENGINE` (or deprecated `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
+3. **Configuration Files (P5)**: `engine:` (or deprecated `runtime:`) or `socketPath` keys inside `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 
