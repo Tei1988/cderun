@@ -139,7 +139,9 @@ func (c *Client) Close() error {
 
 // sendRPC sends a RequestFrame to the server and returns the ResponseFrame payload or error.
 func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []byte) ([]byte, error) {
+	var deadlinePtr *time.Time
 	if deadline, ok := ctx.Deadline(); ok {
+		deadlinePtr = &deadline
 		if err := c.conn.SetDeadline(deadline); err != nil {
 			return nil, fmt.Errorf("failed to set deadline for RPC %s: %w", msgType, err)
 		}
@@ -149,8 +151,9 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	}
 
 	reqFrame := RequestFrame{
-		Type:    msgType,
-		Payload: reqPayload,
+		Type:     msgType,
+		Deadline: deadlinePtr,
+		Payload:  reqPayload,
 	}
 	data, err := json.Marshal(reqFrame)
 	if err != nil {

@@ -201,7 +201,18 @@ func (s *Server) handleConn(conn net.Conn) {
 	}
 }
 
+func (s *Server) buildRequestContext(reqFrame *RequestFrame) (context.Context, context.CancelFunc) {
+	ctx := context.Background()
+	if reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
+		return context.WithDeadline(ctx, *reqFrame.Deadline)
+	}
+	return context.WithCancel(ctx)
+}
+
 func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
+	ctx, cancel := s.buildRequestContext(reqFrame)
+	defer cancel()
+
 	switch reqFrame.Type {
 	case MsgPing:
 		resp := ResponseFrame{Success: true, Payload: []byte("pong")}
@@ -209,23 +220,23 @@ func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
 		_ = WriteFrame(conn, respBytes)
 
 	case MsgCreateContainer:
-		s.handleCreateContainer(conn, reqFrame.Payload)
+		s.handleCreateContainer(ctx, conn, reqFrame.Payload)
 
 	case MsgStartContainer:
-		s.handleStartContainer(conn, reqFrame.Payload)
+		s.handleStartContainer(ctx, conn, reqFrame.Payload)
 
 	case MsgWaitContainer:
-		s.handleWaitContainer(conn, reqFrame.Payload)
+		s.handleWaitContainer(ctx, conn, reqFrame.Payload)
 
 	case MsgRemoveContainer:
-		s.handleRemoveContainer(conn, reqFrame.Payload)
+		s.handleRemoveContainer(ctx, conn, reqFrame.Payload)
 
 	default:
 		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
 	}
 }
 
-func (s *Server) handleCreateContainer(conn net.Conn, payload []byte) {
+func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, payload []byte) {
 	s.mu.Lock()
 	d := s.dispatcher
 	s.mu.Unlock()
@@ -241,7 +252,12 @@ func (s *Server) handleCreateContainer(conn net.Conn, payload []byte) {
 		return
 	}
 
-	containerID, err := d.CreateContainer(context.Background(), args.Config)
+	if args.Config == nil {
+		s.sendErrorResponse(conn, "CreateContainer args.Config is nil")
+		return
+	}
+
+	containerID, err := d.CreateContainer(ctx, args.Config)
 	if err != nil {
 		s.sendErrorResponse(conn, err.Error())
 		return
@@ -259,7 +275,7 @@ func (s *Server) handleCreateContainer(conn net.Conn, payload []byte) {
 	_ = WriteFrame(conn, respBytes)
 }
 
-func (s *Server) handleStartContainer(conn net.Conn, payload []byte) {
+func (s *Server) handleStartContainer(ctx context.Context, conn net.Conn, payload []byte) {
 	s.mu.Lock()
 	d := s.dispatcher
 	s.mu.Unlock()
@@ -275,7 +291,7 @@ func (s *Server) handleStartContainer(conn net.Conn, payload []byte) {
 		return
 	}
 
-	if err := d.StartContainer(context.Background(), args.ContainerID); err != nil {
+	if err := d.StartContainer(ctx, args.ContainerID); err != nil {
 		s.sendErrorResponse(conn, err.Error())
 		return
 	}
@@ -285,7 +301,7 @@ func (s *Server) handleStartContainer(conn net.Conn, payload []byte) {
 	_ = WriteFrame(conn, respBytes)
 }
 
-func (s *Server) handleWaitContainer(conn net.Conn, payload []byte) {
+func (s *Server) handleWaitContainer(ctx context.Context, conn net.Conn, payload []byte) {
 	s.mu.Lock()
 	d := s.dispatcher
 	s.mu.Unlock()
@@ -301,7 +317,7 @@ func (s *Server) handleWaitContainer(conn net.Conn, payload []byte) {
 		return
 	}
 
-	exitCode, err := d.WaitContainer(context.Background(), args.ContainerID)
+	exitCode, err := d.WaitContainer(ctx, args.ContainerID)
 	if err != nil {
 		s.sendErrorResponse(conn, err.Error())
 		return
@@ -319,7 +335,7 @@ func (s *Server) handleWaitContainer(conn net.Conn, payload []byte) {
 	_ = WriteFrame(conn, respBytes)
 }
 
-func (s *Server) handleRemoveContainer(conn net.Conn, payload []byte) {
+func (s *Server) handleRemoveContainer(ctx context.Context, conn net.Conn, payload []byte) {
 	s.mu.Lock()
 	d := s.dispatcher
 	s.mu.Unlock()
@@ -335,7 +351,7 @@ func (s *Server) handleRemoveContainer(conn net.Conn, payload []byte) {
 		return
 	}
 
-	if err := d.RemoveContainer(context.Background(), args.ContainerID); err != nil {
+	if err := d.RemoveContainer(ctx, args.ContainerID); err != nil {
 		s.sendErrorResponse(conn, err.Error())
 		return
 	}

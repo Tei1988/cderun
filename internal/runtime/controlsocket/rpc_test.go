@@ -125,3 +125,60 @@ func TestUnit_ControlSocket_RPC_NoDispatcherError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "server dispatcher not configured")
 }
+
+func TestUnit_ControlSocket_RPC_NilConfigRejection(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "nilcfg.sock")
+
+	disp := &mockDispatcher{}
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	client, err := Connect(ctx, socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	_, err = client.CreateContainer(ctx, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CreateContainer args.Config is nil")
+}
+
+func TestUnit_ControlSocket_RPC_ContextDeadlinePropagation(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "deadline.sock")
+
+	var receivedDeadline time.Time
+	disp := &mockDispatcher{
+		createFunc: func(ctx context.Context, config *container.ContainerConfig) (string, error) {
+			if dl, ok := ctx.Deadline(); ok {
+				receivedDeadline = dl
+			}
+			return "container-dl-123", nil
+		},
+	}
+
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	expectedDeadline := time.Now().Add(5 * time.Second)
+	ctx, cancel := context.WithDeadline(context.Background(), expectedDeadline)
+	defer cancel()
+
+	client, err := Connect(ctx, socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	cID, err := client.CreateContainer(ctx, &container.ContainerConfig{Image: "alpine"})
+	require.NoError(t, err)
+	assert.Equal(t, "container-dl-123", cID)
+
+	assert.False(t, receivedDeadline.IsZero())
+	assert.WithinDuration(t, expectedDeadline, receivedDeadline, 50*time.Millisecond)
+}
