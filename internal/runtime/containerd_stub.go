@@ -23,6 +23,11 @@ func WithContainerdLogger(_ *logging.Logger) ContainerdRuntimeOption {
 	return func(_ *ContainerdRuntime) {}
 }
 
+// WithContainerdClient is a no-op on non-Linux platforms.
+func WithContainerdClient(_ any) ContainerdRuntimeOption {
+	return func(_ *ContainerdRuntime) {}
+}
+
 // NewContainerdRuntime always returns an error on non-Linux platforms.
 func NewContainerdRuntime(_ string, _ ...ContainerdRuntimeOption) (*ContainerdRuntime, error) {
 	return nil, fmt.Errorf("containerd runtime is only supported on Linux")
