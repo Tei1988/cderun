@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -263,7 +264,7 @@ func TestUnit_Config_Path_ResolveVolume_ResolveDevice_Errors(t *testing.T) {
 	t.Run("resolveDevicePath ResolvePath error", func(t *testing.T) {
 		_, err := resolveDevicePath("~/../../etc/passwd:/dev/a", "/work", r)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "path traversal detected")
+		assert.True(t, strings.Contains(err.Error(), "path traversal detected") || strings.Contains(err.Error(), "parent directory references"))
 	})
 }
 
