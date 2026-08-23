@@ -58,7 +58,7 @@ func TestUnit_DockerRuntime_DrainOutputOnStdinError(t *testing.T) {
 		outputDone := make(chan error, 1)
 
 		err := rt.drainOutputOnStdinError(ctx, stdinErr, outputDone)
-		assert.True(t, errors.Is(err, context.Canceled))
+		assert.ErrorIs(t, err, context.Canceled)
 	})
 }
 
