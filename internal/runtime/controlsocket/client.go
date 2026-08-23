@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
+	"cderun/internal/container"
 	"cderun/internal/version"
 )
 
@@ -133,4 +135,109 @@ func (c *Client) Close() error {
 		return c.conn.Close()
 	}
 	return nil
+}
+
+// sendRPC sends a RequestFrame to the server and returns the ResponseFrame payload or error.
+func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []byte) ([]byte, error) {
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := c.conn.SetDeadline(deadline); err != nil {
+			return nil, fmt.Errorf("failed to set deadline for RPC %s: %w", msgType, err)
+		}
+		defer func() {
+			_ = c.conn.SetDeadline(time.Time{})
+		}()
+	}
+
+	reqFrame := RequestFrame{
+		Type:    msgType,
+		Payload: reqPayload,
+	}
+	data, err := json.Marshal(reqFrame)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %s request: %w", msgType, err)
+	}
+
+	if err := WriteFrame(c.conn, data); err != nil {
+		return nil, fmt.Errorf("failed to send %s frame: %w", msgType, err)
+	}
+
+	respBytes, err := ReadFrame(c.conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s response: %w", msgType, err)
+	}
+
+	var resp ResponseFrame
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return nil, fmt.Errorf("malformed %s response frame: %w", msgType, err)
+	}
+
+	if !resp.Success {
+		return nil, errors.New(resp.Error)
+	}
+
+	return resp.Payload, nil
+}
+
+// CreateContainer invokes CreateContainer RPC over Control Socket.
+func (c *Client) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	args := CreateContainerArgs{Config: config}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal CreateContainer args: %w", err)
+	}
+
+	resBytes, err := c.sendRPC(ctx, MsgCreateContainer, payload)
+	if err != nil {
+		return "", err
+	}
+
+	var res CreateContainerResult
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return "", fmt.Errorf("malformed CreateContainer result: %w", err)
+	}
+	return res.ContainerID, nil
+}
+
+// StartContainer invokes StartContainer RPC over Control Socket.
+func (c *Client) StartContainer(ctx context.Context, containerID string) error {
+	args := ContainerIDArgs{ContainerID: containerID}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal StartContainer args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgStartContainer, payload)
+	return err
+}
+
+// WaitContainer invokes WaitContainer RPC over Control Socket.
+func (c *Client) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	args := ContainerIDArgs{ContainerID: containerID}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal WaitContainer args: %w", err)
+	}
+
+	resBytes, err := c.sendRPC(ctx, MsgWaitContainer, payload)
+	if err != nil {
+		return 0, err
+	}
+
+	var res WaitContainerResult
+	if err := json.Unmarshal(resBytes, &res); err != nil {
+		return 0, fmt.Errorf("malformed WaitContainer result: %w", err)
+	}
+	return res.ExitCode, nil
+}
+
+// RemoveContainer invokes RemoveContainer RPC over Control Socket.
+func (c *Client) RemoveContainer(ctx context.Context, containerID string) error {
+	args := ContainerIDArgs{ContainerID: containerID}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal RemoveContainer args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgRemoveContainer, payload)
+	return err
 }

@@ -211,7 +211,7 @@ func TestUnit_Command_HandleDiagnosis_FS_Error(t *testing.T) {
 		SocketPath: "/var/run/docker.sock",
 	}
 
-	err := o.handleDiagnosis(cmd, resolved, nil, nil, nil)
+	err := o.handleDiagnosis(cmd, resolved, nil, nil, nil, nil)
 	require.NoError(t, err) // handleDiagnosis itself doesn't return error on Stat failure, it records it in info.Runtime.Status
 }
 

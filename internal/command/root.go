@@ -402,9 +402,10 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 
 type diagnosticsInfo struct {
 	Runtime struct {
-		Name   string `json:"name" yaml:"name"`
-		Socket string `json:"socket" yaml:"socket"`
-		Status string `json:"status" yaml:"status"`
+		Name          string `json:"name" yaml:"name"`
+		Socket        string `json:"socket" yaml:"socket"`
+		Status        string `json:"status" yaml:"status"`
+		ControlSocket string `json:"control_socket,omitempty" yaml:"control_socket,omitempty"`
 	} `json:"runtime" yaml:"runtime"`
 	Configs struct {
 		Global []string `json:"global" yaml:"global"`
@@ -437,7 +438,7 @@ func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpl
 	}
 }
 
-func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string) error {
+func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig, globalPaths, toolsPaths []string, globalCfg *config.CDERunConfig) error {
 	o.ensureHooks()
 	info := diagnosticsInfo{}
 	info.Runtime.Name = resolved.Runtime
@@ -446,6 +447,9 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 		info.Runtime.Status = "accessible"
 	} else {
 		info.Runtime.Status = fmt.Sprintf("not found or inaccessible: %v", err)
+	}
+	if globalCfg != nil && globalCfg.HostContext != nil && globalCfg.HostContext.ControlSocket != "" {
+		info.Runtime.ControlSocket = globalCfg.HostContext.ControlSocket
 	}
 	info.Configs.Global = globalPaths
 	info.Configs.Tools = toolsPaths
@@ -943,6 +947,19 @@ func (o *rootOptions) initContainer(ctx context.Context, resolved *config.Resolv
 		return
 	}
 
+	// Check if Control Socket active in hostContext (nested execution)
+	if resolved.HostContext != nil && resolved.HostContext.ControlSocket != "" {
+		ctrlPath := resolved.HostContext.ControlSocket
+		o.logger.Debug("Nested execution detected: connecting to Control Socket at %s", ctrlPath)
+		client, connErr := controlsocket.Connect(ctx, ctrlPath)
+		if connErr != nil {
+			o.logger.Warn("Failed to connect to Control Socket at %s: %v (falling back to raw socket)", ctrlPath, connErr)
+		} else {
+			o.logger.Debug("Control Socket connected; wrapping runtime with ControlSocketRuntimeAdapter")
+			rt = runtime.NewControlSocketRuntimeAdapter(rt, client, o.logger)
+		}
+	}
+
 	// Ensure runtime is closed on early error paths
 	defer func() {
 		if err != nil && rt != nil {
@@ -1303,7 +1320,7 @@ intended for the subcommand.`,
 		}
 
 		if resolved.Diagnosis {
-			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths)
+			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths, globalCfg)
 		}
 
 		if resolved.PrefetchAll || resolved.Prefetch != "" {
