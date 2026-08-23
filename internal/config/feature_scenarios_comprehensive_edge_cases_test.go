@@ -1,6 +1,7 @@
 package config
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -242,18 +243,25 @@ func TestUnit_Config_SensitiveEnvMaskingAndPrecedence(t *testing.T) {
 		}
 
 		// Mode 1: nil slice masks all variables
-		maskedNil := MaskSensitiveEnvList(rawEnvs, nil)
+		maskedNil := MaskSensitiveEnvList(slices.Clone(rawEnvs), nil)
 		for _, env := range maskedNil {
 			assert.Contains(t, env, "=[REDACTED]")
 		}
 
 		// Mode 2: empty slice masks no variables
-		maskedEmpty := MaskSensitiveEnvList(rawEnvs, []string{})
-		assert.Equal(t, rawEnvs, maskedEmpty)
+		maskedEmpty := MaskSensitiveEnvList(slices.Clone(rawEnvs), []string{})
+		expectedUnredacted := []string{
+			"API_KEY=secret123",
+			"DATABASE_PASSWORD=pass123",
+			"TOKEN_AUTH=tok456",
+			"USER_NAME=john_doe",
+			"APP_PORT=8080",
+		}
+		assert.Equal(t, expectedUnredacted, maskedEmpty)
 
 		// Mode 3: custom glob pattern matching
 		patterns := []string{"*KEY*", "*PASSWORD*", "TOKEN_*"}
-		maskedCustom := MaskSensitiveEnvList(rawEnvs, patterns)
+		maskedCustom := MaskSensitiveEnvList(slices.Clone(rawEnvs), patterns)
 
 		require.Len(t, maskedCustom, len(rawEnvs))
 		assert.Equal(t, "API_KEY=[REDACTED]", maskedCustom[0])

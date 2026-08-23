@@ -45,6 +45,8 @@ func TestUnit_Runtime_MockRuntimeLifecycle(t *testing.T) {
 	// 4. SignalContainer
 	err = mock.SignalContainer(ctx, cid, "SIGTERM")
 	require.NoError(t, err)
+	assert.Equal(t, cid, mock.SignaledContainerID)
+	assert.Equal(t, "SIGTERM", mock.Signal)
 
 	// 5. RemoveContainer
 	err = mock.RemoveContainer(ctx, cid)
