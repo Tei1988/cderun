@@ -14,18 +14,29 @@ import (
 
 func TestUnit_DockerRuntime_DrainOutputOnStdinError(t *testing.T) {
 	t.Run("output done during grace period", func(t *testing.T) {
+		sleepStarted := make(chan struct{})
+		outputDone := make(chan error, 1)
+
 		rt := &DockerRuntime{
 			logger:                logging.GetGlobalLogger(),
 			attachCloseWriteGrace: 1 * time.Second,
-			sleepFunc:             SleepFunc,
+			sleepFunc: func(ctx context.Context, d time.Duration) error {
+				close(sleepStarted)
+				// Wait for outputDone or ctx cancellation
+				select {
+				case <-outputDone:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			},
 		}
 
 		ctx := context.Background()
 		stdinErr := errors.New("stdin broken pipe")
-		outputDone := make(chan error, 1)
 
 		go func() {
-			time.Sleep(10 * time.Millisecond)
+			<-sleepStarted
 			outputDone <- nil
 		}()
 
