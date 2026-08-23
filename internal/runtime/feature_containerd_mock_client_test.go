@@ -45,12 +45,16 @@ type mockFullTask struct {
 	statusState client.ProcessStatus
 	lastSignal  syscall.Signal
 	resized     bool
+	resizeRows  uint32
+	resizeCols  uint32
+	deleted     bool
 }
 
 func (m *mockFullTask) ID() string        { return m.id }
 func (m *mockFullTask) Pid() uint32       { return m.pid }
 func (m *mockFullTask) Start(ctx context.Context) error { return m.startErr }
 func (m *mockFullTask) Delete(ctx context.Context, opts ...client.ProcessDeleteOpts) (*client.ExitStatus, error) {
+	m.deleted = true
 	if m.deleteErr != nil {
 		return nil, m.deleteErr
 	}
@@ -68,6 +72,8 @@ func (m *mockFullTask) Wait(ctx context.Context) (<-chan client.ExitStatus, erro
 }
 func (m *mockFullTask) Resize(ctx context.Context, w, h uint32) error {
 	m.resized = true
+	m.resizeCols = w
+	m.resizeRows = h
 	return m.resizeErr
 }
 func (m *mockFullTask) Status(ctx context.Context) (client.Status, error) {
@@ -83,10 +89,12 @@ type mockFullContainer struct {
 	taskErr    error
 	newTaskErr error
 	deleteErr  error
+	deleted    bool
 }
 
 func (m *mockFullContainer) ID() string { return m.id }
 func (m *mockFullContainer) Delete(ctx context.Context, opts ...client.DeleteOpts) error {
+	m.deleted = true
 	return m.deleteErr
 }
 func (m *mockFullContainer) NewTask(ctx context.Context, _ cio.Creator, opts ...client.NewTaskOpts) (client.Task, error) {
@@ -243,11 +251,19 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 
 	// 4. Signal & Resize TTY tests
 	t.Run("SignalContainer and ResizeContainerTTY", func(t *testing.T) {
+		mContainer := mc.containers[containerID]
+		require.NotNil(t, mContainer)
+		require.NotNil(t, mContainer.task)
+
 		err := rt.SignalContainer(ctx, containerID, "SIGTERM")
 		require.NoError(t, err)
+		assert.Equal(t, syscall.SIGTERM, mContainer.task.lastSignal)
 
 		err = rt.ResizeContainerTTY(ctx, containerID, 24, 80)
 		require.NoError(t, err)
+		assert.True(t, mContainer.task.resized)
+		assert.Equal(t, uint32(24), mContainer.task.resizeRows)
+		assert.Equal(t, uint32(80), mContainer.task.resizeCols)
 	})
 
 	// 5. WaitContainer tests
@@ -259,8 +275,14 @@ func TestUnit_Containerd_MockClient_Lifecycle(t *testing.T) {
 
 	// 6. RemoveContainer tests
 	t.Run("RemoveContainer Success", func(t *testing.T) {
+		mContainer := mc.containers[containerID]
+		require.NotNil(t, mContainer)
+		require.NotNil(t, mContainer.task)
+
 		err := rt.RemoveContainer(ctx, containerID)
 		require.NoError(t, err)
+		assert.True(t, mContainer.task.deleted)
+		assert.True(t, mContainer.deleted)
 	})
 
 	t.Run("RemoveContainer Nonexistent Is Ignored", func(t *testing.T) {
