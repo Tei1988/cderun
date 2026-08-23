@@ -430,29 +430,7 @@ func (d *DockerRuntime) handleAttachStreamSync(
 		return err
 	case <-stdinDone:
 		if sErr := errState.Get(); sErr != nil {
-			d.logger.Trace("AttachContainer: stdin goroutine finished with error, draining output with grace period")
-			drainCtx, drainCancel := context.WithCancel(ctx)
-			defer drainCancel()
-			sleepErrChan := make(chan error, 1)
-			go func() {
-				sleepErrChan <- d.sleepFunc(drainCtx, d.attachCloseWriteGrace)
-			}()
-			select {
-			case <-outputDone:
-				d.logger.Trace("AttachContainer: output finished during stdin error drain grace period")
-			case sErrSleep := <-sleepErrChan:
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				if sErrSleep != nil && !errors.Is(sErrSleep, context.Canceled) {
-					d.logger.Warn("AttachContainer: drain sleep failed: %v", sErrSleep)
-				} else {
-					d.logger.Trace("AttachContainer: drain grace period expired")
-				}
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			return sErr
+			return d.drainOutputOnStdinError(ctx, sErr, outputDone)
 		}
 		select {
 		case err := <-outputDone:
@@ -465,6 +443,36 @@ func (d *DockerRuntime) handleAttachStreamSync(
 		resp.Close()
 		return ctx.Err()
 	}
+}
+
+func (d *DockerRuntime) drainOutputOnStdinError(
+	ctx context.Context,
+	sErr error,
+	outputDone <-chan error,
+) error {
+	d.logger.Trace("AttachContainer: stdin goroutine finished with error, draining output with grace period")
+	drainCtx, drainCancel := context.WithCancel(ctx)
+	defer drainCancel()
+	sleepErrChan := make(chan error, 1)
+	go func() {
+		sleepErrChan <- d.sleepFunc(drainCtx, d.attachCloseWriteGrace)
+	}()
+	select {
+	case <-outputDone:
+		d.logger.Trace("AttachContainer: output finished during stdin error drain grace period")
+	case sErrSleep := <-sleepErrChan:
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if sErrSleep != nil && !errors.Is(sErrSleep, context.Canceled) {
+			d.logger.Warn("AttachContainer: drain sleep failed: %v", sErrSleep)
+		} else {
+			d.logger.Trace("AttachContainer: drain grace period expired")
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return sErr
 }
 
 // InspectContainer inspects the container to get its status and exit code.
