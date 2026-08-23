@@ -49,6 +49,70 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 	}
 }
 
+func BenchmarkResolveWithFS_ComplexConfig(b *testing.B) {
+	cli := CLIOptions{
+		Image: ptr("node:20"),
+		TTY:   ptr(true),
+		Env:   []string{"VAR1=VAL1", "VAR2=VAL2", "VAR3=VAL3"},
+		Mounts: []string{
+			"type=bind,source=/host/path,target=/app",
+			"type=tmpfs,target=/tmp",
+		},
+		Ulimits: []string{"nofile=1024:2048", "nproc=500:1000"},
+		Sysctls: []string{"net.ipv4.ip_forward=1", "net.core.somaxconn=1024"},
+	}
+	tools := ToolsConfig{
+		"node": ToolConfig{
+			Image: "node:20",
+			Env:   []string{"TOOL_VAR=TOOL_VAL"},
+		},
+	}
+	global := &CDERunConfig{
+		Defaults: ConfigDefaults{
+			Network: "bridge",
+		},
+	}
+	mfs := &MockFileSystem{
+		HomeDir: "/home/user",
+		WD:      "/app",
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ResolveWithFS("node", &cli, tools, global, mfs)
+		if err != nil {
+			b.Fatalf("ResolveWithFS failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkDeduplicateEnv(b *testing.B) {
+	b.Run("SmallSlice", func(b *testing.B) {
+		env := []string{
+			"FOO=1", "BAR=2", "BAZ=3", "FOO=4", "QUX=5", "BAR=6", "ENV=7", "APP=8",
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = deduplicateEnv(env)
+		}
+	})
+
+	b.Run("LargeSlice", func(b *testing.B) {
+		env := []string{
+			"VAR1=1", "VAR2=2", "VAR3=3", "VAR4=4", "VAR5=5",
+			"VAR6=6", "VAR7=7", "VAR8=8", "VAR9=9", "VAR10=10",
+			"VAR1=100", "VAR5=500", "VAR10=1000",
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = deduplicateEnv(env)
+		}
+	})
+}
+
 func BenchmarkExpressionResolver_ResolveString_MultipleExpressions(b *testing.B) {
 	mfs := &MockFileSystem{
 		HomeDir: "/home/user/very/long/path/for/benchmark/testing/directory/structure",
