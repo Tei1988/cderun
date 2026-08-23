@@ -11,7 +11,7 @@ The table below summarizes support for key `cderun` configuration features acros
 | Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | Notes / Adapter Behavior |
 | :--- | :---: | :---: | :---: | :--- |
 | **TTY Allocation** (`--tty`, `-t`) | ✅ | ✅ | ✅ | Allocates a pseudo-TTY (PTY). Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
-| **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached, enabling stream input forwarding. |
+| **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached. In containerd, callers must register I/O via `AttachContainer` before `StartContainer` to forward stream input (otherwise containerd defaults to `NullIO`). |
 | **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
 | **Expose Ports** (`--expose`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |
 | **DNS Servers** (`--dns`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |
