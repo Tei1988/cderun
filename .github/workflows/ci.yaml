@@ -45,9 +45,22 @@ jobs:
         curl -fsSL "${URL}.sha256sum" -o "${TARBALL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
-        sudo cp testdata/containerd.service /etc/systemd/system/containerd.service
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now containerd
+        sudo mkdir -p /etc/containerd
+        sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+        sudo containerd > /tmp/containerd.log 2>&1 &
+        for i in {1..30}; do
+          if [ -S /run/containerd/containerd.sock ]; then
+            echo "containerd socket ready"
+            break
+          fi
+          echo "Waiting for containerd socket..."
+          sleep 1
+        done
+        if [ ! -S /run/containerd/containerd.sock ]; then
+          echo "containerd failed to start. Logs:"
+          cat /tmp/containerd.log
+          exit 1
+        fi
     - name: Install CNI plugins
       run: |
         VERSION=1.6.2
@@ -60,6 +73,7 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs
       run: |
+        sudo apt-get update
         sudo apt-get install -y acl
         sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
     - name: Run containerd integration tests
