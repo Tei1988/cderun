@@ -41,8 +41,8 @@ jobs:
         VERSION=2.2.3
         TARBALL="containerd-${VERSION}-linux-amd64.tar.gz"
         URL="https://github.com/containerd/containerd/releases/download/v${VERSION}/${TARBALL}"
-        wget -q "$URL"
-        wget -q "${URL}.sha256sum"
+        curl -fsSL "$URL" -o "$TARBALL"
+        curl -fsSL "${URL}.sha256sum" -o "${TARBALL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
         sudo cp testdata/containerd.service /etc/systemd/system/containerd.service
@@ -53,8 +53,8 @@ jobs:
         VERSION=1.6.2
         TARBALL="cni-plugins-linux-amd64-v${VERSION}.tgz"
         URL="https://github.com/containernetworking/plugins/releases/download/v${VERSION}/${TARBALL}"
-        wget -q "$URL"
-        wget -q "${URL}.sha256"
+        curl -fsSL "$URL" -o "$TARBALL"
+        curl -fsSL "${URL}.sha256" -o "${TARBALL}.sha256"
         echo "$(awk '{print $1}' ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
         sudo mkdir -p /opt/cni/bin
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
