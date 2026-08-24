@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   tag-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ouchi-kubernetes
     env:
       RELEASE_VERSION: ${{ inputs.version }}
     steps:
