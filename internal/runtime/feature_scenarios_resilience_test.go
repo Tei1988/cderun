@@ -100,13 +100,13 @@ func TestUnit_Runtime_ScenariosResilience_MockAndDockerMapping(t *testing.T) {
 		assert.Equal(t, []string{"CHOWN"}, []string(hostConfig.CapDrop))
 
 		// Security Options
-		assert.Equal(t, []string{"no-new-privileges:true", "seccomp=unconfined"}, []string(hostConfig.SecurityOpt))
+		assert.Equal(t, []string{"no-new-privileges:true", "seccomp=unconfined"}, hostConfig.SecurityOpt)
 
 		// Devices
-		require.Len(t, hostConfig.Resources.Devices, 1)
-		assert.Equal(t, "/dev/fuse", hostConfig.Resources.Devices[0].PathOnHost)
-		assert.Equal(t, "/dev/fuse", hostConfig.Resources.Devices[0].PathInContainer)
-		assert.Equal(t, "rwm", hostConfig.Resources.Devices[0].CgroupPermissions)
+		require.Len(t, hostConfig.Devices, 1)
+		assert.Equal(t, "/dev/fuse", hostConfig.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/fuse", hostConfig.Devices[0].PathInContainer)
+		assert.Equal(t, "rwm", hostConfig.Devices[0].CgroupPermissions)
 	})
 
 	t.Run("containerd_adapter_validation_rules", func(t *testing.T) {
