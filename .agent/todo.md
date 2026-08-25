@@ -703,9 +703,6 @@ fork bomb 対策。CI 環境やマルチテナント環境でプロセス数を�
 - [x] 全経路チェックリスト満たす
 - [x] `docs/features/command-line-options.md` に記載
 - [x] Docker / containerd 両方のユニットテスト
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
 
 ---
 
