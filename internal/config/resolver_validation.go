@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -167,7 +168,7 @@ func (rv *resolver) validateSecurity() error {
 		}
 		for _, m := range rv.res.Mounts {
 			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
-				cleanSource := path.Clean(m.Source)
+				cleanSource := filepath.ToSlash(filepath.Clean(m.Source))
 				isSensitive := cleanSource == "/"
 				for _, p := range sensitiveMountPaths {
 					if cleanSource == p || strings.HasPrefix(cleanSource, p+"/") {
@@ -180,7 +181,7 @@ func (rv *resolver) validateSecurity() error {
 				}
 
 				// Hardening: Warn if a mount source matches a container runtime socket, or common container socket paths.
-				isSocket := cleanSource == path.Clean(rv.res.SocketPath) ||
+				isSocket := cleanSource == filepath.ToSlash(filepath.Clean(rv.res.SocketPath)) ||
 					strings.HasSuffix(cleanSource, "/docker.sock") ||
 					strings.HasSuffix(cleanSource, "/containerd.sock") ||
 					strings.HasSuffix(cleanSource, "/podman.sock")
