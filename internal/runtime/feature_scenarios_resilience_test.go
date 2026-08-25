@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"cderun/internal/container"
 
@@ -29,7 +30,7 @@ func TestUnit_Runtime_ScenariosResilience_MockAndDockerMapping(t *testing.T) {
 		id, err := mock.CreateContainer(ctx, cc)
 		require.NoError(t, err)
 
-		// Test AttachContainer
+		// Test AttachContainer and consume ready with a bounded timeout
 		stdin := bytes.NewBufferString("echo hello\n")
 		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
@@ -38,9 +39,24 @@ func TestUnit_Runtime_ScenariosResilience_MockAndDockerMapping(t *testing.T) {
 		attachErr := mock.AttachContainer(ctx, id, true, stdin, stdout, stderr, ready)
 		require.NoError(t, attachErr)
 
+		select {
+		case <-ready:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timed out waiting for ready channel")
+		}
+		assert.Equal(t, id, mock.GetAttachedContainerID())
+
+		// Test StartContainer after attach
+		startErr := mock.StartContainer(ctx, id)
+		require.NoError(t, startErr)
+		assert.Equal(t, id, mock.GetStartedContainerID())
+
 		// Test ResizeContainerTTY
 		resizeErr := mock.ResizeContainerTTY(ctx, id, 80, 24)
 		require.NoError(t, resizeErr)
+		rows, cols := mock.GetTTYSize()
+		assert.Equal(t, uint(80), rows)
+		assert.Equal(t, uint(24), cols)
 
 		// Test InspectContainer
 		running, exitCodeInspect, inspectErr := mock.InspectContainer(ctx, id)
