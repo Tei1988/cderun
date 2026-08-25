@@ -11,12 +11,12 @@ func TestUnit_Config_SecurityEnhancements_ValidationHardening(t *testing.T) {
 	t.Run("ValidateMountType control character hardening", func(t *testing.T) {
 		validTypes := []string{"", "bind", "volume", "tmpfs"}
 		for _, vt := range validTypes {
-			assert.NoError(t, ValidateMountType(vt), "valid mount type should pass: %q", vt)
+			require.NoError(t, ValidateMountType(vt), "valid mount type should pass: %q", vt)
 		}
 
 		invalidTypes := []string{"overlay", "sshfs", "nfs"}
 		for _, it := range invalidTypes {
-			assert.Error(t, ValidateMountType(it), "unsupported mount type should fail: %q", it)
+			require.Error(t, ValidateMountType(it), "unsupported mount type should fail: %q", it)
 		}
 
 		controlCharTypes := []string{"bind\x00", "bind\x01", "volume\x07", "tmpfs\r\n"}
@@ -80,19 +80,21 @@ func TestUnit_Config_SecurityEnhancements_ValidationHardening(t *testing.T) {
 	})
 
 	t.Run("validateSecurity cross-platform sensitive mount path checking", func(t *testing.T) {
+		buf := setupTestLogger(t, "warn")
+
 		mfs := &MockFileSystem{WD: "/work"}
 		opts := &CLIOptions{
 			Image: strPtrVal("ubuntu:latest"),
 			Mounts: []string{
-				"type=bind,source=/etc,target=/container/etc",
+				"type=bind,source=/usr/../etc/ssl,target=/container/etc",
 			},
 		}
 
-		// Validation should pass (warnings are logged internally)
 		res, err := ResolveWithFS("sh", opts, nil, nil, mfs)
 		require.NoError(t, err)
 		require.Len(t, res.Mounts, 1)
-		assert.Equal(t, "/etc", res.Mounts[0].Source)
+		assert.Equal(t, "/etc/ssl", res.Mounts[0].Source)
+		assert.Contains(t, buf.String(), "Mounting highly sensitive host path")
 	})
 }
 
