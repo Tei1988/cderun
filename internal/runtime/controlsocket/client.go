@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"cderun/internal/container"
@@ -18,6 +19,7 @@ type Client struct {
 	socketPath    string
 	conn          net.Conn
 	serverVersion string
+	mu            sync.Mutex
 }
 
 // Connect establishes a connection to the Control Socket at socketPath and performs the handshake.
@@ -86,6 +88,9 @@ func (c *Client) handshake(ctx context.Context) error {
 
 // Ping sends a ping frame and waits for a pong response to verify connection responsiveness.
 func (c *Client) Ping(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := c.conn.SetDeadline(deadline); err != nil {
 			return fmt.Errorf("failed to set deadline for ping: %w", err)
@@ -139,6 +144,9 @@ func (c *Client) Close() error {
 
 // sendRPC sends a RequestFrame to the server and returns the ResponseFrame payload or error.
 func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []byte) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	var deadlinePtr *time.Time
 	if deadline, ok := ctx.Deadline(); ok {
 		deadlinePtr = &deadline

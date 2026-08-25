@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -152,11 +153,14 @@ func TestUnit_ControlSocket_RPC_ContextDeadlinePropagation(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "deadline.sock")
 
+	var mu sync.Mutex
 	var receivedDeadline time.Time
 	disp := &mockDispatcher{
 		createFunc: func(ctx context.Context, config *container.ContainerConfig) (string, error) {
 			if dl, ok := ctx.Deadline(); ok {
+				mu.Lock()
 				receivedDeadline = dl
+				mu.Unlock()
 			}
 			return "container-dl-123", nil
 		},
@@ -179,6 +183,76 @@ func TestUnit_ControlSocket_RPC_ContextDeadlinePropagation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "container-dl-123", cID)
 
-	assert.False(t, receivedDeadline.IsZero())
-	assert.WithinDuration(t, expectedDeadline, receivedDeadline, 50*time.Millisecond)
+	mu.Lock()
+	dl := receivedDeadline
+	mu.Unlock()
+
+	assert.False(t, dl.IsZero())
+	assert.WithinDuration(t, expectedDeadline, dl, 50*time.Millisecond)
+}
+
+
+func TestUnit_ControlSocket_RPC_ConcurrentRPCs(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "concurrent.sock")
+
+	disp := &mockDispatcher{
+		waitFunc: func(ctx context.Context, containerID string) (int, error) {
+			if containerID == "c-1" {
+				return 10, nil
+			}
+			if containerID == "c-2" {
+				return 20, nil
+			}
+			return 0, nil
+		},
+	}
+
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client, err := Connect(ctx, socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 10)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			cID := fmt.Sprintf("c-%d", (idx%2)+1)
+			expectedCode := 10
+			if cID == "c-2" {
+				expectedCode = 20
+			}
+
+			code, err := client.WaitContainer(ctx, cID)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if code != expectedCode {
+				errs <- fmt.Errorf("expected exit code %d for %s, got %d", expectedCode, cID, code)
+				return
+			}
+
+			if err := client.Ping(ctx); err != nil {
+				errs <- fmt.Errorf("ping failed: %w", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		assert.NoError(t, err)
+	}
 }
