@@ -35,8 +35,8 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		return nil
 	}
 
-	var stackBuf [16]int
-	var allPairsBuf [16]anchorRange
+	var stackBuf [32]int
+	var allPairsBuf [32]anchorRange
 	stack := stackBuf[:0]
 	allPairs := allPairsBuf[:0]
 
@@ -257,7 +257,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		}
 
 		if hasExpr {
-			var anchorBuf [16]anchorRange
+			var anchorBuf [32]anchorRange
 			ranges := scanAnchors(s, anchorBuf[:0])
 			if len(ranges) > 0 {
 				var arr [2048]byte

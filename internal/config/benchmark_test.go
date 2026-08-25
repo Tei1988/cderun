@@ -49,6 +49,48 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 	}
 }
 
+func BenchmarkScanAnchors(b *testing.B) {
+	b.Run("NoExpression", func(b *testing.B) {
+		b.ReportAllocs()
+		input := "plain text without any expressions"
+		var buf [32]anchorRange
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = scanAnchors(input, buf[:0])
+		}
+	})
+
+	b.Run("SingleExpression", func(b *testing.B) {
+		b.ReportAllocs()
+		input := "prefix-{{HOME}}-suffix"
+		var buf [32]anchorRange
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = scanAnchors(input, buf[:0])
+		}
+	})
+
+	b.Run("MultipleExpressions", func(b *testing.B) {
+		b.ReportAllocs()
+		input := "p1-{{HOME}}-p2-{{PWD}}-p3-{{env:VAR1}}-p4-{{env:VAR2}}-p5-{{env:VAR3}}-suffix"
+		var buf [32]anchorRange
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = scanAnchors(input, buf[:0])
+		}
+	})
+
+	b.Run("NestedExpressions", func(b *testing.B) {
+		b.ReportAllocs()
+		input := "nested-{{env:{{VAR:-{{HOME}}}}}}-expression"
+		var buf [32]anchorRange
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = scanAnchors(input, buf[:0])
+		}
+	})
+}
+
 func BenchmarkExpressionResolver_ResolveString_MultipleExpressions(b *testing.B) {
 	mfs := &MockFileSystem{
 		HomeDir: "/home/user/very/long/path/for/benchmark/testing/directory/structure",
