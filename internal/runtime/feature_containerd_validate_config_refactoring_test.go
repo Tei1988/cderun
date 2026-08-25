@@ -71,9 +71,9 @@ func TestUnit_Containerd_ValidateConfig_RefactoredHelpers(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid shm-size")
 
-		err = rt.ValidateConfig(&container.ContainerConfig{ShmSize: "invalid"})
+		err = rt.ValidateConfig(&container.ContainerConfig{ShmSize: "9223372036854775807k"})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid shm-size")
+		require.Contains(t, err.Error(), "shm-size cannot be negative")
 
 		err = rt.ValidateConfig(&container.ContainerConfig{CPUs: math.NaN()})
 		require.Error(t, err)
