@@ -589,28 +589,46 @@ func (rv *resolver) resolveAndValidateImage() error {
 }
 
 func (rv *resolver) resolveComplexOptions() error {
-	var err error
-	var rForMounts *ExpressionResolver
-	hasMounts := len(rv.cli.CderunMounts) > 0 || len(rv.cli.Mounts) > 0 || rv.fs.Getenv("CDERUN_MOUNT") != ""
-	if !hasMounts && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Mounts) > 0 {
-			hasMounts = true
-		}
-	}
-	if !hasMounts && rv.global != nil && len(rv.global.Defaults.Mounts) > 0 {
-		hasMounts = true
+	wd, err := rv.fs.Getwd()
+	if err != nil {
+		return err
 	}
 
-	if hasMounts {
-		var err error
+	// Complex types (Mounts, Env)
+	mcs, err := pickConfigs(
+		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
+		func(t ToolConfig) []MountConfig { return t.Mounts },
+		rv.global, func(g CDERunConfig) []MountConfig { return g.Defaults.Mounts },
+		func(s, src string) (MountConfig, error) {
+			parsed, err := ParseMountFlag(s)
+			if err != nil {
+				switch src {
+				case "override":
+					return MountConfig{}, fmt.Errorf("invalid mount config (override): %w", err)
+				case "env":
+					return MountConfig{}, fmt.Errorf("invalid mount config in CDERUN_MOUNT: %w", err)
+				default:
+					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
+				}
+			}
+			parsed.SetBaseDir(wd)
+			return parsed, nil
+		},
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	var rForMounts *ExpressionResolver
+	if needsResolverForMounts(mcs, rv.global) {
 		rForMounts, err = rv.getR()
 		if err != nil {
 			return err
 		}
 	}
 
-	// Complex types (Mounts, Env)
-	rv.res.Mounts, err = resolveMounts(rv.cli.CderunMounts, rv.cli.Mounts, rv.subcommand, rv.tools, rv.global, rForMounts, rv.fs)
+	rv.res.Mounts, err = resolveMountsFromConfigs(mcs, rForMounts)
 	if err != nil {
 		return err
 	}
@@ -672,7 +690,7 @@ func (rv *resolver) resolveComplexOptions() error {
 		return err
 	}
 
-	rv.res.Ulimits, err = resolveUlimits(rv.cli.CderunUlimits, rv.cli.Ulimits, rv.subcommand, rv.tools, rv.global, rForUlimits, rv.fs)
+	rv.res.Ulimits, err = resolveUlimitsFromRaws(rawUlimits, rForUlimits)
 	if err != nil {
 		return err
 	}
@@ -694,7 +712,7 @@ func (rv *resolver) resolveComplexOptions() error {
 		return err
 	}
 
-	rv.res.Sysctls, err = resolveSysctls(rv.cli.CderunSysctls, rv.cli.Sysctls, rv.subcommand, rv.tools, rv.global, rForSysctls, rv.fs)
+	rv.res.Sysctls, err = resolveSysctlsFromRaws(rawSysctls, rForSysctls)
 	if err != nil {
 		return err
 	}
@@ -921,20 +939,38 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
-	var rForDevices *ExpressionResolver
-	// Check if there are any devices to resolve
-	hasDevices := len(rv.cli.CderunDevices) > 0 || len(rv.cli.Devices) > 0 || rv.fs.Getenv("CDERUN_DEVICE") != ""
-	if !hasDevices && rv.tools != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.Devices) > 0 {
-			hasDevices = true
-		}
-	}
-	if !hasDevices && rv.global != nil && len(rv.global.Defaults.Devices) > 0 {
-		hasDevices = true
+	wd, err := rv.fs.Getwd()
+	if err != nil {
+		return err
 	}
 
-	if hasDevices {
-		var err error
+	dcs, err := pickConfigs(
+		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
+		func(t ToolConfig) []DeviceConfig { return t.Devices },
+		rv.global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		func(s, src string) (DeviceConfig, error) {
+			parsed, ok := ParseDeviceConfig(s)
+			if !ok {
+				switch src {
+				case "override":
+					return DeviceConfig{}, fmt.Errorf("invalid device config (override): %q", s)
+				case "env":
+					return DeviceConfig{}, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", s)
+				default:
+					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
+				}
+			}
+			parsed.SetBaseDir(wd)
+			return parsed, nil
+		},
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	var rForDevices *ExpressionResolver
+	if needsResolverForDevices(dcs, rv.global) {
 		rForDevices, err = rv.getR()
 		if err != nil {
 			return err
@@ -942,7 +978,7 @@ func (rv *resolver) resolveCustomParsing() error {
 	}
 
 	var errDevices error
-	rv.res.Devices, errDevices = resolveDevices(rv.cli.CderunDevices, rv.cli.Devices, rv.subcommand, rv.tools, rv.global, rForDevices, rv.fs)
+	rv.res.Devices, errDevices = resolveDevicesFromConfigs(dcs, rForDevices)
 	if errDevices != nil {
 		return errDevices
 	}

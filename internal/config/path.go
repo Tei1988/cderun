@@ -304,14 +304,13 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 }
 
 func ParseMountFlag(s string) (MountConfig, error) {
-	parts := strings.Split(s, ",")
 	res := MountConfig{
 		Type: "bind", // Default type
 	}
 
-	for _, part := range parts {
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
+	for part := range strings.SplitSeq(s, ",") {
+		key, val, found := strings.Cut(part, "=")
+		if !found {
 			if part == "readonly" {
 				res.ReadOnly = true
 				continue
@@ -322,9 +321,6 @@ func ParseMountFlag(s string) (MountConfig, error) {
 			}
 			return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
 		}
-
-		key := kv[0]
-		val := kv[1]
 
 		switch key {
 		case "type":
