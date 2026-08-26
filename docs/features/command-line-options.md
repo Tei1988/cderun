@@ -34,7 +34,7 @@ The table below summarizes support for key `cderun` configuration features acros
 | **GPU Devices** (`--gpus`) | ✅ | ✅ | ❌ | Unsupported on containerd API (`ValidateConfig` returns error) |
 | **Sysctl Kernel Params** (`--sysctl`) | ✅ | ✅ | ✅ | Mapped directly to OCI `Linux.Sysctl` map |
 | **Read-Only Rootfs** (`--read-only`) | ✅ | ✅ | ✅ | Mapped to `ReadonlyRootfs` (Docker) and `Root.Readonly` (containerd) |
-| **Control Socket Mounting** (`--mount-cderun-socket`)| ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
+| **Control Socket Mounting** (`--mount-cderun-socket`) | ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
 
 ### List-Type (Array-Type) Options and Environment Variable Separator Rules
 
@@ -651,6 +651,7 @@ cderun --cgroupns private alpine ls -la
   - **Default (Unset)**: All environment variables are treated as sensitive, masking values of non-empty keys as `[REDACTED]` in dry-runs and debug logs.
   - **Explicit Disable**: Pass `--sensitive-env=""` (or YAML empty list `sensitiveEnv: []`) to completely disable masking.
   - **Fail-Closed Fallback**: If any glob pattern syntax is malformed (e.g., `[` with no closing bracket), `cderun` safely falls back to masking all non-empty environment values to prevent accidental credential leakage.
+  - **High-Performance Matching**: Pattern matching is optimized via allocation-free fast-path matching (`fastMatchFold`) for standard glob patterns (`*suffix`, `prefix*`, `*substr*`, and exact matches), bypassing heavy glob evaluations on key execution paths.
 
 ```bash
 # Secure-by-default behavior masking all environment variables
