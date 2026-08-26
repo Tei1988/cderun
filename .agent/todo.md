@@ -97,6 +97,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | - |
 
 依存関係・統合の注意:
 
@@ -1104,3 +1105,53 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 - ネスト先からの要求が親の `ContainerConfig` を超える権限（イメージ・マウント・capability 等）を要求した場合に拒否されることを確認するテストがある。
 - macOS 環境での検証結果が `docs/features/nested-execution-control-socket.md` に記録されている。
 - 本フェーズの完了をもって `--mount-cderun-socket` の experimental 表記を外すかどうかを判断する（`docs/features/nested-execution-control-socket.md` の Compatibility and Migration 節の手順に従う）。
+
+---
+
+## T92: `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加
+
+- 種別: 機能
+- 優先度: 中
+- 仕様変更: あり
+
+### 目的
+
+`env` ディレクティブにのみ存在するフォールバック構文 `:-default` を `file` / `find_dir` にも横展開し、参照先が存在しない環境でも設定を壊さずに済むようにする。
+
+動機となったユースケース: git worktree 運用では、本体側のチェックアウトを含む親ディレクトリをマウントする必要がある。現在は `{{find_dir:master}}`（`master` を上方探索し、それを含む親ディレクトリを返す）でこれを実現しているが、`master` が存在しない環境では解決に失敗して実行全体が中断してしまう。フォールバックがあれば `{{find_dir:master:-{{PWD}}}}` と書け、「worktree 運用ならその親、そうでなければカレントディレクトリ」を1つの式で表現できる。
+
+### 仕様
+
+1. 構文: `{{file:NAME:-DEFAULT}}` / `{{find_dir:NAME:-DEFAULT}}`。`resolveEnv`（`internal/config/expression.go`）と同じく最初の `:-` で `strings.Cut` する。
+2. フォールバックの発火条件は**使用箇所に依存しない一律のルール**とする（マウント時のみ等の文脈依存ルールにはしない）。
+    - フォールバックする: 対象が見つからない（`file not found` / `item not found for find_dir`）、Stat / ReadFile の失敗（`file:` にディレクトリを渡した場合を含む）。
+    - フォールバックしない（従来どおり即エラー）: 引数自体の検証失敗（制御文字・不正 UTF-8・`..` traversal・絶対パス・パス区切りを含む名前）、`MaxDirectiveFileSize` 超過。
+    - 理由: 引数不正は設定ミスであり、黙って隠すと発見が遅れる。サイズ上限はガードなのでフォールバックさせない。
+3. `file:` で内容が空（`TrimSpace` 後に空文字）の場合は `env` の挙動（`hasDefault && val == ""`）に揃えて DEFAULT を返す。
+4. DEFAULT 側もネストした式を解決できること。`resolveString` は `resolveDirective` を呼ぶ前に content を再帰解決するため（`{{env:DIR:-{{HOME}}}}` を支える既存の仕組み）、追加実装なしで動くはずだが、テストで担保する。
+5. DEFAULT 値は `resolveEnv` と同様に `validatePathChars` で検証する。
+6. フォールバックが成立した場合は Sticky Error を汚さない（`setError` を呼ばない）こと。
+7. `resolveFile` の fileCache は失敗もキャッシュしている。同一 NAME を DEFAULT 付き / なしの両方で評価してもキャッシュが誤用されないこと（キャッシュは NAME 単位で err を保持したまま、呼び出し側で err を見て DEFAULT に落とす形にすれば要件を満たす）。
+8. `resolveFindDir` は結果に `applyReverseResolution` を適用しているが、DEFAULT は「式として解決済みの文字列」なのでそのまま返す（ネスト実行時は `{{BASE_PWD}}` 等を明示的に書く）。
+9. 互換性: 現在は `{{file:a:-b}}` がファイル名 `a:-b` の探索として扱われる。本変更でこれは分割されるようになる。`env` が既に同じ構文を持つこと、`:-` を含むファイル名が現実的でないことから許容する。
+
+### 完了条件
+
+- `{{file:NAME:-DEFAULT}}` / `{{find_dir:NAME:-DEFAULT}}` が動作する。
+- 仕様 2 の発火条件どおりに分岐する（フォールバックするケース / せずにエラーになるケースの双方にテストがある）。
+- ネストした DEFAULT（`{{find_dir:master:-{{PWD}}}}`）のテストがある。
+- フォールバック成立時に Sticky Error が汚れないことのテストがある。
+- `docs/features/value-resolution.md` および `README.md` の Value Resolution & Expression Engine セクションが更新されている。
+- `make build` / `make test` / `make lint-go` / `make lint-md` がパスする。
+
+### 対象ファイル
+
+- `internal/config/expression.go`（`resolveFile` / `resolveFindDir` を修正。`resolveEnv` が参考実装）
+- `docs/features/value-resolution.md`
+- `README.md`
+
+### スコープ外（検討のうえ不採用とした案）
+
+- git worktree 専用ディレクティブ（`{{git_common_dir}}` 等）の追加: Expression は汎用機能であり、特定ツール・特定ワークフロー専用の構文は持たせない。
+- 汎用の文字列変換パイプ（`{{file:.git|trim_prefix:gitdir: }}` 等）の導入: Expression がミニ言語化し、アンカー境界検証・エスケープとの組み合わせが爆発する。加えて worktree のケースでは `.git` ファイルの `gitdir:` を剥がしても指すのは `<common>/.git/worktrees/<name>` であり、git が `commondir` 経由で必要とする共通 `.git` には 2 階層足りないため、文字列変換だけでは目的を達成できない。
+- マウントの `optional` の意味拡張（式の解決エラーもスキップ扱いにする）: 「マウントの解決時に限り」という文脈依存ルールになるため。
