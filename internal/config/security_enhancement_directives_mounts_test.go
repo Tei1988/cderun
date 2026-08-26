@@ -172,5 +172,5 @@ func TestUnit_Config_SecurityEnhancements_AnchorBoundaryControlCharacterValidati
 
 	_, err = ResolvePath("{{env:HOME_WITH_CTRL}}/sub", "/workspace", r)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid character in resolved anchor path")
+	assert.Contains(t, err.Error(), "invalid character")
 }

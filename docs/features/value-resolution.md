@@ -177,9 +177,9 @@ Path strings starting with `~` or `~/` are expanded to the current user's home d
 
 ## Relative Path Resolution
 
-Relative paths (starting with `./` or `../`) are automatically converted to absolute paths using the following criteria:
+Non-absolute paths (including bare values such as `config.yaml` as well as relative paths starting with `./` or `../`) are automatically converted to absolute paths using the following criteria:
 
-1. **Within Configuration Files**: Resolved relative to the directory containing the configuration file.
+1. **Within Configuration Files**: Resolved relative to the directory containing the configuration file (`BaseDir`).
 2. **Within CLI Flags**: Resolved relative to the host's current working directory (`{{PWD}}`).
 
 **Example**: Inside `/home/user/project/.tools.yaml`:
@@ -199,10 +199,49 @@ The `source` path is resolved to `/home/user/project/src`.
 
 Values are evaluated according to the following strict sequence:
 
-1. **cderun Expressions**: Evaluate double-brace `{{...}}` expressions.
-2. **Tilde Expansion**: Resolve leading tildes to home directories.
-3. **Relative Path Resolution**: Convert remaining relative paths (`./` or `../`) to absolute paths based on configuration or CLI contexts.
-4. **Path Cleaning**: Normalize paths by removing redundant separators and parent traversals (e.g., `/home/user/project/../src` -> `/home/user/src`).
+```text
+  Raw Input String (CLI / Env / YAML)
+                 │
+                 ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 1: Null-Byte & UTF-8 / Control-Char Check   │ ── Invalid ──> Immediate Security Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 2: Evaluate {{...}} Dynamic Expressions     │ ── Error ────> Store Sticky Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 3: Expand Leading Tilde (~ / ~/)            │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 4: Convert Relative Paths (non-absolute)    │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 5: Path Cleaning & Normalization (Clean)    │
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+ ┌──────────────────────────────────────────────────┐
+ │ Step 6: Anchor Boundary Safety Verification      │ ── Escapes ──> Store Sticky Error
+ └────────────────────────┬─────────────────────────┘
+                          │
+                          ▼
+            Final Resolved Value / Target
+```
+
+1. **Null-Byte, UTF-8 & Control-Character Validation**: Scan input strings for null bytes (`\x00`), unescaped C0/C1 control characters, and invalid UTF-8 byte sequences.
+2. **cderun Expressions**: Evaluate double-brace `{{...}}` expressions.
+3. **Tilde Expansion**: Resolve leading tildes to home directories.
+4. **Relative Path Resolution**: Convert non-absolute paths (including bare values like `config.yaml` and relative paths starting with `./` or `../`) to absolute paths relative to configuration or CLI base contexts (`BaseDir` or `{{PWD}}`).
+5. **Path Cleaning**: Normalize paths by removing redundant separators and parent traversals (e.g., `/home/user/project/../src` -> `/home/user/src`).
+6. **Anchor Boundary Safety Verification**: Verify cleaned path against anchor boundaries (`validateAnchorBoundaries`), raising a sticky error if escaping anchor root.
 
 ---
 

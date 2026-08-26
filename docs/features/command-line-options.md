@@ -4,6 +4,38 @@
 
 This document provides a comprehensive reference of all command-line options supported by `cderun`.
 
+### Container Runtime Compatibility Matrix
+
+The table below summarizes support for key `cderun` configuration features across container execution engines:
+
+| Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | Notes / Adapter Behavior |
+| :--- | :---: | :---: | :---: | :--- |
+| **TTY Allocation** (`--tty`, `-t`) | ✅ | ✅ | ✅ | Allocates a pseudo-TTY (PTY). Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
+| **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached. In containerd, callers must register I/O via `AttachContainer` before `StartContainer` to forward stream input (otherwise containerd defaults to `NullIO`). |
+| **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
+| **Expose Ports** (`--expose`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |
+| **DNS Servers** (`--dns`) | ✅ | ✅ | ❌ | Unsupported on direct containerd |
+| **DNS Options & Search** (`--dns-option`, `--dns-search`) | ✅ | ✅ | ❌ | Explicitly rejected by containerd `ValidateConfig` |
+| **Add Host Mappings** (`--add-host`) | ✅ | ✅ | ❌ | Host entry injection not supported by containerd API |
+| **Network Modes** (`--network`) | ✅ | ✅ | ⚠️ | containerd supports `host` mode only (`bridge` is rejected) |
+| **Restart Policies** (`--restart`) | ✅ | ✅ | ❌ | containerd has no daemon restart manager (`ValidateConfig` returns error) |
+| **Container Init** (`--init`) | ✅ | ✅ | ❌ | Tini init injection unsupported on containerd (`ValidateConfig` returns error) |
+| **Memory / CPU Limits** (`-m`, `--cpus`) | ✅ | ✅ | ✅ | Mapped to Cgroups/OCI resource specifications |
+| **CPU Shares & Cpuset** (`--cpu-shares`, `--cpuset-*`) | ✅ | ✅ | ✅ | Mapped directly to OCI Linux resource limits |
+| **Process Limits** (`--pids-limit`) | ✅ | ✅ | ✅ | Mapped to OCI process limit `Pids.Limit` |
+| **Process Ulimits** (`--ulimit`) | ✅ | ✅ | ✅ | Converted to OCI POSIX process rlimits (`specs.POSIXRlimit`) |
+| **Shared Memory** (`--shm-size`) | ✅ | ✅ | ✅ | Dynamically manages `/dev/shm` tmpfs mount in containerd spec |
+| **IPC Namespace** (`--ipc`) | ✅ | ✅ | ⚠️ | containerd supports `"host"`, `"private"`, or `""` (container sharing rejected) |
+| **PID Namespace** (`--pid`) | ✅ | ✅ | ⚠️ | containerd supports `"host"` via `WithHostNamespace(specs.PIDNamespace)` |
+| **Cgroup Namespace** (`--cgroupns`) | ✅ | ✅ | ⚠️ | containerd supports `"host"`, `"private"`, or `""` |
+| **Security Options** (`--security-opt`) | ✅ | ✅ | ⚠️ | containerd maps `no-new-privileges`, `seccomp`, `apparmor`, and `label` |
+| **Capabilities** (`--cap-add`, `--cap-drop`) | ✅ | ✅ | ✅ | Normalized to OCI `CAP_` prefixed capability strings |
+| **Supplementary Groups** (`--group-add`) | ✅ | ✅ | ⚠️ | containerd requires numeric GIDs (group names rejected) |
+| **GPU Devices** (`--gpus`) | ✅ | ✅ | ❌ | Unsupported on containerd API (`ValidateConfig` returns error) |
+| **Sysctl Kernel Params** (`--sysctl`) | ✅ | ✅ | ✅ | Mapped directly to OCI `Linux.Sysctl` map |
+| **Read-Only Rootfs** (`--read-only`) | ✅ | ✅ | ✅ | Mapped to `ReadonlyRootfs` (Docker) and `Root.Readonly` (containerd) |
+| **Control Socket Mounting** (`--mount-cderun-socket`)| ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
+
 ### List-Type (Array-Type) Options and Environment Variable Separator Rules
 
 When supplying multiple values for a list-type option (e.g., `stringArray` or `[]string`) using environment variables (P3), `cderun` enforces specific separator rules depending on the variable:

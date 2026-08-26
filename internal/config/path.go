@@ -136,6 +136,9 @@ func (mc *MountConfig) SetBaseDir(baseDir string) {
 	}
 }
 func ValidateMountType(t string) error {
+	if err := validatePathChars(t); err != nil {
+		return err
+	}
 	if t == "" || t == "bind" || t == "volume" || t == "tmpfs" {
 		return nil
 	}
@@ -1281,6 +1284,9 @@ func ValidateExposePort(s string) error {
 // It rejects empty strings, absolute paths, parent directory references, directory separators,
 // control characters, whitespace, and colons.
 func ValidateToolName(name string) error {
+	if err := validatePathChars(name); err != nil {
+		return err
+	}
 	if name == "" {
 		return fmt.Errorf("tool name cannot be empty")
 	}
@@ -1365,6 +1371,9 @@ func ValidateSysctlKey(s string) error {
 
 // ValidateSysctlValue restricts the sysctl value to standard safe characters, spaces, and separators.
 func ValidateSysctlValue(s string) error {
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||

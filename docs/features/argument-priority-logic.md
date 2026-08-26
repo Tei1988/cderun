@@ -25,6 +25,24 @@ Settings are resolved in the following priority order, from highest to lowest:
   - **Validation Check**: Specifying a P1 internal override before the subcommand in Wrapper Mode is strictly prohibited to prevent confusion with standard P2 flags, resulting in a validation error.
   - **Diagnosis Mode**: Since no subcommand is required, these flags can be placed anywhere.
 
+#### Concrete P1 Internal Override Examples
+
+Below are concrete invocation examples demonstrating Phase 1 internal overrides using both equals-sign (`=`) and space-separated formats:
+
+```bash
+# Override container image using equals-sign format
+cderun node app.js --cderun-image=node:20-alpine
+
+# Override container image using space-separated format (hoists both flag and adjacent value)
+cderun node app.js --cderun-image node:20-alpine
+
+# Override environment variables & working directory after subcommand
+cderun python script.py --cderun-env=LOG_LEVEL=debug --cderun-workdir /workspace
+
+# Combine boolean toggles and value-taking overrides in Polyglot Symlink Mode
+node app.js --cderun-tty=false --cderun-shm-size 512m
+```
+
 For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoisting](./argument-parsing.md).
 
 ### P2: CLI Flags (User Intent)
