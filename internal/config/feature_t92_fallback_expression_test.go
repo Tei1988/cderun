@@ -140,13 +140,14 @@ func TestUnit_Expression_T92_FileAndFindDirFallback(t *testing.T) {
 		// Create a fresh resolver to test cache behavior without sticky error
 		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
-		// Share fileCache with r
+		r2.shared.Store(r.getShared())
 		r2.resolveString("{{file:missing_cached.txt}}")
 		require.Error(t, r2.Error())
 
 		// Now evaluate with fallback using a new resolver instance sharing state
 		r3, err := NewExpressionResolverWithFS(hostCtx, fs)
 		require.NoError(t, err)
+		r3.shared.Store(r.getShared())
 		val, err := r3.ResolveString("{{file:missing_cached.txt:-cached_fallback}}")
 		require.NoError(t, err)
 		assert.NoError(t, r3.Error())
