@@ -184,7 +184,8 @@ func (rv *resolver) validateSecurity() error {
 				isSocket := cleanSource == filepath.ToSlash(filepath.Clean(rv.res.SocketPath)) ||
 					strings.HasSuffix(cleanSource, "/docker.sock") ||
 					strings.HasSuffix(cleanSource, "/containerd.sock") ||
-					strings.HasSuffix(cleanSource, "/podman.sock")
+					strings.HasSuffix(cleanSource, "/podman.sock") ||
+					strings.HasSuffix(cleanSource, "/cderun.sock")
 				if isSocket && !socketWarningLogged {
 					logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
 					socketWarningLogged = true
