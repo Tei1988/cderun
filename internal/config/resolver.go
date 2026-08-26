@@ -589,9 +589,9 @@ func (rv *resolver) resolveAndValidateImage() error {
 }
 
 func (rv *resolver) resolveComplexOptions() error {
-	wd, err := rv.fs.Getwd()
-	if err != nil {
-		return err
+	var getWd func() (string, error)
+	getWd = func() (string, error) {
+		return rv.fs.Getwd()
 	}
 
 	// Complex types (Mounts, Env)
@@ -611,7 +611,11 @@ func (rv *resolver) resolveComplexOptions() error {
 					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
 			}
-			parsed.SetBaseDir(wd)
+			baseDir, err := getWd()
+			if err != nil {
+				return MountConfig{}, err
+			}
+			parsed.SetBaseDir(baseDir)
 			return parsed, nil
 		},
 		rv.fs,
@@ -628,7 +632,7 @@ func (rv *resolver) resolveComplexOptions() error {
 		}
 	}
 
-	rv.res.Mounts, err = resolveMountsFromConfigs(mcs, rForMounts)
+	rv.res.Mounts, err = resolveMountsFromConfigs(mcs, rForMounts, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -939,9 +943,9 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
-	wd, err := rv.fs.Getwd()
-	if err != nil {
-		return err
+	var getWd func() (string, error)
+	getWd = func() (string, error) {
+		return rv.fs.Getwd()
 	}
 
 	dcs, err := pickConfigs(
@@ -960,7 +964,11 @@ func (rv *resolver) resolveCustomParsing() error {
 					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
 			}
-			parsed.SetBaseDir(wd)
+			baseDir, err := getWd()
+			if err != nil {
+				return DeviceConfig{}, err
+			}
+			parsed.SetBaseDir(baseDir)
 			return parsed, nil
 		},
 		rv.fs,

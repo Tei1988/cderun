@@ -559,7 +559,7 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 	return res, nil
 }
 
-func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver) ([]container.Mount, error) {
+func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	if len(mcs) == 0 {
 		return []container.Mount{}, nil
 	}
@@ -571,12 +571,20 @@ func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver) ([]conta
 			if err != nil {
 				return nil, err
 			}
-			if _, err := r.Stat(hostPath); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
+			var statErr error
+			if r != nil {
+				_, statErr = r.Stat(hostPath)
+			} else if fs != nil {
+				_, statErr = fs.Stat(hostPath)
+			} else {
+				_, statErr = os.Stat(hostPath)
+			}
+			if statErr != nil {
+				if errors.Is(statErr, os.ErrNotExist) {
 					// Skip if source doesn't exist
 					continue
 				}
-				return nil, err
+				return nil, statErr
 			}
 		}
 
@@ -608,6 +616,10 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 			}
 			if r != nil {
 				parsed.SetBaseDir(r.Pwd)
+			} else if fs != nil {
+				if wd, err := fs.Getwd(); err == nil {
+					parsed.SetBaseDir(wd)
+				}
 			}
 			return parsed, nil
 		},
@@ -616,7 +628,7 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	if err != nil {
 		return nil, err
 	}
-	return resolveMountsFromConfigs(mcs, r)
+	return resolveMountsFromConfigs(mcs, r, fs)
 }
 
 func needsResolverForMounts(mcs []MountConfig, global *CDERunConfig) bool {
