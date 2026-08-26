@@ -391,7 +391,13 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 	return "{{" + content + "}}", nil // Keep as is if it doesn't look like a directive
 }
 
-func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
+func isSizeLimitError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "too large")
+}
+
+func (r *ExpressionResolver) resolveFile(input string) (string, error) {
+	filename, defaultValue, hasDefault := strings.Cut(input, ":-")
+
 	if err := validatePathChars(filename); err != nil {
 		return "", fmt.Errorf("invalid character in file directive parameter: %w", err)
 	}
@@ -404,8 +410,24 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	shared.mu.RLock()
 	cached, ok := shared.fileCache[filename]
 	shared.mu.RUnlock()
+
 	if ok {
-		return cached.content, cached.err
+		if cached.err != nil {
+			if isSizeLimitError(cached.err) || !hasDefault {
+				return "", cached.err
+			}
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
+		if cached.content == "" && hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
+		return cached.content, nil
 	}
 
 	r.ensureLoader()
@@ -416,6 +438,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		shared.mu.Lock()
 		shared.fileCache[filename] = fileCacheEntry{err: err}
 		shared.mu.Unlock()
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", err
 	}
 
@@ -425,6 +453,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		shared.mu.Lock()
 		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		shared.mu.Unlock()
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", wrappedErr
 	}
 
@@ -442,6 +476,12 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 		shared.mu.Lock()
 		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		shared.mu.Unlock()
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", wrappedErr
 	}
 
@@ -457,10 +497,19 @@ func (r *ExpressionResolver) resolveFile(filename string) (string, error) {
 	shared.mu.Lock()
 	shared.fileCache[filename] = fileCacheEntry{content: result}
 	shared.mu.Unlock()
+
+	if result == "" && hasDefault {
+		if err := validatePathChars(defaultValue); err != nil {
+			return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+		}
+		return defaultValue, nil
+	}
+
 	return result, nil
 }
 
-func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
+func (r *ExpressionResolver) resolveFindDir(input string) (string, error) {
+	name, defaultValue, hasDefault := strings.Cut(input, ":-")
 	if err := validatePathChars(name); err != nil {
 		return "", fmt.Errorf("invalid character in find_dir directive parameter: %w", err)
 	}
@@ -472,12 +521,24 @@ func (r *ExpressionResolver) resolveFindDir(name string) (string, error) {
 	shared := r.getShared()
 	paths := shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for find_dir directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", fmt.Errorf("item not found for find_dir: %q", name)
 	}
 
 	dir := filepath.Dir(paths[0])
 	absDir, err := r.fs.Abs(dir)
 	if err != nil {
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for find_dir directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", fmt.Errorf("failed to get absolute path for %q: %w", dir, err)
 	}
 
