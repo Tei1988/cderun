@@ -655,6 +655,9 @@ func ValidateCpuset(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	if strings.HasPrefix(s, ",") || strings.HasPrefix(s, "-") || strings.HasSuffix(s, ",") || strings.HasSuffix(s, "-") {
 		return fmt.Errorf("invalid cpuset syntax: leading or trailing separator in %q", s)
 	}
@@ -684,6 +687,9 @@ func ValidateGPUs(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	if strings.HasPrefix(s, ",") || strings.HasPrefix(s, "=") || strings.HasPrefix(s, "-") ||
 		strings.HasSuffix(s, ",") || strings.HasSuffix(s, "=") || strings.HasSuffix(s, "-") {
 		return fmt.Errorf("invalid gpus option syntax: leading or trailing separator in %q", s)
@@ -707,6 +713,9 @@ func ValidateGPUs(s string) error {
 func ValidateGroupAdd(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if !isValidGroupPart(s) {
 		return fmt.Errorf("invalid supplementary group name or GID: %q", s)
@@ -832,6 +841,9 @@ func ValidateEnvKey(s string) error {
 			}
 		}
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -839,6 +851,9 @@ func ValidateEnvKey(s string) error {
 func ValidateImageName(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid image name: %q (contains parent directory references)", s)
@@ -967,6 +982,9 @@ func ValidateNetworkName(s string) error {
 	if target, ok := strings.CutPrefix(s, "ns:"); ok {
 		if target == "" {
 			return fmt.Errorf("invalid network name: empty namespace path in %q", s)
+		}
+		if HasParentTraversal(target) {
+			return fmt.Errorf("network namespace path cannot contain parent directory references: %q", target)
 		}
 		if !path.IsAbs(target) {
 			return fmt.Errorf("network namespace path must be an absolute path: %q", target)
@@ -1371,6 +1389,9 @@ func ValidateSecurityOpt(s string) error {
 func ValidateSysctlKey(s string) error {
 	if s == "" {
 		return fmt.Errorf("sysctl key cannot be empty")
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if strings.HasPrefix(s, ".") || strings.HasSuffix(s, ".") || strings.Contains(s, "..") {
 		return fmt.Errorf("invalid sysctl key: leading, trailing, or consecutive dots detected in %q", s)
