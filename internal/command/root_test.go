@@ -507,7 +507,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "\"name\": \"docker\"")
 		assert.Contains(t, out.String(), "\"status\": \"accessible\"")
@@ -532,7 +532,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "name: docker")
 		assert.Contains(t, out.String(), "status: accessible")
@@ -557,7 +557,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"})
+		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"}, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime: docker (/var/run/docker.sock)")
 		assert.Contains(t, out.String(), "Runtime Status: accessible")
@@ -581,7 +581,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil)
+		err := opts.handleDiagnosis(cmd, resolved, nil, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "Runtime Status: not found or inaccessible")
 	})
@@ -601,7 +601,7 @@ func TestUnit_Root_Diagnosis_OutputFormats(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetOut(out)
 
-		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"})
+		err := opts.handleDiagnosis(cmd, resolved, config.ToolsConfig{"node": {}}, []string{"/etc/cderun.yaml"}, []string{".tools.yaml"}, nil)
 		require.NoError(t, err)
 		assert.Contains(t, out.String(), "\"name\": \"docker\"")
 		assert.Contains(t, out.String(), "\"available_tools\":")

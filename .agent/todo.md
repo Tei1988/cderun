@@ -93,7 +93,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T84 | containerd アダプタのクライアント抽象化によるユニットテストのモック化とカバレッジ向上 | 改善 | 中 | 大 | - | DONE |
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
 | T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
-| T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | - |
+| T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
@@ -1020,29 +1020,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
-
----
-
-## T88: Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通
-
-- 種別: 機能
-- 優先度: 中
-- 規模: 中
-- 前提: T87 完了
-- 対象: T87 で実装した Control Socket サーバー・クライアントに RPC ディスパッチを追加
-- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
-
-### 方針
-
-- `CreateContainer` / `StartContainer` / `WaitContainer` / `RemoveContainer` を Control Socket 経由で Docker アダプタにディスパッチする。
-- TTY なし・非 interactive な実行のみを対象とする（Attach/Signal/Resize は T89）。
-- ネスト先の `cderun` は、`hostContext.controlSocket` が存在する場合、これらのライフサイクル呼び出しについて生のランタイムソケットではなく Control Socket を使用するようクライアント側を実装する。
-
-### 完了条件
-
-- `--mount-cderun-socket` 指定時、Docker エンジンにおいて非 interactive なネスト実行が Control Socket 経由で実際に動作する（統合テストを含む）。
-- 生ソケット経由（`--mount-socket`）との実行結果（exit code 等）が同等であることを確認するテストがある。
-- どちらの経路が使われたかが `--diagnosis` / debug ログで判別できる。
 
 ---
 

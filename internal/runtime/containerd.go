@@ -147,38 +147,50 @@ func (r *ContainerdRuntime) Name() string {
 
 // ValidateConfig validates that the runtime supports the given container configuration.
 func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) error {
+	if err := validateContainerdUnsupportedFeatures(config); err != nil {
+		return err
+	}
+	if err := validateContainerdNamespacesAndSecurity(config); err != nil {
+		return err
+	}
+	if err := validateContainerdResources(config); err != nil {
+		return err
+	}
+	if err := validateContainerdNetworking(config); err != nil {
+		return err
+	}
+	return validateContainerdMountsAndGroups(config)
+}
+
+func validateContainerdUnsupportedFeatures(config *container.ContainerConfig) error {
 	if config.Init {
 		return fmt.Errorf("containerd runtime: init is not supported yet")
 	}
-
 	if config.GPUs != "" {
 		return fmt.Errorf("containerd runtime: gpus is not supported yet")
 	}
-
 	if config.Restart != "" && config.Restart != "no" {
 		return fmt.Errorf("containerd runtime: restart policy is not supported yet")
 	}
-
 	if len(config.DNSSearch) > 0 {
 		return fmt.Errorf("containerd runtime: dns-search is not supported yet")
 	}
-
 	if len(config.DNSOptions) > 0 {
 		return fmt.Errorf("containerd runtime: dns-option is not supported yet")
 	}
+	return nil
+}
 
+func validateContainerdNamespacesAndSecurity(config *container.ContainerConfig) error {
 	if config.Pid != "" && config.Pid != "host" && config.Pid != "private" {
 		return fmt.Errorf("containerd runtime: unsupported PID namespace mode: %q", config.Pid)
 	}
-
 	if config.IPC != "" && config.IPC != "host" && config.IPC != "private" {
 		return fmt.Errorf("containerd runtime: unsupported IPC namespace mode: %q", config.IPC)
 	}
-
 	if config.Cgroupns != "" && config.Cgroupns != "host" && config.Cgroupns != "private" {
 		return fmt.Errorf("containerd runtime: unsupported cgroup namespace mode: %q", config.Cgroupns)
 	}
-
 	for _, opt := range config.SecurityOpt {
 		if opt == "apparmor=" || opt == "apparmor:" {
 			return fmt.Errorf("containerd runtime: empty AppArmor profile is not supported")
@@ -188,7 +200,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			return fmt.Errorf("containerd runtime: unsupported security option: %q", opt)
 		}
 	}
+	return nil
+}
 
+func validateContainerdResources(config *container.ContainerConfig) error {
 	if config.ShmSize != "" {
 		bytes, err := units.RAMInBytes(config.ShmSize)
 		if err != nil {
@@ -198,18 +213,15 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			return fmt.Errorf("containerd runtime: shm-size cannot be negative: %d", bytes)
 		}
 	}
-
 	if math.IsNaN(config.CPUs) || math.IsInf(config.CPUs, 0) {
 		return fmt.Errorf("containerd runtime: non-finite CPU limit %f is not supported", config.CPUs)
 	}
-
 	if config.Memory < 0 {
 		return fmt.Errorf("containerd runtime: negative memory limit %d is not supported", config.Memory)
 	}
 	if config.CPUs < 0 {
 		return fmt.Errorf("containerd runtime: negative CPU limit %f is not supported", config.CPUs)
 	}
-
 	if config.CPUs > 0 {
 		period := uint64(100000)
 		quota := int64(config.CPUs * float64(period))
@@ -217,7 +229,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			return fmt.Errorf("containerd runtime: CPU quota %d derived from CPUs %f is too small", quota, config.CPUs)
 		}
 	}
+	return nil
+}
 
+func validateContainerdNetworking(config *container.ContainerConfig) error {
 	if config.Network != "" && config.Network != "host" {
 		return fmt.Errorf("containerd runtime: Network %q is not supported yet (only \"host\" is supported for containerd)", config.Network)
 	}
@@ -230,7 +245,10 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 	if len(config.AddHosts) > 0 {
 		return fmt.Errorf("containerd runtime: add-host is not supported yet")
 	}
+	return nil
+}
 
+func validateContainerdMountsAndGroups(config *container.ContainerConfig) error {
 	for _, m := range config.Mounts {
 		if m.Type == "volume" {
 			return fmt.Errorf("containerd runtime: volume mount type is not supported")
@@ -239,7 +257,6 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			return fmt.Errorf("containerd runtime: unsupported mount type %q", m.Type)
 		}
 	}
-
 	if len(config.GroupAdd) > 0 {
 		for _, g := range config.GroupAdd {
 			_, err := strconv.ParseUint(g, 10, 32)
@@ -248,7 +265,6 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 			}
 		}
 	}
-
 	return nil
 }
 
