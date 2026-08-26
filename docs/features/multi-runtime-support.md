@@ -57,15 +57,31 @@ The `ContainerRuntime` interface governs:
 
 ---
 
-## Engine Selection
+## Runtime Engine Selection
 
-Container engine selection (`docker`, `podman`, or `containerd`) is determined automatically via socket detection (scanning for Docker, containerd, or Podman sockets, with Docker as the default fallback when no active socket is found) or explicitly configured via `--runtime`.
+`cderun` supports selecting the target container execution engine via command-line options, environment variables, or global configuration settings.
 
-### Resolution Priority Sequence
+### Supported Runtime Values
 
-1. **Phase 1 (P1) and CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` settings.
-2. **Environment Variables (P3)**: `CDERUN_RUNTIME` or `CDERUN_SOCKET_PATH`.
-3. **Configuration Files (P5)**: `runtime` or `socketPath` keys inside `.cderun.yaml`.
+The supported runtime engines are:
+
+- `docker`: Standard Docker Engine daemon (default)
+- `podman`: Podman local service API
+- `containerd`: Direct containerd gRPC service (Linux only)
+
+### Configuration Mappings
+
+- **Option Flag**: `--runtime` (P2) / `--cderun-runtime` (P1)
+- **Environment Variable**: `CDERUN_RUNTIME` (P3)
+- **Configuration Key**: `runtime:` inside `.cderun.yaml`
+- **Default Value**: Auto-detected via socket availability (or fallback to `docker`)
+
+### Resolution Priority Sequence for Runtime Selection
+
+1. **Phase 1 (P1) Internal Overrides**: `--cderun-runtime` flag takes top precedence over all other options.
+2. **CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` CLI flags.
+3. **Environment Variables (P3)**: `CDERUN_RUNTIME` or `CDERUN_SOCKET_PATH`.
+4. **Configuration Files (P5)**: Global `runtime:` or `socketPath:` keys in `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 

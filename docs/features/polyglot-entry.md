@@ -24,8 +24,8 @@ Upon program startup (at the very beginning of the `main` function before any fl
      - **Rewrite Step 2 (Hoisting & Subcommand Placement)**: Scan all arguments appearing after `os.Args[0]`. Extract only Phase 1 (P1) internal override flags prefixed with `--cderun-` (and their associated values), hoisting them before the extracted symlink subcommand. Place the extracted symlink base name immediately after the hoisted `--cderun-` flags as the subcommand, followed by all remaining original arguments in their exact sequence.
 
    The final structure of rewritten `os.Args` is:
-
-```text
+   
+   ```text
    os.Args = [ "cderun", ...hoisted_cderun_flags, <extracted_base_name>, ...original_arguments_excluding_hoisted_flags ]
    ```
 
