@@ -555,6 +555,9 @@ func resolveDevicePath(d string, baseDir string, r *ExpressionResolver) (string,
 	if HasParentTraversal(host) {
 		return "", fmt.Errorf("device source cannot contain parent directory references: %q", host)
 	}
+	if HasParentTraversal(remainder) {
+		return "", fmt.Errorf("device destination cannot contain parent directory references: %q", remainder)
+	}
 	resolvedHost, err := ResolvePath(host, baseDir, r)
 	if err != nil {
 		return "", err
@@ -926,6 +929,9 @@ func ValidateHostname(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	if len(s) > 253 {
 		return fmt.Errorf("hostname too long: %d characters (max 253)", len(s))
 	}
@@ -939,6 +945,9 @@ func ValidateHostname(s string) error {
 func ValidateNetworkName(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid network name: %q (contains parent directory references)", s)
@@ -1056,6 +1065,9 @@ func isValidGroupPart(s string) bool {
 func ValidateUserName(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	user, group, hasGroup := strings.Cut(s, ":")
 	if hasGroup && strings.Contains(group, ":") {
@@ -1229,6 +1241,9 @@ func isValidWorkdirChars(s string) bool {
 func ValidateWorkdir(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if !path.IsAbs(s) {
 		return fmt.Errorf("working directory must be an absolute path: %q", s)
