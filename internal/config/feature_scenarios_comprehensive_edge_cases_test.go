@@ -272,9 +272,11 @@ func TestUnit_Config_SensitiveEnvMaskingAndPrecedence(t *testing.T) {
 	})
 
 	t.Run("Configuration priority matrix P1 > P2 > P3 > P4 > P5 > P6", func(t *testing.T) {
-		t.Parallel()
 		mfs := &MockFileSystem{
 			WD: "/app",
+			Env: map[string]string{
+				"CDERUN_WORKDIR": "/p3-env-workdir",
+			},
 			Files: map[string][]byte{
 				"/app/.cderun.yaml": []byte(`
 global:
@@ -287,32 +289,50 @@ tools:
 			},
 		}
 
-		cliOpt := &CLIOptions{
-			CderunImage:   ptrToVal("python:3.12-alpine"), // P1 internal override
-			Image:         ptrToVal("python:3.11-slim"),   // P2 CLI
-			CderunWorkdir: ptrToVal("/p1-override-workdir"),// P1 internal override
-			Workdir:       ptrToVal("/p2-cli-workdir"),     // P2 CLI
-		}
+		t.Run("P1 internal override wins over P2, P3, P4, P5, P6", func(t *testing.T) {
+			cliOpt := &CLIOptions{
+				CderunImage:   ptrToVal("python:3.12-alpine"), // P1 internal override
+				Image:         ptrToVal("python:3.11-slim"),   // P2 CLI
+				CderunWorkdir: ptrToVal("/p1-override-workdir"),// P1 internal override
+				Workdir:       ptrToVal("/p2-cli-workdir"),     // P2 CLI
+			}
 
-		toolsCfg := ToolsConfig{
-			"python": ToolConfig{
-				Image:   "python:3.10",
-				Workdir: "/p4-tool-workdir",
-			},
-		}
+			toolsCfg := ToolsConfig{
+				"python": ToolConfig{
+					Image:   "python:3.10",
+					Workdir: "/p4-tool-workdir",
+				},
+			}
 
-		globalCfg := &CDERunConfig{
-			Defaults: ConfigDefaults{
-				Workdir: "/p5-global-workdir",
-			},
-		}
+			globalCfg := &CDERunConfig{
+				Defaults: ConfigDefaults{
+					Workdir: "/p5-global-workdir",
+				},
+			}
 
-		res, err := ResolveWithFS("python", cliOpt, toolsCfg, globalCfg, mfs)
-		require.NoError(t, err)
+			res, err := ResolveWithFS("python", cliOpt, toolsCfg, globalCfg, mfs)
+			require.NoError(t, err)
 
-		// P1 internal override takes precedence over P2, P4, P5
-		assert.Equal(t, "python:3.12-alpine", res.Image)
-		assert.Equal(t, "/p1-override-workdir", res.Workdir)
+			// P1 internal override takes precedence over P2, P3, P4, P5, P6
+			assert.Equal(t, "python:3.12-alpine", res.Image)
+			assert.Equal(t, "/p1-override-workdir", res.Workdir)
+		})
+
+		t.Run("P6 fallback default used when no higher precedence layers are present", func(t *testing.T) {
+			emptyCLI := &CLIOptions{
+				Image: ptrToVal("alpine:latest"),
+			}
+			emptyTools := ToolsConfig{}
+			emptyGlobal := &CDERunConfig{}
+			emptyFS := &MockFileSystem{WD: "/app"}
+
+			res, err := ResolveWithFS("", emptyCLI, emptyTools, emptyGlobal, emptyFS)
+			require.NoError(t, err)
+
+			// P6 fallback default for Network is "bridge"
+			assert.Equal(t, "bridge", res.Network)
+			assert.Equal(t, "alpine:latest", res.Image)
+		})
 	})
 }
 
