@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"time"
 )
 
 // CurrentProtocolVersion defines the Control Socket protocol version.
@@ -36,8 +37,9 @@ const (
 
 // RequestFrame represents a generic request payload frame.
 type RequestFrame struct {
-	Type    MessageType `json:"type"`
-	Payload []byte      `json:"payload,omitempty"`
+	Type     MessageType `json:"type"`
+	Deadline *time.Time  `json:"deadline,omitempty"`
+	Payload  []byte      `json:"payload,omitempty"`
 }
 
 // ResponseFrame represents a generic response payload frame.

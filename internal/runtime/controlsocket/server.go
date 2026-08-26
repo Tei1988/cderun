@@ -1,6 +1,7 @@
 package controlsocket
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,9 +11,18 @@ import (
 	"sync"
 	"time"
 
+	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/version"
 )
+
+// ContainerRuntimeDispatcher defines the subset of container lifecycle operations needed for dispatch.
+type ContainerRuntimeDispatcher interface {
+	CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error)
+	StartContainer(ctx context.Context, containerID string) error
+	WaitContainer(ctx context.Context, containerID string) (int, error)
+	RemoveContainer(ctx context.Context, containerID string) error
+}
 
 // Server handles Control Socket connections from nested cderun instances.
 type Server struct {
@@ -23,6 +33,7 @@ type Server struct {
 	closed     chan struct{}
 	wg         sync.WaitGroup
 	logger     *logging.Logger
+	dispatcher ContainerRuntimeDispatcher
 }
 
 // NewServer creates a new Control Socket Server for the specified socketPath.
@@ -36,6 +47,13 @@ func NewServer(socketPath string, logger *logging.Logger) *Server {
 		closed:     make(chan struct{}),
 		logger:     logger,
 	}
+}
+
+// SetDispatcher configures the underlying ContainerRuntimeDispatcher for servicing RPC requests.
+func (s *Server) SetDispatcher(dispatcher ContainerRuntimeDispatcher) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dispatcher = dispatcher
 }
 
 // Start opens the Unix domain socket and starts accepting incoming connections in a background goroutine.
@@ -162,7 +180,7 @@ func (s *Server) handleConn(conn net.Conn) {
 		s.logger.Warn("Failed to clear read deadline after handshake: %v", err)
 	}
 
-	// 2. Request Loop (Phase 1 supports Ping/Pong)
+	// 2. Request Loop
 	for {
 		frameBytes, err := ReadFrame(conn)
 		if err != nil {
@@ -179,17 +197,168 @@ func (s *Server) handleConn(conn net.Conn) {
 			continue
 		}
 
-		switch reqFrame.Type {
-		case MsgPing:
-			resp := ResponseFrame{Success: true, Payload: []byte("pong")}
-			respBytes, _ := json.Marshal(resp)
-			if err := WriteFrame(conn, respBytes); err != nil {
-				return
-			}
-		default:
-			s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
-		}
+		s.dispatchRequest(conn, &reqFrame)
 	}
+}
+
+func (s *Server) buildRequestContext(reqFrame *RequestFrame) (context.Context, context.CancelFunc) {
+	ctx := context.Background()
+	if reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
+		return context.WithDeadline(ctx, *reqFrame.Deadline)
+	}
+	return context.WithCancel(ctx)
+}
+
+func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
+	ctx, cancel := s.buildRequestContext(reqFrame)
+	defer cancel()
+
+	switch reqFrame.Type {
+	case MsgPing:
+		resp := ResponseFrame{Success: true, Payload: []byte("pong")}
+		respBytes, _ := json.Marshal(resp)
+		_ = WriteFrame(conn, respBytes)
+
+	case MsgCreateContainer:
+		s.handleCreateContainer(ctx, conn, reqFrame.Payload)
+
+	case MsgStartContainer:
+		s.handleStartContainer(ctx, conn, reqFrame.Payload)
+
+	case MsgWaitContainer:
+		s.handleWaitContainer(ctx, conn, reqFrame.Payload)
+
+	case MsgRemoveContainer:
+		s.handleRemoveContainer(ctx, conn, reqFrame.Payload)
+
+	default:
+		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
+	}
+}
+
+func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args CreateContainerArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed CreateContainer args: %v", err))
+		return
+	}
+
+	if args.Config == nil {
+		s.sendErrorResponse(conn, "CreateContainer args.Config is nil")
+		return
+	}
+
+	containerID, err := d.CreateContainer(ctx, args.Config)
+	if err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	res := CreateContainerResult{ContainerID: containerID}
+	resBytes, err := json.Marshal(res)
+	if err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("failed to marshal CreateContainer result: %v", err))
+		return
+	}
+
+	resp := ResponseFrame{Success: true, Payload: resBytes}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleStartContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args ContainerIDArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed StartContainer args: %v", err))
+		return
+	}
+
+	if err := d.StartContainer(ctx, args.ContainerID); err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleWaitContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args ContainerIDArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed WaitContainer args: %v", err))
+		return
+	}
+
+	exitCode, err := d.WaitContainer(ctx, args.ContainerID)
+	if err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	res := WaitContainerResult{ExitCode: exitCode}
+	resBytes, err := json.Marshal(res)
+	if err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("failed to marshal WaitContainer result: %v", err))
+		return
+	}
+
+	resp := ResponseFrame{Success: true, Payload: resBytes}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleRemoveContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args ContainerIDArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed RemoveContainer args: %v", err))
+		return
+	}
+
+	if err := d.RemoveContainer(ctx, args.ContainerID); err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
 }
 
 func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg string) error {
