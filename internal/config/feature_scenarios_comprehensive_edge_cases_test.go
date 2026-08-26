@@ -259,8 +259,8 @@ func TestUnit_Config_SensitiveEnvMaskingAndPrecedence(t *testing.T) {
 		}
 		assert.Equal(t, expectedUnredacted, maskedEmpty)
 
-		// Mode 3: custom glob pattern matching
-		patterns := []string{"*KEY*", "*PASSWORD*", "TOKEN_*"}
+		// Mode 3: custom glob pattern matching (using lowercase patterns to test case-insensitive matching)
+		patterns := []string{"*key*", "*password*", "token_*"}
 		maskedCustom := MaskSensitiveEnvList(slices.Clone(rawEnvs), patterns)
 
 		require.Len(t, maskedCustom, len(rawEnvs))
@@ -278,40 +278,41 @@ func TestUnit_Config_SensitiveEnvMaskingAndPrecedence(t *testing.T) {
 			Files: map[string][]byte{
 				"/app/.cderun.yaml": []byte(`
 global:
-  workdir: "/global-workdir"
+  workdir: "/p5-global-workdir"
 tools:
   python:
     image: "python:3.10"
-    workdir: "/tool-workdir"
+    workdir: "/p4-tool-workdir"
 `),
 			},
 		}
 
 		cliOpt := &CLIOptions{
-			Image:         ptrToVal("python:3.10"),
-			CderunWorkdir: ptrToVal("/override-workdir"), // P1 internal override
-			Workdir:       ptrToVal("/cli-workdir"),      // P2 CLI
+			CderunImage:   ptrToVal("python:3.12-alpine"), // P1 internal override
+			Image:         ptrToVal("python:3.11-slim"),   // P2 CLI
+			CderunWorkdir: ptrToVal("/p1-override-workdir"),// P1 internal override
+			Workdir:       ptrToVal("/p2-cli-workdir"),     // P2 CLI
 		}
 
 		toolsCfg := ToolsConfig{
 			"python": ToolConfig{
 				Image:   "python:3.10",
-				Workdir: "/tool-workdir",
+				Workdir: "/p4-tool-workdir",
 			},
 		}
 
 		globalCfg := &CDERunConfig{
 			Defaults: ConfigDefaults{
-				Workdir: "/global-workdir",
+				Workdir: "/p5-global-workdir",
 			},
 		}
 
 		res, err := ResolveWithFS("python", cliOpt, toolsCfg, globalCfg, mfs)
 		require.NoError(t, err)
 
-		// P1 internal override takes precedence over P2 CLI
-		assert.Equal(t, "python:3.10", res.Image)
-		assert.Equal(t, "/override-workdir", res.Workdir)
+		// P1 internal override takes precedence over P2, P4, P5
+		assert.Equal(t, "python:3.12-alpine", res.Image)
+		assert.Equal(t, "/p1-override-workdir", res.Workdir)
 	})
 }
 
