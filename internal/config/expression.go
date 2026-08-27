@@ -450,6 +450,12 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 		shared.mu.Lock()
 		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		shared.mu.Unlock()
+		if hasDefault {
+			if err := validatePathChars(defaultValue); err != nil {
+				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
+			}
+			return defaultValue, nil
+		}
 		return "", wrappedErr
 	}
 

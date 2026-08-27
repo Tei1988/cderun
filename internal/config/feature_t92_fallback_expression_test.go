@@ -180,4 +180,27 @@ func TestUnit_Expression_T92_FileAndFindDirFallback(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed")
 	})
+
+	t.Run("stat failure on first request triggers fallback", func(t *testing.T) {
+		statErrFS := &t92MockFS{
+			MockFileSystem: MockFileSystem{
+				Files: map[string][]byte{
+					"/project/stat_err.txt": []byte("some text"),
+				},
+				Dirs: map[string]bool{
+					"/project": true,
+				},
+				WD:      "/project",
+				HomeDir: "/home/user",
+				StatErr: os.ErrPermission,
+			},
+		}
+		r, err := NewExpressionResolverWithFS(hostCtx, statErrFS)
+		require.NoError(t, err)
+
+		val, err := r.ResolveString("{{file:stat_err.txt:-stat_fallback}}")
+		require.NoError(t, err)
+		assert.NoError(t, r.Error())
+		assert.Equal(t, "stat_fallback", val)
+	})
 }
