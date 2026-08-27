@@ -32,18 +32,7 @@ func parseSlice[T any](slice []string, sourceLabel string, parser func(string, s
 	return res, nil
 }
 
-func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
-	raws, err := pickConfigs(
-		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
-		func(t ToolConfig) []string { return t.Ulimits },
-		global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
-		nil,
-		fs,
-	)
-	if err != nil {
-		return nil, err
-	}
-
+func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.Ulimit, error) {
 	if len(raws) == 0 {
 		return []container.Ulimit{}, nil
 	}
@@ -77,18 +66,21 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return res, nil
 }
 
-func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
+func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
 	raws, err := pickConfigs(
-		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
-		func(t ToolConfig) []string { return t.Sysctls },
-		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
+		func(t ToolConfig) []string { return t.Ulimits },
+		global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
 		nil,
 		fs,
 	)
 	if err != nil {
 		return nil, err
 	}
+	return resolveUlimitsFromRaws(raws, r)
+}
 
+func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]string, error) {
 	if len(raws) == 0 {
 		return nil, nil
 	}
@@ -154,6 +146,20 @@ func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConf
 		res[k] = val
 	}
 	return res, nil
+}
+
+func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
+	raws, err := pickConfigs(
+		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
+		func(t ToolConfig) []string { return t.Sysctls },
+		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		nil,
+		fs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return resolveSysctlsFromRaws(raws, r)
 }
 
 func parseEnvItem[T any](s string, parser func(string, string) (T, error)) (T, error) {
@@ -237,6 +243,21 @@ func pickConfigs[T any](
 	return nil, nil
 }
 
+func resolveDevicesFromConfigs(dcs []DeviceConfig, r *ExpressionResolver) ([]container.DeviceMapping, error) {
+	if len(dcs) == 0 {
+		return nil, nil
+	}
+	res := make([]container.DeviceMapping, 0, len(dcs))
+	for _, dc := range dcs {
+		resolved, err := dc.Resolve(r)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, resolved)
+	}
+	return res, nil
+}
+
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	dcs, err := pickConfigs(
 		p1, p2, "CDERUN_DEVICE", ",", subcommand, tools,
@@ -254,7 +275,9 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
 			}
-			parsed.SetBaseDir(r.Pwd)
+			if r != nil {
+				parsed.SetBaseDir(r.Pwd)
+			}
 			return parsed, nil
 		},
 		fs,
@@ -262,16 +285,7 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	if err != nil {
 		return nil, err
 	}
-
-	res := make([]container.DeviceMapping, 0, len(dcs))
-	for _, dc := range dcs {
-		resolved, err := dc.Resolve(r)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, resolved)
-	}
-	return res, nil
+	return resolveDevicesFromConfigs(dcs, r)
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
@@ -545,6 +559,44 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 	return res, nil
 }
 
+func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
+	if len(mcs) == 0 {
+		return []container.Mount{}, nil
+	}
+
+	res := make([]container.Mount, 0, len(mcs))
+	for _, mc := range mcs {
+		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
+			hostPath, err := mc.Source.Resolve(r)
+			if err != nil {
+				return nil, err
+			}
+			var statErr error
+			if r != nil {
+				_, statErr = r.Stat(hostPath)
+			} else if fs != nil {
+				_, statErr = fs.Stat(hostPath)
+			} else {
+				_, statErr = os.Stat(hostPath)
+			}
+			if statErr != nil {
+				if errors.Is(statErr, os.ErrNotExist) {
+					// Skip if source doesn't exist
+					continue
+				}
+				return nil, statErr
+			}
+		}
+
+		resolved, err := mc.Resolve(r)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, resolved)
+	}
+	return res, nil
+}
+
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	mcs, err := pickConfigs(
 		p1, p2, "CDERUN_MOUNT", ";", subcommand, tools,
@@ -562,7 +614,13 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
 			}
-			parsed.SetBaseDir(r.Pwd)
+			if r != nil {
+				parsed.SetBaseDir(r.Pwd)
+			} else if fs != nil {
+				if wd, err := fs.Getwd(); err == nil {
+					parsed.SetBaseDir(wd)
+				}
+			}
 			return parsed, nil
 		},
 		fs,
@@ -570,32 +628,38 @@ func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfi
 	if err != nil {
 		return nil, err
 	}
+	return resolveMountsFromConfigs(mcs, r, fs)
+}
 
+func needsResolverForMounts(mcs []MountConfig, global *CDERunConfig) bool {
 	if len(mcs) == 0 {
-		return []container.Mount{}, nil
+		return false
 	}
-
-	res := make([]container.Mount, 0, len(mcs))
+	if global != nil && global.HostContext != nil && global.HostContext.Level > 0 {
+		return true
+	}
 	for _, mc := range mcs {
-		if mc.Optional && (mc.Type == "bind" || mc.Type == "") && !mc.Source.IsEmpty() {
-			hostPath, err := mc.Source.Resolve(r)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := r.Stat(hostPath); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					// Skip if source doesn't exist
-					continue
-				}
-				return nil, err
-			}
+		if strings.Contains(mc.Source.Raw, "{{") || strings.HasPrefix(mc.Source.Raw, "~") ||
+			strings.Contains(mc.Target.Raw, "{{") || strings.HasPrefix(mc.Target.Raw, "~") ||
+			mc.Optional {
+			return true
 		}
-
-		resolved, err := mc.Resolve(r)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, resolved)
 	}
-	return res, nil
+	return false
+}
+
+func needsResolverForDevices(dcs []DeviceConfig, global *CDERunConfig) bool {
+	if len(dcs) == 0 {
+		return false
+	}
+	if global != nil && global.HostContext != nil && global.HostContext.Level > 0 {
+		return true
+	}
+	for _, dc := range dcs {
+		if strings.Contains(dc.Source.Raw, "{{") || strings.HasPrefix(dc.Source.Raw, "~") ||
+			strings.Contains(dc.Destination.Raw, "{{") || strings.HasPrefix(dc.Destination.Raw, "~") {
+			return true
+		}
+	}
+	return false
 }

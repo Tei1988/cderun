@@ -124,6 +124,9 @@ func (r *ExpressionResolver) Error() error {
 // Use this when resolving container-side paths (e.g. mount targets) that should not
 // undergo reverse path resolution.
 func (r *ExpressionResolver) WithoutHostContext() *ExpressionResolver {
+	if r == nil {
+		return nil
+	}
 	r.ensureShared()
 	res := &ExpressionResolver{
 		fs:          r.fs,
