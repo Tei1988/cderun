@@ -508,6 +508,12 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 }
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
+	if err := validatePathChars(v); err != nil {
+		return "", fmt.Errorf("security validation failed for volume: %w", err)
+	}
+	if HasParentTraversal(v) {
+		return "", fmt.Errorf("volume specification cannot contain parent directory references: %q", v)
+	}
 	host, remainder, ok := SplitHostRemainder(v)
 	if !ok {
 		resolved := v
@@ -625,8 +631,8 @@ func HasParentTraversal(s string) bool {
 			return false
 		}
 		pos := idx + i
-		startOk := pos == 0 || s[pos-1] == '/' || s[pos-1] == '\\'
-		endOk := pos+2 == len(s) || s[pos+2] == '/' || s[pos+2] == '\\'
+		startOk := pos == 0 || s[pos-1] == '/' || s[pos-1] == '\\' || s[pos-1] == ':'
+		endOk := pos+2 == len(s) || s[pos+2] == '/' || s[pos+2] == '\\' || s[pos+2] == ':'
 		if startOk && endOk {
 			return true
 		}
@@ -1354,6 +1360,9 @@ func isNamedVolume(s string) bool {
 func ValidateDNSOption(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid DNS option: %q (contains parent directory references)", s)

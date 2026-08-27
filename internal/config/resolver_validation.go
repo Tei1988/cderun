@@ -132,6 +132,9 @@ func (rv *resolver) validateSecurity() error {
 	if err := rv.validateDeviceSecurity(); err != nil {
 		return err
 	}
+	if err := rv.validateSysctlSecurity(); err != nil {
+		return err
+	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {
 		if isHighlyPrivilegedCapability(capName) {
@@ -512,16 +515,22 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateMountSocketPathRaw() error {
-	overrideSet, overrideValStr := getPtrVal(rv.cli.CderunMountSocketPath)
-	cliSet, cliValStr := getPtrVal(rv.cli.MountSocketPath)
+	var overrideSet, cliSet bool
+	var overrideValStr, cliValStr string
+	if rv.cli != nil {
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountSocketPath)
+	}
 
 	var raw string
 	if overrideSet {
 		raw = overrideValStr
 	} else if cliSet {
 		raw = cliValStr
-	} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
-		raw = env
+	} else if rv.fs != nil {
+		if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+			raw = env
+		}
 	} else {
 		found := false
 		if rv.tools != nil {
@@ -632,6 +641,24 @@ func (rv *resolver) validateMountSecurity() error {
 		}
 		if (m.Type == "bind" || m.Type == "") && m.Source == "" {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): source path cannot be empty for bind mount", i)
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) validateSysctlSecurity() error {
+	for k, v := range rv.res.Sysctls {
+		if err := validatePathChars(k); err != nil {
+			return fmt.Errorf("security validation failed for sysctl key %q: %w", k, err)
+		}
+		if err := validatePathChars(v); err != nil {
+			return fmt.Errorf("security validation failed for sysctl value %q: %w", v, err)
+		}
+		if err := ValidateSysctlKey(k); err != nil {
+			return fmt.Errorf("security validation failed for sysctl key %q: %w", k, err)
+		}
+		if err := ValidateSysctlValue(v); err != nil {
+			return fmt.Errorf("security validation failed for sysctl value %q: %w", v, err)
 		}
 	}
 	return nil
