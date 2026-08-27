@@ -527,20 +527,23 @@ func (rv *resolver) validateMountSocketPathRaw() error {
 		raw = overrideValStr
 	} else if cliSet {
 		raw = cliValStr
-	} else if rv.fs != nil {
-		if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
-			raw = env
-		}
 	} else {
-		found := false
-		if rv.tools != nil {
-			if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountSocketPath.Raw != "" {
-				raw = tool.MountSocketPath.Raw
-				found = true
+		if rv.fs != nil {
+			if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+				raw = env
 			}
 		}
-		if !found && rv.global != nil && rv.global.Defaults.MountSocketPath.Raw != "" {
-			raw = rv.global.Defaults.MountSocketPath.Raw
+		if raw == "" {
+			found := false
+			if rv.tools != nil {
+				if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountSocketPath.Raw != "" {
+					raw = tool.MountSocketPath.Raw
+					found = true
+				}
+			}
+			if !found && rv.global != nil && rv.global.Defaults.MountSocketPath.Raw != "" {
+				raw = rv.global.Defaults.MountSocketPath.Raw
+			}
 		}
 	}
 
