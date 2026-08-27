@@ -324,8 +324,8 @@ Expressions can be used to inject host-context or dynamic values into options li
   - `{{BASE_HOME}}`: Path to the home directory on the *base host* (Level 0 physical machine/VM), ensuring correct referencing even when executing recursively inside a nested container.
   - `{{BASE_PWD}}`: Path to the working directory on the *base host*.
 - **Directives**:
-  - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`).
-  - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`).
+  - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`). Supports fallbacks using `{{file:path:-default}}` when missing, stat/read error, or empty.
+  - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`). Supports fallbacks using `{{find_dir:name:-default}}` when missing.
   - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
 
 #### Detailed Value Resolution and Escaping Mechanics

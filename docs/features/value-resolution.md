@@ -94,8 +94,8 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 
 | Directive | Description |
 | :--- | :--- |
-| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. |
+| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{file:<filename>:-default}}` when the file is missing, cannot be read/stat, or when trimmed content is empty. |
+| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing. |
 | `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version}}}}`). |
 
 ### 3. Unrecognized and Unknown Expressions
@@ -117,17 +117,24 @@ This escaping mechanism bypasses evaluation and also prevents strict resolution 
 
 ### 5. Nested Expressions
 
-Expressions can be nested to configure complex fallback scenarios. The expression engine evaluates expressions from the inside out.
+Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine evaluates expressions from the inside out.
 
-**Example:**
+**Examples:**
 
 ```text
-{{env:VERSION:-{{file:.version}}}}
+{{env:VERSION:-{{file:.version:-1.0.0}}}}
 ```
 
-1. The inner expression `{{file:.version}}` is evaluated first (e.g., resolving to `1.2.3`).
+1. The inner expression `{{file:.version:-1.0.0}}` is evaluated first (e.g., resolving to `1.2.3` if `.version` exists, or `1.0.0` if missing).
 2. The outer expression is evaluated with the fallback parameter: `{{env:VERSION:-1.2.3}}`.
 3. If the host environment variable `VERSION` is set, its value is used; otherwise, it falls back to `1.2.3`.
+
+```text
+{{find_dir:master:-{{PWD}}}}
+```
+
+1. The inner expression `{{PWD}}` evaluates to the current working directory path (e.g., `/project/app`).
+2. The outer `find_dir:master` directive traverses upwards for `master`. If not found, it falls back to `/project/app`.
 
 ---
 
