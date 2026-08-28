@@ -177,6 +177,18 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
+	// Expand raw target expression before ResolvePath normalizes/cleans it
+	rawTarget := mc.Target.Raw
+	if r != nil && rawTarget != "" {
+		expanded, err := r.WithoutHostContext().ResolveString(rawTarget)
+		if err != nil {
+			return container.Mount{}, err
+		}
+		if HasParentTraversal(expanded) {
+			return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", expanded)
+		}
+	}
+
 	// Resolve the target using WithoutHostContext to avoid reverse resolution on the target itself.
 	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
@@ -291,6 +303,18 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
+	// Expand raw destination expression before ResolvePath normalizes/cleans it
+	rawDest := dc.Destination.Raw
+	if r != nil && rawDest != "" {
+		expanded, err := r.WithoutHostContext().ResolveString(rawDest)
+		if err != nil {
+			return container.DeviceMapping{}, err
+		}
+		if HasParentTraversal(expanded) {
+			return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", expanded)
+		}
+	}
+
 	containerPath, err := dc.Destination.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.DeviceMapping{}, err

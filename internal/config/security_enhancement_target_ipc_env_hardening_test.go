@@ -29,6 +29,24 @@ func TestUnit_SecurityEnhancement_Target_IPC_Env_Hardening(t *testing.T) {
 		assert.Contains(t, err.Error(), "mount target cannot contain parent directory references")
 	})
 
+	t.Run("MountConfig target expression expanded parent traversal post resolution", func(t *testing.T) {
+		mfsWithEnv := &MockFileSystem{
+			WD:  "/app",
+			Env: map[string]string{"BAD_TARGET": "/container/foo/.."},
+		}
+		rEnv, err := NewExpressionResolverWithFS(nil, mfsWithEnv)
+		require.NoError(t, err)
+
+		mc := MountConfig{
+			Type:   "bind",
+			Source: ConfigPath{Raw: "/host/data"},
+			Target: ConfigPath{Raw: "{{env:BAD_TARGET}}"},
+		}
+		_, err = mc.Resolve(rEnv)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "mount target cannot contain parent directory references")
+	})
+
 	t.Run("DeviceConfig destination parent traversal post resolution", func(t *testing.T) {
 		dc := DeviceConfig{
 			Source:      ConfigPath{Raw: "/dev/ttyS0"},
@@ -36,6 +54,24 @@ func TestUnit_SecurityEnhancement_Target_IPC_Env_Hardening(t *testing.T) {
 			Permissions: "rwm",
 		}
 		_, err := dc.Resolve(r)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device destination cannot contain parent directory references")
+	})
+
+	t.Run("DeviceConfig destination expression expanded parent traversal post resolution", func(t *testing.T) {
+		mfsWithEnv := &MockFileSystem{
+			WD:  "/app",
+			Env: map[string]string{"BAD_DEST": "/dev/foo/.."},
+		}
+		rEnv, err := NewExpressionResolverWithFS(nil, mfsWithEnv)
+		require.NoError(t, err)
+
+		dc := DeviceConfig{
+			Source:      ConfigPath{Raw: "/dev/ttyS0"},
+			Destination: ConfigPath{Raw: "{{env:BAD_DEST}}"},
+			Permissions: "rwm",
+		}
+		_, err = dc.Resolve(rEnv)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "device destination cannot contain parent directory references")
 	})
