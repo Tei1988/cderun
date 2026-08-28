@@ -14,6 +14,8 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/version"
+
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // ContainerRuntimeDispatcher defines the subset of container lifecycle operations needed for dispatch.
@@ -22,6 +24,20 @@ type ContainerRuntimeDispatcher interface {
 	StartContainer(ctx context.Context, containerID string) error
 	WaitContainer(ctx context.Context, containerID string) (int, error)
 	RemoveContainer(ctx context.Context, containerID string) error
+	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
+	SignalContainer(ctx context.Context, containerID string, sig string) error
+}
+
+type syncWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (s *syncWriter) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.w.Write(p)
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -197,7 +213,9 @@ func (s *Server) handleConn(conn net.Conn) {
 			continue
 		}
 
-		s.dispatchRequest(conn, &reqFrame)
+		if hijacked := s.dispatchRequest(conn, &reqFrame); hijacked {
+			return
+		}
 	}
 }
 
@@ -209,7 +227,7 @@ func (s *Server) buildRequestContext(reqFrame *RequestFrame) (context.Context, c
 	return context.WithCancel(ctx)
 }
 
-func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
+func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) bool {
 	ctx, cancel := s.buildRequestContext(reqFrame)
 	defer cancel()
 
@@ -231,9 +249,20 @@ func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
 	case MsgRemoveContainer:
 		s.handleRemoveContainer(ctx, conn, reqFrame.Payload)
 
+	case MsgSignalContainer:
+		s.handleSignalContainer(ctx, conn, reqFrame.Payload)
+
+	case MsgResizeContainerTTY:
+		s.handleResizeContainerTTY(ctx, conn, reqFrame.Payload)
+
+	case MsgAttachContainer:
+		s.handleAttachContainer(ctx, conn, reqFrame.Payload)
+		return true
+
 	default:
 		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
 	}
+	return false
 }
 
 func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, payload []byte) {
@@ -359,6 +388,105 @@ func (s *Server) handleRemoveContainer(ctx context.Context, conn net.Conn, paylo
 	resp := ResponseFrame{Success: true}
 	respBytes, _ := json.Marshal(resp)
 	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleSignalContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args SignalContainerArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed SignalContainer args: %v", err))
+		return
+	}
+
+	if err := d.SignalContainer(ctx, args.ContainerID, args.Signal); err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleResizeContainerTTY(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args ResizeContainerTTYArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed ResizeContainerTTY args: %v", err))
+		return
+	}
+
+	if err := d.ResizeContainerTTY(ctx, args.ContainerID, args.Rows, args.Cols); err != nil {
+		s.sendErrorResponse(conn, err.Error())
+		return
+	}
+
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	_ = WriteFrame(conn, respBytes)
+}
+
+func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args AttachContainerArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed AttachContainer args: %v", err))
+		return
+	}
+
+	// Send initial response acknowledging AttachContainer request before stream takeover
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	if err := WriteFrame(conn, respBytes); err != nil {
+		s.logger.Warn("Failed to send AttachContainer response frame: %v", err)
+		return
+	}
+
+	// Create thread-safe writer for conn
+	safeWriter := &syncWriter{w: conn}
+
+	var stdinReader io.Reader = conn
+	var stdoutWriter io.Writer
+	var stderrWriter io.Writer
+
+	if args.TTY {
+		stdoutWriter = safeWriter
+		stderrWriter = safeWriter
+	} else {
+		stdoutWriter = stdcopy.NewStdWriter(safeWriter, stdcopy.Stdout)
+		stderrWriter = stdcopy.NewStdWriter(safeWriter, stdcopy.Stderr)
+	}
+
+	readyChan := make(chan struct{})
+
+	// Call dispatcher's AttachContainer
+	if err := d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan); err != nil {
+		s.logger.Debug("AttachContainer dispatcher returned error for container %s: %v", args.ContainerID, err)
+	}
 }
 
 func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg string) error {
