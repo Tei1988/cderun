@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,13 +26,17 @@ func TestUnit_ControlSocket_Phase3_Interactive_AttachAndSignals(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "cderun_phase3.sock")
 
+	var mu sync.Mutex
 	var attachCalled bool
 
 	mockRt := runtime.NewMockRuntime()
 	mockRt.CreatedContainerID = "interactive-container-789"
 
 	mockRt.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		mu.Lock()
 		attachCalled = true
+		mu.Unlock()
+
 		if ready != nil {
 			select {
 			case ready <- struct{}{}:
@@ -104,7 +109,11 @@ func TestUnit_ControlSocket_Phase3_Interactive_AttachAndSignals(t *testing.T) {
 	err = rt.AttachContainer(ctx, cID, false, stdinBuf, stdoutBuf, stderrBuf, readyChan)
 	require.NoError(t, err)
 
-	assert.True(t, attachCalled)
+	mu.Lock()
+	aDone := attachCalled
+	mu.Unlock()
+
+	assert.True(t, aDone)
 	assert.Equal(t, "container output msg", stdoutBuf.String())
 	assert.Equal(t, "container error msg", stderrBuf.String())
 

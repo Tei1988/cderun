@@ -270,7 +270,9 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	if err != nil {
 		return fmt.Errorf("failed to dial control socket for attach: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	args := AttachContainerArgs{
 		ContainerID: containerID,

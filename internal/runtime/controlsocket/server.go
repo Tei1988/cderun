@@ -1,6 +1,7 @@
 package controlsocket
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,15 +30,34 @@ type ContainerRuntimeDispatcher interface {
 	SignalContainer(ctx context.Context, containerID string, sig string) error
 }
 
-type syncWriter struct {
-	mu sync.Mutex
-	w  io.Writer
+type gatedWriter struct {
+	mu     sync.Mutex
+	w      io.Writer
+	gated  bool
+	buffer bytes.Buffer
 }
 
-func (s *syncWriter) Write(p []byte) (n int, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.w.Write(p)
+func (g *gatedWriter) Write(p []byte) (int, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if !g.gated {
+		return g.buffer.Write(p)
+	}
+	return g.w.Write(p)
+}
+
+func (g *gatedWriter) Enable() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.gated = true
+	if g.buffer.Len() > 0 {
+		_, err := g.w.Write(g.buffer.Bytes())
+		g.buffer.Reset()
+		return err
+	}
+	return nil
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -458,34 +478,49 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 		return
 	}
 
-	// Send initial response acknowledging AttachContainer request before stream takeover
-	resp := ResponseFrame{Success: true}
-	respBytes, _ := json.Marshal(resp)
-	if err := WriteFrame(conn, respBytes); err != nil {
-		s.logger.Warn("Failed to send AttachContainer response frame: %v", err)
-		return
-	}
+	readyChan := make(chan struct{})
+	attachErrCh := make(chan error, 1)
 
-	// Create thread-safe writer for conn
-	safeWriter := &syncWriter{w: conn}
+	gw := &gatedWriter{w: conn}
 
 	var stdinReader io.Reader = conn
 	var stdoutWriter io.Writer
 	var stderrWriter io.Writer
 
 	if args.TTY {
-		stdoutWriter = safeWriter
-		stderrWriter = safeWriter
+		stdoutWriter = gw
+		stderrWriter = gw
 	} else {
-		stdoutWriter = stdcopy.NewStdWriter(safeWriter, stdcopy.Stdout)
-		stderrWriter = stdcopy.NewStdWriter(safeWriter, stdcopy.Stderr)
+		stdoutWriter = stdcopy.NewStdWriter(gw, stdcopy.Stdout)
+		stderrWriter = stdcopy.NewStdWriter(gw, stdcopy.Stderr)
 	}
 
-	readyChan := make(chan struct{})
+	go func() {
+		attachErrCh <- d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
+	}()
 
-	// Call dispatcher's AttachContainer
-	if err := d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan); err != nil {
-		s.logger.Debug("AttachContainer dispatcher returned error for container %s: %v", args.ContainerID, err)
+	select {
+	case <-readyChan:
+		// Send initial response acknowledging AttachContainer request only after setup signals readiness
+		resp := ResponseFrame{Success: true}
+		respBytes, _ := json.Marshal(resp)
+		if err := WriteFrame(conn, respBytes); err != nil {
+			s.logger.Warn("Failed to send AttachContainer response frame: %v", err)
+			return
+		}
+		_ = gw.Enable()
+		if err := <-attachErrCh; err != nil {
+			s.logger.Debug("AttachContainer dispatcher returned error for container %s: %v", args.ContainerID, err)
+		}
+	case err := <-attachErrCh:
+		if err == nil {
+			resp := ResponseFrame{Success: true}
+			respBytes, _ := json.Marshal(resp)
+			_ = WriteFrame(conn, respBytes)
+			_ = gw.Enable()
+		} else {
+			s.sendErrorResponse(conn, err.Error())
+		}
 	}
 }
 

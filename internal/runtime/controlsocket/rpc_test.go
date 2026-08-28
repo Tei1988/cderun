@@ -292,20 +292,25 @@ func TestUnit_ControlSocket_RPC_SignalAndResize(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "signal_resize.sock")
 
+	var mu sync.Mutex
 	var signalCalled, resizeCalled bool
 	var receivedSig string
 	var receivedRows, receivedCols uint
 
 	disp := &mockDispatcher{
 		signalFunc: func(ctx context.Context, containerID string, sig string) error {
+			mu.Lock()
 			signalCalled = true
 			receivedSig = sig
+			mu.Unlock()
 			return nil
 		},
 		resizeFunc: func(ctx context.Context, containerID string, rows, cols uint) error {
+			mu.Lock()
 			resizeCalled = true
 			receivedRows = rows
 			receivedCols = cols
+			mu.Unlock()
 			return nil
 		},
 	}
@@ -324,14 +329,27 @@ func TestUnit_ControlSocket_RPC_SignalAndResize(t *testing.T) {
 
 	// Signal
 	require.NoError(t, client.SignalContainer(ctx, "c1", "SIGINT"))
-	assert.True(t, signalCalled)
-	assert.Equal(t, "SIGINT", receivedSig)
+
+	mu.Lock()
+	sigDone := signalCalled
+	sigVal := receivedSig
+	mu.Unlock()
+
+	assert.True(t, sigDone)
+	assert.Equal(t, "SIGINT", sigVal)
 
 	// Resize
 	require.NoError(t, client.ResizeContainerTTY(ctx, "c1", 24, 80))
-	assert.True(t, resizeCalled)
-	assert.Equal(t, uint(24), receivedRows)
-	assert.Equal(t, uint(80), receivedCols)
+
+	mu.Lock()
+	resDone := resizeCalled
+	rRows := receivedRows
+	rCols := receivedCols
+	mu.Unlock()
+
+	assert.True(t, resDone)
+	assert.Equal(t, uint(24), rRows)
+	assert.Equal(t, uint(80), rCols)
 }
 
 func TestUnit_ControlSocket_RPC_AttachContainer_NonTTY(t *testing.T) {
