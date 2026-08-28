@@ -33,7 +33,9 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	defer func() {
 		if !success {
 			if ctrlServer != nil {
-				_ = ctrlServer.Close()
+				if err := ctrlServer.Close(); err != nil {
+					logger.Debug("failed to close control socket server: %v", err)
+				}
 			}
 			if err := cleanupSnapshot(fs, snapshotDir); err != nil {
 				logger.Debug("failed to cleanup snapshot directory %s: %v", snapshotDir, err)
