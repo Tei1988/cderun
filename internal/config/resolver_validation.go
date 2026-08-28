@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"cderun/internal/logging"
 
@@ -263,12 +264,22 @@ func (rv *resolver) validateCriticalFields() error {
 
 	// ipc
 	ipcValidator := func(v string) error {
-		isContainerReference := strings.HasPrefix(v, "container:") &&
-			strings.TrimPrefix(v, "container:") != ""
-		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
-			return fmt.Errorf("unsupported ipc namespace: %q", v)
+		if v == "" || v == "host" || v == "private" || v == "shareable" || v == "none" {
+			return nil
 		}
-		return nil
+		if target, ok := strings.CutPrefix(v, "container:"); ok {
+			if target == "" || target == ".." || target == "." || HasParentTraversal(target) {
+				return fmt.Errorf("unsupported ipc namespace: empty or invalid container reference in %q", v)
+			}
+			for i := 0; i < len(target); i++ {
+				c := target[i]
+				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
+					return fmt.Errorf("invalid character in container ipc reference: %q", target)
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("unsupported ipc namespace: %q", v)
 	}
 	if err := validateField(rv.res.IPC, "ipc", ipcValidator); err != nil {
 		return err
@@ -603,6 +614,9 @@ func (rv *resolver) validateEnvSecurity() error {
 		}
 		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
+		}
+		if !utf8.ValidString(val) {
+			return fmt.Errorf("security validation failed for env[%d] (value): invalid UTF-8 encoding", i)
 		}
 		if strings.ContainsRune(val, 0) {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)

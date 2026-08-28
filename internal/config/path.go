@@ -186,6 +186,9 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	if target != "" && !filepath.IsAbs(target) {
 		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
 	}
+	if HasParentTraversal(target) {
+		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", target)
+	}
 
 	return container.Mount{
 		Type:     mountType,
@@ -295,6 +298,9 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	// Check if it's absolute after resolution (Feedback point 3)
 	if containerPath != "" && !filepath.IsAbs(containerPath) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
+	}
+	if HasParentTraversal(containerPath) {
+		return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", containerPath)
 	}
 	return container.DeviceMapping{
 		PathOnHost:        host,
@@ -1351,6 +1357,9 @@ func ValidateDNSOption(s string) error {
 	if s == "" {
 		return nil
 	}
+	if err := validatePathChars(s); err != nil {
+		return err
+	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid DNS option: %q (contains parent directory references)", s)
 	}
@@ -1367,6 +1376,9 @@ func ValidateDNSOption(s string) error {
 func ValidateSecurityOpt(s string) error {
 	if s == "" {
 		return nil
+	}
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid security option: %q (contains parent directory references)", s)
