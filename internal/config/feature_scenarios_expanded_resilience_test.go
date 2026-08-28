@@ -79,9 +79,9 @@ func TestUnit_Config_ExpandedValidation_EdgeCases(t *testing.T) {
 		assert.NoError(t, ValidateGPUs("device=0,1"))
 
 		assert.NoError(t, ValidateGPUs("")) // empty is valid
-		assert.Error(t, ValidateGPUs(",0,1"))
-		assert.Error(t, ValidateGPUs("device=0,1,"))
-		assert.Error(t, ValidateGPUs("gpus\x00invalid"))
+		require.Error(t, ValidateGPUs(",0,1"))
+		require.Error(t, ValidateGPUs("device=0,1,"))
+		require.Error(t, ValidateGPUs("gpus\x00invalid"))
 
 		assert.NoError(t, ValidateCpuset("0-3"))
 		assert.NoError(t, ValidateCpuset("0,2,4"))
