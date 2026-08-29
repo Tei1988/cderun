@@ -33,7 +33,7 @@ func TestUnit_Logging_RefactoredSanitizeLogString(t *testing.T) {
 
 		assert.Equal(t, "short\\x01test\\x0amessage", sanitizedShort)
 		assert.Contains(t, sanitizedLong, "\\x01")
-		assert.Equal(t, 271+3, len(sanitizedLong)) // 271 bytes original; \x01 expands to \x01 (4 chars instead of 1 byte, +3 length = 274)
+		assert.Len(t, sanitizedLong, 271+3) // 271 bytes original; \x01 expands to \x01 (4 chars instead of 1 byte, +3 length = 274)
 	})
 }
 
