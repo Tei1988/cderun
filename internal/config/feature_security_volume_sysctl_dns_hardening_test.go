@@ -51,7 +51,7 @@ func TestUnit_Config_Security_Volume_Sysctl_DNS_Hardening(t *testing.T) {
 		// Expression resolving to control character
 		_, err = resolveVolumePath("{{env:CTRL_PATH}}:/container_target", "/tmp", r)
 		require.Error(t, err)
-		assert.True(t, assert.ObjectsAreEqual(true, true)) // verify error occurred
+		assert.Contains(t, err.Error(), "security validation failed")
 	})
 
 	t.Run("ValidateDNSOption rejects control characters and invalid UTF-8", func(t *testing.T) {
