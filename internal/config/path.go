@@ -155,8 +155,16 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		mountType = "bind"
 	}
 
-	// Prevent parent directory references in mount target raw inputs to avoid obfuscation/traversal
-	if HasParentTraversal(mc.Target.Raw) {
+	// Validate resolver-expanded mount target for parent traversal before normalization
+	expandedTarget := mc.Target.Raw
+	if r != nil {
+		resolved, err := r.WithoutHostContext().ResolveString(mc.Target.Raw)
+		if err != nil {
+			return container.Mount{}, err
+		}
+		expandedTarget = resolved
+	}
+	if HasParentTraversal(expandedTarget) {
 		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", mc.Target.Raw)
 	}
 
@@ -275,12 +283,21 @@ func (dc *DeviceConfig) SetBaseDir(baseDir string) {
 	}
 }
 func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, error) {
-	// Prevent parent directory references in device destination raw inputs to avoid obfuscation/traversal
-	if HasParentTraversal(dc.Destination.Raw) {
+	// Validate resolver-expanded device destination and source for parent traversal before normalization
+	expandedDest := dc.Destination.Raw
+	expandedSource := dc.Source.Raw
+	if r != nil {
+		if resolved, err := r.WithoutHostContext().ResolveString(dc.Destination.Raw); err == nil {
+			expandedDest = resolved
+		}
+		if resolved, err := r.ResolveString(dc.Source.Raw); err == nil {
+			expandedSource = resolved
+		}
+	}
+	if HasParentTraversal(expandedDest) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", dc.Destination.Raw)
 	}
-	// Prevent parent directory references in device source raw inputs to avoid obfuscation/traversal
-	if HasParentTraversal(dc.Source.Raw) {
+	if HasParentTraversal(expandedSource) {
 		return container.DeviceMapping{}, fmt.Errorf("device source cannot contain parent directory references: %q", dc.Source.Raw)
 	}
 
