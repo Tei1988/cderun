@@ -135,9 +135,9 @@ func TestUnit_Config_AdvancedExpressionFallbacksAndMasking(t *testing.T) {
 	})
 
 	t.Run("DoubleBraceEscaping", func(t *testing.T) {
-		res, err := r.ResolveString("literal_{{HOME}}_escaped")
+		res, err := r.ResolveString("literal_{{ {{HOME}} }}_escaped")
 		require.NoError(t, err)
-		require.Contains(t, res, "literal_")
+		require.Equal(t, "literal_{{HOME}}_escaped", res)
 	})
 
 	t.Run("SensitiveEnvMasking", func(t *testing.T) {
@@ -146,13 +146,15 @@ func TestUnit_Config_AdvancedExpressionFallbacksAndMasking(t *testing.T) {
 			"DATABASE_PASSWORD=supersecret",
 			"NORMAL_VAR=hello",
 		}
-		masked := MaskSensitiveEnvList(envSlice, nil)
-		require.Len(t, masked, 3)
+		masked := MaskSensitiveEnvList(envSlice, []string{"*KEY*", "*PASSWORD*"})
+		require.Equal(t, []string{
+			"API_KEY=[REDACTED]",
+			"DATABASE_PASSWORD=[REDACTED]",
+			"NORMAL_VAR=hello",
+		}, masked)
 		for _, item := range masked {
-			if item == "NORMAL_VAR=hello" {
-				continue
-			}
-			require.Contains(t, item, "[REDACTED]")
+			require.NotContains(t, item, "secret123")
+			require.NotContains(t, item, "supersecret")
 		}
 	})
 }

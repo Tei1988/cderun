@@ -52,7 +52,7 @@ node:
 		})
 		require.NoError(t, err)
 
-		var output map[string]interface{}
+		var output map[string]any
 		err = json.Unmarshal(stdoutBuf.Bytes(), &output)
 		require.NoError(t, err)
 
@@ -89,11 +89,11 @@ python:
 		})
 		require.NoError(t, err)
 
-		var output map[string]interface{}
+		var output map[string]any
 		err = json.Unmarshal(stdoutBuf.Bytes(), &output)
 		require.NoError(t, err)
 
-		cmdVal, ok := output["command"].([]interface{})
+		cmdVal, ok := output["command"].([]any)
 		require.True(t, ok)
 		require.Equal(t, "script.py", cmdVal[0])
 	})
@@ -121,15 +121,15 @@ python:
 		})
 		require.NoError(t, err)
 
-		var output map[string]interface{}
+		var output map[string]any
 		err = json.Unmarshal(stdoutBuf.Bytes(), &output)
 		require.NoError(t, err)
 
-		envList, ok := output["env"].([]interface{})
+		envList, ok := output["env"].([]any)
 		require.True(t, ok)
 
-		foundApiKeyRedacted := false
-		foundDbPassRedacted := false
+		foundAPIKeyRedacted := false
+		foundDBPassRedacted := false
 
 		for _, item := range envList {
 			str, ok := item.(string)
@@ -137,14 +137,14 @@ python:
 				continue
 			}
 			if str == "API_KEY=[REDACTED]" {
-				foundApiKeyRedacted = true
+				foundAPIKeyRedacted = true
 			}
 			if str == "DATABASE_PASSWORD=[REDACTED]" {
-				foundDbPassRedacted = true
+				foundDBPassRedacted = true
 			}
 		}
 
-		require.True(t, foundApiKeyRedacted)
-		require.True(t, foundDbPassRedacted)
+		require.True(t, foundAPIKeyRedacted)
+		require.True(t, foundDBPassRedacted)
 	})
 }
