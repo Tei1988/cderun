@@ -33,6 +33,7 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Substring pattern exact", "SOME_SECRET_KEY_SOME", "pass", []string{"*_SECRET_*"}, "[REDACTED]"},
 		{"Non-ASCII pattern fallback", "SECRET", "pass", []string{"SEC★"}, "pass"},
 		{"Unicode key matching patterns", "SEC★RET", "pass", []string{"SEC★RET"}, "[REDACTED]"},
+		{"Unicode lowercase key with uppercase pattern fallback", "ü_token", "pass", []string{"*Ü_TOKEN*"}, "[REDACTED]"},
 	}
 
 	for _, tt := range tests {
@@ -62,6 +63,13 @@ func TestMaskSensitiveEnvList(t *testing.T) {
 	t.Run("Mask patterns", func(t *testing.T) {
 		expected := []string{"SAFE=VALUE", "MY_PASSWORD=[REDACTED]", "NO_EQUALS"}
 		got := MaskSensitiveEnvList(env, []string{"*_PASSWORD"})
+		assert.Equal(t, expected, got)
+	})
+
+	t.Run("Mask Unicode lowercase key with uppercase pattern fallback", func(t *testing.T) {
+		unicodeEnv := []string{"ü_token=secret_val"}
+		expected := []string{"ü_token=[REDACTED]"}
+		got := MaskSensitiveEnvList(unicodeEnv, []string{"*Ü_TOKEN*"})
 		assert.Equal(t, expected, got)
 	})
 

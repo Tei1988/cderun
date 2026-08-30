@@ -243,7 +243,7 @@ func matchPreAnalyzed(key string, keyIsASCII, keyIsUpper bool, ap *preAnalyzedPa
 	}
 
 	if *upperKey == "" {
-		if keyIsUpper {
+		if keyIsASCII && keyIsUpper {
 			*upperKey = key
 		} else {
 			*upperKey = strings.ToUpper(key)
