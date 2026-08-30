@@ -19,7 +19,12 @@ import (
 // hostDir is the resolved host path (used as mount source for the next container).
 func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount, reader mountInfoReader, mountCderunSocket bool) (string, string, *controlsocket.Server, error) {
 	id := uuid.New().String()
-	snapshotDir := filepath.Join(fs.TempDir(), "cderun-snap-"+id)
+	// Determine snapshot base dir independent of TMPDIR environment variable overrides (e.g. node_modules/.tmp)
+	baseTempDir := fs.TempDir()
+	if _, isReal := fs.(config.RealFileSystem); isReal {
+		baseTempDir = "/tmp"
+	}
+	snapshotDir := filepath.Join(baseTempDir, "cderun-snap-"+id)
 
 	hostCtx := buildSnapshotHostContext(logger, fs, globalCfg.HostContext, currentMounts, reader)
 
