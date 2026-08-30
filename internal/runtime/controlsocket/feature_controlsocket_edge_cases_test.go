@@ -300,3 +300,33 @@ func TestUnit_ControlSocket_Server_Lifecycle_EdgeCases(t *testing.T) {
 		assert.Contains(t, resp.Error, "unsupported request message type")
 	})
 }
+
+func TestUnit_ControlSocket_PreReadinessWritesAndBufferBounding(t *testing.T) {
+	outBuf := new(bytes.Buffer)
+	gw := &gatedWriter{w: outBuf}
+
+	// 1. Write pre-readiness output below limit
+	_, err := gw.Write([]byte("early stdout log\n"))
+	require.NoError(t, err)
+
+	// 2. Write pre-readiness output exceeding MaxPreReadinessBufferSize
+	largeData := bytes.Repeat([]byte("X"), MaxPreReadinessBufferSize+100)
+	n, err := gw.Write(largeData)
+	require.NoError(t, err)
+	assert.Equal(t, len(largeData), n)
+
+	// Verify buffer size is capped at MaxPreReadinessBufferSize
+	assert.LessOrEqual(t, gw.buffer.Len(), MaxPreReadinessBufferSize)
+
+	// 3. Enable output delivery after readiness
+	err = gw.Enable()
+	require.NoError(t, err)
+
+	outStr := outBuf.String()
+	assert.Contains(t, outStr, "early stdout log\n")
+
+	// 4. Post-readiness write delivers directly to destination writer
+	_, err = gw.Write([]byte("post readiness log\n"))
+	require.NoError(t, err)
+	assert.Contains(t, outBuf.String(), "post readiness log\n")
+}

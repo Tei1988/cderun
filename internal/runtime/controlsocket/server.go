@@ -30,6 +30,9 @@ type ContainerRuntimeDispatcher interface {
 	SignalContainer(ctx context.Context, containerID string, sig string) error
 }
 
+// MaxPreReadinessBufferSize limits maximum buffer size for pre-readiness stream output (1MB).
+const MaxPreReadinessBufferSize = 1 * 1024 * 1024
+
 type gatedWriter struct {
 	mu     sync.Mutex
 	w      io.Writer
@@ -42,6 +45,19 @@ func (g *gatedWriter) Write(p []byte) (int, error) {
 	defer g.mu.Unlock()
 
 	if !g.gated {
+		if len(p) == 0 {
+			return 0, nil
+		}
+		current := g.buffer.Len()
+		if current >= MaxPreReadinessBufferSize {
+			// Pre-readiness buffer full; discard excess pre-readiness output to prevent memory exhaustion
+			return len(p), nil
+		}
+		allowed := MaxPreReadinessBufferSize - current
+		if len(p) > allowed {
+			_, _ = g.buffer.Write(p[:allowed])
+			return len(p), nil
+		}
 		return g.buffer.Write(p)
 	}
 	return g.w.Write(p)
