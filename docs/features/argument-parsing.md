@@ -152,24 +152,54 @@ To simplify argument parsing and avoid semantic ambiguity with shell-native and 
 
 ---
 
-## Symlink Mode & Polyglot Entry Point
+## Execution Modes & Boundary Detection
 
-When `cderun` is executed via a symbolic link (e.g., `node` -> `cderun`), the base name of the executable (`node`) is automatically detected as the subcommand.
+`cderun` supports four distinct execution modes, each handling subcommand boundary detection and argument parsing according to specific rules:
 
-In this mode:
+### 1. Wrapper Mode
 
-- Only `--cderun-` prefixed flags appearing after the executable name are hoisted.
-- Standard flags without the `--cderun-` prefix (such as `--env`) appearing after the executable name are treated as literal passthrough arguments and are forwarded directly to the containerized tool.
+Standard execution mode where `cderun` is invoked explicitly followed by the target subcommand.
+
+- **Boundary Detection**: The first non-flag argument is consumed as the `<subcommand>` lookup key.
+- **P1 Override Placement**: All `--cderun-*` overrides must appear **after** the subcommand and are hoisted to the front during preprocessing.
+
+```bash
+cderun --tty node app.js --cderun-image=node:20-alpine
+```
+
+### 2. Symlink Mode (Polyglot Entry Point)
+
+Executed via a symbolic link pointing to `cderun` (e.g., `ln -s cderun node`).
+
+- **Boundary Detection**: The base name of the symlink executable (e.g., `node`) is automatically detected and consumed as the subcommand.
+- **Passthrough Isolation**: All non-`--cderun-` arguments following the symlink executable name (including standard flags like `--env`) are treated as literal passthrough arguments for the target tool.
+- **P1 Overrides**: `--cderun-*` flags placed after the symlink executable name are extracted, hoisted, and applied as `cderun` P1 overrides without affecting the target tool's arguments.
 
 ```bash
 # Executed via symlink 'node':
 node --env DEBUG=app app.js --cderun-env=NODE_ENV=production
+```
 
-# Internal Resolution Workflow:
-# 1. Identifies 'node' as the subcommand from the executable name.
-# 2. Scans and detects '--cderun-env=NODE_ENV=production', hoisting it to the front.
-# 3. Keeps '--env DEBUG=app app.js' intact as passthrough arguments.
-# 4. Executes 'node --env DEBUG=app app.js' in the container, applying 'NODE_ENV=production' internally with P1 priority.
+### 3. Ad-hoc Mode
+
+Used to run arbitrary container commands by explicitly specifying `--image` (and optionally `--entrypoint`).
+
+- **Boundary Detection**: The first non-flag argument is still consumed as the subcommand lookup key for tool mappings. If explicitly provided, `--entrypoint` overrides the default container image entrypoint.
+- **Image Priority**: The `--image` flag supplies the container image directly, bypassing `.tools.yaml` image mapping requirements for unregistered subcommands.
+
+```bash
+cderun --image=alpine --entrypoint=ls ls -la
+```
+
+### 4. Diagnosis Mode
+
+System verification mode activated via `--diagnosis` or `--cderun-diagnosis`.
+
+- **Boundary Detection**: No subcommand is required. The argument preprocessor detects the diagnosis flag and skips subcommand boundary validation entirely, outputting system diagnostic details (active container runtimes, sockets, and available tool definitions).
+
+```bash
+cderun --diagnosis
+cderun --diagnosis-format=json
 ```
 
 ---
