@@ -193,13 +193,14 @@ cderun --image=alpine --entrypoint=ls ls -la
 
 ### 4. Diagnosis Mode
 
-System verification mode activated via `--diagnosis` or `--cderun-diagnosis`.
+System verification mode activated via `--diagnosis` or `--cderun-diagnosis` (or the `CDERUN_DIAGNOSIS` environment variable).
 
-- **Boundary Detection**: No subcommand is required. The argument preprocessor detects the diagnosis flag and skips subcommand boundary validation entirely, outputting system diagnostic details (active container runtimes, sockets, and available tool definitions).
+- **Boundary Detection**: No subcommand is required. The argument preprocessor detects the absence of a subcommand and Cobra parses global flags directly, outputting system diagnostic details (active container runtimes, sockets, and available tool definitions).
+- **Format Configuration**: The output format can be customized using `--diagnosis-format=<format>` or `--cderun-diagnosis-format=<format>` (`yaml`, `json`, or `simple`) alongside the activation flag.
 
 ```bash
 cderun --diagnosis
-cderun --diagnosis-format=json
+cderun --diagnosis --diagnosis-format=json
 ```
 
 ---
