@@ -306,7 +306,8 @@ func TestUnit_ControlSocket_PreReadinessWritesAndBufferBounding(t *testing.T) {
 	gw := &gatedWriter{w: outBuf}
 
 	// 1. Write pre-readiness output below limit
-	_, err := gw.Write([]byte("early stdout log\n"))
+	earlyLog := []byte("early stdout log\n")
+	_, err := gw.Write(earlyLog)
 	require.NoError(t, err)
 
 	// 2. Write pre-readiness output exceeding MaxPreReadinessBufferSize
@@ -315,18 +316,21 @@ func TestUnit_ControlSocket_PreReadinessWritesAndBufferBounding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, len(largeData), n)
 
-	// Verify buffer size is capped at MaxPreReadinessBufferSize
-	assert.LessOrEqual(t, gw.buffer.Len(), MaxPreReadinessBufferSize)
+	// Verify buffer size is capped exactly at MaxPreReadinessBufferSize
+	assert.Equal(t, MaxPreReadinessBufferSize, gw.buffer.Len())
 
 	// 3. Enable output delivery after readiness
 	err = gw.Enable()
 	require.NoError(t, err)
 
-	outStr := outBuf.String()
-	assert.Contains(t, outStr, "early stdout log\n")
+	// Assert the flushed output length matches exact retained byte count
+	assert.Equal(t, MaxPreReadinessBufferSize, outBuf.Len())
+	assert.Contains(t, outBuf.String(), "early stdout log\n")
 
 	// 4. Post-readiness write delivers directly to destination writer
-	_, err = gw.Write([]byte("post readiness log\n"))
+	postLog := []byte("post readiness log\n")
+	_, err = gw.Write(postLog)
 	require.NoError(t, err)
+	assert.Equal(t, MaxPreReadinessBufferSize+len(postLog), outBuf.Len())
 	assert.Contains(t, outBuf.String(), "post readiness log\n")
 }
