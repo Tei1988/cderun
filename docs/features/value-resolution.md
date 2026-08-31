@@ -106,7 +106,7 @@ All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` 
 
 1. **Trigger Conditions (Fallback Is Evaluated)**:
    - **`file:`**: Target file does not exist, file read/stat fails (e.g., target is a directory or lacks read permissions), or trimmed file content is empty.
-   - **`find_dir:`**: Target file or directory name is not found during upward directory traversal.
+   - **`find_dir:`**: Target file or directory name is not found during upward directory traversal, or absolute-path resolution (`r.fs.Abs(dir)`) fails after the target is found.
    - **`env:`**: Environment variable is unset or empty (`""`).
    - *Behavior on Trigger*: When a fallback trigger occurs and a default value is provided, the resolution engine evaluates the default value, does **NOT** record a sticky error, and proceeds with the resolved fallback string.
 

@@ -161,5 +161,5 @@ Certain options are dynamically and transitively enabled based on the resolution
 2. **`mountSocket` Auto-enablement**:
    If `mountCderun` resolves to `true` (including transitively), `mountSocket` is transitively set to `true`.
 
-**Explicit Override Suppression**:
-If a target option is explicitly configured as `false` in any higher-priority layer (P1–P5), its dynamic auto-enablement is strictly suppressed. For example, if `.cderun.yaml` (P5) explicitly sets `mountSocket: false`, the runtime socket will not be mounted even if `mountCderun` or `mountTools` resolves to `true` in P4 or P3.
+**Explicit Override & Priority Rules**:
+Normal priority rules (P1 > P2 > P3 > P4 > P5) apply first when resolving target options (such as `mountSocket` or `mountCderun`). Transitive auto-enablement is applied **only** when the target option remains completely unconfigured (`nil` / unspecified) across all P1–P5 layers. If the target option resolves to an explicit value (`true` or `false`) through standard layer precedence, auto-enablement does not override it (e.g. an explicit higher-priority `mountSocket: true` overrides a lower-priority `false`, while an explicitly resolved `false` value suppresses transitive auto-enablement).
