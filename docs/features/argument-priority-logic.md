@@ -154,11 +154,12 @@ Within a single source (e.g., only CLI flags or inside a single YAML block), if 
 
 ## Transitive Auto-enablement
 
-Certain options are dynamically and transitively enabled based on the resolution state of other options. These transitive rules apply **only when the target option remains unconfigured (`nil`) across all P1 to P5 layers**:
+Certain options are dynamically and transitively enabled based on the resolution state of other options. These transitive rules apply **only when the target option remains unconfigured (`nil` or un-set) across all P1 to P5 layers**:
 
 1. **`mountCderun` Auto-enablement**:
    If `mountTools` is specified (non-empty) or if `mountAllTools` resolves to `true`, `mountCderun` is transitively set to `true`.
 2. **`mountSocket` Auto-enablement**:
    If `mountCderun` resolves to `true` (including transitively), `mountSocket` is transitively set to `true`.
 
-**Note**: If an option is explicitly set to `false` in any layer (P1–P5), its dynamic auto-enablement is suppressed. For example, if `.cderun.yaml` configures `mountSocket: false`, the socket will not be mounted even if `mountCderun` resolves to `true`.
+**Explicit Override Suppression**:
+If a target option is explicitly configured as `false` in any higher-priority layer (P1–P5), its dynamic auto-enablement is strictly suppressed. For example, if `.cderun.yaml` (P5) explicitly sets `mountSocket: false`, the runtime socket will not be mounted even if `mountCderun` or `mountTools` resolves to `true` in P4 or P3.

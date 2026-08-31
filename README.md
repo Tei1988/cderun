@@ -503,7 +503,7 @@ defaults:
   interactive: true
   remove: true
 logging:
-  level: warn
+  level: error
   format: text
 ```
 
