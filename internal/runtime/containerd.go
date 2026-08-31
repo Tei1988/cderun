@@ -350,9 +350,18 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 		return "", err
 	}
 
+	labels := make(map[string]string)
+	for k, v := range config.Labels {
+		labels[k] = v
+	}
+	if _, ok := labels["cderun"]; !ok {
+		labels["cderun"] = "true"
+	}
+
 	_, err = r.client.NewContainer(ctx, id,
 		client.WithImage(img),
 		client.WithNewSnapshot(id, img),
+		client.WithContainerLabels(labels),
 		client.WithNewSpec(opts...),
 	)
 	if err != nil {
