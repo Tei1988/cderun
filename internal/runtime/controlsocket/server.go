@@ -1,7 +1,6 @@
 package controlsocket
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,8 +14,6 @@ import (
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/version"
-
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // ContainerRuntimeDispatcher defines the subset of container lifecycle operations needed for dispatch.
@@ -25,55 +22,6 @@ type ContainerRuntimeDispatcher interface {
 	StartContainer(ctx context.Context, containerID string) error
 	WaitContainer(ctx context.Context, containerID string) (int, error)
 	RemoveContainer(ctx context.Context, containerID string) error
-	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
-	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
-	SignalContainer(ctx context.Context, containerID string, sig string) error
-}
-
-// MaxPreReadinessBufferSize limits maximum buffer size for pre-readiness stream output (1MB).
-const MaxPreReadinessBufferSize = 1 * 1024 * 1024
-
-type gatedWriter struct {
-	mu     sync.Mutex
-	w      io.Writer
-	gated  bool
-	buffer bytes.Buffer
-}
-
-func (g *gatedWriter) Write(p []byte) (int, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if !g.gated {
-		if len(p) == 0 {
-			return 0, nil
-		}
-		current := g.buffer.Len()
-		if current >= MaxPreReadinessBufferSize {
-			// Pre-readiness buffer full; discard excess pre-readiness output to prevent memory exhaustion
-			return len(p), nil
-		}
-		allowed := MaxPreReadinessBufferSize - current
-		if len(p) > allowed {
-			_, _ = g.buffer.Write(p[:allowed])
-			return len(p), nil
-		}
-		return g.buffer.Write(p)
-	}
-	return g.w.Write(p)
-}
-
-func (g *gatedWriter) Enable() error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.gated = true
-	if g.buffer.Len() > 0 {
-		_, err := g.w.Write(g.buffer.Bytes())
-		g.buffer.Reset()
-		return err
-	}
-	return nil
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -249,9 +197,7 @@ func (s *Server) handleConn(conn net.Conn) {
 			continue
 		}
 
-		if hijacked := s.dispatchRequest(conn, &reqFrame); hijacked {
-			return
-		}
+		s.dispatchRequest(conn, &reqFrame)
 	}
 }
 
@@ -263,7 +209,7 @@ func (s *Server) buildRequestContext(reqFrame *RequestFrame) (context.Context, c
 	return context.WithCancel(ctx)
 }
 
-func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) bool {
+func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
 	ctx, cancel := s.buildRequestContext(reqFrame)
 	defer cancel()
 
@@ -285,20 +231,9 @@ func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) bool {
 	case MsgRemoveContainer:
 		s.handleRemoveContainer(ctx, conn, reqFrame.Payload)
 
-	case MsgSignalContainer:
-		s.handleSignalContainer(ctx, conn, reqFrame.Payload)
-
-	case MsgResizeContainerTTY:
-		s.handleResizeContainerTTY(ctx, conn, reqFrame.Payload)
-
-	case MsgAttachContainer:
-		s.handleAttachContainer(ctx, conn, reqFrame.Payload)
-		return true
-
 	default:
 		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
 	}
-	return false
 }
 
 func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, payload []byte) {
@@ -424,120 +359,6 @@ func (s *Server) handleRemoveContainer(ctx context.Context, conn net.Conn, paylo
 	resp := ResponseFrame{Success: true}
 	respBytes, _ := json.Marshal(resp)
 	_ = WriteFrame(conn, respBytes)
-}
-
-func (s *Server) handleSignalContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	s.mu.Lock()
-	d := s.dispatcher
-	s.mu.Unlock()
-
-	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
-		return
-	}
-
-	var args SignalContainerArgs
-	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed SignalContainer args: %v", err))
-		return
-	}
-
-	if err := d.SignalContainer(ctx, args.ContainerID, args.Signal); err != nil {
-		s.sendErrorResponse(conn, err.Error())
-		return
-	}
-
-	resp := ResponseFrame{Success: true}
-	respBytes, _ := json.Marshal(resp)
-	_ = WriteFrame(conn, respBytes)
-}
-
-func (s *Server) handleResizeContainerTTY(ctx context.Context, conn net.Conn, payload []byte) {
-	s.mu.Lock()
-	d := s.dispatcher
-	s.mu.Unlock()
-
-	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
-		return
-	}
-
-	var args ResizeContainerTTYArgs
-	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed ResizeContainerTTY args: %v", err))
-		return
-	}
-
-	if err := d.ResizeContainerTTY(ctx, args.ContainerID, args.Rows, args.Cols); err != nil {
-		s.sendErrorResponse(conn, err.Error())
-		return
-	}
-
-	resp := ResponseFrame{Success: true}
-	respBytes, _ := json.Marshal(resp)
-	_ = WriteFrame(conn, respBytes)
-}
-
-func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	s.mu.Lock()
-	d := s.dispatcher
-	s.mu.Unlock()
-
-	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
-		return
-	}
-
-	var args AttachContainerArgs
-	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed AttachContainer args: %v", err))
-		return
-	}
-
-	readyChan := make(chan struct{})
-	attachErrCh := make(chan error, 1)
-
-	gw := &gatedWriter{w: conn}
-
-	var stdinReader io.Reader = conn
-	var stdoutWriter io.Writer
-	var stderrWriter io.Writer
-
-	if args.TTY {
-		stdoutWriter = gw
-		stderrWriter = gw
-	} else {
-		stdoutWriter = stdcopy.NewStdWriter(gw, stdcopy.Stdout)
-		stderrWriter = stdcopy.NewStdWriter(gw, stdcopy.Stderr)
-	}
-
-	go func() {
-		attachErrCh <- d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
-	}()
-
-	select {
-	case <-readyChan:
-		// Send initial response acknowledging AttachContainer request only after setup signals readiness
-		resp := ResponseFrame{Success: true}
-		respBytes, _ := json.Marshal(resp)
-		if err := WriteFrame(conn, respBytes); err != nil {
-			s.logger.Warn("Failed to send AttachContainer response frame: %v", err)
-			return
-		}
-		_ = gw.Enable()
-		if err := <-attachErrCh; err != nil {
-			s.logger.Debug("AttachContainer dispatcher returned error for container %s: %v", args.ContainerID, err)
-		}
-	case err := <-attachErrCh:
-		if err == nil {
-			resp := ResponseFrame{Success: true}
-			respBytes, _ := json.Marshal(resp)
-			_ = WriteFrame(conn, respBytes)
-			_ = gw.Enable()
-		} else {
-			s.sendErrorResponse(conn, err.Error())
-		}
-	}
 }
 
 func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg string) error {

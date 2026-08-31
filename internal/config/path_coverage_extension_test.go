@@ -258,7 +258,7 @@ func TestUnit_Config_Path_ResolveVolume_ResolveDevice_Errors(t *testing.T) {
 		// ResolvePath errors if anchor boundary is escaped
 		_, err := resolveVolumePath("~/../../etc/passwd:/data", "/work", r)
 		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(), "path traversal detected") || strings.Contains(err.Error(), "parent directory references"))
+		assert.Contains(t, err.Error(), "path traversal detected")
 	})
 
 	t.Run("resolveDevicePath ResolvePath error", func(t *testing.T) {

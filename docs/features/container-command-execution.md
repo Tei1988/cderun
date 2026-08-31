@@ -13,7 +13,6 @@ Command-line parameters are parsed according to the rules defined in the [Argume
 - Executes arbitrary commands seamlessly inside containers.
 - Automatically removes the container after execution by default (controlled via the `--remove` flag).
 - Preserves and returns the exact process exit codes and standard output streams.
-- Reclassifies non-essential status logs (such as image prefetching notices) to `Debug` level, ensuring standard execution remains silent under the default `error` log level.
 
 ### Interactive Terminal Support
 

@@ -1,11 +1,9 @@
 package controlsocket
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -23,9 +21,6 @@ type mockDispatcher struct {
 	startFunc  func(ctx context.Context, containerID string) error
 	waitFunc   func(ctx context.Context, containerID string) (int, error)
 	removeFunc func(ctx context.Context, containerID string) error
-	attachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
-	resizeFunc func(ctx context.Context, containerID string, rows, cols uint) error
-	signalFunc func(ctx context.Context, containerID string, sig string) error
 }
 
 func (m *mockDispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
@@ -52,33 +47,6 @@ func (m *mockDispatcher) WaitContainer(ctx context.Context, containerID string) 
 func (m *mockDispatcher) RemoveContainer(ctx context.Context, containerID string) error {
 	if m.removeFunc != nil {
 		return m.removeFunc(ctx, containerID)
-	}
-	return nil
-}
-
-func (m *mockDispatcher) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	if m.attachFunc != nil {
-		return m.attachFunc(ctx, containerID, tty, stdin, stdout, stderr, ready)
-	}
-	if ready != nil {
-		select {
-		case ready <- struct{}{}:
-		default:
-		}
-	}
-	return nil
-}
-
-func (m *mockDispatcher) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
-	if m.resizeFunc != nil {
-		return m.resizeFunc(ctx, containerID, rows, cols)
-	}
-	return nil
-}
-
-func (m *mockDispatcher) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	if m.signalFunc != nil {
-		return m.signalFunc(ctx, containerID, sig)
 	}
 	return nil
 }
@@ -223,6 +191,7 @@ func TestUnit_ControlSocket_RPC_ContextDeadlinePropagation(t *testing.T) {
 	assert.WithinDuration(t, expectedDeadline, dl, 50*time.Millisecond)
 }
 
+
 func TestUnit_ControlSocket_RPC_ConcurrentRPCs(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "concurrent.sock")
@@ -286,162 +255,4 @@ func TestUnit_ControlSocket_RPC_ConcurrentRPCs(t *testing.T) {
 	for err := range errs {
 		assert.NoError(t, err)
 	}
-}
-
-func TestUnit_ControlSocket_RPC_SignalAndResize(t *testing.T) {
-	tmpDir := t.TempDir()
-	socketPath := filepath.Join(tmpDir, "signal_resize.sock")
-
-	var mu sync.Mutex
-	var signalCalled, resizeCalled bool
-	var receivedSig string
-	var receivedRows, receivedCols uint
-
-	disp := &mockDispatcher{
-		signalFunc: func(ctx context.Context, containerID string, sig string) error {
-			mu.Lock()
-			signalCalled = true
-			receivedSig = sig
-			mu.Unlock()
-			return nil
-		},
-		resizeFunc: func(ctx context.Context, containerID string, rows, cols uint) error {
-			mu.Lock()
-			resizeCalled = true
-			receivedRows = rows
-			receivedCols = cols
-			mu.Unlock()
-			return nil
-		},
-	}
-
-	server := NewServer(socketPath, logging.NewLogger())
-	server.SetDispatcher(disp)
-	require.NoError(t, server.Start())
-	defer server.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	client, err := Connect(ctx, socketPath)
-	require.NoError(t, err)
-	defer client.Close()
-
-	// Signal
-	require.NoError(t, client.SignalContainer(ctx, "c1", "SIGINT"))
-
-	mu.Lock()
-	sigDone := signalCalled
-	sigVal := receivedSig
-	mu.Unlock()
-
-	assert.True(t, sigDone)
-	assert.Equal(t, "SIGINT", sigVal)
-
-	// Resize
-	require.NoError(t, client.ResizeContainerTTY(ctx, "c1", 24, 80))
-
-	mu.Lock()
-	resDone := resizeCalled
-	rRows := receivedRows
-	rCols := receivedCols
-	mu.Unlock()
-
-	assert.True(t, resDone)
-	assert.Equal(t, uint(24), rRows)
-	assert.Equal(t, uint(80), rCols)
-}
-
-func TestUnit_ControlSocket_RPC_AttachContainer_NonTTY(t *testing.T) {
-	tmpDir := t.TempDir()
-	socketPath := filepath.Join(tmpDir, "attach_nontty.sock")
-
-	disp := &mockDispatcher{
-		attachFunc: func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-			if ready != nil {
-				select {
-				case ready <- struct{}{}:
-				default:
-				}
-			}
-			// Write stdout and stderr
-			_, _ = stdout.Write([]byte("hello stdout"))
-			_, _ = stderr.Write([]byte("hello stderr"))
-
-			// Read stdin
-			stdinBuf := new(bytes.Buffer)
-			_, _ = io.Copy(stdinBuf, stdin)
-			if stdinBuf.String() != "hello stdin" {
-				return fmt.Errorf("unexpected stdin input: %s", stdinBuf.String())
-			}
-			return nil
-		},
-	}
-
-	server := NewServer(socketPath, logging.NewLogger())
-	server.SetDispatcher(disp)
-	require.NoError(t, server.Start())
-	defer server.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client, err := Connect(ctx, socketPath)
-	require.NoError(t, err)
-	defer client.Close()
-
-	stdin := bytes.NewBufferString("hello stdin")
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	ready := make(chan struct{}, 1)
-
-	err = client.AttachContainer(ctx, "c1", false, stdin, stdout, stderr, ready)
-	require.NoError(t, err)
-
-	assert.Equal(t, "hello stdout", stdout.String())
-	assert.Equal(t, "hello stderr", stderr.String())
-
-	select {
-	case <-ready:
-	default:
-		t.Fatal("ready channel was not signaled")
-	}
-}
-
-func TestUnit_ControlSocket_RPC_AttachContainer_TTY(t *testing.T) {
-	tmpDir := t.TempDir()
-	socketPath := filepath.Join(tmpDir, "attach_tty.sock")
-
-	disp := &mockDispatcher{
-		attachFunc: func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-			if ready != nil {
-				select {
-				case ready <- struct{}{}:
-				default:
-				}
-			}
-			_, _ = stdout.Write([]byte("tty output"))
-			return nil
-		},
-	}
-
-	server := NewServer(socketPath, logging.NewLogger())
-	server.SetDispatcher(disp)
-	require.NoError(t, server.Start())
-	defer server.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	client, err := Connect(ctx, socketPath)
-	require.NoError(t, err)
-	defer client.Close()
-
-	stdout := new(bytes.Buffer)
-	ready := make(chan struct{}, 1)
-
-	err = client.AttachContainer(ctx, "c1", true, nil, stdout, nil, ready)
-	require.NoError(t, err)
-
-	assert.Equal(t, "tty output", stdout.String())
 }

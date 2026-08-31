@@ -6,15 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"sync"
 	"time"
 
 	"cderun/internal/container"
 	"cderun/internal/version"
-
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // Client represents a connection to a Base Host cderun Control Socket.
@@ -27,34 +24,36 @@ type Client struct {
 
 // Connect establishes a connection to the Control Socket at socketPath and performs the handshake.
 func Connect(ctx context.Context, socketPath string) (*Client, error) {
-	c := &Client{
-		socketPath: socketPath,
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to control socket %s: %w", socketPath, err)
 	}
 
-	conn, err := c.dialAndHandshake(ctx)
-	if err != nil {
+	c := &Client{
+		socketPath: socketPath,
+		conn:       conn,
+	}
+
+	if err := c.handshake(ctx); err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
-	c.conn = conn
 
 	return c, nil
 }
 
-func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "unix", c.socketPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to control socket %s: %w", c.socketPath, err)
-	}
-
+func (c *Client) handshake(ctx context.Context) error {
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		deadline = time.Now().Add(5 * time.Second)
 	}
-	if err := conn.SetDeadline(deadline); err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("failed to set deadline for control socket handshake: %w", err)
+	if err := c.conn.SetDeadline(deadline); err != nil {
+		return fmt.Errorf("failed to set deadline for control socket handshake: %w", err)
 	}
+	defer func() {
+		_ = c.conn.SetDeadline(time.Time{})
+	}()
 
 	req := HandshakeRequest{
 		ProtocolVersion: CurrentProtocolVersion,
@@ -62,39 +61,29 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	}
 	reqData, err := json.Marshal(req)
 	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("failed to marshal handshake request: %w", err)
+		return fmt.Errorf("failed to marshal handshake request: %w", err)
 	}
 
-	if err := WriteFrame(conn, reqData); err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("failed to send handshake request: %w", err)
+	if err := WriteFrame(c.conn, reqData); err != nil {
+		return fmt.Errorf("failed to send handshake request: %w", err)
 	}
 
-	respData, err := ReadFrame(conn)
+	respData, err := ReadFrame(c.conn)
 	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("failed to read handshake response: %w", err)
+		return fmt.Errorf("failed to read handshake response: %w", err)
 	}
-
-	_ = conn.SetDeadline(time.Time{})
 
 	var resp HandshakeResponse
 	if err := json.Unmarshal(respData, &resp); err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("malformed handshake response from control socket: %w", err)
+		return fmt.Errorf("malformed handshake response from control socket: %w", err)
 	}
 
 	if !resp.Accepted {
-		_ = conn.Close()
-		return nil, fmt.Errorf("control socket handshake rejected: %s (please re-run --mount-cderun-path with a matching binary)", resp.Error)
+		return fmt.Errorf("control socket handshake rejected: %s (please re-run --mount-cderun-path with a matching binary)", resp.Error)
 	}
 
-	if c.serverVersion == "" {
-		c.serverVersion = resp.ServerVersion
-	}
-
-	return conn, nil
+	c.serverVersion = resp.ServerVersion
+	return nil
 }
 
 // Ping sends a ping frame and waits for a pong response to verify connection responsiveness.
@@ -261,121 +250,5 @@ func (c *Client) RemoveContainer(ctx context.Context, containerID string) error 
 	}
 
 	_, err = c.sendRPC(ctx, MsgRemoveContainer, payload)
-	return err
-}
-
-// AttachContainer attaches to a container's IO streams over Control Socket.
-func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	conn, err := c.dialAndHandshake(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to dial control socket for attach: %w", err)
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	args := AttachContainerArgs{
-		ContainerID: containerID,
-		TTY:         tty,
-	}
-	payload, err := json.Marshal(args)
-	if err != nil {
-		return fmt.Errorf("failed to marshal AttachContainer args: %w", err)
-	}
-
-	reqFrame := RequestFrame{
-		Type:    MsgAttachContainer,
-		Payload: payload,
-	}
-	reqBytes, err := json.Marshal(reqFrame)
-	if err != nil {
-		return fmt.Errorf("failed to marshal AttachContainer request frame: %w", err)
-	}
-
-	if err := WriteFrame(conn, reqBytes); err != nil {
-		return fmt.Errorf("failed to send AttachContainer request frame: %w", err)
-	}
-
-	respBytes, err := ReadFrame(conn)
-	if err != nil {
-		return fmt.Errorf("failed to read AttachContainer response frame: %w", err)
-	}
-
-	var resp ResponseFrame
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return fmt.Errorf("malformed AttachContainer response frame: %w", err)
-	}
-
-	if !resp.Success {
-		return errors.New(resp.Error)
-	}
-
-	// Notify caller that attach connection is established
-	if ready != nil {
-		select {
-		case ready <- struct{}{}:
-		default:
-		}
-	}
-
-	// Start stdin forwarding in background if stdin is provided
-	if stdin != nil {
-		go func() {
-			_, _ = io.Copy(conn, stdin)
-			if cw, ok := conn.(interface{ CloseWrite() error }); ok {
-				_ = cw.CloseWrite()
-			}
-		}()
-	}
-
-	// Demux/copy output streams from server
-	var outputErr error
-	if tty {
-		if stdout != nil {
-			_, outputErr = io.Copy(stdout, conn)
-		} else {
-			_, outputErr = io.Copy(io.Discard, conn)
-		}
-	} else {
-		if stdout == nil {
-			stdout = io.Discard
-		}
-		if stderr == nil {
-			stderr = io.Discard
-		}
-		_, outputErr = stdcopy.StdCopy(stdout, stderr, conn)
-	}
-
-	return outputErr
-}
-
-// SignalContainer invokes SignalContainer RPC over Control Socket.
-func (c *Client) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	args := SignalContainerArgs{
-		ContainerID: containerID,
-		Signal:      sig,
-	}
-	payload, err := json.Marshal(args)
-	if err != nil {
-		return fmt.Errorf("failed to marshal SignalContainer args: %w", err)
-	}
-
-	_, err = c.sendRPC(ctx, MsgSignalContainer, payload)
-	return err
-}
-
-// ResizeContainerTTY invokes ResizeContainerTTY RPC over Control Socket.
-func (c *Client) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
-	args := ResizeContainerTTYArgs{
-		ContainerID: containerID,
-		Rows:        rows,
-		Cols:        cols,
-	}
-	payload, err := json.Marshal(args)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ResizeContainerTTY args: %w", err)
-	}
-
-	_, err = c.sendRPC(ctx, MsgResizeContainerTTY, payload)
 	return err
 }

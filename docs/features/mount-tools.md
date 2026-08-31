@@ -112,12 +112,9 @@ node --version
 cderun node --version
 ```
 
-### Validation and Security Rules
+### Validation and Error Handling
 
-Each tool name specified in `--mount-tools` or extracted from `--mount-all-tools` undergoes strict validation before mounting:
-
-1. **Character Whitelisting (`ValidateToolName`)**: Tool names are strictly validated against allowed ASCII characters (`a-z`, `A-Z`, `0-9`, `.`, `_`, `-`). Any control characters, invalid UTF-8 sequences, or path traversal segments (`..`, `/`, `\`) trigger an immediate security validation error.
-2. **Configuration Presence Check**: If a tool specified in `--mount-tools` is missing from the active `.tools.yaml` configuration, `cderun` aborts execution immediately during transitive option resolution with an explicit error:
+If a tool specified in `--mount-tools` is missing from the active `.tools.yaml` configuration, `cderun` aborts execution immediately during transitive option resolution with an explicit error:
 
 ```bash
 cderun --mount-tools unknown-tool alpine sh
