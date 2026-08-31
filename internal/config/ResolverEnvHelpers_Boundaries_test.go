@@ -46,6 +46,7 @@ func TestUnit_Config_EnvHelpers_Boundaries(t *testing.T) {
 		res := deduplicateEnv(input)
 		// Should return the exact same slice (same reference) to avoid allocation
 		assert.Equal(t, input, res)
+		assert.Same(t, &input[0], &res[0])
 	})
 
 	t.Run("deduplicateEnv large list > 16 with duplicates", func(t *testing.T) {
