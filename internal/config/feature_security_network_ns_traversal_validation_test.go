@@ -46,7 +46,7 @@ func TestUnit_Config_ValidateNetworkName_NSTraversal(t *testing.T) {
 		{
 			name:    "Container network reference traversal attempt",
 			input:   "container:../bad",
-			wantErr: "invalid character in container network reference",
+			wantErr: "contains parent directory references",
 		},
 	}
 
