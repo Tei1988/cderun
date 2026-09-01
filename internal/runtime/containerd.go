@@ -351,9 +351,7 @@ func (r *ContainerdRuntime) CreateContainer(ctx context.Context, config *contain
 	}
 
 	labels := make(map[string]string)
-	for k, v := range config.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, config.Labels)
 	if _, ok := labels["cderun"]; !ok {
 		labels["cderun"] = "true"
 	}
