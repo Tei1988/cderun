@@ -21,7 +21,7 @@ func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *con
 	id := uuid.New().String()
 	// Determine snapshot base dir independent of TMPDIR environment variable overrides (e.g. node_modules/.tmp)
 	baseTempDir := fs.TempDir()
-	if _, isReal := fs.(config.RealFileSystem); isReal {
+	if isRealFileSystem(fs) {
 		baseTempDir = "/tmp"
 	}
 	snapshotDir := filepath.Join(baseTempDir, "cderun-snap-"+id)
@@ -131,7 +131,7 @@ func startSnapshotControlSocket(fs config.FileSystem, logger *logging.Logger, ho
 	hostSocketPath := filepath.Join(hostSnapshotDir, "cderun.sock")
 	hostCtx.ControlSocket = hostSocketPath
 
-	if _, isReal := fs.(config.RealFileSystem); isReal {
+	if isRealFileSystem(fs) {
 		ctrlServer := controlsocket.NewServer(containerSocketPath, logger)
 		if err := ctrlServer.Start(); err != nil {
 			return nil, fmt.Errorf("failed to start control socket server: %w", err)
@@ -217,6 +217,15 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 }
 
 var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
+
+func isRealFileSystem(fs config.FileSystem) bool {
+	switch fs.(type) {
+	case config.RealFileSystem, *config.RealFileSystem:
+		return true
+	default:
+		return false
+	}
+}
 
 func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (string, error) {
 	if reader == nil {
