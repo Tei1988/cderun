@@ -610,7 +610,7 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
 func findAnchors(s string) []string {
-	var buf [8]anchorRange
+	var buf [32]anchorRange
 	ranges := scanAnchors(s, buf[:0])
 	if len(ranges) == 0 {
 		return nil
@@ -662,6 +662,17 @@ func HasParentTraversal(s string) bool {
 
 // validatePathChars ensures the string does not contain C0 or C1 control characters or invalid UTF-8 sequences.
 func validatePathChars(s string) error {
+	hasControlOrNonASCII := false
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b < 0x20 || b >= 0x7f {
+			hasControlOrNonASCII = true
+			break
+		}
+	}
+	if !hasControlOrNonASCII {
+		return nil
+	}
 	for pos, r := range s {
 		if r == utf8.RuneError {
 			_, width := utf8.DecodeRuneInString(s[pos:])

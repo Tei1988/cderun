@@ -7,7 +7,7 @@ import (
 )
 
 // TestUnit_Config_EnvHelpers_Boundaries validates environment helpers addEnv, deduplicateEnv, and mergeEnv
-// across small (<= 8) and large (> 8) boundaries and with/without duplicates.
+// across small (<= 16) and large (> 16) boundaries and with/without duplicates.
 func TestUnit_Config_EnvHelpers_Boundaries(t *testing.T) {
 	t.Parallel()
 
@@ -28,34 +28,43 @@ func TestUnit_Config_EnvHelpers_Boundaries(t *testing.T) {
 		assert.Equal(t, []string{"A=1"}, deduplicateEnv([]string{"A=1"}))
 	})
 
-	t.Run("deduplicateEnv small list <= 8 with duplicates", func(t *testing.T) {
-		input := []string{"A=1", "B=2", "A=3", "C=4", "B=5"}
-		expected := []string{"A=3", "B=5", "C=4"}
+	t.Run("deduplicateEnv small list <= 16 with duplicates", func(t *testing.T) {
+		input := []string{
+			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
+			"A=9", "I=10", "B=11", "J=12", "K=13", "L=14", "M=15", "N=16",
+		}
+		expected := []string{"A=9", "B=11", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=10", "J=12", "K=13", "L=14", "M=15", "N=16"}
 		res := deduplicateEnv(input)
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("deduplicateEnv small list <= 8 without duplicates", func(t *testing.T) {
-		input := []string{"A=1", "B=2", "C=3", "D=4"}
+	t.Run("deduplicateEnv small list <= 16 without duplicates", func(t *testing.T) {
+		input := []string{
+			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+		}
 		res := deduplicateEnv(input)
 		// Should return the exact same slice (same reference) to avoid allocation
 		assert.Equal(t, input, res)
+		assert.Same(t, &input[0], &res[0])
 	})
 
-	t.Run("deduplicateEnv large list > 8 with duplicates", func(t *testing.T) {
+	t.Run("deduplicateEnv large list > 16 with duplicates", func(t *testing.T) {
 		input := []string{
 			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
-			"A=9", "I=10", "B=11",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+			"A=17", "Q=18", "B=19",
 		}
-		expected := []string{"A=9", "B=11", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=10"}
+		expected := []string{"A=17", "B=19", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16", "Q=18"}
 		res := deduplicateEnv(input)
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("deduplicateEnv large list > 8 without duplicates", func(t *testing.T) {
+	t.Run("deduplicateEnv large list > 16 without duplicates", func(t *testing.T) {
 		input := []string{
 			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
-			"I=9", "J=10",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+			"Q=17", "R=18",
 		}
 		res := deduplicateEnv(input)
 		assert.Equal(t, input, res)
@@ -72,43 +81,43 @@ func TestUnit_Config_EnvHelpers_Boundaries(t *testing.T) {
 		assert.Equal(t, []string{"A=2"}, mergeEnv(nil, nil, base))
 	})
 
-	t.Run("mergeEnv small list <= 8 total with duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2"}
-		p2 := []string{"C=3", "A=4"}
-		p1 := []string{"D=5", "B=6"}
-		// Total strings = 6 (<= 8)
+	t.Run("mergeEnv small list <= 16 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4"}
+		p2 := []string{"E=5", "F=6", "A=7", "G=8"}
+		p1 := []string{"H=9", "I=10", "B=11", "J=12"}
+		// Total strings = 12 (<= 16)
 		res := mergeEnv(base, p2, p1)
-		expected := []string{"A=4", "B=6", "C=3", "D=5"}
+		expected := []string{"A=7", "B=11", "C=3", "D=4", "E=5", "F=6", "G=8", "H=9", "I=10", "J=12"}
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("mergeEnv large list > 8 total with duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2", "C=3"}
-		p2 := []string{"D=4", "E=5", "F=6"}
-		p1 := []string{"G=7", "H=8", "A=9", "D=10"}
-		// Total strings = 10 (> 8)
+	t.Run("mergeEnv large list > 16 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6"}
+		p2 := []string{"G=7", "H=8", "I=9", "J=10", "K=11", "L=12"}
+		p1 := []string{"M=13", "N=14", "O=15", "A=16", "D=17", "P=18"}
+		// Total strings = 18 (> 16)
 		res := mergeEnv(base, p2, p1)
-		expected := []string{"A=9", "B=2", "C=3", "D=10", "E=5", "F=6", "G=7", "H=8"}
+		expected := []string{"A=16", "B=2", "C=3", "D=17", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=18"}
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("mergeEnv exact cutover limit 8 total with duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2", "C=3"}
-		p2 := []string{"D=4", "E=5", "F=6"}
-		p1 := []string{"A=7", "D=8"}
-		// Total strings = 8 (<= 8)
+	t.Run("mergeEnv exact cutover limit 16 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6"}
+		p2 := []string{"G=7", "H=8", "I=9", "J=10", "K=11"}
+		p1 := []string{"A=12", "D=13", "L=14", "M=15", "N=16"}
+		// Total strings = 16 (<= 16)
 		res := mergeEnv(base, p2, p1)
-		expected := []string{"A=7", "B=2", "C=3", "D=8", "E=5", "F=6"}
+		expected := []string{"A=12", "B=2", "C=3", "D=13", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=14", "M=15", "N=16"}
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("mergeEnv exact cutover limit 9 total with duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2", "C=3"}
-		p2 := []string{"D=4", "E=5", "F=6"}
-		p1 := []string{"A=7", "D=8", "G=9"}
-		// Total strings = 9 (> 8)
+	t.Run("mergeEnv exact cutover limit 17 total with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6"}
+		p2 := []string{"G=7", "H=8", "I=9", "J=10", "K=11", "L=12"}
+		p1 := []string{"A=13", "D=14", "M=15", "N=16", "O=17"}
+		// Total strings = 17 (> 16)
 		res := mergeEnv(base, p2, p1)
-		expected := []string{"A=7", "B=2", "C=3", "D=8", "E=5", "F=6", "G=9"}
+		expected := []string{"A=13", "B=2", "C=3", "D=14", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=12", "M=15", "N=16", "O=17"}
 		assert.Equal(t, expected, res)
 	})
 }

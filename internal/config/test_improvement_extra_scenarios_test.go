@@ -48,28 +48,40 @@ func TestUnit_Config_ResolverHelpers_DeduplicateEnv(t *testing.T) {
 		assert.Equal(t, []string{"KEY=val"}, res)
 	})
 
-	t.Run("under 8 elements without duplicates", func(t *testing.T) {
+	t.Run("under 16 elements without duplicates", func(t *testing.T) {
 		input := []string{"A=1", "B=2", "C=3"}
 		res := deduplicateEnv(input)
 		assert.Equal(t, input, res)
 	})
 
-	t.Run("under 8 elements with duplicates", func(t *testing.T) {
+	t.Run("under 16 elements with duplicates", func(t *testing.T) {
 		input := []string{"A=1", "B=2", "A=3", "C=4", "B=5"}
 		expected := []string{"A=3", "B=5", "C=4"}
 		res := deduplicateEnv(input)
 		assert.Equal(t, expected, res)
 	})
 
-	t.Run("over 8 elements without duplicates", func(t *testing.T) {
-		input := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9"}
+	t.Run("over 16 elements without duplicates", func(t *testing.T) {
+		input := []string{
+			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+			"Q=17",
+		}
 		res := deduplicateEnv(input)
 		assert.Equal(t, input, res)
 	})
 
-	t.Run("over 8 elements with duplicates", func(t *testing.T) {
-		input := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9", "A=10", "E=20"}
-		expected := []string{"A=10", "B=2", "C=3", "D=4", "E=20", "F=6", "G=7", "H=8", "I=9"}
+	t.Run("over 16 elements with duplicates", func(t *testing.T) {
+		input := []string{
+			"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+			"Q=17", "A=18", "E=20",
+		}
+		expected := []string{
+			"A=18", "B=2", "C=3", "D=4", "E=20", "F=6", "G=7", "H=8",
+			"I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16",
+			"Q=17",
+		}
 		res := deduplicateEnv(input)
 		assert.Equal(t, expected, res)
 	})
@@ -101,7 +113,7 @@ func TestUnit_Config_ResolverHelpers_MergeEnv(t *testing.T) {
 		assert.Equal(t, []string{"C=2"}, res)
 	})
 
-	t.Run("total elements <= 8 without duplicates", func(t *testing.T) {
+	t.Run("total elements <= 16 without duplicates", func(t *testing.T) {
 		base := []string{"A=1", "B=2"}
 		p2 := []string{"C=3", "D=4"}
 		p1 := []string{"E=5"}
@@ -110,7 +122,7 @@ func TestUnit_Config_ResolverHelpers_MergeEnv(t *testing.T) {
 		assert.Equal(t, []string{"A=1", "B=2", "C=3", "D=4", "E=5"}, res)
 	})
 
-	t.Run("total elements <= 8 with duplicates", func(t *testing.T) {
+	t.Run("total elements <= 16 with duplicates", func(t *testing.T) {
 		base := []string{"A=1", "B=2"}
 		p2 := []string{"C=3", "A=4"}
 		p1 := []string{"B=5", "D=6"}
@@ -119,22 +131,22 @@ func TestUnit_Config_ResolverHelpers_MergeEnv(t *testing.T) {
 		assert.Equal(t, []string{"A=4", "B=5", "C=3", "D=6"}, res)
 	})
 
-	t.Run("total elements > 8 without duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2", "C=3"}
-		p2 := []string{"D=4", "E=5", "F=6"}
-		p1 := []string{"G=7", "H=8", "I=9"}
+	t.Run("total elements > 16 without duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6"}
+		p2 := []string{"G=7", "H=8", "I=9", "J=10", "K=11", "L=12"}
+		p1 := []string{"M=13", "N=14", "O=15", "P=16", "Q=17"}
 
 		res := mergeEnv(base, p2, p1)
-		assert.Equal(t, []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9"}, res)
+		assert.Equal(t, []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "P=16", "Q=17"}, res)
 	})
 
-	t.Run("total elements > 8 with duplicates", func(t *testing.T) {
-		base := []string{"A=1", "B=2", "C=3"}
-		p2 := []string{"D=4", "E=5", "A=6"}
-		p1 := []string{"G=7", "H=8", "B=9", "I=10"}
+	t.Run("total elements > 16 with duplicates", func(t *testing.T) {
+		base := []string{"A=1", "B=2", "C=3", "D=4", "E=5", "F=6"}
+		p2 := []string{"G=7", "H=8", "I=9", "J=10", "K=11", "L=12"}
+		p1 := []string{"M=13", "N=14", "O=15", "A=16", "B=17", "Q=18"}
 
 		res := mergeEnv(base, p2, p1)
-		expected := []string{"A=6", "B=9", "C=3", "D=4", "E=5", "G=7", "H=8", "I=10"}
+		expected := []string{"A=16", "B=17", "C=3", "D=4", "E=5", "F=6", "G=7", "H=8", "I=9", "J=10", "K=11", "L=12", "M=13", "N=14", "O=15", "Q=18"}
 		assert.Equal(t, expected, res)
 	})
 }
