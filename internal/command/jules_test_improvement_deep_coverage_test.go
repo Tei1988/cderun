@@ -111,6 +111,8 @@ func TestDeepCoverage_DryRunJSONOutput(t *testing.T) {
 	err = json.Unmarshal(stdoutBuf.Bytes(), &dryRunData)
 	require.NoError(t, err, "stdout should contain valid JSON dry-run payload: %s", stdoutBuf.String())
 
+	assert.NotContains(t, stdoutBuf.String(), "super_secret_123", "stdout output should not contain unredacted raw secret value")
+
 	// Verify sensitive environment variable values are redacted
 	if envs, ok := dryRunData["env"].([]any); ok {
 		for _, e := range envs {

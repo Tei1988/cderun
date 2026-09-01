@@ -53,7 +53,7 @@ func TestDeepCoverage_ConfigParameterValidators(t *testing.T) {
 		assert.NoError(t, ValidateDNSOption("attempts:3"))
 		assert.NoError(t, ValidateDNSOption(""))
 		assert.Error(t, ValidateDNSOption("ndots:5\x00"))
-		assert.Error(t, ValidateDNSOption("ndots:5;bad"))
+		require.Error(t, ValidateDNSOption("ndots:5;bad"))
 
 		assert.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
 		assert.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
