@@ -49,26 +49,6 @@ func BenchmarkExpressionResolver_ResolveString(b *testing.B) {
 	}
 }
 
-func BenchmarkValidatePathChars(b *testing.B) {
-	b.Run("PrintableASCII", func(b *testing.B) {
-		input := "type=bind,source=/home/user/project/subpath,target=/app/workdir,readonly"
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_ = validatePathChars(input)
-		}
-	})
-
-	b.Run("ControlCharacter", func(b *testing.B) {
-		input := "type=bind,source=/home/user/project/\x07subpath,target=/app"
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_ = validatePathChars(input)
-		}
-	})
-}
-
 func BenchmarkResolveWithFS_ComplexConfig(b *testing.B) {
 	cli := CLIOptions{
 		Image: ptr("node:20"),
