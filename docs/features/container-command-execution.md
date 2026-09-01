@@ -15,6 +15,12 @@ Command-line parameters are parsed according to the rules defined in the [Argume
 - Preserves and returns the exact process exit codes and standard output streams.
 - Reclassifies non-essential status logs (such as image prefetching notices) to `Debug` level, ensuring standard execution remains silent under the default `error` log level.
 
+### Exit Code Propagation & Signal Handling
+
+- Captures and forwards process exit codes directly from the container task back to the caller.
+- Forwards Unix signals (`SIGINT`, `SIGTERM`, `SIGHUP`) received by `cderun` on the host to the main process inside the container.
+- Handles container creation/start errors and IO attach errors gracefully, ensuring cleanup defers fire reliably without leaking background resources.
+
 ### Interactive Terminal Support
 
 - Allocates pseudo-TTYs for interactive command flows (`--tty`).

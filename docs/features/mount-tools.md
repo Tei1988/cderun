@@ -159,6 +159,18 @@ cderun --mount-tools node,npm,npx \
   '
 ```
 
+### Stand-alone Image Prefetching
+
+Tool images defined in `.tools.yaml` can be pre-fetched ahead of execution using `--prefetch` or `--prefetch-all` without spawning container subcommands:
+
+```bash
+# Prefetch images for specific tools defined in .tools.yaml
+cderun --prefetch node,python
+
+# Prefetch images for all tools defined in .tools.yaml
+cderun --prefetch-all
+```
+
 ---
 
 ## Limitations & Best Practices
