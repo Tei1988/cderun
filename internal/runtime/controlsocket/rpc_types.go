@@ -4,13 +4,10 @@ import "cderun/internal/container"
 
 // MessageType RPC action definitions for container lifecycle dispatch.
 const (
-	MsgCreateContainer    MessageType = "CreateContainer"
-	MsgStartContainer     MessageType = "StartContainer"
-	MsgWaitContainer      MessageType = "WaitContainer"
-	MsgRemoveContainer    MessageType = "RemoveContainer"
-	MsgAttachContainer    MessageType = "AttachContainer"
-	MsgSignalContainer    MessageType = "SignalContainer"
-	MsgResizeContainerTTY MessageType = "ResizeContainerTTY"
+	MsgCreateContainer MessageType = "CreateContainer"
+	MsgStartContainer  MessageType = "StartContainer"
+	MsgWaitContainer   MessageType = "WaitContainer"
+	MsgRemoveContainer MessageType = "RemoveContainer"
 )
 
 // CreateContainerArgs holds payload for CreateContainer RPC request.
@@ -31,23 +28,4 @@ type ContainerIDArgs struct {
 // WaitContainerResult holds response payload for WaitContainer RPC request.
 type WaitContainerResult struct {
 	ExitCode int `json:"exitCode"`
-}
-
-// AttachContainerArgs holds payload for AttachContainer RPC request.
-type AttachContainerArgs struct {
-	ContainerID string `json:"containerId"`
-	TTY         bool   `json:"tty"`
-}
-
-// SignalContainerArgs holds payload for SignalContainer RPC request.
-type SignalContainerArgs struct {
-	ContainerID string `json:"containerId"`
-	Signal      string `json:"signal"`
-}
-
-// ResizeContainerTTYArgs holds payload for ResizeContainerTTY RPC request.
-type ResizeContainerTTYArgs struct {
-	ContainerID string `json:"containerId"`
-	Rows        uint   `json:"rows"`
-	Cols        uint   `json:"cols"`
 }

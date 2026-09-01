@@ -12,88 +12,106 @@ import (
 // 2. patterns is non-nil but empty: NO environment variables are masked.
 // 3. patterns is non-empty: Only keys matching the glob patterns are masked (fail-closed on invalid glob).
 
-func analyzeKeyASCII(s string) (isASCII bool, isUpper bool) {
-	isASCII = true
-	isUpper = true
+func isUpper(s string) bool {
 	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 128 {
-			isASCII = false
-		}
-		if c >= 'a' && c <= 'z' {
-			isUpper = false
-		}
-	}
-	return isASCII, isUpper
-}
-
-func equalFoldASCIILower(s, patLower string) bool {
-	if len(s) != len(patLower) {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		if c != patLower[i] {
+		if s[i] >= 'a' && s[i] <= 'z' {
 			return false
 		}
 	}
 	return true
 }
 
-func hasSuffixFoldASCIILower(s, suffixLower string) bool {
-	if len(s) < len(suffixLower) {
+func equalFoldASCII(s1, s2 string) bool {
+	if len(s1) != len(s2) {
 		return false
 	}
-	start := len(s) - len(suffixLower)
-	for i := 0; i < len(suffixLower); i++ {
-		c := s[start+i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		if c != suffixLower[i] {
-			return false
+	for i := 0; i < len(s1); i++ {
+		c1 := s1[i]
+		c2 := s2[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func hasPrefixFoldASCIILower(s, prefixLower string) bool {
-	if len(s) < len(prefixLower) {
+func hasSuffixFoldASCII(s, suffix string) bool {
+	if len(s) < len(suffix) {
 		return false
 	}
-	for i := 0; i < len(prefixLower); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		if c != prefixLower[i] {
-			return false
+	start := len(s) - len(suffix)
+	for i := 0; i < len(suffix); i++ {
+		c1 := s[start+i]
+		c2 := suffix[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func containsFoldASCIILower(s, substrLower string) bool {
-	if len(substrLower) == 0 {
+func hasPrefixFoldASCII(s, prefix string) bool {
+	if len(s) < len(prefix) {
+		return false
+	}
+	for i := 0; i < len(prefix); i++ {
+		c1 := s[i]
+		c2 := prefix[i]
+		if c1 != c2 {
+			if c1 >= 'A' && c1 <= 'Z' {
+				c1 += 'a' - 'A'
+			}
+			if c2 >= 'A' && c2 <= 'Z' {
+				c2 += 'a' - 'A'
+			}
+			if c1 != c2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func containsFoldASCII(s, substr string) bool {
+	if len(substr) == 0 {
 		return true
 	}
-	if len(s) < len(substrLower) {
+	if len(s) < len(substr) {
 		return false
 	}
-	limit := len(s) - len(substrLower)
+	limit := len(s) - len(substr)
 	for i := 0; i <= limit; i++ {
 		match := true
-		for j := 0; j < len(substrLower); j++ {
-			c := s[i+j]
-			if c >= 'A' && c <= 'Z' {
-				c += 'a' - 'A'
-			}
-			if c != substrLower[j] {
-				match = false
-				break
+		for j := 0; j < len(substr); j++ {
+			c1 := s[i+j]
+			c2 := substr[j]
+			if c1 != c2 {
+				if c1 >= 'A' && c1 <= 'Z' {
+					c1 += 'a' - 'A'
+				}
+				if c2 >= 'A' && c2 <= 'Z' {
+					c2 += 'a' - 'A'
+				}
+				if c1 != c2 {
+					match = false
+					break
+				}
 			}
 		}
 		if match {
@@ -113,15 +131,14 @@ func isASCII(s string) bool {
 }
 
 type preAnalyzedPattern struct {
-	raw           string
-	upperPattern  string
-	isASCII       bool
-	isGlob        bool
-	isSuffix      bool
-	isPrefix      bool
-	isSubstr      bool
-	cleanPatLower string
-	cleanPatUpper string
+	raw          string
+	upperPattern string
+	isASCII      bool
+	isGlob       bool
+	isSuffix     bool
+	isPrefix     bool
+	isSubstr     bool
+	cleanPat     string
 }
 
 type analyzedPatternsCacheEntry struct {
@@ -181,69 +198,50 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 
 	hasWildcard := strings.ContainsAny(p, "*?[\\")
 	if !hasWildcard {
-		ap.cleanPatLower = strings.ToLower(p)
-		ap.cleanPatUpper = strings.ToUpper(p)
+		ap.cleanPat = p
 		return ap
 	}
 
 	ap.isGlob = true
 	if strings.HasPrefix(p, "*") && !strings.ContainsAny(p[1:], "*?[\\") {
 		ap.isSuffix = true
-		ap.cleanPatLower = strings.ToLower(p[1:])
-		ap.cleanPatUpper = strings.ToUpper(p[1:])
+		ap.cleanPat = p[1:]
 		return ap
 	}
 
 	if strings.HasSuffix(p, "*") && !strings.ContainsAny(p[:len(p)-1], "*?[\\") {
 		ap.isPrefix = true
-		ap.cleanPatLower = strings.ToLower(p[:len(p)-1])
-		ap.cleanPatUpper = strings.ToUpper(p[:len(p)-1])
+		ap.cleanPat = p[:len(p)-1]
 		return ap
 	}
 
 	if len(p) >= 2 && strings.HasPrefix(p, "*") && strings.HasSuffix(p, "*") && !strings.ContainsAny(p[1:len(p)-1], "*?[\\") {
 		ap.isSubstr = true
-		ap.cleanPatLower = strings.ToLower(p[1 : len(p)-1])
-		ap.cleanPatUpper = strings.ToUpper(p[1 : len(p)-1])
+		ap.cleanPat = p[1 : len(p)-1]
 		return ap
 	}
 
 	return ap
 }
 
-func matchPreAnalyzed(key string, keyIsASCII, keyIsUpper bool, ap *preAnalyzedPattern, upperKey *string) bool {
+func matchPreAnalyzed(key string, keyIsASCII bool, ap *preAnalyzedPattern, upperKey *string) bool {
 	if keyIsASCII && ap.isASCII {
-		if keyIsUpper {
-			if !ap.isGlob {
-				return key == ap.cleanPatUpper
-			}
-			if ap.isSuffix {
-				return strings.HasSuffix(key, ap.cleanPatUpper)
-			}
-			if ap.isPrefix {
-				return strings.HasPrefix(key, ap.cleanPatUpper)
-			}
-			if ap.isSubstr {
-				return strings.Contains(key, ap.cleanPatUpper)
-			}
-		} else {
-			if !ap.isGlob {
-				return equalFoldASCIILower(key, ap.cleanPatLower)
-			}
-			if ap.isSuffix {
-				return hasSuffixFoldASCIILower(key, ap.cleanPatLower)
-			}
-			if ap.isPrefix {
-				return hasPrefixFoldASCIILower(key, ap.cleanPatLower)
-			}
-			if ap.isSubstr {
-				return containsFoldASCIILower(key, ap.cleanPatLower)
-			}
+		if !ap.isGlob {
+			return equalFoldASCII(key, ap.cleanPat)
+		}
+		if ap.isSuffix {
+			return hasSuffixFoldASCII(key, ap.cleanPat)
+		}
+		if ap.isPrefix {
+			return hasPrefixFoldASCII(key, ap.cleanPat)
+		}
+		if ap.isSubstr {
+			return containsFoldASCII(key, ap.cleanPat)
 		}
 	}
 
 	if *upperKey == "" {
-		if keyIsASCII && keyIsUpper {
+		if isUpper(key) {
 			*upperKey = key
 		} else {
 			*upperKey = strings.ToUpper(key)
@@ -271,11 +269,11 @@ func MaskSensitiveEnv(key, value string, patterns []string) string {
 
 	analyzed := getAnalyzedPatterns(patterns)
 
-	keyIsASCII, keyIsUpper := analyzeKeyASCII(key)
+	keyIsASCII := isASCII(key)
 	var upperKey string
 
 	for i := range analyzed {
-		if matchPreAnalyzed(key, keyIsASCII, keyIsUpper, &analyzed[i], &upperKey) {
+		if matchPreAnalyzed(key, keyIsASCII, &analyzed[i], &upperKey) {
 			return "[REDACTED]"
 		}
 	}
@@ -302,7 +300,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 						res = make([]string, len(env))
 						copy(res, env[:i])
 					}
-					res[i] = e[:len(k)+1] + "[REDACTED]"
+					res[i] = k + "=[REDACTED]"
 				} else if res != nil {
 					res[i] = e
 				}
@@ -328,12 +326,12 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 				continue
 			}
 
-			keyIsASCII, keyIsUpper := analyzeKeyASCII(k)
+			keyIsASCII := isASCII(k)
 			var upperKey string
 			matched := false
 
 			for j := range analyzed {
-				if matchPreAnalyzed(k, keyIsASCII, keyIsUpper, &analyzed[j], &upperKey) {
+				if matchPreAnalyzed(k, keyIsASCII, &analyzed[j], &upperKey) {
 					matched = true
 					break
 				}
@@ -344,7 +342,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 					res = make([]string, len(env))
 					copy(res, env[:i])
 				}
-				res[i] = e[:len(k)+1] + "[REDACTED]"
+				res[i] = k + "=[REDACTED]"
 			} else if res != nil {
 				res[i] = e
 			}

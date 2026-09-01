@@ -20,7 +20,7 @@ type ControlSocketRuntimeAdapter struct {
 }
 
 // NewControlSocketRuntimeAdapter wraps an underlying ContainerRuntime with a Control Socket client
-// for dispatching container lifecycle calls over the control socket.
+// for dispatching non-interactive container lifecycle calls over the control socket.
 func NewControlSocketRuntimeAdapter(underlying ContainerRuntime, client *controlsocket.Client, logger *logging.Logger) *ControlSocketRuntimeAdapter {
 	if logger == nil {
 		logger = logging.GetGlobalLogger()
@@ -61,18 +61,15 @@ func (a *ControlSocketRuntimeAdapter) RemoveContainer(ctx context.Context, conta
 }
 
 func (a *ControlSocketRuntimeAdapter) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	a.logger.Debug("Dispatching AttachContainer via Control Socket client")
-	return a.client.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	return a.underlying.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
 }
 
 func (a *ControlSocketRuntimeAdapter) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
-	a.logger.Debug("Dispatching ResizeContainerTTY via Control Socket client")
-	return a.client.ResizeContainerTTY(ctx, containerID, rows, cols)
+	return a.underlying.ResizeContainerTTY(ctx, containerID, rows, cols)
 }
 
 func (a *ControlSocketRuntimeAdapter) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	a.logger.Debug("Dispatching SignalContainer via Control Socket client")
-	return a.client.SignalContainer(ctx, containerID, sig)
+	return a.underlying.SignalContainer(ctx, containerID, sig)
 }
 
 func (a *ControlSocketRuntimeAdapter) Name() string {
