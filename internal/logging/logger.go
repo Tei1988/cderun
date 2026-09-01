@@ -222,10 +222,6 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 		return
 	}
 
-	l.writeFormattedLog(level, message, now)
-}
-
-func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 	if l.format == "json" {
 		data := l.formatJSON(level, message, now)
 		_, _ = fmt.Fprintln(l.writer, string(data))
@@ -275,25 +271,20 @@ func NewLogger() *Logger {
 
 const hexChars = "0123456789abcdef"
 
-func isControlByte(c byte) bool {
-	return (c < 32 && c != '\t') || c == 127
-}
-
-func hasControlByte(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if isControlByte(s[i]) {
-			return true
-		}
-	}
-	return false
-}
-
 // SanitizeLogString escapes ASCII control characters (ASCII < 32 and ASCII 127)
 // with hex-escaped strings, preserving only tab ('\t') to prevent terminal
 // escape sequence or log injection attacks. Carriage returns ('\r') and
 // line feeds ('\n') are explicitly hex-escaped as "\x0d" and "\x0a".
 func SanitizeLogString(s string) string {
-	if !hasControlByte(s) {
+	hasControl := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < 32 && c != '\t') || c == 127 {
+			hasControl = true
+			break
+		}
+	}
+	if !hasControl {
 		return s
 	}
 
@@ -309,7 +300,7 @@ func SanitizeLogString(s string) string {
 			if c == '\t' {
 				buf[w] = c
 				w++
-			} else if isControlByte(c) {
+			} else if c < 32 || c == 127 {
 				buf[w] = '\\'
 				buf[w+1] = 'x'
 				buf[w+2] = hexChars[c>>4]
@@ -329,7 +320,7 @@ func SanitizeLogString(s string) string {
 		c := s[i]
 		if c == '\t' {
 			builder.WriteByte(c)
-		} else if isControlByte(c) {
+		} else if c < 32 || c == 127 {
 			builder.WriteString("\\x")
 			builder.WriteByte(hexChars[c>>4])
 			builder.WriteByte(hexChars[c&0x0f])
