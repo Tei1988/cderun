@@ -177,18 +177,6 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 		}
 	}
 
-	// Expand raw target expression before ResolvePath normalizes/cleans it
-	rawTarget := mc.Target.Raw
-	if r != nil && rawTarget != "" {
-		expanded, err := r.WithoutHostContext().ResolveString(rawTarget)
-		if err != nil {
-			return container.Mount{}, err
-		}
-		if HasParentTraversal(expanded) {
-			return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", expanded)
-		}
-	}
-
 	// Resolve the target using WithoutHostContext to avoid reverse resolution on the target itself.
 	target, err := mc.Target.Resolve(r.WithoutHostContext())
 	if err != nil {
@@ -197,9 +185,6 @@ func (mc MountConfig) Resolve(r *ExpressionResolver) (container.Mount, error) {
 	// Check if it's absolute after resolution (Feedback point 3)
 	if target != "" && !filepath.IsAbs(target) {
 		return container.Mount{}, fmt.Errorf("mount target must be an absolute path: %q", target)
-	}
-	if HasParentTraversal(target) {
-		return container.Mount{}, fmt.Errorf("mount target cannot contain parent directory references: %q", target)
 	}
 
 	return container.Mount{
@@ -303,18 +288,6 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	if err != nil {
 		return container.DeviceMapping{}, err
 	}
-	// Expand raw destination expression before ResolvePath normalizes/cleans it
-	rawDest := dc.Destination.Raw
-	if r != nil && rawDest != "" {
-		expanded, err := r.WithoutHostContext().ResolveString(rawDest)
-		if err != nil {
-			return container.DeviceMapping{}, err
-		}
-		if HasParentTraversal(expanded) {
-			return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", expanded)
-		}
-	}
-
 	containerPath, err := dc.Destination.Resolve(r.WithoutHostContext())
 	if err != nil {
 		return container.DeviceMapping{}, err
@@ -322,9 +295,6 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 	// Check if it's absolute after resolution (Feedback point 3)
 	if containerPath != "" && !filepath.IsAbs(containerPath) {
 		return container.DeviceMapping{}, fmt.Errorf("device destination must be an absolute path: %q", containerPath)
-	}
-	if HasParentTraversal(containerPath) {
-		return container.DeviceMapping{}, fmt.Errorf("device destination cannot contain parent directory references: %q", containerPath)
 	}
 	return container.DeviceMapping{
 		PathOnHost:        host,
@@ -534,33 +504,39 @@ func ResolvePath(p string, baseDir string, r *ExpressionResolver) (string, error
 }
 
 func resolveVolumePath(v string, baseDir string, r *ExpressionResolver) (string, error) {
-	host, remainder, ok := SplitHostRemainder(v)
-	if !ok {
-		resolved := v
-		if r != nil {
-			var err error
-			resolved, err = r.ResolveString(v)
-			if err != nil {
-				return "", err
-			}
-		}
-		if isNamedVolume(resolved) {
-			return resolved, nil
-		}
-		return ResolvePath(v, baseDir, r)
+	if err := validatePathChars(v); err != nil {
+		return "", fmt.Errorf("security validation failed for volume: %w", err)
+	}
+	if HasParentTraversal(v) {
+		return "", fmt.Errorf("volume specification cannot contain parent directory references: %q", v)
 	}
 
-	resolvedHost := host
+	resolvedV := v
 	if r != nil {
 		var err error
-		resolvedHost, err = r.ResolveString(host)
+		resolvedV, err = r.ResolveString(v)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	if isNamedVolume(resolvedHost) {
-		return resolvedHost + ":" + remainder, nil
+	if err := validatePathChars(resolvedV); err != nil {
+		return "", fmt.Errorf("security validation failed for volume: %w", err)
+	}
+	if HasParentTraversal(resolvedV) {
+		return "", fmt.Errorf("volume specification cannot contain parent directory references: %q", resolvedV)
+	}
+
+	host, remainder, ok := SplitHostRemainder(resolvedV)
+	if !ok {
+		if isNamedVolume(resolvedV) {
+			return resolvedV, nil
+		}
+		return ResolvePath(resolvedV, baseDir, r)
+	}
+
+	if isNamedVolume(host) {
+		return host + ":" + remainder, nil
 	}
 
 	finalHost, err := ResolvePath(host, baseDir, r)
@@ -610,7 +586,7 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
 func findAnchors(s string) []string {
-	var buf [32]anchorRange
+	var buf [8]anchorRange
 	ranges := scanAnchors(s, buf[:0])
 	if len(ranges) == 0 {
 		return nil
@@ -651,8 +627,8 @@ func HasParentTraversal(s string) bool {
 			return false
 		}
 		pos := idx + i
-		startOk := pos == 0 || s[pos-1] == '/' || s[pos-1] == '\\'
-		endOk := pos+2 == len(s) || s[pos+2] == '/' || s[pos+2] == '\\'
+		startOk := pos == 0 || s[pos-1] == '/' || s[pos-1] == '\\' || s[pos-1] == ':'
+		endOk := pos+2 == len(s) || s[pos+2] == '/' || s[pos+2] == '\\' || s[pos+2] == ':'
 		if startOk && endOk {
 			return true
 		}
@@ -662,17 +638,6 @@ func HasParentTraversal(s string) bool {
 
 // validatePathChars ensures the string does not contain C0 or C1 control characters or invalid UTF-8 sequences.
 func validatePathChars(s string) error {
-	hasControlOrNonASCII := false
-	for i := 0; i < len(s); i++ {
-		b := s[i]
-		if b < 0x20 || b >= 0x7f {
-			hasControlOrNonASCII = true
-			break
-		}
-	}
-	if !hasControlOrNonASCII {
-		return nil
-	}
 	for pos, r := range s {
 		if r == utf8.RuneError {
 			_, width := utf8.DecodeRuneInString(s[pos:])
@@ -1062,7 +1027,8 @@ func isValidUserPart(s string) bool {
 		}
 	}
 	if isNumeric {
-		return true
+		_, err := strconv.ParseUint(s, 10, 32)
+		return err == nil
 	}
 
 	// Check if it matches: ^[a-z_][a-z0-9_-]*[$]?$
@@ -1096,7 +1062,8 @@ func isValidGroupPart(s string) bool {
 		}
 	}
 	if isNumeric {
-		return true
+		_, err := strconv.ParseUint(s, 10, 32)
+		return err == nil
 	}
 
 	// Check if it matches: ^[a-zA-Z_][a-zA-Z0-9_-]*[$]?$
@@ -1151,6 +1118,31 @@ func validatePortNumber(s string, allowZero bool) (int, error) {
 	return p, nil
 }
 
+func validatePortOrRange(spec string, allowZero bool) (int, int, error) {
+	if spec == "" {
+		return 0, 0, fmt.Errorf("empty port specification")
+	}
+	if parts := strings.SplitN(spec, "-", 2); len(parts) == 2 {
+		start, err := validatePortNumber(parts[0], allowZero)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid start port in range: %w", err)
+		}
+		end, err := validatePortNumber(parts[1], allowZero)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid end port in range: %w", err)
+		}
+		if start > end {
+			return 0, 0, fmt.Errorf("invalid port range: %d > %d", start, end)
+		}
+		return start, end, nil
+	}
+	p, err := validatePortNumber(spec, allowZero)
+	if err != nil {
+		return 0, 0, err
+	}
+	return p, p, nil
+}
+
 // ValidatePort ensures the port mapping is valid.
 // Supports formats: [ip:][hostPort:]containerPort[/protocol]
 func ValidatePort(s string) error {
@@ -1175,29 +1167,41 @@ func ValidatePort(s string) error {
 	switch len(parts) {
 	case 1:
 		// containerPort
-		if _, err := validatePortNumber(parts[0], false); err != nil {
+		if _, _, err := validatePortOrRange(parts[0], false); err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 	case 2:
 		// hostPort:containerPort OR ip:containerPort
-		if _, err := validatePortNumber(parts[1], false); err != nil {
+		cStart, cEnd, err := validatePortOrRange(parts[1], false)
+		if err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
-		// Try parsing as port first
-		if _, err := validatePortNumber(parts[0], true); err != nil {
-			// If not a valid port, must be an IP
-			if net.ParseIP(parts[0]) == nil {
+		// Try parsing as port or range first
+		if hStart, hEnd, err := validatePortOrRange(parts[0], false); err == nil {
+			if (hStart != hEnd || cStart != cEnd) && (hEnd-hStart != cEnd-cStart) {
+				return fmt.Errorf("host and container port range lengths must match: %d vs %d", hEnd-hStart+1, cEnd-cStart+1)
+			}
+		} else {
+			// If not a valid non-zero port or range, try as host port allowing zero (if zero alone) or an IP
+			if hStartZero, hEndZero, errZero := validatePortOrRange(parts[0], true); errZero == nil && hStartZero == 0 && hEndZero == 0 {
+				// host port 0 is allowed for dynamic host port allocation (0:8080 is invalid if host is 0, wait, hostPort:containerPort allows hostPort 0)
+			} else if net.ParseIP(parts[0]) == nil {
 				return fmt.Errorf("invalid host port or IP: %q", parts[0])
 			}
 		}
 	case 3:
 		// ip:hostPort:containerPort
-		if _, err := validatePortNumber(parts[2], false); err != nil {
+		cStart, cEnd, err := validatePortOrRange(parts[2], false)
+		if err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 		if parts[1] != "" {
-			if _, err := validatePortNumber(parts[1], true); err != nil {
+			hStart, hEnd, err := validatePortOrRange(parts[1], true)
+			if err != nil {
 				return fmt.Errorf("invalid host port: %w", err)
+			}
+			if (hStart != hEnd || cStart != cEnd) && (hEnd-hStart != cEnd-cStart) {
+				return fmt.Errorf("host and container port range lengths must match: %d vs %d", hEnd-hStart+1, cEnd-cStart+1)
 			}
 		}
 		if net.ParseIP(parts[0]) == nil {
@@ -1256,9 +1260,16 @@ func isValidCapability(s string) bool {
 	if first < 'A' || first > 'Z' {
 		return false
 	}
-	for i := 1; i < len(s); i++ {
+	last := s[len(s)-1]
+	if (last < 'A' || last > 'Z') && (last < '0' || last > '9') {
+		return false
+	}
+	for i := 1; i < len(s)-1; i++ {
 		c := s[i]
 		if (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
+			return false
+		}
+		if c == '_' && s[i-1] == '_' {
 			return false
 		}
 	}
@@ -1383,6 +1394,9 @@ func isNamedVolume(s string) bool {
 	if s == "" {
 		return false
 	}
+	if HasParentTraversal(s) {
+		return false
+	}
 	return !strings.ContainsAny(s, "/\\") && !strings.HasPrefix(s, ".") && !strings.HasPrefix(s, "~")
 }
 
@@ -1411,9 +1425,6 @@ func ValidateDNSOption(s string) error {
 func ValidateSecurityOpt(s string) error {
 	if s == "" {
 		return nil
-	}
-	if err := validatePathChars(s); err != nil {
-		return err
 	}
 	if HasParentTraversal(s) {
 		return fmt.Errorf("invalid security option: %q (contains parent directory references)", s)

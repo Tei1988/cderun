@@ -341,3 +341,42 @@ func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
 	err := cleanupSnapshot(mfs, "/tmp/snapshot")
 	require.NoError(t, err)
 }
+
+func TestUnit_Snapshot_RealFileSystem_TMPDIR_Override(t *testing.T) {
+	// Save initial TMPDIR
+	origTMPDIR, set := os.LookupEnv("TMPDIR")
+	defer func() {
+		if set {
+			_ = os.Setenv("TMPDIR", origTMPDIR)
+		} else {
+			_ = os.Unsetenv("TMPDIR")
+		}
+	}()
+
+	// Simulate node_modules/.tmp TMPDIR override
+	_ = os.Setenv("TMPDIR", "/workspace/node_modules/.tmp")
+
+	t.Run("value type config.RealFileSystem", func(t *testing.T) {
+		realFS := config.RealFileSystem{}
+		containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), realFS, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
+		require.NoError(t, err)
+		if containerDir != "" {
+			t.Cleanup(func() { _ = cleanupSnapshot(realFS, containerDir) })
+		}
+
+		assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
+		assert.True(t, strings.HasPrefix(hostDir, "/tmp/cderun-snap-"), "expected host snapshot path to start with /tmp/cderun-snap-, got: %s", hostDir)
+	})
+
+	t.Run("pointer type *config.RealFileSystem", func(t *testing.T) {
+		realFSPtr := &config.RealFileSystem{}
+		containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), realFSPtr, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
+		require.NoError(t, err)
+		if containerDir != "" {
+			t.Cleanup(func() { _ = cleanupSnapshot(realFSPtr, containerDir) })
+		}
+
+		assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
+		assert.True(t, strings.HasPrefix(hostDir, "/tmp/cderun-snap-"), "expected host snapshot path to start with /tmp/cderun-snap-, got: %s", hostDir)
+	})
+}

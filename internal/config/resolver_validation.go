@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"cderun/internal/logging"
 
@@ -131,6 +130,9 @@ func (rv *resolver) validateSecurity() error {
 		return err
 	}
 	if err := rv.validateDeviceSecurity(); err != nil {
+		return err
+	}
+	if err := rv.validateSysctlSecurity(); err != nil {
 		return err
 	}
 	var found []string
@@ -264,22 +266,12 @@ func (rv *resolver) validateCriticalFields() error {
 
 	// ipc
 	ipcValidator := func(v string) error {
-		if v == "" || v == "host" || v == "private" || v == "shareable" || v == "none" {
-			return nil
+		isContainerReference := strings.HasPrefix(v, "container:") &&
+			strings.TrimPrefix(v, "container:") != ""
+		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
+			return fmt.Errorf("unsupported ipc namespace: %q", v)
 		}
-		if target, ok := strings.CutPrefix(v, "container:"); ok {
-			if target == "" || target == ".." || target == "." || HasParentTraversal(target) {
-				return fmt.Errorf("unsupported ipc namespace: empty or invalid container reference in %q", v)
-			}
-			for i := 0; i < len(target); i++ {
-				c := target[i]
-				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
-					return fmt.Errorf("invalid character in container ipc reference: %q", target)
-				}
-			}
-			return nil
-		}
-		return fmt.Errorf("unsupported ipc namespace: %q", v)
+		return nil
 	}
 	if err := validateField(rv.res.IPC, "ipc", ipcValidator); err != nil {
 		return err
@@ -523,26 +515,35 @@ func (rv *resolver) validateCriticalFields() error {
 }
 
 func (rv *resolver) validateMountSocketPathRaw() error {
-	overrideSet, overrideValStr := getPtrVal(rv.cli.CderunMountSocketPath)
-	cliSet, cliValStr := getPtrVal(rv.cli.MountSocketPath)
+	var overrideSet, cliSet bool
+	var overrideValStr, cliValStr string
+	if rv.cli != nil {
+		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountSocketPath)
+		cliSet, cliValStr = getPtrVal(rv.cli.MountSocketPath)
+	}
 
 	var raw string
 	if overrideSet {
 		raw = overrideValStr
 	} else if cliSet {
 		raw = cliValStr
-	} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
-		raw = env
 	} else {
-		found := false
-		if rv.tools != nil {
-			if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountSocketPath.Raw != "" {
-				raw = tool.MountSocketPath.Raw
-				found = true
+		if rv.fs != nil {
+			if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+				raw = env
 			}
 		}
-		if !found && rv.global != nil && rv.global.Defaults.MountSocketPath.Raw != "" {
-			raw = rv.global.Defaults.MountSocketPath.Raw
+		if raw == "" {
+			found := false
+			if rv.tools != nil {
+				if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountSocketPath.Raw != "" {
+					raw = tool.MountSocketPath.Raw
+					found = true
+				}
+			}
+			if !found && rv.global != nil && rv.global.Defaults.MountSocketPath.Raw != "" {
+				raw = rv.global.Defaults.MountSocketPath.Raw
+			}
 		}
 	}
 
@@ -615,9 +616,6 @@ func (rv *resolver) validateEnvSecurity() error {
 		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
-		if !utf8.ValidString(val) {
-			return fmt.Errorf("security validation failed for env[%d] (value): invalid UTF-8 encoding", i)
-		}
 		if strings.ContainsRune(val, 0) {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
@@ -646,6 +644,24 @@ func (rv *resolver) validateMountSecurity() error {
 		}
 		if (m.Type == "bind" || m.Type == "") && m.Source == "" {
 			return fmt.Errorf("security validation failed for mounts[%d] (source): source path cannot be empty for bind mount", i)
+		}
+	}
+	return nil
+}
+
+func (rv *resolver) validateSysctlSecurity() error {
+	for k, v := range rv.res.Sysctls {
+		if err := validatePathChars(k); err != nil {
+			return fmt.Errorf("security validation failed for sysctl key %q: %w", k, err)
+		}
+		if err := validatePathChars(v); err != nil {
+			return fmt.Errorf("security validation failed for sysctl value %q: %w", v, err)
+		}
+		if err := ValidateSysctlKey(k); err != nil {
+			return fmt.Errorf("security validation failed for sysctl key %q: %w", k, err)
+		}
+		if err := ValidateSysctlValue(v); err != nil {
+			return fmt.Errorf("security validation failed for sysctl value %q: %w", v, err)
 		}
 	}
 	return nil

@@ -22,6 +22,7 @@
 
 - **Status**: Experimental.
 - **Communication Protocol**: Interacts directly with the containerd gRPC API, bypassing Docker/Podman engines for lighter execution.
+- **Testing Architecture**: Provides functional option `WithContainerdClient` in `internal/runtime/containerd.go` to inject mock `containerdClient` implementations, enabling zero-daemon unit testing for container lifecycles (creation, start, wait, remove, signal, resize) without requiring a running containerd socket.
 - **Limitations**:
   - **Platform Constraint**: **Linux-only** (`//go:build linux` build tags). It is not supported on macOS or Windows, which require virtual machines.
   - **Networking**: Only supports `host` networking. Users **must** explicitly pass `--network host` (or configure `network: host` in configurations), as the default `bridge` network setting is rejected by the containerd adapter.
