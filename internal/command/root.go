@@ -328,15 +328,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	// Step 10.2: Container command assembly.
 	// The subcommand itself is NOT included in fullCommand.
 	// the passthrough arguments provided after the subcommand are used.
-	var fullCommand []string
-	if len(passthroughArgs) > 0 {
-		fullCommand = append([]string{}, passthroughArgs...)
-	}
-
-	for i, arg := range fullCommand {
+	for i, arg := range passthroughArgs {
 		if strings.ContainsRune(arg, 0) {
 			return nil, fmt.Errorf("security validation failed: command argument [%d] contains null byte", i)
 		}
+	}
+
+	var fullCommand []string
+	if len(passthroughArgs) > 0 {
+		fullCommand = append([]string{}, passthroughArgs...)
 	}
 
 	// Build ContainerConfig
@@ -1556,12 +1556,24 @@ func hoistOverrides(cmd *cobra.Command, args []string, isPolyglot bool, subcmdId
 	// In polyglot mode, everything after index 0 is after the subcommand.
 	// In standard mode, only arguments after subcmdIdx are considered for hoisting P1 overrides.
 	startIdx := 1
+	remaining := len(args) - 1
+	if !isPolyglot && subcmdIdx != -1 {
+		startIdx = subcmdIdx + 1
+		remaining = len(args) - startIdx
+	}
+	if remaining < 0 {
+		remaining = 0
+	}
+	othersCap := max(0, len(args)-1)
+
+	overrides = make([]string, 0, remaining)
+	others = make([]string, 0, othersCap)
+
 	if !isPolyglot && subcmdIdx != -1 {
 		// Standard mode: hoist only from after the subcommand
 		for i := 1; i <= subcmdIdx; i++ {
 			others = append(others, args[i])
 		}
-		startIdx = subcmdIdx + 1
 	}
 
 	for i := startIdx; i < len(args); i++ {
