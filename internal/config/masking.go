@@ -300,7 +300,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 						res = make([]string, len(env))
 						copy(res, env[:i])
 					}
-					res[i] = k + "=[REDACTED]"
+					res[i] = e[:len(k)+1] + "[REDACTED]"
 				} else if res != nil {
 					res[i] = e
 				}
@@ -342,7 +342,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 					res = make([]string, len(env))
 					copy(res, env[:i])
 				}
-				res[i] = k + "=[REDACTED]"
+				res[i] = e[:len(k)+1] + "[REDACTED]"
 			} else if res != nil {
 				res[i] = e
 			}
