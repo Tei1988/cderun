@@ -71,13 +71,15 @@ func TestComprehensiveExecution_WrapperModeHoisting(t *testing.T) {
 	})
 }
 
-// TestComprehensiveExecution_SymlinkModePassthrough tests Symlink Mode tool execution
-// and option passthrough.
+// TestComprehensiveExecution_SymlinkModePassthrough tests Symlink Mode tool execution,
+// verifying the recorded mockRuntime invocation, selected image, and preserved tool arguments.
 // Ref: docs/features/polyglot-entry.md
 func TestComprehensiveExecution_SymlinkModePassthrough(t *testing.T) {
 	t.Parallel()
 
 	mockRuntime := runtime.NewMockRuntime()
+	mockRuntime.CreatedContainerID = "mock-cid-symlink"
+
 	mfs := &config.MockFileSystem{
 		WD:      "/work",
 		HomeDir: "/home/user",
@@ -99,6 +101,12 @@ func TestComprehensiveExecution_SymlinkModePassthrough(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+
+	// Assert mockRuntime recorded container invocation
+	createdCfg := mockRuntime.GetCreatedConfig()
+	require.NotNil(t, createdCfg, "mockRuntime must receive container configuration")
+	assert.Equal(t, "node:20-alpine", createdCfg.Image, "selected container image must match --cderun-image")
+	assert.Equal(t, []string{"index.js", "--port", "3000"}, createdCfg.Command, "tool arguments after node must be preserved")
 }
 
 // TestComprehensiveExecution_DryRunJSONOutput verifies JSON formatting and sensitive variable masking.

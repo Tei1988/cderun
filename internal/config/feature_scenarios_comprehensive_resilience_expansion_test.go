@@ -317,15 +317,30 @@ func TestComprehensiveResilience_PrecedenceMatrix(t *testing.T) {
 
 	t.Run("P1 CLI override precedence over P3 config file", func(t *testing.T) {
 		t.Parallel()
+
+		// P1 CLI explicitly specifies "ubuntu:22.04"
 		cliOpts := config.CLIOptions{
 			Image: strPtr("ubuntu:22.04"),
 		}
-		tools := config.ToolsConfig{}
-		global := &config.CDERunConfig{}
+
+		// P3 configuration specifies a distinct image tag "ubuntu:20.04" (same registry/repository)
+		tools := config.ToolsConfig{
+			"run": config.ToolConfig{
+				Image: "ubuntu:20.04",
+			},
+		}
+		global := &config.CDERunConfig{
+			Defaults: config.ConfigDefaults{
+				Network: "bridge",
+			},
+		}
 
 		res, err := config.Resolve("run", &cliOpts, tools, global)
 		require.NoError(t, err)
-		assert.Equal(t, "ubuntu:22.04", res.Image)
+
+		// Assert P1 CLI override takes precedence over configured P3 value
+		assert.Equal(t, "ubuntu:22.04", res.Image, "P1 CLI image override must take precedence over P3 config file image")
+		assert.NotEqual(t, "ubuntu:20.04", res.Image, "Configured P3 image value must not override P1 CLI image")
 	})
 }
 
