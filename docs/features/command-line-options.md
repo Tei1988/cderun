@@ -910,8 +910,11 @@ cderun --hang-timeout 5s node script.js
 
 ## P1 Internal Overrides (`--cderun-*`)
 
-Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOptions`, and `Float64Options` have a corresponding `--cderun-` prefixed counterpart (e.g., `--cderun-tty`, `--cderun-image`).
+Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOptions`, `Float64Options`, and `StringSliceOptions` have a corresponding `--cderun-` prefixed counterpart (e.g., `--cderun-tty`, `--cderun-image`, `--cderun-env`).
 
-- **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers.
-- **Hoisting Mechanics**: During argument preprocessing, any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally.
-- **Equals-Sign & Space-Separated Formats**: Value-taking internal overrides can be specified using either the equals-sign format (e.g., `--cderun-image=alpine`) or the space-separated format (e.g., `--cderun-image alpine`). `cderun`'s preprocessor uses option metadata to correctly identify value-taking options and consumes the subsequent adjacent parameter as their value during the hoisting scan. If the subsequent adjacent parameter is itself another `--cderun-` flag, it is strictly rejected with a validation error to prevent parsing corruption.
+- **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers (P2 through P6).
+- **Hoisting Mechanics**: During argument preprocessing (`preprocessArgs`), any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally prior to Cobra flag parsing.
+- **Equals-Sign & Space-Separated Formats**: Value-taking internal overrides can be specified using either the equals-sign format (e.g., `--cderun-image=alpine`) or the space-separated format (e.g., `--cderun-image alpine`). `cderun`'s preprocessor uses option registration metadata to correctly identify value-taking options and consumes the subsequent adjacent parameter as their value during the hoisting scan.
+- **Adjacent Parameter Protection**: If a value-taking `--cderun-` flag in space-separated format is followed immediately by another `--cderun-` flag, preprocessing strictly rejects it with a validation error to prevent parsing corruption.
+- **Boolean Override Toggles**: Boolean overrides (e.g., `--cderun-tty`, `--cderun-read-only`, `--cderun-privileged`) do not consume subsequent adjacent arguments and are hoisted autonomously. Optional inline boolean values may be passed using the equals-sign format (e.g., `--cderun-tty=false`).
+- **Symlink / Polyglot Isolation**: In Symlink Mode, `--cderun-*` flags are extracted and hoisted without modifying any arguments destined for the wrapped executable.

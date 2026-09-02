@@ -98,6 +98,29 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 | `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing. |
 | `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version}}}}`). |
 
+### Directive Fallback Syntax & Rules (`:-default`)
+
+All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` fallback syntax, which uses the first `:-` delimiter to separate the primary target name from its default value.
+
+#### Fallback Trigger vs. Immediate Error Conditions
+
+1. **Trigger Conditions (Fallback Is Evaluated)**:
+   - **`file:`**: Target file does not exist, file read/stat fails (e.g., target is a directory or lacks read permissions), or trimmed file content is empty.
+   - **`find_dir:`**: Target file or directory name is not found during upward directory traversal, or absolute-path resolution (`r.fs.Abs(dir)`) fails after the target is found.
+   - **`env:`**: Environment variable is unset or empty (`""`).
+   - *Behavior on Trigger*: When a fallback trigger occurs and a default value is provided, the resolution engine evaluates the default value, does **NOT** record a sticky error, and proceeds with the resolved fallback string.
+
+2. **Immediate Error Conditions (Bypass Fallback)**:
+   - **Parameter Validation Failure**: Target names containing path separators (`/` or `\`), parent directory traversal (`..`), control characters, or invalid UTF-8 sequences trigger immediate validation errors.
+   - **Size Limit Violation**: Files exceeding the **1MB** (`MaxDirectiveFileSize`) threshold trigger an immediate size limit error.
+   - *Behavior on Error*: Execution immediately aborts with a validation or size limit error without evaluating the `:-default` fallback.
+
+#### Fallback Value Processing & Reverse Path Resolution
+
+- **Nested Expression Evaluation**: Fallback default strings are evaluated recursively inside-out. For instance, in `{{find_dir:master:-{{PWD}}}}`, `{{PWD}}` is evaluated first to supply the fallback value.
+- **Sticky Error Isolation**: A fallback-eligible condition (such as a missing file) caches a non-fatal error internally for the target name, allowing default evaluation to proceed without dirtying the resolver's sticky error state (`setError`).
+- **Reverse Path Resolution Exemption**: Default values provided for `find_dir:` bypass host path reverse resolution (`applyReverseResolution`), as defaults represent explicitly specified fallback expression strings rather than dynamically discovered host paths.
+
 ### 3. Unrecognized and Unknown Expressions
 
 To prevent silent failures and typos (such as typing `{{HOM}}` instead of `{{HOME}}`), the engine implements **Strict Resolution** rules for unrecognized brace contents:
