@@ -16,7 +16,7 @@ func TestScenarios_ParameterValidators_Resilience(t *testing.T) {
 	t.Run("ValidateToolName", func(t *testing.T) {
 		validNames := []string{"node", "python3", "my-tool_v1.0", "tool.sub"}
 		for _, name := range validNames {
-			assert.NoError(t, ValidateToolName(name), "valid tool name should pass: %s", name)
+			require.NoError(t, ValidateToolName(name), "valid tool name should pass: %s", name)
 		}
 
 		invalidNames := []string{
@@ -29,78 +29,78 @@ func TestScenarios_ParameterValidators_Resilience(t *testing.T) {
 			"tool\xffname",
 		}
 		for _, name := range invalidNames {
-			assert.Error(t, ValidateToolName(name), "invalid tool name should fail: %q", name)
+			require.Error(t, ValidateToolName(name), "invalid tool name should fail: %q", name)
 		}
 	})
 
 	t.Run("ValidateHostname", func(t *testing.T) {
-		assert.NoError(t, ValidateHostname("my-host.local"))
-		assert.NoError(t, ValidateHostname(""), "empty hostname is permitted as optional setting")
-		assert.Error(t, ValidateHostname("host_name"), "underscore is invalid in hostname RFC 1123")
-		assert.Error(t, ValidateHostname("host\x00name"))
+		require.NoError(t, ValidateHostname("my-host.local"))
+		require.NoError(t, ValidateHostname(""), "empty hostname is permitted as optional setting")
+		require.Error(t, ValidateHostname("host_name"), "underscore is invalid in hostname RFC 1123")
+		require.Error(t, ValidateHostname("host\x00name"))
 	})
 
 	t.Run("ValidateDNSOption", func(t *testing.T) {
-		assert.NoError(t, ValidateDNSOption("ndots:5"))
-		assert.NoError(t, ValidateDNSOption("timeout:2"))
-		assert.NoError(t, ValidateDNSOption(""), "empty dns option is permitted as optional setting")
-		assert.Error(t, ValidateDNSOption("invalid option!"))
-		assert.Error(t, ValidateDNSOption("ndots:\x005"))
+		require.NoError(t, ValidateDNSOption("ndots:5"))
+		require.NoError(t, ValidateDNSOption("timeout:2"))
+		require.NoError(t, ValidateDNSOption(""), "empty dns option is permitted as optional setting")
+		require.Error(t, ValidateDNSOption("invalid option!"))
+		require.Error(t, ValidateDNSOption("ndots:\x005"))
 	})
 
 	t.Run("ValidateSecurityOpt", func(t *testing.T) {
-		assert.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
-		assert.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
-		assert.NoError(t, ValidateSecurityOpt(""), "empty security opt is permitted as optional setting")
-		assert.Error(t, ValidateSecurityOpt("security;\x00opt"))
+		require.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
+		require.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
+		require.NoError(t, ValidateSecurityOpt(""), "empty security opt is permitted as optional setting")
+		require.Error(t, ValidateSecurityOpt("security;\x00opt"))
 	})
 
 	t.Run("ValidateSysctlKeyAndValue", func(t *testing.T) {
-		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
-		assert.Error(t, ValidateSysctlKey(""))
-		assert.Error(t, ValidateSysctlKey("net..ipv4"))
-		assert.Error(t, ValidateSysctlKey("net/ipv4"))
+		require.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
+		require.Error(t, ValidateSysctlKey(""))
+		require.Error(t, ValidateSysctlKey("net..ipv4"))
+		require.Error(t, ValidateSysctlKey("net/ipv4"))
 
-		assert.NoError(t, ValidateSysctlValue("1"))
-		assert.NoError(t, ValidateSysctlValue("1 0 1"))
-		assert.NoError(t, ValidateSysctlValue(""), "empty sysctl value is permitted as optional setting")
-		assert.Error(t, ValidateSysctlValue("1;\x000"))
+		require.NoError(t, ValidateSysctlValue("1"))
+		require.NoError(t, ValidateSysctlValue("1 0 1"))
+		require.NoError(t, ValidateSysctlValue(""), "empty sysctl value is permitted as optional setting")
+		require.Error(t, ValidateSysctlValue("1;\x000"))
 	})
 
 	t.Run("ValidateGPUsAndCpuset", func(t *testing.T) {
-		assert.NoError(t, ValidateGPUs("all"))
-		assert.NoError(t, ValidateGPUs("device=0,1"))
-		assert.Error(t, ValidateGPUs("gpus,,"))
-		assert.Error(t, ValidateGPUs("gpus;\x00"))
+		require.NoError(t, ValidateGPUs("all"))
+		require.NoError(t, ValidateGPUs("device=0,1"))
+		require.Error(t, ValidateGPUs("gpus,,"))
+		require.Error(t, ValidateGPUs("gpus;\x00"))
 
-		assert.NoError(t, ValidateCpuset("0-3"))
-		assert.NoError(t, ValidateCpuset("0,2,4-6"))
-		assert.Error(t, ValidateCpuset("0--3"))
-		assert.Error(t, ValidateCpuset("0-3-4"))
-		assert.Error(t, ValidateCpuset("0,\x001"))
+		require.NoError(t, ValidateCpuset("0-3"))
+		require.NoError(t, ValidateCpuset("0,2,4-6"))
+		require.Error(t, ValidateCpuset("0--3"))
+		require.Error(t, ValidateCpuset("0-3-4"))
+		require.Error(t, ValidateCpuset("0,\x001"))
 	})
 
 	t.Run("ValidateAddHostAndImageName", func(t *testing.T) {
-		assert.NoError(t, ValidateAddHost("host.docker.internal:host-gateway"))
-		assert.Error(t, ValidateAddHost(":127.0.0.1"))
-		assert.Error(t, ValidateAddHost("hostname:"))
+		require.NoError(t, ValidateAddHost("host.docker.internal:host-gateway"))
+		require.Error(t, ValidateAddHost(":127.0.0.1"))
+		require.Error(t, ValidateAddHost("hostname:"))
 
-		assert.NoError(t, ValidateImageName("node:20-alpine"))
-		assert.NoError(t, ValidateImageName("ghcr.io/owner/repo:tag"))
-		assert.Error(t, ValidateImageName("node/"))
-		assert.Error(t, ValidateImageName("node::20"))
-		assert.Error(t, ValidateImageName("node\x00:20"))
+		require.NoError(t, ValidateImageName("node:20-alpine"))
+		require.NoError(t, ValidateImageName("ghcr.io/owner/repo:tag"))
+		require.Error(t, ValidateImageName("node/"))
+		require.Error(t, ValidateImageName("node::20"))
+		require.Error(t, ValidateImageName("node\x00:20"))
 	})
 
 	t.Run("ValidateEnvKeyAndMountType", func(t *testing.T) {
-		assert.NoError(t, ValidateEnvKey("MY_VAR_123"))
-		assert.Error(t, ValidateEnvKey("123_VAR"))
-		assert.Error(t, ValidateEnvKey("MY-VAR"))
+		require.NoError(t, ValidateEnvKey("MY_VAR_123"))
+		require.Error(t, ValidateEnvKey("123_VAR"))
+		require.Error(t, ValidateEnvKey("MY-VAR"))
 
-		assert.NoError(t, ValidateMountType("bind"))
-		assert.NoError(t, ValidateMountType("volume"))
-		assert.NoError(t, ValidateMountType("tmpfs"))
-		assert.Error(t, ValidateMountType("invalid"))
+		require.NoError(t, ValidateMountType("bind"))
+		require.NoError(t, ValidateMountType("volume"))
+		require.NoError(t, ValidateMountType("tmpfs"))
+		require.Error(t, ValidateMountType("invalid"))
 	})
 }
 
@@ -189,11 +189,19 @@ func TestScenarios_SensitiveEnvMasking_Resilience(t *testing.T) {
 		"NON_ASCII_🔑":       "value",
 	}
 
+	seenKeys := make(map[string]bool)
 	for _, item := range masked {
 		k, v, found := parseKeyValue(item)
 		require.True(t, found, "item should be key=value pair: %s", item)
-		assert.Equal(t, expected[k], v, "mismatch for key: %s", k)
+		require.False(t, seenKeys[k], "duplicate key observed in masked list: %s", k)
+		seenKeys[k] = true
+
+		expVal, inExpected := expected[k]
+		require.True(t, inExpected, "unexpected key found in masked list: %s", k)
+		assert.Equal(t, expVal, v, "mismatch for key: %s", k)
 	}
+
+	assert.Equal(t, len(expected), len(seenKeys), "all expected keys must be present in masked output")
 
 	// Empty list and empty patterns slice edge cases
 	assert.Empty(t, MaskSensitiveEnvList(nil, patterns))

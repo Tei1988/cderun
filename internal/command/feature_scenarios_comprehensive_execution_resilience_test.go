@@ -2,7 +2,6 @@ package command
 
 import (
 	"bytes"
-	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -94,11 +93,17 @@ func TestScenarios_SymlinkMode_ExecutionAndMapping(t *testing.T) {
 	assert.Contains(t, cc.Env, "NODE_ENV=production")
 }
 
-// TestScenarios_DryRun_JSONFormattingAndMasking verifies dry-run JSON payload formatting,
+// TestScenarios_DryRun_JSONFormattingAndMasking verifies dry-run JSON payload formatting via handleDryRun,
 // ensuring sensitive environment variables are masked in JSON container configuration output.
 // Reference: docs/features/command-line-options.md & docs/testing/strategy.md
 func TestScenarios_DryRun_JSONFormattingAndMasking(t *testing.T) {
 	t.Parallel()
+
+	opts := &rootOptions{}
+	cmd := newRootCmd(opts)
+
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
 
 	cc := &container.ContainerConfig{
 		Image: "python:3.11-slim",
@@ -113,13 +118,13 @@ func TestScenarios_DryRun_JSONFormattingAndMasking(t *testing.T) {
 		},
 	}
 
-	sensitivePatterns := []string{"*KEY*", "*PASSWORD*"}
-	cc.Env = config.MaskSensitiveEnvList(cc.Env, sensitivePatterns)
+	resolved := &config.ResolvedConfig{
+		DryRunFormat: "json",
+		SensitiveEnv: []string{"*KEY*", "*PASSWORD*"},
+	}
 
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	require.NoError(t, enc.Encode(cc))
+	err := opts.handleDryRun(cmd, cc, resolved)
+	require.NoError(t, err)
 
 	outputJSON := buf.String()
 	assert.Contains(t, outputJSON, "PUBLIC_ENV=development")
@@ -153,7 +158,7 @@ func TestScenarios_Snapshot_TempDirResolution(t *testing.T) {
 	assert.NotEmpty(t, snapDir)
 	assert.NotEmpty(t, ctrlPath)
 	_, errCderun := mfs.Stat(filepath.Join(snapDir, ".cderun.yaml"))
-	assert.NoError(t, errCderun, ".cderun.yaml should be created inside snapshot directory")
+	require.NoError(t, errCderun, ".cderun.yaml should be created inside snapshot directory")
 	_, errTools := mfs.Stat(filepath.Join(snapDir, ".tools.yaml"))
-	assert.NoError(t, errTools, ".tools.yaml should be created inside snapshot directory")
+	require.NoError(t, errTools, ".tools.yaml should be created inside snapshot directory")
 }
