@@ -65,6 +65,7 @@ func (m *mockFullTask) Kill(ctx context.Context, sig syscall.Signal, opts ...cli
 	return m.killErr
 }
 func (m *mockFullTask) Wait(ctx context.Context) (<-chan client.ExitStatus, error) {
+	m.statusState = client.Stopped
 	ch := make(chan client.ExitStatus, 1)
 	ch <- *client.NewExitStatus(m.exitCode, time.Now(), m.exitErr)
 	close(ch)

@@ -77,7 +77,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別およびT81ホイスト動作） | テスト | 中 | 小 | - | DONE |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | DONE |
-| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
+| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | DONE |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | DONE |
@@ -97,7 +97,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
-| T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | - |
+| T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 
 依存関係・統合の注意:
 
@@ -853,11 +853,11 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 ### 完了条件
 
-- [ ] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
-- [ ] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
-- [ ] 契約スイートが Mock、Docker、Podman、および containerd すべてのランタイムを網羅し、CI 上で T20 インテグレーション環境が完了し実行されていること（T20の統合を必須要件とする）。
-- [ ] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
-- [ ] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
+- [x] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
+- [x] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
+- [x] 契約スイートが Mock、Docker、Podman、および containerd すべてのランタイムを網羅し、CI 上で T20 インテグレーション環境が完了し実行されていること（T20の統合を必須要件とする）。
+- [x] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
+- [x] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
 
 ---
 
