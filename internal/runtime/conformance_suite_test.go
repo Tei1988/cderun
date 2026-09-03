@@ -15,6 +15,7 @@ import (
 // ConformanceCapabilities describes what features a runtime adapter supports or rejects.
 type ConformanceCapabilities struct {
 	SupportsVolumes     bool
+	SupportsTmpfs       bool
 	SupportsPorts       bool
 	SupportsGPUs        bool
 	SupportsDNSSearch   bool
@@ -89,7 +90,65 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}
 
 		err := rt.ValidateConfig(cfg)
-		assert.NoError(t, err, "Valid tmpfs mounts must pass ValidateConfig (T51 contract)")
+		if caps.SupportsTmpfs {
+			assert.NoError(t, err, "Valid tmpfs mounts must pass ValidateConfig (T51 contract)")
+		} else {
+			require.Error(t, err, "Unsupported tmpfs mounts must be explicitly rejected")
+		}
+	})
+
+	t.Run("ValidateConfig_PortsContract", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		cfg := &container.ContainerConfig{
+			Image: "alpine:latest",
+			Pull:  "missing",
+			Ports: []string{"8080:80"},
+		}
+
+		err := rt.ValidateConfig(cfg)
+		if caps.SupportsPorts {
+			assert.NoError(t, err, "Ports mapping should be supported by this runtime")
+		} else {
+			require.Error(t, err, "Unsupported ports mapping must be explicitly rejected")
+		}
+	})
+
+	t.Run("ValidateConfig_DNSSearchContract", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		cfg := &container.ContainerConfig{
+			Image:     "alpine:latest",
+			Pull:      "missing",
+			DNSSearch: []string{"example.com"},
+		}
+
+		err := rt.ValidateConfig(cfg)
+		if caps.SupportsDNSSearch {
+			assert.NoError(t, err, "DNS search should be supported by this runtime")
+		} else {
+			require.Error(t, err, "Unsupported DNS search must be explicitly rejected")
+		}
+	})
+
+	t.Run("ValidateConfig_DNSOptionsContract", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		cfg := &container.ContainerConfig{
+			Image:      "alpine:latest",
+			Pull:       "missing",
+			DNSOptions: []string{"ndots:5"},
+		}
+
+		err := rt.ValidateConfig(cfg)
+		if caps.SupportsDNSOptions {
+			assert.NoError(t, err, "DNS options should be supported by this runtime")
+		} else {
+			require.Error(t, err, "Unsupported DNS options must be explicitly rejected")
+		}
 	})
 
 	t.Run("ValidateConfig_UnsupportedGPUsContract", func(t *testing.T) {
@@ -123,6 +182,13 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 
 		err := rt.ValidateConfig(cfg)
 		assert.NoError(t, err, "Capabilities should pass validation when valid names are supplied")
+
+		if caps.RequiresCapPrefix {
+			normAdd := normalizeCapabilities(cfg.CapAdd)
+			assert.Equal(t, []string{"CAP_SYS_ADMIN", "CAP_NET_ADMIN"}, normAdd)
+			normDrop := normalizeCapabilities(cfg.CapDrop)
+			assert.Equal(t, []string{"CAP_CHOWN"}, normDrop)
+		}
 	})
 
 	t.Run("Lifecycle_CreateStartWaitInspectRemove", func(t *testing.T) {
@@ -144,14 +210,14 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		assert.NotEmpty(t, id)
 
 		err = rt.StartContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		code, err := rt.WaitContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 0, code)
 
 		isRunning, exitCode, err := rt.InspectContainer(ctx, id)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, isRunning)
 		assert.Equal(t, 0, exitCode)
 
@@ -168,10 +234,12 @@ func TestConformance_MockRuntime(t *testing.T) {
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
+		SupportsTmpfs:      true,
 		SupportsPorts:      true,
 		SupportsGPUs:       true,
 		SupportsDNSSearch:  true,
 		SupportsDNSOptions: true,
+		RequiresCapPrefix:  false,
 	}
 	RunConformanceTests(t, factory, caps)
 }
@@ -201,10 +269,12 @@ func TestConformance_DockerRuntime_MockClient(t *testing.T) {
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
+		SupportsTmpfs:      true,
 		SupportsPorts:      true,
 		SupportsGPUs:       true,
 		SupportsDNSSearch:  true,
 		SupportsDNSOptions: true,
+		RequiresCapPrefix:  false,
 	}
 	RunConformanceTests(t, factory, caps)
 }

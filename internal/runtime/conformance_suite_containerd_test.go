@@ -17,6 +17,7 @@ func TestConformance_ContainerdRuntime_MockClient(t *testing.T) {
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    false,
+		SupportsTmpfs:      true,
 		SupportsPorts:      false,
 		SupportsGPUs:       false,
 		SupportsDNSSearch:  false,
