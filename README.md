@@ -437,7 +437,7 @@ If no engine is explicitly specified, `cderun` checks for socket files in the fo
 2. `/run/containerd/containerd.sock` (containerd)
 3. `/run/podman/podman.sock` (Podman)
 
-Matches are isolated to the path's base name to avoid misdetection in nested paths. If no socket is found, it defaults to `docker` at `/var/run/docker.sock`.
+Matches are isolated to the path's base name to avoid misdetection in nested paths. If no socket is found on disk, `cderun` falls back to `docker` using `/var/run/docker.sock`.
 
 ### 2. containerd Runtime Limitations & Compatibility Matrix
 

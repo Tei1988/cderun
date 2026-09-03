@@ -16,6 +16,17 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 
 ---
 
+## Execution Modes & Subcommand Resolution
+
+`cderun` supports four primary execution modes, each handling subcommand resolution and argument parsing deterministically:
+
+1. **Wrapper Mode**: The user explicitly invokes `cderun` with a subcommand (e.g., `cderun node app.js`). The subcommand (`node`) serves as the lookup key. Standard flags (P2) precede the subcommand; P1 internal overrides (`--cderun-*`) follow the subcommand and are hoisted during preprocessing.
+2. **Symlink Mode (Polyglot Entry Point)**: `cderun` is invoked via a symlink (e.g., `./node --version`). The binary detects its executable name (`node`) as the subcommand. All arguments following the symlink invocation are treated as container passthrough arguments, except for `--cderun-*` overrides which are hoisted to configure `cderun` without altering the tool's flags.
+3. **Ad-hoc Mode**: The user executes arbitrary commands in a container by specifying the image explicitly (e.g., `cderun --image=alpine --entrypoint=ls ls -l`). The first non-flag argument (`ls`) acts as the lookup key; specifying `--entrypoint` overrides the container image entrypoint to execute the requested command.
+4. **Diagnosis Mode**: Invoked with `--diagnosis` (e.g., `cderun --diagnosis`). No subcommand is required, and system diagnostics or available tool mappings are printed directly.
+
+---
+
 ## Container Image Selection Sequence
 
 The container image is selected according to the following precedence hierarchy. For a detailed resolution process, please refer to [Argument & Setting Priority Logic](./argument-priority-logic.md).

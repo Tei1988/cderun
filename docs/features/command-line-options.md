@@ -34,6 +34,8 @@ The table below summarizes support for key `cderun` configuration features acros
 | **GPU Devices** (`--gpus`) | ✅ | ✅ | ❌ | Unsupported on containerd API (`ValidateConfig` returns error) |
 | **Sysctl Kernel Params** (`--sysctl`) | ✅ | ✅ | ✅ | Mapped directly to OCI `Linux.Sysctl` map |
 | **Read-Only Rootfs** (`--read-only`) | ✅ | ✅ | ✅ | Mapped to `ReadonlyRootfs` (Docker) and `Root.Readonly` (containerd) |
+| **Stand-alone Image Prefetching** (`--prefetch`, `--prefetch-all`) | ✅ | ✅ | ✅ | Prefetches tool images via runtime `PullImage` API without container execution |
+| **Hang Timeout** (`--hang-timeout`) | ✅ | ✅ | ✅ | Managed by `cderun` execution controller after I/O finishes in non-TTY environments |
 | **Control Socket Mounting** (`--mount-cderun-socket`) | ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
 
 ### List-Type (Array-Type) Options and Environment Variable Separator Rules
@@ -299,9 +301,15 @@ cderun --strict-env --env NPM_TOKEN node app.js
 ### `--runtime`
 
 - **Type**: string
-- **Default**: Auto-detected (`docker` -> `containerd` -> `podman`)
+- **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
 - **Environment Variable**: `CDERUN_RUNTIME`
 - **Supported Engines**: `docker`, `podman`, `containerd`.
+- **Auto-detection Logic**:
+  When no engine is explicitly specified, `cderun` checks for active runtime sockets in the following priority order:
+  1. `/var/run/docker.sock` (Docker)
+  2. `/run/containerd/containerd.sock` (containerd)
+  3. `/run/podman/podman.sock` (Podman)
+  If no socket file exists on disk, `cderun` falls back to `docker` at `/var/run/docker.sock`.
 
 ```bash
 cderun --runtime podman node app.js

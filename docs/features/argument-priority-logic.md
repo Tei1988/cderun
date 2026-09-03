@@ -120,7 +120,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `diagnosis: false`
   - `diagnosisFormat: yaml`
   - `hangTimeout: 10s`
-  - `sensitiveEnv: nil` (Unset; means all environment variable values are masked)
+  - `sensitiveEnv: nil` (Unset; enforces Secure-by-Default mask-all behavior where all non-empty environment variable values are masked as `[REDACTED]`. An explicit empty string or empty list at P1–P5 disables masking)
   - `image`: None (Trigger Fatal Error if unresolved)
 
 ## Resolution Example
