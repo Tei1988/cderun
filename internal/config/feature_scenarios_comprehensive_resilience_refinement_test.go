@@ -201,7 +201,7 @@ func TestScenarios_SensitiveEnvMasking_Resilience(t *testing.T) {
 		assert.Equal(t, expVal, v, "mismatch for key: %s", k)
 	}
 
-	assert.Equal(t, len(expected), len(seenKeys), "all expected keys must be present in masked output")
+	assert.Len(t, seenKeys, len(expected), "all expected keys must be present in masked output")
 
 	// Empty list and empty patterns slice edge cases
 	assert.Empty(t, MaskSensitiveEnvList(nil, patterns))
