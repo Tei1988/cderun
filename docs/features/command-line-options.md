@@ -305,7 +305,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **Environment Variable**: `CDERUN_RUNTIME`
 - **Supported Engines**: `docker`, `podman`, `containerd`.
 - **Auto-detection Logic**:
-  When no engine is explicitly specified, `cderun` checks for active runtime sockets in the following priority order:
+  When no engine is explicitly specified, `cderun` checks for runtime socket files on disk (via filesystem stat) in the following priority order:
   1. `/var/run/docker.sock` (Docker)
   2. `/run/containerd/containerd.sock` (containerd)
   3. `/run/podman/podman.sock` (Podman)

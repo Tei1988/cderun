@@ -21,7 +21,7 @@ cderun [cderun-flags] <subcommand> [passthrough-args]
 `cderun` supports four primary execution modes, each handling subcommand resolution and argument parsing deterministically:
 
 1. **Wrapper Mode**: The user explicitly invokes `cderun` with a subcommand (e.g., `cderun node app.js`). The subcommand (`node`) serves as the lookup key. Standard flags (P2) precede the subcommand; P1 internal overrides (`--cderun-*`) follow the subcommand and are hoisted during preprocessing.
-2. **Symlink Mode (Polyglot Entry Point)**: `cderun` is invoked via a symlink (e.g., `./node --version`). The binary detects its executable name (`node`) as the subcommand. All arguments following the symlink invocation are treated as container passthrough arguments, except for `--cderun-*` overrides which are hoisted to configure `cderun` without altering the tool's flags.
+2. **Symlink Mode (Polyglot Entry Point)**: Enabled whenever the executable basename (derived from `os.Args[0]`) is not `cderun` (e.g., `./node --version`). This applies regardless of whether the binary was invoked via a symbolic link, a renamed executable, or a hard link. The binary automatically detects its executable basename (`node`) as the subcommand. All arguments following the invocation are treated as container passthrough arguments, except for `--cderun-*` overrides which are hoisted to configure `cderun` without altering the wrapped tool's flags.
 3. **Ad-hoc Mode**: The user executes arbitrary commands in a container by specifying the image explicitly (e.g., `cderun --image=alpine --entrypoint=ls ls -l`). The first non-flag argument (`ls`) acts as the lookup key; specifying `--entrypoint` overrides the container image entrypoint to execute the requested command.
 4. **Diagnosis Mode**: Invoked with `--diagnosis` (e.g., `cderun --diagnosis`). No subcommand is required, and system diagnostics or available tool mappings are printed directly.
 
@@ -165,7 +165,7 @@ To simplify argument parsing and avoid semantic ambiguity with shell-native and 
 
 ## Symlink Mode & Polyglot Entry Point
 
-When `cderun` is executed via a symbolic link (e.g., `node` -> `cderun`), the base name of the executable (`node`) is automatically detected as the subcommand.
+When `cderun` is executed under a name other than `cderun` (such as via a symbolic link, renamed executable, or hard link like `node` -> `cderun`), the base name of the executable (`node`) is automatically detected as the subcommand.
 
 In this mode:
 
