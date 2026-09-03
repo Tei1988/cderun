@@ -638,15 +638,27 @@ func HasParentTraversal(s string) bool {
 
 // validatePathChars ensures the string does not contain C0 or C1 control characters or invalid UTF-8 sequences.
 func validatePathChars(s string) error {
-	for pos, r := range s {
+	fastIdx := 0
+	for ; fastIdx < len(s); fastIdx++ {
+		b := s[fastIdx]
+		if b < 0x20 || b >= 0x7f {
+			break
+		}
+	}
+	if fastIdx == len(s) {
+		return nil
+	}
+
+	for pos, r := range s[fastIdx:] {
+		actualPos := fastIdx + pos
 		if r == utf8.RuneError {
-			_, width := utf8.DecodeRuneInString(s[pos:])
+			_, width := utf8.DecodeRuneInString(s[actualPos:])
 			if width == 1 {
-				return fmt.Errorf("invalid character in path or configuration: invalid UTF-8 encoding (position %d)", pos)
+				return fmt.Errorf("invalid character in path or configuration: invalid UTF-8 encoding (position %d)", actualPos)
 			}
 		}
 		if unicode.IsControl(r) {
-			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, pos)
+			return fmt.Errorf("invalid character in path or configuration: %q (position %d)", r, actualPos)
 		}
 	}
 	return nil
@@ -842,9 +854,6 @@ func ValidateEnvKey(s string) error {
 				return fmt.Errorf("invalid environment variable key: %q", s)
 			}
 		}
-	}
-	if err := validatePathChars(s); err != nil {
-		return err
 	}
 	return nil
 }

@@ -255,8 +255,8 @@ func matchPreAnalyzed(key string, keyIsASCII bool, ap *preAnalyzedPattern, upper
 }
 
 func MaskSensitiveEnv(key, value string, patterns []string) string {
-	if value == "" {
-		return ""
+	if value == "" || value == "[REDACTED]" {
+		return value
 	}
 
 	if patterns == nil {
@@ -295,7 +295,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 		var res []string
 		for i, e := range env {
 			if k, v, found := strings.Cut(e, "="); found {
-				if v != "" {
+				if v != "" && v != "[REDACTED]" {
 					if res == nil {
 						res = make([]string, len(env))
 						copy(res, env[:i])
@@ -338,6 +338,12 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 			}
 
 			if matched {
+				if v == "[REDACTED]" {
+					if res != nil {
+						res[i] = e
+					}
+					continue
+				}
 				if res == nil {
 					res = make([]string, len(env))
 					copy(res, env[:i])
