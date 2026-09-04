@@ -94,7 +94,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
 | T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
-| T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
+| T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |

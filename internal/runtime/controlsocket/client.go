@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/docker/docker/pkg/stdcopy"
 
 	"cderun/internal/container"
 	"cderun/internal/version"
@@ -250,5 +253,225 @@ func (c *Client) RemoveContainer(ctx context.Context, containerID string) error 
 	}
 
 	_, err = c.sendRPC(ctx, MsgRemoveContainer, payload)
+	return err
+}
+
+// SignalContainer invokes SignalContainer RPC over Control Socket.
+func (c *Client) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	args := SignalContainerArgs{ContainerID: containerID, Signal: sig}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal SignalContainer args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgSignalContainer, payload)
+	return err
+}
+
+// ResizeContainerTTY invokes ResizeContainerTTY RPC over Control Socket.
+func (c *Client) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	args := ResizeContainerTTYArgs{ContainerID: containerID, Rows: rows, Cols: cols}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ResizeContainerTTY args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgResizeContainerTTY, payload)
+	return err
+}
+
+func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "unix", c.socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial control socket %s for streaming: %w", c.socketPath, err)
+	}
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Second)
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to set deadline for streaming handshake: %w", err)
+	}
+	defer func() {
+		_ = conn.SetDeadline(time.Time{})
+	}()
+
+	req := HandshakeRequest{
+		ProtocolVersion: CurrentProtocolVersion,
+		ClientVersion:   version.Version,
+	}
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to marshal handshake request: %w", err)
+	}
+
+	if err := WriteFrame(conn, reqData); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to send handshake request: %w", err)
+	}
+
+	respData, err := ReadFrame(conn)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to read handshake response: %w", err)
+	}
+
+	var resp HandshakeResponse
+	if err := json.Unmarshal(respData, &resp); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("malformed handshake response: %w", err)
+	}
+
+	if !resp.Accepted {
+		_ = conn.Close()
+		return nil, fmt.Errorf("control socket handshake rejected: %s", resp.Error)
+	}
+
+	return conn, nil
+}
+
+// AttachContainer connects a dedicated stream connection and attaches to container standard I/O streams over Control Socket.
+func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	conn, err := c.dialAndHandshake(ctx)
+	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		return err
+	}
+	defer conn.Close()
+
+	args := AttachContainerArgs{
+		ContainerID: containerID,
+		TTY:         tty,
+	}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		return fmt.Errorf("failed to marshal AttachContainer args: %w", err)
+	}
+
+	reqFrame := RequestFrame{
+		Type:    MsgAttachContainer,
+		Payload: payload,
+	}
+	reqBytes, err := json.Marshal(reqFrame)
+	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		return fmt.Errorf("failed to marshal AttachContainer request frame: %w", err)
+	}
+
+	if err := WriteFrame(conn, reqBytes); err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		return fmt.Errorf("failed to send AttachContainer request frame: %w", err)
+	}
+
+	readDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.SetReadDeadline(time.Now())
+		case <-readDone:
+		}
+	}()
+
+	respBytes, err := ReadFrame(conn)
+	close(readDone)
+	_ = conn.SetReadDeadline(time.Time{})
+
+	if err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return fmt.Errorf("failed to read AttachContainer response frame: %w", err)
+	}
+
+	var resp ResponseFrame
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		if ready != nil {
+			close(ready)
+		}
+		return fmt.Errorf("malformed AttachContainer response frame: %w", err)
+	}
+
+	if !resp.Success {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New(resp.Error)
+	}
+
+	if ready != nil {
+		close(ready)
+	}
+
+	stdinDone := make(chan struct{})
+	stdinErrChan := make(chan error, 1)
+	if stdin != nil {
+		go func() {
+			defer close(stdinDone)
+			_, copyErr := io.Copy(conn, stdin)
+			if copyErr != nil && !errors.Is(copyErr, io.EOF) {
+				stdinErrChan <- copyErr
+				_ = conn.Close()
+				return
+			}
+			if cw, ok := conn.(interface{ CloseWrite() error }); ok {
+				_ = cw.CloseWrite()
+			}
+		}()
+	} else {
+		close(stdinDone)
+	}
+
+	outputDone := make(chan error, 1)
+	go func() {
+		if stdout == nil {
+			stdout = io.Discard
+		}
+		if stderr == nil {
+			stderr = io.Discard
+		}
+		var copyErr error
+		if tty {
+			_, copyErr = io.Copy(stdout, conn)
+		} else {
+			_, copyErr = stdcopy.StdCopy(stdout, stderr, conn)
+		}
+		outputDone <- copyErr
+	}()
+
+	select {
+	case sErr := <-stdinErrChan:
+		return sErr
+	case err := <-outputDone:
+		select {
+		case sErr := <-stdinErrChan:
+			return sErr
+		default:
+		}
+		return copyErrOrNil(err)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func copyErrOrNil(err error) error {
+	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+		return nil
+	}
 	return err
 }
