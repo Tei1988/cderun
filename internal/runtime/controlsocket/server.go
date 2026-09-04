@@ -330,66 +330,50 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 	}
 
 	readyChan := make(chan struct{})
-	readyWrapped := make(chan struct{})
-	errChan := make(chan error, 1)
+	startRes := make(chan error, 1)
+	streamErrChan := make(chan error, 1)
 
 	go func() {
 		err := d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
-		errChan <- err
+		startRes <- err
+		streamErrChan <- err
 	}()
-
-	go func() {
-		select {
-		case <-readyChan:
-		case err := <-errChan:
-			if err != nil {
-				errChan <- err
-			}
-		}
-		close(readyWrapped)
-	}()
-
-	var errConsumed bool
 
 	select {
-	case <-readyWrapped:
+	case err := <-startRes:
+		if err != nil {
+			s.sendErrorResponse(conn, err.Error())
+			return
+		}
+	case <-readyChan:
 		select {
-		case err := <-errChan:
-			errConsumed = true
+		case err := <-startRes:
 			if err != nil {
 				s.sendErrorResponse(conn, err.Error())
 				return
 			}
 		default:
 		}
-
-		resp := ResponseFrame{Success: true}
-		respBytes, _ := json.Marshal(resp)
-		if err := WriteFrame(conn, respBytes); err != nil {
-			s.logger.Warn("Failed to send AttachContainer success response: %v", err)
-			return
-		}
-		releaseGate()
-	case err := <-errChan:
-		errConsumed = true
-		if err != nil {
-			s.sendErrorResponse(conn, err.Error())
-			return
-		}
 	case <-ctx.Done():
 		s.sendErrorResponse(conn, ctx.Err().Error())
 		return
 	}
 
-	if !errConsumed {
-		select {
-		case err := <-errChan:
-			if err != nil {
-				s.logger.Debug("AttachContainer streaming finished with error: %v", err)
-			}
-		case <-ctx.Done():
-			s.logger.Debug("AttachContainer context canceled")
+	resp := ResponseFrame{Success: true}
+	respBytes, _ := json.Marshal(resp)
+	if err := WriteFrame(conn, respBytes); err != nil {
+		s.logger.Warn("Failed to send AttachContainer success response: %v", err)
+		return
+	}
+	releaseGate()
+
+	select {
+	case err := <-streamErrChan:
+		if err != nil {
+			s.logger.Debug("AttachContainer streaming finished with error: %v", err)
 		}
+	case <-ctx.Done():
+		s.logger.Debug("AttachContainer context canceled")
 	}
 }
 

@@ -267,13 +267,16 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	if !ok {
 		deadline = time.Now().Add(5 * time.Second)
 	}
-	_ = conn.SetDeadline(deadline)
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to set deadline for streaming handshake: %w", err)
+	}
 
 	handshakeDone := make(chan struct{})
 	go func() {
 		select {
 		case <-ctx.Done():
-			_ = conn.SetReadDeadline(time.Now())
+			_ = conn.SetDeadline(time.Now())
 		case <-handshakeDone:
 		}
 	}()

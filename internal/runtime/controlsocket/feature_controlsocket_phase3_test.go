@@ -70,9 +70,6 @@ func (m *phase3Dispatcher) AttachContainer(ctx context.Context, containerID stri
 	m.mu.Unlock()
 
 	if containerID == "err-container" {
-		if ready != nil {
-			close(ready)
-		}
 		return errors.New("failed to attach to container")
 	}
 
@@ -282,8 +279,8 @@ func TestUnit_ControlSocket_Phase3_DialAndHandshake_Timeout(t *testing.T) {
 
 	go func() {
 		conn, err := l.Accept()
+		close(connAccepted)
 		if err == nil {
-			close(connAccepted)
 			defer conn.Close()
 			<-clientDone
 		}
