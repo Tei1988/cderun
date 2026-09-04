@@ -302,7 +302,11 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	if err != nil {
 		_ = conn.Close()
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("failed to read handshake response: %w", errors.Join(err, ctx.Err()))
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, fmt.Errorf("failed to read handshake response: %w", errors.Join(err, context.DeadlineExceeded))
 		}
 		return nil, fmt.Errorf("failed to read handshake response: %w", err)
 	}
