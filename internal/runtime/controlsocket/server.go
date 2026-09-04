@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"runtime"
 	"sync"
 	"time"
 
@@ -331,18 +330,29 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 	}
 
 	readyChan := make(chan struct{})
+	readyWrapped := make(chan struct{})
 	errChan := make(chan error, 1)
 
 	go func() {
-		errChan <- d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
+		err := d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
+		errChan <- err
+	}()
+
+	go func() {
+		select {
+		case <-readyChan:
+		case err := <-errChan:
+			if err != nil {
+				errChan <- err
+			}
+		}
+		close(readyWrapped)
 	}()
 
 	var errConsumed bool
 
 	select {
-	case <-readyChan:
-		// Yield execution briefly to allow any concurrent errChan send immediately following readyChan close
-		runtime.Gosched()
+	case <-readyWrapped:
 		select {
 		case err := <-errChan:
 			errConsumed = true

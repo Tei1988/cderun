@@ -277,11 +277,15 @@ func TestUnit_ControlSocket_Phase3_DialAndHandshake_Timeout(t *testing.T) {
 	require.NoError(t, err)
 	defer l.Close()
 
+	connAccepted := make(chan struct{})
+	clientDone := make(chan struct{})
+
 	go func() {
 		conn, err := l.Accept()
 		if err == nil {
+			close(connAccepted)
 			defer conn.Close()
-			time.Sleep(200 * time.Millisecond)
+			<-clientDone
 		}
 	}()
 
@@ -290,5 +294,9 @@ func TestUnit_ControlSocket_Phase3_DialAndHandshake_Timeout(t *testing.T) {
 	defer cancel()
 
 	_, err = client.dialAndHandshake(ctx)
+	close(clientDone)
+	<-connAccepted
+
 	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }

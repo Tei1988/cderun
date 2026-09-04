@@ -267,11 +267,19 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	if !ok {
 		deadline = time.Now().Add(5 * time.Second)
 	}
-	if err := conn.SetDeadline(deadline); err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("failed to set deadline for streaming handshake: %w", err)
-	}
+	_ = conn.SetDeadline(deadline)
+
+	handshakeDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.SetReadDeadline(time.Now())
+		case <-handshakeDone:
+		}
+	}()
+
 	defer func() {
+		close(handshakeDone)
 		_ = conn.SetDeadline(time.Time{})
 	}()
 
@@ -293,6 +301,9 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	respData, err := ReadFrame(conn)
 	if err != nil {
 		_ = conn.Close()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("failed to read handshake response: %w", err)
 	}
 
