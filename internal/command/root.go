@@ -552,6 +552,127 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 	return nil
 }
 
+func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
+	_, _ = fmt.Fprintf(w, "Image: %s\n", cfg.Image)
+	var quotedCmd []string
+	for _, arg := range cfg.Command {
+		quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
+	}
+	_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
+	_, _ = fmt.Fprintf(w, "TTY: %v\n", cfg.TTY)
+	_, _ = fmt.Fprintf(w, "Interactive: %v\n", cfg.Interactive)
+	_, _ = fmt.Fprintf(w, "Network: %s\n", cfg.Network)
+	_, _ = fmt.Fprintf(w, "Remove: %v\n", cfg.Remove)
+	_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", cfg.ReadOnly)
+	_, _ = fmt.Fprintf(w, "Init: %v\n", cfg.Init)
+	var mounts []string
+	for _, m := range cfg.Mounts {
+		mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
+	}
+	_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
+	var quotedEnvs []string
+	for _, e := range cfg.Env {
+		if k, v, found := strings.Cut(e, "="); found {
+			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
+		} else {
+			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
+		}
+	}
+	_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
+	_, _ = fmt.Fprintf(w, "Workdir: %s\n", cfg.Workdir)
+	_, _ = fmt.Fprintf(w, "User: %s\n", cfg.User)
+	_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(cfg.Ports, ", "))
+	_, _ = fmt.Fprintf(w, "PublishAll: %v\n", cfg.PublishAll)
+	_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(cfg.Expose, ", "))
+	_, _ = fmt.Fprintf(w, "Hostname: %s\n", cfg.Hostname)
+	_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(cfg.DNS, ", "))
+	_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(cfg.AddHosts, ", "))
+	_, _ = fmt.Fprintf(w, "Privileged: %v\n", cfg.Privileged)
+	if cfg.Pid != "" {
+		_, _ = fmt.Fprintf(w, "Pid: %s\n", cfg.Pid)
+	}
+	if cfg.ShmSize != "" {
+		_, _ = fmt.Fprintf(w, "ShmSize: %s\n", cfg.ShmSize)
+	}
+	if cfg.IPC != "" {
+		_, _ = fmt.Fprintf(w, "IPC: %s\n", cfg.IPC)
+	}
+	if len(cfg.SecurityOpt) > 0 {
+		_, _ = fmt.Fprintf(w, "SecurityOpt: %s\n", strings.Join(cfg.SecurityOpt, ", "))
+	}
+	if len(cfg.DNSSearch) > 0 {
+		_, _ = fmt.Fprintf(w, "DNSSearch: %s\n", strings.Join(cfg.DNSSearch, ", "))
+	}
+	if len(cfg.DNSOptions) > 0 {
+		_, _ = fmt.Fprintf(w, "DNSOptions: %s\n", strings.Join(cfg.DNSOptions, ", "))
+	}
+	if cfg.GPUs != "" {
+		_, _ = fmt.Fprintf(w, "GPUs: %s\n", cfg.GPUs)
+	}
+	if cfg.Cgroupns != "" {
+		_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", cfg.Cgroupns)
+	}
+	if cfg.PidsLimit != 0 {
+		_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", cfg.PidsLimit)
+	}
+	if cfg.CPUShares > 0 {
+		_, _ = fmt.Fprintf(w, "CPUShares: %d\n", cfg.CPUShares)
+	}
+	if cfg.CpusetCpus != "" {
+		_, _ = fmt.Fprintf(w, "CpusetCpus: %s\n", cfg.CpusetCpus)
+	}
+	if cfg.CpusetMems != "" {
+		_, _ = fmt.Fprintf(w, "CpusetMems: %s\n", cfg.CpusetMems)
+	}
+	if cfg.Restart != "" && cfg.Restart != "no" {
+		_, _ = fmt.Fprintf(w, "Restart: %s\n", cfg.Restart)
+	}
+	_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(cfg.CapAdd, ", "))
+	_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(cfg.CapDrop, ", "))
+	_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(cfg.GroupAdd, ", "))
+
+	var ulimits []string
+	for _, u := range cfg.Ulimits {
+		ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
+	}
+	if len(ulimits) > 0 {
+		_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
+	}
+
+	var sysctls []string
+	for k, v := range cfg.Sysctls {
+		sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(sysctls)
+	if len(sysctls) > 0 {
+		_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
+	}
+
+	var devices []string
+	for _, d := range cfg.Devices {
+		if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
+			devices = append(devices, d.PathOnHost)
+		} else {
+			devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+		}
+	}
+	_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
+
+	if cfg.Memory > 0 {
+		_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(cfg.Memory)))
+	}
+	if cfg.CPUs > 0 {
+		_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
+	}
+	if len(cfg.Entrypoint) > 0 {
+		var quotedEntry []string
+		for _, arg := range cfg.Entrypoint {
+			quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
+		}
+		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
+	}
+}
+
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
 	o.ensureHooks()
 
@@ -560,124 +681,7 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env, resolved.SensitiveEnv)
 
 	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Image: %s\n", maskedContainerConfig.Image)
-		var quotedCmd []string
-		for _, arg := range maskedContainerConfig.Command {
-			quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
-		}
-		_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
-		_, _ = fmt.Fprintf(w, "TTY: %v\n", maskedContainerConfig.TTY)
-		_, _ = fmt.Fprintf(w, "Interactive: %v\n", maskedContainerConfig.Interactive)
-		_, _ = fmt.Fprintf(w, "Network: %s\n", maskedContainerConfig.Network)
-		_, _ = fmt.Fprintf(w, "Remove: %v\n", maskedContainerConfig.Remove)
-		_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", maskedContainerConfig.ReadOnly)
-		_, _ = fmt.Fprintf(w, "Init: %v\n", maskedContainerConfig.Init)
-		var mounts []string
-		for _, m := range maskedContainerConfig.Mounts {
-			mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
-		}
-		_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-		var quotedEnvs []string
-		for _, e := range maskedContainerConfig.Env {
-			if k, v, found := strings.Cut(e, "="); found {
-				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
-			} else {
-				quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
-			}
-		}
-		_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
-		_, _ = fmt.Fprintf(w, "Workdir: %s\n", maskedContainerConfig.Workdir)
-		_, _ = fmt.Fprintf(w, "User: %s\n", maskedContainerConfig.User)
-		_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(maskedContainerConfig.Ports, ", "))
-		_, _ = fmt.Fprintf(w, "PublishAll: %v\n", maskedContainerConfig.PublishAll)
-		_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(maskedContainerConfig.Expose, ", "))
-		_, _ = fmt.Fprintf(w, "Hostname: %s\n", maskedContainerConfig.Hostname)
-		_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(maskedContainerConfig.DNS, ", "))
-		_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(maskedContainerConfig.AddHosts, ", "))
-		_, _ = fmt.Fprintf(w, "Privileged: %v\n", maskedContainerConfig.Privileged)
-		if maskedContainerConfig.Pid != "" {
-			_, _ = fmt.Fprintf(w, "Pid: %s\n", maskedContainerConfig.Pid)
-		}
-		if maskedContainerConfig.ShmSize != "" {
-			_, _ = fmt.Fprintf(w, "ShmSize: %s\n", maskedContainerConfig.ShmSize)
-		}
-		if maskedContainerConfig.IPC != "" {
-			_, _ = fmt.Fprintf(w, "IPC: %s\n", maskedContainerConfig.IPC)
-		}
-		if len(maskedContainerConfig.SecurityOpt) > 0 {
-			_, _ = fmt.Fprintf(w, "SecurityOpt: %s\n", strings.Join(maskedContainerConfig.SecurityOpt, ", "))
-		}
-		if len(maskedContainerConfig.DNSSearch) > 0 {
-			_, _ = fmt.Fprintf(w, "DNSSearch: %s\n", strings.Join(maskedContainerConfig.DNSSearch, ", "))
-		}
-		if len(maskedContainerConfig.DNSOptions) > 0 {
-			_, _ = fmt.Fprintf(w, "DNSOptions: %s\n", strings.Join(maskedContainerConfig.DNSOptions, ", "))
-		}
-		if maskedContainerConfig.GPUs != "" {
-			_, _ = fmt.Fprintf(w, "GPUs: %s\n", maskedContainerConfig.GPUs)
-		}
-		if maskedContainerConfig.Cgroupns != "" {
-			_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", maskedContainerConfig.Cgroupns)
-		}
-		if maskedContainerConfig.PidsLimit != 0 {
-			_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", maskedContainerConfig.PidsLimit)
-		}
-		if maskedContainerConfig.CPUShares > 0 {
-			_, _ = fmt.Fprintf(w, "CPUShares: %d\n", maskedContainerConfig.CPUShares)
-		}
-		if maskedContainerConfig.CpusetCpus != "" {
-			_, _ = fmt.Fprintf(w, "CpusetCpus: %s\n", maskedContainerConfig.CpusetCpus)
-		}
-		if maskedContainerConfig.CpusetMems != "" {
-			_, _ = fmt.Fprintf(w, "CpusetMems: %s\n", maskedContainerConfig.CpusetMems)
-		}
-		if maskedContainerConfig.Restart != "" && maskedContainerConfig.Restart != "no" {
-			_, _ = fmt.Fprintf(w, "Restart: %s\n", maskedContainerConfig.Restart)
-		}
-		_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(maskedContainerConfig.CapAdd, ", "))
-		_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(maskedContainerConfig.CapDrop, ", "))
-		_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(maskedContainerConfig.GroupAdd, ", "))
-
-		var ulimits []string
-		for _, u := range maskedContainerConfig.Ulimits {
-			ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
-		}
-		if len(ulimits) > 0 {
-			_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
-		}
-
-		var sysctls []string
-		for k, v := range maskedContainerConfig.Sysctls {
-			sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
-		}
-		sort.Strings(sysctls)
-		if len(sysctls) > 0 {
-			_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
-		}
-
-		var devices []string
-		for _, d := range maskedContainerConfig.Devices {
-			if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
-				devices = append(devices, d.PathOnHost)
-			} else {
-				devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
-			}
-		}
-		_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
-
-		if maskedContainerConfig.Memory > 0 {
-			_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(maskedContainerConfig.Memory)))
-		}
-		if maskedContainerConfig.CPUs > 0 {
-			_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(maskedContainerConfig.CPUs, 'f', -1, 64))
-		}
-		if len(maskedContainerConfig.Entrypoint) > 0 {
-			var quotedEntry []string
-			for _, arg := range maskedContainerConfig.Entrypoint {
-				quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
-			}
-			_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
-		}
+		formatDryRunSimple(w, &maskedContainerConfig)
 	})
 }
 
@@ -1212,6 +1216,62 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 	return exitCode, nil
 }
 
+func (o *rootOptions) initEarlyLogger(cmd *cobra.Command) error {
+	initialLevel := "error"
+	if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
+		initialLevel = env
+	}
+	if cmd.Flags().Changed("log-level") {
+		initialLevel = o.logLevel
+	}
+	if cmd.Flags().Changed("cderun-log-level") {
+		initialLevel = o.cderunLogLevel
+	}
+
+	// Validate initial log level
+	lvl := strings.ToLower(initialLevel)
+	if lvl != "error" && lvl != "warn" && lvl != "warning" && lvl != "info" && lvl != "debug" && lvl != "trace" {
+		return fmt.Errorf("unsupported log level: %q", initialLevel)
+	}
+
+	initialFormat := "text"
+	if env := o.fs.Getenv("CDERUN_LOG_FORMAT"); env != "" {
+		initialFormat = env
+	}
+	if cmd.Flags().Changed("log-format") {
+		initialFormat = o.logFormat
+	}
+	if cmd.Flags().Changed("cderun-log-format") {
+		initialFormat = o.cderunLogFormat
+	}
+
+	// Validate initial log format
+	fmtStr := strings.ToLower(initialFormat)
+	if fmtStr != "text" && fmtStr != "json" {
+		return fmt.Errorf("unsupported log format: %q", initialFormat)
+	}
+
+	initialTimestamp := true
+	if env := o.fs.Getenv("CDERUN_LOG_TIMESTAMP"); env != "" {
+		b, err := strconv.ParseBool(env)
+		if err != nil {
+			return fmt.Errorf("invalid boolean value for log-timestamp: %q", env)
+		}
+		initialTimestamp = b
+	}
+	if cmd.Flags().Changed("log-timestamp") {
+		initialTimestamp = o.logTimestamp
+	}
+	if cmd.Flags().Changed("cderun-log-timestamp") {
+		initialTimestamp = o.cderunLogTimestamp
+	}
+
+	if err := o.logger.Init(initialLevel, initialFormat, initialTimestamp); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	return nil
+}
+
 func newRootCmd(o *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Version:       version.Info(),
@@ -1235,61 +1295,8 @@ intended for the subcommand.`,
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		// Early logger initialization with CLI and Environment settings before config loading.
 		// This allows loadConfigs() to use the correct log level.
-		initialLevel := "error"
-		if env := o.fs.Getenv("CDERUN_LOG_LEVEL"); env != "" {
-			initialLevel = env
-		}
-		if cmd.Flags().Changed("log-level") {
-			initialLevel = o.logLevel
-		}
-		if cmd.Flags().Changed("cderun-log-level") {
-			initialLevel = o.cderunLogLevel
-		}
-
-		// Validate initial log level
-		{
-			lvl := strings.ToLower(initialLevel)
-			if lvl != "error" && lvl != "warn" && lvl != "warning" && lvl != "info" && lvl != "debug" && lvl != "trace" {
-				return fmt.Errorf("unsupported log level: %q", initialLevel)
-			}
-		}
-
-		initialFormat := "text"
-		if env := o.fs.Getenv("CDERUN_LOG_FORMAT"); env != "" {
-			initialFormat = env
-		}
-		if cmd.Flags().Changed("log-format") {
-			initialFormat = o.logFormat
-		}
-		if cmd.Flags().Changed("cderun-log-format") {
-			initialFormat = o.cderunLogFormat
-		}
-
-		// Validate initial log format
-		{
-			fmtStr := strings.ToLower(initialFormat)
-			if fmtStr != "text" && fmtStr != "json" {
-				return fmt.Errorf("unsupported log format: %q", initialFormat)
-			}
-		}
-
-		initialTimestamp := true
-		if env := o.fs.Getenv("CDERUN_LOG_TIMESTAMP"); env != "" {
-			b, err := strconv.ParseBool(env)
-			if err != nil {
-				return fmt.Errorf("invalid boolean value for log-timestamp: %q", env)
-			}
-			initialTimestamp = b
-		}
-		if cmd.Flags().Changed("log-timestamp") {
-			initialTimestamp = o.logTimestamp
-		}
-		if cmd.Flags().Changed("cderun-log-timestamp") {
-			initialTimestamp = o.cderunLogTimestamp
-		}
-
-		if err := o.logger.Init(initialLevel, initialFormat, initialTimestamp); err != nil {
-			return fmt.Errorf("failed to initialize logger: %w", err)
+		if err := o.initEarlyLogger(cmd); err != nil {
+			return err
 		}
 
 		// Load configurations
