@@ -57,9 +57,9 @@ func TestUnit_Config_DeepResilience_Validators(t *testing.T) {
 	})
 
 	t.Run("ValidateSecurityOpt and ValidateSysctl boundary checks", func(t *testing.T) {
-		assert.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
-		assert.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
-		assert.Error(t, ValidateSecurityOpt("invalid\nopt"))
+		require.NoError(t, ValidateSecurityOpt("no-new-privileges:true"))
+		require.NoError(t, ValidateSecurityOpt("seccomp=unconfined"))
+		require.Error(t, ValidateSecurityOpt("invalid\nopt"))
 
 		assert.NoError(t, ValidateSysctlKey("net.ipv4.ip_forward"))
 		assert.Error(t, ValidateSysctlKey("invalid key"))

@@ -132,13 +132,13 @@ func TestUnit_Command_DeepExecution_DryRunJSONFormatting(t *testing.T) {
 	outStr := buf.String()
 	assert.NotEmpty(t, outStr)
 
-	var payload map[string]interface{}
+	var payload map[string]any
 	err = json.Unmarshal([]byte(outStr), &payload)
 	require.NoError(t, err)
 
 	assert.Equal(t, "alpine:latest", payload["image"])
 
-	envRaw, ok := payload["env"].([]interface{})
+	envRaw, ok := payload["env"].([]any)
 	require.True(t, ok)
 
 	envSlice := make([]string, len(envRaw))
