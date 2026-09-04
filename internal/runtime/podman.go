@@ -8,13 +8,11 @@ import (
 	"github.com/docker/docker/client"
 )
 
-// NewPodmanRuntime creates a new Podman runtime instance.
-// It uses the Docker-compatible API provided by Podman.
-func NewPodmanRuntime(socket string, opts ...DockerRuntimeOption) (*DockerRuntime, error) {
-	// Create a custom transport to handle unix sockets and disable keep-alives.
-	// DisableKeepAlives: true is a known workaround for EOF issues with some
-	// container runtime proxies (especially Podman's system service).
-	httpClient := &http.Client{
+// newPodmanHTTPClient creates a custom HTTP client configured for Podman Unix domain sockets.
+// DisableKeepAlives: true is a known workaround for EOF issues with some
+// container runtime proxies (especially Podman's system service).
+func newPodmanHTTPClient(socket string) *http.Client {
+	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				return (&net.Dialer{}).DialContext(ctx, "unix", socket)
@@ -22,6 +20,12 @@ func NewPodmanRuntime(socket string, opts ...DockerRuntimeOption) (*DockerRuntim
 			DisableKeepAlives: true,
 		},
 	}
+}
+
+// NewPodmanRuntime creates a new Podman runtime instance.
+// It uses the Docker-compatible API provided by Podman.
+func NewPodmanRuntime(socket string, opts ...DockerRuntimeOption) (*DockerRuntime, error) {
+	httpClient := newPodmanHTTPClient(socket)
 
 	return NewDockerRuntimeWithOptions(
 		socket,
