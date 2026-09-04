@@ -97,7 +97,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
-| T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | - |
+| T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 
 依存関係・統合の注意:
 
@@ -853,11 +853,11 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 ### 完了条件
 
-- [ ] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
-- [ ] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
+- [x] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
+- [x] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
 - [ ] 契約スイートが Mock、Docker、Podman、および containerd すべてのランタイムを網羅し、CI 上で T20 インテグレーション環境が完了し実行されていること（T20の統合を必須要件とする）。
-- [ ] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
-- [ ] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
+- [x] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
+- [x] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
 
 ---
 
