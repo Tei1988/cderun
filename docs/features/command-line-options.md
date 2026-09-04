@@ -281,7 +281,7 @@ cderun --mount type=tmpfs,target=/tmp alpine
 - **Type**: string
 - **Environment Variable**: `CDERUN_WORKDIR`
 - **Description**: Specify the container's working directory.
-- **Validation**: Enforces absolute path checks and blocks parent directory traversals (`..`) if explicitly configured.
+- **Validation**: Enforces absolute path checks and blocks parent directory traversals (`..`) if explicitly configured. Valid working directory paths permit standard path characters as well as `@` and `+` symbols (supporting pnpm virtual store paths like `.pnpm/esbuild@0.25.12` and scoped package directories like `@scope/pkg`).
 
 ```bash
 cderun --workdir /app node server.js
