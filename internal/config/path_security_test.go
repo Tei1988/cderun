@@ -335,6 +335,9 @@ func TestUnit_Config_ValidateWorkdir(t *testing.T) {
 		{"Injection attempt", "/app; rm -rf /", true},
 		{"Path traversal containing dotdot", "/app/../etc", true},
 		{"Path traversal ending in dotdot", "/app/..", true},
+		{"Pnpm virtual store path with at sign", "/home/user/workspace/project/apps/app/node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild", false},
+		{"Scoped package path with at sign and plus", "/home/user/project/node_modules/.pnpm/@scope+pkg@1.0.0/node_modules/@scope/pkg", false},
+		{"Path with plus sign", "/workspace/c++_project", false},
 	}
 
 	for _, tt := range tests {
