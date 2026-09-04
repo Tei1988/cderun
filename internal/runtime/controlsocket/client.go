@@ -263,6 +263,18 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("failed to dial control socket %s for streaming: %w", c.socketPath, err)
 	}
 
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Second)
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to set deadline for streaming handshake: %w", err)
+	}
+	defer func() {
+		_ = conn.SetDeadline(time.Time{})
+	}()
+
 	req := HandshakeRequest{
 		ProtocolVersion: CurrentProtocolVersion,
 		ClientVersion:   version.Version,
@@ -341,10 +353,25 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 		return fmt.Errorf("failed to send AttachContainer request frame: %w", err)
 	}
 
+	readDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.SetReadDeadline(time.Now())
+		case <-readDone:
+		}
+	}()
+
 	respBytes, err := ReadFrame(conn)
+	close(readDone)
+	_ = conn.SetReadDeadline(time.Time{})
+
 	if err != nil {
 		if ready != nil {
 			close(ready)
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 		return fmt.Errorf("failed to read AttachContainer response frame: %w", err)
 	}
@@ -369,10 +396,16 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	}
 
 	stdinDone := make(chan struct{})
+	stdinErrChan := make(chan error, 1)
 	if stdin != nil {
 		go func() {
 			defer close(stdinDone)
-			_, _ = io.Copy(conn, stdin)
+			_, copyErr := io.Copy(conn, stdin)
+			if copyErr != nil && !errors.Is(copyErr, io.EOF) {
+				stdinErrChan <- copyErr
+				_ = conn.Close()
+				return
+			}
 			if cw, ok := conn.(interface{ CloseWrite() error }); ok {
 				_ = cw.CloseWrite()
 			}
@@ -400,7 +433,14 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	}()
 
 	select {
+	case sErr := <-stdinErrChan:
+		return sErr
 	case err := <-outputDone:
+		select {
+		case sErr := <-stdinErrChan:
+			return sErr
+		default:
+		}
 		return copyErrOrNil(err)
 	case <-ctx.Done():
 		return ctx.Err()

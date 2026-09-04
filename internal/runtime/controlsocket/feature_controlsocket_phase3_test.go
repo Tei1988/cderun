@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -238,4 +239,56 @@ func TestUnit_ControlSocket_Phase3_Attach_Error(t *testing.T) {
 	default:
 		t.Fatal("ready channel should be closed even on error")
 	}
+}
+
+type errReader struct{}
+
+func (e *errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("failing stdin read")
+}
+
+func TestUnit_ControlSocket_Phase3_Attach_StdinErrorPropagation(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "phase3_stdin_err.sock")
+
+	disp := &phase3Dispatcher{}
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client, err := Connect(ctx, socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	err = client.AttachContainer(ctx, "c-phase3-123", true, &errReader{}, nil, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failing stdin read")
+}
+
+func TestUnit_ControlSocket_Phase3_DialAndHandshake_Timeout(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "silent_listener.sock")
+
+	l, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer l.Close()
+
+	go func() {
+		conn, err := l.Accept()
+		if err == nil {
+			defer conn.Close()
+			time.Sleep(200 * time.Millisecond)
+		}
+	}()
+
+	client := &Client{socketPath: socketPath}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err = client.dialAndHandshake(ctx)
+	require.Error(t, err)
 }

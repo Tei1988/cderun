@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -311,6 +312,15 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 	}
 
 	gate := make(chan struct{})
+	var releaseGateOnce sync.Once
+	releaseGate := func() {
+		releaseGateOnce.Do(func() {
+			close(gate)
+		})
+	}
+	defer releaseGate()
+	defer conn.Close()
+
 	var stdoutWriter, stderrWriter io.Writer
 	if args.TTY {
 		stdoutWriter = &gateWriter{w: conn, gate: gate}
@@ -327,15 +337,20 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 		errChan <- d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
 	}()
 
+	var errConsumed bool
+
 	select {
 	case <-readyChan:
+		// Yield execution briefly to allow any concurrent errChan send immediately following readyChan close
+		runtime.Gosched()
 		select {
 		case err := <-errChan:
+			errConsumed = true
 			if err != nil {
 				s.sendErrorResponse(conn, err.Error())
 				return
 			}
-		case <-time.After(5 * time.Millisecond):
+		default:
 		}
 
 		resp := ResponseFrame{Success: true}
@@ -344,8 +359,9 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 			s.logger.Warn("Failed to send AttachContainer success response: %v", err)
 			return
 		}
-		close(gate)
+		releaseGate()
 	case err := <-errChan:
+		errConsumed = true
 		if err != nil {
 			s.sendErrorResponse(conn, err.Error())
 			return
@@ -355,15 +371,16 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 		return
 	}
 
-	select {
-	case err := <-errChan:
-		if err != nil {
-			s.logger.Debug("AttachContainer streaming finished with error: %v", err)
+	if !errConsumed {
+		select {
+		case err := <-errChan:
+			if err != nil {
+				s.logger.Debug("AttachContainer streaming finished with error: %v", err)
+			}
+		case <-ctx.Done():
+			s.logger.Debug("AttachContainer context canceled")
 		}
-	case <-ctx.Done():
-		s.logger.Debug("AttachContainer context canceled")
 	}
-	_ = conn.Close()
 }
 
 type gateWriter struct {
