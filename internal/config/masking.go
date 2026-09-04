@@ -294,13 +294,14 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	if patterns == nil {
 		var res []string
 		for i, e := range env {
-			if k, v, found := strings.Cut(e, "="); found {
+			if idx := strings.IndexByte(e, '='); idx >= 0 {
+				v := e[idx+1:]
 				if v != "" && v != "[REDACTED]" {
 					if res == nil {
 						res = make([]string, len(env))
 						copy(res, env[:i])
 					}
-					res[i] = e[:len(k)+1] + "[REDACTED]"
+					res[i] = e[:idx+1] + "[REDACTED]"
 				} else if res != nil {
 					res[i] = e
 				}
@@ -318,7 +319,9 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 
 	var res []string
 	for i, e := range env {
-		if k, v, found := strings.Cut(e, "="); found {
+		if idx := strings.IndexByte(e, '='); idx >= 0 {
+			k := e[:idx]
+			v := e[idx+1:]
 			if v == "" {
 				if res != nil {
 					res[i] = e
@@ -348,7 +351,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 					res = make([]string, len(env))
 					copy(res, env[:i])
 				}
-				res[i] = e[:len(k)+1] + "[REDACTED]"
+				res[i] = e[:idx+1] + "[REDACTED]"
 			} else if res != nil {
 				res[i] = e
 			}

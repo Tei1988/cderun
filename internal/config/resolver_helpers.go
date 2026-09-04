@@ -311,7 +311,13 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 
 func addEnv(m map[string]string, keys *[]string, env []string) {
 	for _, e := range env {
-		key, _, _ := strings.Cut(e, "=")
+		idx := strings.IndexByte(e, '=')
+		var key string
+		if idx >= 0 {
+			key = e[:idx]
+		} else {
+			key = e
+		}
 		if _, ok := m[key]; !ok {
 			*keys = append(*keys, key)
 		}
@@ -330,7 +336,13 @@ func deduplicateEnv(env []string) []string {
 		hasDuplicates := false
 
 		for _, e := range env {
-			key, _, _ := strings.Cut(e, "=")
+			idx := strings.IndexByte(e, '=')
+			var key string
+			if idx >= 0 {
+				key = e[:idx]
+			} else {
+				key = e
+			}
 			foundIdx := -1
 			for j := 0; j < size; j++ {
 				if keys[j] == key {
@@ -375,7 +387,13 @@ func deduplicateEnv(env []string) []string {
 
 func addEnvSmall(keys *[32]string, vals *[32]string, size *int, env []string) {
 	for _, e := range env {
-		key, _, _ := strings.Cut(e, "=")
+		idx := strings.IndexByte(e, '=')
+		var key string
+		if idx >= 0 {
+			key = e[:idx]
+		} else {
+			key = e
+		}
 		foundIdx := -1
 		for j := 0; j < *size; j++ {
 			if keys[j] == key {
@@ -512,7 +530,7 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 			val = v
 		}
 
-		if strings.ContainsRune(val, 0) {
+		if strings.IndexByte(val, 0) != -1 {
 			return nil, fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
 		hasControlOrNonASCII := false
