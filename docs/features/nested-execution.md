@@ -48,6 +48,15 @@ Nested execution relies on three fundamental mechanisms:
 
 When a container that supports nested execution is started, `cderun` generates a temporary snapshot directory and mounts it inside the container.
 
+### Snapshot Base Directory
+
+The directory that holds the snapshot is selected per Execution Host:
+
+- **Base Host (Level 0)**: the temp directory reported by the environment (`TMPDIR`, or the platform default) is used as-is. The snapshot path is handed to the container runtime as a bind mount source, so it must be a path the runtime can share. On macOS the per-user directory in `TMPDIR` (`/var/folders/...`) is shared with the runtime VM, while `/tmp` is not.
+- **Inside a container (Level 1 or deeper)**: the value is normalized to `/tmp`. Images and package managers point `TMPDIR` at locations such as `/root/tmp` or `node_modules/.tmp`, which do not reverse-resolve to a usable Base Host path and make the nested bind mount fail.
+
+A relative `TMPDIR` is normalized to `/tmp` at any level, since it would otherwise place the snapshot under the current working directory.
+
 ### Snapshot Creation Sequence
 
 The snapshot creation sequence distinguishes between the path on the current Execution Host (where files are written) and the path on the Base Host (used as the mount source for the container runtime daemon).

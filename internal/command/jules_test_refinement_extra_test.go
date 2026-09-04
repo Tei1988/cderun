@@ -33,9 +33,9 @@ func TestUnit_Command_Preprocessor_AdvancedAdjacentOverrides(t *testing.T) {
 		args := []string{
 			"cderun",
 			"sh",
-			"--cderun-read-only", // boolean flag
-			"some_arg",           // should not be consumed as value for read-only
-			"--cderun-tty=false", // inline override
+			"--cderun-read-only",             // boolean flag
+			"some_arg",                       // should not be consumed as value for read-only
+			"--cderun-tty=false",             // inline override
 			"--cderun-image", "ubuntu:22.04", // space-separated value-taking flag
 		}
 
@@ -67,7 +67,7 @@ func TestUnit_Command_Preprocessor_AdvancedAdjacentOverrides(t *testing.T) {
 			"cderun",
 			"--tty", // Standard flag (P2)
 			"sh",
-			"-l",             // standard passthrough
+			"-l",                       // standard passthrough
 			"--cderun-image", "alpine", // P1 override
 			"-c", "echo 'hi'", // standard passthrough
 		}

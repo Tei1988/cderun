@@ -343,40 +343,64 @@ func TestUnit_Snapshot_Cleanup_Success(t *testing.T) {
 }
 
 func TestUnit_Snapshot_RealFileSystem_TMPDIR_Override(t *testing.T) {
-	// Save initial TMPDIR
-	origTMPDIR, set := os.LookupEnv("TMPDIR")
-	defer func() {
-		if set {
-			_ = os.Setenv("TMPDIR", origTMPDIR)
-		} else {
-			_ = os.Unsetenv("TMPDIR")
+	realFileSystems := map[string]config.FileSystem{
+		"value type config.RealFileSystem":    config.RealFileSystem{},
+		"pointer type *config.RealFileSystem": &config.RealFileSystem{},
+	}
+
+	// Simulate the OverlayFS root mapping so nested host path resolution is deterministic.
+	overlayMountInfo := "24 25 0:21 / / rw,relatime - overlay overlay rw,lowerdir=/l,upperdir=/var/lib/docker/overlay2/abc/diff,workdir=/w\n"
+
+	t.Run("base host honors an absolute TMPDIR", func(t *testing.T) {
+		// The Base Host snapshot path becomes a bind mount source, so the per-user temp
+		// directory (e.g. macOS /var/folders/...) must be preserved.
+		tmpDir := t.TempDir()
+		t.Setenv("TMPDIR", tmpDir)
+
+		for name, fs := range realFileSystems {
+			t.Run(name, func(t *testing.T) {
+				containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), fs, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = cleanupSnapshot(fs, containerDir) })
+
+				wantPrefix := filepath.Join(tmpDir, "cderun-snap-")
+				assert.True(t, strings.HasPrefix(containerDir, wantPrefix), "expected snapshot path to start with %s, got: %s", wantPrefix, containerDir)
+				assert.Equal(t, containerDir, hostDir, "Base Host snapshot path must be used as-is")
+			})
 		}
-	}()
-
-	// Simulate node_modules/.tmp TMPDIR override
-	_ = os.Setenv("TMPDIR", "/workspace/node_modules/.tmp")
-
-	t.Run("value type config.RealFileSystem", func(t *testing.T) {
-		realFS := config.RealFileSystem{}
-		containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), realFS, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
-		require.NoError(t, err)
-		if containerDir != "" {
-			t.Cleanup(func() { _ = cleanupSnapshot(realFS, containerDir) })
-		}
-
-		assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
-		assert.True(t, strings.HasPrefix(hostDir, "/tmp/cderun-snap-"), "expected host snapshot path to start with /tmp/cderun-snap-, got: %s", hostDir)
 	})
 
-	t.Run("pointer type *config.RealFileSystem", func(t *testing.T) {
-		realFSPtr := &config.RealFileSystem{}
-		containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), realFSPtr, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
-		require.NoError(t, err)
-		if containerDir != "" {
-			t.Cleanup(func() { _ = cleanupSnapshot(realFSPtr, containerDir) })
-		}
+	t.Run("base host falls back for a relative TMPDIR", func(t *testing.T) {
+		// A relative TMPDIR would place the snapshot under the current working directory.
+		t.Setenv("TMPDIR", filepath.Join("node_modules", ".tmp"))
 
-		assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
-		assert.True(t, strings.HasPrefix(hostDir, "/tmp/cderun-snap-"), "expected host snapshot path to start with /tmp/cderun-snap-, got: %s", hostDir)
+		for name, fs := range realFileSystems {
+			t.Run(name, func(t *testing.T) {
+				containerDir, _, _, err := createSnapshot(logging.NewLogger(), fs, &config.CDERunConfig{}, config.ToolsConfig{}, nil, nil, false)
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = cleanupSnapshot(fs, containerDir) })
+
+				assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
+			})
+		}
+	})
+
+	t.Run("nested execution normalizes TMPDIR to /tmp", func(t *testing.T) {
+		// Inside a container TMPDIR may point at a location such as /root/tmp that does
+		// not reverse-resolve to a usable Base Host path.
+		t.Setenv("TMPDIR", t.TempDir())
+		reader := &mockMountInfoReader{Content: []byte(overlayMountInfo)}
+		globalCfg := &config.CDERunConfig{HostContext: &config.HostContext{Level: 1}}
+
+		for name, fs := range realFileSystems {
+			t.Run(name, func(t *testing.T) {
+				containerDir, hostDir, _, err := createSnapshot(logging.NewLogger(), fs, globalCfg, config.ToolsConfig{}, nil, reader, false)
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = cleanupSnapshot(fs, containerDir) })
+
+				assert.True(t, strings.HasPrefix(containerDir, "/tmp/cderun-snap-"), "expected snapshot path to start with /tmp/cderun-snap-, got: %s", containerDir)
+				assert.True(t, strings.HasPrefix(hostDir, "/var/lib/docker/overlay2/abc/diff/tmp/cderun-snap-"), "expected host path via OverlayFS upperdir, got: %s", hostDir)
+			})
+		}
 	})
 }

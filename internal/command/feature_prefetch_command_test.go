@@ -19,11 +19,11 @@ import (
 // prefetchMockRuntime implements only PullImage to check pulled images and can simulate failures.
 type prefetchMockRuntime struct {
 	*runtime.MockRuntime
-	PulledImages    []string
-	PullPolicies    []string
-	PullMaxRetries  []int
+	PulledImages     []string
+	PullPolicies     []string
+	PullMaxRetries   []int
 	PullBackoffBases []time.Duration
-	FailForImage    string
+	FailForImage     string
 }
 
 func (m *prefetchMockRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {

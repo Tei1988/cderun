@@ -32,7 +32,7 @@ func TestUnit_Command_Preprocessor_AdjacentValueRestriction(t *testing.T) {
 		args := []string{
 			"cderun",
 			"sh",
-			"--cderun-image", // value-taking flag
+			"--cderun-image",        // value-taking flag
 			"--cderun-network=host", // next adjacent arg is also a cderun flag
 		}
 

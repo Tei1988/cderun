@@ -19,12 +19,7 @@ import (
 // hostDir is the resolved host path (used as mount source for the next container).
 func createSnapshot(logger *logging.Logger, fs config.FileSystem, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, currentMounts []container.Mount, reader mountInfoReader, mountCderunSocket bool) (string, string, *controlsocket.Server, error) {
 	id := uuid.New().String()
-	// Determine snapshot base dir independent of TMPDIR environment variable overrides (e.g. node_modules/.tmp)
-	baseTempDir := fs.TempDir()
-	if isRealFileSystem(fs) {
-		baseTempDir = "/tmp"
-	}
-	snapshotDir := filepath.Join(baseTempDir, "cderun-snap-"+id)
+	snapshotDir := filepath.Join(resolveSnapshotBaseDir(fs, globalCfg), "cderun-snap-"+id)
 
 	hostCtx := buildSnapshotHostContext(logger, fs, globalCfg.HostContext, currentMounts, reader)
 
@@ -217,6 +212,38 @@ func (realMountInfoReader) ReadMountInfo(fs config.FileSystem) ([]byte, error) {
 }
 
 var defaultMountInfoReader mountInfoReader = realMountInfoReader{}
+
+// fallbackSnapshotBaseDir holds the execution snapshot whenever the temp directory
+// reported by the environment cannot be used.
+const fallbackSnapshotBaseDir = "/tmp"
+
+// resolveSnapshotBaseDir picks the directory that will hold the execution snapshot.
+//
+// On the Base Host the temp directory reported by the environment is honored, because
+// the snapshot path is handed to the container runtime as a bind mount source. On macOS
+// the per-user directory in TMPDIR is shared with the runtime VM, while /tmp is not.
+//
+// Inside a container the value is normalized to /tmp instead. Images and package managers
+// point TMPDIR at locations such as /root/tmp or node_modules/.tmp, which do not
+// reverse-resolve to a usable Base Host path and make the nested bind mount fail.
+// A relative TMPDIR is normalized at any level, since it would otherwise place the
+// snapshot under the current working directory.
+func resolveSnapshotBaseDir(fs config.FileSystem, globalCfg *config.CDERunConfig) string {
+	baseTempDir := fs.TempDir()
+	if !isRealFileSystem(fs) {
+		return baseTempDir
+	}
+	if isNestedExecutionHost(globalCfg) || !filepath.IsAbs(baseTempDir) {
+		return fallbackSnapshotBaseDir
+	}
+	return baseTempDir
+}
+
+// isNestedExecutionHost reports whether this process already runs inside a
+// cderun-managed container (Level 1 or deeper) rather than on the Base Host.
+func isNestedExecutionHost(globalCfg *config.CDERunConfig) bool {
+	return globalCfg != nil && globalCfg.HostContext != nil && globalCfg.HostContext.Level > 0
+}
 
 func isRealFileSystem(fs config.FileSystem) bool {
 	switch fs.(type) {
