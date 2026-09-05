@@ -135,84 +135,105 @@ func (rv *resolver) validateSecurity() error {
 	if err := rv.validateSysctlSecurity(); err != nil {
 		return err
 	}
+
+	foundCaps := rv.auditCapabilityWarnings()
+	if logging.Enabled(logging.WarnLevel) {
+		rv.auditSecurityWarnings(foundCaps)
+	}
+	return nil
+}
+
+func (rv *resolver) auditCapabilityWarnings() []string {
 	var found []string
 	for _, capName := range rv.res.CapAdd {
 		if isHighlyPrivilegedCapability(capName) {
 			found = append(found, capName)
 		}
 	}
+	return found
+}
 
-	if logging.Enabled(logging.WarnLevel) {
-		var socketWarningLogged bool
-		if rv.res.MountSocket {
-			logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
-			socketWarningLogged = true
-		}
+func (rv *resolver) auditSecurityWarnings(foundCaps []string) {
+	socketWarningLogged := rv.auditExecutionModeWarnings(foundCaps)
+	rv.auditMountAndDeviceWarnings(socketWarningLogged)
+	rv.auditSecurityOptWarnings()
+}
 
-		if rv.res.Privileged {
-			logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
-			if len(found) > 0 {
-				logging.Warn("Highly privileged capability %v detected in CapAdd while running in privileged mode. Please consider minimizing privileges.", found)
-			}
-		} else if len(found) > 0 {
-			logging.Warn("Highly privileged capability %v detected in CapAdd. Please consider minimizing privileges.", found)
-		}
-		if rv.res.Network == "host" {
-			logging.Warn("Container is running with host network mode enabled. This disables network isolation and may expose host network services to the container.")
-		}
-		if rv.res.Pid == "host" {
-			logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
-		}
-		if rv.res.IPC == "host" {
-			logging.Warn("Container is running with host IPC namespace enabled. This disables process communication isolation and allows the container to share inter-process communication mechanisms with the host.")
-		}
-		if rv.res.Cgroupns == "host" {
-			logging.Warn("Container is running with host cgroup namespace enabled. This reduces container isolation by exposing host-side control groups layout and limits.")
-		}
-		for _, m := range rv.res.Mounts {
-			if (m.Type == "bind" || m.Type == "") && m.Source != "" {
-				cleanSource := filepath.ToSlash(filepath.Clean(m.Source))
-				isSensitive := cleanSource == "/"
-				for _, p := range sensitiveMountPaths {
-					if cleanSource == p || strings.HasPrefix(cleanSource, p+"/") {
-						isSensitive = true
-						break
-					}
-				}
-				if isSensitive {
-					logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
-				}
+func (rv *resolver) auditExecutionModeWarnings(foundCaps []string) bool {
+	var socketWarningLogged bool
+	if rv.res.MountSocket {
+		logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+		socketWarningLogged = true
+	}
 
-				// Hardening: Warn if a mount source matches a container runtime socket, or common container socket paths.
-				isSocket := cleanSource == filepath.ToSlash(filepath.Clean(rv.res.SocketPath)) ||
-					strings.HasSuffix(cleanSource, "/docker.sock") ||
-					strings.HasSuffix(cleanSource, "/containerd.sock") ||
-					strings.HasSuffix(cleanSource, "/podman.sock") ||
-					strings.HasSuffix(cleanSource, "/cderun.sock")
-				if isSocket && !socketWarningLogged {
-					logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
-					socketWarningLogged = true
+	if rv.res.Privileged {
+		logging.Warn("Container is running in privileged mode. This reduces container isolation and may pose security risks.")
+		if len(foundCaps) > 0 {
+			logging.Warn("Highly privileged capability %v detected in CapAdd while running in privileged mode. Please consider minimizing privileges.", foundCaps)
+		}
+	} else if len(foundCaps) > 0 {
+		logging.Warn("Highly privileged capability %v detected in CapAdd. Please consider minimizing privileges.", foundCaps)
+	}
+	if rv.res.Network == "host" {
+		logging.Warn("Container is running with host network mode enabled. This disables network isolation and may expose host network services to the container.")
+	}
+	if rv.res.Pid == "host" {
+		logging.Warn("Container is running with host PID namespace enabled. This disables process isolation and allows the container to see and interact with processes on the host.")
+	}
+	if rv.res.IPC == "host" {
+		logging.Warn("Container is running with host IPC namespace enabled. This disables process communication isolation and allows the container to share inter-process communication mechanisms with the host.")
+	}
+	if rv.res.Cgroupns == "host" {
+		logging.Warn("Container is running with host cgroup namespace enabled. This reduces container isolation by exposing host-side control groups layout and limits.")
+	}
+	return socketWarningLogged
+}
+
+func (rv *resolver) auditMountAndDeviceWarnings(socketWarningLogged bool) {
+	for _, m := range rv.res.Mounts {
+		if (m.Type == "bind" || m.Type == "") && m.Source != "" {
+			cleanSource := filepath.ToSlash(filepath.Clean(m.Source))
+			isSensitive := cleanSource == "/"
+			for _, p := range sensitiveMountPaths {
+				if cleanSource == p || strings.HasPrefix(cleanSource, p+"/") {
+					isSensitive = true
+					break
 				}
 			}
-		}
-		for _, d := range rv.res.Devices {
-			if isHighlySensitiveDevice(d.PathOnHost) {
-				logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
+			if isSensitive {
+				logging.Warn("Mounting highly sensitive host path %q into the container reduces host security isolation. Please ensure this is intended.", m.Source)
 			}
-		}
 
-		if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
-			logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
-		}
-
-		for _, opt := range rv.res.SecurityOpt {
-			lowerOpt := strings.ToLower(opt)
-			if lowerOpt == "seccomp=unconfined" || lowerOpt == "apparmor=unconfined" || lowerOpt == "label=disable" || lowerOpt == "label:disable" || lowerOpt == "systempaths=unconfined" || lowerOpt == "no-new-privileges=false" {
-				logging.Warn("Container security profile or restriction is explicitly relaxed or disabled (%s). Ensure this is intended as it reduces security isolation.", opt)
+			// Hardening: Warn if a mount source matches a container runtime socket, or common container socket paths.
+			isSocket := cleanSource == filepath.ToSlash(filepath.Clean(rv.res.SocketPath)) ||
+				strings.HasSuffix(cleanSource, "/docker.sock") ||
+				strings.HasSuffix(cleanSource, "/containerd.sock") ||
+				strings.HasSuffix(cleanSource, "/podman.sock") ||
+				strings.HasSuffix(cleanSource, "/cderun.sock")
+			if isSocket && !socketWarningLogged {
+				logging.Warn("Container socket mounting is enabled. Granting access to the container runtime socket is highly privileged and allows full control over the container engine.")
+				socketWarningLogged = true
 			}
 		}
 	}
-	return nil
+	for _, d := range rv.res.Devices {
+		if isHighlySensitiveDevice(d.PathOnHost) {
+			logging.Warn("Mounting highly sensitive host device %q into the container reduces host security isolation. Please ensure this is intended.", d.PathOnHost)
+		}
+	}
+
+	if socketWarningLogged && ContainsNumericGID(rv.res.GroupAdd) {
+		logging.Warn("Granting container socket permissions through a numeric VM socket GID allows socket access but is highly privileged. Limit such deployments to trusted environments.")
+	}
+}
+
+func (rv *resolver) auditSecurityOptWarnings() {
+	for _, opt := range rv.res.SecurityOpt {
+		lowerOpt := strings.ToLower(opt)
+		if lowerOpt == "seccomp=unconfined" || lowerOpt == "apparmor=unconfined" || lowerOpt == "label=disable" || lowerOpt == "label:disable" || lowerOpt == "systempaths=unconfined" || lowerOpt == "no-new-privileges=false" {
+			logging.Warn("Container security profile or restriction is explicitly relaxed or disabled (%s). Ensure this is intended as it reduces security isolation.", opt)
+		}
+	}
 }
 
 func (rv *resolver) validateCriticalFields() error {
