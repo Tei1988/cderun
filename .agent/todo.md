@@ -94,7 +94,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T86 | ゴールデンテスト（L2: Golden Tests）の複合シナリオの追加 | テスト | 低 | 小 | - | DONE |
 | T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
-| T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | - |
+| T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
@@ -1021,29 +1021,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 正常なコンテナ起動後のシグナル・接続エラー等の重要度が適切に Warn レベルに下げられていること。
 - 対応するテストケースが実装・確認されていること。
-
----
-
-## T89: Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize）
-
-- 種別: 機能
-- 優先度: 中
-- 規模: 中
-- 前提: T88 完了
-- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
-
-### 背景
-
-Attach/シグナル/exit code 周りは過去に最もバグが集中してきた領域（T43, T52, T61, T62 等）であるため、T88 の非対話実行とは独立したタスクとして切り出す。
-
-### 方針
-
-- `AttachContainer`（stdin/stdout/stderr の多重化ストリーミング）、`SignalContainer`、`ResizeContainerTTY` を Control Socket 経由で Docker アダプタにディスパッチする。
-
-### 完了条件
-
-- `--mount-cderun-socket` 指定時、TTY ありの interactive なネスト実行が Control Socket 経由で動作する（stdin 入力、シグナル転送、ウィンドウリサイズを含む）。
-- 生ソケット経由との比較で、シグナル配送・TTY リサイズ・異常終了時の挙動に退行がないことを確認するテストがある。
 
 ---
 

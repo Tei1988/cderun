@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -21,6 +22,9 @@ type mockDispatcher struct {
 	startFunc  func(ctx context.Context, containerID string) error
 	waitFunc   func(ctx context.Context, containerID string) (int, error)
 	removeFunc func(ctx context.Context, containerID string) error
+	attachFunc func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	signalFunc func(ctx context.Context, containerID string, sig string) error
+	resizeFunc func(ctx context.Context, containerID string, rows, cols uint) error
 }
 
 func (m *mockDispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
@@ -33,6 +37,30 @@ func (m *mockDispatcher) CreateContainer(ctx context.Context, config *container.
 func (m *mockDispatcher) StartContainer(ctx context.Context, containerID string) error {
 	if m.startFunc != nil {
 		return m.startFunc(ctx, containerID)
+	}
+	return nil
+}
+
+func (m *mockDispatcher) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	if m.attachFunc != nil {
+		return m.attachFunc(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	}
+	if ready != nil {
+		close(ready)
+	}
+	return nil
+}
+
+func (m *mockDispatcher) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if m.signalFunc != nil {
+		return m.signalFunc(ctx, containerID, sig)
+	}
+	return nil
+}
+
+func (m *mockDispatcher) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	if m.resizeFunc != nil {
+		return m.resizeFunc(ctx, containerID, rows, cols)
 	}
 	return nil
 }
