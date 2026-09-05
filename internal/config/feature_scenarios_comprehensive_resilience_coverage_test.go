@@ -12,7 +12,7 @@ import (
 func TestUnit_ExpandHome(t *testing.T) {
 	home := "/home/testuser"
 
-	assert.Equal(t, "", expandHome("", home))
+	assert.Empty(t, expandHome("", home))
 	assert.Equal(t, "relative/path", expandHome("relative/path", home))
 	assert.Equal(t, "/abs/path", expandHome("/abs/path", home))
 	assert.Equal(t, home, expandHome("~", home))
@@ -47,10 +47,8 @@ func TestUnit_EnvHelpers_MergeAndDeduplicate(t *testing.T) {
 
 		res := mergeEnv(base, p2, p1)
 		// Expected precedence: p1 overrides p2, p2 overrides base
-		assert.Contains(t, res, "A=10")
-		assert.Contains(t, res, "B=20")
-		assert.Contains(t, res, "C=30")
-		assert.Contains(t, res, "D=40")
+		expected := []string{"A=10", "B=20", "C=30", "D=40"}
+		assert.Equal(t, expected, res)
 	})
 }
 
