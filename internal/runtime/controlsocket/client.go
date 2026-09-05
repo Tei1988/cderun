@@ -256,6 +256,30 @@ func (c *Client) RemoveContainer(ctx context.Context, containerID string) error 
 	return err
 }
 
+// SignalContainer invokes SignalContainer RPC over Control Socket.
+func (c *Client) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	args := SignalContainerArgs{ContainerID: containerID, Signal: sig}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal SignalContainer args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgSignalContainer, payload)
+	return err
+}
+
+// ResizeContainerTTY invokes ResizeContainerTTY RPC over Control Socket.
+func (c *Client) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	args := ResizeContainerTTYArgs{ContainerID: containerID, Rows: rows, Cols: cols}
+	payload, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ResizeContainerTTY args: %w", err)
+	}
+
+	_, err = c.sendRPC(ctx, MsgResizeContainerTTY, payload)
+	return err
+}
+
 func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", c.socketPath)
@@ -271,18 +295,7 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("failed to set deadline for streaming handshake: %w", err)
 	}
-
-	handshakeDone := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = conn.SetDeadline(time.Now())
-		case <-handshakeDone:
-		}
-	}()
-
 	defer func() {
-		close(handshakeDone)
 		_ = conn.SetDeadline(time.Time{})
 	}()
 
@@ -304,13 +317,6 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	respData, err := ReadFrame(conn)
 	if err != nil {
 		_ = conn.Close()
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("failed to read handshake response: %w", errors.Join(err, ctx.Err()))
-		}
-		var netErr net.Error
-		if errors.As(err, &netErr) && netErr.Timeout() {
-			return nil, fmt.Errorf("failed to read handshake response: %w", errors.Join(err, context.DeadlineExceeded))
-		}
 		return nil, fmt.Errorf("failed to read handshake response: %w", err)
 	}
 
@@ -328,7 +334,7 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 	return conn, nil
 }
 
-// AttachContainer attaches to a container's streams via Control Socket over a dedicated connection.
+// AttachContainer connects a dedicated stream connection and attaches to container standard I/O streams over Control Socket.
 func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
 	conn, err := c.dialAndHandshake(ctx)
 	if err != nil {
@@ -342,7 +348,6 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	args := AttachContainerArgs{
 		ContainerID: containerID,
 		TTY:         tty,
-		HasStdin:    stdin != nil,
 	}
 	payload, err := json.Marshal(args)
 	if err != nil {
@@ -440,7 +445,6 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 		if stderr == nil {
 			stderr = io.Discard
 		}
-
 		var copyErr error
 		if tty {
 			_, copyErr = io.Copy(stdout, conn)
@@ -469,29 +473,5 @@ func copyErrOrNil(err error) error {
 	if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 		return nil
 	}
-	return err
-}
-
-// SignalContainer sends a signal to a container via Control Socket.
-func (c *Client) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	args := SignalContainerArgs{ContainerID: containerID, Signal: sig}
-	payload, err := json.Marshal(args)
-	if err != nil {
-		return fmt.Errorf("failed to marshal SignalContainer args: %w", err)
-	}
-
-	_, err = c.sendRPC(ctx, MsgSignalContainer, payload)
-	return err
-}
-
-// ResizeContainerTTY resizes a container's TTY window via Control Socket.
-func (c *Client) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
-	args := ResizeContainerTTYArgs{ContainerID: containerID, Rows: rows, Cols: cols}
-	payload, err := json.Marshal(args)
-	if err != nil {
-		return fmt.Errorf("failed to marshal ResizeContainerTTY args: %w", err)
-	}
-
-	_, err = c.sendRPC(ctx, MsgResizeContainerTTY, payload)
 	return err
 }

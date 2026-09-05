@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
-
 	"cderun/internal/container"
 	"cderun/internal/logging"
 	"cderun/internal/version"
@@ -25,8 +23,8 @@ type ContainerRuntimeDispatcher interface {
 	WaitContainer(ctx context.Context, containerID string) (int, error)
 	RemoveContainer(ctx context.Context, containerID string) error
 	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
-	SignalContainer(ctx context.Context, containerID string, sig string) error
 	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
+	SignalContainer(ctx context.Context, containerID string, sig string) error
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -289,104 +287,6 @@ func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, paylo
 	_ = WriteFrame(conn, respBytes)
 }
 
-func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	s.mu.Lock()
-	d := s.dispatcher
-	s.mu.Unlock()
-
-	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
-		return
-	}
-
-	var args AttachContainerArgs
-	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed AttachContainer args: %v", err))
-		return
-	}
-
-	var stdinReader io.Reader
-	if args.HasStdin {
-		stdinReader = conn
-	}
-
-	gate := make(chan struct{})
-	var releaseGateOnce sync.Once
-	releaseGate := func() {
-		releaseGateOnce.Do(func() {
-			close(gate)
-		})
-	}
-	defer releaseGate()
-	defer conn.Close()
-
-	var stdoutWriter, stderrWriter io.Writer
-	if args.TTY {
-		stdoutWriter = &gateWriter{w: conn, gate: gate}
-		stderrWriter = &gateWriter{w: conn, gate: gate}
-	} else {
-		stdoutWriter = &gateWriter{w: stdcopy.NewStdWriter(conn, stdcopy.Stdout), gate: gate}
-		stderrWriter = &gateWriter{w: stdcopy.NewStdWriter(conn, stdcopy.Stderr), gate: gate}
-	}
-
-	readyChan := make(chan struct{})
-	startRes := make(chan error, 1)
-	streamErrChan := make(chan error, 1)
-
-	go func() {
-		err := d.AttachContainer(ctx, args.ContainerID, args.TTY, stdinReader, stdoutWriter, stderrWriter, readyChan)
-		startRes <- err
-		streamErrChan <- err
-	}()
-
-	select {
-	case err := <-startRes:
-		if err != nil {
-			s.sendErrorResponse(conn, err.Error())
-			return
-		}
-	case <-readyChan:
-		select {
-		case err := <-startRes:
-			if err != nil {
-				s.sendErrorResponse(conn, err.Error())
-				return
-			}
-		default:
-		}
-	case <-ctx.Done():
-		s.sendErrorResponse(conn, ctx.Err().Error())
-		return
-	}
-
-	resp := ResponseFrame{Success: true}
-	respBytes, _ := json.Marshal(resp)
-	if err := WriteFrame(conn, respBytes); err != nil {
-		s.logger.Warn("Failed to send AttachContainer success response: %v", err)
-		return
-	}
-	releaseGate()
-
-	select {
-	case err := <-streamErrChan:
-		if err != nil {
-			s.logger.Debug("AttachContainer streaming finished with error: %v", err)
-		}
-	case <-ctx.Done():
-		s.logger.Debug("AttachContainer context canceled")
-	}
-}
-
-type gateWriter struct {
-	w    io.Writer
-	gate <-chan struct{}
-}
-
-func (g *gateWriter) Write(p []byte) (int, error) {
-	<-g.gate
-	return g.w.Write(p)
-}
-
 func (s *Server) handleSignalContainer(ctx context.Context, conn net.Conn, payload []byte) {
 	s.mu.Lock()
 	d := s.dispatcher
@@ -437,6 +337,75 @@ func (s *Server) handleResizeContainerTTY(ctx context.Context, conn net.Conn, pa
 	resp := ResponseFrame{Success: true}
 	respBytes, _ := json.Marshal(resp)
 	_ = WriteFrame(conn, respBytes)
+}
+
+type gateWriter struct {
+	io.Writer
+	gate chan struct{}
+}
+
+func (g *gateWriter) Write(p []byte) (int, error) {
+	<-g.gate
+	return g.Writer.Write(p)
+}
+
+func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, payload []byte) {
+	s.mu.Lock()
+	d := s.dispatcher
+	s.mu.Unlock()
+
+	if d == nil {
+		s.sendErrorResponse(conn, "server dispatcher not configured")
+		return
+	}
+
+	var args AttachContainerArgs
+	if err := json.Unmarshal(payload, &args); err != nil {
+		s.sendErrorResponse(conn, fmt.Sprintf("malformed AttachContainer args: %v", err))
+		return
+	}
+
+	readyChan := make(chan struct{})
+	errChan := make(chan error, 1)
+	gate := make(chan struct{})
+	var closeGateOnce sync.Once
+	openGate := func() {
+		closeGateOnce.Do(func() {
+			close(gate)
+		})
+	}
+	defer openGate()
+
+	gw := &gateWriter{Writer: conn, gate: gate}
+
+	go func() {
+		errChan <- d.AttachContainer(ctx, args.ContainerID, args.TTY, conn, gw, gw, readyChan)
+	}()
+
+	select {
+	case <-readyChan:
+		resp := ResponseFrame{Success: true}
+		respBytes, _ := json.Marshal(resp)
+		if err := WriteFrame(conn, respBytes); err != nil {
+			s.logger.Warn("Failed to send AttachContainer ready frame: %v", err)
+			return
+		}
+		openGate()
+	case err := <-errChan:
+		if err != nil {
+			s.sendErrorResponse(conn, err.Error())
+			return
+		}
+		openGate()
+	case <-ctx.Done():
+		s.sendErrorResponse(conn, ctx.Err().Error())
+		return
+	}
+
+	if err := <-errChan; err != nil {
+		s.logger.Debug("AttachContainer streaming finished: %v", err)
+	}
+	_ = conn.Close()
 }
 
 func (s *Server) handleStartContainer(ctx context.Context, conn net.Conn, payload []byte) {

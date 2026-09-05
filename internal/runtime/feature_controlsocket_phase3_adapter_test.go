@@ -1,86 +1,28 @@
-package runtime_test
+package runtime
 
 import (
 	"bytes"
 	"context"
 	"io"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"cderun/internal/container"
 	"cderun/internal/logging"
-	"cderun/internal/runtime"
 	"cderun/internal/runtime/controlsocket"
 )
 
-type phase3Dispatcher struct {
-	mu           sync.Mutex
-	lastSignal   string
-	lastTTYRows  uint
-	lastTTYCols  uint
-	attachCalled bool
-}
-
-func (m *phase3Dispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	return "c-phase3-123", nil
-}
-
-func (m *phase3Dispatcher) StartContainer(ctx context.Context, containerID string) error {
-	return nil
-}
-
-func (m *phase3Dispatcher) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	return 0, nil
-}
-
-func (m *phase3Dispatcher) RemoveContainer(ctx context.Context, containerID string) error {
-	return nil
-}
-
-func (m *phase3Dispatcher) SignalContainer(ctx context.Context, containerID string, sig string) error {
-	m.mu.Lock()
-	m.lastSignal = sig
-	m.mu.Unlock()
-	return nil
-}
-
-func (m *phase3Dispatcher) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
-	m.mu.Lock()
-	m.lastTTYRows = rows
-	m.lastTTYCols = cols
-	m.mu.Unlock()
-	return nil
-}
-
-func (m *phase3Dispatcher) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
-	m.mu.Lock()
-	m.attachCalled = true
-	m.mu.Unlock()
-
-	if ready != nil {
-		close(ready)
-	}
-
-	if tty {
-		if stdout != nil {
-			_, _ = stdout.Write([]byte("TTY_OUTPUT"))
-		}
-	}
-	return nil
-}
-
-func TestUnit_ControlSocket_Phase3_AdapterDispatch(t *testing.T) {
+func TestUnit_ControlSocket_Phase3_Adapter_Dispatch(t *testing.T) {
 	tmpDir := t.TempDir()
-	socketPath := filepath.Join(tmpDir, "phase3_adapter.sock")
+	socketPath := filepath.Join(tmpDir, "cderun.sock")
 
-	disp := &phase3Dispatcher{}
+	underlyingMock := NewMockRuntime()
+
 	server := controlsocket.NewServer(socketPath, logging.NewLogger())
-	server.SetDispatcher(disp)
+	server.SetDispatcher(underlyingMock)
 	require.NoError(t, server.Start())
 	defer server.Close()
 
@@ -91,34 +33,41 @@ func TestUnit_ControlSocket_Phase3_AdapterDispatch(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	mockRuntime := runtime.NewMockRuntime()
-	adapter := runtime.NewControlSocketRuntimeAdapter(mockRuntime, client, logging.NewLogger())
-	defer adapter.Close()
+	adapter := NewControlSocketRuntimeAdapter(underlyingMock, client, logging.NewLogger())
 
-	// 1. SignalContainer via adapter
+	// 1. Test SignalContainer dispatch via Control Socket Adapter
 	err = adapter.SignalContainer(ctx, "c-phase3-123", "SIGINT")
 	require.NoError(t, err)
-	disp.mu.Lock()
-	assert.Equal(t, "SIGINT", disp.lastSignal)
-	disp.mu.Unlock()
+	assert.Equal(t, "c-phase3-123", underlyingMock.SignaledContainerID)
+	assert.Equal(t, "SIGINT", underlyingMock.Signal)
 
-	// 2. ResizeContainerTTY via adapter
-	err = adapter.ResizeContainerTTY(ctx, "c-phase3-123", 40, 120)
+	// 2. Test ResizeContainerTTY dispatch via Control Socket Adapter
+	err = adapter.ResizeContainerTTY(ctx, "c-phase3-123", 30, 100)
 	require.NoError(t, err)
-	disp.mu.Lock()
-	assert.Equal(t, uint(40), disp.lastTTYRows)
-	assert.Equal(t, uint(120), disp.lastTTYCols)
-	disp.mu.Unlock()
+	rows, cols := underlyingMock.GetTTYSize()
+	assert.Equal(t, uint(30), rows)
+	assert.Equal(t, uint(100), cols)
 
-	// 3. AttachContainer via adapter
-	var stdout bytes.Buffer
+	// 3. Test AttachContainer dispatch via Control Socket Adapter
+	underlyingMock.AttachFunc = func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+		if ready != nil {
+			close(ready)
+		}
+		_, err := stdout.Write([]byte("adapter stdout output\n"))
+		return err
+	}
+
+	var stdoutBuf bytes.Buffer
 	ready := make(chan struct{})
-	err = adapter.AttachContainer(ctx, "c-phase3-123", true, nil, &stdout, nil, ready)
+	err = adapter.AttachContainer(ctx, "c-phase3-123", true, nil, &stdoutBuf, nil, ready)
 	require.NoError(t, err)
+
 	select {
 	case <-ready:
 	default:
-		t.Fatal("ready channel should be closed")
+		t.Fatal("expected ready channel to be closed")
 	}
-	assert.Equal(t, "TTY_OUTPUT", stdout.String())
+
+	assert.Equal(t, "adapter stdout output\n", stdoutBuf.String())
+	assert.Equal(t, "c-phase3-123", underlyingMock.GetAttachedContainerID())
 }
