@@ -4,12 +4,12 @@ import "cderun/internal/container"
 
 // MessageType RPC action definitions for container lifecycle dispatch.
 const (
-	MsgCreateContainer   MessageType = "CreateContainer"
-	MsgStartContainer    MessageType = "StartContainer"
-	MsgWaitContainer     MessageType = "WaitContainer"
-	MsgRemoveContainer   MessageType = "RemoveContainer"
-	MsgAttachContainer   MessageType = "AttachContainer"
-	MsgSignalContainer   MessageType = "SignalContainer"
+	MsgCreateContainer    MessageType = "CreateContainer"
+	MsgStartContainer     MessageType = "StartContainer"
+	MsgWaitContainer      MessageType = "WaitContainer"
+	MsgRemoveContainer    MessageType = "RemoveContainer"
+	MsgAttachContainer    MessageType = "AttachContainer"
+	MsgSignalContainer    MessageType = "SignalContainer"
 	MsgResizeContainerTTY MessageType = "ResizeContainerTTY"
 )
 
@@ -37,6 +37,7 @@ type WaitContainerResult struct {
 type AttachContainerArgs struct {
 	ContainerID string `json:"containerId"`
 	TTY         bool   `json:"tty"`
+	HasStdin    bool   `json:"hasStdin"`
 }
 
 // SignalContainerArgs holds payload for SignalContainer RPC request.
