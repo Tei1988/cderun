@@ -566,8 +566,8 @@ func resolveEnvValues(env []string, sensitivePatterns []string, strict bool, r *
 
 		if res == nil && final != e {
 			// Allocation needed, copy previous unchanged entries
-			res = make([]string, 0, len(env))
-			res = append(res, env[:i]...)
+			res = make([]string, i, len(env))
+			copy(res, env[:i])
 		}
 		if res != nil {
 			res = append(res, final)
