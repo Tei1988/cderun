@@ -20,6 +20,7 @@ type ConformanceCapabilities struct {
 	SupportsGPUs        bool
 	SupportsDNSSearch   bool
 	SupportsDNSOptions  bool
+	SupportsInit        bool
 	RequiresCapPrefix   bool // OCI spec requires CAP_ prefix
 }
 
@@ -191,6 +192,52 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}
 	})
 
+	t.Run("ValidateConfig_FullOptionsContract", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		cfg := &container.ContainerConfig{
+			Image:       "alpine:latest",
+			Command:     []string{"echo", "test"},
+			Workdir:     "/workspace",
+			User:        "1000:1000",
+			Memory:      1024 * 1024 * 128,
+			CPUs:        1.0,
+			CPUShares:   512,
+			CpusetCpus:  "0-1",
+			CpusetMems:  "0",
+			PidsLimit:   100,
+			ShmSize:     "64m",
+			Init:        caps.SupportsInit,
+			SecurityOpt: []string{"no-new-privileges"},
+			Sysctls:     map[string]string{"net.ipv4.ip_forward": "1"},
+			Env:         []string{"ENV_A=valA", "ENV_B=valB"},
+			Pull:        "missing",
+		}
+
+		err := rt.ValidateConfig(cfg)
+		assert.NoError(t, err, "Valid full ContainerConfig must pass ValidateConfig")
+	})
+
+	t.Run("ValidateConfig_InitContract", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		cfg := &container.ContainerConfig{
+			Image: "alpine:latest",
+			Pull:  "missing",
+			Init:  true,
+		}
+
+		err := rt.ValidateConfig(cfg)
+		if caps.SupportsInit {
+			assert.NoError(t, err, "Init option should be supported by this runtime")
+		} else {
+			require.Error(t, err, "Unsupported Init option must be explicitly rejected")
+			assert.Contains(t, err.Error(), "init", "Error message should mention init")
+		}
+	})
+
 	t.Run("Lifecycle_CreateStartWaitInspectRemove", func(t *testing.T) {
 		rt := factory(t)
 		defer rt.Close()
@@ -239,6 +286,43 @@ func TestConformance_MockRuntime(t *testing.T) {
 		SupportsGPUs:       true,
 		SupportsDNSSearch:  true,
 		SupportsDNSOptions: true,
+		SupportsInit:       true,
+		RequiresCapPrefix:  false,
+	}
+	RunConformanceTests(t, factory, caps)
+}
+
+func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
+	factory := func(t *testing.T) ContainerRuntime {
+		mock := &mockDockerClient{
+			createResp: dockercontainer.CreateResponse{ID: "podman-container-456"},
+			waitResp:   dockercontainer.WaitResponse{StatusCode: 0},
+			inspectResp: dockercontainer.InspectResponse{
+				ContainerJSONBase: &dockercontainer.ContainerJSONBase{
+					State: &dockercontainer.State{
+						Running:  false,
+						ExitCode: 0,
+					},
+				},
+			},
+		}
+		rt := &DockerRuntime{
+			logger:       logging.GetGlobalLogger(),
+			client:       mock,
+			name:         "podman",
+			sleepFunc:    noopSleepFunc,
+			removeOnExit: make(map[string]bool),
+		}
+		return rt
+	}
+	caps := ConformanceCapabilities{
+		SupportsVolumes:    true,
+		SupportsTmpfs:      true,
+		SupportsPorts:      true,
+		SupportsGPUs:       true,
+		SupportsDNSSearch:  true,
+		SupportsDNSOptions: true,
+		SupportsInit:       true,
 		RequiresCapPrefix:  false,
 	}
 	RunConformanceTests(t, factory, caps)
@@ -274,6 +358,7 @@ func TestConformance_DockerRuntime_MockClient(t *testing.T) {
 		SupportsGPUs:       true,
 		SupportsDNSSearch:  true,
 		SupportsDNSOptions: true,
+		SupportsInit:       true,
 		RequiresCapPrefix:  false,
 	}
 	RunConformanceTests(t, factory, caps)

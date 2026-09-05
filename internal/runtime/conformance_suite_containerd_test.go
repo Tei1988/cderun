@@ -22,6 +22,7 @@ func TestConformance_ContainerdRuntime_MockClient(t *testing.T) {
 		SupportsGPUs:       false,
 		SupportsDNSSearch:  false,
 		SupportsDNSOptions: false,
+		SupportsInit:       false,
 		RequiresCapPrefix:  true,
 	}
 	RunConformanceTests(t, factory, caps)
