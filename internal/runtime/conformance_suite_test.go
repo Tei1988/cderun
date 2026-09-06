@@ -276,6 +276,9 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		err := rt.ValidateConfig(cfg)
 		require.NoError(t, err)
 
+		err = rt.PullImage(ctx, cfg.Image, cfg.Pull, 3, 100)
+		require.NoError(t, err)
+
 		id, err := rt.CreateContainer(ctx, cfg)
 		require.NoError(t, err)
 		assert.NotEmpty(t, id)
