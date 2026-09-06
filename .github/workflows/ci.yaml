@@ -76,7 +76,8 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket permissions
       run: |
-        sudo chmod 666 /run/containerd/containerd.sock
+        sudo chown $(whoami) /run/containerd/containerd.sock
+        sudo chmod 600 /run/containerd/containerd.sock
     - name: Run containerd integration tests
       run: |
         export CDERUN_RUNTIME=containerd
@@ -95,7 +96,8 @@ jobs:
         go-version-file: go.mod
     - name: Set Docker socket permissions
       run: |
-        sudo chmod 666 /var/run/docker.sock
+        sudo chown $(whoami) /var/run/docker.sock
+        sudo chmod 600 /var/run/docker.sock
     - name: Run Docker integration tests
       run: |
         export CDERUN_RUNTIME=docker
@@ -116,16 +118,16 @@ jobs:
       run: |
         sudo mkdir -p /etc/containers
         sudo tee /etc/containers/storage.conf <<'EOF'
-[storage]
-driver = "vfs"
-runroot = "/tmp/containers/run"
-graphroot = "/tmp/containers/storage"
-EOF
+        [storage]
+        driver = "vfs"
+        runroot = "/tmp/containers/run"
+        graphroot = "/tmp/containers/storage"
+        EOF
         sudo tee /etc/containers/containers.conf <<'EOF'
-[engine]
-no_pivot_root = true
-cgroup_manager = "cgroupfs"
-EOF
+        [engine]
+        no_pivot_root = true
+        cgroup_manager = "cgroupfs"
+        EOF
     - name: Install and start Podman
       run: |
         sudo apt-get update
@@ -145,7 +147,8 @@ EOF
           cat /tmp/podman.log
           exit 1
         fi
-        sudo chmod 666 "$PODMAN_SOCK"
+        sudo chown $(whoami) "$PODMAN_SOCK"
+        sudo chmod 600 "$PODMAN_SOCK"
     - name: Run Podman integration tests
       run: |
         export CDERUN_RUNTIME=podman
