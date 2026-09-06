@@ -118,7 +118,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y podman acl
         PODMAN_SOCK="/tmp/podman.sock"
-        sudo podman system service --time=0 "unix://${PODMAN_SOCK}" > /tmp/podman.log 2>&1 &
+        sudo podman --storage-driver vfs system service --time=0 "unix://${PODMAN_SOCK}" > /tmp/podman.log 2>&1 &
         for i in {1..30}; do
           if [ -S "$PODMAN_SOCK" ]; then
             echo "podman socket ready at $PODMAN_SOCK"
