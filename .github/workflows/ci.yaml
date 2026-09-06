@@ -49,7 +49,7 @@ jobs:
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
         sudo mkdir -p /etc/containerd
-        sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+        sudo containerd config default | sudo sed 's/snapshotter = "overlayfs"/snapshotter = "native"/g' | sudo tee /etc/containerd/config.toml > /dev/null
         sudo containerd > /tmp/containerd.log 2>&1 &
         for i in {1..30}; do
           if [ -S /run/containerd/containerd.sock ]; then
@@ -112,6 +112,20 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
+    - name: Configure Podman containers storage and settings
+      run: |
+        sudo mkdir -p /etc/containers
+        sudo tee /etc/containers/storage.conf <<'EOF'
+[storage]
+driver = "vfs"
+runroot = "/tmp/containers/run"
+graphroot = "/tmp/containers/storage"
+EOF
+        sudo tee /etc/containers/containers.conf <<'EOF'
+[engine]
+no_pivot_root = true
+cgroup_manager = "cgroupfs"
+EOF
     - name: Install and start Podman
       run: |
         sudo apt-get update
