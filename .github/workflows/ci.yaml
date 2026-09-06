@@ -49,7 +49,7 @@ jobs:
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
         sudo mkdir -p /etc/containerd
-        sudo containerd config default | sudo sed 's/snapshotter = "overlayfs"/snapshotter = "native"/g' | sudo tee /etc/containerd/config.toml > /dev/null
+        sudo containerd config default | sudo sed 's/snapshotter = "[^"]*"/snapshotter = "native"/g' | sudo tee /etc/containerd/config.toml > /dev/null
         sudo containerd > /tmp/containerd.log 2>&1 &
         for i in {1..30}; do
           if [ -S /run/containerd/containerd.sock ]; then
@@ -76,8 +76,7 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket permissions
       run: |
-        sudo chown $(whoami) /run/containerd/containerd.sock
-        sudo chmod 600 /run/containerd/containerd.sock
+        sudo chmod 666 /run/containerd/containerd.sock
     - name: Run containerd integration tests
       run: |
         export CDERUN_RUNTIME=containerd
@@ -96,8 +95,7 @@ jobs:
         go-version-file: go.mod
     - name: Set Docker socket permissions
       run: |
-        sudo chown $(whoami) /var/run/docker.sock
-        sudo chmod 600 /var/run/docker.sock
+        sudo chmod 666 /var/run/docker.sock
     - name: Run Docker integration tests
       run: |
         export CDERUN_RUNTIME=docker
@@ -117,13 +115,13 @@ jobs:
     - name: Configure Podman containers storage and settings
       run: |
         sudo mkdir -p /etc/containers
-        sudo tee /etc/containers/storage.conf <<'EOF'
+        sed 's/^ *//' <<'EOF' | sudo tee /etc/containers/storage.conf > /dev/null
         [storage]
         driver = "vfs"
         runroot = "/tmp/containers/run"
         graphroot = "/tmp/containers/storage"
         EOF
-        sudo tee /etc/containers/containers.conf <<'EOF'
+        sed 's/^ *//' <<'EOF' | sudo tee /etc/containers/containers.conf > /dev/null
         [engine]
         no_pivot_root = true
         cgroup_manager = "cgroupfs"
@@ -147,8 +145,7 @@ jobs:
           cat /tmp/podman.log
           exit 1
         fi
-        sudo chown $(whoami) "$PODMAN_SOCK"
-        sudo chmod 600 "$PODMAN_SOCK"
+        sudo chmod 666 "$PODMAN_SOCK"
     - name: Run Podman integration tests
       run: |
         export CDERUN_RUNTIME=podman
