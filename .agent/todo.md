@@ -26,7 +26,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
-| T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
+| T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | DONE |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -77,7 +77,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別およびT81ホイスト動作） | テスト | 中 | 小 | - | DONE |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | DONE |
-| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
+| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | DONE |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | DONE |
@@ -193,29 +193,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、およびスペース区切り/イコール付きP1オーバーライドフラグのホイスト動作のテストがある
-
----
-
-## T20: Docker / Podman のランタイムテストを CI に追加
-
-- 種別: CI / テストカバレッジ
-- 対象: `.github/workflows/ci.yaml`
-
-### 問題
-
-containerd のインテグレーションテストジョブはあるが、Docker と Podman のテストが存在しない。`ubuntu-latest` には Docker が標準搭載されているため、Docker のランタイムテストは比較的容易に追加できる。
-
-### 方針
-
-ランタイムテストは `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` 環境変数で対象を切り替える構造（ci.yaml の containerd ジョブ参照: `CDERUN_RUNTIME=containerd`, `CDERUN_SOCKET_PATH=/run/containerd/containerd.sock`）。
-
-- **Docker**: `ubuntu-latest` の `/var/run/docker.sock` がそのまま使える。runner ユーザーは docker グループ所属済みのため ACL 設定も不要のはず
-- **Podman**: `sudo apt-get install -y podman` 後、`systemctl --user enable --now podman.socket` でソケットは `/run/user/$(id -u)/podman/podman.sock`
-
-### 完了条件
-
-- Docker / Podman それぞれのインテグレーションテストジョブが追加され、CI がグリーン
-- ジョブ構成は既存 containerd ジョブと一貫した形式
 
 ---
 
@@ -829,35 +806,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - registry にオプションを 1 つ追加すると、優先順位マトリクステストが自動で拡張される
 - 既知のトラップ（fast-path 詰め替え漏れ）を意図的に仕込むとテストが落ちることを確認済み
-
----
-
-## T70: `ContainerRuntime` コンフォーマンススイート（L3: Conformance Suite）の導入による各ランタイム間の挙動不変性保証
-
-- 種別: テスト基盤
-- 優先度: 高
-- 対象: `internal/runtime/`（`conformance_test.go` 等）、`.github/workflows/ci.yaml`
-- 依存: **T20（Docker/Podman の CI ジョブ）と統合実装を推奨**。T16（事前バリデーション）、T40/T45/T51（containerd パリティバグ）と密接に関連
-- 前提: `docs/testing/strategy.md` を必ず読むこと
-
-### 目的
-
-`ContainerRuntime` インターフェースを実装する全アダプタ（Mock, Docker, Podman, containerd）が、同一の `ContainerConfig` 入力に対して、同一の観測可能な挙動をすること、または未対応の機能について確実に明示的なエラー（"not supported yet"）を返す仕様（契約）を満たしていることを一元的にテストする。T40（ENTRYPOINT 消失）・T45（cap-drop 黙殺）・T51（不正 OCI spec）のようなパリティバグをクラスごと検出可能にする。
-
-### 方針
-
-- `ContainerRuntime` の各メソッドに対する契約（例: 「Entrypoint 未指定 + Command 指定時はイメージの ENTRYPOINT が前置される」「未対応機能は明示エラーを返す」）をテスト関数群として定義し、実装をパラメータ化して全ランタイムで実行する
-- Mock は毎 PR、実ランタイム（Docker / Podman / containerd）は CI ジョブ（`-tags=runtime`）で同一スイートを回す
-- 「未対応」を返すことが正しいランタイムには、期待値を capability 宣言（T16 の `Capabilities()` 案）として表現できるとよい
-- 検証用イメージは軽量なもの（alpine / busybox + ENTRYPOINT 付きカスタム）に固定し、digest 固定で再現性を確保
-
-### 完了条件
-
-- [x] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
-- [x] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
-- [ ] 契約スイートが Mock、Docker、Podman、および containerd すべてのランタイムを網羅し、CI 上で T20 インテグレーション環境が完了し実行されていること（T20の統合を必須要件とする）。
-- [x] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
-- [x] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
 
 ---
 
