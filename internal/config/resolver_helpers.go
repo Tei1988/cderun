@@ -329,9 +329,9 @@ func deduplicateEnv(env []string) []string {
 	if len(env) <= 1 {
 		return env
 	}
-	if len(env) <= 32 {
-		var keys [32]string
-		var vals [32]string
+	if len(env) <= 64 {
+		var keys [64]string
+		var vals [64]string
 		size := 0
 		hasDuplicates := false
 
@@ -350,7 +350,7 @@ func deduplicateEnv(env []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 32 {
+			if foundIdx >= 0 && foundIdx < 64 {
 				//nolint:gosec // false positive G602: bounds checked above
 				vals[foundIdx] = e
 				hasDuplicates = true
@@ -385,7 +385,7 @@ func deduplicateEnv(env []string) []string {
 	return res
 }
 
-func addEnvSmall(keys *[32]string, vals *[32]string, size *int, env []string) {
+func addEnvSmall(keys *[64]string, vals *[64]string, size *int, env []string) {
 	for _, e := range env {
 		idx := strings.IndexByte(e, '=')
 		var key string
@@ -401,10 +401,10 @@ func addEnvSmall(keys *[32]string, vals *[32]string, size *int, env []string) {
 				break
 			}
 		}
-		if foundIdx >= 0 && foundIdx < 32 {
+		if foundIdx >= 0 && foundIdx < 64 {
 			//nolint:gosec // false positive G602: bounds checked above
 			vals[foundIdx] = e
-		} else if *size < 32 {
+		} else if *size < 64 {
 			keys[*size] = key
 			vals[*size] = e
 			(*size)++
@@ -428,9 +428,9 @@ func mergeEnv(base, p2, p1 []string) []string {
 		return deduplicateEnv(p1)
 	}
 
-	if total <= 32 {
-		var keys [32]string
-		var vals [32]string
+	if total <= 64 {
+		var keys [64]string
+		var vals [64]string
 		size := 0
 
 		addEnvSmall(&keys, &vals, &size, base)
