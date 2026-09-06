@@ -487,6 +487,38 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 	}
 
 	// Determine the list of tools to prefetch
+	toolsToPrefetch, err := determineToolsToPrefetch(resolved, toolsCfg)
+	if err != nil {
+		return err
+	}
+
+	// Resolve image strings and check for missing/unconfigured tools
+	imagesToPull, err := resolvePrefetchImages(r, toolsToPrefetch, toolsCfg)
+	if err != nil {
+		return err
+	}
+
+	// Initialize Runtime
+	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
+	if err != nil {
+		return &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
+	}
+	defer func() {
+		if closeErr := rt.Close(); closeErr != nil {
+			o.logger.Debug("failed to close runtime: %v", closeErr)
+		}
+	}()
+
+	// Pull each image
+	if err := o.pullPrefetchImages(cmd.Context(), rt, imagesToPull, resolved); err != nil {
+		return err
+	}
+
+	o.logger.Debug("Successfully prefetched all images.")
+	return nil
+}
+
+func determineToolsToPrefetch(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig) ([]string, error) {
 	var toolsToPrefetch []string
 	if resolved.PrefetchAll {
 		for toolName := range toolsCfg {
@@ -503,52 +535,43 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 	}
 
 	if len(toolsToPrefetch) == 0 {
-		return fmt.Errorf("no tools specified for prefetch")
+		return nil, fmt.Errorf("no tools specified for prefetch")
 	}
 
 	// Sort tool names for deterministic output
 	sort.Strings(toolsToPrefetch)
+	return toolsToPrefetch, nil
+}
 
-	// Resolve image strings and check for missing/unconfigured tools
+func resolvePrefetchImages(r *config.ExpressionResolver, toolsToPrefetch []string, toolsCfg config.ToolsConfig) ([]string, error) {
 	var imagesToPull []string
 	for _, toolName := range toolsToPrefetch {
 		tool, ok := toolsCfg[toolName]
 		if !ok {
-			return fmt.Errorf("tool %q is not defined in tools configuration", toolName)
+			return nil, fmt.Errorf("tool %q is not defined in tools configuration", toolName)
 		}
 		if tool.Image == "" {
-			return fmt.Errorf("tool %q does not have an image configured", toolName)
+			return nil, fmt.Errorf("tool %q does not have an image configured", toolName)
 		}
 
 		// Resolve the image string
 		resolvedImg, err := r.ResolveString(tool.Image)
 		if err != nil {
-			return fmt.Errorf("failed to resolve image for tool %q: %w", toolName, err)
+			return nil, fmt.Errorf("failed to resolve image for tool %q: %w", toolName, err)
 		}
 		imagesToPull = append(imagesToPull, resolvedImg)
 	}
+	return imagesToPull, nil
+}
 
-	// Initialize Runtime
-	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
-	if err != nil {
-		return &config.RuntimeInitError{Runtime: resolved.Runtime, Err: err}
-	}
-	defer func() {
-		if closeErr := rt.Close(); closeErr != nil {
-			o.logger.Debug("failed to close runtime: %v", closeErr)
-		}
-	}()
-
-	// Pull each image
+func (o *rootOptions) pullPrefetchImages(ctx context.Context, rt runtime.ContainerRuntime, imagesToPull []string, resolved *config.ResolvedConfig) error {
 	for _, img := range imagesToPull {
 		o.logger.Debug("Prefetching image %s...", img)
-		err := rt.PullImage(cmd.Context(), img, resolved.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase)
+		err := rt.PullImage(ctx, img, resolved.Pull, resolved.PullMaxRetries, resolved.PullBackoffBase)
 		if err != nil {
 			return fmt.Errorf("failed to prefetch image %s: %w", img, err)
 		}
 	}
-
-	o.logger.Debug("Successfully prefetched all images.")
 	return nil
 }
 
@@ -825,34 +848,7 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	state := newExecutionState()
 
-	go func() {
-		for {
-			select {
-			case sig := <-sigChan:
-				sigName := getSignalName(sig)
-				cancelCtx, forwardImmediate, activeRt, activeID := state.HandleSignal(sigName)
-
-				if cancelCtx {
-					o.logger.Debug("Cancelling execution on signal %v (%s)", sig, sigName)
-					cancel()
-					return
-				}
-
-				if forwardImmediate && activeRt != nil {
-					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
-					go func(signalName string, containerRuntime runtime.ContainerRuntime, containerID string) {
-						if err := containerRuntime.SignalContainer(ctxG, containerID, signalName); err != nil {
-							o.logger.Warn("failed to forward signal %s: %v", signalName, err)
-						} else {
-							o.logger.Debug("Successfully forwarded signal %s to container %s", signalName, containerID)
-						}
-					}(sigName, activeRt, activeID)
-				}
-			case <-ctxG.Done():
-				return
-			}
-		}
-	}()
+	o.startSignalForwarder(ctxG, cancel, sigChan, state)
 
 	rt, containerID, cleanup, err := o.initContainer(ctxG, resolved, containerConfig)
 	if err != nil {
@@ -905,6 +901,37 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	defer stopResize()
 
 	return o.waitForCompletion(ctxG, cmd, state.GetRuntime(), state.GetContainerID(), containerConfig, resolved, isHostStdinTerminal, att)
+}
+
+func (o *rootOptions) startSignalForwarder(ctx context.Context, cancel context.CancelFunc, sigChan <-chan os.Signal, state *executionState) {
+	go func() {
+		for {
+			select {
+			case sig := <-sigChan:
+				sigName := getSignalName(sig)
+				cancelCtx, forwardImmediate, activeRt, activeID := state.HandleSignal(sigName)
+
+				if cancelCtx {
+					o.logger.Debug("Cancelling execution on signal %v (%s)", sig, sigName)
+					cancel()
+					return
+				}
+
+				if forwardImmediate && activeRt != nil {
+					o.logger.Debug("Forwarding signal %v (%s) to container %s", sig, sigName, activeID)
+					go func(signalName string, containerRuntime runtime.ContainerRuntime, containerID string) {
+						if err := containerRuntime.SignalContainer(ctx, containerID, signalName); err != nil {
+							o.logger.Warn("failed to forward signal %s: %v", signalName, err)
+						} else {
+							o.logger.Debug("Successfully forwarded signal %s to container %s", signalName, containerID)
+						}
+					}(sigName, activeRt, activeID)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *container.ContainerConfig) {
