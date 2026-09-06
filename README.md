@@ -224,7 +224,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--image`: Container image to use.
 - `--entrypoint`: Overwrite the default ENTRYPOINT of the image.
 - `--user`, `-u`: Username or UID (format: `<name|uid>[:<group|gid>]`).
-- `--workdir`, `-w`: Working directory inside the container.
+- `--workdir`, `-w`: Working directory inside the container (validates absolute path, blocks parent traversals `..`, and permits `@` and `+` symbols for pnpm virtual store paths and scoped packages).
 - `--env`, `-e`: Set environment variables (`KEY=VALUE` or `KEY` for host passthrough).
 - `--strict-env`: Require all passed environment variables to be present on the host. (Default: `false`)
 - `--pull`: Pull image before running (`always`, `missing`, `never`). (Default: `missing`)
