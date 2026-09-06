@@ -33,9 +33,9 @@ func TestAdvancedResilience_ParameterValidators(t *testing.T) {
 		assert.NoError(t, ValidateSecurityOpt("label=disable"))
 		assert.NoError(t, ValidateSecurityOpt(""))
 
-		assert.Error(t, ValidateSecurityOpt("no-new-privileges:\x00true"))
-		assert.Error(t, ValidateSecurityOpt("seccomp=\xff\xfe"))
-		assert.Error(t, ValidateSecurityOpt("label=disable/.."))
+		require.Error(t, ValidateSecurityOpt("no-new-privileges:\x00true"))
+		require.Error(t, ValidateSecurityOpt("seccomp=\xff\xfe"))
+		require.Error(t, ValidateSecurityOpt("label=disable/.."))
 	})
 
 	t.Run("ValidatePort boundaries", func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestAdvancedResilience_TemplateExpressionFallbackAndEscaping(t *testing.T) 
 		r1, err1 := NewExpressionResolverWithFS(hostCtx, mockFS)
 		require.NoError(t, err1)
 		_, err1 = r1.ResolveString("{{invalid_directive:foo}}")
-		assert.Error(t, err1)
+		require.Error(t, err1)
 
 		r2, err2 := NewExpressionResolverWithFS(hostCtx, mockFS)
 		require.NoError(t, err2)
