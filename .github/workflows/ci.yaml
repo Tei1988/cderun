@@ -74,11 +74,9 @@ jobs:
         echo "$(awk '{print $1}' ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
         sudo mkdir -p /opt/cni/bin
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
-    - name: Set containerd socket ACLs
+    - name: Set containerd socket permissions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y acl
-        sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+        sudo chmod 666 /run/containerd/containerd.sock
     - name: Run containerd integration tests
       run: |
         export CDERUN_RUNTIME=containerd
@@ -95,11 +93,9 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
-    - name: Set Docker socket ACLs
+    - name: Set Docker socket permissions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y acl
-        sudo setfacl -m u:${USER}:rw /var/run/docker.sock
+        sudo chmod 666 /var/run/docker.sock
     - name: Run Docker integration tests
       run: |
         export CDERUN_RUNTIME=docker
@@ -135,7 +131,7 @@ jobs:
           cat /tmp/podman.log
           exit 1
         fi
-        sudo setfacl -m u:${USER}:rw "$PODMAN_SOCK"
+        sudo chmod 666 "$PODMAN_SOCK"
     - name: Run Podman integration tests
       run: |
         export CDERUN_RUNTIME=podman
