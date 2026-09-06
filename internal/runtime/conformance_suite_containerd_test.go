@@ -11,16 +11,16 @@ import (
 
 func TestConformance_ContainerdRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
-		socket := os.Getenv("CDERUN_SOCKET_PATH")
-		if socket == "" {
-			socket = "/run/containerd/containerd.sock"
-		}
-
-		if _, err := os.Stat(socket); err == nil && os.Getenv("CDERUN_RUNTIME") == "containerd" {
-			rt, err := NewContainerdRuntime(socket)
-			if err == nil {
-				return rt
+		if os.Getenv("CDERUN_RUNTIME") == "containerd" {
+			socket := os.Getenv("CDERUN_SOCKET_PATH")
+			if socket == "" {
+				socket = "/run/containerd/containerd.sock"
 			}
+			_, err := os.Stat(socket)
+			require.NoError(t, err, "containerd runtime socket should exist when CDERUN_RUNTIME=containerd")
+			rt, err := NewContainerdRuntime(socket)
+			require.NoError(t, err, "failed to create live containerd runtime")
+			return rt
 		}
 
 		mc := newMockFullClient()

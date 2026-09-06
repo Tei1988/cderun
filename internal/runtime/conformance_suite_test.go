@@ -322,18 +322,16 @@ func TestConformance_MockRuntime(t *testing.T) {
 
 func TestConformance_PodmanRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
-		socket := os.Getenv("CDERUN_SOCKET_PATH")
-		if socket == "" {
-			socket = "/tmp/podman.sock"
-		}
-
 		if os.Getenv("CDERUN_RUNTIME") == "podman" {
-			if _, err := os.Stat(socket); err == nil {
-				rt, err := NewPodmanRuntime(socket)
-				if err == nil {
-					return rt
-				}
+			socket := os.Getenv("CDERUN_SOCKET_PATH")
+			if socket == "" {
+				socket = "/tmp/podman.sock"
 			}
+			_, err := os.Stat(socket)
+			require.NoError(t, err, "podman runtime socket should exist when CDERUN_RUNTIME=podman")
+			rt, err := NewPodmanRuntime(socket)
+			require.NoError(t, err, "failed to create live podman runtime")
+			return rt
 		}
 
 		// Fallback to mock client when live podman daemon is unavailable
@@ -372,18 +370,16 @@ func TestConformance_PodmanRuntime(t *testing.T) {
 
 func TestConformance_DockerRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
-		socket := os.Getenv("CDERUN_SOCKET_PATH")
-		if socket == "" && os.Getenv("CDERUN_RUNTIME") == "docker" {
-			socket = "/var/run/docker.sock"
-		}
-
-		if os.Getenv("CDERUN_RUNTIME") == "docker" && socket != "" {
-			if _, err := os.Stat(socket); err == nil {
-				rt, err := NewDockerRuntime(socket)
-				if err == nil {
-					return rt
-				}
+		if os.Getenv("CDERUN_RUNTIME") == "docker" {
+			socket := os.Getenv("CDERUN_SOCKET_PATH")
+			if socket == "" {
+				socket = "/var/run/docker.sock"
 			}
+			_, err := os.Stat(socket)
+			require.NoError(t, err, "docker runtime socket should exist when CDERUN_RUNTIME=docker")
+			rt, err := NewDockerRuntime(socket)
+			require.NoError(t, err, "failed to create live docker runtime")
+			return rt
 		}
 
 		// Fallback to mock client when live docker daemon is unavailable
