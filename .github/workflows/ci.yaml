@@ -117,8 +117,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y podman acl
-        systemctl --user enable --now podman.socket || true
-        PODMAN_SOCK="/run/user/$(id -u)/podman/podman.sock"
+        PODMAN_SOCK="/tmp/podman.sock"
+        sudo podman system service --time=0 "unix://${PODMAN_SOCK}" > /tmp/podman.log 2>&1 &
         for i in {1..30}; do
           if [ -S "$PODMAN_SOCK" ]; then
             echo "podman socket ready at $PODMAN_SOCK"
@@ -128,13 +128,13 @@ jobs:
           sleep 1
         done
         if [ ! -S "$PODMAN_SOCK" ]; then
-          echo "podman socket failed to start"
+          echo "podman socket failed to start. Logs:"
+          cat /tmp/podman.log
           exit 1
         fi
-        sudo setfacl -m u:${USER}:rw "$PODMAN_SOCK" || true
+        sudo setfacl -m u:${USER}:rw "$PODMAN_SOCK"
     - name: Run Podman integration tests
       run: |
-        PODMAN_SOCK="/run/user/$(id -u)/podman/podman.sock"
         export CDERUN_RUNTIME=podman
-        export CDERUN_SOCKET_PATH="$PODMAN_SOCK"
+        export CDERUN_SOCKET_PATH=/tmp/podman.sock
         go test -v ./internal/runtime/...
