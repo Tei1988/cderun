@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ouchi-kubernetes
@@ -46,7 +49,7 @@ jobs:
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
         sudo mkdir -p /etc/containerd
-        sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
+        sudo containerd config default | sudo sed 's/snapshotter = "[^"]*"/snapshotter = "native"/g' | sudo tee /etc/containerd/config.toml > /dev/null
         sudo containerd > /tmp/containerd.log 2>&1 &
         for i in {1..30}; do
           if [ -S /run/containerd/containerd.sock ]; then
@@ -71,13 +74,80 @@ jobs:
         echo "$(awk '{print $1}' ${TARBALL}.sha256)  ${TARBALL}" | sha256sum -c -
         sudo mkdir -p /opt/cni/bin
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
-    - name: Set containerd socket ACLs
+    - name: Set containerd socket permissions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y acl
-        sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+        sudo chmod 666 /run/containerd/containerd.sock
     - name: Run containerd integration tests
       run: |
         export CDERUN_RUNTIME=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
+        go test -v ./internal/runtime/...
+
+  runtime-test-docker:
+    runs-on: ouchi-kubernetes
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Set Docker socket permissions
+      run: |
+        sudo chmod 666 /var/run/docker.sock
+    - name: Run Docker integration tests
+      run: |
+        export CDERUN_RUNTIME=docker
+        export CDERUN_SOCKET_PATH=/var/run/docker.sock
+        go test -v ./internal/runtime/...
+
+  runtime-test-podman:
+    runs-on: ouchi-kubernetes
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Configure Podman containers storage and settings
+      run: |
+        sudo mkdir -p /etc/containers
+        sed 's/^ *//' <<'EOF' | sudo tee /etc/containers/storage.conf > /dev/null
+        [storage]
+        driver = "vfs"
+        runroot = "/tmp/containers/run"
+        graphroot = "/tmp/containers/storage"
+        EOF
+        sed 's/^ *//' <<'EOF' | sudo tee /etc/containers/containers.conf > /dev/null
+        [engine]
+        no_pivot_root = true
+        cgroup_manager = "cgroupfs"
+        EOF
+    - name: Install and start Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman acl
+        PODMAN_SOCK="/tmp/podman.sock"
+        sudo podman --storage-driver vfs system service --time=0 "unix://${PODMAN_SOCK}" > /tmp/podman.log 2>&1 &
+        for i in {1..30}; do
+          if [ -S "$PODMAN_SOCK" ]; then
+            echo "podman socket ready at $PODMAN_SOCK"
+            break
+          fi
+          echo "Waiting for podman socket..."
+          sleep 1
+        done
+        if [ ! -S "$PODMAN_SOCK" ]; then
+          echo "podman socket failed to start. Logs:"
+          cat /tmp/podman.log
+          exit 1
+        fi
+        sudo chmod 666 "$PODMAN_SOCK"
+    - name: Run Podman integration tests
+      run: |
+        export CDERUN_RUNTIME=podman
+        export CDERUN_SOCKET_PATH=/tmp/podman.sock
         go test -v ./internal/runtime/...

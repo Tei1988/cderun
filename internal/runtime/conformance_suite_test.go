@@ -2,9 +2,12 @@ package runtime
 
 import (
 	"context"
+	"os"
 	"testing"
+	"time"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -42,7 +45,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image:   "alpine:latest",
+			Image:   "docker.io/library/alpine:latest",
 			Command: []string{"echo", "hello"},
 			Pull:    "always",
 		}
@@ -55,7 +58,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
+			Image: "docker.io/library/alpine:latest",
 			Pull:  "missing",
 			Mounts: []container.Mount{
 				{
@@ -103,7 +106,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
+			Image: "docker.io/library/alpine:latest",
 			Pull:  "missing",
 			Ports: []string{"8080:80"},
 		}
@@ -121,7 +124,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image:     "alpine:latest",
+			Image:     "docker.io/library/alpine:latest",
 			Pull:      "missing",
 			DNSSearch: []string{"example.com"},
 		}
@@ -139,7 +142,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image:      "alpine:latest",
+			Image:      "docker.io/library/alpine:latest",
 			Pull:       "missing",
 			DNSOptions: []string{"ndots:5"},
 		}
@@ -157,7 +160,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
+			Image: "docker.io/library/alpine:latest",
 			Pull:  "missing",
 			GPUs:  "all",
 		}
@@ -175,7 +178,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image:   "alpine:latest",
+			Image:   "docker.io/library/alpine:latest",
 			Pull:    "missing",
 			CapAdd:  []string{"SYS_ADMIN", "NET_ADMIN"},
 			CapDrop: []string{"CHOWN"},
@@ -197,7 +200,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image:       "alpine:latest",
+			Image:       "docker.io/library/alpine:latest",
 			Command:     []string{"echo", "test"},
 			Workdir:     "/workspace",
 			User:        "1000:1000",
@@ -224,7 +227,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		defer rt.Close()
 
 		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
+			Image: "docker.io/library/alpine:latest",
 			Pull:  "missing",
 			Init:  true,
 		}
@@ -238,18 +241,43 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}
 	})
 
+	t.Run("ProcessArgs_EntrypointPreservation_T40", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		// Ref: T40 - containerd: command specified without entrypoint should preserve image entrypoint
+		cfg := &container.ContainerConfig{
+			Command: []string{"arg1", "arg2"},
+		}
+
+		getSpec := func(ctx context.Context) (ocispec.Image, error) {
+			return ocispec.Image{
+				Config: ocispec.ImageConfig{
+					Entrypoint: []string{"/entrypoint.sh"},
+				},
+			}, nil
+		}
+
+		resolved, err := resolveProcessArgs(context.Background(), cfg, getSpec)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"/entrypoint.sh", "arg1", "arg2"}, resolved)
+	})
+
 	t.Run("Lifecycle_CreateStartWaitInspectRemove", func(t *testing.T) {
 		rt := factory(t)
 		defer rt.Close()
 
 		ctx := context.Background()
 		cfg := &container.ContainerConfig{
-			Image:   "alpine:latest",
+			Image:   "docker.io/library/alpine:latest",
 			Command: []string{"true"},
 			Pull:    "missing",
 		}
 
 		err := rt.ValidateConfig(cfg)
+		require.NoError(t, err)
+
+		err = rt.PullImage(ctx, cfg.Image, cfg.Pull, 3, 100*time.Millisecond)
 		require.NoError(t, err)
 
 		id, err := rt.CreateContainer(ctx, cfg)
@@ -292,8 +320,21 @@ func TestConformance_MockRuntime(t *testing.T) {
 	RunConformanceTests(t, factory, caps)
 }
 
-func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
+func TestConformance_PodmanRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
+		if os.Getenv("CDERUN_RUNTIME") == "podman" {
+			socket := os.Getenv("CDERUN_SOCKET_PATH")
+			if socket == "" {
+				socket = "/tmp/podman.sock"
+			}
+			_, err := os.Stat(socket)
+			require.NoError(t, err, "podman runtime socket should exist when CDERUN_RUNTIME=podman")
+			rt, err := NewPodmanRuntime(socket)
+			require.NoError(t, err, "failed to create live podman runtime")
+			return rt
+		}
+
+		// Fallback to mock client when live podman daemon is unavailable
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "podman-container-456"},
 			waitResp:   dockercontainer.WaitResponse{StatusCode: 0},
@@ -306,14 +347,13 @@ func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
 				},
 			},
 		}
-		rt := &DockerRuntime{
+		return &DockerRuntime{
 			logger:       logging.GetGlobalLogger(),
 			client:       mock,
 			name:         "podman",
 			sleepFunc:    noopSleepFunc,
 			removeOnExit: make(map[string]bool),
 		}
-		return rt
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
@@ -328,8 +368,21 @@ func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
 	RunConformanceTests(t, factory, caps)
 }
 
-func TestConformance_DockerRuntime_MockClient(t *testing.T) {
+func TestConformance_DockerRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
+		if os.Getenv("CDERUN_RUNTIME") == "docker" {
+			socket := os.Getenv("CDERUN_SOCKET_PATH")
+			if socket == "" {
+				socket = "/var/run/docker.sock"
+			}
+			_, err := os.Stat(socket)
+			require.NoError(t, err, "docker runtime socket should exist when CDERUN_RUNTIME=docker")
+			rt, err := NewDockerRuntime(socket)
+			require.NoError(t, err, "failed to create live docker runtime")
+			return rt
+		}
+
+		// Fallback to mock client when live docker daemon is unavailable
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "docker-container-123"},
 			waitResp:   dockercontainer.WaitResponse{StatusCode: 0},
@@ -342,14 +395,13 @@ func TestConformance_DockerRuntime_MockClient(t *testing.T) {
 				},
 			},
 		}
-		rt := &DockerRuntime{
+		return &DockerRuntime{
 			logger:       logging.GetGlobalLogger(),
 			client:       mock,
 			name:         "docker",
 			sleepFunc:    noopSleepFunc,
 			removeOnExit: make(map[string]bool),
 		}
-		return rt
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
