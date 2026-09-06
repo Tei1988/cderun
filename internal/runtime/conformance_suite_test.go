@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -276,7 +277,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		err := rt.ValidateConfig(cfg)
 		require.NoError(t, err)
 
-		err = rt.PullImage(ctx, cfg.Image, cfg.Pull, 3, 100)
+		err = rt.PullImage(ctx, cfg.Image, cfg.Pull, 3, 100*time.Millisecond)
 		require.NoError(t, err)
 
 		id, err := rt.CreateContainer(ctx, cfg)
@@ -372,11 +373,11 @@ func TestConformance_PodmanRuntime(t *testing.T) {
 func TestConformance_DockerRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
 		socket := os.Getenv("CDERUN_SOCKET_PATH")
-		if socket == "" {
+		if socket == "" && os.Getenv("CDERUN_RUNTIME") == "docker" {
 			socket = "/var/run/docker.sock"
 		}
 
-		if os.Getenv("CDERUN_RUNTIME") == "docker" {
+		if os.Getenv("CDERUN_RUNTIME") == "docker" && socket != "" {
 			if _, err := os.Stat(socket); err == nil {
 				rt, err := NewDockerRuntime(socket)
 				if err == nil {
