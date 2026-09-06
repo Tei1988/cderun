@@ -2,9 +2,11 @@ package runtime
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -238,6 +240,28 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}
 	})
 
+	t.Run("ProcessArgs_EntrypointPreservation_T40", func(t *testing.T) {
+		rt := factory(t)
+		defer rt.Close()
+
+		// Ref: T40 - containerd: command specified without entrypoint should preserve image entrypoint
+		cfg := &container.ContainerConfig{
+			Command: []string{"arg1", "arg2"},
+		}
+
+		getSpec := func(ctx context.Context) (ocispec.Image, error) {
+			return ocispec.Image{
+				Config: ocispec.ImageConfig{
+					Entrypoint: []string{"/entrypoint.sh"},
+				},
+			}, nil
+		}
+
+		resolved, err := resolveProcessArgs(context.Background(), cfg, getSpec)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"/entrypoint.sh", "arg1", "arg2"}, resolved)
+	})
+
 	t.Run("Lifecycle_CreateStartWaitInspectRemove", func(t *testing.T) {
 		rt := factory(t)
 		defer rt.Close()
@@ -292,8 +316,23 @@ func TestConformance_MockRuntime(t *testing.T) {
 	RunConformanceTests(t, factory, caps)
 }
 
-func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
+func TestConformance_PodmanRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
+		socket := os.Getenv("CDERUN_SOCKET_PATH")
+		if socket == "" {
+			socket = "/tmp/podman.sock"
+		}
+
+		if os.Getenv("CDERUN_RUNTIME") == "podman" {
+			if _, err := os.Stat(socket); err == nil {
+				rt, err := NewPodmanRuntime(socket)
+				if err == nil {
+					return rt
+				}
+			}
+		}
+
+		// Fallback to mock client when live podman daemon is unavailable
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "podman-container-456"},
 			waitResp:   dockercontainer.WaitResponse{StatusCode: 0},
@@ -306,14 +345,13 @@ func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
 				},
 			},
 		}
-		rt := &DockerRuntime{
+		return &DockerRuntime{
 			logger:       logging.GetGlobalLogger(),
 			client:       mock,
 			name:         "podman",
 			sleepFunc:    noopSleepFunc,
 			removeOnExit: make(map[string]bool),
 		}
-		return rt
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
@@ -328,8 +366,23 @@ func TestConformance_PodmanRuntime_MockClient(t *testing.T) {
 	RunConformanceTests(t, factory, caps)
 }
 
-func TestConformance_DockerRuntime_MockClient(t *testing.T) {
+func TestConformance_DockerRuntime(t *testing.T) {
 	factory := func(t *testing.T) ContainerRuntime {
+		socket := os.Getenv("CDERUN_SOCKET_PATH")
+		if socket == "" {
+			socket = "/var/run/docker.sock"
+		}
+
+		if os.Getenv("CDERUN_RUNTIME") == "docker" {
+			if _, err := os.Stat(socket); err == nil {
+				rt, err := NewDockerRuntime(socket)
+				if err == nil {
+					return rt
+				}
+			}
+		}
+
+		// Fallback to mock client when live docker daemon is unavailable
 		mock := &mockDockerClient{
 			createResp: dockercontainer.CreateResponse{ID: "docker-container-123"},
 			waitResp:   dockercontainer.WaitResponse{StatusCode: 0},
@@ -342,14 +395,13 @@ func TestConformance_DockerRuntime_MockClient(t *testing.T) {
 				},
 			},
 		}
-		rt := &DockerRuntime{
+		return &DockerRuntime{
 			logger:       logging.GetGlobalLogger(),
 			client:       mock,
 			name:         "docker",
 			sleepFunc:    noopSleepFunc,
 			removeOnExit: make(map[string]bool),
 		}
-		return rt
 	}
 	caps := ConformanceCapabilities{
 		SupportsVolumes:    true,
