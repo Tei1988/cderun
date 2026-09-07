@@ -309,6 +309,14 @@ func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tool
 	return resolveEnvValues(merged, sensitivePatterns, strict, r, fs)
 }
 
+// maxStackEnvThreshold defines the absolute upper ceiling for stack-allocated
+// environment variable deduplication and merging.
+//
+// Beyond 64 items, O(N^2) linear search overhead exceeds O(N) map lookups,
+// and stack memory usage (approx 2 KiB) approaches standard Go goroutine stack limits.
+// Any environment slice larger than maxStackEnvThreshold MUST fall back to map-based O(N) processing.
+const maxStackEnvThreshold = 64
+
 func addEnv(m map[string]string, keys *[]string, env []string) {
 	for _, e := range env {
 		idx := strings.IndexByte(e, '=')
@@ -329,9 +337,9 @@ func deduplicateEnv(env []string) []string {
 	if len(env) <= 1 {
 		return env
 	}
-	if len(env) <= 64 {
-		var keys [64]string
-		var vals [64]string
+	if len(env) <= maxStackEnvThreshold {
+		var keys [maxStackEnvThreshold]string
+		var vals [maxStackEnvThreshold]string
 		size := 0
 		hasDuplicates := false
 
@@ -350,7 +358,7 @@ func deduplicateEnv(env []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < 64 {
+			if foundIdx >= 0 && foundIdx < maxStackEnvThreshold {
 				//nolint:gosec // false positive G602: bounds checked above
 				vals[foundIdx] = e
 				hasDuplicates = true
@@ -385,7 +393,7 @@ func deduplicateEnv(env []string) []string {
 	return res
 }
 
-func addEnvSmall(keys *[64]string, vals *[64]string, size *int, env []string) {
+func addEnvSmall(keys *[maxStackEnvThreshold]string, vals *[maxStackEnvThreshold]string, size *int, env []string) {
 	for _, e := range env {
 		idx := strings.IndexByte(e, '=')
 		var key string
@@ -401,10 +409,10 @@ func addEnvSmall(keys *[64]string, vals *[64]string, size *int, env []string) {
 				break
 			}
 		}
-		if foundIdx >= 0 && foundIdx < 64 {
+		if foundIdx >= 0 && foundIdx < maxStackEnvThreshold {
 			//nolint:gosec // false positive G602: bounds checked above
 			vals[foundIdx] = e
-		} else if *size < 64 {
+		} else if *size < maxStackEnvThreshold {
 			keys[*size] = key
 			vals[*size] = e
 			(*size)++
@@ -428,9 +436,9 @@ func mergeEnv(base, p2, p1 []string) []string {
 		return deduplicateEnv(p1)
 	}
 
-	if total <= 64 {
-		var keys [64]string
-		var vals [64]string
+	if total <= maxStackEnvThreshold {
+		var keys [maxStackEnvThreshold]string
+		var vals [maxStackEnvThreshold]string
 		size := 0
 
 		addEnvSmall(&keys, &vals, &size, base)
