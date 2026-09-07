@@ -280,7 +280,18 @@ func isControlByte(c byte) bool {
 }
 
 func hasControlByte(s string) bool {
-	for i := 0; i < len(s); i++ {
+	i := 0
+	// Process 8 bytes at a time for strings with length >= 8.
+	// Bytes below 32 (except '\t') and byte 127 (DEL) are control bytes.
+	for ; i+8 <= len(s); i += 8 {
+		b0, b1, b2, b3 := s[i], s[i+1], s[i+2], s[i+3]
+		b4, b5, b6, b7 := s[i+4], s[i+5], s[i+6], s[i+7]
+		if isControlByte(b0) || isControlByte(b1) || isControlByte(b2) || isControlByte(b3) ||
+			isControlByte(b4) || isControlByte(b5) || isControlByte(b6) || isControlByte(b7) {
+			return true
+		}
+	}
+	for ; i < len(s); i++ {
 		if isControlByte(s[i]) {
 			return true
 		}
