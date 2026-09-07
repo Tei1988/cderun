@@ -280,7 +280,22 @@ func isControlByte(c byte) bool {
 }
 
 func hasControlByte(s string) bool {
-	for i := 0; i < len(s); i++ {
+	i := 0
+	// Process 8 bytes at a time for strings with length >= 8
+	for ; i+8 <= len(s); i += 8 {
+		// Quick check: if any byte in the 8-byte chunk has high bit set (c >= 128)
+		// or if any byte is < 32, we do detailed check on those 8 bytes.
+		// Standard printable ASCII characters (except space 32 to ~ 126) are in [0x20, 0x7e].
+		// A byte is standard printable ASCII (32..126) if (c - 32) <= (126 - 32) = 94.
+		// Alternatively, we check byte by byte if any byte is < 32 or == 127 or >= 128 (non-ASCII or DEL or control).
+		b0, b1, b2, b3 := s[i], s[i+1], s[i+2], s[i+3]
+		b4, b5, b6, b7 := s[i+4], s[i+5], s[i+6], s[i+7]
+		if isControlByte(b0) || isControlByte(b1) || isControlByte(b2) || isControlByte(b3) ||
+			isControlByte(b4) || isControlByte(b5) || isControlByte(b6) || isControlByte(b7) {
+			return true
+		}
+	}
+	for ; i < len(s); i++ {
 		if isControlByte(s[i]) {
 			return true
 		}
