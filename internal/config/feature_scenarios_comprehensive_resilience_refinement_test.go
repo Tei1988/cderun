@@ -72,13 +72,30 @@ func TestUnit_Config_Boundary_PrecedenceMatrix(t *testing.T) {
 	}
 
 	opts := &CLIOptions{
-		Image:       optStr("cli-override-image:latest"),
+		Image:       optStr("node:22-alpine"),
+		Workdir:     optStr("/cli-workdir"),
 		HangTimeout: optStr("45s"),
 	}
 
-	res, err := ResolveWithFS("node", opts, nil, nil, mockFS)
+	toolsCfg := ToolsConfig{
+		"node": ToolConfig{
+			Image:       "node:20-alpine",
+			Workdir:     "/tool-workdir",
+			HangTimeout: "30s",
+		},
+	}
+
+	globalCfg := &CDERunConfig{
+		Defaults: ConfigDefaults{
+			Workdir:     "/global-workdir",
+			HangTimeout: "15s",
+		},
+	}
+
+	res, err := ResolveWithFS("node", opts, toolsCfg, globalCfg, mockFS)
 	require.NoError(t, err)
-	assert.Equal(t, "cli-override-image:latest", res.Image)
+	assert.Equal(t, "node:22-alpine", res.Image)
+	assert.Equal(t, "/cli-workdir", res.Workdir)
 	assert.Equal(t, 45*time.Second, res.HangTimeout)
 }
 
