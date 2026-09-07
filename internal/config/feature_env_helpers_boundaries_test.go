@@ -12,6 +12,24 @@ import (
 // the value with last-one-wins precedence across configuration layers (P1 > P2 > Base).
 
 func TestUnit_DeduplicateEnv_Boundaries(t *testing.T) {
+	t.Run("64 unique entries exercising all 64 stack-array slots without duplicates", func(t *testing.T) {
+		env := make([]string, 64)
+		for i := range 64 {
+			env[i] = fmt.Sprintf("VAR_%d=v1", i)
+		}
+
+		deduped := deduplicateEnv(env)
+
+		// Expected output matches input exactly when no duplicates are present.
+		// Specification reference: docs/features/argument-priority-logic.md
+		expected := make([]string, 64)
+		for i := range 64 {
+			expected[i] = fmt.Sprintf("VAR_%d=v1", i)
+		}
+
+		assert.Equal(t, expected, deduped)
+	})
+
 	t.Run("64-entry boundary with duplicate keys (fixed stack array path)", func(t *testing.T) {
 		// 60 unique entries + 4 duplicates = 64 total items
 		env := make([]string, 60)
@@ -66,7 +84,41 @@ func TestUnit_DeduplicateEnv_Boundaries(t *testing.T) {
 }
 
 func TestUnit_MergeEnv_Boundaries(t *testing.T) {
-	t.Run("64-entry total boundary across base, p2, p1 (fixed stack array path)", func(t *testing.T) {
+	t.Run("64 unique total entries across base, p2, p1 exercising all 64 stack-array slots", func(t *testing.T) {
+		base := make([]string, 20)
+		for i := range 20 {
+			base[i] = fmt.Sprintf("VAR_%d=base", i)
+		}
+
+		p2 := make([]string, 20)
+		for i := range 20 {
+			p2[i] = fmt.Sprintf("VAR_%d=p2", i+20) // VAR_20..VAR_39
+		}
+
+		p1 := make([]string, 24)
+		for i := range 24 {
+			p1[i] = fmt.Sprintf("VAR_%d=p1", i+40) // VAR_40..VAR_63
+		}
+
+		merged := mergeEnv(base, p2, p1)
+
+		// Complete 64 unique keys with layer-specific values
+		// Specification reference: docs/features/argument-priority-logic.md
+		expected := make([]string, 64)
+		for i := range 64 {
+			if i < 20 {
+				expected[i] = fmt.Sprintf("VAR_%d=base", i)
+			} else if i < 40 {
+				expected[i] = fmt.Sprintf("VAR_%d=p2", i)
+			} else {
+				expected[i] = fmt.Sprintf("VAR_%d=p1", i)
+			}
+		}
+
+		assert.Equal(t, expected, merged)
+	})
+
+	t.Run("64-entry total boundary across base, p2, p1 with overlapping keys (fixed stack array path)", func(t *testing.T) {
 		base := make([]string, 20)
 		for i := range 20 {
 			base[i] = fmt.Sprintf("VAR_%d=base", i)
