@@ -43,6 +43,16 @@ Users can bypass standard search sequences and explicitly specify configuration 
 
 ---
 
+## Dynamic Template Expressions and Relative Path Resolution in Configuration Files
+
+Configuration values defined within `.cderun.yaml` and `.tools.yaml` undergo dynamic resolution during configuration loading:
+
+1. **Base Directory Binding (`BaseDir`)**: Relative paths specified within YAML properties (e.g., `source: ./src` under `mounts` or `workdir: ./build`) are resolved relative to the directory containing the configuration file (`BaseDir`), ensuring consistent path evaluation regardless of the user's invocation directory.
+2. **Template Expression Evaluation**: Expressions such as `{{HOME}}`, `{{PWD}}`, `{{env:VAR}}`, `{{file:...}}`, and `{{find_dir:...}}` embedded in YAML string fields are expanded recursively. Fallback syntax (e.g., `{{file:.go-version:-1.22.0}}`) is fully supported.
+3. **Anchor Boundary Enforcement**: Any path generated via dynamic expressions or tildes (`~`) inside YAML files is validated against anchor boundaries to prevent directory traversal outside permissible roots.
+
+---
+
 ## Hierarchical Search and Merging Rules
 
 To provide flexible defaults and project-specific configurations, `cderun` searches multiple locations and merges discovered configurations.
