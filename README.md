@@ -449,7 +449,7 @@ Direct containerd integration operates natively via the containerd gRPC API. Ple
 - **Mounts**: Named volume-type mounts are not supported (use `bind` or `tmpfs` mounts).
 - **Adaptation Contract**: The containerd adapter enforces a strict contract to validate and convert Docker-compatible fields (e.g. mapping capabilities like `SYS_ADMIN` to `CAP_SYS_ADMIN`), returning explicit errors for unsupported fields rather than passing them through silently.
 
-For a detailed feature comparison table across Docker, Podman, and direct containerd, see the [Container Runtime Compatibility Matrix](docs/features/command-line-options.md#container-runtime-compatibility-matrix).
+For a detailed feature comparison table across Docker, Podman, and direct containerd, see the [Multi-Runtime Feature Specification](docs/features/multi-runtime-support.md#runtime-capability-comparison-matrix) and [Container Runtime Compatibility Matrix](docs/features/command-line-options.md#container-runtime-compatibility-matrix).
 
 ---
 
