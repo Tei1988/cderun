@@ -123,5 +123,9 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 
 		_, err = parseUlimitFast("nofile=abc:def")
 		require.Error(t, err)
+
+		// Invalid soft == -1 when hard is finite (nofile=-1:1024)
+		_, err = parseUlimitFast("nofile=-1:1024")
+		require.Error(t, err)
 	})
 }

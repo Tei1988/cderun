@@ -75,7 +75,7 @@ func parseUlimitFast(s string) (*units.Ulimit, error) {
 		soft, hard = val, val
 	}
 
-	if soft < -1 || hard < -1 || (hard != -1 && soft > hard) {
+	if soft < -1 || hard < -1 || (hard != -1 && (soft == -1 || soft > hard)) {
 		return units.ParseUlimit(s)
 	}
 
