@@ -28,12 +28,8 @@ func TestFeatureScenarios_ExecutionBoundary_HoistingAndParsing(t *testing.T) {
 		overrides, others, err := hoistOverrides(cmd, args, false, 0)
 		require.NoError(t, err)
 
-		assert.Contains(t, overrides, "--cderun-image=node:20-alpine")
-		assert.Contains(t, overrides, "--cderun-workdir")
-		assert.Contains(t, overrides, "/app")
-
-		assert.Contains(t, others, "--")
-		assert.Contains(t, others, "index.js")
+		assert.Equal(t, []string{"--cderun-image=node:20-alpine", "--cderun-workdir", "/app"}, overrides)
+		assert.Equal(t, []string{"--", "index.js"}, others)
 	})
 
 	t.Run("SymlinkMode_PassthroughExecution", func(t *testing.T) {
@@ -57,12 +53,14 @@ func TestFeatureScenarios_ExecutionBoundary_HoistingAndParsing(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		rawEnv := []string{
+			"API_KEY=supersecretkey123",
+			"SECRET_TOKEN=supersecrettoken456",
+		}
+		maskedEnv := config.MaskSensitiveEnvList(rawEnv, nil)
 		cc := &container.ContainerConfig{
 			Image: "alpine:latest",
-			Env: []string{
-				"API_KEY=[REDACTED]",
-				"SECRET_TOKEN=[REDACTED]",
-			},
+			Env:   maskedEnv,
 		}
 
 		formatDryRunSimple(&buf, cc)
@@ -70,6 +68,8 @@ func TestFeatureScenarios_ExecutionBoundary_HoistingAndParsing(t *testing.T) {
 		out := buf.String()
 		assert.Contains(t, out, "Image: alpine:latest")
 		assert.Contains(t, out, `"API_KEY"="[REDACTED]"`)
+		assert.NotContains(t, out, "supersecretkey123")
+		assert.NotContains(t, out, "supersecrettoken456")
 
 		jsonBuf := &bytes.Buffer{}
 		encoder := json.NewEncoder(jsonBuf)
@@ -80,6 +80,7 @@ func TestFeatureScenarios_ExecutionBoundary_HoistingAndParsing(t *testing.T) {
 		jsonStr := jsonBuf.String()
 		assert.Contains(t, jsonStr, `"image": "alpine:latest"`)
 		assert.Contains(t, jsonStr, `API_KEY=[REDACTED]`)
-		assert.NotContains(t, jsonStr, `supersecret`)
+		assert.NotContains(t, jsonStr, "supersecretkey123")
+		assert.NotContains(t, jsonStr, "supersecrettoken456")
 	})
 }

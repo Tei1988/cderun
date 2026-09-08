@@ -136,13 +136,25 @@ func TestFeatureScenarios_BoundaryResilience_ExpressionResolution(t *testing.T) 
 	t.Run("PrecedenceResolutionMatrix", func(t *testing.T) {
 		t.Parallel()
 
+		// Test precedence between CLI layer (P1) and Tools/Global layer (P3/P4)
 		opts := &CLIOptions{
-			Image: ptrVal("golang:1.22-alpine"),
+			Image: ptrVal("golang:1.22-alpine"), // P1 winner
+		}
+		toolsCfg := ToolsConfig{
+			"golang": ToolConfig{
+				Image: "golang:1.21-alpine", // P3 lower priority
+			},
 		}
 
-		res, err := ResolveWithFS("golang", opts, nil, nil, mfs)
+		res, err := ResolveWithFS("golang", opts, toolsCfg, nil, mfs)
 		require.NoError(t, err)
 		assert.Equal(t, "golang:1.22-alpine", res.Image)
+
+		// Test tool configuration (P3) wins when CLI (P1) is unset
+		emptyOpts := &CLIOptions{}
+		resTool, err := ResolveWithFS("golang", emptyOpts, toolsCfg, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, "golang:1.21-alpine", resTool.Image)
 	})
 }
 
@@ -158,12 +170,19 @@ func TestFeatureScenarios_BoundaryResilience_MaskingInvariants(t *testing.T) {
 			"TOKEN=xyz987",
 		}
 
-		// When pattern is nil/empty, default masks all values
-		masked := MaskSensitiveEnvList(env, nil)
-		require.Len(t, masked, 3)
-		assert.Equal(t, "PATH=[REDACTED]", masked[0])
-		assert.Equal(t, "SECRET_KEY=[REDACTED]", masked[1])
-		assert.Equal(t, "TOKEN=[REDACTED]", masked[2])
+		// When pattern is nil, default masks all values
+		maskedNil := MaskSensitiveEnvList(env, nil)
+		require.Len(t, maskedNil, 3)
+		assert.Equal(t, "PATH=[REDACTED]", maskedNil[0])
+		assert.Equal(t, "SECRET_KEY=[REDACTED]", maskedNil[1])
+		assert.Equal(t, "TOKEN=[REDACTED]", maskedNil[2])
+
+		// Calling with empty slice []string{} disables masking (no patterns match)
+		maskedEmpty := MaskSensitiveEnvList(env, []string{})
+		require.Len(t, maskedEmpty, 3)
+		assert.Equal(t, "PATH=/usr/bin:/bin", maskedEmpty[0])
+		assert.Equal(t, "SECRET_KEY=supersecret123", maskedEmpty[1])
+		assert.Equal(t, "TOKEN=xyz987", maskedEmpty[2])
 	})
 
 	t.Run("MaskSensitiveEnv_ExplicitPatterns", func(t *testing.T) {

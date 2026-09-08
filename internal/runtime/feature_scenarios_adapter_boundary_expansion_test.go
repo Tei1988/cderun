@@ -58,6 +58,13 @@ func TestFeatureScenarios_AdapterBoundary_RuntimeOperations(t *testing.T) {
 
 		assert.Equal(t, "alpine:latest", dockerCfg.Image)
 		assert.Len(t, hostCfg.Ulimits, 2)
+		assert.ElementsMatch(t, []container.Ulimit{
+			{Name: "nofile", Soft: 1024, Hard: 2048},
+			{Name: "nproc", Soft: 4096, Hard: 4096},
+		}, []container.Ulimit{
+			{Name: hostCfg.Ulimits[0].Name, Soft: hostCfg.Ulimits[0].Soft, Hard: hostCfg.Ulimits[0].Hard},
+			{Name: hostCfg.Ulimits[1].Name, Soft: hostCfg.Ulimits[1].Soft, Hard: hostCfg.Ulimits[1].Hard},
+		})
 		assert.Equal(t, dockercontainer.RestartPolicyMode("on-failure"), hostCfg.RestartPolicy.Name)
 		assert.Equal(t, 3, hostCfg.RestartPolicy.MaximumRetryCount)
 	})
