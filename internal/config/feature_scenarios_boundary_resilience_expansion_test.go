@@ -15,13 +15,14 @@ func TestFeatureScenarios_BoundaryResilience_Validators(t *testing.T) {
 
 		// Valid cases
 		require.NoError(t, ValidatePort("8080:80"))
+		require.NoError(t, ValidatePort("0:80")) // host port 0 is allowed for dynamic allocation
 		require.NoError(t, ValidatePort("8080:80/tcp"))
 		require.NoError(t, ValidatePort("127.0.0.1:8080:80/udp"))
 		require.NoError(t, ValidatePort("8000-8005:9000-9005"))
 
 		// Invalid cases
 		require.Error(t, ValidatePort("invalid"))
-		require.Error(t, ValidatePort("0:80"))
+		require.Error(t, ValidatePort("80:0")) // container port 0 is disallowed
 		require.Error(t, ValidatePort("70000:80"))
 	})
 
