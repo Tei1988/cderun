@@ -44,7 +44,7 @@
 | **Port Publishing (`-p`, `-P`)** | Yes | Yes | No |
 | **Custom DNS & Add-Host** | Yes | Yes | No |
 | **Bind & tmpfs Mounts** | Yes | Yes | Yes |
-| **Volume Mounts** | Yes | Yes | No |
+| **Named Volume Mounts** | Yes | Yes | No |
 | **Linux Capabilities (`--cap-add/drop`)** | Yes | Yes | Yes (Converted to `CAP_` prefix) |
 | **Process Resource Limits (ulimits)** | Yes | Yes | Yes (Converted to POSIX rlimits) |
 | **Read-Only RootFS** | Yes | Yes | Yes |
