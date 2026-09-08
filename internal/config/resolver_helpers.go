@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -32,6 +33,59 @@ func parseSlice[T any](slice []string, sourceLabel string, parser func(string, s
 	return res, nil
 }
 
+func isStandardUlimitType(name string) bool {
+	switch name {
+	case "as", "core", "cpu", "data", "fsize", "locks", "memlock",
+		"msgqueue", "nice", "nofile", "nproc", "rss", "rtprio",
+		"rttime", "sigpending", "stack":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseUlimitFast(s string) (*units.Ulimit, error) {
+	eqIdx := strings.IndexByte(s, '=')
+	if eqIdx <= 0 || eqIdx == len(s)-1 {
+		return units.ParseUlimit(s)
+	}
+	name := s[:eqIdx]
+	if !isStandardUlimitType(name) || strings.IndexByte(name, ':') != -1 {
+		return units.ParseUlimit(s)
+	}
+	valStr := s[eqIdx+1:]
+	colonIdx := strings.IndexByte(valStr, ':')
+
+	var soft, hard int64
+	if colonIdx != -1 {
+		if colonIdx == 0 || colonIdx == len(valStr)-1 {
+			return units.ParseUlimit(s)
+		}
+		softVal, err1 := strconv.ParseInt(valStr[:colonIdx], 10, 64)
+		hardVal, err2 := strconv.ParseInt(valStr[colonIdx+1:], 10, 64)
+		if err1 != nil || err2 != nil {
+			return units.ParseUlimit(s)
+		}
+		soft, hard = softVal, hardVal
+	} else {
+		val, err := strconv.ParseInt(valStr, 10, 64)
+		if err != nil {
+			return units.ParseUlimit(s)
+		}
+		soft, hard = val, val
+	}
+
+	if soft < -1 || hard < -1 || (hard != -1 && soft > hard) {
+		return units.ParseUlimit(s)
+	}
+
+	return &units.Ulimit{
+		Name: name,
+		Soft: soft,
+		Hard: hard,
+	}, nil
+}
+
 func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.Ulimit, error) {
 	if len(raws) == 0 {
 		return []container.Ulimit{}, nil
@@ -50,7 +104,7 @@ func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.U
 		if err := validatePathChars(resolvedRaw); err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
 		}
-		parsed, err := units.ParseUlimit(resolvedRaw)
+		parsed, err := parseUlimitFast(resolvedRaw)
 		if err != nil {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: err}
 		}
@@ -127,8 +181,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 			}
 		}
 
-		k := strings.TrimSpace(key)
-		if err := ValidateSysctlKey(k); err != nil {
+		if err := ValidateSysctlKey(key); err != nil {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
@@ -143,7 +196,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 			}
 		}
 
-		res[k] = val
+		res[key] = val
 	}
 	return res, nil
 }

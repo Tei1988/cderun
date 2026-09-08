@@ -94,4 +94,34 @@ func TestUnit_Config_Ulimit_ParsingAndResolution(t *testing.T) {
 		assert.Equal(t, "nofile=-2:1024", cfgErr.Value)
 		assert.Contains(t, cfgErr.Err.Error(), "limit values must be at least -1")
 	})
+
+	t.Run("parseUlimitFast coverage and fallbacks", func(t *testing.T) {
+		// Valid fast-path soft:hard
+		u1, err := parseUlimitFast("nofile=1024:2048")
+		require.NoError(t, err)
+		assert.Equal(t, "nofile", u1.Name)
+		assert.Equal(t, int64(1024), u1.Soft)
+		assert.Equal(t, int64(2048), u1.Hard)
+
+		// Valid fast-path single value
+		u2, err := parseUlimitFast("nproc=512")
+		require.NoError(t, err)
+		assert.Equal(t, "nproc", u2.Name)
+		assert.Equal(t, int64(512), u2.Soft)
+		assert.Equal(t, int64(512), u2.Hard)
+
+		// Non-standard ulimit name falls back
+		_, err = parseUlimitFast("unknown_ulimit=100")
+		require.Error(t, err)
+
+		// Malformed colon syntax falls back
+		_, err = parseUlimitFast("nofile=:100")
+		require.Error(t, err)
+
+		_, err = parseUlimitFast("nofile=100:")
+		require.Error(t, err)
+
+		_, err = parseUlimitFast("nofile=abc:def")
+		require.Error(t, err)
+	})
 }
