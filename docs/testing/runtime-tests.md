@@ -65,7 +65,7 @@ make test-runtime
 ### 今後の拡張（`.agent/todo.md` を参照）
 
 - **T20**: Docker / Podman のランタイムテストジョブの追加。`ubuntu-latest` は Docker が標準搭載のため `/var/run/docker.sock` がそのまま使える。Podman は `podman.socket` の有効化が必要
-- **T70**: ランタイム間のコンフォーマンススイートを CI ジョブの器として実装する
+- **T70**: ランタイム間のコンフォーマンススイート（詳細は [`conformance.md`](conformance.md) を参照）を CI ジョブの器として実装する
 
 なお、複数の Docker バージョンを DinD でマトリックス検証する構成は、コスト対効果の観点から採用しない（cderun は Docker API の安定した部分のみを使用しており、バージョン間差異のリスクが小さいため）。
 
