@@ -6,7 +6,7 @@
 
 ## Basic Syntax
 
-```bash
+```text
 cderun [cderun-flags] <subcommand> [passthrough-args]
 ```
 
