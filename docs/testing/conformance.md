@@ -20,7 +20,7 @@ The conformance test harness receives a factory function that instantiates the a
 type RuntimeFactory func(t *testing.T) ContainerRuntime
 ```
 
-The factory function creates a fresh `ContainerRuntime` instance for each test case and handles cleanup via `defer rt.Close()`.
+The factory function creates a fresh `ContainerRuntime` instance for each test case, while `RunConformanceTests` owns cleanup after the runtime is returned by calling `defer rt.Close()`.
 
 ### `ConformanceCapabilities` Options
 
@@ -117,7 +117,7 @@ func TestConformance_MyNewRuntime(t *testing.T) {
 }
 ```
 
-### Step 4: Run Unit and Integration Conformance Tests
+### Step 4: Run Unit Conformance Tests
 
 - **Unit Testing (Mock Client)**: Run tests without a live daemon requirement during standard unit testing:
 
@@ -125,16 +125,12 @@ func TestConformance_MyNewRuntime(t *testing.T) {
   go test -v ./internal/runtime/ -run TestConformance_
   ```
 
-- **Integration Testing (Live Socket)**: When testing against live container daemons in CI or integration environments, set `CDERUN_RUNTIME`:
-
-  ```bash
-  CDERUN_RUNTIME=mynewruntime go test -v ./internal/runtime/ -run TestConformance_
-  ```
+- **Live Socket Testing**: Live conformance tests against real runtime sockets can be registered using `CDERUN_RUNTIME` environment probes or live client constructors in integration suites (e.g., `-tags=runtime`).
 
 ---
 
 ## Execution Environment & Image Reference Guidelines
 
-1. **Fully Qualified Image References**: Always use fully qualified image references (e.g., `docker.io/library/alpine:latest`) in test fixtures to ensure compatibility across Docker, Podman, and containerd reference resolvers.
+1. **Fully Qualified Image References**: Always use fully qualified image references (e.g., `docker.io/library/alpine:latest`) in test fixtures and `ContainerConfig` definitions passed to `RunConformanceTests` to ensure compatibility across Docker, Podman, and containerd reference resolvers.
 2. **Resource Cleanup**: Always ensure containers and sockets are cleaned up using `defer rt.Close()` and `RemoveContainer` in lifecycle tests.
 3. **Fail-Fast Principles**: Never pass unsupported configuration parameters through to OCI or engine specs without validation. Misconfigurations must fail at `ValidateConfig` time before container creation starts.
