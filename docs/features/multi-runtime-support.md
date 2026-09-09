@@ -34,6 +34,26 @@
 
 ---
 
+## Runtime Capability Comparison Matrix
+
+| Feature / Capability | Docker | Podman | containerd (Direct gRPC) |
+| :--- | :---: | :---: | :---: |
+| **Supported OS** | Linux, macOS, Windows | Linux, macOS, Windows | **Linux-only** (`//go:build linux`) |
+| **Communication Protocol** | HTTP Unix socket | HTTP Unix socket | gRPC Unix socket |
+| **Bridge Networking** | Yes | Yes | No (Host network only) |
+| **Port Publishing (`-p`, `-P`)** | Yes | Yes | No |
+| **Custom DNS & Add-Host** | Yes | Yes | No |
+| **Bind & tmpfs Mounts** | Yes | Yes | Yes |
+| **Named Volume Mounts** | Yes | Yes | No |
+| **Linux Capabilities (`--cap-add/drop`)** | Yes | Yes | Yes (Converted to `CAP_` prefix) |
+| **Process Resource Limits (ulimits)** | Yes | Yes | Yes (Converted to POSIX rlimits) |
+| **Read-Only RootFS** | Yes | Yes | Yes |
+| **Host PID / IPC / Cgroup Namespaces** | Yes | Yes | Yes (Host or Private) |
+| **Init Process (`--init`)** | Yes | Yes | No |
+| **Restart Policies (`--restart`)** | Yes | Yes | No |
+
+---
+
 ## Architecture and Abstraction Layer
 
 The engine abstraction uses a unified Go interface:
