@@ -77,7 +77,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T68 | dry-run ゴールデンテスト基盤（L2） | テスト | 高 | 中 | - | DONE |
 | T79 | ゴールデンテストの必須ケース追加（T44 判別およびT81ホイスト動作） | テスト | 中 | 小 | - | DONE |
 | T69 | registry 駆動の優先順位マトリクステスト生成（L1） | テスト | 高 | 中 | - | DONE |
-| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | - |
+| T70 | `ContainerRuntime` コンフォーマンススイート（L3） | テスト | 高 | 大 | - | DONE |
 | T71 | mutation testing の導入 | テスト/CI | 中 | 中 | - | - |
 | T72 | 既存 coverage 系テストの段階的整理・吸収 | クリーンアップ | 低 | 大 | - | - |
 | T73 | ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加 | クリーンアップ | 中 | 小 | - | DONE |
@@ -832,35 +832,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 ---
 
-## T70: `ContainerRuntime` コンフォーマンススイート（L3: Conformance Suite）の導入による各ランタイム間の挙動不変性保証
-
-- 種別: テスト基盤
-- 優先度: 高
-- 対象: `internal/runtime/`（`conformance_test.go` 等）、`.github/workflows/ci.yaml`
-- 依存: **T20（Docker/Podman の CI ジョブ）と統合実装を推奨**。T16（事前バリデーション）、T40/T45/T51（containerd パリティバグ）と密接に関連
-- 前提: `docs/testing/strategy.md` を必ず読むこと
-
-### 目的
-
-`ContainerRuntime` インターフェースを実装する全アダプタ（Mock, Docker, Podman, containerd）が、同一の `ContainerConfig` 入力に対して、同一の観測可能な挙動をすること、または未対応の機能について確実に明示的なエラー（"not supported yet"）を返す仕様（契約）を満たしていることを一元的にテストする。T40（ENTRYPOINT 消失）・T45（cap-drop 黙殺）・T51（不正 OCI spec）のようなパリティバグをクラスごと検出可能にする。
-
-### 方針
-
-- `ContainerRuntime` の各メソッドに対する契約（例: 「Entrypoint 未指定 + Command 指定時はイメージの ENTRYPOINT が前置される」「未対応機能は明示エラーを返す」）をテスト関数群として定義し、実装をパラメータ化して全ランタイムで実行する
-- Mock は毎 PR、実ランタイム（Docker / Podman / containerd）は CI ジョブ（`-tags=runtime`）で同一スイートを回す
-- 「未対応」を返すことが正しいランタイムには、期待値を capability 宣言（T16 の `Capabilities()` 案）として表現できるとよい
-- 検証用イメージは軽量なもの（alpine / busybox + ENTRYPOINT 付きカスタム）に固定し、digest 固定で再現性を確保
-
-### 完了条件
-
-- [x] 共通の適合テストスイート（例: `conformance_suite_test.go` の `RunConformanceTests`）を実装する。
-- [x] テストケースには、「Entrypoint 未指定時にイメージの ENTRYPOINT が正しく前置されること」「未対応のポートマウント、DNS設定、volumeマウント、tmpfsに対して正しく明示的なエラーが返ること」など、共通の契約検証項目を含める。
-- [ ] 契約スイートが Mock、Docker、Podman、および containerd すべてのランタイムを網羅し、CI 上で T20 インテグレーション環境が完了し実行されていること（T20の統合を必須要件とする）。
-- [x] T40 / T45 / T51 の再現ケースがスイートに含まれ、修正前は落ち、修正後に通ることが確認されている。
-- [x] 新ランタイム追加時の手順（スイートへの組み込み方）が文書化されている。
-
----
-
 ## T71: mutation testing の導入
 
 - 種別: テスト / CI
@@ -968,6 +939,7 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
 - [x] @jules: Update `docs/features/command-line-options.md` to add information about `--prefetch` and `--prefetch-all` flags, explaining stand-alone image prefetching and template expression support mapped to CDERUN_PREFETCH and CDERUN_PREFETCH_ALL.
+- [ ] @jules: Create/Update `docs/testing/conformance.md` to document the procedure for onboarding new `ContainerRuntime` adapter implementations into the L3 Conformance Suite (`RunConformanceTests`).
 
 ---
 
