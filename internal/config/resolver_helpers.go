@@ -44,14 +44,22 @@ func isStandardUlimitType(name string) bool {
 	}
 }
 
-func parseUlimitFast(s string) (*units.Ulimit, error) {
+func parseUlimitFast(s string) (container.Ulimit, error) {
 	eqIdx := strings.IndexByte(s, '=')
 	if eqIdx <= 0 || eqIdx == len(s)-1 {
-		return units.ParseUlimit(s)
+		u, err := units.ParseUlimit(s)
+		if err != nil {
+			return container.Ulimit{}, err
+		}
+		return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 	}
 	name := s[:eqIdx]
 	if !isStandardUlimitType(name) || strings.IndexByte(name, ':') != -1 {
-		return units.ParseUlimit(s)
+		u, err := units.ParseUlimit(s)
+		if err != nil {
+			return container.Ulimit{}, err
+		}
+		return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 	}
 	valStr := s[eqIdx+1:]
 	colonIdx := strings.IndexByte(valStr, ':')
@@ -59,27 +67,43 @@ func parseUlimitFast(s string) (*units.Ulimit, error) {
 	var soft, hard int64
 	if colonIdx != -1 {
 		if colonIdx == 0 || colonIdx == len(valStr)-1 {
-			return units.ParseUlimit(s)
+			u, err := units.ParseUlimit(s)
+			if err != nil {
+				return container.Ulimit{}, err
+			}
+			return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 		}
 		softVal, err1 := strconv.ParseInt(valStr[:colonIdx], 10, 64)
 		hardVal, err2 := strconv.ParseInt(valStr[colonIdx+1:], 10, 64)
 		if err1 != nil || err2 != nil {
-			return units.ParseUlimit(s)
+			u, err := units.ParseUlimit(s)
+			if err != nil {
+				return container.Ulimit{}, err
+			}
+			return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 		}
 		soft, hard = softVal, hardVal
 	} else {
 		val, err := strconv.ParseInt(valStr, 10, 64)
 		if err != nil {
-			return units.ParseUlimit(s)
+			u, err := units.ParseUlimit(s)
+			if err != nil {
+				return container.Ulimit{}, err
+			}
+			return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 		}
 		soft, hard = val, val
 	}
 
 	if soft < -1 || hard < -1 || (hard != -1 && (soft == -1 || soft > hard)) {
-		return units.ParseUlimit(s)
+		u, err := units.ParseUlimit(s)
+		if err != nil {
+			return container.Ulimit{}, err
+		}
+		return container.Ulimit{Name: u.Name, Soft: u.Soft, Hard: u.Hard}, nil
 	}
 
-	return &units.Ulimit{
+	return container.Ulimit{
 		Name: name,
 		Soft: soft,
 		Hard: hard,
@@ -111,11 +135,7 @@ func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.U
 		if parsed.Hard < -1 || parsed.Soft < -1 {
 			return nil, &InvalidConfigError{Field: "ulimit", Value: raw, Err: fmt.Errorf("limit values must be at least -1")}
 		}
-		res = append(res, container.Ulimit{
-			Name: parsed.Name,
-			Hard: parsed.Hard,
-			Soft: parsed.Soft,
-		})
+		res = append(res, parsed)
 	}
 	return res, nil
 }

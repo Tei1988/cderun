@@ -329,7 +329,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	// The subcommand itself is NOT included in fullCommand.
 	// the passthrough arguments provided after the subcommand are used.
 	for i, arg := range passthroughArgs {
-		if strings.ContainsRune(arg, 0) {
+		if strings.IndexByte(arg, 0) != -1 {
 			return nil, fmt.Errorf("security validation failed: command argument [%d] contains null byte", i)
 		}
 	}
