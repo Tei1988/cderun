@@ -33,6 +33,9 @@ type ContainerConfig struct {
 	// Mounts
 	Mounts []Mount `json:"mounts" yaml:"mounts"`
 
+	// Container labels
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+
 	// Environment variables (format: ["KEY=value", "KEY2=value2"])
 	Env []string `json:"env" yaml:"env"`
 

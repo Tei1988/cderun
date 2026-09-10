@@ -22,6 +22,12 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		return nil, nil, nil, fmt.Errorf("nil container config")
 	}
 
+	labels := make(map[string]string)
+	maps.Copy(labels, config.Labels)
+	if _, ok := labels["cderun"]; !ok {
+		labels["cderun"] = "true"
+	}
+
 	containerConfig := &dockercontainer.Config{
 		Image:        config.Image,
 		Cmd:          config.Command,
@@ -33,6 +39,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		User:         config.User,
 		Hostname:     config.Hostname,
 		Entrypoint:   config.Entrypoint,
+		Labels:       labels,
 		ExposedPorts: make(nat.PortSet),
 	}
 
