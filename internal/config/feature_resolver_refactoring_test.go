@@ -106,3 +106,102 @@ func TestUnit_Config_ResolverRefactoring_MergeEnvSmall(t *testing.T) {
 	res := mergeEnv(base, p2, p1)
 	assert.Equal(t, []string{"A=1", "B=20", "C=30", "D=4"}, res)
 }
+
+func TestUnit_Config_ResolverRefactoring_DetectRuntimeFromFS(t *testing.T) {
+	t.Run("detects docker when docker socket exists", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/var/run/docker.sock": {},
+			},
+		}
+		rt, sock := detectRuntimeFromFS(mfs)
+		assert.Equal(t, "docker", rt)
+		assert.Equal(t, "/var/run/docker.sock", sock)
+	})
+
+	t.Run("detects containerd when containerd socket exists", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/run/containerd/containerd.sock": {},
+			},
+		}
+		rt, sock := detectRuntimeFromFS(mfs)
+		assert.Equal(t, "containerd", rt)
+		assert.Equal(t, "/run/containerd/containerd.sock", sock)
+	})
+
+	t.Run("detects podman when podman socket exists", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{
+				"/run/podman/podman.sock": {},
+			},
+		}
+		rt, sock := detectRuntimeFromFS(mfs)
+		assert.Equal(t, "podman", rt)
+		assert.Equal(t, "/run/podman/podman.sock", sock)
+	})
+
+	t.Run("returns empty when no sockets exist", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			Files: map[string][]byte{},
+		}
+		rt, sock := detectRuntimeFromFS(mfs)
+		assert.Equal(t, "", rt)
+		assert.Equal(t, "", sock)
+	})
+}
+
+func TestUnit_Config_ResolverRefactoring_ModularOptions(t *testing.T) {
+	mfs := &MockFileSystem{
+		WD: "/workspace",
+		Env: map[string]string{
+			"CDERUN_ULIMIT": "nofile=1024:2048",
+			"CDERUN_SYSCTL": "net.ipv4.ip_forward=1",
+			"CDERUN_DEVICE": "/dev/kvm:/dev/kvm:rwm",
+		},
+	}
+
+	cli := &CLIOptions{
+		Env: []string{"FOO=bar", "BAZ={{PWD}}"},
+	}
+
+	res := &ResolvedConfig{}
+	rv := &resolver{
+		subcommand: "testtool",
+		cli:        cli,
+		fs:         mfs,
+		res:        res,
+	}
+
+	t.Run("resolveEnvOptions", func(t *testing.T) {
+		err := rv.resolveEnvOptions()
+		require.NoError(t, err)
+		assert.Contains(t, rv.res.Env, "FOO=bar")
+		assert.Contains(t, rv.res.Env, "BAZ=/workspace")
+	})
+
+	t.Run("resolveUlimitOptions", func(t *testing.T) {
+		err := rv.resolveUlimitOptions()
+		require.NoError(t, err)
+		require.Len(t, rv.res.Ulimits, 1)
+		assert.Equal(t, "nofile", rv.res.Ulimits[0].Name)
+		assert.Equal(t, int64(1024), rv.res.Ulimits[0].Soft)
+		assert.Equal(t, int64(2048), rv.res.Ulimits[0].Hard)
+	})
+
+	t.Run("resolveSysctlOptions", func(t *testing.T) {
+		err := rv.resolveSysctlOptions()
+		require.NoError(t, err)
+		require.NotNil(t, rv.res.Sysctls)
+		assert.Equal(t, "1", rv.res.Sysctls["net.ipv4.ip_forward"])
+	})
+
+	t.Run("resolveDeviceOptions", func(t *testing.T) {
+		err := rv.resolveDeviceOptions()
+		require.NoError(t, err)
+		require.Len(t, rv.res.Devices, 1)
+		assert.Equal(t, "/dev/kvm", rv.res.Devices[0].PathOnHost)
+		assert.Equal(t, "/dev/kvm", rv.res.Devices[0].PathInContainer)
+		assert.Equal(t, "rwm", rv.res.Devices[0].CgroupPermissions)
+	})
+}
