@@ -589,12 +589,24 @@ func (rv *resolver) resolveAndValidateImage() error {
 }
 
 func (rv *resolver) resolveComplexOptions() error {
+	if err := rv.resolveMountOptions(); err != nil {
+		return err
+	}
+	if err := rv.resolveEnvOptions(); err != nil {
+		return err
+	}
+	if err := rv.resolveUlimitOptions(); err != nil {
+		return err
+	}
+	return rv.resolveSysctlOptions()
+}
+
+func (rv *resolver) resolveMountOptions() error {
 	var getWd func() (string, error)
 	getWd = func() (string, error) {
 		return rv.fs.Getwd()
 	}
 
-	// Complex types (Mounts, Env)
 	mcs, err := pickConfigs(
 		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
 		func(t ToolConfig) []MountConfig { return t.Mounts },
@@ -633,14 +645,12 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	rv.res.Mounts, err = resolveMountsFromConfigs(mcs, rForMounts, rv.fs)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
+func (rv *resolver) resolveEnvOptions() error {
 	var rForEnv *ExpressionResolver
-	// Check if there are any environment variables
-	var envs []string
-	envs, err = pickConfigs(
+	envs, err := pickConfigs(
 		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Env },
 		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
@@ -666,18 +676,16 @@ func (rv *resolver) resolveComplexOptions() error {
 		}
 	}
 
-	// Deduplicate within the winning source (last-one-wins for the same key)
 	var merged []string
 	if len(envs) > 0 {
 		merged = deduplicateEnv(envs)
 	}
 
 	rv.res.Env, err = resolveEnvValues(merged, rv.res.SensitiveEnv, rv.res.StrictEnv, rForEnv, rv.fs)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	// Resolve Ulimits
+func (rv *resolver) resolveUlimitOptions() error {
 	rawUlimits, err := pickConfigs(
 		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Ulimits },
@@ -695,11 +703,10 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	rv.res.Ulimits, err = resolveUlimitsFromRaws(rawUlimits, rForUlimits)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	// Resolve Sysctls
+func (rv *resolver) resolveSysctlOptions() error {
 	rawSysctls, err := pickConfigs(
 		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Sysctls },
@@ -717,11 +724,20 @@ func (rv *resolver) resolveComplexOptions() error {
 	}
 
 	rv.res.Sysctls, err = resolveSysctlsFromRaws(rawSysctls, rForSysctls)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	return nil
+func detectRuntimeFromFS(fs FileSystem) (string, string) {
+	if _, err := fs.Stat("/var/run/docker.sock"); err == nil {
+		return "docker", "/var/run/docker.sock"
+	}
+	if _, err := fs.Stat("/run/containerd/containerd.sock"); err == nil {
+		return "containerd", "/run/containerd/containerd.sock"
+	}
+	if _, err := fs.Stat("/run/podman/podman.sock"); err == nil {
+		return "podman", "/run/podman/podman.sock"
+	}
+	return "", ""
 }
 
 func (rv *resolver) resolveRuntimeAndSocket() error {
@@ -769,20 +785,7 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 						rv.res.Runtime = autoDetectedRuntime
 						rv.res.SocketPath = autoDetectedSocketPath
 					} else {
-						var detectedRuntime string
-						var detectedSocketPath string
-
-						if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-							detectedRuntime = "docker"
-							detectedSocketPath = "/var/run/docker.sock"
-						} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-							detectedRuntime = "containerd"
-							detectedSocketPath = "/run/containerd/containerd.sock"
-						} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-							detectedRuntime = "podman"
-							detectedSocketPath = "/run/podman/podman.sock"
-						}
-
+						detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
 						if detectedRuntime != "" {
 							autoDetectedRuntime = detectedRuntime
 							autoDetectedSocketPath = detectedSocketPath
@@ -793,15 +796,10 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 					autoDetectMu.Unlock()
 				}
 			} else {
-				if _, err := rv.fs.Stat("/var/run/docker.sock"); err == nil {
-					rv.res.Runtime = "docker"
-					rv.res.SocketPath = "/var/run/docker.sock"
-				} else if _, err := rv.fs.Stat("/run/containerd/containerd.sock"); err == nil {
-					rv.res.Runtime = "containerd"
-					rv.res.SocketPath = "/run/containerd/containerd.sock"
-				} else if _, err := rv.fs.Stat("/run/podman/podman.sock"); err == nil {
-					rv.res.Runtime = "podman"
-					rv.res.SocketPath = "/run/podman/podman.sock"
+				detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
+				if detectedRuntime != "" {
+					rv.res.Runtime = detectedRuntime
+					rv.res.SocketPath = detectedSocketPath
 				}
 			}
 
@@ -943,52 +941,8 @@ func (rv *resolver) resolveCustomParsing() error {
 		}
 	}
 
-	var getWd func() (string, error)
-	getWd = func() (string, error) {
-		return rv.fs.Getwd()
-	}
-
-	dcs, err := pickConfigs(
-		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
-		func(t ToolConfig) []DeviceConfig { return t.Devices },
-		rv.global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
-		func(s, src string) (DeviceConfig, error) {
-			parsed, ok := ParseDeviceConfig(s)
-			if !ok {
-				switch src {
-				case "override":
-					return DeviceConfig{}, fmt.Errorf("invalid device config (override): %q", s)
-				case "env":
-					return DeviceConfig{}, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", s)
-				default:
-					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
-				}
-			}
-			baseDir, err := getWd()
-			if err != nil {
-				return DeviceConfig{}, err
-			}
-			parsed.SetBaseDir(baseDir)
-			return parsed, nil
-		},
-		rv.fs,
-	)
-	if err != nil {
+	if err := rv.resolveDeviceOptions(); err != nil {
 		return err
-	}
-
-	var rForDevices *ExpressionResolver
-	if needsResolverForDevices(dcs, rv.global) {
-		rForDevices, err = rv.getR()
-		if err != nil {
-			return err
-		}
-	}
-
-	var errDevices error
-	rv.res.Devices, errDevices = resolveDevicesFromConfigs(dcs, rForDevices)
-	if errDevices != nil {
-		return errDevices
 	}
 
 	// Resolve memory via registry
@@ -1086,4 +1040,52 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 	default:
 		return cp.Resolve(r)
 	}
+}
+
+func (rv *resolver) resolveDeviceOptions() error {
+	var getWd func() (string, error)
+	getWd = func() (string, error) {
+		return rv.fs.Getwd()
+	}
+
+	dcs, err := pickConfigs(
+		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
+		func(t ToolConfig) []DeviceConfig { return t.Devices },
+		rv.global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		func(s, src string) (DeviceConfig, error) {
+			parsed, ok := ParseDeviceConfig(s)
+			if !ok {
+				switch src {
+				case "override":
+					return DeviceConfig{}, fmt.Errorf("invalid device config (override): %q", s)
+				case "env":
+					return DeviceConfig{}, fmt.Errorf("invalid device config in CDERUN_DEVICE: %q", s)
+				default:
+					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
+				}
+			}
+			baseDir, err := getWd()
+			if err != nil {
+				return DeviceConfig{}, err
+			}
+			parsed.SetBaseDir(baseDir)
+			return parsed, nil
+		},
+		rv.fs,
+	)
+	if err != nil {
+		return err
+	}
+
+	var rForDevices *ExpressionResolver
+	if needsResolverForDevices(dcs, rv.global) {
+		rForDevices, err = rv.getR()
+		if err != nil {
+			return err
+		}
+	}
+
+	var errDevices error
+	rv.res.Devices, errDevices = resolveDevicesFromConfigs(dcs, rForDevices)
+	return errDevices
 }
