@@ -602,11 +602,6 @@ func (rv *resolver) resolveComplexOptions() error {
 }
 
 func (rv *resolver) resolveMountOptions() error {
-	var getWd func() (string, error)
-	getWd = func() (string, error) {
-		return rv.fs.Getwd()
-	}
-
 	mcs, err := pickConfigs(
 		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
 		func(t ToolConfig) []MountConfig { return t.Mounts },
@@ -623,7 +618,7 @@ func (rv *resolver) resolveMountOptions() error {
 					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
 			}
-			baseDir, err := getWd()
+			baseDir, err := rv.fs.Getwd()
 			if err != nil {
 				return MountConfig{}, err
 			}
@@ -1043,11 +1038,6 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 }
 
 func (rv *resolver) resolveDeviceOptions() error {
-	var getWd func() (string, error)
-	getWd = func() (string, error) {
-		return rv.fs.Getwd()
-	}
-
 	dcs, err := pickConfigs(
 		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []DeviceConfig { return t.Devices },
@@ -1064,7 +1054,7 @@ func (rv *resolver) resolveDeviceOptions() error {
 					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
 			}
-			baseDir, err := getWd()
+			baseDir, err := rv.fs.Getwd()
 			if err != nil {
 				return DeviceConfig{}, err
 			}
