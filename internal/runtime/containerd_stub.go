@@ -75,6 +75,10 @@ func (r *ContainerdRuntime) InspectContainer(_ context.Context, _ string) (bool,
 	return false, 0, fmt.Errorf("containerd runtime is only supported on Linux")
 }
 
+func (r *ContainerdRuntime) PruneContainers(_ context.Context) ([]string, error) {
+	return nil, fmt.Errorf("containerd runtime is only supported on Linux")
+}
+
 func (r *ContainerdRuntime) Close() error {
 	return fmt.Errorf("containerd runtime is only supported on Linux")
 }

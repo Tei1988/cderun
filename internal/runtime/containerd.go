@@ -40,6 +40,7 @@ type containerdClient interface {
 	GetImage(ctx context.Context, ref string) (client.Image, error)
 	NewContainer(ctx context.Context, id string, opts ...client.NewContainerOpts) (client.Container, error)
 	LoadContainer(ctx context.Context, id string) (client.Container, error)
+	Containers(ctx context.Context, filters ...string) ([]client.Container, error)
 	Close() error
 }
 
@@ -905,6 +906,44 @@ func (r *ContainerdRuntime) InspectContainer(ctx context.Context, containerID st
 		return false, 0, err
 	}
 	return status.Status == client.Running, int(status.ExitStatus), nil
+}
+
+func (r *ContainerdRuntime) PruneContainers(ctx context.Context) ([]string, error) {
+	if r.isClientNil() {
+		return nil, fmt.Errorf("containerd client is not initialized")
+	}
+
+	cCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	containersList, err := r.client.Containers(cCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containerd containers for prune: %w", err)
+	}
+
+	var pruned []string
+	for _, c := range containersList {
+		id := c.ID()
+		task, err := c.Task(cCtx, nil)
+		if err == nil {
+			status, errStatus := task.Status(cCtx)
+			if errStatus == nil && (status.Status == client.Running || status.Status == client.Created || status.Status == client.Pausing || status.Status == client.Paused) {
+				r.logger.Debug("Skipping active containerd task %s during prune (status=%v)", id, status.Status)
+				continue
+			}
+			_, _ = task.Delete(cCtx, client.WithProcessKill)
+		}
+
+		err = c.Delete(cCtx, client.WithSnapshotCleanup)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				r.logger.Warn("Failed to delete containerd container %s during prune: %v", id, err)
+			}
+			continue
+		}
+		pruned = append(pruned, id)
+	}
+	return pruned, nil
 }
 
 func getShmSizeSpecOpt(shmBytes int64) oci.SpecOpts {

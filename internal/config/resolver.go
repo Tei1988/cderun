@@ -41,6 +41,7 @@ type ResolvedConfig struct {
 	DiagnosisFormat string
 	PrefetchAll     bool
 	Prefetch        string
+	Prune           bool
 	LogLevel        string
 	LogFormat       string
 	LogTimestamp    bool
