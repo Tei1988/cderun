@@ -165,7 +165,7 @@ func TestUnit_Expression_DirectiveFallbackMechanics(t *testing.T) {
 		res, err := expr.ResolveString("{{file:nonexistent.txt:-safe_fallback}}")
 		require.NoError(t, err)
 		assert.Equal(t, "safe_fallback", res)
-		assert.NoError(t, expr.Error())
+		require.NoError(t, expr.Error())
 
 		// Subsequent resolution should work normally
 		res, err = expr.ResolveString("Hello {{HOME}}")
