@@ -30,21 +30,21 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | - |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
-| T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
+| T24 | `--shm-size` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T25 | `--init` フラグの追加 | 機能 | 高 | 小 | あり | - |
+| T26 | `--pid` フラグの追加 | 機能 | 高 | 小 | あり | - |
 | T27 | `--read-only` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | DONE |
-| T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | DONE |
+| T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T35 | `--gpus` フラグの追加 | 機能 | 中 | 中 | あり | - |
+| T36 | `--cgroupns` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T37 | `--pids-limit` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T38 | `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加 | 機能 | 中 | 小 | あり | - |
+| T39 | `--restart` フラグの追加 | 機能 | 低 | 小 | あり | - |
 | T40 | containerd: コマンド指定時にイメージの ENTRYPOINT が消失する | バグ | 高 | 中 | - | DONE |
 | T41 | snapshot 一時ディレクトリが `os.Exit` によりリークする | バグ | 高 | 小 | - | DONE |
 | T42 | 空文字サブコマンドで nil panic | バグ | 高 | 小 | - | DONE |
@@ -303,7 +303,6 @@ cderun --prune
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
 
-
 ---
 
 ## T24: `--shm-size` フラグの追加
@@ -330,9 +329,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-shm-size`) オーバーライド対応
+- Docker アダプターで `HostConfig.ShmSize` へのマッピング実装
+- containerd アダプターで OCI spec マウントオプションへの設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker および containerd の両アダプターに関するユニットテストの追加・パス確認
 
 ---
 
@@ -362,10 +365,14 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker: `HostConfig.Init` に渡るテスト
-- containerd: 設計決定に基づいた挙動のテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-init`) オーバーライド対応
+- Docker アダプターで `HostConfig.Init` へのマッピング実装
+- containerd アダプターで設計決定に基づいた動作（事前バリデーションエラーまたはマウント）実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker: `HostConfig.Init` に渡るテストの追加
+- containerd: 設計決定に基づいた挙動のテストの追加
 
 ---
 
@@ -392,9 +399,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-pid`) オーバーライド対応
+- Docker アダプターで `HostConfig.PidMode` へのマッピング実装
+- containerd アダプターで OCI spec namespaces への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -427,10 +438,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker: `SecurityOpt` に渡るテスト
-- containerd: サポート範囲のテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-security-opt`) オーバーライド対応
+- Docker アダプターで `HostConfig.SecurityOpt` へのマッピング実装
+- containerd アダプターで OCI spec 対応フィールドへのマッピング実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker および containerd アダプターに関するユニットテストの追加・パス確認
 
 ---
 
@@ -463,9 +477,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- パース + Docker / containerd 変換のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-sysctl`) オーバーライド対応
+- Docker アダプターで `HostConfig.Sysctls` へのマッピング実装
+- containerd アダプターで `Linux.Sysctl` への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- パース + Docker / containerd 変換のユニットテスト追加・パス確認
 
 ---
 
@@ -492,9 +510,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-dns-search`) オーバーライド対応
+- Docker アダプターで `HostConfig.DNSSearch` へのマッピング実装
+- containerd アダプターで OCI spec DNS 設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -521,9 +543,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-dns-option`) オーバーライド対応
+- Docker アダプターで `HostConfig.DNSOptions` へのマッピング実装
+- containerd アダプターで OCI spec DNS 設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -551,9 +577,13 @@ Puppeteer / Playwright によるブラウザテスト、ML ワークロード（
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-ipc`) オーバーライド対応
+- Docker アダプターで `HostConfig.IpcMode` へのマッピング実装
+- containerd アダプターで OCI spec namespaces への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -586,10 +616,12 @@ ML ワークロードで NVIDIA GPU をコンテナにパススルーする。`d
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker: `DeviceRequests` に変換されるユニットテスト
-- containerd: 未サポートエラーのテスト（T16 と連携）
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-gpus`) オーバーライド対応
+- Docker: `DeviceRequests` に変換されるマッピング実装およびユニットテスト
+- containerd: 未サポートエラー（T16 連携）のマッピング実装およびユニットテスト
+- `docs/features/command-line-options.md` および `README.md` の更新
 
 ---
 
@@ -616,9 +648,13 @@ cgroup v2 環境でのネームスペース分離を制御。Docker Engine 20.10
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-cgroupns`) オーバーライド対応
+- Docker アダプターで `HostConfig.CgroupnsMode` へのマッピング実装
+- containerd アダプターで OCI spec namespaces への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -645,9 +681,13 @@ fork bomb 対策。CI 環境やマルチテナント環境でプロセス数を�
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-pids-limit`) オーバーライド対応
+- Docker アダプターで `Resources.PidsLimit` へのマッピング実装
+- containerd アダプターで `Linux.Resources.Pids.Limit` への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -678,9 +718,13 @@ fork bomb 対策。CI 環境やマルチテナント環境でプロセス数を�
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- Docker / containerd 両方のユニットテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-cpu-shares`, `--cderun-cpuset-cpus`, `--cderun-cpuset-mems`) オーバーライド対応
+- Docker アダプターで `Resources` へのマッピング実装
+- containerd アダプターで `Linux.Resources.CPU` への設定実装
+- `docs/features/command-line-options.md` および `README.md` の更新
+- Docker / containerd 両方のユニットテストの追加・パス確認
 
 ---
 
@@ -712,11 +756,13 @@ cderun はエフェメラルコンテナを前提としているが、開発中�
 
 ### 完了条件
 
-- 全経路チェックリスト満たす
-- `docs/features/command-line-options.md` に記載
-- `--remove=true` + `--restart` の排他バリデーションテスト
-- Docker: `RestartPolicy` に変換されるテスト
-- containerd: 未サポートエラーのテスト
+- `internal/config/registry.go` への登録および `make generate` による生成コード反映
+- `internal/config/resolver.go` での解析・検証および `ConfigDefaults` 統合
+- CLI フラグ binding および P1 フラグ (`--cderun-restart`) オーバーライド対応
+- `--remove=true` + `--restart` の排他バリデーション実装およびテスト
+- Docker: `RestartPolicy` へのマッピング実装およびユニットテスト
+- containerd: 未サポートエラーのマッピング実装およびユニットテスト
+- `docs/features/command-line-options.md` および `README.md` の更新
 
 ---
 
@@ -1173,13 +1219,20 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 | --- | --- | --- | --- | --- |
 | `--oci-runtime` | string | 空（エンジンのデフォルト） | `CDERUN_OCI_RUNTIME` | OCI ランタイムの指定 |
 
+- `.cderun.yaml` OCI ランタイム契約: `.cderun.yaml` 設定ファイルの `defaults:` セクションにキー `ociRuntime`（型: `string`）として定義する。
+- 優先順位（Precedence Matrix）:
+  1. `P1`: `--cderun-oci-runtime`（P1 内部オーバーライドフラグ）
+  2. `P2`: `--oci-runtime`（P2 CLI フラグ）
+  3. `P4`: `CDERUN_OCI_RUNTIME`（P4 環境変数）
+  4. `P5`: `.cderun.yaml`（`defaults.ociRuntime`、P5 設定ファイル）
 - Docker / Podman: `HostConfig.Runtime` に設定する。Podman は `NewPodmanRuntime` が Docker 互換 API 経由で `DockerRuntime` を利用しているため、同じ経路で透過的に効く（旧 T31 は「Podman には `--runtime` オプションとして透過的に渡す」と記載していたが、CLI を経由しないので誤り）
 - containerd: 未サポートとして明示エラー（T16 で導入したランタイム未対応機能の事前バリデーションに乗せる）
 - P1 フラグ `--cderun-oci-runtime` も併せて追加する
 
 ### 完了条件
 
-- `--oci-runtime` / `--cderun-oci-runtime` / `CDERUN_OCI_RUNTIME` / `.cderun.yaml` で OCI ランタイムを指定できる
+- `--oci-runtime` / `--cderun-oci-runtime` / `CDERUN_OCI_RUNTIME` / `.cderun.yaml` (`defaults.ociRuntime`) で OCI ランタイムを指定できる
+- `.cderun.yaml` の `defaults.ociRuntime` 設定値がロードされ、優先順位（P1 > P2 > P4 > P5）に従ってオーバーライドされることを検証する設定ファイルテストが存在すること
 - P1 オーバーライドフラグ `--cderun-oci-runtime` が正常に動作し、`--oci-runtime` と一貫して処理されることを検証するテストがある
 - Docker で `HostConfig.Runtime` に反映されるテストがある
 - containerd 指定時に明示エラーになるテストがある
@@ -1374,8 +1427,8 @@ AGENTS.md のルール（1タスク = 1 PR）を遵守するため、T99 は単�
 #### T99.1: テストファイル命名規約の明文化と lint チェック・CI ジョブ追加
 
 - 依存: なし
-- スコープ: `AGENTS.md` と `docs/testing/organization.md` への禁止語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`, `jules` 等のエージェント名）および命名例の明文化。禁止語を含むファイル名を検知するリントコマンド（`make lint-test-names` 等）の作成と CI ワークフローへの必須チェックとしての組み込み。なお、リントチェックは既存の禁止語を含むファイル群で CI を失敗させないよう、ドキュメント化されたベースラインファイル方式（baseline file）または変更ファイル限定（changed-files-only）ポリシーを採用する（あるいは T99.2〜T99.4 のリネーム完了まで必須化順序を調整する）。
-- 完了条件: リントコマンドおよび CI ジョブが追加・設定され、既存の違反ファイルにより CI がブロックされることなく最終チェックゲートが正常にパスすること。規約が明文化されていること。
+- スコープ: `AGENTS.md` と `docs/testing/organization.md` への禁止語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`, `jules` 等のエージェント名）および命名例の明文化。禁止語を含むファイル名を検知するリントコマンド（`make lint-test-names` 等）の作成と CI ワークフローへの必須チェックとしての組み込み。なお、新規・変更されたファイル名はベースラインに関わらず常に独立して検証される設計（またはベースライン更新が自動生成され手動追加から保護される構造）とする。また、T99.2〜T99.4 のリネーム作業完了後には、ドキュメント化された既存の命名ルールおよび CI ゲートを維持したまま、全ツリーを対象とする必須の「違反ゼロ検証（full-tree zero-violation check）」を追加する。
+- 完了条件: リントコマンドおよび CI ジョブが追加・設定され、新規・変更ファイルが常に独立して検証され、T99.2〜T99.4 完了後に全ツリーの違反ゼロ検証がパスすること。規約が明文化されていること。
 
 #### T99.2: `internal/config` の禁止語含むテストファイルのリネームと重複削除
 
