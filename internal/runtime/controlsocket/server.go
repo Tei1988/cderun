@@ -31,14 +31,19 @@ type ContainerRuntimeDispatcher interface {
 
 // Server handles Control Socket connections from nested cderun instances.
 type Server struct {
-	socketPath string
-	listener   net.Listener
-	mu         sync.Mutex
-	conns      map[net.Conn]struct{}
-	closed     chan struct{}
-	wg         sync.WaitGroup
-	logger     *logging.Logger
-	dispatcher ContainerRuntimeDispatcher
+	socketPath     string
+	listener       net.Listener
+	mu             sync.Mutex
+	conns          map[net.Conn]struct{}
+	closed         chan struct{}
+	wg             sync.WaitGroup
+	logger         *logging.Logger
+	dispatcher     ContainerRuntimeDispatcher
+	ctx            context.Context
+	cancelCtx      context.CancelFunc
+	closeTimeout   time.Duration
+	activeHandlers map[string]time.Time
+	handlerSeq     uint64
 }
 
 // NewServer creates a new Control Socket Server for the specified socketPath.
@@ -46,12 +51,24 @@ func NewServer(socketPath string, logger *logging.Logger) *Server {
 	if logger == nil {
 		logger = logging.GetGlobalLogger()
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
-		socketPath: socketPath,
-		conns:      make(map[net.Conn]struct{}),
-		closed:     make(chan struct{}),
-		logger:     logger,
+		socketPath:     socketPath,
+		conns:          make(map[net.Conn]struct{}),
+		closed:         make(chan struct{}),
+		logger:         logger,
+		ctx:            ctx,
+		cancelCtx:      cancel,
+		closeTimeout:   5 * time.Second,
+		activeHandlers: make(map[string]time.Time),
 	}
+}
+
+// SetCloseTimeout configures the maximum time Server.Close() waits for active RPC handlers to finish.
+func (s *Server) SetCloseTimeout(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closeTimeout = d
 }
 
 // SetDispatcher configures the underlying ContainerRuntimeDispatcher for servicing RPC requests.
@@ -59,6 +76,31 @@ func (s *Server) SetDispatcher(dispatcher ContainerRuntimeDispatcher) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.dispatcher = dispatcher
+}
+
+// ActiveHandlerCount returns the number of active or lingering RPC handlers.
+func (s *Server) ActiveHandlerCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.activeHandlers)
+}
+
+func (s *Server) trackHandlerStart(rpcName string) (uint64, func()) {
+	s.mu.Lock()
+	s.handlerSeq++
+	id := s.handlerSeq
+	key := fmt.Sprintf("%s#%d", rpcName, id)
+	if s.activeHandlers == nil {
+		s.activeHandlers = make(map[string]time.Time)
+	}
+	s.activeHandlers[key] = time.Now()
+	s.mu.Unlock()
+
+	return id, func() {
+		s.mu.Lock()
+		delete(s.activeHandlers, key)
+		s.mu.Unlock()
+	}
 }
 
 // Start opens the Unix domain socket and starts accepting incoming connections in a background goroutine.
@@ -143,6 +185,13 @@ func (s *Server) unregisterConn(c net.Conn) {
 }
 
 func (s *Server) handleConn(conn net.Conn) {
+	s.mu.Lock()
+	serverCtx := s.ctx
+	s.mu.Unlock()
+
+	connCtx, cancelConn := context.WithCancel(serverCtx)
+	defer cancelConn()
+
 	// 1. Handshake Phase
 	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		s.logger.Warn("Failed to set deadline for handshake: %v", err)
@@ -187,6 +236,7 @@ func (s *Server) handleConn(conn net.Conn) {
 
 	// 2. Request Loop
 	for {
+		_ = conn.SetReadDeadline(time.Time{})
 		frameBytes, err := ReadFrame(conn)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
@@ -202,16 +252,19 @@ func (s *Server) handleConn(conn net.Conn) {
 			continue
 		}
 
-		s.dispatchRequest(conn, &reqFrame)
+		s.dispatchRequest(conn, connCtx, &reqFrame)
+		_ = conn.SetReadDeadline(time.Time{})
 	}
 }
 
-func (s *Server) buildRequestContext(reqFrame *RequestFrame) (context.Context, context.CancelFunc) {
-	ctx := context.Background()
-	if reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
-		return context.WithDeadline(ctx, *reqFrame.Deadline)
+func (s *Server) buildRequestContext(parentCtx context.Context, reqFrame *RequestFrame) (context.Context, context.CancelFunc) {
+	if parentCtx == nil {
+		parentCtx = s.ctx
 	}
-	return context.WithCancel(ctx)
+	if reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
+		return context.WithDeadline(parentCtx, *reqFrame.Deadline)
+	}
+	return context.WithCancel(parentCtx)
 }
 
 func (s *Server) getDispatcher() ContainerRuntimeDispatcher {
@@ -220,34 +273,95 @@ func (s *Server) getDispatcher() ContainerRuntimeDispatcher {
 	return s.dispatcher
 }
 
-func (s *Server) dispatchRequest(conn net.Conn, reqFrame *RequestFrame) {
-	ctx, cancel := s.buildRequestContext(reqFrame)
-	defer cancel()
+func (s *Server) watchDisconnect(conn net.Conn, reqCtx context.Context, connCtx context.Context, reqDone <-chan struct{}, cancelReq context.CancelFunc) {
+	readDone := make(chan struct{})
+	readErrChan := make(chan error, 1)
+
+	go func() {
+		defer close(readDone)
+		buf := make([]byte, 1)
+		_, err := conn.Read(buf)
+		readErrChan <- err
+	}()
+
+	select {
+	case <-reqDone:
+		_ = conn.SetReadDeadline(time.Now())
+		<-readDone
+		return
+	case <-connCtx.Done():
+		cancelReq()
+		_ = conn.SetReadDeadline(time.Now())
+		<-readDone
+		return
+	case <-reqCtx.Done():
+		_ = conn.SetReadDeadline(time.Now())
+		<-readDone
+		return
+	case err := <-readErrChan:
+		if err != nil {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				<-readDone
+				return
+			}
+			s.logger.Debug("Control socket peer disconnected during request execution: %v", err)
+			cancelReq()
+		}
+		<-readDone
+		return
+	}
+}
+
+func (s *Server) dispatchRequest(conn net.Conn, connCtx context.Context, reqFrame *RequestFrame) {
+	reqCtx, cancelReq := s.buildRequestContext(connCtx, reqFrame)
+	defer cancelReq()
+
+	reqDone := make(chan struct{})
+	watchDone := make(chan struct{})
+
+	_, doneHandler := s.trackHandlerStart(string(reqFrame.Type))
+	defer doneHandler()
+
+	if reqFrame.Type != MsgAttachContainer {
+		go func() {
+			s.watchDisconnect(conn, reqCtx, connCtx, reqDone, cancelReq)
+			close(watchDone)
+		}()
+	} else {
+		close(watchDone)
+	}
+
+	defer func() {
+		close(reqDone)
+		<-watchDone
+		_ = conn.SetReadDeadline(time.Time{})
+	}()
 
 	switch reqFrame.Type {
 	case MsgPing:
 		_ = s.sendSuccessResponse(conn, []byte("pong"))
 
 	case MsgCreateContainer:
-		s.handleCreateContainer(ctx, conn, reqFrame.Payload)
+		s.handleCreateContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgStartContainer:
-		s.handleStartContainer(ctx, conn, reqFrame.Payload)
+		s.handleStartContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgWaitContainer:
-		s.handleWaitContainer(ctx, conn, reqFrame.Payload)
+		s.handleWaitContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgRemoveContainer:
-		s.handleRemoveContainer(ctx, conn, reqFrame.Payload)
+		s.handleRemoveContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgAttachContainer:
-		s.handleAttachContainer(ctx, conn, reqFrame.Payload)
+		s.handleAttachContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgSignalContainer:
-		s.handleSignalContainer(ctx, conn, reqFrame.Payload)
+		s.handleSignalContainer(reqCtx, conn, reqFrame.Payload)
 
 	case MsgResizeContainerTTY:
-		s.handleResizeContainerTTY(ctx, conn, reqFrame.Payload)
+		s.handleResizeContainerTTY(reqCtx, conn, reqFrame.Payload)
 
 	default:
 		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
@@ -466,7 +580,6 @@ func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg stri
 		ServerVersion:   version.Version,
 		Error:           errMsg,
 	}
-	// HandshakeResponse contains only primitive fields, so json.Marshal cannot fail under standard Go json semantics.
 	data, err := json.Marshal(resp)
 	if err != nil {
 		return err
@@ -476,20 +589,19 @@ func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg stri
 
 func (s *Server) sendSuccessResponse(conn net.Conn, payload []byte) error {
 	resp := ResponseFrame{Success: true, Payload: payload}
-	// ResponseFrame contains only primitive/byte fields, so json.Marshal cannot fail under standard Go json semantics.
 	respBytes, _ := json.Marshal(resp)
 	return WriteFrame(conn, respBytes)
 }
 
 func (s *Server) sendErrorResponse(conn net.Conn, errMsg string) {
 	resp := ResponseFrame{Success: false, Error: errMsg}
-	// ResponseFrame contains only primitive/byte fields, so json.Marshal cannot fail under standard Go json semantics.
 	data, _ := json.Marshal(resp)
 	_ = WriteFrame(conn, data)
 }
 
-// Close gracefully stops the listener, closes all active connections, and removes the socket file.
-func (s *Server) Close() error {
+// CloseWithTimeout gracefully stops the listener, cancels all request contexts, closes active connections,
+// and performs a bounded wait up to timeout for handlers to finish.
+func (s *Server) CloseWithTimeout(timeout time.Duration) error {
 	s.mu.Lock()
 	select {
 	case <-s.closed:
@@ -497,6 +609,10 @@ func (s *Server) Close() error {
 		return nil
 	default:
 		close(s.closed)
+	}
+
+	if s.cancelCtx != nil {
+		s.cancelCtx()
 	}
 
 	if s.listener != nil {
@@ -508,7 +624,29 @@ func (s *Server) Close() error {
 	}
 	s.mu.Unlock()
 
-	s.wg.Wait()
+	// Bounded wait for handler goroutines
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	s.mu.Lock()
+	if timeout <= 0 {
+		timeout = s.closeTimeout
+	}
+	s.mu.Unlock()
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+
+	select {
+	case <-done:
+		s.logger.Debug("Control Socket server stopped gracefully")
+	case <-time.After(timeout):
+		count := s.ActiveHandlerCount()
+		s.logger.Warn("Control Socket server Close timed out after %v with %d lingering handler(s)", timeout, count)
+	}
 
 	// Clean up socket file
 	if s.socketPath != "" {
@@ -519,4 +657,12 @@ func (s *Server) Close() error {
 
 	s.logger.Debug("Control Socket server stopped for %s", s.socketPath)
 	return nil
+}
+
+// Close gracefully stops the listener, closes all active connections, and removes the socket file.
+func (s *Server) Close() error {
+	s.mu.Lock()
+	timeout := s.closeTimeout
+	s.mu.Unlock()
+	return s.CloseWithTimeout(timeout)
 }
