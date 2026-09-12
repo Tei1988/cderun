@@ -3,6 +3,7 @@ package controlsocket
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"path/filepath"
 	"sync"
@@ -67,11 +68,7 @@ func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	require.NoError(t, WriteFrame(conn, reqBytes))
 
 	// Wait for handler to start executing WaitContainer
-	select {
-	case <-waitStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for WaitContainer handler to start")
-	}
+	<-waitStarted
 
 	assert.Equal(t, 1, server.ActiveHandlerCount())
 
@@ -79,17 +76,13 @@ func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	require.NoError(t, conn.Close())
 
 	// Verify server handler detects disconnect and cancels request context
-	select {
-	case err := <-ctxCanceled:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for request context cancellation on peer disconnect")
-	}
+	err = <-ctxCanceled
+	require.ErrorIs(t, err, context.Canceled)
 
 	// Verify active handler count returns to 0
 	require.Eventually(t, func() bool {
 		return server.ActiveHandlerCount() == 0
-	}, 2*time.Second, 10*time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 }
 
 func TestUnit_ControlSocket_ServerClose_CancelsRequestContext(t *testing.T) {
@@ -126,23 +119,15 @@ func TestUnit_ControlSocket_ServerClose_CancelsRequestContext(t *testing.T) {
 		_, _ = client.WaitContainer(ctx, "c-123")
 	}()
 
-	select {
-	case <-waitStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for WaitContainer handler to start")
-	}
+	<-waitStarted
 
 	assert.Equal(t, 1, server.ActiveHandlerCount())
 
 	// Close server while WaitContainer is active
 	require.NoError(t, server.Close())
 
-	select {
-	case err := <-ctxCanceled:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for request context cancellation on Server.Close()")
-	}
+	err = <-ctxCanceled
+	require.ErrorIs(t, err, context.Canceled)
 
 	wg.Wait()
 }
@@ -178,11 +163,7 @@ func TestUnit_ControlSocket_ServerClose_BoundedWait_LingeringHandler(t *testing.
 		_, _ = client.WaitContainer(ctx, "c-lingering")
 	}()
 
-	select {
-	case <-waitStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for WaitContainer handler to start")
-	}
+	<-waitStarted
 
 	start := time.Now()
 	err = server.Close()
@@ -245,11 +226,7 @@ func TestUnit_ControlSocket_DataSentDuringBlockedRequest_NonConsumingDisconnect(
 	require.NoError(t, WriteFrame(conn, reqBytes))
 
 	// Wait for handler to block
-	select {
-	case <-waitStarted:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for WaitContainer handler to start")
-	}
+	<-waitStarted
 
 	// Send extra data over the socket while handler is blocked
 	pingFrame := RequestFrame{Type: MsgPing}
@@ -261,10 +238,73 @@ func TestUnit_ControlSocket_DataSentDuringBlockedRequest_NonConsumingDisconnect(
 	require.NoError(t, conn.Close())
 
 	// Verify server handler context is canceled upon disconnect despite extra data sent
-	select {
-	case err := <-ctxCanceled:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for request context cancellation on disconnect after data sent")
+	err = <-ctxCanceled
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestUnit_ControlSocket_NoStdinAttach_PeerDisconnect_CancelsContext(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "ns_attach.sock")
+
+	attachStarted := make(chan struct{})
+	ctxCanceled := make(chan error, 1)
+
+	disp := &mockDispatcher{
+		attachFunc: func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+			if ready != nil {
+				close(ready)
+			}
+			close(attachStarted)
+			<-ctx.Done()
+			ctxCanceled <- ctx.Err()
+			return ctx.Err()
+		},
 	}
+
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	var d net.Dialer
+	conn, err := d.DialContext(context.Background(), "unix", socketPath)
+	require.NoError(t, err)
+
+	// Handshake
+	hsReq := HandshakeRequest{
+		ProtocolVersion: CurrentProtocolVersion,
+		ClientVersion:   version.Version,
+	}
+	hsBytes, err := json.Marshal(hsReq)
+	require.NoError(t, err)
+	require.NoError(t, WriteFrame(conn, hsBytes))
+
+	_, err = ReadFrame(conn)
+	require.NoError(t, err)
+
+	// Send AttachContainer request (no stdin)
+	attachArgs := AttachContainerArgs{
+		ContainerID: "c-nostdin",
+		TTY:         false,
+		HasStdin:    false,
+	}
+	payload, err := json.Marshal(attachArgs)
+	require.NoError(t, err)
+
+	reqFrame := RequestFrame{
+		Type:    MsgAttachContainer,
+		Payload: payload,
+	}
+	reqBytes, err := json.Marshal(reqFrame)
+	require.NoError(t, err)
+	require.NoError(t, WriteFrame(conn, reqBytes))
+
+	<-attachStarted
+
+	// Close stream connection during attach
+	require.NoError(t, conn.Close())
+
+	// Verify dispatcher observes context cancellation
+	err = <-ctxCanceled
+	require.ErrorIs(t, err, context.Canceled)
 }

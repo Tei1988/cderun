@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/pkg/stdcopy"
@@ -27,6 +28,17 @@ type ContainerRuntimeDispatcher interface {
 	AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	SignalContainer(ctx context.Context, containerID string, sig string) error
 	ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error
+}
+
+type connState struct {
+	net.Conn
+	writeMu sync.Mutex
+}
+
+func (c *connState) WriteFrame(payload []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return WriteFrame(c.Conn, payload)
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -161,7 +173,8 @@ func (s *Server) acceptLoop() {
 			defer s.unregisterConn(c)
 			defer c.Close()
 
-			s.handleConn(c)
+			cs := &connState{Conn: c}
+			s.handleConn(cs)
 		}(conn)
 	}
 }
@@ -184,7 +197,7 @@ func (s *Server) unregisterConn(c net.Conn) {
 	delete(s.conns, c)
 }
 
-func (s *Server) handleConn(conn net.Conn) {
+func (s *Server) handleConn(cs *connState) {
 	s.mu.Lock()
 	serverCtx := s.ctx
 	s.mu.Unlock()
@@ -193,12 +206,12 @@ func (s *Server) handleConn(conn net.Conn) {
 	defer cancelConn()
 
 	// 1. Handshake Phase
-	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := cs.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		s.logger.Warn("Failed to set deadline for handshake: %v", err)
 		return
 	}
 
-	reqBytes, err := ReadFrame(conn)
+	reqBytes, err := ReadFrame(cs.Conn)
 	if err != nil {
 		s.logger.Warn("Failed to read handshake request: %v", err)
 		return
@@ -207,14 +220,14 @@ func (s *Server) handleConn(conn net.Conn) {
 	var req HandshakeRequest
 	if err := json.Unmarshal(reqBytes, &req); err != nil {
 		s.logger.Warn("Malformed handshake request payload: %v", err)
-		_ = s.sendHandshakeResponse(conn, false, fmt.Sprintf("invalid handshake payload: %v", err))
+		_ = s.sendHandshakeResponse(cs, false, fmt.Sprintf("invalid handshake payload: %v", err))
 		return
 	}
 
 	if req.ProtocolVersion != CurrentProtocolVersion {
 		errMsg := fmt.Sprintf("unsupported protocol version: client requested v%d, server supports v%d", req.ProtocolVersion, CurrentProtocolVersion)
 		s.logger.Warn("Handshake rejected: %s (Client version: %s)", errMsg, req.ClientVersion)
-		_ = s.sendHandshakeResponse(conn, false, errMsg)
+		_ = s.sendHandshakeResponse(cs, false, errMsg)
 		return
 	}
 
@@ -224,19 +237,19 @@ func (s *Server) handleConn(conn net.Conn) {
 		s.logger.Debug("Control socket version skew detected: client cderun version=%s, server cderun version=%s (both speak protocol v%d)", req.ClientVersion, serverVer, CurrentProtocolVersion)
 	}
 
-	if err := s.sendHandshakeResponse(conn, true, ""); err != nil {
+	if err := s.sendHandshakeResponse(cs, true, ""); err != nil {
 		s.logger.Warn("Failed to send handshake response: %v", err)
 		return
 	}
 
 	// Reset read deadline for normal operation
-	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+	if err := cs.SetReadDeadline(time.Time{}); err != nil {
 		s.logger.Warn("Failed to clear read deadline after handshake: %v", err)
 	}
 
 	// 2. Request Loop (Single connection-owning loop)
 	for {
-		frameBytes, err := ReadFrame(conn)
+		frameBytes, err := ReadFrame(cs.Conn)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 				cancelConn()
@@ -249,17 +262,17 @@ func (s *Server) handleConn(conn net.Conn) {
 
 		var reqFrame RequestFrame
 		if err := json.Unmarshal(frameBytes, &reqFrame); err != nil {
-			s.sendErrorResponse(conn, fmt.Sprintf("invalid request frame: %v", err))
+			s.sendErrorResponse(cs, fmt.Sprintf("invalid request frame: %v", err))
 			continue
 		}
 
 		if reqFrame.Type == MsgAttachContainer {
-			s.dispatchRequest(conn, connCtx, &reqFrame)
+			s.dispatchRequest(cs, connCtx, cancelConn, &reqFrame)
 		} else {
 			s.wg.Add(1)
 			go func(rf RequestFrame) {
 				defer s.wg.Done()
-				s.dispatchRequest(conn, connCtx, &rf)
+				s.dispatchRequest(cs, connCtx, cancelConn, &rf)
 			}(reqFrame)
 		}
 	}
@@ -281,7 +294,7 @@ func (s *Server) getDispatcher() ContainerRuntimeDispatcher {
 	return s.dispatcher
 }
 
-func (s *Server) dispatchRequest(conn net.Conn, connCtx context.Context, reqFrame *RequestFrame) {
+func (s *Server) dispatchRequest(cs *connState, connCtx context.Context, cancelConn context.CancelFunc, reqFrame *RequestFrame) {
 	reqCtx, cancelReq := s.buildRequestContext(connCtx, reqFrame)
 	defer cancelReq()
 
@@ -290,31 +303,31 @@ func (s *Server) dispatchRequest(conn net.Conn, connCtx context.Context, reqFram
 
 	switch reqFrame.Type {
 	case MsgPing:
-		_ = s.sendSuccessResponse(conn, []byte("pong"))
+		_ = s.sendSuccessResponse(cs, []byte("pong"))
 
 	case MsgCreateContainer:
-		s.handleCreateContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleCreateContainer(reqCtx, cs, reqFrame.Payload)
 
 	case MsgStartContainer:
-		s.handleStartContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleStartContainer(reqCtx, cs, reqFrame.Payload)
 
 	case MsgWaitContainer:
-		s.handleWaitContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleWaitContainer(reqCtx, cs, reqFrame.Payload)
 
 	case MsgRemoveContainer:
-		s.handleRemoveContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleRemoveContainer(reqCtx, cs, reqFrame.Payload)
 
 	case MsgAttachContainer:
-		s.handleAttachContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleAttachContainer(reqCtx, cs, cancelConn, reqFrame.Payload)
 
 	case MsgSignalContainer:
-		s.handleSignalContainer(reqCtx, conn, reqFrame.Payload)
+		s.handleSignalContainer(reqCtx, cs, reqFrame.Payload)
 
 	case MsgResizeContainerTTY:
-		s.handleResizeContainerTTY(reqCtx, conn, reqFrame.Payload)
+		s.handleResizeContainerTTY(reqCtx, cs, reqFrame.Payload)
 
 	default:
-		s.sendErrorResponse(conn, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
+		s.sendErrorResponse(cs, fmt.Sprintf("unsupported request message type: %q", reqFrame.Type))
 	}
 }
 
@@ -322,69 +335,69 @@ func (s *Server) dispatchRequest(conn net.Conn, connCtx context.Context, reqFram
 func handleRPCWithResult[TArgs any, TRes any](
 	s *Server,
 	ctx context.Context,
-	conn net.Conn,
+	cs *connState,
 	payload []byte,
 	rpcName string,
 	fn func(ctx context.Context, d ContainerRuntimeDispatcher, args TArgs) (TRes, error),
 ) {
 	d := s.getDispatcher()
 	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
+		s.sendErrorResponse(cs, "server dispatcher not configured")
 		return
 	}
 
 	var args TArgs
 	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed %s args: %v", rpcName, err))
+		s.sendErrorResponse(cs, fmt.Sprintf("malformed %s args: %v", rpcName, err))
 		return
 	}
 
 	res, err := fn(ctx, d, args)
 	if err != nil {
-		s.sendErrorResponse(conn, err.Error())
+		s.sendErrorResponse(cs, err.Error())
 		return
 	}
 
 	resBytes, err := json.Marshal(res)
 	if err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("failed to marshal %s result: %v", rpcName, err))
+		s.sendErrorResponse(cs, fmt.Sprintf("failed to marshal %s result: %v", rpcName, err))
 		return
 	}
 
-	_ = s.sendSuccessResponse(conn, resBytes)
+	_ = s.sendSuccessResponse(cs, resBytes)
 }
 
 // handleRPCAction abstracts RPC request handling for operations returning only success status.
 func handleRPCAction[TArgs any](
 	s *Server,
 	ctx context.Context,
-	conn net.Conn,
+	cs *connState,
 	payload []byte,
 	rpcName string,
 	fn func(ctx context.Context, d ContainerRuntimeDispatcher, args TArgs) error,
 ) {
 	d := s.getDispatcher()
 	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
+		s.sendErrorResponse(cs, "server dispatcher not configured")
 		return
 	}
 
 	var args TArgs
 	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed %s args: %v", rpcName, err))
+		s.sendErrorResponse(cs, fmt.Sprintf("malformed %s args: %v", rpcName, err))
 		return
 	}
 
 	if err := fn(ctx, d, args); err != nil {
-		s.sendErrorResponse(conn, err.Error())
+		s.sendErrorResponse(cs, err.Error())
 		return
 	}
 
-	_ = s.sendSuccessResponse(conn, nil)
+	_ = s.sendSuccessResponse(cs, nil)
 }
 
-func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCWithResult(s, ctx, conn, payload, "CreateContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args CreateContainerArgs) (CreateContainerResult, error) {
+func (s *Server) handleCreateContainer(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCWithResult(s, ctx, cs, payload, "CreateContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args CreateContainerArgs) (CreateContainerResult, error) {
 		if args.Config == nil {
 			return CreateContainerResult{}, errors.New("CreateContainer args.Config is nil")
 		}
@@ -396,14 +409,14 @@ func (s *Server) handleCreateContainer(ctx context.Context, conn net.Conn, paylo
 	})
 }
 
-func (s *Server) handleStartContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCAction(s, ctx, conn, payload, "StartContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) error {
+func (s *Server) handleStartContainer(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCAction(s, ctx, cs, payload, "StartContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) error {
 		return d.StartContainer(ctx, args.ContainerID)
 	})
 }
 
-func (s *Server) handleWaitContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCWithResult(s, ctx, conn, payload, "WaitContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) (WaitContainerResult, error) {
+func (s *Server) handleWaitContainer(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCWithResult(s, ctx, cs, payload, "WaitContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) (WaitContainerResult, error) {
 		exitCode, err := d.WaitContainer(ctx, args.ContainerID)
 		if err != nil {
 			return WaitContainerResult{}, err
@@ -412,40 +425,64 @@ func (s *Server) handleWaitContainer(ctx context.Context, conn net.Conn, payload
 	})
 }
 
-func (s *Server) handleRemoveContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCAction(s, ctx, conn, payload, "RemoveContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) error {
+func (s *Server) handleRemoveContainer(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCAction(s, ctx, cs, payload, "RemoveContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args ContainerIDArgs) error {
 		return d.RemoveContainer(ctx, args.ContainerID)
 	})
 }
 
-func (s *Server) handleSignalContainer(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCAction(s, ctx, conn, payload, "SignalContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args SignalContainerArgs) error {
+func (s *Server) handleSignalContainer(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCAction(s, ctx, cs, payload, "SignalContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args SignalContainerArgs) error {
 		return d.SignalContainer(ctx, args.ContainerID, args.Signal)
 	})
 }
 
-func (s *Server) handleResizeContainerTTY(ctx context.Context, conn net.Conn, payload []byte) {
-	handleRPCAction(s, ctx, conn, payload, "ResizeContainerTTY", func(ctx context.Context, d ContainerRuntimeDispatcher, args ResizeContainerTTYArgs) error {
+func (s *Server) handleResizeContainerTTY(ctx context.Context, cs *connState, payload []byte) {
+	handleRPCAction(s, ctx, cs, payload, "ResizeContainerTTY", func(ctx context.Context, d ContainerRuntimeDispatcher, args ResizeContainerTTYArgs) error {
 		return d.ResizeContainerTTY(ctx, args.ContainerID, args.Rows, args.Cols)
 	})
 }
 
-func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, payload []byte) {
+func (s *Server) handleAttachContainer(ctx context.Context, cs *connState, cancelConn context.CancelFunc, payload []byte) {
 	d := s.getDispatcher()
 	if d == nil {
-		s.sendErrorResponse(conn, "server dispatcher not configured")
+		s.sendErrorResponse(cs, "server dispatcher not configured")
 		return
 	}
 
 	var args AttachContainerArgs
 	if err := json.Unmarshal(payload, &args); err != nil {
-		s.sendErrorResponse(conn, fmt.Sprintf("malformed AttachContainer args: %v", err))
+		s.sendErrorResponse(cs, fmt.Sprintf("malformed AttachContainer args: %v", err))
 		return
 	}
 
 	var stdinReader io.Reader
 	if args.HasStdin {
-		stdinReader = conn
+		stdinReader = cs.Conn
+	} else {
+		go func() {
+			sc, ok := cs.Conn.(syscall.Conn)
+			if ok {
+				if rawConn, err := sc.SyscallConn(); err == nil {
+					buf := make([]byte, 1)
+					_ = rawConn.Read(func(fd uintptr) bool {
+						n, _, pErr := syscall.Recvfrom(int(fd), buf, syscall.MSG_PEEK)
+						if n == 0 && pErr == nil {
+							cancelConn()
+							return true
+						}
+						if pErr != nil {
+							if errors.Is(pErr, syscall.EAGAIN) || errors.Is(pErr, syscall.EWOULDBLOCK) {
+								return false
+							}
+							cancelConn()
+							return true
+						}
+						return false
+					})
+				}
+			}
+		}()
 	}
 
 	gate := make(chan struct{})
@@ -456,15 +493,15 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 		})
 	}
 	defer releaseGate()
-	defer conn.Close()
+	defer cs.Close()
 
 	var stdoutWriter, stderrWriter io.Writer
 	if args.TTY {
-		stdoutWriter = &gateWriter{w: conn, gate: gate}
-		stderrWriter = &gateWriter{w: conn, gate: gate}
+		stdoutWriter = &gateWriter{w: cs.Conn, gate: gate}
+		stderrWriter = &gateWriter{w: cs.Conn, gate: gate}
 	} else {
-		stdoutWriter = &gateWriter{w: stdcopy.NewStdWriter(conn, stdcopy.Stdout), gate: gate}
-		stderrWriter = &gateWriter{w: stdcopy.NewStdWriter(conn, stdcopy.Stderr), gate: gate}
+		stdoutWriter = &gateWriter{w: stdcopy.NewStdWriter(cs.Conn, stdcopy.Stdout), gate: gate}
+		stderrWriter = &gateWriter{w: stdcopy.NewStdWriter(cs.Conn, stdcopy.Stderr), gate: gate}
 	}
 
 	readyChan := make(chan struct{})
@@ -480,24 +517,24 @@ func (s *Server) handleAttachContainer(ctx context.Context, conn net.Conn, paylo
 	select {
 	case err := <-startRes:
 		if err != nil {
-			s.sendErrorResponse(conn, err.Error())
+			s.sendErrorResponse(cs, err.Error())
 			return
 		}
 	case <-readyChan:
 		select {
 		case err := <-startRes:
 			if err != nil {
-				s.sendErrorResponse(conn, err.Error())
+				s.sendErrorResponse(cs, err.Error())
 				return
 			}
 		default:
 		}
 	case <-ctx.Done():
-		s.sendErrorResponse(conn, ctx.Err().Error())
+		s.sendErrorResponse(cs, ctx.Err().Error())
 		return
 	}
 
-	if err := s.sendSuccessResponse(conn, nil); err != nil {
+	if err := s.sendSuccessResponse(cs, nil); err != nil {
 		s.logger.Warn("Failed to send AttachContainer success response: %v", err)
 		return
 	}
@@ -523,7 +560,7 @@ func (g *gateWriter) Write(p []byte) (int, error) {
 	return g.w.Write(p)
 }
 
-func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg string) error {
+func (s *Server) sendHandshakeResponse(cs *connState, accepted bool, errMsg string) error {
 	resp := HandshakeResponse{
 		Accepted:        accepted,
 		ProtocolVersion: CurrentProtocolVersion,
@@ -534,19 +571,19 @@ func (s *Server) sendHandshakeResponse(conn net.Conn, accepted bool, errMsg stri
 	if err != nil {
 		return err
 	}
-	return WriteFrame(conn, data)
+	return cs.WriteFrame(data)
 }
 
-func (s *Server) sendSuccessResponse(conn net.Conn, payload []byte) error {
+func (s *Server) sendSuccessResponse(cs *connState, payload []byte) error {
 	resp := ResponseFrame{Success: true, Payload: payload}
 	respBytes, _ := json.Marshal(resp)
-	return WriteFrame(conn, respBytes)
+	return cs.WriteFrame(respBytes)
 }
 
-func (s *Server) sendErrorResponse(conn net.Conn, errMsg string) {
+func (s *Server) sendErrorResponse(cs *connState, errMsg string) {
 	resp := ResponseFrame{Success: false, Error: errMsg}
 	data, _ := json.Marshal(resp)
-	_ = WriteFrame(conn, data)
+	_ = cs.WriteFrame(data)
 }
 
 // CloseWithTimeout gracefully stops the listener, cancels all request contexts, closes active connections,
