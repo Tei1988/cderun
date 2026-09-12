@@ -26,7 +26,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
-| T20 | Docker / Podman のランタイムテストを CI に追加 | CI | 中 | 中 | - | - |
+| T20 | ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加） | CI | 高 | 中 | - | - |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | DONE |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -37,7 +37,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T28 | `--ulimit` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T29 | `--security-opt` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T30 | `--sysctl` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
-| T31 | `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加 | 機能/破壊 | 高 | 中 | あり | - |
 | T32 | `--dns-search` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T33 | `--dns-option` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
 | T34 | `--ipc` フラグの追加 | 機能 | 中 | 小 | あり | DONE |
@@ -98,6 +97,17 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
+| T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | - |
+| T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | - |
+| T95 | `--runtime` の意味を OCI ランタイム側へ切り替え | 破壊 | 中 | 小 | あり | - |
+| T96 | Control Socket サーバのリクエスト context を接続の生存に紐づける | バグ | 高 | 小 | - | - |
+| T97 | Control Socket サーバの accept ループ堅牢化とアイドルタイムアウト | バグ | 中 | 小 | - | - |
+| T98 | Control Socket ハンドラの共通化とエラー処理方針の統一 | リファクタ | 中 | 小 | - | - |
+| T99 | テストファイル命名規約の強制（親タスク） | クリーンアップ | 高 | 大 | - | - |
+| T100 | テストファイル命名規約の明文化と lint / CI ゲートの追加 | クリーンアップ | 高 | 小 | - | - |
+| T101 | `internal/config` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
+| T102 | `internal/command` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
+| T103 | `internal/runtime` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
 
 依存関係・統合の注意:
 
@@ -112,7 +122,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T90 は T87 完了後、T88 の直後（T89 と並行可）に着手を推奨**。CLIベースエンジン（nerdctl）を選んだユーザーが他フェーズの完了まで待たされてNested Executionを使えない、という事態を避けるための前倒し。T88 が確立するControl Socketディスパッチの配線パターンを流用したほうが手戻りが少ないため、T88 より前に着手するのは非推奨（逆順・並行実装はコンフリクトしやすい）
 - **T91 は T89 完了が前提**。T90 の完了は必須ではないが、テスト基盤（敵対的テストのハーネス等）を流用できるため T90 の後が望ましい
 - **Apple `container` / WSL Containers 等、ワイヤプロトコルを公開しないランタイムへの nested execution 対応は T88（できれば T89）の完了が前提条件**。T91（全APIベースエンジンパリティ）の完了を待つ必要はない。**採用方針はCLIラッパー方式（`container`/`wslc.exe`をシェルアウト）で、T90で定義する構築技法（`--`挿入・`--flag=value`結合形）・argv構造自己チェック・**そのCLI実バイナリに対する敵対的テスト**（nerdctlで通ったことは他CLIの安全性の根拠にならない。`--`の意味はcobra/pflag等、各CLI内部の引数解析ライブラリ依存のため、アダプタごとに独立して検証が必要）を実装すればControl Socket対応できる。サイドカー方式（`apple/containerization` Swift package や `Microsoft.WSL.Containers` NuGet を直接リンク）は検討したが、プラットフォームごとの別ツールチェーン・署名等の運用コストが見合わないため不採用（`docs/features/nested-execution-control-socket.md` の Relationship to Multi-Runtime Support 節に理由を記録済み。CLIすら提供しない将来のランタイムが出た場合のみ再検討）**
-- **T31（`--runtime`→`--engine`リネーム、engine値の`docker-compat-api`/`containerd-api`/`nerdctl`整理）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T31が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を両タスクが触るため、並行実装はコンフリクトしやすい
+- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を両タスクが触るため、並行実装はコンフリクトしやすい
 
 ---
 
@@ -196,26 +206,58 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 ---
 
-## T20: Docker / Podman のランタイムテストを CI に追加
+## T20: ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加）
 
 - 種別: CI / テストカバレッジ
-- 対象: `.github/workflows/ci.yaml`
+- 優先度: 高
+- 規模: 中
+- 仕様変更: なし
+- 対象: `.github/workflows/ci.yaml`, `internal/runtime/conformance_suite_*_test.go`, `docs/testing/conformance.md`, `docs/testing/runtime-tests.md`
 
 ### 問題
 
-containerd のインテグレーションテストジョブはあるが、Docker と Podman のテストが存在しない。`ubuntu-latest` には Docker が標準搭載されているため、Docker のランタイムテストは比較的容易に追加できる。
+**既存の `runtime-test-containerd` ジョブは実 containerd を一切検証していない**（2026-09-10 調査）。
+
+- ジョブは containerd 2.2.3 と CNI プラグインを実際にインストールし、ソケットに ACL まで設定している（`ci.yaml:29-78`）
+- しかし最後に走るのは `go test -v ./internal/runtime/...` で、`-tags=runtime` が付いていない（`ci.yaml:83`）
+- エクスポートしている `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` を読むのは `internal/config` のフラグ解決と `internal/command/scenario_test.go:78` だけ。後者は `//go:build runtime` なので除外される。**`internal/runtime` 配下にこの2変数を読むテストは存在しない**
+- コンフォーマンススイートの入口4箇所はすべてモッククライアント。`conformance_suite_containerd_test.go` も `newMockFullClient()` と `/dummy/socket.sock` を使っている
+- `//go:build runtime` のテストファイルは6つあるが全て `internal/command` にあり、`-tags=runtime` がどのジョブでも指定されていないため、**CI でもローカルの `make test` でも一度も実行されていない**
+
+結果として、実ランタイムを起動するコストを払ったうえでモックテストを2回走らせている状態になっている。カバレッジがあるように見えるぶん検知が遅れた。
+
+なお `docs/testing/conformance.md:128` は live conformance test を「`CDERUN_RUNTIME` プローブや `-tags=runtime` で登録できる」と将来の選択肢として記述しており、未実装であること自体はドキュメントと整合している。
 
 ### 方針
 
-ランタイムテストは `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` 環境変数で対象を切り替える構造（ci.yaml の containerd ジョブ参照: `CDERUN_RUNTIME=containerd`, `CDERUN_SOCKET_PATH=/run/containerd/containerd.sock`）。
+旧 T20 は「ランタイムテストは `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` で対象を切り替える構造」を前提に Docker / Podman ジョブの追加のみを求めていたが、その前提が成立していない。**まず既存ジョブを実接続にすること**を本タスクの先頭に置く。
 
-- **Docker**: `ubuntu-latest` の `/var/run/docker.sock` がそのまま使える。runner ユーザーは docker グループ所属済みのため ACL 設定も不要のはず
-- **Podman**: `sudo apt-get install -y podman` 後、`systemctl --user enable --now podman.socket` でソケットは `/run/user/$(id -u)/podman/podman.sock`
+1. **live コンフォーマンス入口の追加**: `RunConformanceTests` に実クライアント版の factory を渡す入口を `//go:build runtime` 付きで追加する。接続先は `CDERUN_SOCKET_PATH`（未設定ならエンジンごとの既定パス）から解決する
+2. **既存 containerd ジョブの是正**: `go test -tags=runtime -v ./...` に変更する。対象を `./internal/runtime/...` に限定しない（`//go:build runtime` のファイルは `internal/command` にあるため、現在の限定はタグ付きテストと噛み合っていない）
+3. **Docker ジョブの追加**: runner の `/var/run/docker.sock` を使う。runner ユーザーは docker グループ所属済みのため ACL 設定は不要のはず。ただし下記「セキュリティ上の制約」を満たすこと
+4. **Podman ジョブの追加**: `sudo apt-get install -y podman` 後、`systemctl --user enable --now podman.socket`。ソケットは `/run/user/$(id -u)/podman/podman.sock`
+5. **サイレント劣化の防止**: ランタイムジョブ内で live テストが1件も実行されなかった場合にジョブを失敗させる。ソケットに繋がらないときは `t.Skip` で黙って緑にせず、明示的に失敗させること（今回の問題が3ヶ月気づかれなかった直接の原因がこれにあたる）
+
+### セキュリティ上の制約（3ジョブ共通）
+
+CI は self-hosted runner（`ouchi-kubernetes`）で動くため、fork からの `pull_request` 実行にコンテナランタイムのソケットを渡すと、リポジトリ外の第三者が runner 上で任意のコンテナを起動できる。これは追加する Docker / Podman ジョブだけでなく、**既存の containerd ジョブにも現時点で当てはまる**。
+
+- 信頼されていない `pull_request` 実行（fork 由来）では、ホストのランタイムソケットにアクセスさせないこと。使い捨てまたは rootless のデーモンをジョブ内に立てる、あるいは当該イベントではランタイムジョブを実行しない、のいずれかで対処する
+- どの方式を採るかを決め、理由を `docs/testing/runtime-tests.md` に記録すること
+- fork 由来の `pull_request` がホストソケットに到達できないことを確認するテストまたは検証手順を残すこと
 
 ### 完了条件
 
-- Docker / Podman それぞれのインテグレーションテストジョブが追加され、CI がグリーン
-- ジョブ構成は既存 containerd ジョブと一貫した形式
+- containerd / Docker / Podman の各ジョブが、モックではなく実デーモンに接続してコンテナを起動・待機・削除するテストを実行している
+- `-tags=runtime` が CI で指定され、`internal/command` の既存タグ付きテスト6ファイルが実際に実行されている
+- live テストが0件だった場合にジョブが失敗することを確認している（意図的にソケットパスを壊して赤くなることを手元で確認する）
+- `make test-runtime` がローカルでも同じ経路を通る
+- `docs/testing/conformance.md` の「Live Socket Testing」節が、実装済みの手順として更新されている
+- `docs/testing/runtime-tests.md` に3エンジンの実行方法が記載されている
+
+### 備考
+
+Control Socket（T87〜T91）は「実際にネストしてコンテナが起動するか」が本質であるにもかかわらず、Phase 2/3 の検証はモック dispatcher 相手のユニットテストに留まっている。本タスクで live 経路が通ったら、T90 / T91 の完了条件に Control Socket 経由の live テストを追加すること。
 
 ---
 
@@ -268,478 +310,6 @@ cderun --prune
 
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
-
-
----
-
-## T24: `--shm-size` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-Puppeteer / Playwright によるブラウザテスト、ML ワークロード（PyTorch DataLoader の共有メモリ）等で `/dev/shm` のサイズ不足が頻発する。Docker デフォルトは 64MB であり、多くのケースで不足する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--shm-size` | string | (Docker デフォルト: 64MB) | `CDERUN_SHM_SIZE` |
-
-- Docker の `--shm-size` と同一形式（例: `256m`, `1g`, `2147483648`）
-- `docker/go-units` の `RAMInBytes` でパース
-- Docker: `HostConfig.ShmSize int64`
-- containerd: OCI spec の `/dev/shm` tmpfs マウントの `size` オプション
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T25: `--init` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-コンテナの PID 1 問題。`--init` なしだとシグナルがアプリに届かずゾンビプロセスが残る場合がある。特に `cderun` はシグナルフォワーディングを行うが、コンテナ内プロセスが PID 1 としてシグナルを適切にハンドリングしない場合に問題になる。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--init` | bool | `false` | `CDERUN_INIT` |
-
-- Docker: `HostConfig.Init *bool`
-- containerd: tini 等の init バイナリをコンテナに注入する機構が必要。containerd 単体では直接サポートしないため、エラーまたは警告とする設計判断が必要
-
-### 実装上の注意
-
-- containerd での対応方針を設計時に決定すること（エラーにする / 警告のみ / tini バイナリマウント）
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker: `HostConfig.Init` に渡るテスト
-- [x] containerd: 設計決定に基づいた挙動のテスト
-
----
-
-## T26: `--pid` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 高
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`--pid=host` でホストの PID 名前空間を共有し、デバッグや strace 等で必要。`--pid=container:<id>` も Docker はサポートするが、cderun ではエフェメラルコンテナの特性上 `host` のみで十分。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--pid` | string | (空 = プライベート) | `CDERUN_PID` |
-
-- 値: `host` または空文字列
-- Docker: `HostConfig.PidMode`
-- containerd: OCI spec の Linux namespaces で `pid` の `path` を設定
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T29: `--security-opt` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`no-new-privileges`、SELinux ラベル、AppArmor プロファイル等のセキュリティオプションを指定する。特に `no-new-privileges` は Docker のベストプラクティスとして推奨されている。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--security-opt` | stringArray | (なし) | `CDERUN_SECURITY_OPT` |
-
-- 形式: `key=value` または `key:value`（Docker互換）
-- 環境変数はカンマ区切り
-- Docker: `HostConfig.SecurityOpt []string`
-- containerd: OCI spec の対応フィールド（`no-new-privileges` → `Process.NoNewPrivileges` 等）
-
-### 実装上の注意
-
-- containerd では各オプションを個別にマッピングする必要がある（`no-new-privileges`, `seccomp=`, `apparmor=`, `label=`）
-- サポート範囲を明確に文書化すること
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker: `SecurityOpt` に渡るテスト
-- [x] containerd: サポート範囲のテスト
-
----
-
-## T30: `--sysctl` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路（registry / resolver / flags / docker_adapter / containerd）
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`net.ipv4.ip_forward` 等のカーネルパラメータをコンテナ単位で設定する。ネットワーク関連のテストや VPN コンテナで必要になることがある。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--sysctl` | stringArray | (なし) | `CDERUN_SYSCTL` |
-
-- 形式: `key=value`（例: `net.ipv4.ip_forward=1`）
-- 環境変数はカンマ区切り
-- Docker: `HostConfig.Sysctls map[string]string`
-- containerd: OCI spec の `Linux.Sysctl map[string]string`
-
-### 実装上の注意
-
-- `map[string]string` 型なので、既存の `StringSliceOption` パターンとは少し異なる。`SkipResolution: true` + カスタムパースが必要
-- バリデーション: `key=value` 形式のチェック
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] パース + Docker / containerd 変換のユニットテスト
-
----
-
-## T31: `--runtime` を `--engine` にリネーム + OCI `--runtime` 追加
-
-- 種別: 機能追加 + 破壊的変更
-- 優先度: 高
-- 対象:
-  - `internal/config/registry.go`（`StringOptions` の `runtime` エントリ）
-  - `internal/command/root.go`（`rootOptions`, `resolveSettings`, `runtimeFactory`）
-  - `internal/config/resolver.go`（`CLIOptions`, `ResolvedConfig`）
-  - `internal/config/config.go`（`CDERunConfig.Runtime`）
-  - `internal/runtime/docker_adapter.go`（`HostConfig.Runtime`）
-  - すべてのテスト・ドキュメント
-- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md` を更新
-
-### 背景
-
-cderun の現行 `--runtime` は「どのコンテナエンジンに接続するか」（docker / podman / containerd）を指定するフラグ。一方 Docker の `--runtime` は「コンテナ実行時の OCI ランタイム」（runc / crun / nvidia / kata）を指定する。名前の衝突により、Docker 互換の OCI ランタイム指定が追加できない。
-
-### 仕様
-
-#### リネーム
-
-| 旧 | 新 | 環境変数 |
-| --- | --- | --- |
-| `--runtime` | `--engine` | `CDERUN_ENGINE`（旧 `CDERUN_RUNTIME` は非推奨エイリアス） |
-| `--cderun-runtime` | `--cderun-engine` | - |
-
-#### 新規追加
-
-| フラグ | 型 | デフォルト | 環境変数 | 説明 |
-| --- | --- | --- | --- | --- |
-| `--runtime` | string | (空 = Docker デフォルト) | `CDERUN_OCI_RUNTIME` | OCI ランタイムの指定 |
-
-- Docker: `HostConfig.Runtime string`
-- Podman: `--runtime` オプションとして透過的に渡す
-- containerd: OCI spec の runtime 指定（または未サポートエラー）
-
-#### 移行措置
-
-- `CDERUN_RUNTIME` 環境変数は `CDERUN_ENGINE` のエイリアスとして残す（1リリースの deprecation 期間）
-- `.cderun.yaml` の `runtime:` フィールドは `engine:` にリネーム、旧キーも読み込み可能にする
-
-### 実装上の注意
-
-- `resolveRuntimeAndSocket` 関数の変数名 `rv.res.Runtime` は `rv.res.Engine` にリネーム
-- テストの grep 範囲が広いので一括リネームツール（`gorename` 等）を使用推奨
-- P1 フラグの `--cderun-runtime` → `--cderun-engine` も忘れずに
-
-### 完了条件
-
-- [x] `--engine` で docker/podman/containerd を指定可能
-- [x] `--runtime` で OCI ランタイムを指定可能（Docker のみ。containerd はエラー）
-- [x] `CDERUN_RUNTIME` が非推奨警告付きで動作する移行テスト
-- [x] `.cderun.yaml` の `runtime:` キーが非推奨警告付きで動作するテスト
-- [x] 全ドキュメント更新
-
----
-
-## T32: `--dns-search` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-社内 DNS 環境で検索ドメインを設定する必要がある場合に使用。Kubernetes 環境のテストでも `svc.cluster.local` 等の検索ドメインが必要になる。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--dns-search` | stringArray | (なし) | `CDERUN_DNS_SEARCH` |
-
-- 環境変数はカンマ区切り
-- Docker: `HostConfig.DNSSearch []string`
-- containerd: OCI spec の DNS 設定
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T33: `--dns-option` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`resolv.conf` の `options` 行を設定。`ndots:5`, `timeout:2`, `attempts:3` 等。Kubernetes 互換の DNS 設定をコンテナに注入する場合に有用。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--dns-option` | stringArray | (なし) | `CDERUN_DNS_OPTION` |
-
-- 環境変数はカンマ区切り
-- Docker: `HostConfig.DNSOptions []string`
-- containerd: OCI spec の DNS 設定
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T34: `--ipc` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`--ipc=host` で共有メモリセグメントをホストと共有。PostgreSQL のパフォーマンスチューニングや、プロセス間通信を使うアプリケーションのテストで必要。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--ipc` | string | (空 = プライベート) | `CDERUN_IPC` |
-
-- 値: `host`, `private`, `shareable`, `none`, `container:<id>`
-- cderun のユースケースでは `host` と `private` のみ実質的に使用される
-- Docker: `HostConfig.IpcMode`
-- containerd: OCI spec の Linux namespaces で `ipc` 設定
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T35: `--gpus` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-ML ワークロードで NVIDIA GPU をコンテナにパススルーする。`docker run --gpus all` 相当の機能。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--gpus` | string | (なし) | `CDERUN_GPUS` |
-
-- 値: `all`, `"device=0,1"`, `"count=2"` 等（Docker 互換）
-- Docker: `Resources.DeviceRequests []DeviceRequest` に変換
-- containerd: CDI (Container Device Interface) または nvidia-container-runtime 経由
-
-### 実装上の注意
-
-- Docker の `--gpus` は内部で `DeviceRequest` に変換する複雑なパース処理がある
-- containerd では CDI spec を利用するか、`--runtime=nvidia` と組み合わせる形になる
-- 初期実装は Docker のみ対応し、containerd は未サポートエラーで良い
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker: `DeviceRequests` に変換されるユニットテスト
-- [x] containerd: 未サポートエラーのテスト（T16 と連携）
-
----
-
-## T36: `--cgroupns` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-cgroup v2 環境でのネームスペース分離を制御。Docker Engine 20.10+ ではデフォルトで `private` だが、ホストの cgroup ツリーを見たい場合に `host` を指定する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--cgroupns` | string | (空 = Docker デフォルト) | `CDERUN_CGROUPNS` |
-
-- 値: `host`, `private`
-- Docker: `HostConfig.CgroupnsMode`
-- containerd: OCI spec の Linux namespaces で `cgroup` 設定
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T37: `--pids-limit` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-fork bomb 対策。CI 環境やマルチテナント環境でプロセス数を制限する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--pids-limit` | int64 | (なし = 無制限) | `CDERUN_PIDS_LIMIT` |
-
-- `0` または `-1` は無制限
-- Docker: `Resources.PidsLimit *int64`
-- containerd: OCI spec の `Linux.Resources.Pids.Limit`
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T38: `--cpu-shares` / `--cpuset-cpus` / `--cpuset-mems` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 中
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-`--cpus` よりも細かいリソース制御が必要な場合に使用。`--cpu-shares` は相対的な CPU ウェイト、`--cpuset-cpus` は特定 CPU コアへのピン止め。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--cpu-shares` | int64 | (なし) | `CDERUN_CPU_SHARES` |
-| `--cpuset-cpus` | string | (なし) | `CDERUN_CPUSET_CPUS` |
-| `--cpuset-mems` | string | (なし) | `CDERUN_CPUSET_MEMS` |
-
-- `--cpu-shares`: 相対ウェイト（デフォルト 1024）
-- `--cpuset-cpus`: CPU セット（例: `0-3`, `0,1`）
-- `--cpuset-mems`: メモリノード（例: `0-1`）
-- Docker: `Resources.CPUShares`, `Resources.CpusetCpus`, `Resources.CpusetMems`
-- containerd: OCI spec の `Linux.Resources.CPU`
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] Docker / containerd 両方のユニットテスト
-
----
-
-## T39: `--restart` フラグの追加
-
-- 種別: 機能追加
-- 優先度: 低
-- 対象: 全経路
-- 仕様変更: あり → `docs/features/command-line-options.md` を更新
-
-### 背景
-
-cderun はエフェメラルコンテナを前提としているが、開発中のサーバープロセスをクラッシュ時に自動再起動させたいケースがある。`--remove=false` と組み合わせて使用する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 |
-| --- | --- | --- | --- |
-| `--restart` | string | `no` | `CDERUN_RESTART` |
-
-- 値: `no`, `always`, `on-failure[:max-retries]`, `unless-stopped`
-- Docker: `HostConfig.RestartPolicy`
-- containerd: 未サポート（エラー）— containerd はデーモンとしてのリスタート管理を持たない
-
-### 実装上の注意
-
-- `--remove=true`（デフォルト）と `--restart` の組み合わせは Docker ではエラーになる。cderun 側でバリデーションし、分かりやすいエラーメッセージを出す
-- パース: `on-failure:3` のようなコロン区切り形式のパースが必要
-
-### 完了条件
-
-- [x] 全経路チェックリスト満たす
-- [x] `docs/features/command-line-options.md` に記載
-- [x] `--remove=true` + `--restart` の排他バリデーションテスト
-- [x] Docker: `RestartPolicy` に変換されるテスト
-- [x] containerd: 未サポートエラーのテスト
 
 ---
 
@@ -880,67 +450,6 @@ P1〜P6 優先順位解決を「全オプション × 全ソース組み合わ�
 
 - 対象領域の `*coverage*` ファイルが消え、対応する振る舞いテストが仕様参照コメント付きで存在する
 - mutation score が置き換え前より悪化していない
-
----
-
-## T73: ソースコード内コメントの英語化 + `ContainerConfig` の変換契約コメント追加
-
-- 種別: クリーンアップ
-- 優先度: 中
-- 対象:
-  - `internal/runtime/containerd_test.go:225-226`（日本語コメント残存）
-  - `internal/command/root_test.go:1940-1941`（日本語コメント残存）
-  - `internal/container/config.go`（変換契約コメント追加）
-- 前提: `AGENTS.md` の「English in Source Code」および「Runtime Adapter Conversion Contract」原則を参照
-
-### 背景
-
-プロダクションコードの日本語はすでに英語化済み。テストファイルに2箇所残存しており、`ContainerConfig` の変換契約コメントもまだ追加されていない。
-
-### 作業内容
-
-1. **`containerd_test.go:225-226` の英語化**（`TestUnit_Containerd_NormalizeCapabilities` 直前のコメント）:
-
-   ```go
-   // docs/features/command-line-options.md: --cap-add / --cap-drop accept Docker-compatible
-   // short names (e.g. SYS_ADMIN); the OCI spec requires the CAP_-prefixed form.
-   ```
-
-2. **`root_test.go:1940-1941` の英語化**（`ExitCodeError` 伝搬に関するコメント）。英訳は内容に合わせて作成すること。
-
-3. **`ContainerConfig` の契約コメント追加**（`internal/container/config.go`）:
-
-   ```go
-   // ContainerConfig represents the intermediate representation of a container execution request.
-   //
-   // Field values hold Docker-CLI-compatible notation as entered by the user
-   // (e.g. CapAdd: "SYS_ADMIN", not "CAP_SYS_ADMIN"). The Docker daemon normalizes
-   // such notation implicitly, but runtimes that build an OCI spec directly
-   // (containerd) do NOT: each runtime adapter is responsible for converting every
-   // field it consumes into its native representation, and for returning an explicit
-   // error for fields it cannot support — never pass a value through unconverted or
-   // drop it silently.
-   ```
-
-4. **最終確認**: `grep -rn '[ぁ-ヿ一-鿿]' --include='*.go' .` で残存がないことを確認する。`internal/config/edge_cases_test.go:78` の `ユーザー_TOKEN` は意図的なテストデータのため**対象外**。
-
-### 完了条件
-
-- 上記3ファイルの修正が完了し、`grep` で日本語残存なし（テストデータ除く）
-- `ContainerConfig` の doc comment に変換契約が記載されている
-- 挙動変更なし（既存テストが全パス）
-
----
-
-## Documentation Update Tasks
-
-- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--read-only` and `--cderun-read-only` flags, showing their default of `false` and mapped environment variable `CDERUN_READ_ONLY`.
-- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--pid` and `--cderun-pid` flags, showing their default of `""` (private) and mapped environment variable `CDERUN_PID`.
-- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--ulimit` and `CDERUN_ULIMIT` flags, specifying format `<type>=<soft>:<hard>` or `<type>=<value>`.
-- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--shm-size` and `--cderun-shm-size` flags, explaining shared memory allocation and limits formats (e.g., 256m, 1g) mapped to CDERUN_SHM_SIZE.
-- [x] @jules: Update `docs/features/command-line-options.md` to add information about `--prefetch` and `--prefetch-all` flags, explaining stand-alone image prefetching and template expression support mapped to CDERUN_PREFETCH and CDERUN_PREFETCH_ALL.
-- [x] @jules: Create/Update `docs/testing/conformance.md` to document the procedure for onboarding new `ContainerRuntime` adapter implementations into the L3 Conformance Suite (`RunConformanceTests`).
-- [ ] @jules: Update `docs/features/command-line-options.md` to add documentation for `--prune` and `CDERUN_PRUNE` flags for orphan container cleanup.
 
 ---
 
@@ -1105,3 +614,412 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 - git worktree 専用ディレクティブ（`{{git_common_dir}}` 等）の追加: Expression は汎用機能であり、特定ツール・特定ワークフロー専用の構文は持たせない。
 - 汎用の文字列変換パイプ（`{{file:.git|trim_prefix:gitdir: }}` 等）の導入: Expression がミニ言語化し、アンカー境界検証・エスケープとの組み合わせが爆発する。加えて worktree のケースでは `.git` ファイルの `gitdir:` を剥がしても指すのは `<common>/.git/worktrees/<name>` であり、git が `commondir` 経由で必要とする共通 `.git` には 2 階層足りないため、文字列変換だけでは目的を達成できない。
 - マウントの `optional` の意味拡張（式の解決エラーもスキップ扱いにする）: 「マウントの解決時に限り」という文脈依存ルールになるため。
+
+---
+
+## T93: `--engine` の導入（`--runtime` は非推奨エイリアスとして温存）
+
+- 種別: 機能
+- 優先度: 高
+- 規模: 大
+- 前提: なし（T94 と並行可。**T90 より前に完了させること**）
+- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`
+
+### 背景
+
+cderun の現行 `--runtime` は「どのコンテナエンジンに接続するか」（docker / podman / containerd）を指定するフラグ。一方 Docker の `--runtime` は「コンテナ実行時の OCI ランタイム」（runc / crun / nvidia / kata）を指定する。名前の衝突により、Docker 互換の OCI ランタイム指定が追加できない。
+
+本タスクは**エンジン指定側を `--engine` へ移す作業のみ**を扱い、`--runtime` の意味は変えない（`--engine` の非推奨エイリアスとして従来どおり動作する）。破壊的変更を含まないため単独で出荷できる。
+
+分割の理由（2026-09-10 計測）: 旧 T31 は「リネーム」と「同名フラグへの別意味の付け替え」を1タスクに含んでいた。そのため `runtime` に触れる Go ファイル 146（うちテスト 123）・1,776 行・ドキュメント 32 ファイルのすべてを「エンジン指定か / OCI ランタイム指定か」で個別判定する必要があり、旧 T31 が推奨していた一括リネームツール（`gorename` 等）が原理的に使えなかった。意味の付け替えを T95 に切り出すことで、本タスクは `Runtime` → `Engine` の機械的リネーム + 互換シムに単純化される。
+
+### 仕様
+
+#### リネーム
+
+| 旧 | 新 | 備考 |
+| --- | --- | --- |
+| `--runtime` | `--engine` | 旧名は非推奨警告付きで従来どおり動作 |
+| `--cderun-runtime` | `--cderun-engine` | 同上 |
+| `CDERUN_RUNTIME` | `CDERUN_ENGINE` | 同上 |
+| `.cderun.yaml` の `runtime:` | `engine:` | 同上。両方指定時は `engine:` を優先し警告 |
+
+内部識別子も併せてリネームする: `CDERunConfig.Runtime` → `.Engine`、`ResolvedConfig.Runtime` → `.Engine`、`resolveRuntimeAndSocket` → `resolveEngineAndSocket`、`rv.res.Runtime`（非テスト 15 箇所）→ `rv.res.Engine`、`runtimeFactory` → `engineFactory`。
+
+#### エンジン系統の分類（T90 の前提）
+
+`--engine` の値に加えて、各エンジンが **API ベース**（`docker-compat-api`: docker / podman、`containerd-api`: containerd）か **CLI ベース**（`nerdctl` 等）かを判定できる内部分類を用意する。T90 が「Base Host の設定エンジンが `nerdctl` かどうか」を判定するために必要。
+
+- ユーザー向けの受理値は `docker` / `podman` / `containerd` のまま変更しない（`nerdctl` の受理は T90 の範囲）
+- 分類の定義は `docs/features/nested-execution-control-socket.md` の adapter family に合わせる
+
+注記: 旧 T31 の本文にはこの分類が書かれていなかったが、「タスク間の依存・推奨順序」節の T31 → T90 依存の記述がこれを前提としていたため、本タスクに明示的に含める。
+
+#### 移行措置
+
+- 旧名（フラグ・環境変数・YAML キー）に 1 リリースの deprecation 期間を設け、使用時に非推奨警告を出す（`logging.Warn`）
+- 期間終了後の扱いは T95 で決める
+
+### 完了条件
+
+- `--engine` / `--cderun-engine` / `CDERUN_ENGINE` / `.cderun.yaml` の `engine:` で docker / podman / containerd を指定できる
+- 旧 `--runtime` / `--cderun-runtime` / `CDERUN_RUNTIME` / `runtime:` が非推奨警告付きで従来どおり動作する（各経路にテストがある）
+- `engine:` と `runtime:` の同時指定で `engine:` が優先され警告が出るテストがある
+- エンジン系統（API ベース / CLI ベース）を判定する内部 API があり、テストがある
+- `docs/features/command-line-options.md` / `multi-runtime-support.md` / `README.md` / `USAGE.md` が更新されている
+- `make generate` の生成物（`internal/config/cli_options.gen.go`, `internal/command/root_flags.gen.go`）が再生成・コミットされている
+- `make build` / `make test` / `make lint-go` / `make lint-md` がパスする
+
+### 対象ファイル
+
+- `internal/config/registry.go`（`StringOptions` の `runtime` エントリ。`:384` 付近）
+- `internal/config/resolver.go`（`CLIOptions`, `ResolvedConfig`）
+- `internal/config/resolver_validation.go`（許可値の検証。`:426` 付近）
+- `internal/config/config.go`（`CDERunConfig.Runtime`）
+- `internal/command/root.go`（`rootOptions`, `resolveSettings`, `runtimeFactory`, `resolveRuntimeAndSocket`）
+- 生成物: `internal/config/cli_options.gen.go`, `internal/command/root_flags.gen.go`
+- テスト・ドキュメント全般
+
+### スコープ外
+
+- `--runtime` の意味を OCI ランタイム側へ切り替えること（T95）
+- OCI ランタイム指定フラグそのものの追加（T94）
+- `internal/runtime` パッケージ名および `ContainerRuntime` インターフェース名のリネーム: 実害がなく、差分を不必要に膨らませるため。必要なら別タスクとして起票する
+
+---
+
+## T94: OCI ランタイム指定フラグ `--oci-runtime` の追加
+
+- 種別: 機能
+- 優先度: 高
+- 規模: 小
+- 前提: なし（T93 と並行可。フラグ名が衝突しないため独立して出荷できる）
+- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`
+
+### 背景
+
+`--runtime` がエンジン指定に使われているため、OCI ランタイム（runc / crun / nvidia / kata）を指定する手段が存在しない。T93 のリネーム完了を待たずにこの実害だけ先に解消するため、衝突しない名前 `--oci-runtime` で先行導入する。
+
+### 仕様
+
+| フラグ | 型 | デフォルト | 環境変数 | 説明 |
+| --- | --- | --- | --- | --- |
+| `--oci-runtime` | string | 空（エンジンのデフォルト） | `CDERUN_OCI_RUNTIME` | OCI ランタイムの指定 |
+
+- `.cderun.yaml` OCI ランタイム契約: `.cderun.yaml` 設定ファイルの `defaults:` セクションにキー `ociRuntime`（型: `string`）として定義する。
+- 優先順位（Precedence Matrix）:
+  1. `P1`: `--cderun-oci-runtime`（P1 内部オーバーライドフラグ）
+  2. `P2`: `--oci-runtime`（P2 CLI フラグ）
+  3. `P4`: `CDERUN_OCI_RUNTIME`（P4 環境変数）
+  4. `P5`: `.cderun.yaml`（`defaults.ociRuntime`、P5 設定ファイル）
+- Docker / Podman: `HostConfig.Runtime` に設定する。Podman は `NewPodmanRuntime` が Docker 互換 API 経由で `DockerRuntime` を利用しているため、同じ経路で透過的に効く（旧 T31 は「Podman には `--runtime` オプションとして透過的に渡す」と記載していたが、CLI を経由しないので誤り）
+- containerd: 未サポートとして明示エラー（T16 で導入したランタイム未対応機能の事前バリデーションに乗せる）
+- P1 フラグ `--cderun-oci-runtime` も併せて追加する
+
+### 完了条件
+
+- `--oci-runtime` / `--cderun-oci-runtime` / `CDERUN_OCI_RUNTIME` / `.cderun.yaml` (`defaults.ociRuntime`) で OCI ランタイムを指定できる
+- `.cderun.yaml` の `defaults.ociRuntime` 設定値がロードされ、優先順位（P1 > P2 > P4 > P5）に従ってオーバーライドされることを検証する設定ファイルテストが存在すること
+- P1 オーバーライドフラグ `--cderun-oci-runtime` が正常に動作し、`--oci-runtime` と一貫して処理されることを検証するテストがある
+- Docker で `HostConfig.Runtime` に反映されるテストがある
+- containerd 指定時に明示エラーになるテストがある
+- `docs/features/command-line-options.md` / `multi-runtime-support.md` / `README.md` / `USAGE.md` が更新されている
+- `make generate` の生成物が再生成・コミットされている
+- `make build` / `make test` / `make lint-go` / `make lint-md` がパスする
+
+### 対象ファイル
+
+- `internal/config/registry.go`
+- `internal/config/resolver.go`
+- `internal/config/config.go`
+- `internal/runtime/docker_adapter.go`（`HostConfig` の構築。`:45` 付近）
+- `internal/runtime/containerd.go`（未サポートエラー）
+- 生成物: `internal/config/cli_options.gen.go`, `internal/command/root_flags.gen.go`
+
+---
+
+## T95: `--runtime` の意味を OCI ランタイム側へ切り替え
+
+- 種別: 破壊的変更
+- 優先度: 中
+- 規模: 小
+- 前提: **T93・T94 の完了、および T93 の deprecation 期間（1 リリース）の経過**
+- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`
+
+### 背景
+
+T93 の完了時点で `--runtime` はエンジン指定の非推奨エイリアスになっている。deprecation 期間の終了後、この名前を Docker 互換の意味（OCI ランタイム指定）へ移す。
+
+同じフラグ名の意味が変わる唯一の破壊的変更であり、単独 PR に閉じ込めることで影響範囲とレビュー対象を最小化する。
+
+### 仕様
+
+- `--runtime` / `CDERUN_RUNTIME` / `.cderun.yaml` の `runtime:` を、エンジン指定のエイリアスから **OCI ランタイム指定のエイリアス**（`--oci-runtime` と同義）へ切り替える
+- 切り替え後に値が `docker` / `podman` / `containerd` のいずれかだった場合は、OCI ランタイム名として黙って解釈せず、「エンジン指定は `--engine` に移動した」旨の明示エラーを出す
+- `--oci-runtime` を残すか `--runtime` に一本化するかを本タスクで判断し、ドキュメントに記録する
+
+### 完了条件
+
+- `--runtime` が OCI ランタイム指定として動作する
+- 旧エンジン値（`docker` / `podman` / `containerd`）を `--runtime` に渡すと `--engine` への移行を促す明示エラーになるテストがある
+- ドキュメント・`README.md`・`USAGE.md` が更新され、破壊的変更が明記されている
+- `make build` / `make test` / `make lint-go` / `make lint-md` がパスする
+
+---
+
+## T96: Control Socket サーバのリクエスト context を接続の生存に紐づける
+
+- 種別: バグ
+- 優先度: 高
+- 規模: 小
+- 仕様変更: なし
+- 対象: `internal/runtime/controlsocket/server.go`
+
+### 問題
+
+`buildRequestContext`（`server.go:209-215`）は `RequestFrame.Deadline` が無いとき `context.WithCancel(context.Background())` を返し、この context は `dispatchRequest` が戻るまで cancel されない。つまり**リクエストの context がクライアント接続の生存に紐づいていない**。
+
+`WaitContainer` のような長時間ブロックする RPC の実行中にネスト側クライアントが死ぬと:
+
+1. `Server.Close()` は接続を閉じる（`server.go:563-565`）が、ハンドラは `d.WaitContainer` の内部でブロックしたままで、conn を閉じても ctx は cancel されない
+2. ハンドラゴルーチンが終わらないため、直後の `s.wg.Wait()`（`server.go:568`）が返らない
+3. 結果として Base Host の `cderun` が終了できず、内側のコンテナは孤児として残る
+
+クライアント側は ctx キャンセル時に `conn.SetDeadline(time.Now())` で読みを叩き起こす watchdog を既に持っている（`client.go:276-286`, `client.go:375-385`）。サーバ側にだけ同等の仕組みが無く、**プロトコルの両端で堅牢性の水準が非対称**になっている。
+
+### 仕様
+
+- 各リクエストの context を、接続の切断および `Server.Close()` の両方で cancel されるようにする
+- 接続の切断検知は、クライアント側の watchdog と対称な方法で実装する
+- `Server.Close()` のシャットダウン契約として実現可能な有界待機（bounded-wait）ポリシーを定義する: ディスパッチャーハンドラ待機処理自体をデッドライン意識（deadline-aware）にし、無条件の `s.wg.Wait()` ではなくコンテキスト意識型完了シグナル（`select` / チャネル）を用いる。設定されたデッドライン経過後に `Close` が迅速に復帰（return）し、`Close` を超えて生存するハンドラの追跡・クリーンアップ方法を定義する。
+
+### 完了条件
+
+- 長時間ブロックする RPC（`WaitContainer`）の実行中にクライアント接続を切断すると、サーバ側のハンドラが速やかに終了するテストがある
+- `Server.Close()` が有界待機ポリシーに従い、設定されたデッドライン内に迅速に復帰することを確認するリグレッションテスト（意図的に終了しないハンドラを用いてハングせず復帰・ログ出力・追跡を行うことを検証）がある
+- `make build` / `make test` / `make lint-go` がパスする
+
+### 関連
+
+- 孤児コンテナの後始末という観点では T22（`--prune`）と関連する。本タスクは「Base Host が終了できない」ことの解消に限定し、孤児コンテナの回収は T22 の範囲とする
+
+---
+
+## T97: Control Socket サーバの accept ループ堅牢化とアイドルタイムアウト
+
+- 種別: バグ
+- 優先度: 中
+- 規模: 小
+- 仕様変更: なし
+- 対象: `internal/runtime/controlsocket/server.go`
+
+### 問題
+
+**1. accept ループが任意のエラーで恒久停止する**
+
+`acceptLoop`（`server.go:96-125`）は `Accept()` がエラーを返すと、`s.closed` が閉じていない場合でも Debug ログを1行出して `return` する。`EMFILE`（fd 枯渇）や `ECONNABORTED` のような一時的なエラーでもサーバが以後まったく接続を受け付けなくなり、しかもデフォルトログレベルでは何も表示されない（T82 でデフォルトが error 化されているため）。ネスト実行ツリー全体を支えるサーバとしては脆い。
+
+**2. ハンドシェイク後にアイドルタイムアウトが無い**
+
+`handleConn` はハンドシェイクに 5 秒の read deadline を設定するが、成立後は `conn.SetReadDeadline(time.Time{})` で完全に解除する（`server.go:184`）。以後リクエストを送ってこないクライアントがゴルーチンと fd を無期限に保持する。
+
+### 仕様
+
+- `Accept()` のエラーは一時的なものと恒久的なものを区別し、一時エラーは指数バックオフで再試行する（`net/http` の accept ループが参考実装）
+- 恒久エラーで停止する場合は Debug ではなく Warn 以上で、停止した事実が分かるログを出す
+- ハンドシェイク成立後の接続にアイドルタイムアウトを設ける。ただしアイドルタイムアウト免除は `WaitContainer` / `AttachContainer` RPC 操作の処理期間中に限定（スコープ化）し、ディスパッチ終了後（次のリクエスト処理前）に通常のアイドルデッドラインを復元・再設定する。これにより、長時間無通信になり得る操作中の接続保護と、操作完了後の通常アイドルタイムアウト回収を両立する。
+
+### 完了条件
+
+- 一時的な accept エラーの後もサーバが接続を受け付け続けることを確認するテストがある
+- 恒久エラーでの停止時に Warn 以上のログが出ることを確認するテストがある
+- アイドル接続が回収されることを確認するテストがある
+- `WaitContainer` および対話実行（`AttachContainer`）の処理中はアイドルタイムアウト適用から除外され切断されないことを確認するテストがある
+- `WaitContainer` を送信してレスポンスを受信した後に無通信（黙り込む）状態になった接続について、次のリクエスト処理前に通常のアイドルデッドラインが復元され正しく切断・回収されることを検証するテストがある
+- `make build` / `make test` / `make lint-go` がパスする
+
+---
+
+## T98: Control Socket ハンドラの共通化とエラー処理方針の統一
+
+- 種別: リファクタ
+- 優先度: 中
+- 規模: 小
+- 仕様変更: なし
+- 対象: `internal/runtime/controlsocket/server.go`
+
+### 問題
+
+**1. 6つの RPC ハンドラが同一の定型コードを逐語コピーしている**
+
+`handleCreateContainer` / `handleStartContainer` / `handleWaitContainer` / `handleRemoveContainer` / `handleSignalContainer` / `handleResizeContainerTTY` が、いずれも以下を繰り返している:
+
+- 前置き: `s.mu` ロック → `s.dispatcher` 取得 → アンロック → nil チェック → `json.Unmarshal(payload, &args)` → 失敗時 `sendErrorResponse`
+- 後置き: `resp := ResponseFrame{Success: true}` → `json.Marshal` → `WriteFrame`
+
+合計で約100行。ハンドラを1つ追加するたびにこの定型が増える。ジェネリクスを使った1つのヘルパー（引数型でパラメタライズし、実処理だけをクロージャで受ける）に畳める。
+
+**2. `json.Marshal` のエラー処理が不統一**
+
+`respBytes, _ := json.Marshal(resp)` の形で戻り値のエラーを捨てている箇所が6つある。一方 `handleCreateContainer` は結果構造体の marshal エラーは丁寧に検査して `sendErrorResponse` している（`server.go:281-285`）。同じ関数の中で方針が割れている。
+
+`ResponseFrame` の marshal は実際には失敗しないが、「失敗しないから捨てる」のか「検査すべきだが漏れている」のかがコードから読み取れない。方針を決めて統一すること。
+
+### 仕様
+
+- 共通ヘルパーを1つ用意し、6ハンドラをその上に載せ替える
+- `json.Marshal` のエラー方針を統一する。捨てる場合は、なぜ失敗し得ないのかをコメントで明示する
+- 挙動（ワイヤ上のフレーム内容・エラーメッセージ文言）は変更しないこと。既存テストがそのまま通ることを確認する
+
+### 完了条件
+
+- 6ハンドラの定型コードが共通化され、`server.go` の行数が有意に減っている
+- `json.Marshal` のエラー処理方針が統一され、捨てている箇所には理由のコメントがある
+- 既存の Control Socket テストが変更なしで通る
+- `make build` / `make test` / `make lint-go` がパスする
+
+### 検討事項（実装者が判断する）
+
+- `ResponseFrame.Payload` / `RequestFrame.Payload` が `[]byte` のため、`encoding/json` の仕様上 base64 文字列としてエンコードされ、JSON の中に base64 で JSON を埋める二重エンコードになっている。`json.RawMessage` にすればデバッグ時にフレーム内容がそのまま読める。ただしワイヤ互換が壊れるため、`CurrentProtocolVersion` の扱いと合わせて判断すること。互換を壊す判断をするなら本タスクから切り出して別タスクにする
+
+---
+
+## T99: テストファイル命名規約の強制
+
+- 種別: クリーンアップ / ルール整備
+- 優先度: 高
+- 規模: 大
+- 仕様変更: なし
+- 対象: `internal/**/*_test.go`, `AGENTS.md`, `docs/testing/organization.md`
+
+### 問題
+
+テストコードが 47,224 行に対し実装は 15,131 行（3.1倍）。`internal/config` は実装14ファイルに対しテスト104ファイル（2026-09-10 計測）。
+
+`docs/testing/organization.md` 3.3 の「スコープ別テストファイルルール」自体は正しく、コンフリクト回避のために新規ファイルを作る運用は守られている。崩れているのは**命名**で、237 テストファイル中 **83 ファイルが活動名ベース**になっている:
+
+- `jules_test_refinement_extra_test.go`
+- `feature_scenarios_comprehensive_resilience_expansion_test.go`
+- `test_improvement_additional_test.go`
+- `path_extra_coverage_test.go`
+
+規約が例示しているのは機能・チケット・テーマ単位のスコープ名（`feature_shm_size_test.go`, `bugfix_issue42_test.go`, `resolver_robustness_test.go`）であり、「improvement」「expansion」「refinement」「comprehensive」「extra」「deep」といった**作業の性質**を表す語は規約違反にあたる。
+
+実害は、何を守るテストなのかがファイル名から判別できないことで、重複が検出されないまま増え続ける点にある。テストを消す判断ができないため、体積は単調増加する。
+
+### 分割
+
+規模が大きく 1 PR に収まらないため、以下に分割して実施する（AGENTS.md 第3節 項目4）。
+
+- **T100**: 規約の明文化と lint / CI ゲートの追加（新規・変更ファイルのみを対象）
+- **T101**: `internal/config` のリネーム
+- **T102**: `internal/command` のリネーム
+- **T103**: `internal/runtime` のリネーム
+
+T101〜T103 は T100 の完了を待たずに着手してよい（禁止語の一覧は既に `AGENTS.md` の Testing-First に記載済みのため）。ただし T100 が先に入っていれば各リネーム PR がその場で検証されるので、**推奨順序は T100 → T101〜T103（3つは並行可）**。
+
+### 完了条件
+
+- T100 〜 T103 がすべて完了している
+- **全ツリーを対象とした違反ゼロ検証**（禁止語を含むテストファイル名が 0 件）がパスし、それを CI の必須チェックとして固定している
+- 重複削除の結果としてテスト行数が削減されている（削減率は問わないが、削除したテストの一覧が各 PR の説明にある）
+- `make test` の結果が変更前と同じで、カバレッジが有意に下がっていない
+
+---
+
+## T100: テストファイル命名規約の明文化と lint / CI ゲートの追加
+
+- 種別: クリーンアップ / ルール整備
+- 優先度: 高
+- 規模: 小
+- 前提: なし
+- 仕様変更: なし
+- 対象: `AGENTS.md`, `docs/testing/organization.md`, `Makefile`, `.github/workflows/ci.yaml`
+
+### 仕様
+
+- 禁止語（`improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` 等のエージェント名）と命名例を `docs/testing/organization.md` 3.3 に明記する（`AGENTS.md` の Testing-First には記載済みのため、そこからの参照で足りるなら重複させない）
+- 禁止語を含むテストファイル名を検出する lint コマンド（`make lint-test-names` 等）を追加する
+- CI の必須チェックに組み込む。**対象は新規・追加されたファイル名に限定する**（既存の違反 83 件は T101〜T103 で解消するため、この時点で全ツリーを対象にすると CI が赤のままになる）
+- 既存違反を除外する仕組みを使う場合、除外リストは自動生成とし、手動追記でゲートを迂回できない構造にすること
+
+### 完了条件
+
+- `make lint-test-names` 相当のコマンドが存在し、禁止語を含むファイル名を検出する
+- 新規・変更されたテストファイルが CI で必ず検証される（既存違反の有無に関わらず独立して判定されること）
+- 除外リストを用いる場合、手動追記による迂回ができないことを確認するテストまたは手順がある
+- `docs/testing/organization.md` に禁止語と命名例が記載されている
+- `make lint-go` / `make lint-md` がパスする
+
+### 補足
+
+全ツリーを対象とする違反ゼロ検証は、T101〜T103 の完了後に親タスク T99 の完了条件として実施する。本タスクの完了条件には含めない（含めると T101〜T103 が本タスクに依存し、循環する）。
+
+---
+
+## T101: `internal/config` のテストファイルリネームと重複削除
+
+- 種別: クリーンアップ
+- 優先度: 高
+- 規模: 中
+- 前提: なし（T100 が先に入っていることを推奨）
+- 仕様変更: なし
+- 対象: `internal/config/*_test.go`
+
+### 仕様
+
+1. 禁止語を含むファイル名を、何を検証しているかに基づいて改名する（`feature_*` / `bugfix_*` / `<対象>_robustness_*` 等）。1ファイルが複数テーマを含む場合は分割する
+2. **リネームのみの PR と、重複削除を含む PR を分ける。先にリネームだけを済ませること**。両方を1つの PR に入れると差分が読めなくなる
+3. 重複削除では、同一の入力・同一の assertion を別ファイルで繰り返しているものを1つに統合する
+
+### 完了条件
+
+- `internal/config` 配下に禁止語を含むテストファイル名が 0 件
+- **削除したテストの一覧が PR 説明にある**（何を失ったかがレビュー可能であること）
+- `make test` がパスし、`internal/config` のカバレッジが有意に下がっていない
+- `make lint-go` がパスする
+
+---
+
+## T102: `internal/command` のテストファイルリネームと重複削除
+
+- 種別: クリーンアップ
+- 優先度: 高
+- 規模: 中
+- 前提: なし（T100 が先に入っていることを推奨。T101 と並行可）
+- 仕様変更: なし
+- 対象: `internal/command/*_test.go`
+
+### 仕様
+
+T101 と同じ（リネーム先行、重複削除は別 PR）。
+
+### 完了条件
+
+- `internal/command` 配下に禁止語を含むテストファイル名が 0 件
+- 削除したテストの一覧が PR 説明にある
+- `make test` がパスし、`internal/command` のカバレッジが有意に下がっていない
+- `make lint-go` がパスする
+
+---
+
+## T103: `internal/runtime` のテストファイルリネームと重複削除
+
+- 種別: クリーンアップ
+- 優先度: 高
+- 規模: 中
+- 前提: なし（T100 が先に入っていることを推奨。T101 / T102 と並行可）
+- 仕様変更: なし
+- 対象: `internal/runtime/**/*_test.go`
+
+### 仕様
+
+T101 と同じ（リネーム先行、重複削除は別 PR）。
+
+### 完了条件
+
+- `internal/runtime` 配下（`controlsocket` を含む）に禁止語を含むテストファイル名が 0 件
+- 削除したテストの一覧が PR 説明にある
+- `make test` がパスし、`internal/runtime` のカバレッジが有意に下がっていない
+- `make lint-go` がパスする
+

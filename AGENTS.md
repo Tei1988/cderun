@@ -30,7 +30,9 @@ make lint-md        # markdownlint（.markdownlint.json 準拠）
 make link-check     # ドキュメント内リンクの検証
 ```
 
-**実行してはいけないもの**: `make test-runtime`（`-tags=runtime`）は実際のコンテナランタイムが必要です。実行環境に Docker 等がない場合は実行せず、CI に任せてください。
+`make test-runtime`（`-tags=runtime`）は実際のコンテナランタイムを必要とします。Docker 等が使えない環境では実行しないでください。
+
+> **注意（2026-09-10 時点）**: `-tags=runtime` のテストは **CI でも実行されていません**（`.github/workflows/ci.yaml` のどのジョブも `-tags=runtime` を指定していないため、`internal/command` にあるタグ付きテスト6ファイルはどこでも実行されない）。**「CI が見てくれる」という前提を置かないこと。** ランタイムの挙動に依存する変更を行った場合は、Docker 等が使える環境で `make test-runtime` を実行して確認するか、未検証である旨を PR に明記してください。この状態は T20 で解消予定です。
 
 ## 3. タスクの進め方
 
@@ -40,9 +42,13 @@ make link-check     # ドキュメント内リンクの検証
 1. 着手前に本ファイル → `.agent/todo.md` → `docs/guidelines/working-guide.md` を必ず読む
 2. タスク一覧の確認には `python3 .agent/manage_task.py list` を使用する。詳細手順の抽出には `python3 .agent/manage_task.py show <ID>` を使用する
 3. 原則 **1 タスク = 1 PR**。タスクの「完了条件」をすべて満たすこと
-4. タスク内の file:line は記録時点のもの。ズレていたら grep で再特定する
-5. **Spec-First**: 「仕様変更あり」のタスクは、対応する `docs/features/*.md` の更新が完了条件に含まれる
-6. タスク完了時は `python3 .agent/manage_task.py done <ID>` を実行し、サマリテーブルの更新と詳細手順の削除を自動で行う
+4. **1 PR に収まらないと判断した場合は、実装に着手せず中断してください**。黙って撤退するのではなく、分割案を `.agent/todo.md` に新規タスクとして起票し、ユーザーに報告すること。巨大なまま放置されたタスクは誰にも拾われず、放置されている事実自体も可視化されません
+5. タスク内の file:line は記録時点のもの。ズレていたら grep で再特定する
+6. **Spec-First**: 「仕様変更あり」のタスクは、対応する `docs/features/*.md` の更新が完了条件に含まれる
+7. タスク完了時は `python3 .agent/manage_task.py done <ID>` を実行し、サマリテーブルの更新と詳細手順の削除を自動で行う
+8. **タスク ID は `T` + 数字のみ**（例: `T93`）。`.agent/manage_task.py` が ID を `T\d+` で解析するため、英字サフィックス（`T31a` 等）を付けるとタスクが `list` に現れず、`done` がセクション境界を誤検出して隣のタスクごと削除します。既存タスクを分割する場合も、末尾に新しい番号を採番してください
+9. **「完了条件」はチェックボックス（`- [ ]` / `- [x]`）ではなく素の箇条書き（`-`）で書くこと**。テンプレート由来のチェック済みマークが残ると、未着手のタスクが完了済みに見えます
+10. **`DONE` にしたタスクの詳細セクションは残さず削除してください**（`python3 .agent/manage_task.py done <ID>` が自動で行います。既に `DONE` でセクションだけ残っている場合は `delete-details <ID>`）。完了済みタスクの詳細が残っていると、未達の作業指示として読まれ、出荷済み機能が再実装される事故につながります。**ステータスの正はサマリテーブルであり、詳細セクションの記述ではありません**
 
 ## 4. ナレッジベース（必読ドキュメント）
 
@@ -64,6 +70,10 @@ make link-check     # ドキュメント内リンクの検証
    ドキュメントがない機能の実装を求められた場合は、まずドキュメントの作成（または作成依頼）から始めてください。
 1. **Testing-First:**
    テストを追加または修正する際は、必ず `docs/testing/strategy.md` のテスト原則（テストの正は仕様であり、カバレッジ駆動のテスト追加は禁止）とテスト作成チェックリストを遵守してください。命名規則は `docs/testing/organization.md` に従います。
+   テストファイル名は**何を検証するか**で命名します。作業の性質を表す語（`improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep`）およびエージェント名（`jules` 等）をファイル名に含めないでください。命名例: `feature_shm_size_test.go`、`bugfix_issue42_test.go`、`resolver_robustness_test.go`。
+1. **Level-Aware（Base Host と Nested の区別）:**
+   `cderun` は同一のコードが **Level 0（Base Host: macOS / Linux / Windows）** と **Level 1 以降（コンテナ内）** の双方で動作します。環境依存の値（`TMPDIR`、`HOME`、パス、ソケット、ユーザー / グループ ID 等）を扱う変更は、両方の Level での挙動を必ず明示し、両方にテストを持たせてください。
+   **片方の Level でのみ正しい振る舞いを、無条件に適用しないこと。** 実例として、コンテナ内では正しい `/tmp` へのスナップショット正規化を Level 0 にも無条件適用した結果、macOS で起動不能になった事例があります（`docs/features/nested-execution.md` の Snapshot Base Directory 節を参照）。
 1. **Clean Code:**
    Goの標準的なイディオムに従い、保守性の高いコードを生成してください。
    特に、時間軸を含む命名（`new_flag`, `old_config` 等）は避け、機能や役割を明示した命名を徹底してください。
