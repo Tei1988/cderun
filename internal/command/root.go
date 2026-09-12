@@ -576,7 +576,7 @@ func (o *rootOptions) pullPrefetchImages(ctx context.Context, rt runtime.Contain
 	return nil
 }
 
-func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
+func formatDryRunCoreFields(w io.Writer, cfg *container.ContainerConfig) {
 	_, _ = fmt.Fprintf(w, "Image: %s\n", cfg.Image)
 	var quotedCmd []string
 	for _, arg := range cfg.Command {
@@ -589,6 +589,9 @@ func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
 	_, _ = fmt.Fprintf(w, "Remove: %v\n", cfg.Remove)
 	_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", cfg.ReadOnly)
 	_, _ = fmt.Fprintf(w, "Init: %v\n", cfg.Init)
+}
+
+func formatDryRunMountsAndEnv(w io.Writer, cfg *container.ContainerConfig) {
 	var mounts []string
 	for _, m := range cfg.Mounts {
 		mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
@@ -605,6 +608,9 @@ func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
 	_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
 	_, _ = fmt.Fprintf(w, "Workdir: %s\n", cfg.Workdir)
 	_, _ = fmt.Fprintf(w, "User: %s\n", cfg.User)
+}
+
+func formatDryRunNetworkAndSecurity(w io.Writer, cfg *container.ContainerConfig) {
 	_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(cfg.Ports, ", "))
 	_, _ = fmt.Fprintf(w, "PublishAll: %v\n", cfg.PublishAll)
 	_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(cfg.Expose, ", "))
@@ -636,6 +642,9 @@ func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
 	if cfg.Cgroupns != "" {
 		_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", cfg.Cgroupns)
 	}
+}
+
+func formatDryRunLimitsAndResources(w io.Writer, cfg *container.ContainerConfig) {
 	if cfg.PidsLimit != 0 {
 		_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", cfg.PidsLimit)
 	}
@@ -698,6 +707,13 @@ func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
 		}
 		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
 	}
+}
+
+func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
+	formatDryRunCoreFields(w, cfg)
+	formatDryRunMountsAndEnv(w, cfg)
+	formatDryRunNetworkAndSecurity(w, cfg)
+	formatDryRunLimitsAndResources(w, cfg)
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
@@ -1126,15 +1142,110 @@ func (o *rootOptions) startResizeHandler(ctx context.Context, cmd *cobra.Command
 	return func() {}
 }
 
+type waitResult struct {
+	code int
+	err  error
+}
+
+func (o *rootOptions) drainAttachOutput(containerID string, att *attachResult) {
+	if !att.attachDoneConsumed {
+		o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
+		select {
+		case err := <-att.attachDone:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				o.logger.Warn("failed to attach to container: %v", err)
+			} else {
+				o.logger.Debug("AttachContainer finished successfully for %s", containerID)
+			}
+		case <-time.After(o.attachGracePeriod):
+			o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
+			att.cancelAttach()
+			<-att.attachDone
+		}
+	}
+}
+
+func (o *rootOptions) handleAttachFinishedBeforeExit(
+	rt runtime.ContainerRuntime,
+	containerID string,
+	cc *container.ContainerConfig,
+	isHostStdinTerminal bool,
+	effectiveHangTimeout time.Duration,
+	err error,
+	waitDone chan waitResult,
+) (int, error) {
+	if err != nil && !errors.Is(err, context.Canceled) {
+		o.logger.Warn("failed to attach to container: %v", err)
+		if effectiveHangTimeout > 0 {
+			select {
+			case res := <-waitDone:
+				if res.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+				}
+				return res.code, nil
+			case <-time.After(effectiveHangTimeout):
+				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
+				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
+			}
+		} else {
+			res := <-waitDone
+			if res.err != nil {
+				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+			}
+			return res.code, nil
+		}
+	}
+	o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
+
+	if !isHostStdinTerminal || !cc.Interactive {
+		if effectiveHangTimeout > 0 {
+			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
+			select {
+			case result := <-waitDone:
+				if result.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+				}
+				return result.code, nil
+			case <-time.After(effectiveHangTimeout):
+				killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer killCancel()
+				_, err := o.signalKillIfRunning(killCtx, rt, containerID)
+				if err != nil {
+					return 0, err
+				}
+				select {
+				case result := <-waitDone:
+					if result.err != nil {
+						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+					}
+					return result.code, nil
+				case <-time.After(effectiveHangTimeout):
+					o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
+				}
+			}
+		} else {
+			o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
+			result := <-waitDone
+			if result.err != nil {
+				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+			}
+			return result.code, nil
+		}
+	} else {
+		result := <-waitDone
+		if result.err != nil {
+			return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+		}
+		return result.code, nil
+	}
+}
+
 func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, isHostStdinTerminal bool, att *attachResult) (int, error) {
 	o.logger.Trace("Waiting for container: %s", containerID)
 
 	effectiveHangTimeout := o.getHangTimeout(isHostStdinTerminal, cc.Interactive, resolved)
 
-	type waitResult struct {
-		code int
-		err  error
-	}
 	waitDone := make(chan waitResult, 1)
 	go func() {
 		code, err := rt.WaitContainer(ctx, containerID)
@@ -1151,96 +1262,10 @@ func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command,
 		exitCode = result.code
 		o.logger.Debug("Container %s finished with exit code %d", containerID, exitCode)
 
-		// After container exits, wait a short grace period for remaining output
-		if !att.attachDoneConsumed {
-			o.logger.Trace("Waiting for remaining output from container %s (grace period: %v)", containerID, o.attachGracePeriod)
-			select {
-			case err := <-att.attachDone:
-				if err != nil && !errors.Is(err, context.Canceled) {
-					o.logger.Warn("failed to attach to container: %v", err)
-				} else {
-					o.logger.Debug("AttachContainer finished successfully for %s", containerID)
-				}
-			case <-time.After(o.attachGracePeriod):
-				o.logger.Debug("AttachContainer timed out after container exit for %s, forcing close", containerID)
-				att.cancelAttach()
-				<-att.attachDone
-			}
-		}
+		o.drainAttachOutput(containerID, att)
 
 	case err := <-att.attachDone:
-		if err != nil && !errors.Is(err, context.Canceled) {
-			o.logger.Warn("failed to attach to container: %v", err)
-			// Wait for container to finish (best effort)
-			// We do NOT call cancel() here to allow rt.WaitContainer to continue normally
-			// until it finishes, the timeout expires, or a second signal is received.
-			if effectiveHangTimeout > 0 {
-				select {
-				case res := <-waitDone:
-					if res.err != nil {
-						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
-					}
-					exitCode = res.code
-				case <-time.After(effectiveHangTimeout):
-					o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
-					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
-				}
-			} else {
-				res := <-waitDone
-				if res.err != nil {
-					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
-				}
-				exitCode = res.code
-			}
-			return exitCode, nil
-		}
-		o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
-
-		// IO finished before container exited.
-		if !isHostStdinTerminal || !cc.Interactive {
-			if effectiveHangTimeout > 0 {
-				o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
-				select {
-				case result := <-waitDone:
-					if result.err != nil {
-						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
-					}
-					exitCode = result.code
-				case <-time.After(effectiveHangTimeout):
-					killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer killCancel()
-					_, err := o.signalKillIfRunning(killCtx, rt, containerID)
-					if err != nil {
-						return 0, err
-					}
-					select {
-					case result := <-waitDone:
-						if result.err != nil {
-							return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
-						}
-						exitCode = result.code
-					case <-time.After(effectiveHangTimeout):
-						o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
-						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
-					}
-				}
-			} else {
-				// effectiveHangTimeout is 0, wait indefinitely
-				o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
-				result := <-waitDone
-				if result.err != nil {
-					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
-				}
-				exitCode = result.code
-			}
-		} else {
-			// TTY mode: it's normal to wait for container exit even after IO might seem "done"
-			result := <-waitDone
-			if result.err != nil {
-				return 0, fmt.Errorf("failed to wait for container: %w", result.err)
-			}
-			exitCode = result.code
-		}
+		return o.handleAttachFinishedBeforeExit(rt, containerID, cc, isHostStdinTerminal, effectiveHangTimeout, err, waitDone)
 	}
 
 	o.logger.Debug("Total execution finished for container: %s", containerID)
