@@ -102,7 +102,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T95 | `--runtime` の意味を OCI ランタイム側へ切り替え | 破壊 | 中 | 小 | あり | - |
 | T96 | Control Socket サーバのリクエスト context を接続の生存に紐づける | バグ | 高 | 小 | - | DONE |
 | T97 | Control Socket サーバの accept ループ堅牢化とアイドルタイムアウト | バグ | 中 | 小 | - | - |
-| T98 | Control Socket ハンドラの共通化とエラー処理方針の統一 | リファクタ | 中 | 小 | - | - |
+| T98 | Control Socket ハンドラの共通化とエラー処理方針の統一 | リファクタ | 中 | 小 | - | DONE |
 | T99 | テストファイル命名規約の強制（親タスク） | クリーンアップ | 高 | 大 | - | - |
 | T100 | テストファイル命名規約の明文化と lint / CI ゲートの追加 | クリーンアップ | 高 | 小 | - | - |
 | T101 | `internal/config` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
@@ -792,50 +792,6 @@ T93 の完了時点で `--runtime` はエンジン指定の非推奨エイリア
 - `WaitContainer` および対話実行（`AttachContainer`）の処理中はアイドルタイムアウト適用から除外され切断されないことを確認するテストがある
 - `WaitContainer` を送信してレスポンスを受信した後に無通信（黙り込む）状態になった接続について、次のリクエスト処理前に通常のアイドルデッドラインが復元され正しく切断・回収されることを検証するテストがある
 - `make build` / `make test` / `make lint-go` がパスする
-
----
-
-## T98: Control Socket ハンドラの共通化とエラー処理方針の統一
-
-- 種別: リファクタ
-- 優先度: 中
-- 規模: 小
-- 仕様変更: なし
-- 対象: `internal/runtime/controlsocket/server.go`
-
-### 問題
-
-**1. 6つの RPC ハンドラが同一の定型コードを逐語コピーしている**
-
-`handleCreateContainer` / `handleStartContainer` / `handleWaitContainer` / `handleRemoveContainer` / `handleSignalContainer` / `handleResizeContainerTTY` が、いずれも以下を繰り返している:
-
-- 前置き: `s.mu` ロック → `s.dispatcher` 取得 → アンロック → nil チェック → `json.Unmarshal(payload, &args)` → 失敗時 `sendErrorResponse`
-- 後置き: `resp := ResponseFrame{Success: true}` → `json.Marshal` → `WriteFrame`
-
-合計で約100行。ハンドラを1つ追加するたびにこの定型が増える。ジェネリクスを使った1つのヘルパー（引数型でパラメタライズし、実処理だけをクロージャで受ける）に畳める。
-
-**2. `json.Marshal` のエラー処理が不統一**
-
-`respBytes, _ := json.Marshal(resp)` の形で戻り値のエラーを捨てている箇所が6つある。一方 `handleCreateContainer` は結果構造体の marshal エラーは丁寧に検査して `sendErrorResponse` している（`server.go:281-285`）。同じ関数の中で方針が割れている。
-
-`ResponseFrame` の marshal は実際には失敗しないが、「失敗しないから捨てる」のか「検査すべきだが漏れている」のかがコードから読み取れない。方針を決めて統一すること。
-
-### 仕様
-
-- 共通ヘルパーを1つ用意し、6ハンドラをその上に載せ替える
-- `json.Marshal` のエラー方針を統一する。捨てる場合は、なぜ失敗し得ないのかをコメントで明示する
-- 挙動（ワイヤ上のフレーム内容・エラーメッセージ文言）は変更しないこと。既存テストがそのまま通ることを確認する
-
-### 完了条件
-
-- 6ハンドラの定型コードが共通化され、`server.go` の行数が有意に減っている
-- `json.Marshal` のエラー処理方針が統一され、捨てている箇所には理由のコメントがある
-- 既存の Control Socket テストが変更なしで通る
-- `make build` / `make test` / `make lint-go` がパスする
-
-### 検討事項（実装者が判断する）
-
-- `ResponseFrame.Payload` / `RequestFrame.Payload` が `[]byte` のため、`encoding/json` の仕様上 base64 文字列としてエンコードされ、JSON の中に base64 で JSON を埋める二重エンコードになっている。`json.RawMessage` にすればデバッグ時にフレーム内容がそのまま読める。ただしワイヤ互換が壊れるため、`CurrentProtocolVersion` の扱いと合わせて判断すること。互換を壊す判断をするなら本タスクから切り出して別タスクにする
 
 ---
 

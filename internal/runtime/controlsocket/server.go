@@ -577,12 +577,14 @@ func (s *Server) sendHandshakeResponse(cs *connState, accepted bool, errMsg stri
 
 func (s *Server) sendSuccessResponse(cs *connState, payload []byte) error {
 	resp := ResponseFrame{Success: true, Payload: payload}
+	// json.Marshal cannot fail here because ResponseFrame only contains JSON-primitive types (bool, string, []byte).
 	respBytes, _ := json.Marshal(resp)
 	return cs.WriteFrame(respBytes)
 }
 
 func (s *Server) sendErrorResponse(cs *connState, errMsg string) {
 	resp := ResponseFrame{Success: false, Error: errMsg}
+	// json.Marshal cannot fail here because ResponseFrame only contains JSON-primitive types (bool, string, []byte).
 	data, _ := json.Marshal(resp)
 	_ = cs.WriteFrame(data)
 }
