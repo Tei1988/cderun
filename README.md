@@ -259,6 +259,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--gpus`: GPU devices to request (e.g., `all`, `count=2`, `device=0,1`). Note: containerd does not support GPU requests.
 - `--ipc`: Configure the IPC namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
 - `--cgroupns`: Configure the cgroup namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
+- `--oci-runtime`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`). Maps directly to `HostConfig.Runtime` in Docker / Podman host configuration. Note: containerd explicitly rejects `oci-runtime` with a validation error.
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
@@ -478,6 +479,7 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 - `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
+- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 
 **Note on List-type Options:**
 
