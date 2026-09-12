@@ -26,11 +26,9 @@ func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	disp := &mockDispatcher{
 		waitFunc: func(ctx context.Context, containerID string) (int, error) {
 			close(waitStarted)
-			select {
-			case <-ctx.Done():
-				ctxCanceled <- ctx.Err()
-				return 0, ctx.Err()
-			}
+			<-ctx.Done()
+			ctxCanceled <- ctx.Err()
+			return 0, ctx.Err()
 		},
 	}
 
@@ -83,8 +81,7 @@ func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	// Verify server handler detects disconnect and cancels request context
 	select {
 	case err := <-ctxCanceled:
-		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for request context cancellation on peer disconnect")
 	}
@@ -105,11 +102,9 @@ func TestUnit_ControlSocket_ServerClose_CancelsRequestContext(t *testing.T) {
 	disp := &mockDispatcher{
 		waitFunc: func(ctx context.Context, containerID string) (int, error) {
 			close(waitStarted)
-			select {
-			case <-ctx.Done():
-				ctxCanceled <- ctx.Err()
-				return 0, ctx.Err()
-			}
+			<-ctx.Done()
+			ctxCanceled <- ctx.Err()
+			return 0, ctx.Err()
 		},
 	}
 
@@ -144,8 +139,7 @@ func TestUnit_ControlSocket_ServerClose_CancelsRequestContext(t *testing.T) {
 
 	select {
 	case err := <-ctxCanceled:
-		require.Error(t, err)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for request context cancellation on Server.Close()")
 	}
@@ -198,4 +192,79 @@ func TestUnit_ControlSocket_ServerClose_BoundedWait_LingeringHandler(t *testing.
 	// Must return bounded by the 100ms timeout, well below the 2s handler sleep time
 	assert.Less(t, duration, 1*time.Second)
 	assert.GreaterOrEqual(t, server.ActiveHandlerCount(), 1)
+}
+
+func TestUnit_ControlSocket_DataSentDuringBlockedRequest_NonConsumingDisconnect(t *testing.T) {
+	tmpDir := t.TempDir()
+	socketPath := filepath.Join(tmpDir, "data_sent_blocked.sock")
+
+	waitStarted := make(chan struct{})
+	ctxCanceled := make(chan error, 1)
+
+	disp := &mockDispatcher{
+		waitFunc: func(ctx context.Context, containerID string) (int, error) {
+			close(waitStarted)
+			<-ctx.Done()
+			ctxCanceled <- ctx.Err()
+			return 0, ctx.Err()
+		},
+	}
+
+	server := NewServer(socketPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	defer server.Close()
+
+	var d net.Dialer
+	conn, err := d.DialContext(context.Background(), "unix", socketPath)
+	require.NoError(t, err)
+
+	// Handshake
+	hsReq := HandshakeRequest{
+		ProtocolVersion: CurrentProtocolVersion,
+		ClientVersion:   version.Version,
+	}
+	hsBytes, err := json.Marshal(hsReq)
+	require.NoError(t, err)
+	require.NoError(t, WriteFrame(conn, hsBytes))
+
+	_, err = ReadFrame(conn)
+	require.NoError(t, err)
+
+	// Send WaitContainer request
+	waitArgs := ContainerIDArgs{ContainerID: "test-container-2"}
+	payload, err := json.Marshal(waitArgs)
+	require.NoError(t, err)
+
+	reqFrame := RequestFrame{
+		Type:    MsgWaitContainer,
+		Payload: payload,
+	}
+	reqBytes, err := json.Marshal(reqFrame)
+	require.NoError(t, err)
+	require.NoError(t, WriteFrame(conn, reqBytes))
+
+	// Wait for handler to block
+	select {
+	case <-waitStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for WaitContainer handler to start")
+	}
+
+	// Send extra data over the socket while handler is blocked
+	pingFrame := RequestFrame{Type: MsgPing}
+	pingBytes, err := json.Marshal(pingFrame)
+	require.NoError(t, err)
+	require.NoError(t, WriteFrame(conn, pingBytes))
+
+	// Disconnect client
+	require.NoError(t, conn.Close())
+
+	// Verify server handler context is canceled upon disconnect despite extra data sent
+	select {
+	case err := <-ctxCanceled:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for request context cancellation on disconnect after data sent")
+	}
 }

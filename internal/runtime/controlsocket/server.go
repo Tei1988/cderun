@@ -234,15 +234,16 @@ func (s *Server) handleConn(conn net.Conn) {
 		s.logger.Warn("Failed to clear read deadline after handshake: %v", err)
 	}
 
-	// 2. Request Loop
+	// 2. Request Loop (Single connection-owning loop)
 	for {
-		_ = conn.SetReadDeadline(time.Time{})
 		frameBytes, err := ReadFrame(conn)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+				cancelConn()
 				return
 			}
 			s.logger.Debug("Control socket frame read error: %v", err)
+			cancelConn()
 			return
 		}
 
@@ -252,8 +253,15 @@ func (s *Server) handleConn(conn net.Conn) {
 			continue
 		}
 
-		s.dispatchRequest(conn, connCtx, &reqFrame)
-		_ = conn.SetReadDeadline(time.Time{})
+		if reqFrame.Type == MsgAttachContainer {
+			s.dispatchRequest(conn, connCtx, &reqFrame)
+		} else {
+			s.wg.Add(1)
+			go func(rf RequestFrame) {
+				defer s.wg.Done()
+				s.dispatchRequest(conn, connCtx, &rf)
+			}(reqFrame)
+		}
 	}
 }
 
@@ -273,70 +281,12 @@ func (s *Server) getDispatcher() ContainerRuntimeDispatcher {
 	return s.dispatcher
 }
 
-func (s *Server) watchDisconnect(conn net.Conn, reqCtx context.Context, connCtx context.Context, reqDone <-chan struct{}, cancelReq context.CancelFunc) {
-	readDone := make(chan struct{})
-	readErrChan := make(chan error, 1)
-
-	go func() {
-		defer close(readDone)
-		buf := make([]byte, 1)
-		_, err := conn.Read(buf)
-		readErrChan <- err
-	}()
-
-	select {
-	case <-reqDone:
-		_ = conn.SetReadDeadline(time.Now())
-		<-readDone
-		return
-	case <-connCtx.Done():
-		cancelReq()
-		_ = conn.SetReadDeadline(time.Now())
-		<-readDone
-		return
-	case <-reqCtx.Done():
-		_ = conn.SetReadDeadline(time.Now())
-		<-readDone
-		return
-	case err := <-readErrChan:
-		if err != nil {
-			var netErr net.Error
-			if errors.As(err, &netErr) && netErr.Timeout() {
-				<-readDone
-				return
-			}
-			s.logger.Debug("Control socket peer disconnected during request execution: %v", err)
-			cancelReq()
-		}
-		<-readDone
-		return
-	}
-}
-
 func (s *Server) dispatchRequest(conn net.Conn, connCtx context.Context, reqFrame *RequestFrame) {
 	reqCtx, cancelReq := s.buildRequestContext(connCtx, reqFrame)
 	defer cancelReq()
 
-	reqDone := make(chan struct{})
-	watchDone := make(chan struct{})
-
 	_, doneHandler := s.trackHandlerStart(string(reqFrame.Type))
 	defer doneHandler()
-
-	if reqFrame.Type != MsgAttachContainer {
-		go func() {
-			s.watchDisconnect(conn, reqCtx, connCtx, reqDone, cancelReq)
-			close(watchDone)
-		}()
-	} else {
-		close(watchDone)
-	}
-
-	defer func() {
-		close(reqDone)
-		<-watchDone
-		_ = conn.SetReadDeadline(time.Time{})
-	}()
 
 	switch reqFrame.Type {
 	case MsgPing:
