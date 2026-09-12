@@ -617,7 +617,7 @@ func ContainsNumericGID(groups []string) bool {
 
 // HasParentTraversal checks if a path contains parent directory traversal ("..") segments.
 func HasParentTraversal(s string) bool {
-	if !strings.Contains(s, "..") {
+	if strings.IndexByte(s, '.') == -1 || !strings.Contains(s, "..") {
 		return false
 	}
 	idx := 0

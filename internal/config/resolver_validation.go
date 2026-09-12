@@ -630,19 +630,35 @@ func (rv *resolver) validateSlices() error {
 
 func (rv *resolver) validateEnvSecurity() error {
 	for i, e := range rv.res.Env {
-		key, val, _ := strings.Cut(e, "=")
+		idx := strings.IndexByte(e, '=')
+		var key, val string
+		if idx >= 0 {
+			key, val = e[:idx], e[idx+1:]
+		} else {
+			key = e
+		}
 		if err := validatePathChars(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
 		if err := ValidateEnvKey(key); err != nil {
 			return fmt.Errorf("security validation failed for env[%d] (key): %w", i, err)
 		}
-		if strings.ContainsRune(val, 0) {
+		if strings.IndexByte(val, 0) != -1 {
 			return fmt.Errorf("security validation failed for env[%d] (value): null byte injection detected", i)
 		}
-		for pos, r := range val {
-			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
-				return fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+		hasControlOrNonASCII := false
+		for j := 0; j < len(val); j++ {
+			b := val[j]
+			if (b < 0x20 && b != '\n' && b != '\r' && b != '\t') || b == 0x7f || b >= 0x80 {
+				hasControlOrNonASCII = true
+				break
+			}
+		}
+		if hasControlOrNonASCII {
+			for pos, r := range val {
+				if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+					return fmt.Errorf("security validation failed for env[%d] (value): invalid control character %q at position %d", i, r, pos)
+				}
 			}
 		}
 	}
