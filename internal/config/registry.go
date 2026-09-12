@@ -645,6 +645,19 @@ var StringOptions = []StringOption{
 			return g.Defaults.Restart
 		},
 	},
+	{
+		Name:      "oci-runtime",
+		FieldName: "OciRuntime",
+		EnvKey:    "CDERUN_OCI_RUNTIME",
+		Usage:     "OCI runtime to use (e.g. runc, crun, nvidia, kata)",
+		Default:   "",
+		ToolGetter: func(t ToolConfig) string {
+			return t.OciRuntime
+		},
+		GlobalGetter: func(g CDERunConfig) string {
+			return g.Defaults.OciRuntime
+		},
+	},
 }
 
 var BoolOptions = []BoolOption{

@@ -387,6 +387,7 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		CpusetCpus:  resolved.CpusetCpus,
 		CpusetMems:  resolved.CpusetMems,
 		Restart:     resolved.Restart,
+		OciRuntime:  resolved.OciRuntime,
 	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
