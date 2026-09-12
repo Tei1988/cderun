@@ -184,6 +184,14 @@ func (m *mockFullClient) LoadContainer(ctx context.Context, id string) (client.C
 	return nil, errdefs.ErrNotFound
 }
 
+func (m *mockFullClient) Containers(ctx context.Context, filters ...string) ([]client.Container, error) {
+	var list []client.Container
+	for _, c := range m.containers {
+		list = append(list, c)
+	}
+	return list, nil
+}
+
 func (m *mockFullClient) Close() error {
 	m.closed = true
 	return nil

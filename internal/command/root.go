@@ -468,6 +468,41 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	})
 }
 
+func (o *rootOptions) handlePrune(cmd *cobra.Command, resolved *config.ResolvedConfig) error {
+	o.ensureHooks()
+
+	if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	o.logger.SetOutput(cmd.ErrOrStderr())
+
+	if resolved.DryRun {
+		w := cmd.OutOrStdout()
+		_, _ = fmt.Fprintln(w, "Dry-run mode: Would prune stopped orphan containers created by cderun.")
+		return nil
+	}
+
+	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize runtime: %w", err)
+	}
+	defer rt.Close()
+
+	prunedIDs, err := rt.PruneContainers(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to prune orphan containers: %w", err)
+	}
+
+	w := cmd.OutOrStdout()
+	if len(prunedIDs) == 0 {
+		_, _ = fmt.Fprintln(w, "No orphan containers found to prune.")
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(w, "Pruned %d orphan container(s): %s\n", len(prunedIDs), strings.Join(prunedIDs, ", "))
+	return nil
+}
+
 func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig) error {
 	o.ensureHooks()
 
@@ -1384,6 +1419,10 @@ intended for the subcommand.`,
 
 		if resolved.Diagnosis {
 			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths, globalCfg)
+		}
+
+		if resolved.Prune {
+			return o.handlePrune(cmd, resolved)
 		}
 
 		if resolved.PrefetchAll || resolved.Prefetch != "" {
