@@ -86,6 +86,8 @@ type CLIOptions struct {
 	CderunMountTools        *string
 	Network                 *string
 	CderunNetwork           *string
+	OciRuntime              *string
+	CderunOciRuntime        *string
 	Pid                     *string
 	CderunPid               *string
 	PidsLimit               *int

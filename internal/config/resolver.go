@@ -81,6 +81,7 @@ type ResolvedConfig struct {
 	CpusetCpus      string
 	CpusetMems      string
 	Restart         string
+	OciRuntime      string
 }
 
 // Resolve combines CLI flags, environment variables, tool-specific config, and global defaults.

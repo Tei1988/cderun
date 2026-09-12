@@ -91,6 +91,8 @@ type rootFlags struct {
 	cderunMountTools        string
 	network                 string
 	cderunNetwork           string
+	ociRuntime              string
+	cderunOciRuntime        string
 	pid                     string
 	cderunPid               string
 	pidsLimit               int
@@ -253,6 +255,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunMountTools:        optStr(cmd.Flags().Changed("cderun-mount-tools"), o.cderunMountTools),
 		Network:                 optStr(cmd.Flags().Changed("network"), o.network),
 		CderunNetwork:           optStr(cmd.Flags().Changed("cderun-network"), o.cderunNetwork),
+		OciRuntime:              optStr(cmd.Flags().Changed("oci-runtime"), o.ociRuntime),
+		CderunOciRuntime:        optStr(cmd.Flags().Changed("cderun-oci-runtime"), o.cderunOciRuntime),
 		Pid:                     optStr(cmd.Flags().Changed("pid"), o.pid),
 		CderunPid:               optStr(cmd.Flags().Changed("cderun-pid"), o.cderunPid),
 		PidsLimit:               optInt(cmd.Flags().Changed("pids-limit"), o.pidsLimit),
@@ -383,6 +387,8 @@ func getStringPointers(o *rootOptions, name string) (base, override *string) {
 		return &o.mountTools, &o.cderunMountTools
 	case "network":
 		return &o.network, &o.cderunNetwork
+	case "oci-runtime":
+		return &o.ociRuntime, &o.cderunOciRuntime
 	case "pid":
 		return &o.pid, &o.cderunPid
 	case "prefetch":

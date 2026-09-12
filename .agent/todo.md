@@ -311,6 +311,11 @@ cderun --prune
 - **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
 - **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
 
+### Documentation Update Task: T94 (`--oci-runtime` / `--cderun-oci-runtime`)
+
+- **内容**: T94の実装（`--oci-runtime`, `--cderun-oci-runtime`, `CDERUN_OCI_RUNTIME`, `.cderun.yaml` の `defaults.ociRuntime`）の仕様説明をドキュメントに追加する。
+- **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する
@@ -685,56 +690,6 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 - `--runtime` の意味を OCI ランタイム側へ切り替えること（T95）
 - OCI ランタイム指定フラグそのものの追加（T94）
 - `internal/runtime` パッケージ名および `ContainerRuntime` インターフェース名のリネーム: 実害がなく、差分を不必要に膨らませるため。必要なら別タスクとして起票する
-
----
-
-## T94: OCI ランタイム指定フラグ `--oci-runtime` の追加
-
-- 種別: 機能
-- 優先度: 高
-- 規模: 小
-- 前提: なし（T93 と並行可。フラグ名が衝突しないため独立して出荷できる）
-- 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`
-
-### 背景
-
-`--runtime` がエンジン指定に使われているため、OCI ランタイム（runc / crun / nvidia / kata）を指定する手段が存在しない。T93 のリネーム完了を待たずにこの実害だけ先に解消するため、衝突しない名前 `--oci-runtime` で先行導入する。
-
-### 仕様
-
-| フラグ | 型 | デフォルト | 環境変数 | 説明 |
-| --- | --- | --- | --- | --- |
-| `--oci-runtime` | string | 空（エンジンのデフォルト） | `CDERUN_OCI_RUNTIME` | OCI ランタイムの指定 |
-
-- `.cderun.yaml` OCI ランタイム契約: `.cderun.yaml` 設定ファイルの `defaults:` セクションにキー `ociRuntime`（型: `string`）として定義する。
-- 優先順位（Precedence Matrix）:
-  1. `P1`: `--cderun-oci-runtime`（P1 内部オーバーライドフラグ）
-  2. `P2`: `--oci-runtime`（P2 CLI フラグ）
-  3. `P4`: `CDERUN_OCI_RUNTIME`（P4 環境変数）
-  4. `P5`: `.cderun.yaml`（`defaults.ociRuntime`、P5 設定ファイル）
-- Docker / Podman: `HostConfig.Runtime` に設定する。Podman は `NewPodmanRuntime` が Docker 互換 API 経由で `DockerRuntime` を利用しているため、同じ経路で透過的に効く（旧 T31 は「Podman には `--runtime` オプションとして透過的に渡す」と記載していたが、CLI を経由しないので誤り）
-- containerd: 未サポートとして明示エラー（T16 で導入したランタイム未対応機能の事前バリデーションに乗せる）
-- P1 フラグ `--cderun-oci-runtime` も併せて追加する
-
-### 完了条件
-
-- `--oci-runtime` / `--cderun-oci-runtime` / `CDERUN_OCI_RUNTIME` / `.cderun.yaml` (`defaults.ociRuntime`) で OCI ランタイムを指定できる
-- `.cderun.yaml` の `defaults.ociRuntime` 設定値がロードされ、優先順位（P1 > P2 > P4 > P5）に従ってオーバーライドされることを検証する設定ファイルテストが存在すること
-- P1 オーバーライドフラグ `--cderun-oci-runtime` が正常に動作し、`--oci-runtime` と一貫して処理されることを検証するテストがある
-- Docker で `HostConfig.Runtime` に反映されるテストがある
-- containerd 指定時に明示エラーになるテストがある
-- `docs/features/command-line-options.md` / `multi-runtime-support.md` / `README.md` / `USAGE.md` が更新されている
-- `make generate` の生成物が再生成・コミットされている
-- `make build` / `make test` / `make lint-go` / `make lint-md` がパスする
-
-### 対象ファイル
-
-- `internal/config/registry.go`
-- `internal/config/resolver.go`
-- `internal/config/config.go`
-- `internal/runtime/docker_adapter.go`（`HostConfig` の構築。`:45` 付近）
-- `internal/runtime/containerd.go`（未サポートエラー）
-- 生成物: `internal/config/cli_options.gen.go`, `internal/command/root_flags.gen.go`
 
 ---
 

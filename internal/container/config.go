@@ -84,6 +84,7 @@ type ContainerConfig struct {
 	CpusetCpus  string            `json:"cpuset_cpus,omitempty" yaml:"cpuset_cpus,omitempty"`
 	CpusetMems  string            `json:"cpuset_mems,omitempty" yaml:"cpuset_mems,omitempty"`
 	Restart     string            `json:"restart,omitempty" yaml:"restart,omitempty"`
+	OciRuntime  string            `json:"oci_runtime,omitempty" yaml:"oci_runtime,omitempty"`
 }
 
 // Ulimit represents a ulimit setting for a container.

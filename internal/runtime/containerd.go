@@ -163,6 +163,9 @@ func (r *ContainerdRuntime) ValidateConfig(config *container.ContainerConfig) er
 }
 
 func validateContainerdUnsupportedFeatures(config *container.ContainerConfig) error {
+	if config.OciRuntime != "" {
+		return fmt.Errorf("containerd runtime: oci-runtime is not supported yet")
+	}
 	if config.Init {
 		return fmt.Errorf("containerd runtime: init is not supported yet")
 	}
