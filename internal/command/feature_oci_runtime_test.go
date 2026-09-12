@@ -23,7 +23,7 @@ func TestUnit_Command_OciRuntime_CLIFlags(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Contains(t, outBuf.String(), "Image: alpine")
+		assert.Contains(t, outBuf.String(), "OciRuntime: crun")
 	})
 
 	t.Run("--cderun-oci-runtime flag overrides --oci-runtime in dry-run", func(t *testing.T) {
@@ -38,6 +38,6 @@ func TestUnit_Command_OciRuntime_CLIFlags(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Contains(t, outBuf.String(), "Image: alpine")
+		assert.Contains(t, outBuf.String(), "OciRuntime: runc")
 	})
 }

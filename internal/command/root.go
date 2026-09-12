@@ -651,6 +651,9 @@ func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
 	if cfg.Restart != "" && cfg.Restart != "no" {
 		_, _ = fmt.Fprintf(w, "Restart: %s\n", cfg.Restart)
 	}
+	if cfg.OciRuntime != "" {
+		_, _ = fmt.Fprintf(w, "OciRuntime: %s\n", cfg.OciRuntime)
+	}
 	_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(cfg.CapAdd, ", "))
 	_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(cfg.CapDrop, ", "))
 	_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(cfg.GroupAdd, ", "))
