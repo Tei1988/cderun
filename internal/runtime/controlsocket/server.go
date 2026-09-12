@@ -478,6 +478,7 @@ func (s *Server) handleAttachContainer(ctx context.Context, cs *connState, cance
 							cancelConn()
 							return true
 						}
+						time.Sleep(20 * time.Millisecond)
 						return false
 					})
 				}

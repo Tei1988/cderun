@@ -17,6 +17,17 @@ import (
 	"cderun/internal/version"
 )
 
+func receiveCtxErrorWithTimeout(t *testing.T, ctxCanceled <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-ctxCanceled:
+		return err
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for request context cancellation error")
+		return nil
+	}
+}
+
 func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	socketPath := filepath.Join(tmpDir, "peer_disconnect.sock")
@@ -76,7 +87,7 @@ func TestUnit_ControlSocket_PeerDisconnect_CancelsRequestContext(t *testing.T) {
 	require.NoError(t, conn.Close())
 
 	// Verify server handler detects disconnect and cancels request context
-	err = <-ctxCanceled
+	err = receiveCtxErrorWithTimeout(t, ctxCanceled)
 	require.ErrorIs(t, err, context.Canceled)
 
 	// Verify active handler count returns to 0
@@ -126,7 +137,7 @@ func TestUnit_ControlSocket_ServerClose_CancelsRequestContext(t *testing.T) {
 	// Close server while WaitContainer is active
 	require.NoError(t, server.Close())
 
-	err = <-ctxCanceled
+	err = receiveCtxErrorWithTimeout(t, ctxCanceled)
 	require.ErrorIs(t, err, context.Canceled)
 
 	wg.Wait()
@@ -238,7 +249,7 @@ func TestUnit_ControlSocket_DataSentDuringBlockedRequest_NonConsumingDisconnect(
 	require.NoError(t, conn.Close())
 
 	// Verify server handler context is canceled upon disconnect despite extra data sent
-	err = <-ctxCanceled
+	err = receiveCtxErrorWithTimeout(t, ctxCanceled)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -305,6 +316,6 @@ func TestUnit_ControlSocket_NoStdinAttach_PeerDisconnect_CancelsContext(t *testi
 	require.NoError(t, conn.Close())
 
 	// Verify dispatcher observes context cancellation
-	err = <-ctxCanceled
+	err = receiveCtxErrorWithTimeout(t, ctxCanceled)
 	require.ErrorIs(t, err, context.Canceled)
 }
