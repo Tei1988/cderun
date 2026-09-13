@@ -37,6 +37,8 @@ The table below summarizes support for key `cderun` configuration features acros
 | **Stand-alone Image Prefetching** (`--prefetch`, `--prefetch-all`) | ✅ | ✅ | ✅ | Prefetches tool images via runtime `PullImage` API without container execution |
 | **Hang Timeout** (`--hang-timeout`) | ✅ | ✅ | ✅ | Managed by `cderun` execution controller after I/O finishes in non-TTY environments |
 | **Control Socket Mounting** (`--mount-cderun-socket`) | ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
+| **Custom OCI Runtime Selection** (`--oci-runtime`) | ✅ | ✅ | ❌ | Unsupported on direct containerd (`ValidateConfig` returns error) |
+| **Orphan Container Pruning** (`--prune`) | ✅ | ✅ | ✅ | Cleans up stopped containers tagged with `cderun` label/namespace |
 
 ### List-Type (Array-Type) Options and Environment Variable Separator Rules
 
@@ -314,6 +316,39 @@ cderun --strict-env --env NPM_TOKEN node app.js
 
 ```bash
 cderun --runtime podman node app.js
+```
+
+### `--oci-runtime`
+
+- **Type**: string
+- **Default**: `""`
+- **Environment Variable**: `CDERUN_OCI_RUNTIME`
+- **Description**: Specify a custom OCI runtime binary/engine (e.g., `runc`, `crun`, `kata-runtime`) for low-level container execution.
+- **Details**:
+  - **Docker**: Maps to `HostConfig.Runtime` during Docker container creation.
+  - **Podman**: Mapped to native Podman OCI runtime selection.
+  - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`.
+- **P1 Internal Override**: `--cderun-oci-runtime` is the corresponding Phase 1 (P1) internal override flag (e.g. `cderun node app.js --cderun-oci-runtime crun`).
+
+```bash
+cderun --oci-runtime crun node app.js
+```
+
+### `--prune`
+
+- **Type**: bool
+- **Default**: `false`
+- **Environment Variable**: `CDERUN_PRUNE`
+- **Description**: Stand-alone utility mode to list and remove stopped orphan containers created by `cderun`.
+- **Details**:
+  - Identifies stopped containers matching `cderun=true` label (Docker/Podman) or in the `cderun` namespace (containerd) and removes them.
+  - Running containers are skipped during pruning to avoid interrupting active workloads.
+  - Supports `--dry-run` preview (e.g., `cderun --prune --dry-run`).
+- **P1 Internal Override**: `--cderun-prune` is the corresponding Phase 1 (P1) internal override flag.
+
+```bash
+cderun --prune
+cderun --prune --dry-run
 ```
 
 ### `--remove`
