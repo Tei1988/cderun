@@ -213,6 +213,8 @@ func isTemporaryAcceptError(err error) bool {
 		switch sysErr {
 		case syscall.ECONNABORTED, syscall.EMFILE, syscall.ENFILE, syscall.EINTR, syscall.ENOBUFS, syscall.ENOMEM, syscall.ETIMEDOUT, syscall.EAGAIN:
 			return true
+		default:
+			return false
 		}
 	}
 	return false
@@ -242,7 +244,11 @@ func (s *Server) acceptLoop() {
 					tempDelay = max
 				}
 				s.logger.Warn("Control socket accept temporary error: %v; retrying in %v", err, tempDelay)
-				time.Sleep(tempDelay)
+				select {
+				case <-s.closed:
+					return
+				case <-time.After(tempDelay):
+				}
 				continue
 			}
 
@@ -675,13 +681,23 @@ func (s *Server) sendHandshakeResponse(cs *connState, accepted bool, errMsg stri
 
 func (s *Server) sendSuccessResponse(cs *connState, payload []byte) error {
 	resp := ResponseFrame{Success: true, Payload: payload}
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		// ResponseFrame with primitive fields (Success bool, Payload []byte) cannot fail marshaling.
+		s.logger.Warn("Failed to marshal success ResponseFrame: %v", err)
+		return err
+	}
 	return cs.WriteFrame(respBytes)
 }
 
 func (s *Server) sendErrorResponse(cs *connState, errMsg string) {
 	resp := ResponseFrame{Success: false, Error: errMsg}
-	data, _ := json.Marshal(resp)
+	data, err := json.Marshal(resp)
+	if err != nil {
+		// ResponseFrame with primitive fields (Success bool, Error string) cannot fail marshaling.
+		s.logger.Warn("Failed to marshal error ResponseFrame: %v", err)
+		return
+	}
 	_ = cs.WriteFrame(data)
 }
 
