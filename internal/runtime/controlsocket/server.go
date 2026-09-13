@@ -32,13 +32,51 @@ type ContainerRuntimeDispatcher interface {
 
 type connState struct {
 	net.Conn
-	writeMu sync.Mutex
+	writeMu        sync.Mutex
+	mu             sync.Mutex
+	longRunningOps int
 }
 
 func (c *connState) WriteFrame(payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	return WriteFrame(c.Conn, payload)
+}
+
+func (c *connState) incLongRunningOps() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.longRunningOps++
+	_ = c.SetReadDeadline(time.Time{})
+}
+
+func (c *connState) decLongRunningOps(idleTimeout time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.longRunningOps > 0 {
+		c.longRunningOps--
+	}
+	if c.longRunningOps == 0 {
+		if idleTimeout > 0 {
+			_ = c.SetReadDeadline(time.Now().Add(idleTimeout))
+		} else {
+			_ = c.SetReadDeadline(time.Time{})
+		}
+	}
+}
+
+func (c *connState) updateReadDeadlineForNextFrame(idleTimeout time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.longRunningOps == 0 {
+		if idleTimeout > 0 {
+			_ = c.SetReadDeadline(time.Now().Add(idleTimeout))
+		} else {
+			_ = c.SetReadDeadline(time.Time{})
+		}
+	} else {
+		_ = c.SetReadDeadline(time.Time{})
+	}
 }
 
 // Server handles Control Socket connections from nested cderun instances.
@@ -54,6 +92,7 @@ type Server struct {
 	ctx            context.Context
 	cancelCtx      context.CancelFunc
 	closeTimeout   time.Duration
+	idleTimeout    time.Duration
 	activeHandlers map[string]time.Time
 	handlerSeq     uint64
 }
@@ -72,6 +111,7 @@ func NewServer(socketPath string, logger *logging.Logger) *Server {
 		ctx:            ctx,
 		cancelCtx:      cancel,
 		closeTimeout:   5 * time.Second,
+		idleTimeout:    60 * time.Second,
 		activeHandlers: make(map[string]time.Time),
 	}
 }
@@ -81,6 +121,19 @@ func (s *Server) SetCloseTimeout(d time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closeTimeout = d
+}
+
+// SetIdleTimeout configures the maximum idle duration for client connections.
+func (s *Server) SetIdleTimeout(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.idleTimeout = d
+}
+
+func (s *Server) getIdleTimeout() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.idleTimeout
 }
 
 // SetDispatcher configures the underlying ContainerRuntimeDispatcher for servicing RPC requests.
@@ -147,8 +200,30 @@ func (s *Server) Start() error {
 	return nil
 }
 
+func isTemporaryAcceptError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	var sysErr syscall.Errno
+	if errors.As(err, &sysErr) {
+		switch sysErr {
+		case syscall.ECONNABORTED, syscall.EMFILE, syscall.ENFILE, syscall.EINTR, syscall.ENOBUFS, syscall.ENOMEM, syscall.ETIMEDOUT, syscall.EAGAIN:
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 func (s *Server) acceptLoop() {
 	defer s.wg.Done()
+
+	var tempDelay time.Duration
 
 	for {
 		conn, err := s.listener.Accept()
@@ -157,10 +232,31 @@ func (s *Server) acceptLoop() {
 			case <-s.closed:
 				return
 			default:
-				s.logger.Debug("Accept error on control socket: %v", err)
-				return
 			}
+
+			if isTemporaryAcceptError(err) {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				s.logger.Warn("Control socket accept temporary error: %v; retrying in %v", err, tempDelay)
+				select {
+				case <-s.closed:
+					return
+				case <-time.After(tempDelay):
+				}
+				continue
+			}
+
+			s.logger.Warn("Control socket accept loop exiting due to permanent error: %v", err)
+			return
 		}
+
+		tempDelay = 0
 
 		if !s.registerConn(conn) {
 			_ = conn.Close()
@@ -242,16 +338,18 @@ func (s *Server) handleConn(cs *connState) {
 		return
 	}
 
-	// Reset read deadline for normal operation
-	if err := cs.SetReadDeadline(time.Time{}); err != nil {
-		s.logger.Warn("Failed to clear read deadline after handshake: %v", err)
-	}
-
 	// 2. Request Loop (Single connection-owning loop)
 	for {
+		cs.updateReadDeadlineForNextFrame(s.getIdleTimeout())
 		frameBytes, err := ReadFrame(cs.Conn)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
+				cancelConn()
+				return
+			}
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				s.logger.Debug("Control socket connection idle timeout reached (%v)", cs.RemoteAddr())
 				cancelConn()
 				return
 			}
@@ -300,6 +398,12 @@ func (s *Server) dispatchRequest(cs *connState, connCtx context.Context, cancelC
 
 	_, doneHandler := s.trackHandlerStart(string(reqFrame.Type))
 	defer doneHandler()
+
+	idleTimeout := s.getIdleTimeout()
+	if reqFrame.Type == MsgWaitContainer || reqFrame.Type == MsgAttachContainer {
+		cs.incLongRunningOps()
+		defer cs.decLongRunningOps(idleTimeout)
+	}
 
 	switch reqFrame.Type {
 	case MsgPing:
@@ -577,13 +681,23 @@ func (s *Server) sendHandshakeResponse(cs *connState, accepted bool, errMsg stri
 
 func (s *Server) sendSuccessResponse(cs *connState, payload []byte) error {
 	resp := ResponseFrame{Success: true, Payload: payload}
-	respBytes, _ := json.Marshal(resp)
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		// ResponseFrame with primitive fields (Success bool, Payload []byte) cannot fail marshaling.
+		s.logger.Warn("Failed to marshal success ResponseFrame: %v", err)
+		return err
+	}
 	return cs.WriteFrame(respBytes)
 }
 
 func (s *Server) sendErrorResponse(cs *connState, errMsg string) {
 	resp := ResponseFrame{Success: false, Error: errMsg}
-	data, _ := json.Marshal(resp)
+	data, err := json.Marshal(resp)
+	if err != nil {
+		// ResponseFrame with primitive fields (Success bool, Error string) cannot fail marshaling.
+		s.logger.Warn("Failed to marshal error ResponseFrame: %v", err)
+		return
+	}
 	_ = cs.WriteFrame(data)
 }
 
