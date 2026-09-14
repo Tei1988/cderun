@@ -46,6 +46,7 @@
 | **Bind & tmpfs Mounts** | Yes | Yes | Yes |
 | **Named Volume Mounts** | Yes | Yes | No |
 | **Linux Capabilities (`--cap-add/drop`)** | Yes | Yes | Yes (Converted to `CAP_` prefix) |
+| **Custom OCI Runtime (`--oci-runtime`)** | Yes | Yes | No |
 | **Process Resource Limits (ulimits)** | Yes | Yes | Yes (Converted to POSIX rlimits) |
 | **Read-Only RootFS** | Yes | Yes | Yes |
 | **Host PID / IPC / Cgroup Namespaces** | Yes | Yes | Yes (Host or Private) |

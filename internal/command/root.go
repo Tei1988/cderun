@@ -468,6 +468,41 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	})
 }
 
+func (o *rootOptions) handlePrune(cmd *cobra.Command, resolved *config.ResolvedConfig) error {
+	o.ensureHooks()
+
+	if err := o.logger.Init(resolved.LogLevel, resolved.LogFormat, resolved.LogTimestamp); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	o.logger.SetOutput(cmd.ErrOrStderr())
+
+	if resolved.DryRun {
+		w := cmd.OutOrStdout()
+		_, _ = fmt.Fprintln(w, "Dry-run mode: Would prune stopped orphan containers created by cderun.")
+		return nil
+	}
+
+	rt, err := o.runtimeFactory(resolved.Runtime, resolved.SocketPath, o.logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize runtime: %w", err)
+	}
+	defer rt.Close()
+
+	prunedIDs, err := rt.PruneContainers(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to prune orphan containers: %w", err)
+	}
+
+	w := cmd.OutOrStdout()
+	if len(prunedIDs) == 0 {
+		_, _ = fmt.Fprintln(w, "No orphan containers found to prune.")
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(w, "Pruned %d orphan container(s): %s\n", len(prunedIDs), strings.Join(prunedIDs, ", "))
+	return nil
+}
+
 func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig) error {
 	o.ensureHooks()
 
@@ -1386,6 +1421,10 @@ intended for the subcommand.`,
 			return o.handleDiagnosis(cmd, resolved, toolsCfg, globalPaths, toolsPaths, globalCfg)
 		}
 
+		if resolved.Prune {
+			return o.handlePrune(cmd, resolved)
+		}
+
 		if resolved.PrefetchAll || resolved.Prefetch != "" {
 			return o.handlePrefetch(cmd, resolved, toolsCfg)
 		}
@@ -1544,16 +1583,19 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		}
 	}
 
+	var overrideBuf [32]string
+	var otherBuf [32]string
+
+	overrides, others, err := hoistOverridesInto(cmd, args, isPolyglot, subcmdIdx, overrideBuf[:0], otherBuf[:0])
+	if err != nil {
+		return nil, err
+	}
+
 	processedArgs := make([]string, 0, len(args)+1)
 	if isPolyglot {
 		processedArgs = append(processedArgs, "cderun")
 	} else {
 		processedArgs = append(processedArgs, args[0])
-	}
-
-	overrides, others, err := hoistOverrides(cmd, args, isPolyglot, subcmdIdx)
-	if err != nil {
-		return nil, err
 	}
 
 	processedArgs = append(processedArgs, overrides...)
@@ -1579,12 +1621,16 @@ func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int
 		}
 		// It's a flag. Check if it's a long flag or shorthand and if it takes an argument.
 		if strings.HasPrefix(arg, "--") {
-			name := strings.SplitN(arg[2:], "=", 2)[0]
+			name := arg[2:]
+			eqIdx := strings.IndexByte(name, '=')
+			if eqIdx != -1 {
+				name = name[:eqIdx]
+			}
 			f := cmd.PersistentFlags().Lookup(name)
 			if f == nil {
 				f = cmd.Flags().Lookup(name)
 			}
-			if f != nil && f.NoOptDefVal == "" && !strings.Contains(arg, "=") {
+			if f != nil && f.NoOptDefVal == "" && eqIdx == -1 {
 				// Flag exists, takes an argument, and no '=' used, so skip next argument.
 				i++
 			}
@@ -1615,6 +1661,10 @@ func checkPreSubcommandFlags(args []string, subcmdIdx int) error {
 }
 
 func hoistOverrides(cmd *cobra.Command, args []string, isPolyglot bool, subcmdIdx int) (overrides []string, others []string, err error) {
+	return hoistOverridesInto(cmd, args, isPolyglot, subcmdIdx, nil, nil)
+}
+
+func hoistOverridesInto(cmd *cobra.Command, args []string, isPolyglot bool, subcmdIdx int, overridesBuf []string, othersBuf []string) (overrides []string, others []string, err error) {
 	// Scan all arguments after the executable name
 	// In polyglot mode, everything after index 0 is after the subcommand.
 	// In standard mode, only arguments after subcmdIdx are considered for hoisting P1 overrides.
@@ -1629,8 +1679,17 @@ func hoistOverrides(cmd *cobra.Command, args []string, isPolyglot bool, subcmdId
 	}
 	othersCap := max(0, len(args)-1)
 
-	overrides = make([]string, 0, remaining)
-	others = make([]string, 0, othersCap)
+	if overridesBuf == nil {
+		overrides = make([]string, 0, remaining)
+	} else {
+		overrides = overridesBuf
+	}
+
+	if othersBuf == nil {
+		others = make([]string, 0, othersCap)
+	} else {
+		others = othersBuf
+	}
 
 	if !isPolyglot && subcmdIdx != -1 {
 		// Standard mode: hoist only from after the subcommand

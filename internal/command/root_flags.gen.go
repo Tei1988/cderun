@@ -103,6 +103,8 @@ type rootFlags struct {
 	cderunPrefetchAll       bool
 	privileged              bool
 	cderunPrivileged        bool
+	prune                   bool
+	cderunPrune             bool
 	ports                   []string
 	cderunPorts             []string
 	publishAll              bool
@@ -267,6 +269,8 @@ func buildCLIOptions(cmd *cobra.Command, o *rootOptions) config.CLIOptions {
 		CderunPrefetchAll:       optBool(cmd.Flags().Changed("cderun-prefetch-all"), o.cderunPrefetchAll),
 		Privileged:              optBool(cmd.Flags().Changed("privileged"), o.privileged),
 		CderunPrivileged:        optBool(cmd.Flags().Changed("cderun-privileged"), o.cderunPrivileged),
+		Prune:                   optBool(cmd.Flags().Changed("prune"), o.prune),
+		CderunPrune:             optBool(cmd.Flags().Changed("cderun-prune"), o.cderunPrune),
 		Ports:                   o.ports,
 		CderunPorts:             o.cderunPorts,
 		PublishAll:              optBool(cmd.Flags().Changed("publish-all"), o.publishAll),
@@ -334,6 +338,8 @@ func getBoolPointers(o *rootOptions, name string) (base, override *bool) {
 		return &o.prefetchAll, &o.cderunPrefetchAll
 	case "privileged":
 		return &o.privileged, &o.cderunPrivileged
+	case "prune":
+		return &o.prune, &o.cderunPrune
 	case "publish-all":
 		return &o.publishAll, &o.cderunPublishAll
 	case "read-only":

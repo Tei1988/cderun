@@ -232,6 +232,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--pull-backoff-base`: Base duration for exponential backoff during image pull (e.g. `1s`, `500ms`). (Default: `1s`)
 - `--prefetch`: Prefetch specified tool images defined in `.tools.yaml`. Accepts a comma-separated list of tool names as a scalar string flag (e.g., `--prefetch node,python`). Supports template expressions (e.g., `{{env:...}}`).
 - `--prefetch-all`: Prefetch all tool images defined in `.tools.yaml`. (Default: `false`)
+- `--prune`: List and remove stopped orphan containers created by `cderun`. Supports `--dry-run` preview. (Default: `false`)
 - `--remove`: Automatically remove the container when it exits. (Default: `true`)
 - `--restart`: Configure the container's restart policy when the container exits (e.g., `no`, `always`, `on-failure:5`). Configuring any non-`no` restart policy requires setting `--remove=false` due to default removal behavior and resolver constraints. Note: containerd does not support restart policies.
 - `--hang-timeout`: Grace period after I/O completion before force-terminating the container (e.g. `10s`, `5s`, `0` for infinite). This applies to non-interactive or non-TTY sessions. (Default: `10s`)
@@ -259,6 +260,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--gpus`: GPU devices to request (e.g., `all`, `count=2`, `device=0,1`). Note: containerd does not support GPU requests.
 - `--ipc`: Configure the IPC namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
 - `--cgroupns`: Configure the cgroup namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
+- `--oci-runtime`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`). Maps directly to `HostConfig.Runtime` in Docker / Podman host configuration. Note: containerd explicitly rejects `oci-runtime` with a validation error.
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
@@ -290,6 +292,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
 - `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`).
+- `--oci-runtime`: Specify custom OCI runtime binary/engine (`runc`, `crun`, `kata-runtime`).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -467,6 +470,8 @@ Key variables include:
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_PREFETCH`: Prefetch specified tool images (comma-separated list).
 - `CDERUN_PREFETCH_ALL`: Prefetch all tool images defined in `.tools.yaml`.
+- `CDERUN_OCI_RUNTIME`: Specify custom OCI runtime binary/engine (`runc`, `crun`, `kata-runtime`).
+- `CDERUN_PRUNE`: List and remove stopped orphan containers created by `cderun`.
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
 - `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
@@ -478,6 +483,7 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 - `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
+- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 
 **Note on List-type Options:**
 

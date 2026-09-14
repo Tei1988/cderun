@@ -93,45 +93,265 @@ func (rv *resolver) resolveStringSliceOptionResolver(vals []string) (*Expression
 	return nil, nil
 }
 
-func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	var p1v, p2v []string
-	var fastPathUsed bool
-
-	switch opt.Name {
-	case "publish":
-		p1v, p2v = rv.cli.CderunPorts, rv.cli.Ports
-		fastPathUsed = true
-	case "expose":
-		p1v, p2v = rv.cli.CderunExpose, rv.cli.Expose
-		fastPathUsed = true
-	case "dns":
-		p1v, p2v = rv.cli.CderunDNS, rv.cli.DNS
-		fastPathUsed = true
-	case "add-host":
-		p1v, p2v = rv.cli.CderunAddHosts, rv.cli.AddHosts
-		fastPathUsed = true
-	case "group-add":
-		p1v, p2v = rv.cli.CderunGroupAdd, rv.cli.GroupAdd
-		fastPathUsed = true
-	case "cap-add":
-		p1v, p2v = rv.cli.CderunCapAdd, rv.cli.CapAdd
-		fastPathUsed = true
-	case "cap-drop":
-		p1v, p2v = rv.cli.CderunCapDrop, rv.cli.CapDrop
-		fastPathUsed = true
-	case "entrypoint":
-		p1v, p2v = rv.cli.CderunEntrypoint, rv.cli.Entrypoint
-		fastPathUsed = true
-	case "security-opt":
-		p1v, p2v = rv.cli.CderunSecurityOpt, rv.cli.SecurityOpt
-		fastPathUsed = true
-	case "dns-search":
-		p1v, p2v = rv.cli.CderunDNSSearch, rv.cli.DNSSearch
-		fastPathUsed = true
-	case "dns-option":
-		p1v, p2v = rv.cli.CderunDNSOptions, rv.cli.DNSOptions
-		fastPathUsed = true
+func getStringOptionFastPathPtrs(cli *CLIOptions, name string) (*string, *string, bool) {
+	switch name {
+	case "image":
+		return cli.CderunImage, cli.Image, true
+	case "pid":
+		return cli.CderunPid, cli.Pid, true
+	case "shm-size":
+		return cli.CderunShmSize, cli.ShmSize, true
+	case "network":
+		return cli.CderunNetwork, cli.Network, true
+	case "workdir":
+		return cli.CderunWorkdir, cli.Workdir, true
+	case "runtime":
+		return cli.CderunRuntime, cli.Runtime, true
+	case "user":
+		return cli.CderunUser, cli.User, true
+	case "log-level":
+		return cli.CderunLogLevel, cli.LogLevel, true
+	case "log-format":
+		return cli.CderunLogFormat, cli.LogFormat, true
+	case "hostname":
+		return cli.CderunHostname, cli.Hostname, true
+	case "pull":
+		return cli.CderunPull, cli.Pull, true
+	case "dry-run-format":
+		return cli.CderunDryRunFormat, cli.DryRunFormat, true
+	case "diagnosis-format":
+		return cli.CderunDiagnosisFormat, cli.DiagnosisFormat, true
+	case "ipc":
+		return cli.CderunIPC, cli.IPC, true
+	case "gpus":
+		return cli.CderunGPUs, cli.GPUs, true
+	case "cgroupns":
+		return cli.CderunCgroupns, cli.Cgroupns, true
+	case "cpuset-cpus":
+		return cli.CderunCpusetCpus, cli.CpusetCpus, true
+	case "cpuset-mems":
+		return cli.CderunCpusetMems, cli.CpusetMems, true
+	case "restart":
+		return cli.CderunRestart, cli.Restart, true
+	case "prefetch":
+		return cli.CderunPrefetch, cli.Prefetch, true
+	default:
+		return nil, nil, false
 	}
+}
+
+func assignResolvedString(res *ResolvedConfig, name string, resolved string) {
+	switch name {
+	case "image":
+		res.Image = resolved
+	case "pid":
+		res.Pid = resolved
+	case "shm-size":
+		res.ShmSize = resolved
+	case "network":
+		res.Network = resolved
+	case "workdir":
+		res.Workdir = resolved
+	case "runtime":
+		res.Runtime = resolved
+	case "user":
+		res.User = resolved
+	case "log-level":
+		res.LogLevel = resolved
+	case "log-format":
+		res.LogFormat = resolved
+	case "hostname":
+		res.Hostname = resolved
+	case "pull":
+		res.Pull = resolved
+	case "dry-run-format":
+		res.DryRunFormat = resolved
+	case "diagnosis-format":
+		res.DiagnosisFormat = resolved
+	case "ipc":
+		res.IPC = resolved
+	case "gpus":
+		res.GPUs = resolved
+	case "cgroupns":
+		res.Cgroupns = resolved
+	case "cpuset-cpus":
+		res.CpusetCpus = resolved
+	case "cpuset-mems":
+		res.CpusetMems = resolved
+	case "restart":
+		res.Restart = resolved
+	case "prefetch":
+		res.Prefetch = resolved
+	}
+}
+
+func getBoolOptionFastPathPtrs(cli *CLIOptions, name string) (*bool, *bool, bool) {
+	switch name {
+	case "tty":
+		return cli.CderunTTY, cli.TTY, true
+	case "interactive":
+		return cli.CderunInteractive, cli.Interactive, true
+	case "read-only":
+		return cli.CderunReadOnly, cli.ReadOnly, true
+	case "init":
+		return cli.CderunInit, cli.Init, true
+	case "remove":
+		return cli.CderunRemove, cli.Remove, true
+	case "diagnosis":
+		return cli.CderunDiagnosis, cli.Diagnosis, true
+	case "strict-env":
+		return cli.CderunStrictEnv, cli.StrictEnv, true
+	case "privileged":
+		return cli.CderunPrivileged, cli.Privileged, true
+	case "publish-all":
+		return cli.CderunPublishAll, cli.PublishAll, true
+	case "log-timestamp":
+		return cli.CderunLogTimestamp, cli.LogTimestamp, true
+	case "mount-socket":
+		return cli.CderunMountSocket, cli.MountSocket, true
+	case "mount-cderun":
+		return cli.CderunMountCderun, cli.MountCderun, true
+	case "mount-all-tools":
+		return cli.CderunMountAllTools, cli.MountAllTools, true
+	case "dry-run":
+		return cli.CderunDryRun, cli.DryRun, true
+	case "prefetch-all":
+		return cli.CderunPrefetchAll, cli.PrefetchAll, true
+	default:
+		return nil, nil, false
+	}
+}
+
+func assignResolvedBool(res *ResolvedConfig, name string, resolved bool) {
+	switch name {
+	case "tty":
+		res.TTY = resolved
+	case "interactive":
+		res.Interactive = resolved
+	case "read-only":
+		res.ReadOnly = resolved
+	case "init":
+		res.Init = resolved
+	case "remove":
+		res.Remove = resolved
+	case "diagnosis":
+		res.Diagnosis = resolved
+	case "strict-env":
+		res.StrictEnv = resolved
+	case "privileged":
+		res.Privileged = resolved
+	case "publish-all":
+		res.PublishAll = resolved
+	case "log-timestamp":
+		res.LogTimestamp = resolved
+	case "mount-socket":
+		res.MountSocket = resolved
+	case "mount-cderun":
+		res.MountCderun = resolved
+	case "mount-all-tools":
+		res.MountAllTools = resolved
+	case "dry-run":
+		res.DryRun = resolved
+	case "prefetch-all":
+		res.PrefetchAll = resolved
+	}
+}
+
+func getStringSliceOptionFastPathSlices(cli *CLIOptions, name string) ([]string, []string, bool) {
+	switch name {
+	case "publish":
+		return cli.CderunPorts, cli.Ports, true
+	case "expose":
+		return cli.CderunExpose, cli.Expose, true
+	case "dns":
+		return cli.CderunDNS, cli.DNS, true
+	case "add-host":
+		return cli.CderunAddHosts, cli.AddHosts, true
+	case "group-add":
+		return cli.CderunGroupAdd, cli.GroupAdd, true
+	case "cap-add":
+		return cli.CderunCapAdd, cli.CapAdd, true
+	case "cap-drop":
+		return cli.CderunCapDrop, cli.CapDrop, true
+	case "entrypoint":
+		return cli.CderunEntrypoint, cli.Entrypoint, true
+	case "security-opt":
+		return cli.CderunSecurityOpt, cli.SecurityOpt, true
+	case "dns-search":
+		return cli.CderunDNSSearch, cli.DNSSearch, true
+	case "dns-option":
+		return cli.CderunDNSOptions, cli.DNSOptions, true
+	default:
+		return nil, nil, false
+	}
+}
+
+func assignResolvedStringSlice(res *ResolvedConfig, name string, resolved []string) {
+	switch name {
+	case "publish":
+		res.Ports = resolved
+	case "expose":
+		res.Expose = resolved
+	case "dns":
+		res.DNS = resolved
+	case "add-host":
+		res.AddHosts = resolved
+	case "group-add":
+		res.GroupAdd = resolved
+	case "cap-add":
+		res.CapAdd = resolved
+	case "cap-drop":
+		res.CapDrop = resolved
+	case "entrypoint":
+		res.Entrypoint = resolved
+	case "security-opt":
+		res.SecurityOpt = resolved
+	case "dns-search":
+		res.DNSSearch = resolved
+	case "dns-option":
+		res.DNSOptions = resolved
+	}
+}
+
+func getIntOptionFastPathPtrs(cli *CLIOptions, name string) (*int, *int, bool) {
+	switch name {
+	case "pull-max-retries":
+		return cli.CderunPullMaxRetries, cli.PullMaxRetries, true
+	case "pids-limit":
+		return cli.CderunPidsLimit, cli.PidsLimit, true
+	case "cpu-shares":
+		return cli.CderunCPUShares, cli.CPUShares, true
+	default:
+		return nil, nil, false
+	}
+}
+
+func assignResolvedInt(res *ResolvedConfig, name string, resolved int) {
+	switch name {
+	case "pull-max-retries":
+		res.PullMaxRetries = resolved
+	case "pids-limit":
+		res.PidsLimit = resolved
+	case "cpu-shares":
+		res.CPUShares = resolved
+	}
+}
+
+func getFloat64OptionFastPathPtrs(cli *CLIOptions, name string) (*float64, *float64, bool) {
+	if name == "cpus" {
+		return cli.CderunCPUs, cli.CPUs, true
+	}
+	return nil, nil, false
+}
+
+func assignResolvedFloat64(res *ResolvedConfig, name string, resolved float64) {
+	if name == "cpus" {
+		res.CPUs = resolved
+	}
+}
+
+func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
+	p1v, p2v, fastPathUsed := getStringSliceOptionFastPathSlices(rv.cli, opt.Name)
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
 	if err != nil {
@@ -151,30 +371,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 			return err
 		}
 		resolved := resolveStringSliceOptWithVals(vals, rForSlice)
-		switch opt.Name {
-		case "publish":
-			rv.res.Ports = resolved
-		case "expose":
-			rv.res.Expose = resolved
-		case "dns":
-			rv.res.DNS = resolved
-		case "add-host":
-			rv.res.AddHosts = resolved
-		case "group-add":
-			rv.res.GroupAdd = resolved
-		case "cap-add":
-			rv.res.CapAdd = resolved
-		case "cap-drop":
-			rv.res.CapDrop = resolved
-		case "entrypoint":
-			rv.res.Entrypoint = resolved
-		case "security-opt":
-			rv.res.SecurityOpt = resolved
-		case "dns-search":
-			rv.res.DNSSearch = resolved
-		case "dns-option":
-			rv.res.DNSOptions = resolved
-		}
+		assignResolvedStringSlice(rv.res, opt.Name, resolved)
 		return nil
 	}
 
@@ -206,93 +403,9 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	var p1Set, p2Set bool
-	var p1Val, p2Val string
-	var fastPathUsed bool
-
-	// Fast-path for common options to avoid reflection and redundant map lookups
-	switch opt.Name {
-	case "image":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunImage)
-		p2Set, p2Val = getPtrVal(rv.cli.Image)
-		fastPathUsed = true
-	case "pid":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPid)
-		p2Set, p2Val = getPtrVal(rv.cli.Pid)
-		fastPathUsed = true
-	case "shm-size":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunShmSize)
-		p2Set, p2Val = getPtrVal(rv.cli.ShmSize)
-		fastPathUsed = true
-	case "network":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunNetwork)
-		p2Set, p2Val = getPtrVal(rv.cli.Network)
-		fastPathUsed = true
-	case "workdir":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunWorkdir)
-		p2Set, p2Val = getPtrVal(rv.cli.Workdir)
-		fastPathUsed = true
-	case "runtime":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRuntime)
-		p2Set, p2Val = getPtrVal(rv.cli.Runtime)
-		fastPathUsed = true
-	case "user":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunUser)
-		p2Set, p2Val = getPtrVal(rv.cli.User)
-		fastPathUsed = true
-	case "log-level":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogLevel)
-		p2Set, p2Val = getPtrVal(rv.cli.LogLevel)
-		fastPathUsed = true
-	case "log-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.LogFormat)
-		fastPathUsed = true
-	case "hostname":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunHostname)
-		p2Set, p2Val = getPtrVal(rv.cli.Hostname)
-		fastPathUsed = true
-	case "pull":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPull)
-		p2Set, p2Val = getPtrVal(rv.cli.Pull)
-		fastPathUsed = true
-	case "dry-run-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRunFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRunFormat)
-		fastPathUsed = true
-	case "diagnosis-format":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosisFormat)
-		p2Set, p2Val = getPtrVal(rv.cli.DiagnosisFormat)
-		fastPathUsed = true
-	case "ipc":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunIPC)
-		p2Set, p2Val = getPtrVal(rv.cli.IPC)
-		fastPathUsed = true
-	case "gpus":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunGPUs)
-		p2Set, p2Val = getPtrVal(rv.cli.GPUs)
-		fastPathUsed = true
-	case "cgroupns":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunCgroupns)
-		p2Set, p2Val = getPtrVal(rv.cli.Cgroupns)
-		fastPathUsed = true
-	case "cpuset-cpus":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunCpusetCpus)
-		p2Set, p2Val = getPtrVal(rv.cli.CpusetCpus)
-		fastPathUsed = true
-	case "cpuset-mems":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunCpusetMems)
-		p2Set, p2Val = getPtrVal(rv.cli.CpusetMems)
-		fastPathUsed = true
-	case "restart":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRestart)
-		p2Set, p2Val = getPtrVal(rv.cli.Restart)
-		fastPathUsed = true
-	case "prefetch":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPrefetch)
-		p2Set, p2Val = getPtrVal(rv.cli.Prefetch)
-		fastPathUsed = true
-	}
+	p1Ptr, p2Ptr, fastPathUsed := getStringOptionFastPathPtrs(rv.cli, opt.Name)
+	p1Set, p1Val := getPtrVal(p1Ptr)
+	p2Set, p2Val := getPtrVal(p2Ptr)
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
 	if err != nil {
@@ -310,48 +423,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		if err != nil {
 			return err
 		}
-		switch opt.Name {
-		case "image":
-			rv.res.Image = resolved
-		case "pid":
-			rv.res.Pid = resolved
-		case "shm-size":
-			rv.res.ShmSize = resolved
-		case "network":
-			rv.res.Network = resolved
-		case "workdir":
-			rv.res.Workdir = resolved
-		case "runtime":
-			rv.res.Runtime = resolved
-		case "user":
-			rv.res.User = resolved
-		case "log-level":
-			rv.res.LogLevel = resolved
-		case "log-format":
-			rv.res.LogFormat = resolved
-		case "hostname":
-			rv.res.Hostname = resolved
-		case "pull":
-			rv.res.Pull = resolved
-		case "dry-run-format":
-			rv.res.DryRunFormat = resolved
-		case "diagnosis-format":
-			rv.res.DiagnosisFormat = resolved
-		case "ipc":
-			rv.res.IPC = resolved
-		case "gpus":
-			rv.res.GPUs = resolved
-		case "cgroupns":
-			rv.res.Cgroupns = resolved
-		case "cpuset-cpus":
-			rv.res.CpusetCpus = resolved
-		case "cpuset-mems":
-			rv.res.CpusetMems = resolved
-		case "restart":
-			rv.res.Restart = resolved
-		case "prefetch":
-			rv.res.Prefetch = resolved
-		}
+		assignResolvedString(rv.res, opt.Name, resolved)
 		return nil
 	}
 
@@ -372,73 +444,9 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 }
 
 func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	var p1Set, p2Set bool
-	var p1Val, p2Val bool
-	var fastPathUsed bool
-
-	// Fast-path for common options to avoid reflection and redundant map lookups
-	switch opt.Name {
-	case "tty":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunTTY)
-		p2Set, p2Val = getPtrVal(rv.cli.TTY)
-		fastPathUsed = true
-	case "interactive":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunInteractive)
-		p2Set, p2Val = getPtrVal(rv.cli.Interactive)
-		fastPathUsed = true
-	case "read-only":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunReadOnly)
-		p2Set, p2Val = getPtrVal(rv.cli.ReadOnly)
-		fastPathUsed = true
-	case "init":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunInit)
-		p2Set, p2Val = getPtrVal(rv.cli.Init)
-		fastPathUsed = true
-	case "remove":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunRemove)
-		p2Set, p2Val = getPtrVal(rv.cli.Remove)
-		fastPathUsed = true
-	case "diagnosis":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDiagnosis)
-		p2Set, p2Val = getPtrVal(rv.cli.Diagnosis)
-		fastPathUsed = true
-	case "strict-env":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunStrictEnv)
-		p2Set, p2Val = getPtrVal(rv.cli.StrictEnv)
-		fastPathUsed = true
-	case "privileged":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPrivileged)
-		p2Set, p2Val = getPtrVal(rv.cli.Privileged)
-		fastPathUsed = true
-	case "publish-all":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPublishAll)
-		p2Set, p2Val = getPtrVal(rv.cli.PublishAll)
-		fastPathUsed = true
-	case "log-timestamp":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunLogTimestamp)
-		p2Set, p2Val = getPtrVal(rv.cli.LogTimestamp)
-		fastPathUsed = true
-	case "mount-socket":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountSocket)
-		p2Set, p2Val = getPtrVal(rv.cli.MountSocket)
-		fastPathUsed = true
-	case "mount-cderun":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountCderun)
-		p2Set, p2Val = getPtrVal(rv.cli.MountCderun)
-		fastPathUsed = true
-	case "mount-all-tools":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunMountAllTools)
-		p2Set, p2Val = getPtrVal(rv.cli.MountAllTools)
-		fastPathUsed = true
-	case "dry-run":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunDryRun)
-		p2Set, p2Val = getPtrVal(rv.cli.DryRun)
-		fastPathUsed = true
-	case "prefetch-all":
-		p1Set, p1Val = getPtrVal(rv.cli.CderunPrefetchAll)
-		p2Set, p2Val = getPtrVal(rv.cli.PrefetchAll)
-		fastPathUsed = true
-	}
+	p1Ptr, p2Ptr, fastPathUsed := getBoolOptionFastPathPtrs(rv.cli, opt.Name)
+	p1Set, p1Val := getPtrVal(p1Ptr)
+	p2Set, p2Val := getPtrVal(p2Ptr)
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
 	if err != nil {
@@ -455,38 +463,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		if err != nil {
 			return err
 		}
-		switch opt.Name {
-		case "tty":
-			rv.res.TTY = resolved
-		case "interactive":
-			rv.res.Interactive = resolved
-		case "read-only":
-			rv.res.ReadOnly = resolved
-		case "init":
-			rv.res.Init = resolved
-		case "remove":
-			rv.res.Remove = resolved
-		case "diagnosis":
-			rv.res.Diagnosis = resolved
-		case "strict-env":
-			rv.res.StrictEnv = resolved
-		case "privileged":
-			rv.res.Privileged = resolved
-		case "publish-all":
-			rv.res.PublishAll = resolved
-		case "log-timestamp":
-			rv.res.LogTimestamp = resolved
-		case "mount-socket":
-			rv.res.MountSocket = resolved
-		case "mount-cderun":
-			rv.res.MountCderun = resolved
-		case "mount-all-tools":
-			rv.res.MountAllTools = resolved
-		case "dry-run":
-			rv.res.DryRun = resolved
-		case "prefetch-all":
-			rv.res.PrefetchAll = resolved
-		}
+		assignResolvedBool(rv.res, opt.Name, resolved)
 		return nil
 	}
 
@@ -507,24 +484,9 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 }
 
 func (rv *resolver) applyIntOption(opt IntOption) error {
-	var p1Set, p2Set bool
-	var p1Int, p2Int int
-	var fastPathUsed bool
-
-	switch opt.Name {
-	case "pull-max-retries":
-		p1Set, p1Int = getPtrVal(rv.cli.CderunPullMaxRetries)
-		p2Set, p2Int = getPtrVal(rv.cli.PullMaxRetries)
-		fastPathUsed = true
-	case "pids-limit":
-		p1Set, p1Int = getPtrVal(rv.cli.CderunPidsLimit)
-		p2Set, p2Int = getPtrVal(rv.cli.PidsLimit)
-		fastPathUsed = true
-	case "cpu-shares":
-		p1Set, p1Int = getPtrVal(rv.cli.CderunCPUShares)
-		p2Set, p2Int = getPtrVal(rv.cli.CPUShares)
-		fastPathUsed = true
-	}
+	p1Ptr, p2Ptr, fastPathUsed := getIntOptionFastPathPtrs(rv.cli, opt.Name)
+	p1Set, p1Int := getPtrVal(p1Ptr)
+	p2Set, p2Int := getPtrVal(p2Ptr)
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
 	if err != nil {
@@ -541,14 +503,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		if err != nil {
 			return err
 		}
-		switch opt.Name {
-		case "pull-max-retries":
-			rv.res.PullMaxRetries = resolved
-		case "pids-limit":
-			rv.res.PidsLimit = resolved
-		case "cpu-shares":
-			rv.res.CPUShares = resolved
-		}
+		assignResolvedInt(rv.res, opt.Name, resolved)
 		return nil
 	}
 
@@ -576,15 +531,9 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 }
 
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	var p1Set, p2Set bool
-	var p1Float, p2Float float64
-	var fastPathUsed bool
-
-	if opt.Name == "cpus" {
-		p1Set, p1Float = getPtrVal(rv.cli.CderunCPUs)
-		p2Set, p2Float = getPtrVal(rv.cli.CPUs)
-		fastPathUsed = true
-	}
+	p1Ptr, p2Ptr, fastPathUsed := getFloat64OptionFastPathPtrs(rv.cli, opt.Name)
+	p1Set, p1Float := getPtrVal(p1Ptr)
+	p2Set, p2Float := getPtrVal(p2Ptr)
 
 	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
 	if err != nil {
@@ -601,10 +550,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		if err != nil {
 			return err
 		}
-		switch opt.Name {
-		case "cpus":
-			rv.res.CPUs = resolved
-		}
+		assignResolvedFloat64(rv.res, opt.Name, resolved)
 		return nil
 	}
 

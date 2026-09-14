@@ -844,6 +844,17 @@ var BoolOptions = []BoolOption{
 			return g.Defaults.MountCderunSocket
 		},
 	},
+	{
+		Name:   "prune",
+		EnvKey: "CDERUN_PRUNE",
+		Usage:  "Remove stopped orphan containers created by cderun",
+		ToolGetter: func(t ToolConfig) *bool {
+			return t.Prune
+		},
+		GlobalGetter: func(g CDERunConfig) *bool {
+			return g.Defaults.Prune
+		},
+	},
 }
 
 var (

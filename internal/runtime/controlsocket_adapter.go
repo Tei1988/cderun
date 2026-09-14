@@ -83,6 +83,11 @@ func (a *ControlSocketRuntimeAdapter) InspectContainer(ctx context.Context, cont
 	return a.underlying.InspectContainer(ctx, containerID)
 }
 
+func (a *ControlSocketRuntimeAdapter) PruneContainers(ctx context.Context) ([]string, error) {
+	a.logger.Debug("Dispatching PruneContainers to underlying runtime")
+	return a.underlying.PruneContainers(ctx)
+}
+
 func (a *ControlSocketRuntimeAdapter) Close() error {
 	var errs []error
 	if err := a.client.Close(); err != nil {

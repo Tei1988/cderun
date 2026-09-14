@@ -98,6 +98,8 @@ type CLIOptions struct {
 	CderunPrefetchAll       *bool
 	Privileged              *bool
 	CderunPrivileged        *bool
+	Prune                   *bool
+	CderunPrune             *bool
 	Ports                   []string
 	CderunPorts             []string
 	PublishAll              *bool

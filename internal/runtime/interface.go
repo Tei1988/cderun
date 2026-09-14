@@ -37,5 +37,6 @@ type ContainerRuntime interface {
 	InspectContainer(ctx context.Context, containerID string) (isRunning bool, exitCode int, err error)
 
 	// Cleanup
+	PruneContainers(ctx context.Context) ([]string, error)
 	Close() error
 }

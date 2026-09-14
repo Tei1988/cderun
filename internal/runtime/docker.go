@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
@@ -37,6 +38,7 @@ type dockerClient interface {
 	ContainerInspect(ctx context.Context, containerID string) (dockercontainer.InspectResponse, error)
 	ContainerKill(ctx context.Context, containerID string, signal string) error
 	ContainerAttach(ctx context.Context, container string, options dockercontainer.AttachOptions) (types.HijackedResponse, error)
+	ContainerList(ctx context.Context, options dockercontainer.ListOptions) ([]types.Container, error)
 }
 
 // DockerRuntime implements ContainerRuntime using Docker Engine API.
@@ -482,6 +484,42 @@ func (d *DockerRuntime) InspectContainer(ctx context.Context, containerID string
 		return false, 0, err
 	}
 	return resp.State.Running, resp.State.ExitCode, nil
+}
+
+// PruneContainers removes stopped orphan containers created by cderun (labeled with cderun=true).
+func (d *DockerRuntime) PruneContainers(ctx context.Context) ([]string, error) {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", "cderun=true")
+
+	containers, err := d.client.ContainerList(ctx, dockercontainer.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers for prune: %w", err)
+	}
+
+	var pruned []string
+	for _, c := range containers {
+		state := strings.ToLower(c.State)
+		if state == "running" || state == "restarting" || state == "paused" {
+			d.logger.Debug("Skipping active container %s during prune (state=%s)", c.ID, c.State)
+			continue
+		}
+
+		err := d.client.ContainerRemove(ctx, c.ID, dockercontainer.RemoveOptions{
+			Force:         true,
+			RemoveVolumes: true,
+		})
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				d.logger.Warn("Failed to remove container %s during prune: %v", c.ID, err)
+			}
+			continue
+		}
+		pruned = append(pruned, c.ID)
+	}
+	return pruned, nil
 }
 
 // Name returns the name of the runtime.

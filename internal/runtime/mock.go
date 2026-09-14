@@ -47,6 +47,9 @@ type MockRuntime struct {
 	WaitFunc    func(ctx context.Context, containerID string) (int, error)
 	AttachFunc  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
 	InspectFunc func(ctx context.Context, containerID string) (bool, int, error)
+	PruneFunc   func(ctx context.Context) ([]string, error)
+	PrunedContainers []string
+	PruneErr    error
 	CloseCalled bool
 	CloseErr    error
 }
@@ -238,6 +241,19 @@ func (m *MockRuntime) InspectContainer(ctx context.Context, containerID string) 
 		return f(ctx, containerID)
 	}
 	return false, exitCode, nil
+}
+
+func (m *MockRuntime) PruneContainers(ctx context.Context) ([]string, error) {
+	m.mu.Lock()
+	f := m.PruneFunc
+	err := m.PruneErr
+	pruned := m.PrunedContainers
+	m.mu.Unlock()
+
+	if f != nil {
+		return f(ctx)
+	}
+	return pruned, err
 }
 
 // Name returns the name of the runtime.

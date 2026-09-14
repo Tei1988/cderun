@@ -129,6 +129,7 @@ type mockContainerdClient struct {
 	getImageFunc      func(context.Context, string) (client.Image, error)
 	newContainerFunc  func(context.Context, string, ...client.NewContainerOpts) (client.Container, error)
 	loadContainerFunc func(context.Context, string) (client.Container, error)
+	containersFunc    func(context.Context, ...string) ([]client.Container, error)
 	closeErr          error
 }
 
@@ -160,6 +161,13 @@ func (m *mockContainerdClient) NewContainer(ctx context.Context, id string, opts
 func (m *mockContainerdClient) LoadContainer(ctx context.Context, id string) (client.Container, error) {
 	if m.loadContainerFunc != nil {
 		return m.loadContainerFunc(ctx, id)
+	}
+	return nil, nil
+}
+
+func (m *mockContainerdClient) Containers(ctx context.Context, filters ...string) ([]client.Container, error) {
+	if m.containersFunc != nil {
+		return m.containersFunc(ctx, filters...)
 	}
 	return nil, nil
 }
