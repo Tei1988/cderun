@@ -13,10 +13,15 @@ jobs:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         persist-credentials: false
+        fetch-depth: 0
     - name: Set up Go
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
+    - name: Verify test file names
+      env:
+        TARGET_BRANCH: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+      run: ./scripts/check-test-names.sh
     - name: Run unit tests
       run: go test -v -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /scripts)
     - name: Upload coverage to Codecov

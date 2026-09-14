@@ -316,6 +316,11 @@ cderun --prune
 - **内容**: T94の実装（`--oci-runtime`, `--cderun-oci-runtime`, `CDERUN_OCI_RUNTIME`, `.cderun.yaml` の `defaults.ociRuntime`）の仕様説明をドキュメントに追加する。
 - **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
 
+### Documentation Update Task: T100 Test Naming Policy & Rules
+
+- **内容**: T100 のテストファイル命名規則（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` および命名例）を `docs/testing/organization.md` に追記する。
+- **対応ドキュメント**: `docs/testing/organization.md`
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する
