@@ -19,7 +19,7 @@ jobs:
       with:
         go-version-file: go.mod
     - name: Verify test file names
-      run: make lint-test-names
+      run: ./scripts/check-test-names.sh
     - name: Run unit tests
       run: go test -v -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /scripts)
     - name: Upload coverage to Codecov
