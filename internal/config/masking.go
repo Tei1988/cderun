@@ -21,97 +21,73 @@ func isUpper(s string) bool {
 	return true
 }
 
-func equalFoldASCII(s1, s2 string) bool {
-	if len(s1) != len(s2) {
+func equalFoldASCIILower(s, cleanLower string) bool {
+	if len(s) != len(cleanLower) {
 		return false
 	}
-	for i := 0; i < len(s1); i++ {
-		c1 := s1[i]
-		c2 := s2[i]
-		if c1 != c2 {
-			if c1 >= 'A' && c1 <= 'Z' {
-				c1 += 'a' - 'A'
-			}
-			if c2 >= 'A' && c2 <= 'Z' {
-				c2 += 'a' - 'A'
-			}
-			if c1 != c2 {
-				return false
-			}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != cleanLower[i] {
+			return false
 		}
 	}
 	return true
 }
 
-func hasSuffixFoldASCII(s, suffix string) bool {
-	if len(s) < len(suffix) {
+func hasSuffixFoldASCIILower(s, suffixLower string) bool {
+	if len(s) < len(suffixLower) {
 		return false
 	}
-	start := len(s) - len(suffix)
-	for i := 0; i < len(suffix); i++ {
-		c1 := s[start+i]
-		c2 := suffix[i]
-		if c1 != c2 {
-			if c1 >= 'A' && c1 <= 'Z' {
-				c1 += 'a' - 'A'
-			}
-			if c2 >= 'A' && c2 <= 'Z' {
-				c2 += 'a' - 'A'
-			}
-			if c1 != c2 {
-				return false
-			}
+	start := len(s) - len(suffixLower)
+	for i := 0; i < len(suffixLower); i++ {
+		c := s[start+i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != suffixLower[i] {
+			return false
 		}
 	}
 	return true
 }
 
-func hasPrefixFoldASCII(s, prefix string) bool {
-	if len(s) < len(prefix) {
+func hasPrefixFoldASCIILower(s, prefixLower string) bool {
+	if len(s) < len(prefixLower) {
 		return false
 	}
-	for i := 0; i < len(prefix); i++ {
-		c1 := s[i]
-		c2 := prefix[i]
-		if c1 != c2 {
-			if c1 >= 'A' && c1 <= 'Z' {
-				c1 += 'a' - 'A'
-			}
-			if c2 >= 'A' && c2 <= 'Z' {
-				c2 += 'a' - 'A'
-			}
-			if c1 != c2 {
-				return false
-			}
+	for i := 0; i < len(prefixLower); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != prefixLower[i] {
+			return false
 		}
 	}
 	return true
 }
 
-func containsFoldASCII(s, substr string) bool {
-	if len(substr) == 0 {
+func containsFoldASCIILower(s, substrLower string) bool {
+	if len(substrLower) == 0 {
 		return true
 	}
-	if len(s) < len(substr) {
+	if len(s) < len(substrLower) {
 		return false
 	}
-	limit := len(s) - len(substr)
+	limit := len(s) - len(substrLower)
 	for i := 0; i <= limit; i++ {
 		match := true
-		for j := 0; j < len(substr); j++ {
-			c1 := s[i+j]
-			c2 := substr[j]
-			if c1 != c2 {
-				if c1 >= 'A' && c1 <= 'Z' {
-					c1 += 'a' - 'A'
-				}
-				if c2 >= 'A' && c2 <= 'Z' {
-					c2 += 'a' - 'A'
-				}
-				if c1 != c2 {
-					match = false
-					break
-				}
+		for j := 0; j < len(substrLower); j++ {
+			c := s[i+j]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != substrLower[j] {
+				match = false
+				break
 			}
 		}
 		if match {
@@ -131,14 +107,15 @@ func isASCII(s string) bool {
 }
 
 type preAnalyzedPattern struct {
-	raw          string
-	upperPattern string
-	isASCII      bool
-	isGlob       bool
-	isSuffix     bool
-	isPrefix     bool
-	isSubstr     bool
-	cleanPat     string
+	raw           string
+	upperPattern  string
+	isASCII       bool
+	isGlob        bool
+	isSuffix      bool
+	isPrefix      bool
+	isSubstr      bool
+	cleanPat      string
+	cleanPatLower string
 }
 
 type analyzedPatternsCacheEntry struct {
@@ -199,6 +176,7 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 	hasWildcard := strings.ContainsAny(p, "*?[\\")
 	if !hasWildcard {
 		ap.cleanPat = p
+		ap.cleanPatLower = strings.ToLower(p)
 		return ap
 	}
 
@@ -206,18 +184,21 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 	if strings.HasPrefix(p, "*") && !strings.ContainsAny(p[1:], "*?[\\") {
 		ap.isSuffix = true
 		ap.cleanPat = p[1:]
+		ap.cleanPatLower = strings.ToLower(p[1:])
 		return ap
 	}
 
 	if strings.HasSuffix(p, "*") && !strings.ContainsAny(p[:len(p)-1], "*?[\\") {
 		ap.isPrefix = true
 		ap.cleanPat = p[:len(p)-1]
+		ap.cleanPatLower = strings.ToLower(p[:len(p)-1])
 		return ap
 	}
 
 	if len(p) >= 2 && strings.HasPrefix(p, "*") && strings.HasSuffix(p, "*") && !strings.ContainsAny(p[1:len(p)-1], "*?[\\") {
 		ap.isSubstr = true
 		ap.cleanPat = p[1 : len(p)-1]
+		ap.cleanPatLower = strings.ToLower(p[1 : len(p)-1])
 		return ap
 	}
 
@@ -227,16 +208,16 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 func matchPreAnalyzed(key string, keyIsASCII bool, ap *preAnalyzedPattern, upperKey *string) bool {
 	if keyIsASCII && ap.isASCII {
 		if !ap.isGlob {
-			return equalFoldASCII(key, ap.cleanPat)
+			return equalFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isSuffix {
-			return hasSuffixFoldASCII(key, ap.cleanPat)
+			return hasSuffixFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isPrefix {
-			return hasPrefixFoldASCII(key, ap.cleanPat)
+			return hasPrefixFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isSubstr {
-			return containsFoldASCII(key, ap.cleanPat)
+			return containsFoldASCIILower(key, ap.cleanPatLower)
 		}
 	}
 
