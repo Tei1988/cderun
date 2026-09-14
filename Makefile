@@ -23,7 +23,12 @@ test-runtime:
 	@go test -v -tags=runtime ./...
 
 .PHONY: lint
-lint: lint-go lint-md lint-actions link-check
+lint: lint-test-names lint-go lint-md lint-actions link-check
+
+.PHONY: lint-test-names
+lint-test-names:
+	@echo "Checking test file names..."
+	@./scripts/check-test-names.sh
 
 # Pinned version of pinact is used for consistency between local and CI environments.
 # v3.9.0 is selected following the aged stable policy.
