@@ -38,7 +38,6 @@ The table below summarizes support for key `cderun` configuration features acros
 | **Stand-alone Image Prefetching** (`--prefetch`, `--prefetch-all`) | ✅ | ✅ | ✅ | Prefetches tool images via runtime `PullImage` API without container execution |
 | **Hang Timeout** (`--hang-timeout`) | ✅ | ✅ | ✅ | Managed by `cderun` execution controller after I/O finishes in non-TTY environments |
 | **Control Socket Mounting** (`--mount-cderun-socket`) | ✅ | ✅ | ✅ | Native Control Socket framing (`cderun.sock`) for nested containers |
-| **Custom OCI Runtime Selection** (`--oci-runtime`) | ✅ | ✅ | ❌ | Unsupported on direct containerd (`ValidateConfig` returns error) |
 | **Orphan Container Pruning** (`--prune`) | ✅ | ✅ | ✅ | Cleans up stopped containers tagged with `cderun` label/namespace |
 
 ### List-Type (Array-Type) Options and Environment Variable Separator Rules
@@ -838,21 +837,6 @@ cderun --cpuset-cpus "0,1" alpine sh
 
 ```bash
 cderun --cpuset-mems "0" alpine sh
-```
-
-### `--oci-runtime`
-
-- **Type**: string
-- **Default**: `""`
-- **Environment Variable**: `CDERUN_OCI_RUNTIME`
-- **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
-- **Details**:
-  - **Docker / Podman**: Maps directly to `HostConfig.Runtime` in Docker / Podman host configuration.
-  - **containerd**: Not supported. Explicitly rejected with a validation error (`"containerd runtime: oci-runtime is not supported yet"`) inside `ValidateConfig` to prevent silent misconfigurations.
-- **P1 Internal Override**: `--cderun-oci-runtime` is the corresponding Phase 1 (P1) internal override flag. It accepts a string value (e.g., `--cderun-oci-runtime crun` or `--cderun-oci-runtime=crun`), supporting both space-separated and equals-sign formats, and must be placed after the subcommand in Wrapper Mode.
-
-```bash
-cderun --oci-runtime crun alpine sh
 ```
 
 ### `--sysctl`
