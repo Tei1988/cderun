@@ -103,7 +103,7 @@ Configuration fields use **camelCase** keys.
 #### `defaults` Fields
 
 - `tty`, `interactive`, `remove`, `strictEnv` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout` (string)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime` (string)
 - `cpus` (float64)
 - `pullMaxRetries` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
