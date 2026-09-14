@@ -19,6 +19,8 @@ jobs:
       with:
         go-version-file: go.mod
     - name: Verify test file names
+      env:
+        TARGET_BRANCH: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
       run: ./scripts/check-test-names.sh
     - name: Run unit tests
       run: go test -v -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v /scripts)
