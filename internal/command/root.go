@@ -702,24 +702,24 @@ func formatDryRunLimitsAndResources(w io.Writer, cfg *container.ContainerConfig)
 	_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(cfg.CapDrop, ", "))
 	_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(cfg.GroupAdd, ", "))
 
-	var ulimits []string
-	for _, u := range cfg.Ulimits {
-		ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
-	}
-	if len(ulimits) > 0 {
+	if len(cfg.Ulimits) > 0 {
+		ulimits := make([]string, 0, len(cfg.Ulimits))
+		for _, u := range cfg.Ulimits {
+			ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
+		}
 		_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
 	}
 
-	var sysctls []string
-	for k, v := range cfg.Sysctls {
-		sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
-	}
-	sort.Strings(sysctls)
-	if len(sysctls) > 0 {
+	if len(cfg.Sysctls) > 0 {
+		sysctls := make([]string, 0, len(cfg.Sysctls))
+		for k, v := range cfg.Sysctls {
+			sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
+		}
+		sort.Strings(sysctls)
 		_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
 	}
 
-	var devices []string
+	devices := make([]string, 0, len(cfg.Devices))
 	for _, d := range cfg.Devices {
 		if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
 			devices = append(devices, d.PathOnHost)
