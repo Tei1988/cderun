@@ -264,6 +264,15 @@ func (m *mockRetryDockerClient) ImagePull(ctx context.Context, ref string, optio
 }
 
 func TestUnit_Docker_PullImage(t *testing.T) {
+	t.Run("unknown policy", func(t *testing.T) {
+		mock := &mockDockerClient{}
+		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}
+		err := runtime.PullImage(context.Background(), "test", "invalid_policy", 3, 1*time.Second)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unknown pull policy \"invalid_policy\"")
+		assert.Equal(t, 0, mock.pullCount)
+	})
+
 	t.Run("never policy", func(t *testing.T) {
 		mock := &mockDockerClient{}
 		runtime := &DockerRuntime{logger: logging.GetGlobalLogger(), client: mock, sleepFunc: noopSleepFunc}

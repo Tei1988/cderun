@@ -273,6 +273,9 @@ func validateContainerdMountsAndGroups(config *container.ContainerConfig) error 
 }
 
 func (r *ContainerdRuntime) PullImage(ctx context.Context, img string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
+	if pullPolicy != "always" && pullPolicy != "missing" && pullPolicy != "never" {
+		return fmt.Errorf("unknown pull policy %q", pullPolicy)
+	}
 	if maxRetries < 0 {
 		maxRetries = 0
 	}
