@@ -35,6 +35,13 @@ func TestUnit_Containerd_PullImage_Never(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUnit_Containerd_PullImage_UnknownPolicy(t *testing.T) {
+	rt := &ContainerdRuntime{}
+	err := rt.PullImage(context.Background(), "img", "invalid_policy", 3, 1*time.Second)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown pull policy \"invalid_policy\"")
+}
+
 func TestUnit_Containerd_Lifecycle_Local(t *testing.T) {
 	// NewContainerdRuntime usually succeeds even if socket is missing
 	// as connection is lazy or handled by grpc.
