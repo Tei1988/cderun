@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 
 func TestFeature_MemoryAndDurationOption_BoundaryCases(t *testing.T) {
 	t.Parallel()
+
+	fieldOnce.Do(initFieldInfo)
 
 	mfs := &MockFileSystem{
 		WD: "/app",
@@ -111,6 +112,8 @@ func TestFeature_MemoryAndDurationOption_BoundaryCases(t *testing.T) {
 func TestFeature_PathValueAndDirectives_BoundaryCases(t *testing.T) {
 	t.Parallel()
 
+	fieldOnce.Do(initFieldInfo)
+
 	mfs := &MockFileSystem{
 		WD: "/app",
 		Files: map[string][]byte{
@@ -131,8 +134,8 @@ func TestFeature_PathValueAndDirectives_BoundaryCases(t *testing.T) {
 			fs:  mfs,
 		}
 
-		// Valid path resolution
-		resolved, err := rv.resolvePathValue("socket-path", "CDERUN_SOCKET_PATH", nil, nil, "/app/config.json")
+		// Valid relative path resolution to absolute path
+		resolved, err := rv.resolvePathValue("socket-path", "CDERUN_SOCKET_PATH", nil, nil, "config.json")
 		require.NoError(t, err)
 		assert.Equal(t, "/app/config.json", resolved)
 
@@ -275,27 +278,12 @@ func TestFeature_EnvHelpers_DeduplicationAndMerge(t *testing.T) {
 
 		// Create 70 environment variables (exceeds maxStackEnvThreshold of 64)
 		largeEnv := make([]string, 70)
-		for i := 0; i < 70; i++ {
+		for i := range 70 {
 			largeEnv[i] = "VAR_" + string(rune('A'+(i%26))) + "=val"
 		}
 
 		res := deduplicateEnv(largeEnv)
 		require.NotEmpty(t, res)
-		assert.LessOrEqual(t, len(res), 26)
+		assert.Len(t, res, 26)
 	})
-}
-
-func TestFeature_Resolver_ContextCancellation(t *testing.T) {
-	t.Parallel()
-
-	mfs := &MockFileSystem{
-		WD: "/app",
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel context immediately
-
-	_, err := ResolveWithFS("test", &CLIOptions{}, ToolsConfig{}, &CDERunConfig{}, mfs)
-	_ = ctx
-	_ = err
 }
