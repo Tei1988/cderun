@@ -80,11 +80,12 @@ AIエージェントや複数の開発者が並列で開発を進める際、巨
 2. **スコープを絞った新規テストファイルの作成**
 
   - 新機能の追加、バグ修正、特定のテーマに対するテストの追加を行う際は、必ずスコープが明確な新しいテストファイルを作成してください。
+  - **テストファイル命名禁止語**: テストファイル名には、検証対象ではなく作業の性質を表す不透明な語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`）およびエージェント名（`jules` 等）を含めてはなりません。
   - 命名例:
 
     - 新機能: `feature_shm_size_test.go`
     - バグ修正: `bugfix_issue42_test.go`
-    - テーマ別: `resolver_robustness_test.go`, `command_extra_scenarios_test.go`
+    - テーマ別: `resolver_robustness_test.go`, `command_scenario_boundaries_test.go`
 
 3. **ファイル分離によるコンフリクト確率の低減**
 
