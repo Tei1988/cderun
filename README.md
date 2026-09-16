@@ -483,7 +483,23 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 - `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
-- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
+- `CDERUN_USER`: Username or UID inside the container (`<user|uid>[:<group|gid>]`).
+- `CDERUN_GROUP_ADD`: Supplementary group IDs or names to add to the execution user (containerd requires numeric GIDs).
+- `CDERUN_READ_ONLY`: Mount the container's root filesystem as read-only.
+- `CDERUN_INIT`: Run an init process inside the container (`CDERUN_INIT=true` is rejected by containerd `ValidateConfig`).
+- `CDERUN_PID`: Configure PID namespace (accepts `""` for private PID namespace, `"host"`, or `"container:<reference>"`; containerd supports `""` and `"host"`).
+- `CDERUN_PIDS_LIMIT`: Limit maximum active processes/threads inside the container.
+- `CDERUN_IPC`: Configure IPC namespace (`host` or private).
+- `CDERUN_CGROUPNS`: Configure cgroup namespace (`host` or private).
+- `CDERUN_SECURITY_OPT`: List of security options (e.g. `no-new-privileges`).
+- `CDERUN_ULIMIT`: List of process ulimit resource specifications (e.g. `nofile=1024:2048`).
+- `CDERUN_SHM_SIZE`: Size of shared memory partition `/dev/shm` (e.g. `256m`, `1g`).
+- `CDERUN_SYSCTL`: List of kernel parameters to configure at runtime (`key=value`).
+- `CDERUN_CAP_ADD`: List of Linux capabilities to add.
+- `CDERUN_CAP_DROP`: List of Linux capabilities to drop.
+- `CDERUN_GPUS`: GPU devices to request (`all`, `count=2`, `device=0,1`; non-empty values are rejected by containerd `ValidateConfig`).
+- `CDERUN_MOUNT_CDERUN_SOCKET`: Mount cderun Control Socket (`cderun.sock`) for nested execution.
+- `CDERUN_MOUNT_CDERUN_PATH`: Host-side path to the `cderun` binary to mount into the container.
 
 **Note on List-type Options:**
 
