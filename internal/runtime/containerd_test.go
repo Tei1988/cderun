@@ -101,6 +101,47 @@ func TestUnit_Containerd_ParseSignal(t *testing.T) {
 	}
 }
 
+func TestUnit_Containerd_BuildMountSpecOpts_Tmpfs(t *testing.T) {
+	t.Parallel()
+
+	cfg := &container.ContainerConfig{
+		Mounts: []container.Mount{
+			{
+				Type:     "tmpfs",
+				Target:   "/tmp/test",
+				ReadOnly: true,
+			},
+			{
+				Type:     "bind",
+				Source:   "/host/path",
+				Target:   "/container/path",
+				ReadOnly: false,
+			},
+		},
+	}
+
+	opts := buildContainerdMountSpecOpts(cfg)
+	require.Len(t, opts, 2)
+
+	spec := &specs.Spec{}
+	for _, opt := range opts {
+		err := opt(context.Background(), nil, nil, spec)
+		require.NoError(t, err)
+	}
+
+	require.Len(t, spec.Mounts, 2)
+	assert.Equal(t, "tmpfs", spec.Mounts[0].Type)
+	assert.Equal(t, "tmpfs", spec.Mounts[0].Source)
+	assert.Equal(t, "/tmp/test", spec.Mounts[0].Destination)
+	assert.Contains(t, spec.Mounts[0].Options, "ro")
+
+	assert.Equal(t, "bind", spec.Mounts[1].Type)
+	assert.Equal(t, "/host/path", spec.Mounts[1].Source)
+	assert.Equal(t, "/container/path", spec.Mounts[1].Destination)
+	assert.Contains(t, spec.Mounts[1].Options, "rbind")
+	assert.Contains(t, spec.Mounts[1].Options, "rw")
+}
+
 func TestUnit_Containerd_ConvertUlimits(t *testing.T) {
 	t.Parallel()
 
