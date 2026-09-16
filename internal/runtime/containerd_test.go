@@ -133,13 +133,12 @@ func TestUnit_Containerd_BuildMountSpecOpts_Tmpfs(t *testing.T) {
 	assert.Equal(t, "tmpfs", spec.Mounts[0].Type)
 	assert.Equal(t, "tmpfs", spec.Mounts[0].Source)
 	assert.Equal(t, "/tmp/test", spec.Mounts[0].Destination)
-	assert.Contains(t, spec.Mounts[0].Options, "ro")
+	assert.ElementsMatch(t, []string{"ro"}, spec.Mounts[0].Options)
 
 	assert.Equal(t, "bind", spec.Mounts[1].Type)
 	assert.Equal(t, "/host/path", spec.Mounts[1].Source)
 	assert.Equal(t, "/container/path", spec.Mounts[1].Destination)
-	assert.Contains(t, spec.Mounts[1].Options, "rbind")
-	assert.Contains(t, spec.Mounts[1].Options, "rw")
+	assert.ElementsMatch(t, []string{"rw", "rbind"}, spec.Mounts[1].Options)
 }
 
 func TestUnit_Containerd_ConvertUlimits(t *testing.T) {
