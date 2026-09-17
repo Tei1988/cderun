@@ -304,6 +304,10 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 }
 
 func ParseMountFlag(s string) (MountConfig, error) {
+	if strings.HasSuffix(s, ",") {
+		return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
+	}
+
 	res := MountConfig{
 		Type: "bind", // Default type
 	}
