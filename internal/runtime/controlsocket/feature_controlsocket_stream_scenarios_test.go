@@ -281,12 +281,29 @@ func TestUnit_ControlSocket_ConnState_LongRunningOps(t *testing.T) {
 	assert.Equal(t, 0, cs.longRunningOps)
 
 	cs.updateReadDeadlineForNextFrame(50 * time.Millisecond)
+
+	// Verify that the set read deadline causes an idle read timeout on the pipe
+	buf := make([]byte, 10)
+	errChan := make(chan error, 1)
+	go func() {
+		_, err := c1.Read(buf)
+		errChan <- err
+	}()
+
+	select {
+	case err := <-errChan:
+		require.Error(t, err)
+		var netErr net.Error
+		require.True(t, errors.As(err, &netErr) && netErr.Timeout(), "expected read timeout error, got %v", err)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected read on net.Pipe to time out after updateReadDeadlineForNextFrame")
+	}
 }
 
 func TestUnit_ControlSocket_CopyErrOrNil(t *testing.T) {
-	assert.Nil(t, copyErrOrNil(nil))
-	assert.Nil(t, copyErrOrNil(io.EOF))
-	assert.Nil(t, copyErrOrNil(net.ErrClosed))
+	assert.NoError(t, copyErrOrNil(nil))
+	assert.NoError(t, copyErrOrNil(io.EOF))
+	assert.NoError(t, copyErrOrNil(net.ErrClosed))
 
 	customErr := errors.New("stream copy error")
 	assert.Equal(t, customErr, copyErrOrNil(customErr))
