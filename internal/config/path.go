@@ -308,7 +308,16 @@ func ParseMountFlag(s string) (MountConfig, error) {
 		Type: "bind", // Default type
 	}
 
-	for part := range strings.SplitSeq(s, ",") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		key, val, found := strings.Cut(part, "=")
 		if !found {
 			if part == "readonly" {
@@ -688,7 +697,16 @@ func ValidateCpuset(s string) error {
 			}
 		}
 	}
-	for part := range strings.SplitSeq(s, ",") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		hyphenCount := strings.Count(part, "-")
 		if hyphenCount > 1 {
 			return fmt.Errorf("invalid cpuset syntax: multiple range delimiters in segment %q", part)
