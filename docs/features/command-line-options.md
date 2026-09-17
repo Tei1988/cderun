@@ -65,6 +65,15 @@ When supplying multiple values for a list-type option (e.g., `stringArray` or `[
   - `CDERUN_SENSITIVE_ENV`
   - `CDERUN_ULIMIT`
   - `CDERUN_SYSCTL`
+  - `CDERUN_USER`
+  - `CDERUN_READ_ONLY`
+  - `CDERUN_INIT`
+  - `CDERUN_PID`
+  - `CDERUN_PIDS_LIMIT`
+  - `CDERUN_IPC`
+  - `CDERUN_CGROUPNS`
+  - `CDERUN_SHM_SIZE`
+  - `CDERUN_GPUS`
 
 *Note: When passing list-type options via CLI flags (P1/P2), separators are not used. Instead, repeat the flag (e.g., `--env A=1 --env B=2` or `--dns 8.8.8.8 --dns 1.1.1.1`). An exception is scalar string options like `--prefetch` (and `--mount-tools`), which are registered as scalar string flags whose handlers split comma-separated values (e.g., `--prefetch node,python`).*
 
