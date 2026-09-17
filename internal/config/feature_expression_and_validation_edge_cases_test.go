@@ -181,12 +181,25 @@ func TestFeature_ExpressionAndValidation_EdgeCases(t *testing.T) {
 			OciRuntime: &ociRuntimeVal,
 		}
 
-		res, err := ResolveWithFS("sh", cliOpts, nil, nil, fs)
+		toolsCfg := ToolsConfig{
+			"sh": ToolConfig{
+				Image:      "ubuntu:20.04",
+				OciRuntime: "runc",
+			},
+		}
+
+		globalCfg := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				OciRuntime: "kata",
+			},
+		}
+
+		res, err := ResolveWithFS("sh", cliOpts, toolsCfg, globalCfg, fs)
 		require.NoError(t, err)
 
-		// CLI override takes precedence for OciRuntime
+		// CLI override ("crun") wins over ToolConfig ("runc") and CDERunConfig ("kata") for OciRuntime
 		assert.Equal(t, "crun", res.OciRuntime)
-		// Env var CDERUN_IMAGE supplies Image
+		// Env var CDERUN_IMAGE ("ubuntu:22.04") wins over ToolConfig ("ubuntu:20.04") for Image
 		assert.Equal(t, "ubuntu:22.04", res.Image)
 	})
 }
