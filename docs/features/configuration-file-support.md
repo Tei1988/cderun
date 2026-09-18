@@ -102,13 +102,13 @@ Configuration fields use **camelCase** keys.
 
 #### `defaults` Fields
 
-- `tty`, `interactive`, `remove`, `strictEnv` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime` (string)
+- `tty`, `interactive`, `remove`, `strictEnv`, `readOnly`, `init`, `mountCderunSocket`, `prune`, `prefetchAll` (bool)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime`, `pid`, `shmSize`, `ipc`, `cgroupns`, `cpusetCpus`, `cpusetMems`, `restart`, `gpus`, `prefetch` (string)
 - `cpus` (float64)
-- `pullMaxRetries` (int)
+- `pullMaxRetries`, `pidsLimit`, `cpuShares` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
 - `mountCderunPath`, `mountSocketPath` (string)
-- `mountTools`, `ports`, `expose`, `dns`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv` ([]string)
+- `mountTools`, `ports`, `expose`, `dns`, `dnsSearch`, `dnsOptions`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv`, `securityOpt`, `ulimits` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)
