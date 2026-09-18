@@ -121,6 +121,25 @@ func TestUnit_ContainerConfig_JSONSerialization(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, data)
 
+	// Assert literal JSON keys emitted for each populated field
+	var rawMap map[string]any
+	err = json.Unmarshal(data, &rawMap)
+	require.NoError(t, err)
+
+	expectedKeys := []string{
+		"image", "command", "tty", "interactive", "remove", "read_only", "init",
+		"network", "ports", "publish_all", "expose", "hostname", "dns", "add_hosts",
+		"mounts", "labels", "env", "workdir", "user", "privileged", "pid", "shm_size",
+		"cap_add", "cap_drop", "entrypoint", "pull", "memory", "cpus", "devices",
+		"group_add", "ulimits", "sysctls", "ipc", "security_opt", "dns_search",
+		"dns_options", "gpus", "cgroupns", "pids_limit", "cpu_shares", "cpuset_cpus",
+		"cpuset_mems", "restart", "oci_runtime",
+	}
+
+	for _, key := range expectedKeys {
+		assert.Contains(t, rawMap, key, "expected JSON output to contain key %q", key)
+	}
+
 	var unmarshaled ContainerConfig
 	err = json.Unmarshal(data, &unmarshaled)
 	require.NoError(t, err)
