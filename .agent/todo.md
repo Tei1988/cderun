@@ -930,12 +930,11 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 
 ### 仕様
 
-T101 と同じ（リネーム先行、重複削除は別 PR）。
+14 ファイルのテストファイル名のリネーム（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` の除去）は完了済み。重複テストの特定・削除は本タスクの次回 PR で実施する。
 
 ### 完了条件
 
-- `internal/runtime` 配下（`controlsocket` を含む）に禁止語を含むテストファイル名が 0 件
+- `internal/runtime` 配下（`controlsocket` を含む）に禁止語を含むテストファイル名が 0 件（達成済み）
 - 削除したテストの一覧が PR 説明にある
 - `make test` がパスし、`internal/runtime` のカバレッジが有意に下がっていない
 - `make lint-go` がパスする
-
