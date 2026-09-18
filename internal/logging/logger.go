@@ -189,7 +189,8 @@ func (l *Logger) formatText(level Level, message string, now time.Time) string {
 	var builder strings.Builder
 	builder.Grow(needed)
 	if l.timestamp {
-		builder.WriteString(now.Format("2006-01-02 15:04:05"))
+		var timeBuf [20]byte
+		builder.Write(now.AppendFormat(timeBuf[:0], "2006-01-02 15:04:05"))
 		builder.WriteByte(' ')
 	}
 	builder.WriteByte('[')
@@ -228,10 +229,11 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 	if l.format == "json" {
 		data := l.formatJSON(level, message, now)
-		_, _ = fmt.Fprintln(l.writer, string(data))
+		_, _ = l.writer.Write(data)
+		_, _ = l.writer.Write([]byte{'\n'})
 	} else {
 		output := l.formatText(level, message, now)
-		_, _ = fmt.Fprint(l.writer, output)
+		_, _ = io.WriteString(l.writer, output)
 	}
 }
 
@@ -308,12 +310,12 @@ func SanitizeLogString(s string) string {
 		return s
 	}
 
-	// Fast stack-allocated path for common messages (up to 256 bytes)
-	// Each control character is escaped to 4 bytes. If len(s) <= 256, the maximum
-	// possible size is 4 * 256 = 1024 bytes, which fits in a 1KB stack buffer,
+	// Fast stack-allocated path for common messages (up to 512 bytes)
+	// Each control character is escaped to 4 bytes. If len(s) <= 512, the maximum
+	// possible size is 4 * 512 = 2048 bytes, which fits in a 2KB stack buffer,
 	// avoiding intermediate strings.Builder heap allocations (allocating only for the final string result).
-	if len(s) <= 256 {
-		var buf [1024]byte
+	if len(s) <= 512 {
+		var buf [2048]byte
 		w := 0
 		for i := 0; i < len(s); i++ {
 			c := s[i]
@@ -341,7 +343,8 @@ func SanitizeLogString(s string) string {
 		if c == '\t' {
 			builder.WriteByte(c)
 		} else if isControlByte(c) {
-			builder.WriteString("\\x")
+			builder.WriteByte('\\')
+			builder.WriteByte('x')
 			builder.WriteByte(hexChars[c>>4])
 			builder.WriteByte(hexChars[c&0x0f])
 		} else {
