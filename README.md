@@ -471,7 +471,7 @@ Key variables include:
 - `CDERUN_INIT`: If set to `true`, runs an init process inside container.
 - `CDERUN_PID`: PID namespace mode (`""` or `"host"`).
 - `CDERUN_PIDS_LIMIT`: Tune process limits inside container.
-- `CDERUN_IPC`: IPC namespace mode (`""` or `"host"`).
+- `CDERUN_IPC`: IPC namespace mode (`""`, `"host"`, or `"private"`).
 - `CDERUN_CGROUPNS`: Cgroup namespace mode (`""`, `"host"`, or `"private"`).
 - `CDERUN_SECURITY_OPT`: List of security options (e.g. `no-new-privileges`).
 - `CDERUN_ULIMIT`: List of ulimits (e.g. `nofile=65535:65535`).
