@@ -229,8 +229,8 @@ func (l *Logger) log(level Level, msg string, args ...any) {
 func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 	if l.format == "json" {
 		data := l.formatJSON(level, message, now)
+		data = append(data, '\n')
 		_, _ = l.writer.Write(data)
-		_, _ = l.writer.Write([]byte{'\n'})
 	} else {
 		output := l.formatText(level, message, now)
 		_, _ = io.WriteString(l.writer, output)
