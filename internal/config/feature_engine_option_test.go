@@ -29,6 +29,20 @@ func TestUnit_EngineOption_Resolution(t *testing.T) {
 		assert.Equal(t, "containerd", res.Runtime)
 	})
 
+	t.Run("CLI runtime flag takes precedence over CDERUN_ENGINE env var", func(t *testing.T) {
+		runtimeVal := "podman"
+		cli := &CLIOptions{Image: &imgVal, Runtime: &runtimeVal}
+		fs := &MockFileSystem{
+			Env: map[string]string{
+				"CDERUN_ENGINE": "containerd",
+			},
+		}
+		res, err := ResolveWithFS("test-tool", cli, nil, nil, fs)
+		require.NoError(t, err)
+		assert.Equal(t, "podman", res.Engine)
+		assert.Equal(t, "podman", res.Runtime)
+	})
+
 	t.Run("resolves engine from env var CDERUN_ENGINE", func(t *testing.T) {
 		fs := &MockFileSystem{
 			Env: map[string]string{

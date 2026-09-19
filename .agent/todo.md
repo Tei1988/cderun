@@ -97,7 +97,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
-| T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
+| T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | - |
 | T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | - |
 | T95 | `--runtime` の意味を OCI ランタイム側へ切り替え | 破壊 | 中 | 小 | あり | - |
 | T96 | Control Socket サーバのリクエスト context を接続の生存に紐づける | バグ | 高 | 小 | - | DONE |

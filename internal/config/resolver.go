@@ -773,24 +773,43 @@ func (r *ResolvedConfig) IsCLIBased() bool {
 }
 
 func (rv *resolver) getEngineOptionWinner() (engineVal string, engineSet bool, runtimeVal string, runtimeSet bool) {
+	// Layer 1: CLI Flags (P1 override & P2 flag)
 	if set, val := getPtrVal(rv.cli.CderunEngine); set {
 		engineVal, engineSet = val, true
 	} else if set, val := getPtrVal(rv.cli.Engine); set {
 		engineVal, engineSet = val, true
-	} else if env := rv.fs.Getenv("CDERUN_ENGINE"); env != "" {
-		engineVal, engineSet = env, true
-	} else if rv.global != nil && rv.global.Engine != "" {
-		engineVal, engineSet = rv.global.Engine, true
 	}
 
 	if set, val := getPtrVal(rv.cli.CderunRuntime); set {
 		runtimeVal, runtimeSet = val, true
 	} else if set, val := getPtrVal(rv.cli.Runtime); set {
 		runtimeVal, runtimeSet = val, true
-	} else if env := rv.fs.Getenv("CDERUN_RUNTIME"); env != "" {
+	}
+
+	if engineSet || runtimeSet {
+		return engineVal, engineSet, runtimeVal, runtimeSet
+	}
+
+	// Layer 2: Environment Variables (P3)
+	if env := rv.fs.Getenv("CDERUN_ENGINE"); env != "" {
+		engineVal, engineSet = env, true
+	}
+	if env := rv.fs.Getenv("CDERUN_RUNTIME"); env != "" {
 		runtimeVal, runtimeSet = env, true
-	} else if rv.global != nil && rv.global.Runtime != "" {
-		runtimeVal, runtimeSet = rv.global.Runtime, true
+	}
+
+	if engineSet || runtimeSet {
+		return engineVal, engineSet, runtimeVal, runtimeSet
+	}
+
+	// Layer 3: Global Configuration (P5)
+	if rv.global != nil {
+		if rv.global.Engine != "" {
+			engineVal, engineSet = rv.global.Engine, true
+		}
+		if rv.global.Runtime != "" {
+			runtimeVal, runtimeSet = rv.global.Runtime, true
+		}
 	}
 
 	return engineVal, engineSet, runtimeVal, runtimeSet
