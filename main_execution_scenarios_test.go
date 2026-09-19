@@ -46,7 +46,7 @@ func TestUnit_Main_CommandExecutionScenarios(t *testing.T) {
 		assert.Equal(t, "underlying failure", exitErr.Error())
 
 		var extracted *command.ExitCodeError
-		assert.True(t, errors.As(exitErr, &extracted))
+		assert.ErrorAs(t, exitErr, &extracted)
 		assert.Equal(t, 42, extracted.Code)
 	})
 }
