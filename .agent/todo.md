@@ -321,6 +321,11 @@ cderun --prune
 - **内容**: T100 のテストファイル命名規則（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` および命名例）を `docs/testing/organization.md` に追記する。
 - **対応ドキュメント**: `docs/testing/organization.md`
 
+### Documentation Update Task: T93 (`--engine` / `--cderun-engine`)
+
+- **内容**: T93 の実装（`--engine`, `--cderun-engine`, `CDERUN_ENGINE`, `.cderun.yaml` の `engine:`、および `--runtime` の非推奨エイリアス化と警告ログ）の仕様説明をドキュメントに追加する。
+- **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する

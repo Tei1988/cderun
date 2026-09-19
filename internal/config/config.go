@@ -16,6 +16,7 @@ import (
 )
 
 type CDERunConfig struct {
+	Engine      string         `yaml:"engine"`
 	Runtime     string         `yaml:"runtime"`
 	SocketPath  ConfigPath     `yaml:"socketPath"`
 	Defaults    ConfigDefaults `yaml:"defaults"`
