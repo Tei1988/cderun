@@ -586,6 +586,9 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
 func findAnchors(s string) []string {
+	if strings.IndexByte(s, '{') == -1 {
+		return nil
+	}
 	var buf [8]anchorRange
 	ranges := scanAnchors(s, buf[:0])
 	if len(ranges) == 0 {
