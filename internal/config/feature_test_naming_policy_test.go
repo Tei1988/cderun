@@ -65,9 +65,50 @@ func TestUnit_CheckTestNamesScriptExecution(t *testing.T) {
 		t.Skip("check-test-names.sh not found, skipping script execution test")
 	}
 
-	// Run script against current repository state (which has valid test names)
-	cmd := exec.Command(scriptPath)
-	cmd.Dir = repoRoot
-	out, err := cmd.CombinedOutput()
-	assert.NoError(t, err, "check-test-names.sh should pass on clean working tree: %s", string(out))
+	t.Run("CleanWorkingTree", func(t *testing.T) {
+		// Run script against current repository state
+		cmd := exec.Command(scriptPath)
+		cmd.Dir = repoRoot
+		out, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "check-test-names.sh should pass on clean working tree: %s", string(out))
+	})
+
+	t.Run("ControlledTemporaryRepoCases", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		// Initialize temporary git repo
+		initCmd := exec.Command("git", "init")
+		initCmd.Dir = tempDir
+		require.NoError(t, initCmd.Run(), "git init in tempDir must succeed")
+
+		// Create scripts directory and copy check-test-names.sh
+		scriptsDir := filepath.Join(tempDir, "scripts")
+		require.NoError(t, os.MkdirAll(scriptsDir, 0755))
+		tempScriptPath := filepath.Join(scriptsDir, "check-test-names.sh")
+
+		scriptBytes, err := os.ReadFile(scriptPath)
+		require.NoError(t, err, "Must read check-test-names.sh")
+		require.NoError(t, os.WriteFile(tempScriptPath, scriptBytes, 0755))
+
+		// Case 1: Prohibited test filename present
+		prohibitedFile := filepath.Join(tempDir, "feature_improvement_test.go")
+		require.NoError(t, os.WriteFile(prohibitedFile, []byte("package test"), 0644))
+
+		cmdProhibited := exec.Command(tempScriptPath)
+		cmdProhibited.Dir = tempDir
+		outProhibited, errProhibited := cmdProhibited.CombinedOutput()
+		assert.Error(t, errProhibited, "Script should return non-zero error for prohibited filename")
+		assert.Contains(t, string(outProhibited), "Error: Test file naming policy violation detected")
+
+		// Case 2: Remove prohibited file and create valid test filename
+		require.NoError(t, os.Remove(prohibitedFile))
+		validFile := filepath.Join(tempDir, "feature_shm_size_test.go")
+		require.NoError(t, os.WriteFile(validFile, []byte("package test"), 0644))
+
+		cmdValid := exec.Command(tempScriptPath)
+		cmdValid.Dir = tempDir
+		outValid, errValid := cmdValid.CombinedOutput()
+		assert.NoError(t, errValid, "Script should succeed for valid filename: %s", string(outValid))
+		assert.Contains(t, string(outValid), "Test file naming check passed successfully")
+	})
 }
