@@ -127,7 +127,7 @@ func TestUnit_NewBaseContainerConfig_FieldMapping(t *testing.T) {
 	assert.Equal(t, []string{"/entrypoint.sh"}, cfg.Entrypoint)
 	assert.Equal(t, "always", cfg.Pull)
 	assert.Equal(t, int64(1024*1024*512), cfg.Memory)
-	assert.Equal(t, 2.0, cfg.CPUs)
+	assert.InDelta(t, 2.0, cfg.CPUs, 1e-6)
 	assert.Equal(t, "host", cfg.IPC)
 	assert.Equal(t, []string{"no-new-privileges:true"}, cfg.SecurityOpt)
 	assert.Equal(t, []string{"example.com"}, cfg.DNSSearch)
