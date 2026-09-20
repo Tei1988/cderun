@@ -104,11 +104,11 @@ func TestUnit_Logging_ConcurrentAccess(t *testing.T) {
 	const numGoroutines = 10
 	const opsPerGoroutine = 50
 
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < opsPerGoroutine; j++ {
+			for j := range opsPerGoroutine {
 				if (id+j)%2 == 0 {
 					_ = logger.Init("debug", "text", true)
 				} else {
