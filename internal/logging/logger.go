@@ -231,10 +231,10 @@ func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 	if l.format == "json" {
 		data := l.formatJSON(level, message, now)
 		data = append(data, '\n')
-		_, _ = l.writer.Write(data)
+		_, _ = l.writer.Write(data) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
 	} else {
 		output := l.formatText(level, message, now)
-		_, _ = io.WriteString(l.writer, output)
+		_, _ = io.WriteString(l.writer, output) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
 	}
 }
 
