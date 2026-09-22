@@ -291,7 +291,8 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`).
+- `--engine`: Container engine to use (`docker`/`podman`/`containerd`).
+- `--runtime`: Container engine to use (deprecated alias for `--engine`).
 - `--oci-runtime`: Specify custom OCI runtime binary/engine (`runc`, `crun`, `kata-runtime`).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
@@ -465,7 +466,8 @@ Key variables include:
 - `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_RUNTIME`: Container runtime to use (docker/podman/containerd).
+- `CDERUN_ENGINE`: Container engine to use (docker/podman/containerd).
+- `CDERUN_RUNTIME`: Container engine to use (deprecated alias for `CDERUN_ENGINE`).
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_PREFETCH`: Prefetch specified tool images (comma-separated list).

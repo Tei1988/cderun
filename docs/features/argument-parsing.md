@@ -121,9 +121,12 @@ During program startup (particularly visible when running in Polyglot/Symlink Mo
 
 #### Support for Space-Separated and Equals-Sign Formats for Value-Taking Flags
 
-To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`) can specify their value using either the space-separated format (e.g., `--cderun-image alpine`) or the equals-sign format (e.g., `--cderun-image=alpine`).
+To provide a natural, user-friendly CLI experience, internal override flags that take a value (e.g., `--cderun-image`, `--cderun-workdir`, `--cderun-engine`, `--cderun-oci-runtime`) can specify their value using either the space-separated format (e.g., `--cderun-image alpine`) or the equals-sign format (e.g., `--cderun-image=alpine`).
 
-During the argument preprocessing scan, `cderun` looks up the registration metadata of any encountered `--cderun-` flag. If the flag is defined to expect a value (meaning it is a non-boolean standard flag) and is written without an equals-sign, the preprocessor automatically consumes the next adjacent argument as its value, hoisting both arguments together. Boolean override flags (e.g., `--cderun-tty`) take no value and are hoisted autonomously without consuming subsequent arguments.
+During the argument preprocessing scan, `cderun` looks up the registration metadata of any encountered `--cderun-` flag in the central option registry (`registry.go`). If the flag is defined to expect a value (meaning it is a non-boolean standard flag) and is written without an equals-sign, the preprocessor automatically consumes the next adjacent argument as its value, hoisting both arguments together.
+
+- **Value-Taking Override Flags**: Registered value-taking options (such as `--cderun-image`, `--cderun-workdir`, `--cderun-user`, `--cderun-env`, `--cderun-memory`, `--cderun-cpus`, `--cderun-network`, `--cderun-engine`, `--cderun-oci-runtime`, `--cderun-hang-timeout`, etc.) consume the adjacent parameter as their value when specified without an equals-sign. If the adjacent parameter is another `--cderun-` flag, preprocessing fails immediately with a validation error to prevent argument corruption.
+- **Boolean Override Flags**: Toggles (such as `--cderun-tty`, `--cderun-interactive`, `--cderun-read-only`, `--cderun-init`, `--cderun-prune`, `--cderun-strict-env`, `--cderun-dry-run`, `--cderun-mount-socket`, `--cderun-mount-cderun`, `--cderun-mount-cderun-socket`, `--cderun-publish-all`, `--cderun-prefetch-all`, `--cderun-log-timestamp`) do not consume adjacent arguments and are hoisted autonomously. They can optionally take explicit boolean assignments using the equals-sign format (e.g., `--cderun-tty=false` or `--cderun-read-only=true`).
 
 #### Preprocessing Transformation Examples
 

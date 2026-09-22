@@ -301,12 +301,25 @@ cderun --workdir "{{PWD}}/src" node app.js
 cderun --strict-env --env NPM_TOKEN node app.js
 ```
 
+### `--engine`
+
+- **Type**: string
+- **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
+- **Environment Variable**: `CDERUN_ENGINE`
+- **Supported Engines**: `docker`, `podman`, `containerd`.
+- **Note**: `--runtime` / `CDERUN_RUNTIME` / `runtime:` in `.cderun.yaml` function as deprecated alias options with warning logs.
+
+```bash
+cderun --engine podman node app.js
+```
+
 ### `--runtime`
 
 - **Type**: string
 - **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
 - **Environment Variable**: `CDERUN_RUNTIME`
 - **Supported Engines**: `docker`, `podman`, `containerd`.
+- **Deprecation Warning**: Deprecated alias for `--engine`. Use `--engine` / `CDERUN_ENGINE` instead.
 - **Auto-detection Logic**:
   When no engine is explicitly specified, `cderun` checks for runtime socket files on disk (via filesystem stat) in the following priority order:
   1. `/var/run/docker.sock` (Docker)
