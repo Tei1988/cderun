@@ -120,8 +120,6 @@ func defaultOptions() rootOptions {
 				return runtime.NewPodmanRuntime(socket, runtime.WithLogger(l))
 			case "containerd":
 				return runtime.NewContainerdRuntime(socket, runtime.WithContainerdLogger(l))
-			case "nerdctl":
-				return nil, fmt.Errorf("nerdctl engine requires control socket execution (T90)")
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
