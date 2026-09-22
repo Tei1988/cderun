@@ -37,43 +37,43 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	}
 
 	var stackBuf [32]int
-	var allPairsBuf [32]anchorRange
 	stack := stackBuf[:0]
-	allPairs := allPairsBuf[:0]
+	res := buf[:0]
 
-	for i := 0; i < len(s)-1; {
-		if s[i] == '{' && s[i+1] == '{' {
-			stack = append(stack, i)
-			i += 2
-		} else if s[i] == '}' && s[i+1] == '}' {
+	i := 0
+	for i < len(s)-1 {
+		idx := strings.IndexAny(s[i:], "{}")
+		if idx == -1 {
+			break
+		}
+		p := i + idx
+		if p >= len(s)-1 {
+			break
+		}
+
+		if s[p] == '{' && s[p+1] == '{' {
+			stack = append(stack, p)
+			i = p + 2
+		} else if s[p] == '}' && s[p+1] == '}' {
 			if len(stack) > 0 {
 				start := stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
-				allPairs = append(allPairs, anchorRange{start: start, end: i + 2})
+				end := p + 2
+
+				for len(res) > 0 && res[len(res)-1].start > start {
+					res = res[:len(res)-1]
+				}
+				res = append(res, anchorRange{start: start, end: end})
 			}
-			i += 2
+			i = p + 2
 		} else {
-			i++
+			i = p + 1
 		}
 	}
 
-	if len(allPairs) == 0 {
+	if len(res) == 0 {
 		return nil
 	}
-
-	res := buf[:0]
-	lastStart := len(s) + 1
-	for i := len(allPairs) - 1; i >= 0; i-- {
-		p := allPairs[i]
-		if p.end <= lastStart {
-			res = append(res, p)
-			lastStart = p.start
-		}
-	}
-
-	// Reverse to maintain original order
-	slices.Reverse(res)
-
 	return res
 }
 
