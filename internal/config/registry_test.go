@@ -38,6 +38,12 @@ func TestRegistryOptionUsages(t *testing.T) {
 	t.Run("runtime usage description", func(t *testing.T) {
 		opt, ok := GetStringOption("runtime")
 		assert.True(t, ok)
-		assert.Equal(t, "Container runtime to use (docker/podman/containerd)", opt.Usage)
+		assert.Equal(t, "Container runtime to use (deprecated alias for --engine)", opt.Usage)
+	})
+
+	t.Run("engine usage description", func(t *testing.T) {
+		opt, ok := GetStringOption("engine")
+		assert.True(t, ok)
+		assert.Equal(t, "Container engine to use (docker/podman/containerd)", opt.Usage)
 	})
 }

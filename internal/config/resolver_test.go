@@ -619,7 +619,7 @@ func TestUnit_Resolver_Exhaustive_Advanced(t *testing.T) {
 		global := &CDERunConfig{Runtime: "unknown"}
 		_, err = ResolveWithFS("sh", &CLIOptions{Image: ptr("alpine")}, nil, global, &MockFileSystem{})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported runtime: \"unknown\"")
+		assert.Contains(t, err.Error(), "unsupported engine: \"unknown\"")
 	})
 
 	t.Run("Resolve coverage final", func(t *testing.T) {

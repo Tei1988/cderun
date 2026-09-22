@@ -302,7 +302,7 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			{"network", CLIOptions{Network: ptr("net\r")}},
 			{"hostname", CLIOptions{Hostname: ptr("host\t")}},
 			{"workdir", CLIOptions{Workdir: ptr("dir\v")}},
-			{"runtime", CLIOptions{Runtime: ptr("run\f")}},
+			{"engine", CLIOptions{Engine: ptr("run\f")}},
 			{"dry-run-format", CLIOptions{DryRunFormat: ptr("fmt\n")}},
 			{"log-level", CLIOptions{LogLevel: ptr("level\r")}},
 		}
@@ -586,9 +586,9 @@ func TestUnit_Config_ResolveWithFS_Coverage(t *testing.T) {
 			{
 				name: "Invalid runtime",
 				cli: CLIOptions{
-					Image: ptr("alpine"), Runtime: ptr("rkt")},
+					Image: ptr("alpine"), Engine: ptr("rkt")},
 				wantErr:     true,
-				errContains: "unsupported runtime: \"rkt\"",
+				errContains: "unsupported engine: \"rkt\"",
 			},
 			{
 				name: "Invalid dry-run-format",

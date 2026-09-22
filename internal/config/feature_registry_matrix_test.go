@@ -27,6 +27,7 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 	// Specific valid value generators for options with strict validation or special defaults
 	stringValidVals := map[string]validValues[string]{
 		"pid":              {P1: "host", P2: "host", P3: "host", P4: "host", P5: "host"},
+		"engine":           {P1: "docker", P2: "podman", P3: "containerd", P4: "docker", P5: "podman"},
 		"runtime":          {P1: "docker", P2: "podman", P3: "containerd", P4: "docker", P5: "podman"},
 		"shm-size":         {P1: "512m", P2: "1g", P3: "2g", P4: "256m", P5: "64m"},
 		"workdir":          {P1: "/app/p1", P2: "/app/p2", P3: "/app/p3", P4: "/app/p4", P5: "/app/p5"},
@@ -150,12 +151,17 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 				}
 
 				// Test P5 wins over default
-				if opt.Name == "runtime" {
-					// runtime has auto-detection when P1-P5 are empty; verify P5 overrides auto-detected default
-					globalP5 := &CDERunConfig{Runtime: p5Val}
+				if opt.Name == "runtime" || opt.Name == "engine" {
+					// runtime/engine has auto-detection when P1-P5 are empty; verify P5 overrides auto-detected default
+					var globalP5 *CDERunConfig
+					if opt.Name == "engine" {
+						globalP5 = &CDERunConfig{Engine: p5Val}
+					} else {
+						globalP5 = &CDERunConfig{Runtime: p5Val}
+					}
 					res, err := ResolveWithFS("sh", cliEmpty, nil, globalP5, &MockFileSystem{})
 					require.NoError(t, err)
-					assert.Equal(t, p5Val, res.Runtime, "P5 should win for runtime")
+					assert.Equal(t, p5Val, res.Engine, "P5 should win for "+opt.Name)
 				} else {
 					mfsNoEnv := &MockFileSystem{}
 					res, err = ResolveWithFS("sh", cliEmpty, nil, global, mfsNoEnv)
@@ -535,6 +541,10 @@ func createGlobalConfigWithString(t *testing.T, optName, fieldName string, val s
 	}
 	if optName == "runtime" {
 		cfg.Runtime = val
+		return cfg
+	}
+	if optName == "engine" {
+		cfg.Engine = val
 		return cfg
 	}
 	v := reflect.ValueOf(&cfg.Defaults).Elem().FieldByName(fieldName)

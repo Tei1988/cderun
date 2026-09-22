@@ -237,6 +237,13 @@ func (rv *resolver) auditSecurityOptWarnings() {
 }
 
 func (rv *resolver) validateCriticalFields() error {
+	if rv.res.Engine == "" && rv.res.Runtime != "" {
+		rv.res.Engine = rv.res.Runtime
+	}
+	if rv.res.Runtime == "" && rv.res.Engine != "" {
+		rv.res.Runtime = rv.res.Engine
+	}
+
 	// image
 	if err := validateField(rv.res.Image, "image", ValidateImageName); err != nil {
 		return err
@@ -421,14 +428,17 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// runtime
-	runtimeValidator := func(v string) error {
-		if v != "docker" && v != "podman" && v != "containerd" {
-			return fmt.Errorf("unsupported runtime: %q", v)
+	// engine / runtime
+	engineValidator := func(v string) error {
+		if v != "docker" && v != "podman" && v != "containerd" && v != "nerdctl" {
+			return fmt.Errorf("unsupported engine: %q", v)
 		}
 		return nil
 	}
-	if err := validateField(rv.res.Runtime, "runtime", runtimeValidator); err != nil {
+	if err := validateField(rv.res.Engine, "engine", engineValidator); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.Runtime, "runtime", engineValidator); err != nil {
 		return err
 	}
 
