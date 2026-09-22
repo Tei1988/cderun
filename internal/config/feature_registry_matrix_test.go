@@ -27,7 +27,7 @@ func TestUnit_Config_Registry_PriorityMatrix(t *testing.T) {
 	// Specific valid value generators for options with strict validation or special defaults
 	stringValidVals := map[string]validValues[string]{
 		"pid":              {P1: "host", P2: "host", P3: "host", P4: "host", P5: "host"},
-		"engine":           {P1: "docker", P2: "podman", P3: "containerd", P4: "docker", P5: "podman"},
+		"engine":           {P1: "docker", P2: "podman", P3: "containerd", P4: "nerdctl", P5: "docker"},
 		"runtime":          {P1: "docker", P2: "podman", P3: "containerd", P4: "docker", P5: "podman"},
 		"shm-size":         {P1: "512m", P2: "1g", P3: "2g", P4: "256m", P5: "64m"},
 		"workdir":          {P1: "/app/p1", P2: "/app/p2", P3: "/app/p3", P4: "/app/p4", P5: "/app/p5"},

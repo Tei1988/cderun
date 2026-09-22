@@ -44,6 +44,6 @@ func TestRegistryOptionUsages(t *testing.T) {
 	t.Run("engine usage description", func(t *testing.T) {
 		opt, ok := GetStringOption("engine")
 		assert.True(t, ok)
-		assert.Equal(t, "Container engine to use (docker/podman/containerd)", opt.Usage)
+		assert.Equal(t, "Container engine to use (docker/podman/containerd/nerdctl)", opt.Usage)
 	})
 }

@@ -381,7 +381,7 @@ var StringOptions = []StringOption{
 	{
 		Name:   "engine",
 		EnvKey: "CDERUN_ENGINE",
-		Usage:  "Container engine to use (docker/podman/containerd)",
+		Usage:  "Container engine to use (docker/podman/containerd/nerdctl)",
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Engine
 		},
