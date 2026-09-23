@@ -263,8 +263,14 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 		return "", err
 	}
 
-	lines := strings.SplitSeq(string(data), "\n")
-	for line := range lines {
+	remData := string(data)
+	for remData != "" {
+		var line string
+		if idx := strings.IndexByte(remData, '\n'); idx >= 0 {
+			line, remData = remData[:idx], remData[idx+1:]
+		} else {
+			line, remData = remData, ""
+		}
 		if line == "" {
 			continue
 		}
@@ -297,8 +303,14 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 
 		// Superblock options are at the end
 		sbOptions := fields[len(fields)-1]
-		options := strings.SplitSeq(sbOptions, ",")
-		for opt := range options {
+		remOptions := sbOptions
+		for remOptions != "" {
+			var opt string
+			if idx := strings.IndexByte(remOptions, ','); idx >= 0 {
+				opt, remOptions = remOptions[:idx], remOptions[idx+1:]
+			} else {
+				opt, remOptions = remOptions, ""
+			}
 			if after, ok := strings.CutPrefix(opt, "upperdir="); ok {
 				return after, nil
 			}

@@ -280,7 +280,14 @@ func pickConfigs[T any](
 					res = []T{}
 				}
 			} else {
-				for s := range strings.SplitSeq(env, envSep) {
+				rem := env
+				for rem != "" {
+					var s string
+					if idx := strings.Index(rem, envSep); idx >= 0 {
+						s, rem = rem[:idx], rem[idx+len(envSep):]
+					} else {
+						s, rem = rem, ""
+					}
 					s = strings.TrimSpace(s)
 					if s == "" {
 						continue

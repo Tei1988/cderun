@@ -160,7 +160,14 @@ func getWinningStringSlice(
 				return []string{v}
 			}
 			var vals []string
-			for v := range strings.SplitSeq(env, envSep) {
+			rem := env
+			for rem != "" {
+				var v string
+				if idx := strings.Index(rem, envSep); idx >= 0 {
+					v, rem = rem[:idx], rem[idx+len(envSep):]
+				} else {
+					v, rem = rem, ""
+				}
 				v = strings.TrimSpace(v)
 				if v == "" {
 					continue
