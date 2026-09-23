@@ -90,7 +90,6 @@ The supported runtime engines are:
 - `docker`: Standard Docker Engine daemon (default)
 - `podman`: Podman local service API
 - `containerd`: Direct containerd gRPC service (Linux only)
-- `nerdctl`: nerdctl CLI wrapper
 
 ### Configuration Mappings
 
@@ -101,10 +100,10 @@ The supported runtime engines are:
 
 ### Resolution Priority Sequence for Engine Selection
 
-1. **Phase 1 (P1) Internal Overrides**: `--cderun-engine` (or `--cderun-runtime`) flag takes top precedence over all other options.
-2. **CLI (P2) Flags**: Explicit `--engine` (or `--runtime`) or `--socket-path` CLI flags.
-3. **Environment Variables (P3)**: `CDERUN_ENGINE` (or `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
-4. **Configuration Files (P5)**: Global `engine:` (or `runtime:`) or `socketPath:` keys in `.cderun.yaml`.
+1. **Phase 1 (P1) Internal Overrides**: P1 flags (`--cderun-engine` or `--cderun-runtime`) outrank environment and configuration values. When `--cderun-engine` and deprecated alias `--cderun-runtime` are both specified, `--cderun-engine` takes precedence.
+2. **CLI (P2) Flags**: Explicit `--engine` (or deprecated `--runtime`) or `--socket-path` CLI flags. When both `--engine` and `--runtime` are supplied at the CLI tier, `--engine` takes precedence.
+3. **Environment Variables (P3)**: `CDERUN_ENGINE` (or deprecated `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
+4. **Configuration Files (P5)**: Global `engine:` (or deprecated `runtime:`) or `socketPath:` keys in `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 

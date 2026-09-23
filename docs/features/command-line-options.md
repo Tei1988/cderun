@@ -10,7 +10,7 @@ The table below summarizes support for key `cderun` configuration features acros
 
 | Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | Notes / Adapter Behavior |
 | :--- | :---: | :---: | :---: | :--- |
-| **Container Engine Selection** (`--engine`) | ✅ | ✅ | ✅ | Specifies container execution engine (`docker`, `podman`, `containerd`, `nerdctl`). `--runtime` is supported as a deprecated alias. |
+| **Container Engine Selection** (`--engine`) | ✅ | ✅ | ✅ | Specifies container execution engine (`docker`, `podman`, `containerd`). `--runtime` is supported as a deprecated alias. |
 | **TTY Allocation** (`--tty`, `-t`) | ✅ | ✅ | ✅ | Allocates a pseudo-TTY (PTY). Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
 | **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached. In containerd, callers must register I/O via `AttachContainer` before `StartContainer` to forward stream input (otherwise containerd defaults to `NullIO`). |
 | **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
@@ -307,7 +307,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **Type**: string
 - **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
 - **Environment Variable**: `CDERUN_ENGINE`
-- **Supported Engines**: `docker`, `podman`, `containerd`, `nerdctl`.
+- **Supported Engines**: `docker`, `podman`, `containerd`.
 - **Auto-detection Logic**:
   When no engine is explicitly specified, `cderun` checks for runtime socket files on disk (via filesystem stat) in the following priority order:
   1. `/var/run/docker.sock` (Docker)
