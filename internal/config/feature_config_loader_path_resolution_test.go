@@ -85,16 +85,21 @@ func TestUnit_ConfigLoader_LoadFromPath_StrictYAML(t *testing.T) {
 		WD:      "/workspace",
 		HomeDir: "/home/user",
 		Files: map[string][]byte{
-			"/workspace/unknown-field.yaml": []byte(`
-invalid_field_unknown: true
+			"/workspace/unknown-cderun-field.yaml": []byte(`
 runtime: docker
+invalid_field_unknown: true
+`),
+			"/workspace/unknown-tools-field.yaml": []byte(`
+node:
+  image: node:20-alpine
+  unknown_nested_field: true
 `),
 		},
 	}
 	loader := NewConfigLoaderWithFS(fs)
 
 	t.Run("CDERunConfig_StrictUnmarshalError", func(t *testing.T) {
-		cfg, paths, err := loader.LoadCDERunConfigFromPath("unknown-field.yaml")
+		cfg, paths, err := loader.LoadCDERunConfigFromPath("unknown-cderun-field.yaml")
 		require.Error(t, err)
 		assert.Nil(t, cfg)
 		assert.Nil(t, paths)
@@ -102,7 +107,7 @@ runtime: docker
 	})
 
 	t.Run("ToolsConfig_StrictUnmarshalError", func(t *testing.T) {
-		tools, paths, err := loader.LoadToolsConfigFromPath("unknown-field.yaml")
+		tools, paths, err := loader.LoadToolsConfigFromPath("unknown-tools-field.yaml")
 		require.Error(t, err)
 		assert.Nil(t, tools)
 		assert.Nil(t, paths)
@@ -126,14 +131,17 @@ func TestUnit_ConfigLoader_FindConfigsAndLoad_Hierarchical(t *testing.T) {
 			"/etc/cderun/.cderun.yaml": []byte(`
 runtime: docker
 defaults:
-  network: bridge
+  network: system-net
+  workdir: /etc/work
 `),
 			"/home/user/.config/cderun/.cderun.yaml": []byte(`
 defaults:
+  network: home-net
   workdir: /home/user/work
 `),
 			"/workspace/project/.cderun.yaml": []byte(`
 defaults:
+  network: project-net
   readOnly: true
 `),
 		},
@@ -157,8 +165,10 @@ defaults:
 		require.NotNil(t, cfg)
 
 		// Verification of merged properties according to precedence (/workspace/project > home > /etc)
+		// project-net overrides home-net and system-net
 		assert.Equal(t, "docker", cfg.Runtime)
-		assert.Equal(t, "bridge", cfg.Defaults.Network)
+		assert.Equal(t, "project-net", cfg.Defaults.Network)
+		// home workdir overrides system workdir
 		assert.Equal(t, "/home/user/work", cfg.Defaults.Workdir)
 		require.NotNil(t, cfg.Defaults.ReadOnly)
 		assert.True(t, *cfg.Defaults.ReadOnly)
