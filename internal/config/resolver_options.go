@@ -135,6 +135,8 @@ func getStringOptionFastPathPtrs(cli *CLIOptions, name string) (*string, *string
 		return cli.CderunRestart, cli.Restart, true
 	case "prefetch":
 		return cli.CderunPrefetch, cli.Prefetch, true
+	case "oci-runtime":
+		return cli.CderunOciRuntime, cli.OciRuntime, true
 	default:
 		return nil, nil, false
 	}
@@ -182,6 +184,8 @@ func assignResolvedString(res *ResolvedConfig, name string, resolved string) {
 		res.Restart = resolved
 	case "prefetch":
 		res.Prefetch = resolved
+	case "oci-runtime":
+		res.OciRuntime = resolved
 	}
 }
 
@@ -217,6 +221,10 @@ func getBoolOptionFastPathPtrs(cli *CLIOptions, name string) (*bool, *bool, bool
 		return cli.CderunDryRun, cli.DryRun, true
 	case "prefetch-all":
 		return cli.CderunPrefetchAll, cli.PrefetchAll, true
+	case "mount-cderun-socket":
+		return cli.CderunMountCderunSocket, cli.MountCderunSocket, true
+	case "prune":
+		return cli.CderunPrune, cli.Prune, true
 	default:
 		return nil, nil, false
 	}
@@ -254,6 +262,10 @@ func assignResolvedBool(res *ResolvedConfig, name string, resolved bool) {
 		res.DryRun = resolved
 	case "prefetch-all":
 		res.PrefetchAll = resolved
+	case "mount-cderun-socket":
+		res.MountCderunSocket = resolved
+	case "prune":
+		res.Prune = resolved
 	}
 }
 
