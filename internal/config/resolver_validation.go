@@ -247,7 +247,16 @@ func (rv *resolver) validateCriticalFields() error {
 		if v == "" {
 			return nil
 		}
-		for part := range strings.SplitSeq(v, ",") {
+		remaining := v
+		for len(remaining) > 0 {
+			var part string
+			if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+				part = remaining[:idx]
+				remaining = remaining[idx+1:]
+			} else {
+				part = remaining
+				remaining = ""
+			}
 			part = strings.TrimSpace(part)
 			if part == "" {
 				continue

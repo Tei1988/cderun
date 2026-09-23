@@ -982,7 +982,16 @@ func PascalCase(s string) string {
 
 	var builder strings.Builder
 	builder.Grow(len(s))
-	for part := range strings.SplitSeq(s, "-") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, '-'); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		if part == "" {
 			continue
 		}
