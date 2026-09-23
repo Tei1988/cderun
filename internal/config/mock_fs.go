@@ -28,6 +28,8 @@ type MockFileSystem struct {
 	HomeDirErr   error
 	TempDirValue string
 	Perms        map[string]os.FileMode
+	UIDValue     *int
+	GIDValue     *int
 }
 
 func (m *MockFileSystem) Getwd() (string, error) {
@@ -192,4 +194,22 @@ func (m *MockFileSystem) Abs(path string) (string, error) {
 		return filepath.Clean(path), nil
 	}
 	return filepath.Join(m.WD, path), nil
+}
+
+func (m *MockFileSystem) Getuid() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.UIDValue != nil {
+		return *m.UIDValue
+	}
+	return 1000
+}
+
+func (m *MockFileSystem) Getgid() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.GIDValue != nil {
+		return *m.GIDValue
+	}
+	return 1000
 }
