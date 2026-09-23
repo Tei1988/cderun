@@ -16,7 +16,8 @@ import (
 
 func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 	t.Run("nested_socket_autodetected_from_environment", func(t *testing.T) {
-		t.Setenv("CDERUN_SOCKET_PATH", "/var/run/cderun-nested.sock")
+		socketPath := "/var/run/cderun-nested.sock"
+		t.Setenv("CDERUN_SOCKET_PATH", socketPath)
 
 		args := []string{
 			"cderun",
@@ -29,6 +30,9 @@ func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 
 		mfs := &config.MockFileSystem{
 			WD: "/workspace",
+			Env: map[string]string{
+				"CDERUN_SOCKET_PATH": socketPath,
+			},
 		}
 
 		outBuf := &bytes.Buffer{}
@@ -44,8 +48,13 @@ func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 		err = json.Unmarshal(outBuf.Bytes(), &res)
 		require.NoError(t, err)
 
-		// Dry-run output should reflect image and command
 		assert.Equal(t, "alpine:latest", res["image"])
+
+		// Assert socket path auto-detection resolution via config resolver
+		img := "alpine:latest"
+		resolved, err := config.ResolveWithFS("sh", &config.CLIOptions{Image: &img}, config.ToolsConfig{}, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, socketPath, resolved.SocketPath)
 	})
 
 	t.Run("mount_cderun_socket_flag_creates_bind_mount", func(t *testing.T) {
@@ -55,7 +64,7 @@ func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 			"bash",
 			"--cderun-image", "ubuntu:22.04",
 			"--cderun-socket-path", socketPath,
-			"--cderun-mount-cderun-socket",
+			"--cderun-mount-socket",
 			"--cderun-dry-run",
 			"--cderun-dry-run-format", "json",
 		}
@@ -83,7 +92,7 @@ func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 		mounts, ok := res["mounts"].([]any)
 		require.True(t, ok)
 
-		// Find socket mount or verify mount_cderun_socket resolution
+		// Find socket mount and assert that it was added
 		foundSocketMount := false
 		for _, m := range mounts {
 			mMap, isMap := m.(map[string]any)
@@ -96,8 +105,7 @@ func TestUnit_Command_NestedExecution_ControlSocketScenarios(t *testing.T) {
 				break
 			}
 		}
-		// If socket mount is populated dynamically during execution or dry-run, verify dry run succeeded
-		_ = foundSocketMount
+		assert.True(t, foundSocketMount, "expected mount for socket path %s in mounts: %v", socketPath, mounts)
 		assert.Equal(t, "ubuntu:22.04", res["image"])
 	})
 }
@@ -110,7 +118,22 @@ func TestUnit_Command_Snapshot_LevelInvariants(t *testing.T) {
 		HomeDir: "/home/user",
 	}
 
-	t.Run("resolve_snapshot_base_dir_level0", func(t *testing.T) {
+	t.Run("resolve_snapshot_base_dir_real_filesystem_level0", func(t *testing.T) {
+		t.Parallel()
+
+		realFS := config.RealFileSystem{}
+		globalCfg := &config.CDERunConfig{
+			HostContext: &config.HostContext{
+				Level: 0,
+			},
+		}
+
+		baseDir := resolveSnapshotBaseDir(realFS, globalCfg)
+		assert.NotEmpty(t, baseDir)
+		assert.Equal(t, realFS.TempDir(), baseDir)
+	})
+
+	t.Run("resolve_snapshot_base_dir_mock_filesystem_level0", func(t *testing.T) {
 		t.Parallel()
 
 		globalCfg := &config.CDERunConfig{
@@ -121,6 +144,7 @@ func TestUnit_Command_Snapshot_LevelInvariants(t *testing.T) {
 
 		baseDir := resolveSnapshotBaseDir(mfs, globalCfg)
 		assert.NotEmpty(t, baseDir)
+		assert.Equal(t, mfs.TempDir(), baseDir)
 	})
 
 	t.Run("resolve_host_snapshot_dir_level1", func(t *testing.T) {

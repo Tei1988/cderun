@@ -194,6 +194,13 @@ func TestUnit_ContainerConfig_YAMLSerializationTagMatching(t *testing.T) {
 	yamlBytes, err := yaml.Marshal(orig)
 	require.NoError(t, err)
 
+	var rawMap map[string]any
+	err = yaml.Unmarshal(yamlBytes, &rawMap)
+	require.NoError(t, err)
+
+	assert.Contains(t, rawMap, "oci_runtime")
+	assert.Equal(t, "crun", rawMap["oci_runtime"])
+
 	var decoded ContainerConfig
 	err = yaml.Unmarshal(yamlBytes, &decoded)
 	require.NoError(t, err)
