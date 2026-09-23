@@ -247,7 +247,16 @@ func (rv *resolver) validateCriticalFields() error {
 		if v == "" {
 			return nil
 		}
-		for part := range strings.SplitSeq(v, ",") {
+		remaining := v
+		for len(remaining) > 0 {
+			var part string
+			if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+				part = remaining[:idx]
+				remaining = remaining[idx+1:]
+			} else {
+				part = remaining
+				remaining = ""
+			}
 			part = strings.TrimSpace(part)
 			if part == "" {
 				continue
@@ -421,14 +430,23 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// runtime
+	// engine & runtime
+	engineValidator := func(v string) error {
+		if v != "" && v != "docker" && v != "podman" && v != "containerd" {
+			return fmt.Errorf("unsupported engine: %q", v)
+		}
+		return nil
+	}
 	runtimeValidator := func(v string) error {
-		if v != "docker" && v != "podman" && v != "containerd" {
+		if v != "" && v != "docker" && v != "podman" && v != "containerd" {
 			return fmt.Errorf("unsupported runtime: %q", v)
 		}
 		return nil
 	}
 	if err := validateField(rv.res.Runtime, "runtime", runtimeValidator); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.Engine, "engine", engineValidator); err != nil {
 		return err
 	}
 

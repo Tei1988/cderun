@@ -292,7 +292,6 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
 - `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`).
-- `--oci-runtime`: Specify custom OCI runtime binary/engine (`runc`, `crun`, `kata-runtime`).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -465,12 +464,27 @@ Key variables include:
 - `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_RUNTIME`: Container runtime to use (docker/podman/containerd).
+- `CDERUN_RUNTIME`: Container runtime to use (`docker`/`podman`/`containerd`).
+- `CDERUN_USER`: Username or UID (format: `<name|uid>[:<group|gid>]`).
+- `CDERUN_GROUP_ADD`: Supplementary groups to add to the container.
+- `CDERUN_READ_ONLY`: If set to `true`, mounts container root filesystem as read-only.
+- `CDERUN_INIT`: If set to `true`, runs an init process inside container.
+- `CDERUN_PID`: PID namespace mode (`""` or `"host"`).
+- `CDERUN_PIDS_LIMIT`: Tune process limits inside container.
+- `CDERUN_IPC`: IPC namespace mode (`""`, `"host"`, or `"private"`).
+- `CDERUN_CGROUPNS`: Cgroup namespace mode (`""`, `"host"`, or `"private"`).
+- `CDERUN_SECURITY_OPT`: List of security options (e.g. `no-new-privileges`).
+- `CDERUN_ULIMIT`: List of ulimits (e.g. `nofile=65535:65535`).
+- `CDERUN_SHM_SIZE`: Shared memory size for `/dev/shm` (e.g. `512m`).
+- `CDERUN_SYSCTL`: Kernel sysctl parameter overrides.
+- `CDERUN_CAP_ADD`: Linux capabilities to add.
+- `CDERUN_CAP_DROP`: Linux capabilities to drop.
+- `CDERUN_GPUS`: GPU device requests.
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_PREFETCH`: Prefetch specified tool images (comma-separated list).
 - `CDERUN_PREFETCH_ALL`: Prefetch all tool images defined in `.tools.yaml`.
-- `CDERUN_OCI_RUNTIME`: Specify custom OCI runtime binary/engine (`runc`, `crun`, `kata-runtime`).
+- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 - `CDERUN_PRUNE`: List and remove stopped orphan containers created by `cderun`.
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
 - `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
@@ -479,6 +493,8 @@ Key variables include:
 - `CDERUN_DIAGNOSIS`: If set to `true`, enables diagnosis mode.
 - `CDERUN_DIAGNOSIS_FORMAT`: Output format for diagnosis (yaml, json, simple).
 - `CDERUN_PUBLISH_ALL`: If set to `true`, publish all exposed ports to random ports.
+- `CDERUN_MOUNT_CDERUN_SOCKET`: If set to `true`, mounts cderun Control Socket.
+- `CDERUN_MOUNT_CDERUN_PATH`: Path to host-side `cderun` binary for nested mounting.
 - `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.

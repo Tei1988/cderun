@@ -104,9 +104,9 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T97 | Control Socket サーバの accept ループ堅牢化とアイドルタイムアウト | バグ | 中 | 小 | - | DONE |
 | T98 | Control Socket ハンドラの共通化とエラー処理方針の統一 | リファクタ | 中 | 小 | - | DONE |
 | T99 | テストファイル命名規約の強制（親タスク） | クリーンアップ | 高 | 大 | - | - |
-| T100 | テストファイル命名規約の明文化と lint / CI ゲートの追加 | クリーンアップ | 高 | 小 | - | - |
+| T100 | テストファイル命名規約の明文化と lint / CI ゲートの追加 | クリーンアップ | 高 | 小 | - | DONE |
 | T101 | `internal/config` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
-| T102 | `internal/command` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
+| T102 | `internal/command` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | DONE |
 | T103 | `internal/runtime` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
 
 依存関係・統合の注意:
@@ -320,6 +320,11 @@ cderun --prune
 
 - **内容**: T100 のテストファイル命名規則（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` および命名例）を `docs/testing/organization.md` に追記する。
 - **対応ドキュメント**: `docs/testing/organization.md`
+
+### Documentation Update Task: T93 (`--engine` / `--cderun-engine`)
+
+- **内容**: T93 の実装（`--engine`, `--cderun-engine`, `CDERUN_ENGINE`, `.cderun.yaml` の `engine:`、および `--runtime` の非推奨エイリアス化と警告ログ）の仕様説明をドキュメントに追加する。
+- **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
 
 ---
 
@@ -843,36 +848,6 @@ T101〜T103 は T100 の完了を待たずに着手してよい（禁止語の�
 
 ---
 
-## T100: テストファイル命名規約の明文化と lint / CI ゲートの追加
-
-- 種別: クリーンアップ / ルール整備
-- 優先度: 高
-- 規模: 小
-- 前提: なし
-- 仕様変更: なし
-- 対象: `AGENTS.md`, `docs/testing/organization.md`, `Makefile`, `.github/workflows/ci.yaml`
-
-### 仕様
-
-- 禁止語（`improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` 等のエージェント名）と命名例を `docs/testing/organization.md` 3.3 に明記する（`AGENTS.md` の Testing-First には記載済みのため、そこからの参照で足りるなら重複させない）
-- 禁止語を含むテストファイル名を検出する lint コマンド（`make lint-test-names` 等）を追加する
-- CI の必須チェックに組み込む。**対象は新規・追加されたファイル名に限定する**（既存の違反 83 件は T101〜T103 で解消するため、この時点で全ツリーを対象にすると CI が赤のままになる）
-- 既存違反を除外する仕組みを使う場合、除外リストは自動生成とし、手動追記でゲートを迂回できない構造にすること
-
-### 完了条件
-
-- `make lint-test-names` 相当のコマンドが存在し、禁止語を含むファイル名を検出する
-- 新規・変更されたテストファイルが CI で必ず検証される（既存違反の有無に関わらず独立して判定されること）
-- 除外リストを用いる場合、手動追記による迂回ができないことを確認するテストまたは手順がある
-- `docs/testing/organization.md` に禁止語と命名例が記載されている
-- `make lint-go` / `make lint-md` がパスする
-
-### 補足
-
-全ツリーを対象とする違反ゼロ検証は、T101〜T103 の完了後に親タスク T99 の完了条件として実施する。本タスクの完了条件には含めない（含めると T101〜T103 が本タスクに依存し、循環する）。
-
----
-
 ## T101: `internal/config` のテストファイルリネームと重複削除
 
 - 種別: クリーンアップ
@@ -930,12 +905,11 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 
 ### 仕様
 
-T101 と同じ（リネーム先行、重複削除は別 PR）。
+14 ファイルのテストファイル名のリネーム（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` の除去）は完了済み。重複テストの特定・削除は本タスクの次回 PR で実施する。
 
 ### 完了条件
 
-- `internal/runtime` 配下（`controlsocket` を含む）に禁止語を含むテストファイル名が 0 件
+- `internal/runtime` 配下（`controlsocket` を含む）に禁止語を含むテストファイル名が 0 件（達成済み）
 - 削除したテストの一覧が PR 説明にある
 - `make test` がパスし、`internal/runtime` のカバレッジが有意に下がっていない
 - `make lint-go` がパスする
-

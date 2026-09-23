@@ -379,12 +379,25 @@ var StringOptions = []StringOption{
 		},
 	},
 	{
+		Name:   "engine",
+		EnvKey: "CDERUN_ENGINE",
+		Usage:  "Container engine to use (docker/podman/containerd)",
+		GlobalGetter: func(g CDERunConfig) string {
+			if g.Engine != "" {
+				return g.Engine
+			}
+			return g.Runtime
+		},
+		SkipResolution: true, // resolved in resolveEngineAndSocket
+	},
+	{
 		Name:   "runtime",
 		EnvKey: "CDERUN_RUNTIME",
-		Usage:  "Container runtime to use (docker/podman/containerd)",
+		Usage:  "Container engine to use (docker/podman/containerd) [deprecated: use engine]",
 		GlobalGetter: func(g CDERunConfig) string {
 			return g.Runtime
 		},
+		SkipResolution: true, // resolved in resolveEngineAndSocket
 	},
 	{
 		Name:   "shm-size",
@@ -969,7 +982,16 @@ func PascalCase(s string) string {
 
 	var builder strings.Builder
 	builder.Grow(len(s))
-	for part := range strings.SplitSeq(s, "-") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, '-'); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		if part == "" {
 			continue
 		}

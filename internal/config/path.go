@@ -304,11 +304,24 @@ func (dc DeviceConfig) Resolve(r *ExpressionResolver) (container.DeviceMapping, 
 }
 
 func ParseMountFlag(s string) (MountConfig, error) {
+	if strings.HasSuffix(s, ",") {
+		return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
+	}
+
 	res := MountConfig{
 		Type: "bind", // Default type
 	}
 
-	for part := range strings.SplitSeq(s, ",") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		key, val, found := strings.Cut(part, "=")
 		if !found {
 			if part == "readonly" {
@@ -586,6 +599,9 @@ func SplitHostRemainder(s string) (string, string, bool) {
 
 // findAnchors finds all top-level {{...}} expressions in a string, respecting nested braces.
 func findAnchors(s string) []string {
+	if strings.IndexByte(s, '{') == -1 {
+		return nil
+	}
 	var buf [8]anchorRange
 	ranges := scanAnchors(s, buf[:0])
 	if len(ranges) == 0 {
@@ -688,7 +704,16 @@ func ValidateCpuset(s string) error {
 			}
 		}
 	}
-	for part := range strings.SplitSeq(s, ",") {
+	remaining := s
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
 		hyphenCount := strings.Count(part, "-")
 		if hyphenCount > 1 {
 			return fmt.Errorf("invalid cpuset syntax: multiple range delimiters in segment %q", part)
