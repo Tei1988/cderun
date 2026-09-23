@@ -154,6 +154,26 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return resolveUlimitsFromRaws(raws, r)
 }
 
+func isWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\v' || b == '\f'
+}
+
+func hasOuterWhitespace(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	return isWhitespace(s[0]) || isWhitespace(s[len(s)-1])
+}
+
+func isWhitespaceOnly(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if !isWhitespace(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]string, error) {
 	if len(raws) == 0 {
 		return nil, nil
@@ -170,7 +190,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 		}
 
 		key, val, found := strings.Cut(resolvedRaw, "=")
-		if !found || strings.TrimSpace(key) == "" {
+		if !found || len(key) == 0 || isWhitespaceOnly(key) {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
@@ -178,7 +198,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 			}
 		}
 
-		if key != strings.TrimSpace(key) {
+		if hasOuterWhitespace(key) {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,

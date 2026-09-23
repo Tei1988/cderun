@@ -208,15 +208,27 @@ func preAnalyzePattern(p string) preAnalyzedPattern {
 func matchPreAnalyzed(key string, keyIsASCII bool, ap *preAnalyzedPattern, upperKey *string) bool {
 	if keyIsASCII && ap.isASCII {
 		if !ap.isGlob {
+			if key == ap.cleanPat || key == ap.cleanPatLower {
+				return true
+			}
 			return equalFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isSuffix {
+			if strings.HasSuffix(key, ap.cleanPat) || strings.HasSuffix(key, ap.cleanPatLower) {
+				return true
+			}
 			return hasSuffixFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isPrefix {
+			if strings.HasPrefix(key, ap.cleanPat) || strings.HasPrefix(key, ap.cleanPatLower) {
+				return true
+			}
 			return hasPrefixFoldASCIILower(key, ap.cleanPatLower)
 		}
 		if ap.isSubstr {
+			if strings.Contains(key, ap.cleanPat) || strings.Contains(key, ap.cleanPatLower) {
+				return true
+			}
 			return containsFoldASCIILower(key, ap.cleanPatLower)
 		}
 	}
