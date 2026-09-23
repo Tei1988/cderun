@@ -42,6 +42,15 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	allPairs := allPairsBuf[:0]
 
 	for i := 0; i < len(s)-1; {
+		idx := strings.IndexAny(s[i:], "{}")
+		if idx == -1 {
+			break
+		}
+		i += idx
+		if i >= len(s)-1 {
+			break
+		}
+
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
 			i += 2
