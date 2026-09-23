@@ -309,21 +309,31 @@ func ParseMountFlag(s string) (MountConfig, error) {
 	}
 
 	rem := s
-	for rem != "" {
+	for {
 		var part string
-		if idx := strings.IndexByte(rem, ','); idx >= 0 {
-			part, rem = rem[:idx], rem[idx+1:]
+		idx := strings.IndexByte(rem, ',')
+		if idx >= 0 {
+			part = rem[:idx]
+			rem = rem[idx+1:]
 		} else {
-			part, rem = rem, ""
+			part = rem
+			rem = ""
 		}
+
 		key, val, found := strings.Cut(part, "=")
 		if !found {
 			if part == "readonly" {
 				res.ReadOnly = true
+				if idx < 0 {
+					break
+				}
 				continue
 			}
 			if part == "optional" {
 				res.Optional = true
+				if idx < 0 {
+					break
+				}
 				continue
 			}
 			return MountConfig{}, fmt.Errorf("invalid mount format: %q", s)
@@ -350,6 +360,10 @@ func ParseMountFlag(s string) (MountConfig, error) {
 			res.Optional = b
 		default:
 			return MountConfig{}, fmt.Errorf("unknown mount option: %q (supported: type, source, src, target, dst, destination, readonly, optional)", key)
+		}
+
+		if idx < 0 {
+			break
 		}
 	}
 

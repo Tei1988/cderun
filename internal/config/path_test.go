@@ -182,6 +182,14 @@ func TestUnit_Path_Resolution(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown mount option: \"unknown\"")
 		assert.Contains(t, err.Error(), "supported: type, source, src, target, dst, destination, readonly, optional")
+
+		_, err = ParseMountFlag("target=/work,")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid mount format")
+
+		_, err = ParseMountFlag("target=/work,readonly,")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid mount format")
 	})
 
 	t.Run("Windows Paths", func(t *testing.T) {
