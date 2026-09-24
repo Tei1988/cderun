@@ -77,7 +77,7 @@ AIエージェントや複数の開発者が並列で開発を進める際、巨
 
   - 既存のテストケースそのものを修正・更新する場合を除き、新規追加するテストケースを `resolver_test.go` や `root_test.go` 等の末尾に追記することを禁止します。
 
-2. **スコープを絞った新規テストファイルの作成**
+2. **スコープを絞った新規テストファイルの作成と命名規約**
 
   - 新機能の追加、バグ修正、特定のテーマに対するテストの追加を行う際は、必ずスコープが明確な新しいテストファイルを作成してください。
   - **テストファイル命名禁止語**: テストファイル名には、検証対象ではなく作業の性質を表す不透明な語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`）およびエージェント名（`jules` 等）を含めてはなりません。
@@ -86,6 +86,10 @@ AIエージェントや複数の開発者が並列で開発を進める際、巨
     - 新機能: `feature_shm_size_test.go`
     - バグ修正: `bugfix_issue42_test.go`
     - テーマ別: `resolver_robustness_test.go`, `command_scenario_boundaries_test.go`
+
+  - **Lint / CI ゲート (`make lint-test-names`)**:
+    - リポジトリのルートには `./scripts/check-test-names.sh` および Makefile ターゲット `make lint-test-names`（`make lint` 内に組み込み済み）が用意されています。
+    - CI パイプライン（`.github/workflows/ci.yaml`）では、新規追加および変更されたテストファイル名に対してこのスクリプトが自動実行され、禁止語が含まれている場合は CI チェックが失敗します。
 
 3. **ファイル分離によるコンフリクト確率の低減**
 

@@ -42,6 +42,15 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 	allPairs := allPairsBuf[:0]
 
 	for i := 0; i < len(s)-1; {
+		idx := strings.IndexAny(s[i:], "{}")
+		if idx == -1 {
+			break
+		}
+		i += idx
+		if i >= len(s)-1 {
+			break
+		}
+
 		if s[i] == '{' && s[i+1] == '{' {
 			stack = append(stack, i)
 			i += 2
@@ -364,6 +373,20 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 			return r.HostContext.WorkingDir, nil
 		}
 		return r.Pwd, nil
+	case "UID":
+		return r.getUID(), nil
+	case "GID":
+		return r.getGID(), nil
+	case "BASE_UID":
+		if r.HostContext != nil && r.HostContext.UID != "" {
+			return r.HostContext.UID, nil
+		}
+		return r.getUID(), nil
+	case "BASE_GID":
+		if r.HostContext != nil && r.HostContext.GID != "" {
+			return r.HostContext.GID, nil
+		}
+		return r.getGID(), nil
 	}
 
 	// 2. Directives
@@ -549,6 +572,32 @@ func (r *ExpressionResolver) resolveFindDir(input string) (string, error) {
 // resolveEnv returns the value of an environment variable.
 // It mirrors os.Getenv behavior and returns an empty string if the key is missing.
 // It supports default value syntax: {{env:KEY:-default}}.
+func (r *ExpressionResolver) getUID() string {
+	if r.fs != nil {
+		uid := r.fs.Getuid()
+		if uid >= 0 {
+			return fmt.Sprintf("%d", uid)
+		}
+		if envUID := r.fs.Getenv("UID"); envUID != "" {
+			return envUID
+		}
+	}
+	return "0"
+}
+
+func (r *ExpressionResolver) getGID() string {
+	if r.fs != nil {
+		gid := r.fs.Getgid()
+		if gid >= 0 {
+			return fmt.Sprintf("%d", gid)
+		}
+		if envGID := r.fs.Getenv("GID"); envGID != "" {
+			return envGID
+		}
+	}
+	return "0"
+}
+
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
 	key, defaultValue, hasDefault := strings.Cut(input, ":-")
 	if err := ValidateEnvKey(key); err != nil {

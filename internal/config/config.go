@@ -16,6 +16,7 @@ import (
 )
 
 type CDERunConfig struct {
+	Engine      string         `yaml:"engine"`
 	Runtime     string         `yaml:"runtime"`
 	SocketPath  ConfigPath     `yaml:"socketPath"`
 	Defaults    ConfigDefaults `yaml:"defaults"`
@@ -203,6 +204,8 @@ type HostContext struct {
 	BinPath       string         `yaml:"binPath"`
 	WorkingDir    string         `yaml:"workingDir"`
 	HomeDir       string         `yaml:"homeDir"`
+	UID           string         `yaml:"uid,omitempty"`
+	GID           string         `yaml:"gid,omitempty"`
 	Mounts        []MountMapping `yaml:"mounts"`
 }
 
@@ -414,6 +417,8 @@ type FileSystem interface {
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	RemoveAll(path string) error
 	Abs(path string) (string, error)
+	Getuid() int
+	Getgid() int
 }
 
 // RealFileSystem implements FileSystem using standard os and filepath.
@@ -442,6 +447,8 @@ func (RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) 
 }
 func (RealFileSystem) RemoveAll(path string) error     { return os.RemoveAll(path) }
 func (RealFileSystem) Abs(path string) (string, error) { return filepath.Abs(path) }
+func (RealFileSystem) Getuid() int                     { return os.Getuid() }
+func (RealFileSystem) Getgid() int                     { return os.Getgid() }
 
 // statResult holds file info and any stat error.
 type statResult struct {

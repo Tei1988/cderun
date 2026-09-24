@@ -154,6 +154,10 @@ func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConf
 	return resolveUlimitsFromRaws(raws, r)
 }
 
+func isWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
 func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]string, error) {
 	if len(raws) == 0 {
 		return nil, nil
@@ -170,7 +174,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 		}
 
 		key, val, found := strings.Cut(resolvedRaw, "=")
-		if !found || strings.TrimSpace(key) == "" {
+		if !found || len(key) == 0 {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
@@ -178,7 +182,7 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 			}
 		}
 
-		if key != strings.TrimSpace(key) {
+		if isWhitespace(key[0]) || isWhitespace(key[len(key)-1]) {
 			return nil, &InvalidConfigError{
 				Field: "sysctl",
 				Value: raw,
@@ -280,19 +284,31 @@ func pickConfigs[T any](
 					res = []T{}
 				}
 			} else {
-				for s := range strings.SplitSeq(env, envSep) {
-					s = strings.TrimSpace(s)
-					if s == "" {
-						continue
+				remaining := env
+				if len(envSep) > 0 {
+					sepByte := envSep[0]
+					for len(remaining) > 0 {
+						var s string
+						if idx := strings.IndexByte(remaining, sepByte); idx >= 0 {
+							s = remaining[:idx]
+							remaining = remaining[idx+1:]
+						} else {
+							s = remaining
+							remaining = ""
+						}
+						s = strings.TrimSpace(s)
+						if s == "" {
+							continue
+						}
+						v, err := parseEnvItem(s, parser)
+						if err != nil {
+							return nil, err
+						}
+						if res == nil {
+							res = make([]T, 0, 4)
+						}
+						res = append(res, v)
 					}
-					v, err := parseEnvItem(s, parser)
-					if err != nil {
-						return nil, err
-					}
-					if res == nil {
-						res = make([]T, 0, 4)
-					}
-					res = append(res, v)
 				}
 				if res == nil {
 					res = []T{}

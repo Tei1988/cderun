@@ -160,15 +160,27 @@ func getWinningStringSlice(
 				return []string{v}
 			}
 			var vals []string
-			for v := range strings.SplitSeq(env, envSep) {
-				v = strings.TrimSpace(v)
-				if v == "" {
-					continue
+			remaining := env
+			if len(envSep) > 0 {
+				sepByte := envSep[0]
+				for len(remaining) > 0 {
+					var v string
+					if idx := strings.IndexByte(remaining, sepByte); idx >= 0 {
+						v = remaining[:idx]
+						remaining = remaining[idx+1:]
+					} else {
+						v = remaining
+						remaining = ""
+					}
+					v = strings.TrimSpace(v)
+					if v == "" {
+						continue
+					}
+					if vals == nil {
+						vals = make([]string, 0, 4)
+					}
+					vals = append(vals, v)
 				}
-				if vals == nil {
-					vals = make([]string, 0, 4)
-				}
-				vals = append(vals, v)
 			}
 			if vals == nil {
 				return []string{}

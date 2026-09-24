@@ -324,25 +324,23 @@ func (o *rootOptions) applySocketMount(
 	return nil
 }
 
-func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
-	// Step 10.2: Container command assembly.
-	// The subcommand itself is NOT included in fullCommand.
-	// the passthrough arguments provided after the subcommand are used.
+func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
 	for i, arg := range passthroughArgs {
 		if strings.IndexByte(arg, 0) != -1 {
 			return nil, fmt.Errorf("security validation failed: command argument [%d] contains null byte", i)
 		}
 	}
 
-	var fullCommand []string
-	if len(passthroughArgs) > 0 {
-		fullCommand = append([]string{}, passthroughArgs...)
+	if len(passthroughArgs) == 0 {
+		return nil, nil
 	}
+	return append([]string{}, passthroughArgs...), nil
+}
 
-	// Build ContainerConfig
-	containerConfig := &container.ContainerConfig{
+func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *container.ContainerConfig {
+	return &container.ContainerConfig{
 		Image:       resolved.Image,
-		Command:     fullCommand,
+		Command:     cmdArgs,
 		TTY:         resolved.TTY,
 		Interactive: resolved.Interactive,
 		Network:     resolved.Network,
@@ -389,6 +387,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 		Restart:     resolved.Restart,
 		OciRuntime:  resolved.OciRuntime,
 	}
+}
+
+func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, passthroughArgs []string, toolsCfg config.ToolsConfig) (*container.ContainerConfig, error) {
+	cmdArgs, err := assembleContainerCommand(passthroughArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	containerConfig := newBaseContainerConfig(resolved, cmdArgs)
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
 		return nil, err
