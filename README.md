@@ -323,8 +323,12 @@ Expressions can be used to inject host-context or dynamic values into options li
 - **Magic Words**:
   - `{{HOME}}`: Resolves to the user's home directory path.
   - `{{PWD}}`: Resolves to the current working directory of the execution host.
+  - `{{UID}}`: Resolves to the numeric User ID (UID) of the current process.
+  - `{{GID}}`: Resolves to the numeric Group ID (GID) of the current process.
   - `{{BASE_HOME}}`: Path to the home directory on the *base host* (Level 0 physical machine/VM), ensuring correct referencing even when executing recursively inside a nested container.
   - `{{BASE_PWD}}`: Path to the working directory on the *base host*.
+  - `{{BASE_UID}}`: Numeric User ID (UID) on the *base host*.
+  - `{{BASE_GID}}`: Numeric Group ID (GID) on the *base host*.
 - **Directives**:
   - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`). Supports fallbacks using `{{file:path:-default}}` when missing, stat/read error, or empty.
   - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`). Supports fallbacks using `{{find_dir:name:-default}}` when missing.
@@ -499,23 +503,6 @@ Key variables include:
 - `CDERUN_LOG_FORMAT`: Set log format (text, json).
 - `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
 - `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
-- `CDERUN_USER`: Username or UID inside the container (`<name|uid>[:<group|gid>]`).
-- `CDERUN_GROUP_ADD`: Supplementary groups to add to the container user (comma-separated).
-- `CDERUN_READ_ONLY`: If set to `true`, mounts container root filesystem as read-only.
-- `CDERUN_INIT`: If set to `true`, runs an init process (tini) inside the container.
-- `CDERUN_PID`: Configure PID namespace (`host` or `""`).
-- `CDERUN_PIDS_LIMIT`: Limit maximum active processes/threads inside the container.
-- `CDERUN_IPC`: Configure IPC namespace (`host`, `private`, or `""`).
-- `CDERUN_CGROUPNS`: Configure cgroup namespace (`host`, `private`, or `""`).
-- `CDERUN_SECURITY_OPT`: Security options for container execution (comma-separated).
-- `CDERUN_ULIMIT`: Configure process resource limits / ulimits (comma-separated).
-- `CDERUN_SHM_SIZE`: Configure size of `/dev/shm` shared memory partition.
-- `CDERUN_SYSCTL`: Kernel parameters to configure at runtime (comma-separated `key=value`).
-- `CDERUN_CAP_ADD`: Add Linux capabilities (comma-separated).
-- `CDERUN_CAP_DROP`: Drop Linux capabilities (comma-separated).
-- `CDERUN_GPUS`: GPU devices to request from container runtime.
-- `CDERUN_MOUNT_CDERUN_SOCKET`: Mount cderun Control Socket (`cderun.sock`) for nested execution.
-- `CDERUN_MOUNT_CDERUN_PATH`: Host path to the `cderun` binary to mount.
 
 **Note on List-type Options:**
 
