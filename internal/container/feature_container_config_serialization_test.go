@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestUnit_ContainerConfig_JSONSerialization(t *testing.T) {
+func TestUnit_ContainerConfig_ExtendedJSONSerialization(t *testing.T) {
 	orig := ContainerConfig{
 		Image:       "ubuntu:22.04",
 		Command:     []string{"bash", "-c", "uptime"},
@@ -129,7 +129,7 @@ func TestUnit_ContainerConfig_JSONSerialization(t *testing.T) {
 	}
 }
 
-func TestUnit_ContainerConfig_OmitemptyFields(t *testing.T) {
+func TestUnit_ContainerConfig_ExtendedOmitemptyFields(t *testing.T) {
 	minConfig := ContainerConfig{
 		Image:   "alpine:latest",
 		Command: []string{"echo"},
@@ -174,7 +174,7 @@ func TestUnit_ContainerConfig_OmitemptyFields(t *testing.T) {
 	}
 }
 
-func TestUnit_ContainerConfig_YAMLSerialization(t *testing.T) {
+func TestUnit_ContainerConfig_ExtendedYAMLSerialization(t *testing.T) {
 	orig := ContainerConfig{
 		Image:      "redis:alpine",
 		Command:    []string{"redis-server"},
