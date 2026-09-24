@@ -464,7 +464,8 @@ Key variables include:
 - `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_RUNTIME`: Container runtime to use (`docker`/`podman`/`containerd`).
+- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`). Preferred over deprecated `CDERUN_RUNTIME`.
+- `CDERUN_RUNTIME`: (Deprecated) Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`). Fallback for `CDERUN_ENGINE`.
 - `CDERUN_USER`: Username or UID (format: `<name|uid>[:<group|gid>]`).
 - `CDERUN_GROUP_ADD`: Supplementary groups to add to the container.
 - `CDERUN_READ_ONLY`: If set to `true`, mounts container root filesystem as read-only.
