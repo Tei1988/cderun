@@ -174,7 +174,8 @@ func (l *Logger) formatJSON(level Level, message string, now time.Time) []byte {
 		"msg":   message,
 	}
 	if l.timestamp {
-		entry["time"] = now.Format(time.RFC3339)
+		var timeBuf [32]byte
+		entry["time"] = string(now.AppendFormat(timeBuf[:0], time.RFC3339))
 	}
 	data, _ := json.Marshal(entry) //nolint:errcheck
 	return data
@@ -230,10 +231,10 @@ func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 	if l.format == "json" {
 		data := l.formatJSON(level, message, now)
 		data = append(data, '\n')
-		_, _ = l.writer.Write(data)
+		_, _ = l.writer.Write(data) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
 	} else {
 		output := l.formatText(level, message, now)
-		_, _ = io.WriteString(l.writer, output)
+		_, _ = io.WriteString(l.writer, output) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
 	}
 }
 
