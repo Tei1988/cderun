@@ -161,6 +161,28 @@ func populateHostContextPaths(fs config.FileSystem, logger *logging.Logger, host
 			logger.Debug("failed to get home directory for snapshot: %v", err)
 		}
 	}
+
+	if hostCtx.UID == "" {
+		uid := fs.Getuid()
+		if uid >= 0 {
+			hostCtx.UID = fmt.Sprintf("%d", uid)
+		} else if envUID := fs.Getenv("UID"); envUID != "" {
+			hostCtx.UID = envUID
+		} else {
+			hostCtx.UID = "0"
+		}
+	}
+
+	if hostCtx.GID == "" {
+		gid := fs.Getgid()
+		if gid >= 0 {
+			hostCtx.GID = fmt.Sprintf("%d", gid)
+		} else if envGID := fs.Getenv("GID"); envGID != "" {
+			hostCtx.GID = envGID
+		} else {
+			hostCtx.GID = "0"
+		}
+	}
 }
 
 func writeSnapshotConfigFiles(fs config.FileSystem, snapshotDir string, globalCfg *config.CDERunConfig, toolsCfg config.ToolsConfig, hostCtx *config.HostContext) error {
