@@ -236,99 +236,59 @@ func (rv *resolver) auditSecurityOptWarnings() {
 	}
 }
 
-func (rv *resolver) validateCriticalFields() error {
-	// image
-	if err := validateField(rv.res.Image, "image", ValidateImageName); err != nil {
-		return err
+func validatePrefetchFormat(v string) error {
+	if v == "" {
+		return nil
 	}
-
-	// prefetch
-	prefetchValidator := func(v string) error {
-		if v == "" {
-			return nil
+	for part := range strings.SplitSeq(v, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
 		}
-		for part := range strings.SplitSeq(v, ",") {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-			if err := ValidateToolName(part); err != nil {
-				return fmt.Errorf("invalid tool name in prefetch: %w", err)
+		if err := ValidateToolName(part); err != nil {
+			return fmt.Errorf("invalid tool name in prefetch: %w", err)
+		}
+	}
+	return nil
+}
+
+func validatePidNamespace(v string) error {
+	if v == "" || v == "host" {
+		return nil
+	}
+	if target, ok := strings.CutPrefix(v, "container:"); ok {
+		if target == "" || target == ".." || target == "." {
+			return fmt.Errorf("invalid pid namespace: empty or invalid container reference in %q", v)
+		}
+		for i := 0; i < len(target); i++ {
+			c := target[i]
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
+				return fmt.Errorf("invalid character in container pid reference: %q", target)
 			}
 		}
 		return nil
 	}
-	if err := validateField(rv.res.Prefetch, "prefetch", prefetchValidator); err != nil {
-		return err
-	}
+	return fmt.Errorf("unsupported pid namespace: %q", v)
+}
 
-	// pid
-	pidValidator := func(v string) error {
-		if v == "" || v == "host" {
-			return nil
-		}
-		if target, ok := strings.CutPrefix(v, "container:"); ok {
-			if target == "" || target == ".." || target == "." {
-				return fmt.Errorf("invalid pid namespace: empty or invalid container reference in %q", v)
-			}
-			for i := 0; i < len(target); i++ {
-				c := target[i]
-				if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' && c != '.' && c != '-' {
-					return fmt.Errorf("invalid character in container pid reference: %q", target)
-				}
-			}
-			return nil
-		}
-		return fmt.Errorf("unsupported pid namespace: %q", v)
+func validateIPCNamespace(v string) error {
+	isContainerReference := strings.HasPrefix(v, "container:") &&
+		strings.TrimPrefix(v, "container:") != ""
+	if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
+		return fmt.Errorf("unsupported ipc namespace: %q", v)
 	}
-	if err := validateField(rv.res.Pid, "pid", pidValidator); err != nil {
-		return err
-	}
+	return nil
+}
 
-	// ipc
-	ipcValidator := func(v string) error {
-		isContainerReference := strings.HasPrefix(v, "container:") &&
-			strings.TrimPrefix(v, "container:") != ""
-		if v != "" && v != "host" && v != "private" && v != "shareable" && v != "none" && !isContainerReference {
-			return fmt.Errorf("unsupported ipc namespace: %q", v)
-		}
-		return nil
+func validateCgroupNamespace(v string) error {
+	if v != "" && v != "host" && v != "private" {
+		return fmt.Errorf("unsupported cgroup namespace: %q", v)
 	}
-	if err := validateField(rv.res.IPC, "ipc", ipcValidator); err != nil {
-		return err
-	}
+	return nil
+}
 
-	// cgroupns
-	cgroupnsValidator := func(v string) error {
-		if v != "" && v != "host" && v != "private" {
-			return fmt.Errorf("unsupported cgroup namespace: %q", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.Cgroupns, "cgroupns", cgroupnsValidator); err != nil {
-		return err
-	}
-
-	// pids-limit
-	if rv.res.PidsLimit < -1 {
-		return &InvalidConfigError{
-			Field: "pids-limit",
-			Value: fmt.Sprintf("%d", rv.res.PidsLimit),
-			Err:   errors.New("pids limit cannot be less than -1"),
-		}
-	}
-
-	// cpu-shares
-	if rv.res.CPUShares < 0 {
-		return &InvalidConfigError{
-			Field: "cpu-shares",
-			Value: fmt.Sprintf("%d", rv.res.CPUShares),
-			Err:   errors.New("cpu shares cannot be negative"),
-		}
-	}
-
-	// restart
-	restartValidator := func(v string) error {
+func validateRestartPolicy(remove bool) func(string) error {
+	return func(v string) error {
 		if v == "" {
 			return nil
 		}
@@ -356,94 +316,136 @@ func (rv *resolver) validateCriticalFields() error {
 				}
 			}
 		}
-		if policy != "no" && rv.res.Remove {
+		if policy != "no" && remove {
 			return fmt.Errorf("the --restart policy cannot be used when --remove is enabled")
 		}
 		return nil
 	}
-	if err := validateField(rv.res.Restart, "restart", restartValidator); err != nil {
+}
+
+func validateShmSizeFormat(v string) error {
+	if v == "" {
+		return nil
+	}
+	if err := validatePathChars(v); err != nil {
+		return fmt.Errorf("security validation failed: %w", err)
+	}
+	bytes, err := units.RAMInBytes(v)
+	if err != nil {
+		return fmt.Errorf("invalid shm-size %q: %w", v, err)
+	}
+	if bytes < 0 {
+		return fmt.Errorf("shm-size cannot be negative: %d", bytes)
+	}
+	return nil
+}
+
+func validateRuntimeEngine(v string) error {
+	if v != "docker" && v != "podman" && v != "containerd" {
+		return fmt.Errorf("unsupported runtime: %q", v)
+	}
+	return nil
+}
+
+func validatePullPolicy(v string) error {
+	if v != "" && v != "always" && v != "missing" && v != "never" {
+		return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", v)
+	}
+	return nil
+}
+
+func validateFormatMode(formatType string) func(string) error {
+	return func(v string) error {
+		if v != "" && v != "yaml" && v != "json" && v != "simple" {
+			return fmt.Errorf("unsupported %s format: %q", formatType, v)
+		}
+		return nil
+	}
+}
+
+func validateLogLevelFormat(v string) error {
+	if v != "" {
+		l := strings.ToLower(v)
+		if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
+			return fmt.Errorf("unsupported log level: %q", v)
+		}
+	}
+	return nil
+}
+
+func validateLogFormatMode(v string) error {
+	if v != "" && v != "text" && v != "json" {
+		return fmt.Errorf("unsupported log format: %q", v)
+	}
+	return nil
+}
+
+func (rv *resolver) validateCriticalFields() error {
+	if err := validateField(rv.res.Image, "image", ValidateImageName); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.Prefetch, "prefetch", validatePrefetchFormat); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.Pid, "pid", validatePidNamespace); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.IPC, "ipc", validateIPCNamespace); err != nil {
+		return err
+	}
+	if err := validateField(rv.res.Cgroupns, "cgroupns", validateCgroupNamespace); err != nil {
 		return err
 	}
 
-	// gpus characters check
+	if rv.res.PidsLimit < -1 {
+		return &InvalidConfigError{
+			Field: "pids-limit",
+			Value: fmt.Sprintf("%d", rv.res.PidsLimit),
+			Err:   errors.New("pids limit cannot be less than -1"),
+		}
+	}
+
+	if rv.res.CPUShares < 0 {
+		return &InvalidConfigError{
+			Field: "cpu-shares",
+			Value: fmt.Sprintf("%d", rv.res.CPUShares),
+			Err:   errors.New("cpu shares cannot be negative"),
+		}
+	}
+
+	if err := validateField(rv.res.Restart, "restart", validateRestartPolicy(rv.res.Remove)); err != nil {
+		return err
+	}
 	if err := validateField(rv.res.GPUs, "gpus", ValidateGPUs); err != nil {
 		return err
 	}
-
-	// cpuset-cpus characters check
 	if err := validateField(rv.res.CpusetCpus, "cpuset-cpus", ValidateCpuset); err != nil {
 		return err
 	}
-
-	// cpuset-mems characters check
 	if err := validateField(rv.res.CpusetMems, "cpuset-mems", ValidateCpuset); err != nil {
 		return err
 	}
-
-	// shm-size
-	shmValidator := func(v string) error {
-		if v == "" {
-			return nil
-		}
-		if err := validatePathChars(v); err != nil {
-			return fmt.Errorf("security validation failed: %w", err)
-		}
-		bytes, err := units.RAMInBytes(v)
-		if err != nil {
-			return fmt.Errorf("invalid shm-size %q: %w", v, err)
-		}
-		if bytes < 0 {
-			return fmt.Errorf("shm-size cannot be negative: %d", bytes)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.ShmSize, "shm-size", shmValidator); err != nil {
+	if err := validateField(rv.res.ShmSize, "shm-size", validateShmSizeFormat); err != nil {
 		return err
 	}
-
-	// user
 	if err := validateField(rv.res.User, "user", ValidateUserName); err != nil {
 		return err
 	}
-
-	// network
 	if err := validateField(rv.res.Network, "network", ValidateNetworkName); err != nil {
 		return err
 	}
-
-	// hostname
 	if err := validateField(rv.res.Hostname, "hostname", ValidateHostname); err != nil {
 		return err
 	}
-
-	// workdir
 	if err := validateField(rv.res.Workdir, "workdir", ValidateWorkdir); err != nil {
 		return err
 	}
-
-	// runtime
-	runtimeValidator := func(v string) error {
-		if v != "docker" && v != "podman" && v != "containerd" {
-			return fmt.Errorf("unsupported runtime: %q", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.Runtime, "runtime", runtimeValidator); err != nil {
+	if err := validateField(rv.res.Runtime, "runtime", validateRuntimeEngine); err != nil {
 		return err
 	}
-
-	// pull
-	pullValidator := func(v string) error {
-		if v != "" && v != "always" && v != "missing" && v != "never" {
-			return fmt.Errorf("invalid pull policy %q: allowed values are \"always\", \"missing\", or \"never\"", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.Pull, "pull", pullValidator); err != nil {
+	if err := validateField(rv.res.Pull, "pull", validatePullPolicy); err != nil {
 		return err
 	}
-
-	// socket-path
 	if err := validateField(rv.res.SocketPath, "socket-path", nil); err != nil {
 		return err
 	}
@@ -452,7 +454,6 @@ func (rv *resolver) validateCriticalFields() error {
 		return err
 	}
 
-	// mount-socket-path
 	if err := validateField(rv.res.MountSocketPath, "mount-socket-path", nil); err != nil {
 		return err
 	}
@@ -465,55 +466,19 @@ func (rv *resolver) validateCriticalFields() error {
 		}
 	}
 
-	// mount-cderun-path
 	if err := validateField(rv.res.MountCderunPath, "mount-cderun-path", nil); err != nil {
 		return err
 	}
-
-	// dry-run-format
-	dryRunFormatValidator := func(v string) error {
-		if v != "" && v != "yaml" && v != "json" && v != "simple" {
-			return fmt.Errorf("unsupported dry-run format: %q", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.DryRunFormat, "dry-run-format", dryRunFormatValidator); err != nil {
+	if err := validateField(rv.res.DryRunFormat, "dry-run-format", validateFormatMode("dry-run")); err != nil {
 		return err
 	}
-
-	// diagnosis-format
-	diagnosisFormatValidator := func(v string) error {
-		if v != "" && v != "yaml" && v != "json" && v != "simple" {
-			return fmt.Errorf("unsupported diagnosis format: %q", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.DiagnosisFormat, "diagnosis-format", diagnosisFormatValidator); err != nil {
+	if err := validateField(rv.res.DiagnosisFormat, "diagnosis-format", validateFormatMode("diagnosis")); err != nil {
 		return err
 	}
-
-	// log-level
-	logLevelValidator := func(v string) error {
-		if v != "" {
-			l := strings.ToLower(v)
-			if l != "error" && l != "warn" && l != "warning" && l != "info" && l != "debug" && l != "trace" {
-				return fmt.Errorf("unsupported log level: %q", v)
-			}
-		}
-		return nil
-	}
-	if err := validateField(rv.res.LogLevel, "log-level", logLevelValidator); err != nil {
+	if err := validateField(rv.res.LogLevel, "log-level", validateLogLevelFormat); err != nil {
 		return err
 	}
-
-	// log-format
-	logFormatValidator := func(v string) error {
-		if v != "" && v != "text" && v != "json" {
-			return fmt.Errorf("unsupported log format: %q", v)
-		}
-		return nil
-	}
-	if err := validateField(rv.res.LogFormat, "log-format", logFormatValidator); err != nil {
+	if err := validateField(rv.res.LogFormat, "log-format", validateLogFormatMode); err != nil {
 		return err
 	}
 
