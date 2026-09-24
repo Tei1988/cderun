@@ -182,6 +182,7 @@ func TestUnit_ContainerConfig_YAMLSerializationTagMatching(t *testing.T) {
 		User:       "999",
 		Env:        []string{},
 		OciRuntime: "crun",
+		Labels:     map[string]string{"role": "db"},
 		Mounts: []Mount{
 			{
 				Type:   "volume",
@@ -271,6 +272,23 @@ func TestUnit_Container_SubStructs(t *testing.T) {
 			Name: "nofile",
 			Soft: 65536,
 			Hard: 65536,
+		}
+
+		data, err := json.Marshal(u)
+		require.NoError(t, err)
+
+		var decoded Ulimit
+		err = json.Unmarshal(data, &decoded)
+		require.NoError(t, err)
+
+		assert.Equal(t, u, decoded)
+	})
+
+	t.Run("Unlimited Ulimit", func(t *testing.T) {
+		u := Ulimit{
+			Name: "memlock",
+			Soft: -1,
+			Hard: -1,
 		}
 
 		data, err := json.Marshal(u)
