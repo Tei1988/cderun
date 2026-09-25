@@ -393,7 +393,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	fieldOnce.Do(initFieldInfo)
+	ensureRegistryMaps()
 
 	res := &ResolvedConfig{}
 	rv := &resolver{
