@@ -118,7 +118,7 @@ Configuration fields use **camelCase** keys.
 #### `.cderun.yaml` Example
 
 ```yaml
-runtime: docker
+engine: docker
 socketPath: /var/run/docker.sock
 defaults:
   tty: true
