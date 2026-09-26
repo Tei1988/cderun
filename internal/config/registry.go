@@ -881,6 +881,8 @@ var (
 
 func ensureRegistryMaps() {
 	registryOnce.Do(func() {
+		fieldOnce.Do(initFieldInfo)
+
 		stringOptionsMap = make(map[string]StringOption, len(StringOptions))
 		for i := range StringOptions {
 			if StringOptions[i].FieldName == "" {
