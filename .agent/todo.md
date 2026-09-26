@@ -326,6 +326,11 @@ cderun --prune
 - **内容**: T93 の実装（`--engine`, `--cderun-engine`, `CDERUN_ENGINE`, `.cderun.yaml` の `engine:`、および `--runtime` の非推奨エイリアス化と警告ログ）の仕様説明をドキュメントに追加する。
 - **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
 
+### テスト関数の重複宣言: `internal/container`
+
+- **内容**: `internal/container/feature_container_config_serialization_test.go` と `internal/container/config_test.go` 間で `TestUnit_ContainerConfig_JSONSerialization`, `TestUnit_ContainerConfig_OmitemptyFields`, `TestUnit_ContainerConfig_YAMLSerialization` のテスト関数名が重複している問題の修正。
+- **対応**: `internal/container` パッケージのリファクタリングタスクでテスト関数名を一意にする。
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する

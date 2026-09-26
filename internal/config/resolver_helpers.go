@@ -141,11 +141,10 @@ func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.U
 }
 
 func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
-	raws, err := pickConfigs(
+	raws, err := pickStringConfigs(
 		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
 		func(t ToolConfig) []string { return t.Ulimits },
 		global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
-		nil,
 		fs,
 	)
 	if err != nil {
@@ -226,17 +225,87 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 }
 
 func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
-	raws, err := pickConfigs(
+	raws, err := pickStringConfigs(
 		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
 		func(t ToolConfig) []string { return t.Sysctls },
 		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
-		nil,
 		fs,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return resolveSysctlsFromRaws(raws, r)
+}
+
+func pickStringConfigs(
+	p1 []string,
+	p2 []string,
+	envKey string,
+	envSep string,
+	subcommand string,
+	tools ToolsConfig,
+	toolGetter func(ToolConfig) []string,
+	global *CDERunConfig,
+	globalGetter func(CDERunConfig) []string,
+	fs FileSystem,
+) ([]string, error) {
+	if p1 != nil {
+		return p1, nil
+	}
+	if p2 != nil {
+		return p2, nil
+	}
+	if envKey != "" {
+		if env, ok := fs.LookupEnv(envKey); ok {
+			if envSep == "" || !strings.Contains(env, envSep) {
+				s := strings.TrimSpace(env)
+				if s != "" {
+					return []string{s}, nil
+				}
+				return []string{}, nil
+			}
+			remaining := env
+			var res []string
+			if len(envSep) > 0 {
+				sepByte := envSep[0]
+				for len(remaining) > 0 {
+					var s string
+					if idx := strings.IndexByte(remaining, sepByte); idx >= 0 {
+						s = remaining[:idx]
+						remaining = remaining[idx+1:]
+					} else {
+						s = remaining
+						remaining = ""
+					}
+					s = strings.TrimSpace(s)
+					if s == "" {
+						continue
+					}
+					if res == nil {
+						res = make([]string, 0, 4)
+					}
+					res = append(res, s)
+				}
+			}
+			if res == nil {
+				return []string{}, nil
+			}
+			return res, nil
+		}
+	}
+	if tools != nil {
+		if tool, ok := tools[subcommand]; ok {
+			if v := toolGetter(tool); v != nil {
+				return v, nil
+			}
+		}
+	}
+	if global != nil {
+		if v := globalGetter(*global); v != nil {
+			return v, nil
+		}
+	}
+	return nil, nil
 }
 
 func parseEnvItem[T any](s string, parser func(string, string) (T, error)) (T, error) {
@@ -378,11 +447,10 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	envs, err := pickConfigs(
+	envs, err := pickStringConfigs(
 		p1, p2, envKey, ";", subcommand, tools,
 		func(t ToolConfig) []string { return t.Env },
 		global, func(g CDERunConfig) []string { return g.Defaults.Env },
-		nil,
 		fs,
 	)
 	if err != nil {
