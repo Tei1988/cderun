@@ -393,7 +393,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
-	fieldOnce.Do(initFieldInfo)
+	ensureRegistryMaps()
 
 	res := &ResolvedConfig{}
 	rv := &resolver{
@@ -648,11 +648,10 @@ func (rv *resolver) resolveMountOptions() error {
 
 func (rv *resolver) resolveEnvOptions() error {
 	var rForEnv *ExpressionResolver
-	envs, err := pickConfigs(
+	envs, err := pickStringConfigs(
 		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Env },
 		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
-		nil,
 		rv.fs,
 	)
 	if err != nil {
@@ -684,11 +683,10 @@ func (rv *resolver) resolveEnvOptions() error {
 }
 
 func (rv *resolver) resolveUlimitOptions() error {
-	rawUlimits, err := pickConfigs(
+	rawUlimits, err := pickStringConfigs(
 		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Ulimits },
 		rv.global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
-		nil,
 		rv.fs,
 	)
 	if err != nil {
@@ -705,11 +703,10 @@ func (rv *resolver) resolveUlimitOptions() error {
 }
 
 func (rv *resolver) resolveSysctlOptions() error {
-	rawSysctls, err := pickConfigs(
+	rawSysctls, err := pickStringConfigs(
 		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
 		func(t ToolConfig) []string { return t.Sysctls },
 		rv.global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
-		nil,
 		rv.fs,
 	)
 	if err != nil {
@@ -833,14 +830,31 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 	engineVal, engineSet, runtimeVal, runtimeSet := rv.getEngineOptionWinner()
 
+	rawEngine := ""
 	if engineSet && runtimeSet {
 		logging.Warn("Both 'engine' (%s) and deprecated 'runtime' (%s) options specified; using 'engine'", engineVal, runtimeVal)
-		rv.res.Engine = engineVal
+		rawEngine = engineVal
 	} else if engineSet {
-		rv.res.Engine = engineVal
+		rawEngine = engineVal
 	} else if runtimeSet {
 		logging.Warn("Option 'runtime' is deprecated; use 'engine' instead")
-		rv.res.Engine = runtimeVal
+		rawEngine = runtimeVal
+	}
+
+	if rawEngine != "" {
+		if strings.Contains(rawEngine, "{{") || strings.HasPrefix(rawEngine, "~") {
+			r, err := rv.getR()
+			if err != nil {
+				return err
+			}
+			resolved, err := r.ResolveString(rawEngine)
+			if err != nil {
+				return err
+			}
+			rv.res.Engine = resolved
+		} else {
+			rv.res.Engine = rawEngine
+		}
 	}
 
 	if rv.res.Engine == "" {
