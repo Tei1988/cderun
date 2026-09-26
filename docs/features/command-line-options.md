@@ -10,6 +10,7 @@ The table below summarizes support for key `cderun` configuration features acros
 
 | Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | Notes / Adapter Behavior |
 | :--- | :---: | :---: | :---: | :--- |
+| **Container Engine Selection** (`--engine`) | ✅ | ✅ | ✅ | Specifies container execution engine (`docker`, `podman`, `containerd`). `--runtime` is supported as a deprecated alias. |
 | **TTY Allocation** (`--tty`, `-t`) | ✅ | ✅ | ✅ | Allocates a pseudo-TTY (PTY). Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
 | **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached. In containerd, callers must register I/O via `AttachContainer` before `StartContainer` to forward stream input (otherwise containerd defaults to `NullIO`). |
 | **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
@@ -301,11 +302,11 @@ cderun --workdir "{{PWD}}/src" node app.js
 cderun --strict-env --env NPM_TOKEN node app.js
 ```
 
-### `--runtime`
+### `--engine`
 
 - **Type**: string
 - **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
-- **Environment Variable**: `CDERUN_RUNTIME`
+- **Environment Variable**: `CDERUN_ENGINE`
 - **Supported Engines**: `docker`, `podman`, `containerd`.
 - **Auto-detection Logic**:
   When no engine is explicitly specified, `cderun` checks for runtime socket files on disk (via filesystem stat) in the following priority order:
@@ -313,9 +314,13 @@ cderun --strict-env --env NPM_TOKEN node app.js
   2. `/run/containerd/containerd.sock` (containerd)
   3. `/run/podman/podman.sock` (Podman)
   If no socket file exists on disk, `cderun` falls back to `docker` at `/var/run/docker.sock`.
+- **Deprecated Fallback Alias (`--runtime`)**:
+  `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` are preserved as deprecated aliases for backward compatibility. Using them emits a `Warn` deprecation log while falling back to `--engine`. If both `engine:` and `runtime:` are provided in configuration, `engine:` takes precedence.
+- **P1 Internal Override**: `--cderun-engine` is the corresponding Phase 1 (P1) internal override flag.
 
 ```bash
-cderun --runtime podman node app.js
+cderun --engine podman node app.js
+cderun --engine containerd node app.js
 ```
 
 ### `--oci-runtime`

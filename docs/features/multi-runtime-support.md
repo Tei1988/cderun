@@ -93,17 +93,17 @@ The supported runtime engines are:
 
 ### Configuration Mappings
 
-- **Option Flag**: `--runtime` (P2) / `--cderun-runtime` (P1)
-- **Environment Variable**: `CDERUN_RUNTIME` (P3)
-- **Configuration Key**: `runtime:` inside `.cderun.yaml`
+- **Option Flag**: `--engine` (P2) / `--cderun-engine` (P1) (*Note: `--runtime` / `--cderun-runtime` are supported as deprecated aliases*)
+- **Environment Variable**: `CDERUN_ENGINE` (P3) (*Note: `CDERUN_RUNTIME` is supported as a deprecated alias*)
+- **Configuration Key**: `engine:` inside `.cderun.yaml` (*Note: `runtime:` is supported as a deprecated alias; `engine:` takes precedence if both are set*)
 - **Default Value**: Auto-detected via socket availability (or fallback to `docker`)
 
-### Resolution Priority Sequence for Runtime Selection
+### Resolution Priority Sequence for Engine Selection
 
-1. **Phase 1 (P1) Internal Overrides**: `--cderun-runtime` flag takes top precedence over all other options.
-2. **CLI (P2) Flags**: Explicit `--runtime` or `--socket-path` CLI flags.
-3. **Environment Variables (P3)**: `CDERUN_RUNTIME` or `CDERUN_SOCKET_PATH`.
-4. **Configuration Files (P5)**: Global `runtime:` or `socketPath:` keys in `.cderun.yaml`.
+1. **Phase 1 (P1) Internal Overrides**: P1 flags (`--cderun-engine` or `--cderun-runtime`) outrank environment and configuration values. When `--cderun-engine` and deprecated alias `--cderun-runtime` are both specified, `--cderun-engine` takes precedence.
+2. **CLI (P2) Flags**: Explicit `--engine` (or deprecated `--runtime`) or `--socket-path` CLI flags. When both `--engine` and `--runtime` are supplied at the CLI tier, `--engine` takes precedence.
+3. **Environment Variables (P3)**: `CDERUN_ENGINE` (or deprecated `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
+4. **Configuration Files (P5)**: Global `engine:` (or deprecated `runtime:`) or `socketPath:` keys in `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 

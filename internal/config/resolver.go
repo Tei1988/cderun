@@ -833,14 +833,31 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 
 	engineVal, engineSet, runtimeVal, runtimeSet := rv.getEngineOptionWinner()
 
+	rawEngine := ""
 	if engineSet && runtimeSet {
 		logging.Warn("Both 'engine' (%s) and deprecated 'runtime' (%s) options specified; using 'engine'", engineVal, runtimeVal)
-		rv.res.Engine = engineVal
+		rawEngine = engineVal
 	} else if engineSet {
-		rv.res.Engine = engineVal
+		rawEngine = engineVal
 	} else if runtimeSet {
 		logging.Warn("Option 'runtime' is deprecated; use 'engine' instead")
-		rv.res.Engine = runtimeVal
+		rawEngine = runtimeVal
+	}
+
+	if rawEngine != "" {
+		if strings.Contains(rawEngine, "{{") || strings.HasPrefix(rawEngine, "~") {
+			r, err := rv.getR()
+			if err != nil {
+				return err
+			}
+			resolved, err := r.ResolveString(rawEngine)
+			if err != nil {
+				return err
+			}
+			rv.res.Engine = resolved
+		} else {
+			rv.res.Engine = rawEngine
+		}
 	}
 
 	if rv.res.Engine == "" {
