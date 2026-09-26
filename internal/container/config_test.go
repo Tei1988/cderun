@@ -49,10 +49,12 @@ func TestUnit_Container_Mount(t *testing.T) {
 		Source:   "/etc/hosts",
 		Target:   "/etc/hosts",
 		ReadOnly: true,
+		Optional: true,
 	}
 
 	assert.Equal(t, "bind", mount.Type)
 	assert.Equal(t, "/etc/hosts", mount.Source)
 	assert.Equal(t, "/etc/hosts", mount.Target)
 	assert.True(t, mount.ReadOnly)
+	assert.True(t, mount.Optional)
 }

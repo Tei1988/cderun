@@ -291,7 +291,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--runtime`: Container runtime to use (`docker`/`podman`/`containerd`).
+- `--engine`: Container engine to use (`docker`/`podman`/`containerd`). (Note: `--runtime` is supported as a deprecated alias)
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -464,8 +464,8 @@ Key variables include:
 - `CDERUN_IMAGE`: Container image to use.
 - `CDERUN_CONFIG`: Path to cderun config file.
 - `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`). Preferred over deprecated `CDERUN_RUNTIME`.
-- `CDERUN_RUNTIME`: (Deprecated) Container engine to use (`docker`/`podman`/`containerd`). Fallback for `CDERUN_ENGINE`.
+- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`). (`CDERUN_RUNTIME` is supported as a deprecated alias).
+- `CDERUN_RUNTIME`: Deprecated alias for `CDERUN_ENGINE`.
 - `CDERUN_USER`: Username or UID (format: `<name|uid>[:<group|gid>]`).
 - `CDERUN_GROUP_ADD`: Supplementary groups to add to the container.
 - `CDERUN_READ_ONLY`: If set to `true`, mounts container root filesystem as read-only.
@@ -536,7 +536,7 @@ Key variables include:
 Used for general settings and defaults.
 
 ```yaml
-runtime: docker
+engine: docker
 defaults:
   tty: true
   interactive: true
