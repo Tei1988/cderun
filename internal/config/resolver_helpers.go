@@ -16,6 +16,9 @@ import (
 
 // parseSlice parses a slice of string configs into type T using the provided parser.
 func parseSlice[T any](slice []string, sourceLabel string, parser func(string, string) (T, error)) ([]T, error) {
+	if len(slice) == 0 {
+		return nil, nil
+	}
 	if parser == nil {
 		if res, ok := any(slice).([]T); ok {
 			return res, nil
@@ -112,7 +115,7 @@ func parseUlimitFast(s string) (container.Ulimit, error) {
 
 func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.Ulimit, error) {
 	if len(raws) == 0 {
-		return []container.Ulimit{}, nil
+		return nil, nil
 	}
 
 	res := make([]container.Ulimit, 0, len(raws))
