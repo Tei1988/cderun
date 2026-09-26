@@ -92,7 +92,8 @@ Configuration fields use **camelCase** keys.
 
 #### Root Keys
 
-- `runtime` (string): Target container engine (`docker` | `podman` | `containerd`).
+- `engine` (string): Target container engine (`docker` | `podman` | `containerd`).
+- `runtime` (string): Deprecated fallback alias for container engine (`docker` | `podman` | `containerd`).
 - `socketPath` (string): Host socket absolute path.
 - `defaults` (object): Default runner options (fields detailed below).
 - `logging` (object): Logging output options:
@@ -108,7 +109,7 @@ Configuration fields use **camelCase** keys.
 - `pullMaxRetries`, `pidsLimit`, `cpuShares` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
 - `mountCderunPath`, `mountSocketPath` (string)
-- `mountTools`, `ports`, `expose`, `dns`, `dnsSearch`, `dnsOptions`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv`, `securityOpt`, `ulimits` ([]string)
+- `mountTools`, `ports`, `expose`, `dns`, `dnsSearch`, `dnsOptions`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv`, `securityOpt`, `ulimits`, `sysctls` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
 - `mounts` ([]MountConfig)
@@ -117,7 +118,7 @@ Configuration fields use **camelCase** keys.
 #### `.cderun.yaml` Example
 
 ```yaml
-runtime: docker
+engine: docker
 socketPath: /var/run/docker.sock
 defaults:
   tty: true

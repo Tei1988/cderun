@@ -84,7 +84,9 @@ Command: `cderun --dry-run --dry-run-format json node app.js`
 ```json
 {
   "image": "node:latest",
-  "command": ["app.js"],
+  "command": [
+    "app.js"
+  ],
   "tty": true,
   "interactive": true,
   "remove": true,
@@ -96,19 +98,35 @@ Command: `cderun --dry-run --dry-run-format json node app.js`
       "target": "/workspace"
     }
   ],
-  "env": ["NODE_ENV=[REDACTED]"],
+  "env": [
+    "NODE_ENV=[REDACTED]"
+  ],
   "workdir": "/workspace",
   "user": "",
-  "ports": ["8080:80"],
+  "ports": [
+    "8080:80"
+  ],
   "publish_all": false,
-  "expose": ["80/tcp"],
+  "expose": [
+    "80/tcp"
+  ],
   "hostname": "node-app",
-  "dns": ["8.8.8.8"],
-  "add_hosts": ["my-server:192.168.1.100"],
+  "dns": [
+    "8.8.8.8"
+  ],
+  "add_hosts": [
+    "my-server:192.168.1.100"
+  ],
   "privileged": false,
-  "cap_add": ["SYS_ADMIN"],
-  "cap_drop": ["NET_RAW"],
-  "entrypoint": ["/usr/bin/node"],
+  "cap_add": [
+    "SYS_ADMIN"
+  ],
+  "cap_drop": [
+    "NET_RAW"
+  ],
+  "entrypoint": [
+    "/usr/bin/node"
+  ],
   "pull": "missing",
   "memory": 536870912,
   "cpus": 1.5,
@@ -128,29 +146,31 @@ Command: `cderun --dry-run --dry-run-format simple node app.js`
 
 ```text
 Image: node:latest
-Command: app.js
+Command: "app.js"
 TTY: true
 Interactive: true
 Network: bridge
 Remove: true
-Mounts: type=bind,source=/home/user/project,target=/workspace,readonly=false
+ReadOnly: false
+Init: false
+Mounts: type=bind,source="/home/user/project",target="/workspace",readonly=false
 Env: "NODE_ENV"="[REDACTED]"
 Workdir: /workspace
 User:
-Ports:
+Ports: 8080:80
 PublishAll: false
-Expose:
-Hostname:
-DNS:
-AddHosts:
+Expose: 80/tcp
+Hostname: node-app
+DNS: 8.8.8.8
+AddHosts: my-server:192.168.1.100
 Privileged: false
-CapAdd:
-CapDrop:
-Entrypoint:
-Pull: missing
+CapAdd: SYS_ADMIN
+CapDrop: NET_RAW
+GroupAdd:
+Devices: /dev/fuse
 Memory: 512MiB
 CPUs: 1.5
-Devices:
+Entrypoint: "/usr/bin/node"
 ```
 
 *Note: In Simple Format, `Memory` is displayed in human-readable binary units (e.g., `512MiB` or `1GiB`), and `CPUs` is rendered as a floating point value (e.g., `1.5`).*
