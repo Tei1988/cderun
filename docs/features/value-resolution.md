@@ -85,8 +85,12 @@ Magic words represent internal, pre-defined constants representing the host's ex
 | :--- | :--- |
 | `{{HOME}}` | Expands to the home directory of the current host execution user. |
 | `{{PWD}}` | Expands to the current working directory of the host execution environment. |
+| `{{UID}}` | Expands to the numeric User ID (UID) of the current host execution process. |
+| `{{GID}}` | Expands to the numeric Group ID (GID) of the current host execution process. |
 | `{{BASE_HOME}}` | Expands to the home directory of the **base host** (Level 0 host/VM). Under nested execution, `{{HOME}}` expands to the container's home (e.g., `/root`), whereas `{{BASE_HOME}}` preserves the original physical host's home path. |
 | `{{BASE_PWD}}` | Expands to the working directory of the **base host** (Level 0 host/VM). Under nested execution, `{{BASE_PWD}}` retains the initial directory where the host process was started. |
+| `{{BASE_UID}}` | Expands to the numeric User ID (UID) of the **base host** execution process. |
+| `{{BASE_GID}}` | Expands to the numeric Group ID (GID) of the **base host** execution process. |
 
 ### 2. Directives
 
