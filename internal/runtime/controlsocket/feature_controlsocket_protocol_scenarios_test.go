@@ -1,6 +1,7 @@
 package controlsocket
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -270,7 +271,12 @@ func TestUnit_ControlSocket_HandshakeRejection(t *testing.T) {
 	tmpDir := t.TempDir()
 	sockPath := filepath.Join(tmpDir, "ctrl.sock")
 
-	srv := NewServer(sockPath, nil)
+	var logBuf bytes.Buffer
+	logger := logging.NewLogger()
+	logger.SetOutput(&logBuf)
+	require.NoError(t, logger.Init("warn", "text", false))
+
+	srv := NewServer(sockPath, logger)
 	require.NoError(t, srv.Start())
 	t.Cleanup(func() { _ = srv.Close() })
 
@@ -292,4 +298,7 @@ func TestUnit_ControlSocket_HandshakeRejection(t *testing.T) {
 	require.NoError(t, json.Unmarshal(respBytes, &hsResp))
 	assert.False(t, hsResp.Accepted)
 	assert.Contains(t, hsResp.Error, "unsupported protocol version")
+
+	// Verify server warning log includes client version
+	assert.Contains(t, logBuf.String(), "0.0.1-dev")
 }
