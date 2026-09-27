@@ -1,18 +1,47 @@
-package runtime_test
+package runtime
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"cderun/internal/runtime"
+	"cderun/internal/logging"
 
+	"github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+type mockDockerClientForPrune struct {
+	dockerClient
+	containers []types.Container
+	listErr    error
+	removed    []string
+	removeErr  error
+}
+
+func (m *mockDockerClientForPrune) Close() error {
+	return nil
+}
+
+func (m *mockDockerClientForPrune) ContainerList(ctx context.Context, options dockercontainer.ListOptions) ([]types.Container, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.containers, nil
+}
+
+func (m *mockDockerClientForPrune) ContainerRemove(ctx context.Context, containerID string, options dockercontainer.RemoveOptions) error {
+	if m.removeErr != nil {
+		return m.removeErr
+	}
+	m.removed = append(m.removed, containerID)
+	return nil
+}
+
 func TestUnit_Runtime_PruneAndInspect_MockRuntime(t *testing.T) {
-	mock := runtime.NewMockRuntime()
+	mock := NewMockRuntime()
 	ctx := context.Background()
 
 	// Test default PruneContainers
@@ -62,13 +91,35 @@ func TestUnit_Runtime_PruneAndInspect_MockRuntime(t *testing.T) {
 	assert.Equal(t, 127, exitCode)
 }
 
-func TestUnit_Runtime_PruneAndInspect_DockerRuntimeUnimplemented(t *testing.T) {
-	dockerRt, err := runtime.NewDockerRuntime("/var/run/docker.sock")
-	require.NoError(t, err)
+func TestUnit_Runtime_PruneAndInspect_DockerRuntimePrune(t *testing.T) {
 	ctx := context.Background()
+	logger := logging.GetGlobalLogger()
 
-	// PruneContainers on DockerRuntime returns nil, nil for now
-	pruned, err := dockerRt.PruneContainers(ctx)
+	// Case 1: Empty container list
+	mock1 := &mockDockerClientForPrune{containers: nil}
+	rt1 := &DockerRuntime{client: mock1, logger: logger}
+	pruned, err := rt1.PruneContainers(ctx)
 	assert.NoError(t, err)
 	assert.Nil(t, pruned)
+
+	// Case 2: Active containers skipped, stopped containers removed
+	mock2 := &mockDockerClientForPrune{
+		containers: []types.Container{
+			{ID: "c-active-1", State: "running"},
+			{ID: "c-active-2", State: "restarting"},
+			{ID: "c-stopped-1", State: "exited"},
+		},
+	}
+	rt2 := &DockerRuntime{client: mock2, logger: logger}
+	pruned, err = rt2.PruneContainers(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"c-stopped-1"}, pruned)
+	assert.Equal(t, []string{"c-stopped-1"}, mock2.removed)
+
+	// Case 3: List error
+	mock3 := &mockDockerClientForPrune{listErr: errors.New("list failed")}
+	rt3 := &DockerRuntime{client: mock3, logger: logger}
+	_, err = rt3.PruneContainers(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to list containers for prune")
 }
