@@ -553,7 +553,7 @@ func deduplicateEnv(env []string) []string {
 	return res
 }
 
-func addEnvSmall(keys *[maxStackEnvThreshold]string, vals *[maxStackEnvThreshold]string, size *int, env []string) {
+func addEnvSmall(keys *[maxStackEnvThreshold]string, vals *[maxStackEnvThreshold]string, size *int, hasDuplicates *bool, env []string) {
 	for _, e := range env {
 		idx := strings.IndexByte(e, '=')
 		var key string
@@ -572,6 +572,7 @@ func addEnvSmall(keys *[maxStackEnvThreshold]string, vals *[maxStackEnvThreshold
 		if foundIdx >= 0 && foundIdx < maxStackEnvThreshold {
 			//nolint:gosec // false positive G602: bounds checked above
 			vals[foundIdx] = e
+			*hasDuplicates = true
 		} else if *size < maxStackEnvThreshold {
 			keys[*size] = key
 			vals[*size] = e
@@ -600,10 +601,19 @@ func mergeEnv(base, p2, p1 []string) []string {
 		var keys [maxStackEnvThreshold]string
 		var vals [maxStackEnvThreshold]string
 		size := 0
+		hasDuplicates := false
 
-		addEnvSmall(&keys, &vals, &size, base)
-		addEnvSmall(&keys, &vals, &size, p2)
-		addEnvSmall(&keys, &vals, &size, p1)
+		addEnvSmall(&keys, &vals, &size, &hasDuplicates, base)
+		addEnvSmall(&keys, &vals, &size, &hasDuplicates, p2)
+		addEnvSmall(&keys, &vals, &size, &hasDuplicates, p1)
+
+		if !hasDuplicates {
+			res := make([]string, total)
+			n := copy(res, base)
+			n += copy(res[n:], p2)
+			copy(res[n:], p1)
+			return res
+		}
 
 		res := make([]string, size)
 		copy(res, vals[:size])
