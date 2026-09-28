@@ -650,7 +650,47 @@ func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, err
 	}
 
 	if found {
+		// The OverlayFS fallback mapping (target "/") is a last resort that redirects
+		// container scratch-space paths onto the container rootfs as seen from the Base
+		// Host. A path that already belongs to the Base Host namespace (typically produced
+		// by {{BASE_HOME}} or {{BASE_PWD}}) must never be rewritten through it: the result
+		// would be a rootfs-prefixed path that does not exist, making the nested bind mount
+		// fail with "bind source path does not exist".
+		if isRootMountTarget(bestTarget) && r.isBaseHostPath(abs) {
+			return abs, nil
+		}
 		return filepath.Join(bestSource, bestRel), nil
 	}
 	return abs, nil
+}
+
+// isRootMountTarget reports whether the mount target refers to the filesystem root.
+// Only the automatically discovered OverlayFS fallback mapping uses such a target.
+func isRootMountTarget(target string) bool {
+	return target == "/" || target == string(filepath.Separator)
+}
+
+// isBaseHostPath reports whether absPath is located under a Base Host (Level 0) root.
+// Only roots that differ from their execution host counterpart are considered: when both
+// sides share the same path the mapping direction is ambiguous, so the regular mount table
+// lookup stays in charge.
+func (r *ExpressionResolver) isBaseHostPath(absPath string) bool {
+	if r.HostContext == nil {
+		return false
+	}
+	for _, pair := range [...]struct{ baseHost, executionHost string }{
+		{r.HostContext.HomeDir, r.Home},
+		{r.HostContext.WorkingDir, r.Pwd},
+	} {
+		root := pair.baseHost
+		if root == "" || root == pair.executionHost || !filepath.IsAbs(root) || filepath.Dir(root) == root {
+			continue
+		}
+		rel, err := filepath.Rel(root, absPath)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		return true
+	}
+	return false
 }

@@ -140,7 +140,8 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 4. **Precedence Rules**:
    - **Longest Match (Longest Target Prefix)**: If multiple mappings match (e.g., `/app` and `/app/src`), the longest matched `target` prefix is selected to favor more specific mounts over generic ones.
    - **Deepest Level Priority**: If targets are of equal length, the mapping with the highest `level` (the most recent nested mount) is selected.
-5. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
+5. **Base Host Path Guard**: If the only matching mapping is the OverlayFS fallback root mapping (`target: /`, see below) and the path already sits under a Base Host root — the Base Host home directory (`{{BASE_HOME}}`) or working directory (`{{BASE_PWD}}`) recorded in `hostContext` — the path is returned unchanged. Such a path is already expressed in the Base Host namespace, so rewriting it through the container rootfs would produce a non-existent mount source. The guard is applied only when the Base Host root differs from its Execution Host counterpart (`HOME` / `PWD` inside the container); when both sides share the same path the direction of the mapping cannot be inferred, and the regular lookup stays in charge.
+6. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
 
 ### Concrete Example
 
@@ -163,6 +164,8 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 If `cderun` detects that it is executing inside a container with an OverlayFS root filesystem, it automatically parses `/proc/self/mountinfo` to extract the host-side `upperdir` path.
 
 It then appends a fallback root mapping (`source: <upperdir>, target: /`) to `hostContext.mounts`. This allows mounting files that reside in the container's scratch space (such as files created in `/tmp`) into nested containers, even if those paths do not belong to a pre-existing volume or bind mount.
+
+This mapping matches every absolute path, so it is applied only after every explicit mount target has been ruled out, and it is subject to the **Base Host Path Guard** described above. Without that guard a mount source such as `{{BASE_HOME}}/.certs/all.pem` — which is already a Base Host path — would be rewritten to `<upperdir>/Users/<user>/.certs/all.pem` and the container runtime would reject it with `bind source path does not exist`.
 
 For more information, see the [/proc/self/mountinfo Specification](../references/proc-self-mountinfo.md).
 
