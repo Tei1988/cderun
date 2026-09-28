@@ -281,9 +281,12 @@ func (r *NerdctlRuntime) CreateContainer(ctx context.Context, config *container.
 	fullArgs = append(fullArgs, argv...)
 
 	cmd := exec.CommandContext(ctx, r.execPath, fullArgs...)
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("nerdctl create failed: %w, output: %s", err, string(out))
+		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("nerdctl create failed: %w, stderr: %s", err, string(exitErr.Stderr))
+		}
+		return "", fmt.Errorf("nerdctl create failed: %w", err)
 	}
 
 	containerID := strings.TrimSpace(string(out))
