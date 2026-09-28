@@ -533,6 +533,55 @@ func (rv *resolver) resolveStandardOptions() error {
 	return nil
 }
 
+func (rv *resolver) validateToolImageMismatch() error {
+	if rv.tools == nil {
+		return nil
+	}
+	tool, ok := rv.tools[rv.subcommand]
+	if !ok || tool.Image == "" {
+		return nil
+	}
+
+	cliImage := ""
+	if rv.cli.CderunImage != nil {
+		cliImage = *rv.cli.CderunImage
+	} else if rv.cli.Image != nil {
+		cliImage = *rv.cli.Image
+	} else if env := rv.fs.Getenv("CDERUN_IMAGE"); env != "" {
+		cliImage = env
+	}
+
+	if cliImage == "" {
+		return nil
+	}
+
+	var errCLI, errCfg error
+	resolvedCLIImage := cliImage
+	resolvedCfgImage := tool.Image
+
+	if strings.Contains(cliImage, "{{") || strings.HasPrefix(cliImage, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		resolvedCLIImage, errCLI = r.ResolveString(cliImage)
+	}
+	if strings.Contains(tool.Image, "{{") || strings.HasPrefix(tool.Image, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
+	}
+
+	if errCLI == nil && errCfg == nil {
+		if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (rv *resolver) resolveAndValidateImage() error {
 	if rv.res.Image == "" && rv.subcommand != "" && !rv.res.Diagnosis {
 		return &ImageNotFoundError{Tool: rv.subcommand}
@@ -544,44 +593,8 @@ func (rv *resolver) resolveAndValidateImage() error {
 		}
 
 		// Registry mismatch validation: if image is provided via CLI/Env, ensure it matches tool config registry
-		if rv.tools != nil {
-			if tool, ok := rv.tools[rv.subcommand]; ok && tool.Image != "" {
-				cliImage := ""
-				if rv.cli.CderunImage != nil {
-					cliImage = *rv.cli.CderunImage
-				} else if rv.cli.Image != nil {
-					cliImage = *rv.cli.Image
-				} else if env := rv.fs.Getenv("CDERUN_IMAGE"); env != "" {
-					cliImage = env
-				}
-
-				if cliImage != "" {
-					var errCLI, errCfg error
-					resolvedCLIImage := cliImage
-					resolvedCfgImage := tool.Image
-
-					if strings.Contains(cliImage, "{{") || strings.HasPrefix(cliImage, "~") {
-						r, err := rv.getR()
-						if err != nil {
-							return err
-						}
-						resolvedCLIImage, errCLI = r.ResolveString(cliImage)
-					}
-					if strings.Contains(tool.Image, "{{") || strings.HasPrefix(tool.Image, "~") {
-						r, err := rv.getR()
-						if err != nil {
-							return err
-						}
-						resolvedCfgImage, errCfg = r.ResolveString(tool.Image)
-					}
-
-					if errCLI == nil && errCfg == nil {
-						if err := validateImageRegistryMatch(resolvedCLIImage, resolvedCfgImage); err != nil {
-							return err
-						}
-					}
-				}
-			}
+		if err := rv.validateToolImageMismatch(); err != nil {
+			return err
 		}
 
 		if logging.DebugEnabled() {
@@ -769,6 +782,103 @@ func (r *ResolvedConfig) IsCLIBased() bool {
 	return r.EngineFamily() == EngineFamilyNerdctl
 }
 
+func (rv *resolver) determineEngineFromWinner() error {
+	engineVal, engineSet, runtimeVal, runtimeSet := rv.getEngineOptionWinner()
+
+	rawEngine := ""
+	if engineSet && runtimeSet {
+		logging.Warn("Both 'engine' (%s) and deprecated 'runtime' (%s) options specified; using 'engine'", engineVal, runtimeVal)
+		rawEngine = engineVal
+	} else if engineSet {
+		rawEngine = engineVal
+	} else if runtimeSet {
+		logging.Warn("Option 'runtime' is deprecated; use 'engine' instead")
+		rawEngine = runtimeVal
+	}
+
+	if rawEngine != "" {
+		if strings.Contains(rawEngine, "{{") || strings.HasPrefix(rawEngine, "~") {
+			r, err := rv.getR()
+			if err != nil {
+				return err
+			}
+			resolved, err := r.ResolveString(rawEngine)
+			if err != nil {
+				return err
+			}
+			rv.res.Engine = resolved
+		} else {
+			rv.res.Engine = rawEngine
+		}
+	}
+	return nil
+}
+
+func deduceEngineFromSocketPath(socketPath string) string {
+	socketName := strings.TrimRight(socketPath, "/")
+	if idx := strings.LastIndexByte(socketName, '/'); idx != -1 {
+		socketName = socketName[idx+1:]
+	}
+	if strings.Contains(socketName, "podman") {
+		return "podman"
+	}
+	if strings.Contains(socketName, "containerd") {
+		return "containerd"
+	}
+	return "docker"
+}
+
+func (rv *resolver) autoDetectEngineAndSocket() {
+	if _, isReal := rv.fs.(RealFileSystem); isReal {
+		autoDetectMu.RLock()
+		cachedRuntime := autoDetectedRuntime
+		cachedSocketPath := autoDetectedSocketPath
+		autoDetectMu.RUnlock()
+
+		if cachedRuntime != "" {
+			rv.res.Engine = cachedRuntime
+			rv.res.SocketPath = cachedSocketPath
+		} else {
+			autoDetectMu.Lock()
+			if autoDetectedRuntime != "" {
+				rv.res.Engine = autoDetectedRuntime
+				rv.res.SocketPath = autoDetectedSocketPath
+			} else {
+				detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
+				if detectedRuntime != "" {
+					autoDetectedRuntime = detectedRuntime
+					autoDetectedSocketPath = detectedSocketPath
+					rv.res.Engine = detectedRuntime
+					rv.res.SocketPath = detectedSocketPath
+				}
+			}
+			autoDetectMu.Unlock()
+		}
+	} else {
+		detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
+		if detectedRuntime != "" {
+			rv.res.Engine = detectedRuntime
+			rv.res.SocketPath = detectedSocketPath
+		}
+	}
+
+	if rv.res.Engine == "" {
+		rv.res.Engine = "docker"
+		rv.res.SocketPath = "/var/run/docker.sock"
+	}
+}
+
+func defaultSocketPathForEngine(engine string) string {
+	switch engine {
+	case "podman":
+		return "/run/podman/podman.sock"
+	case "containerd":
+		return "/run/containerd/containerd.sock"
+	default:
+		return "/var/run/docker.sock"
+	}
+}
+
 func (rv *resolver) getEngineOptionWinner() (engineVal string, engineSet bool, runtimeVal string, runtimeSet bool) {
 	// Layer 1: CLI Flags (P1 override & P2 flag)
 	if set, val := getPtrVal(rv.cli.CderunEngine); set {
@@ -828,100 +938,22 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 		}
 	}
 
-	engineVal, engineSet, runtimeVal, runtimeSet := rv.getEngineOptionWinner()
-
-	rawEngine := ""
-	if engineSet && runtimeSet {
-		logging.Warn("Both 'engine' (%s) and deprecated 'runtime' (%s) options specified; using 'engine'", engineVal, runtimeVal)
-		rawEngine = engineVal
-	} else if engineSet {
-		rawEngine = engineVal
-	} else if runtimeSet {
-		logging.Warn("Option 'runtime' is deprecated; use 'engine' instead")
-		rawEngine = runtimeVal
-	}
-
-	if rawEngine != "" {
-		if strings.Contains(rawEngine, "{{") || strings.HasPrefix(rawEngine, "~") {
-			r, err := rv.getR()
-			if err != nil {
-				return err
-			}
-			resolved, err := r.ResolveString(rawEngine)
-			if err != nil {
-				return err
-			}
-			rv.res.Engine = resolved
-		} else {
-			rv.res.Engine = rawEngine
-		}
+	if err := rv.determineEngineFromWinner(); err != nil {
+		return err
 	}
 
 	if rv.res.Engine == "" {
 		if rv.res.SocketPath != "" {
-			socketName := strings.TrimRight(rv.res.SocketPath, "/")
-			if idx := strings.LastIndexByte(socketName, '/'); idx != -1 {
-				socketName = socketName[idx+1:]
-			}
-			if strings.Contains(socketName, "podman") {
-				rv.res.Engine = "podman"
-			} else if strings.Contains(socketName, "containerd") {
-				rv.res.Engine = "containerd"
-			} else {
-				rv.res.Engine = "docker"
-			}
+			rv.res.Engine = deduceEngineFromSocketPath(rv.res.SocketPath)
 		} else {
-			if _, isReal := rv.fs.(RealFileSystem); isReal {
-				autoDetectMu.RLock()
-				cachedRuntime := autoDetectedRuntime
-				cachedSocketPath := autoDetectedSocketPath
-				autoDetectMu.RUnlock()
-
-				if cachedRuntime != "" {
-					rv.res.Engine = cachedRuntime
-					rv.res.SocketPath = cachedSocketPath
-				} else {
-					autoDetectMu.Lock()
-					if autoDetectedRuntime != "" {
-						rv.res.Engine = autoDetectedRuntime
-						rv.res.SocketPath = autoDetectedSocketPath
-					} else {
-						detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
-						if detectedRuntime != "" {
-							autoDetectedRuntime = detectedRuntime
-							autoDetectedSocketPath = detectedSocketPath
-							rv.res.Engine = detectedRuntime
-							rv.res.SocketPath = detectedSocketPath
-						}
-					}
-					autoDetectMu.Unlock()
-				}
-			} else {
-				detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
-				if detectedRuntime != "" {
-					rv.res.Engine = detectedRuntime
-					rv.res.SocketPath = detectedSocketPath
-				}
-			}
-
-			if rv.res.Engine == "" {
-				rv.res.Engine = "docker"
-				rv.res.SocketPath = "/var/run/docker.sock"
-			}
+			rv.autoDetectEngineAndSocket()
 		}
 	}
 
 	rv.res.Runtime = rv.res.Engine
 
 	if rv.res.SocketPath == "" {
-		switch rv.res.Engine {
-		case "podman":
-			rv.res.SocketPath = "/run/podman/podman.sock"
-		case "containerd":
-			rv.res.SocketPath = "/run/containerd/containerd.sock"
-		default:
-			rv.res.SocketPath = "/var/run/docker.sock"
-		}
+		rv.res.SocketPath = defaultSocketPathForEngine(rv.res.Engine)
 	}
 	rv.res.SocketPath = strings.TrimPrefix(rv.res.SocketPath, "unix://")
 	return nil
