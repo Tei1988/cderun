@@ -120,6 +120,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewPodmanRuntime(socket, runtime.WithLogger(l))
 			case "containerd":
 				return runtime.NewContainerdRuntime(socket, runtime.WithContainerdLogger(l))
+			case "nerdctl":
+				return runtime.NewNerdctlRuntime(socket, runtime.WithNerdctlLogger(l))
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
