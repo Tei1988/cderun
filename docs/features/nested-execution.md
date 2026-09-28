@@ -140,7 +140,12 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 4. **Precedence Rules**:
    - **Longest Match (Longest Target Prefix)**: If multiple mappings match (e.g., `/app` and `/app/src`), the longest matched `target` prefix is selected to favor more specific mounts over generic ones.
    - **Deepest Level Priority**: If targets are of equal length, the mapping with the highest `level` (the most recent nested mount) is selected.
-5. **Base Host Path Guard**: If the only matching mapping is the OverlayFS fallback root mapping (`target: /`, see below) and the path already sits under a Base Host root — the Base Host home directory (`{{BASE_HOME}}`) or working directory (`{{BASE_PWD}}`) recorded in `hostContext` — the path is returned unchanged. Such a path is already expressed in the Base Host namespace, so rewriting it through the container rootfs would produce a non-existent mount source. The guard is applied only when the Base Host root differs from its Execution Host counterpart (`HOME` / `PWD` inside the container); when both sides share the same path the direction of the mapping cannot be inferred, and the regular lookup stays in charge.
+5. **Base Host Path Guard**: A path is returned unchanged, bypassing the OverlayFS fallback root mapping, only when **all** of the following hold:
+   - The only matching mapping is the OverlayFS fallback root mapping (`target: /`, see below); any explicit `hostContext.mounts` entry that covers the path takes precedence and is applied normally.
+   - The path sits under a Base Host root — the Base Host home directory (`{{BASE_HOME}}`) or working directory (`{{BASE_PWD}}`) recorded in `hostContext` — **and** that root differs from its Execution Host counterpart (`HOME` / `PWD` inside the container). When both sides share the same path the direction of the mapping cannot be inferred, so the regular lookup stays in charge.
+   - The path does not exist in the Execution Host filesystem. Containment in a Base Host root alone does not prove the path came from a Base Host expression, because a Base Host root can overlap a directory that also exists inside the container (for example a host user `/home/ubuntu` and an image that ships its own `/home/ubuntu`). The fallback mapping serves container scratch space, whose files are present in the container, so a path that is present there keeps using it.
+
+   Such a path is already expressed in the Base Host namespace, so rewriting it through the container rootfs would produce a non-existent mount source.
 6. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
 
 ### Concrete Example

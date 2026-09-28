@@ -189,3 +189,54 @@ func TestUnit_ReverseResolution_BaseHostLevelZeroIsUntouched(t *testing.T) {
 		t.Errorf("ResolvePath = %q, want %q", got, want)
 	}
 }
+
+// TestUnit_ReverseResolution_OverlappingBaseHostRootKeepsFallback covers a Base Host root
+// that overlaps a directory which also exists inside the container: an Ubuntu host user
+// (/home/ubuntu) running a container as root (/root) whose image ships its own
+// /home/ubuntu. Containment in the Base Host home is not enough to conclude the path came
+// from {{BASE_HOME}}, so a path that is physically present on the Execution Host must keep
+// using the OverlayFS fallback mapping.
+func TestUnit_ReverseResolution_OverlappingBaseHostRootKeepsFallback(t *testing.T) {
+	t.Parallel()
+
+	fs := &MockFileSystem{
+		WD:      "/workspace",
+		HomeDir: "/root",
+		Env:     map[string]string{},
+		Dirs: map[string]bool{
+			"/":                  true,
+			"/home/ubuntu":       true,
+			"/home/ubuntu/cache": true,
+		},
+	}
+	hostCtx := &HostContext{
+		Level:      1,
+		HomeDir:    "/home/ubuntu", // Base Host home, distinct from the container home
+		WorkingDir: "/home/ubuntu/project",
+		Mounts: []MountMapping{
+			{Source: overlayUpperDir, Target: "/", Level: 1},
+		},
+	}
+	r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	if err != nil {
+		t.Fatalf("failed to create resolver: %v", err)
+	}
+
+	// Present inside the container: a genuine scratch-space path, still rewritten.
+	got, err := ResolvePath("/home/ubuntu/cache", "", r)
+	if err != nil {
+		t.Fatalf("ResolvePath returned error: %v", err)
+	}
+	if want := overlayUpperDir + "/home/ubuntu/cache"; got != want {
+		t.Errorf("container-local path: ResolvePath = %q, want %q", got, want)
+	}
+
+	// Absent inside the container: cannot be scratch space, so it is a Base Host path.
+	got, err = ResolvePath("{{BASE_HOME}}/.certs/all.pem", "", r)
+	if err != nil {
+		t.Fatalf("ResolvePath returned error: %v", err)
+	}
+	if want := "/home/ubuntu/.certs/all.pem"; got != want {
+		t.Errorf("base host path: ResolvePath = %q, want %q", got, want)
+	}
+}

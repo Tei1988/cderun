@@ -656,7 +656,13 @@ func (r *ExpressionResolver) applyReverseResolution(absPath string) (string, err
 		// by {{BASE_HOME}} or {{BASE_PWD}}) must never be rewritten through it: the result
 		// would be a rootfs-prefixed path that does not exist, making the nested bind mount
 		// fail with "bind source path does not exist".
-		if isRootMountTarget(bestTarget) && r.isBaseHostPath(abs) {
+		//
+		// Containment in a Base Host root does not by itself prove that the path originated
+		// from a Base Host expression, because a Base Host root can overlap a directory that
+		// also exists inside the container. The fallback is therefore preserved whenever the
+		// path is actually present on the Execution Host: only paths that cannot be container
+		// scratch space bypass it.
+		if isRootMountTarget(bestTarget) && r.isBaseHostPath(abs) && !r.existsOnExecutionHost(abs) {
 			return abs, nil
 		}
 		return filepath.Join(bestSource, bestRel), nil
@@ -673,7 +679,9 @@ func isRootMountTarget(target string) bool {
 // isBaseHostPath reports whether absPath is located under a Base Host (Level 0) root.
 // Only roots that differ from their execution host counterpart are considered: when both
 // sides share the same path the mapping direction is ambiguous, so the regular mount table
-// lookup stays in charge.
+// lookup stays in charge. Containment is a necessary but not sufficient signal that the
+// path came from a Base Host expression, so callers must combine it with
+// existsOnExecutionHost before bypassing the OverlayFS fallback.
 func (r *ExpressionResolver) isBaseHostPath(absPath string) bool {
 	if r.HostContext == nil {
 		return false
@@ -693,4 +701,15 @@ func (r *ExpressionResolver) isBaseHostPath(absPath string) bool {
 		return true
 	}
 	return false
+}
+
+// existsOnExecutionHost reports whether absPath is present in the current Execution Host
+// filesystem. The OverlayFS fallback mapping exists to reach files that physically live in
+// the container, so a path that is absent there cannot be container scratch space.
+func (r *ExpressionResolver) existsOnExecutionHost(absPath string) bool {
+	if r.fs == nil {
+		return false
+	}
+	_, err := r.Stat(absPath)
+	return err == nil
 }

@@ -92,7 +92,7 @@ Magic words represent internal, pre-defined constants representing the host's ex
 | `{{BASE_UID}}` | Expands to the numeric User ID (UID) of the **base host** execution process. |
 | `{{BASE_GID}}` | Expands to the numeric Group ID (GID) of the **base host** execution process. |
 
-> **Note**: `{{BASE_HOME}}` and `{{BASE_PWD}}` already expand to **Base Host (Level 0)** paths. Paths anchored at either of them are therefore exempt from the OverlayFS fallback root mapping applied by reverse path resolution, so they reach the container runtime unchanged. See the [Base Host Path Guard](./nested-execution.md#reverse-path-resolution) in the nested execution specification.
+> **Note**: `{{BASE_HOME}}` and `{{BASE_PWD}}` already expand to **Base Host (Level 0)** paths. Under nested execution a path anchored at either of them may therefore bypass the OverlayFS fallback root mapping applied by reverse path resolution and reach the container runtime unchanged. The bypass is conditional, not absolute: an explicit `hostContext.mounts` entry covering the path still takes precedence, and the fallback mapping is preserved when the Base Host root equals its Execution Host counterpart (`HOME` / `PWD` inside the container) or when the path exists in the Execution Host filesystem. See the [Base Host Path Guard](./nested-execution.md#reverse-path-resolution) in the nested execution specification for the exact conditions.
 
 ### 2. Directives
 
