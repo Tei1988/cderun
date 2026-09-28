@@ -100,6 +100,16 @@ Configuration fields use **camelCase** keys.
   - `level`: `error` | `warn` | `info` | `debug` | `trace`
   - `format`: `text` | `json`
   - `timestamp`: bool
+- `hostContext` (object, optional): Internal execution snapshot metadata passed down during nested execution:
+  - `level` (int): Current nesting execution level (0 = base host).
+  - `snapshotDir` (string): Path to per-invocation snapshot directory.
+  - `controlSocket` (string, optional): Host path to `cderun` Control Socket (`cderun.sock`).
+  - `binPath` (string): Path to `cderun` executable.
+  - `workingDir` (string): Initial host working directory.
+  - `homeDir` (string): Initial host user home directory.
+  - `uid` (string, optional): Base host numeric process User ID.
+  - `gid` (string, optional): Base host numeric process Group ID.
+  - `mounts` ([]MountMapping): List of active host-to-container mount mappings (`source`, `target`, `level`).
 
 #### `defaults` Fields
 
