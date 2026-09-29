@@ -120,6 +120,8 @@ func defaultOptions() rootOptions {
 				return runtime.NewPodmanRuntime(socket, runtime.WithLogger(l))
 			case "containerd":
 				return runtime.NewContainerdRuntime(socket, runtime.WithContainerdLogger(l))
+			case "nerdctl":
+				return runtime.NewNerdctlRuntime(socket, runtime.WithNerdctlLogger(l))
 			default:
 				return nil, fmt.Errorf("unsupported runtime %q", name)
 			}
@@ -564,11 +566,21 @@ func (o *rootOptions) handlePrefetch(cmd *cobra.Command, resolved *config.Resolv
 func determineToolsToPrefetch(resolved *config.ResolvedConfig, toolsCfg config.ToolsConfig) ([]string, error) {
 	var toolsToPrefetch []string
 	if resolved.PrefetchAll {
+		toolsToPrefetch = make([]string, 0, len(toolsCfg))
 		for toolName := range toolsCfg {
 			toolsToPrefetch = append(toolsToPrefetch, toolName)
 		}
 	} else if resolved.Prefetch != "" {
-		for part := range strings.SplitSeq(resolved.Prefetch, ",") {
+		remaining := resolved.Prefetch
+		for len(remaining) > 0 {
+			var part string
+			if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+				part = remaining[:idx]
+				remaining = remaining[idx+1:]
+			} else {
+				part = remaining
+				remaining = ""
+			}
 			part = strings.TrimSpace(part)
 			if part == "" {
 				continue

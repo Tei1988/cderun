@@ -461,49 +461,94 @@ For a detailed feature comparison table across Docker, Podman, and direct contai
 
 ## Environment Variables
 
-Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variable (e.g., `CDERUN_IMAGE`, `CDERUN_TTY`, `CDERUN_REMOVE`).
+Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variable (P3 level in resolution hierarchy).
 
-Key variables include:
+### Configuration & Engine Selection
+
+- `CDERUN_CONFIG`: Path to `cderun` configuration file (`.cderun.yaml`).
+- `CDERUN_TOOL_CONFIG`: Path to tools configuration file (`.tools.yaml`).
+- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`).
+- `CDERUN_RUNTIME`: Deprecated fallback alias for `CDERUN_ENGINE`.
+- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
+- `CDERUN_SOCKET_PATH`: Path to the container runtime socket on the host.
+
+### Execution & Identity
 
 - `CDERUN_IMAGE`: Container image to use.
-- `CDERUN_CONFIG`: Path to cderun config file.
-- `CDERUN_TOOL_CONFIG`: Path to tools config file.
-- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`). (`CDERUN_RUNTIME` is supported as a deprecated alias).
-- `CDERUN_RUNTIME`: Deprecated alias for `CDERUN_ENGINE`.
+- `CDERUN_ENTRYPOINT`: Overwrite default ENTRYPOINT of image (comma-separated list).
 - `CDERUN_USER`: Username or UID (format: `<name|uid>[:<group|gid>]`).
-- `CDERUN_GROUP_ADD`: Supplementary groups to add to the container.
-- `CDERUN_READ_ONLY`: If set to `true`, mounts container root filesystem as read-only.
-- `CDERUN_INIT`: If set to `true`, runs an init process inside container.
-- `CDERUN_PID`: PID namespace mode (`""` or `"host"`).
-- `CDERUN_PIDS_LIMIT`: Tune process limits inside container.
-- `CDERUN_IPC`: IPC namespace mode (`""`, `"host"`, or `"private"`).
-- `CDERUN_CGROUPNS`: Cgroup namespace mode (`""`, `"host"`, or `"private"`).
-- `CDERUN_SECURITY_OPT`: List of security options (e.g. `no-new-privileges`).
-- `CDERUN_ULIMIT`: List of ulimits (e.g. `nofile=65535:65535`).
-- `CDERUN_SHM_SIZE`: Shared memory size for `/dev/shm` (e.g. `512m`).
-- `CDERUN_SYSCTL`: Kernel sysctl parameter overrides.
-- `CDERUN_CAP_ADD`: Linux capabilities to add.
-- `CDERUN_CAP_DROP`: Linux capabilities to drop.
-- `CDERUN_GPUS`: GPU device requests.
+- `CDERUN_GROUP_ADD`: Supplementary groups to add to container (comma-separated list).
+- `CDERUN_WORKDIR`: Working directory inside the container.
+- `CDERUN_ENV`: Environment variables to set or pass through (semicolon-separated list).
+- `CDERUN_STRICT_ENV`: If set to `true`, requires all passed environment variables to be present on host.
+- `CDERUN_TTY`: Allocate a pseudo-TTY if set to `true`.
+- `CDERUN_INTERACTIVE`: Keep STDIN open even if not attached if set to `true`.
+- `CDERUN_READ_ONLY`: Mount container root filesystem as read-only if set to `true`.
+- `CDERUN_INIT`: Run an init process inside container if set to `true`.
+- `CDERUN_REMOVE`: Automatically remove container when it exits if set to `true`.
+- `CDERUN_RESTART`: Container restart policy (e.g. `on-failure:5`).
+- `CDERUN_PULL`: Pull policy (`always`, `missing`, `never`).
 - `CDERUN_PULL_MAX_RETRIES`: Maximum number of retries for image pull (default: `3`).
 - `CDERUN_PULL_BACKOFF_BASE`: Base duration for exponential backoff during image pull (default: `1s`).
 - `CDERUN_PREFETCH`: Prefetch specified tool images (comma-separated list).
-- `CDERUN_PREFETCH_ALL`: Prefetch all tool images defined in `.tools.yaml`.
-- `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
-- `CDERUN_PRUNE`: List and remove stopped orphan containers created by `cderun`.
+- `CDERUN_PREFETCH_ALL`: Prefetch all tool images defined in `.tools.yaml` if set to `true`.
+- `CDERUN_PRUNE`: List and remove stopped orphan containers created by `cderun` if set to `true`.
 - `CDERUN_HANG_TIMEOUT`: Grace period for non-interactive or non-TTY sessions (default: `10s`).
-- `CDERUN_STRICT_ENV`: If set to `true`, requires all environment variables to be present on the host.
-- `CDERUN_DRY_RUN`: If set to `true`, enables dry-run mode.
-- `CDERUN_DRY_RUN_FORMAT`: Output format for dry-run (yaml, json, simple).
-- `CDERUN_DIAGNOSIS`: If set to `true`, enables diagnosis mode.
-- `CDERUN_DIAGNOSIS_FORMAT`: Output format for diagnosis (yaml, json, simple).
-- `CDERUN_PUBLISH_ALL`: If set to `true`, publish all exposed ports to random ports.
-- `CDERUN_MOUNT_CDERUN_SOCKET`: If set to `true`, mounts cderun Control Socket.
+
+### Network & Ports
+
+- `CDERUN_NETWORK`: Network mode (`bridge`, `host`, `none`, or custom network name).
+- `CDERUN_HOSTNAME`: Container host name.
+- `CDERUN_PUBLISH`: Publish container port(s) to host (comma-separated list).
+- `CDERUN_PUBLISH_ALL`: Publish all exposed ports to random ports if set to `true`.
+- `CDERUN_EXPOSE`: Expose port(s) or port range(s) (comma-separated list).
+- `CDERUN_DNS`: Set custom DNS servers (comma-separated list).
+- `CDERUN_DNS_OPTION`: Set custom DNS options (comma-separated list).
+- `CDERUN_DNS_SEARCH`: Set custom DNS search domains (comma-separated list).
+- `CDERUN_ADD_HOST`: Add custom host-to-IP mappings (comma-separated list).
+
+### Resources & Security
+
+- `CDERUN_MEMORY`: Memory limit (e.g. `512m`, `1g`).
+- `CDERUN_CPUS`: Number of CPUs (float).
+- `CDERUN_CPU_SHARES`: Container CPU access weight (relative weight integer).
+- `CDERUN_CPUSET_CPUS`: CPUs in which to allow execution (e.g. `0-3`, `0,1`).
+- `CDERUN_CPUSET_MEMS`: Memory nodes (MEMs) in which to allow execution (e.g. `0-3`, `0,1`).
+- `CDERUN_DEVICE`: Add host devices to container (comma-separated list).
+- `CDERUN_GPUS`: GPU device requests (e.g. `all`, `count=2`).
+- `CDERUN_IPC`: IPC namespace mode (`""`, `"host"`, or `"private"`).
+- `CDERUN_CGROUPNS`: Cgroup namespace mode (`""`, `"host"`, or `"private"`).
+- `CDERUN_PRIVILEGED`: Give extended privileges to container if set to `true`.
+- `CDERUN_PID`: PID namespace mode (`""` or `"host"`).
+- `CDERUN_PIDS_LIMIT`: Limit maximum active processes inside container.
+- `CDERUN_SECURITY_OPT`: List of security options (comma-separated list).
+- `CDERUN_ULIMIT`: List of process resource limits (comma-separated list).
+- `CDERUN_SHM_SIZE`: Shared memory size for `/dev/shm` (e.g. `512m`).
+- `CDERUN_SYSCTL`: Kernel sysctl parameter overrides (comma-separated list).
+- `CDERUN_CAP_ADD`: Linux capabilities to add (comma-separated list).
+- `CDERUN_CAP_DROP`: Linux capabilities to drop (comma-separated list).
+- `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask (comma-separated list).
+
+### Mounting & Nested Execution
+
+- `CDERUN_MOUNT`: Filesystem mounts (semicolon-separated list).
+- `CDERUN_MOUNT_SOCKET`: Mount runtime socket into container if set to `true`.
+- `CDERUN_MOUNT_SOCKET_PATH`: Path inside container where runtime socket should be mounted.
+- `CDERUN_MOUNT_CDERUN`: Mount `cderun` binary into container if set to `true`.
 - `CDERUN_MOUNT_CDERUN_PATH`: Path to host-side `cderun` binary for nested mounting.
-- `CDERUN_LOG_LEVEL`: Set log level (error, warn, info, debug, trace).
-- `CDERUN_LOG_FORMAT`: Set log format (text, json).
-- `CDERUN_LOG_TIMESTAMP`: Include timestamp in logs.
-- `CDERUN_SENSITIVE_ENV`: List of environment variable patterns to mask.
+- `CDERUN_MOUNT_CDERUN_SOCKET`: Mount cderun Control Socket if set to `true`.
+- `CDERUN_MOUNT_TOOLS`: Mount specified tool wrappers into container (comma-separated list).
+- `CDERUN_MOUNT_ALL_TOOLS`: Mount all tool wrappers defined in `.tools.yaml` if set to `true`.
+
+### Diagnostics & Logging
+
+- `CDERUN_DRY_RUN`: Enable dry-run preview mode if set to `true`.
+- `CDERUN_DRY_RUN_FORMAT`: Output format for dry-run (`yaml`, `json`, `simple`).
+- `CDERUN_DIAGNOSIS`: Enable system diagnosis mode if set to `true`.
+- `CDERUN_DIAGNOSIS_FORMAT`: Output format for diagnosis (`yaml`, `json`, `simple`).
+- `CDERUN_LOG_LEVEL`: Set log level (`error`, `warn`, `info`, `debug`, `trace`).
+- `CDERUN_LOG_FORMAT`: Set log format (`text`, `json`).
+- `CDERUN_LOG_TIMESTAMP`: Include timestamps in logs if set to `true`.
 
 **Note on List-type Options:**
 
