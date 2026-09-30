@@ -938,6 +938,12 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 
 	if activeCtrlServer != nil {
 		activeCtrlServer.SetDispatcher(rt)
+		defer func() {
+			o.logger.Trace("Closing control socket server")
+			if err := activeCtrlServer.Close(); err != nil {
+				o.logger.Warn("failed to close control socket server: %v", err)
+			}
+		}()
 	}
 
 	state.SetRuntimeAndID(rt, containerID)
