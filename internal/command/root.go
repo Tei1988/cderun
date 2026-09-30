@@ -898,7 +898,12 @@ func (s *executionState) HandleSignal(sigName string) (cancelCtx bool, forwardIm
 	return true, false, nil, ""
 }
 
-func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig) (int, error) {
+func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfig, containerConfig *container.ContainerConfig, ctrlServer ...*controlsocket.Server) (int, error) {
+	var activeCtrlServer *controlsocket.Server
+	if len(ctrlServer) > 0 {
+		activeCtrlServer = ctrlServer[0]
+	}
+
 	ctx := cmd.Context()
 	fullCmdStr := strings.Join(containerConfig.Command, " ")
 	if len(containerConfig.Entrypoint) > 0 {
@@ -930,6 +935,10 @@ func (o *rootOptions) execute(cmd *cobra.Command, resolved *config.ResolvedConfi
 	}
 	defer state.CloseRuntime(o.logger)
 	defer cleanup()
+
+	if activeCtrlServer != nil {
+		activeCtrlServer.SetDispatcher(rt)
+	}
 
 	state.SetRuntimeAndID(rt, containerID)
 
@@ -1525,7 +1534,7 @@ intended for the subcommand.`,
 		}
 
 		// Execute Container
-		exitCode, err := o.execute(cmd, resolved, containerConfig)
+		exitCode, err := o.execute(cmd, resolved, containerConfig, ctrlServer)
 		if err != nil {
 			var exitErr *ExitCodeError
 			if errors.As(err, &exitErr) {
