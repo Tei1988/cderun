@@ -620,8 +620,8 @@ func (rv *resolver) resolveComplexOptions() error {
 func (rv *resolver) resolveMountOptions() error {
 	mcs, err := pickConfigs(
 		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
-		func(t ToolConfig) []MountConfig { return t.Mounts },
-		rv.global, func(g CDERunConfig) []MountConfig { return g.Defaults.Mounts },
+		toolMountsGetter,
+		rv.global, globalMountsGetter,
 		func(s, src string) (MountConfig, error) {
 			parsed, err := ParseMountFlag(s)
 			if err != nil {
@@ -663,8 +663,8 @@ func (rv *resolver) resolveEnvOptions() error {
 	var rForEnv *ExpressionResolver
 	envs, err := pickStringConfigs(
 		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
-		func(t ToolConfig) []string { return t.Env },
-		rv.global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		toolEnvGetter,
+		rv.global, globalEnvGetter,
 		rv.fs,
 	)
 	if err != nil {
@@ -698,8 +698,8 @@ func (rv *resolver) resolveEnvOptions() error {
 func (rv *resolver) resolveUlimitOptions() error {
 	rawUlimits, err := pickStringConfigs(
 		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
-		func(t ToolConfig) []string { return t.Ulimits },
-		rv.global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
+		toolUlimitsGetter,
+		rv.global, globalUlimitsGetter,
 		rv.fs,
 	)
 	if err != nil {
@@ -718,8 +718,8 @@ func (rv *resolver) resolveUlimitOptions() error {
 func (rv *resolver) resolveSysctlOptions() error {
 	rawSysctls, err := pickStringConfigs(
 		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
-		func(t ToolConfig) []string { return t.Sysctls },
-		rv.global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		toolSysctlsGetter,
+		rv.global, globalSysctlsGetter,
 		rv.fs,
 	)
 	if err != nil {
@@ -930,7 +930,7 @@ func (rv *resolver) resolveRuntimeAndSocket() error {
 			"socket-path",
 			"CDERUN_SOCKET_PATH",
 			nil,
-			func(g CDERunConfig) ConfigPath { return g.SocketPath },
+			globalSocketPathGetter,
 			"",
 		)
 		if errPath != nil {
@@ -965,8 +965,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	p1SetTools, p1ValTools := getPtrVal(rv.cli.CderunMountTools)
 	rv.res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
-			ToolGetter:   func(t ToolConfig) []string { return t.MountTools },
-			GlobalGetter: func(g CDERunConfig) []string { return g.Defaults.MountTools }},
+			ToolGetter:   toolMountToolsGetter,
+			GlobalGetter: globalMountToolsGetter},
 		p1SetTools, p1ValTools,
 		p2SetTools, p2ValTools,
 		rv.subcommand, rv.tools, rv.global, rv.r, rv.fs,
@@ -998,8 +998,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		rv.res.MountCderunPath, errPath = rv.resolvePathValue(
 			"mount-cderun-path",
 			"CDERUN_MOUNT_CDERUN_PATH",
-			func(t ToolConfig) ConfigPath { return t.MountCderunPath },
-			func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+			toolMountCderunPathGetter,
+			globalMountCderunPathGetter,
 			"",
 		)
 		if errPath != nil {
@@ -1028,8 +1028,8 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		rv.res.MountSocketPath, errPath = rv.resolvePathValue(
 			"mount-socket-path",
 			"CDERUN_MOUNT_SOCKET_PATH",
-			func(t ToolConfig) ConfigPath { return t.MountSocketPath },
-			func(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath },
+			toolMountSocketPathGetter,
+			globalMountSocketPathGetter,
 			rv.res.SocketPath,
 		)
 		if errPath != nil {
@@ -1180,8 +1180,8 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 func (rv *resolver) resolveDeviceOptions() error {
 	dcs, err := pickConfigs(
 		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
-		func(t ToolConfig) []DeviceConfig { return t.Devices },
-		rv.global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		toolDevicesGetter,
+		rv.global, globalDevicesGetter,
 		func(s, src string) (DeviceConfig, error) {
 			parsed, ok := ParseDeviceConfig(s)
 			if !ok {

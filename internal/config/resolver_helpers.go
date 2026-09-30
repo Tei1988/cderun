@@ -143,11 +143,37 @@ func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.U
 	return res, nil
 }
 
+func toolMountsGetter(t ToolConfig) []MountConfig    { return t.Mounts }
+func globalMountsGetter(g CDERunConfig) []MountConfig { return g.Defaults.Mounts }
+
+func toolEnvGetter(t ToolConfig) []string    { return t.Env }
+func globalEnvGetter(g CDERunConfig) []string { return g.Defaults.Env }
+
+func toolUlimitsGetter(t ToolConfig) []string    { return t.Ulimits }
+func globalUlimitsGetter(g CDERunConfig) []string { return g.Defaults.Ulimits }
+
+func toolSysctlsGetter(t ToolConfig) []string    { return t.Sysctls }
+func globalSysctlsGetter(g CDERunConfig) []string { return g.Defaults.Sysctls }
+
+func toolDevicesGetter(t ToolConfig) []DeviceConfig    { return t.Devices }
+func globalDevicesGetter(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices }
+
+func toolMountToolsGetter(t ToolConfig) []string    { return t.MountTools }
+func globalMountToolsGetter(g CDERunConfig) []string { return g.Defaults.MountTools }
+
+func toolMountCderunPathGetter(t ToolConfig) ConfigPath    { return t.MountCderunPath }
+func globalMountCderunPathGetter(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }
+
+func toolMountSocketPathGetter(t ToolConfig) ConfigPath    { return t.MountSocketPath }
+func globalMountSocketPathGetter(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath }
+
+func globalSocketPathGetter(g CDERunConfig) ConfigPath { return g.SocketPath }
+
 func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
 	raws, err := pickStringConfigs(
 		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
-		func(t ToolConfig) []string { return t.Ulimits },
-		global, func(g CDERunConfig) []string { return g.Defaults.Ulimits },
+		toolUlimitsGetter,
+		global, globalUlimitsGetter,
 		fs,
 	)
 	if err != nil {
@@ -230,8 +256,8 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
 	raws, err := pickStringConfigs(
 		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
-		func(t ToolConfig) []string { return t.Sysctls },
-		global, func(g CDERunConfig) []string { return g.Defaults.Sysctls },
+		toolSysctlsGetter,
+		global, globalSysctlsGetter,
 		fs,
 	)
 	if err != nil {
@@ -422,8 +448,8 @@ func resolveDevicesFromConfigs(dcs []DeviceConfig, r *ExpressionResolver) ([]con
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
 	dcs, err := pickConfigs(
 		p1, p2, "CDERUN_DEVICE", ",", subcommand, tools,
-		func(t ToolConfig) []DeviceConfig { return t.Devices },
-		global, func(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices },
+		toolDevicesGetter,
+		global, globalDevicesGetter,
 		func(s, src string) (DeviceConfig, error) {
 			parsed, ok := ParseDeviceConfig(s)
 			if !ok {
@@ -452,8 +478,8 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
 	envs, err := pickStringConfigs(
 		p1, p2, envKey, ";", subcommand, tools,
-		func(t ToolConfig) []string { return t.Env },
-		global, func(g CDERunConfig) []string { return g.Defaults.Env },
+		toolEnvGetter,
+		global, globalEnvGetter,
 		fs,
 	)
 	if err != nil {
@@ -798,8 +824,8 @@ func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver, fs FileS
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
 	mcs, err := pickConfigs(
 		p1, p2, "CDERUN_MOUNT", ";", subcommand, tools,
-		func(t ToolConfig) []MountConfig { return t.Mounts },
-		global, func(g CDERunConfig) []MountConfig { return g.Defaults.Mounts },
+		toolMountsGetter,
+		global, globalMountsGetter,
 		func(s, src string) (MountConfig, error) {
 			parsed, err := ParseMountFlag(s)
 			if err != nil {
