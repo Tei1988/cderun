@@ -1,209 +1,224 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestExpressionResolver_AdvancedReverseResolutionAndMounts(t *testing.T) {
-	t.Parallel()
-
-	mfs := &MockFileSystem{
-		WD:      "/home/user/project",
-		HomeDir: "/home/user",
+func TestUnit_Expression_NestedFallbackAndStickyErrors(t *testing.T) {
+	mockFS := &MockFileSystem{
+		HomeDir: "/home/testuser",
+		WD:      "/workspace/project",
+		Env:     map[string]string{"FALLBACK_ENV": "/opt/fallback_dir"},
+		Files: map[string][]byte{
+			"/workspace/project/oversized.txt": make([]byte, MaxDirectiveFileSize+100),
+		},
 	}
 
 	hostCtx := &HostContext{
 		Level:      1,
-		HomeDir:    "/host/home/user",
-		WorkingDir: "/host/home/user/project",
-		Mounts: []MountMapping{
-			{
-				Source: "/host/data",
-				Target: "/data",
-				Level:  1,
-			},
-			{
-				Source: "/host/data/nested",
-				Target: "/data/nested",
-				Level:  1,
-			},
-			{
-				Source: "/host/override/data/nested",
-				Target: "/data/nested",
-				Level:  2, // Higher level tie-breaker
-			},
-		},
+		HomeDir:    "/base/home",
+		WorkingDir: "/base/pwd",
+		UID:        "1001",
+		GID:        "1001",
 	}
 
-	resolver, err := NewExpressionResolverWithFS(hostCtx, mfs)
+	resolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
 	require.NoError(t, err)
 
-	t.Run("reverse resolution tie breaker prefers longer target or higher level", func(t *testing.T) {
-		// Matches /data/nested with level 2 override via ResolvePath
-		res, err := ResolvePath("/data/nested/file.txt", "/base", resolver)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Clean("/host/override/data/nested/file.txt"), filepath.Clean(res))
-
-		// Matches /data with level 1 via ResolvePath
-		res2, err := ResolvePath("/data/other.txt", "/base", resolver)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Clean("/host/data/other.txt"), filepath.Clean(res2))
-
-		// Unmatched path returns absolute path as-is
-		res3, err := ResolvePath("/unmatched/path.txt", "/base", resolver)
-		require.NoError(t, err)
-		assert.Equal(t, filepath.Clean("/unmatched/path.txt"), filepath.Clean(res3))
-	})
-}
-
-func TestExpressionResolver_DirectiveEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	t.Run("file directive exceeds max size", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			WD:      "/app",
-			HomeDir: "/home/user",
-			Files: map[string][]byte{
-				"/app/large.txt": make([]byte, MaxDirectiveFileSize+10),
-			},
-		}
-
-		resolver, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-
-		_, err = resolver.ResolveString("{{file:large.txt}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "too large")
+	t.Run("Multi-level nested fallbacks: find_dir -> env -> file -> default", func(t *testing.T) {
+		expr := "{{find_dir:nonexistent:-{{env:NONEXISTENT_ENV:-{{file:nonexistent.txt:-/default/fallback/path}}}}}}"
+		res, err := resolver.ResolveString(expr)
+		assert.NoError(t, err)
+		assert.Equal(t, "/default/fallback/path", res)
+		assert.NoError(t, resolver.Error())
 	})
 
-	t.Run("env directive default value invalid characters rejection", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			WD:      "/app",
-			HomeDir: "/home/user",
-		}
-
-		resolver, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-
-		// Bad default value with control character
-		_, err = resolver.ResolveString("{{env:NON_EXISTENT_VAR:-invalid\x00value}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "security validation failed")
+	t.Run("Multi-level nested fallbacks: env missing -> fallback_env value", func(t *testing.T) {
+		expr := "{{env:MISSING_VAR:-{{env:FALLBACK_ENV:-/default/path}}}}"
+		res, err := resolver.ResolveString(expr)
+		assert.NoError(t, err)
+		assert.Equal(t, "/opt/fallback_dir", res)
+		assert.NoError(t, resolver.Error())
 	})
 
-	t.Run("find_dir directive with invalid path characters", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			WD:      "/app",
-			HomeDir: "/home/user",
-		}
-
-		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+	t.Run("MaxDirectiveFileSize rejection", func(t *testing.T) {
+		cleanResolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
 		require.NoError(t, err)
 
-		_, err = resolver.ResolveString("{{find_dir:bad\x00dir}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid character")
+		_, err = cleanResolver.ResolveString("{{file:oversized.txt}}")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "is too large")
 	})
 
-	t.Run("nested expression resolution in env default value", func(t *testing.T) {
-		mfs := &MockFileSystem{
-			WD:      "/app",
-			HomeDir: "/home/user",
-		}
-
-		resolver, err := NewExpressionResolverWithFS(nil, mfs)
+	t.Run("Sticky error isolation across multiple ResolveString invocations", func(t *testing.T) {
+		cleanResolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
 		require.NoError(t, err)
 
-		// Resolves {{env:UNDEFINED:-{{HOME}}/config}} -> /home/user/config
-		res, err := resolver.ResolveString("{{env:UNDEFINED:-{{HOME}}/config}}")
-		require.NoError(t, err)
-		assert.Equal(t, "/home/user/config", res)
-	})
-}
+		// Invoking invalid directive sets sticky error
+		_, err = cleanResolver.ResolveString("{{BAD_DIRECTIVE:value}}")
+		assert.Error(t, err)
+		assert.Error(t, cleanResolver.Error())
 
-func TestExpressionResolver_StickyErrorPropagationInStructures(t *testing.T) {
-	t.Parallel()
-
-	mfs := &MockFileSystem{
-		WD:      "/app",
-		HomeDir: "/home/user",
-	}
-
-	resolver, err := NewExpressionResolverWithFS(nil, mfs)
-	require.NoError(t, err)
-
-	input := map[string]any{
-		"valid":   "{{HOME}}/valid",
-		"invalid": "{{file:nonexistent.txt}}",
-		"nested_map": map[string]any{
-			"key": "{{HOME}}/nested",
-		},
-		"nested_slice": []any{
-			"{{HOME}}/slice1",
-			"{{HOME}}/slice2",
-		},
-	}
-
-	resolved := resolver.Resolve(input)
-	require.Error(t, resolver.Error())
-	assert.Contains(t, resolver.Error().Error(), "file not found")
-
-	// Verify resolution stops after encountering the sticky file error, preserving unresolved expressions
-	resolvedMap, ok := resolved.(map[string]any)
-	require.True(t, ok)
-	nestedMap, ok := resolvedMap["nested_map"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "{{HOME}}/nested", nestedMap["key"])
-
-	nestedSlice, ok := resolvedMap["nested_slice"].([]any)
-	require.True(t, ok)
-	require.Len(t, nestedSlice, 2)
-	assert.Equal(t, "{{HOME}}/slice1", nestedSlice[0])
-	assert.Equal(t, "{{HOME}}/slice2", nestedSlice[1])
-
-	// Verify sticky error prevents further resolution when called again
-	resString, err2 := resolver.ResolveString("{{HOME}}/should_not_resolve")
-	require.Error(t, err2)
-	assert.Equal(t, "{{HOME}}/should_not_resolve", resString)
-}
-
-func TestExpressionResolver_UnknownDirectivesAndEscapes(t *testing.T) {
-	t.Parallel()
-
-	mfs := &MockFileSystem{
-		WD:      "/app",
-		HomeDir: "/home/user",
-	}
-
-	t.Run("unknown uppercase directive returns error", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-
-		_, err = r.ResolveString("{{UNKNOWN_MAGIC_WORD}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown directive or magic word")
+		// Subsequent calls fail immediately due to sticky error and return unmodified input
+		out, err2 := cleanResolver.ResolveString("{{HOME}}")
+		assert.Error(t, err2)
+		assert.Equal(t, "{{HOME}}", out)
 	})
 
-	t.Run("unknown colon directive returns error", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, mfs)
+	t.Run("Double brace escaping", func(t *testing.T) {
+		cleanResolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
 		require.NoError(t, err)
 
-		_, err = r.ResolveString("{{custom_prefix:value}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown directive or magic word")
-	})
-
-	t.Run("double brace escape is preserved", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(nil, mfs)
-		require.NoError(t, err)
-
-		// {{{{HOME}}}} should resolve to {{HOME}}
-		res, err := r.ResolveString("{{{{HOME}}}}")
-		require.NoError(t, err)
+		res, err := cleanResolver.ResolveString("{{{{HOME}}}}")
+		assert.NoError(t, err)
 		assert.Equal(t, "{{HOME}}", res)
 	})
+}
+
+func TestUnit_Expression_HostContextMagicWords(t *testing.T) {
+	uid := 501
+	gid := 20
+	mockFS := &MockFileSystem{
+		HomeDir:  "/Users/localuser",
+		WD:       "/Users/localuser/projects/cderun",
+		UIDValue: &uid,
+		GIDValue: &gid,
+	}
+
+	hostCtx := &HostContext{
+		Level:      2,
+		HomeDir:    "/base/home/runner",
+		WorkingDir: "/base/work/cderun",
+		UID:        "1000",
+		GID:        "1000",
+	}
+
+	resolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name     string
+		expr     string
+		expected string
+	}{
+		{"Local HOME", "{{HOME}}", "/Users/localuser"},
+		{"Local PWD", "{{PWD}}", "/Users/localuser/projects/cderun"},
+		{"Base HOME", "{{BASE_HOME}}", "/base/home/runner"},
+		{"Base PWD", "{{BASE_PWD}}", "/base/work/cderun"},
+		{"Local UID", "{{UID}}", "501"},
+		{"Local GID", "{{GID}}", "20"},
+		{"Base UID", "{{BASE_UID}}", "1000"},
+		{"Base GID", "{{BASE_GID}}", "1000"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			val, err := resolver.ResolveString(tc.expr)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, val)
+		})
+	}
+}
+
+func TestUnit_Config_PathSafetyAndValidationInvariants(t *testing.T) {
+	t.Run("ValidateNetworkName safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateNetworkName("bridge"))
+		assert.NoError(t, ValidateNetworkName("custom_net-1"))
+		assert.Error(t, ValidateNetworkName("net; echo pwned"))
+		assert.Error(t, ValidateNetworkName("net\x00null"))
+	})
+
+	t.Run("ValidateUserName safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateUserName("1000:1000"))
+		assert.NoError(t, ValidateUserName("appuser"))
+		assert.Error(t, ValidateUserName("root; id"))
+		assert.Error(t, ValidateUserName("user\nline"))
+	})
+
+	t.Run("ValidateAddHost safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateAddHost("host.docker.internal:127.0.0.1"))
+		assert.Error(t, ValidateAddHost("invalid_no_colon"))
+		assert.Error(t, ValidateAddHost("host:127.0.0.1; evil"))
+	})
+
+	t.Run("ValidateImageName safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateImageName("alpine:3.18"))
+		assert.NoError(t, ValidateImageName("ghcr.io/org/app:v1.0.0"))
+		assert.Error(t, ValidateImageName("alpine:latest; rm -rf /"))
+		assert.Error(t, ValidateImageName("alpine\x00:latest"))
+	})
+
+	t.Run("ValidateWorkdir safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateWorkdir("/app"))
+		assert.NoError(t, ValidateWorkdir("/workspace/src"))
+		assert.Error(t, ValidateWorkdir("relative/path"))
+		assert.Error(t, ValidateWorkdir("/app; malicious"))
+	})
+
+	t.Run("ValidateDNSOption safety invariants", func(t *testing.T) {
+		assert.NoError(t, ValidateDNSOption("ndots:5"))
+		assert.NoError(t, ValidateDNSOption("timeout:2"))
+		assert.Error(t, ValidateDNSOption("ndots:5; malformed"))
+	})
+}
+
+func TestUnit_Config_PrecedenceMatrixAndFSInvariants(t *testing.T) {
+	mockFS := &MockFileSystem{
+		HomeDir: "/home/dev",
+		WD:      "/projects/app",
+		Env: map[string]string{
+			"CDERUN_IMAGE": "redis:6-alpine",
+		},
+	}
+
+	cliOpts := &CLIOptions{
+		CderunImage: makeTestStrPtr("redis:7-alpine"),
+	}
+
+	globalCfg := &CDERunConfig{
+		Engine: "docker",
+	}
+
+	res, err := ResolveWithFS("redis", cliOpts, nil, globalCfg, mockFS)
+	require.NoError(t, err)
+	assert.Equal(t, "redis:7-alpine", res.Image, "P1 CLI option must override P2 environment variable")
+
+	t.Run("Validate path resolution with tilde and relative boundaries", func(t *testing.T) {
+		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
+		require.NoError(t, err)
+
+		absPath, err := ResolvePath("~/data", "/projects/app", resolver)
+		assert.NoError(t, err)
+		assert.Equal(t, "/home/dev/data", absPath)
+
+		relPath, err := ResolvePath("src/main.go", "/projects/app", resolver)
+		assert.NoError(t, err)
+		assert.Equal(t, "/projects/app/src/main.go", relPath)
+	})
+
+	t.Run("Reverse path resolution tie-breaking", func(t *testing.T) {
+		hostCtx := &HostContext{
+			Level:      1,
+			HomeDir:    "/home/dev",
+			WorkingDir: "/projects/app",
+			Mounts: []MountMapping{
+				{Source: "/data/v1", Target: "/shared/path", Level: 1},
+				{Source: "/data/v2", Target: "/shared/path", Level: 2},
+			},
+		}
+
+		resolver, err := NewExpressionResolverWithFS(hostCtx, mockFS)
+		require.NoError(t, err)
+
+		resolvedAbs, err := resolver.applyReverseResolution("/shared/path/file.txt")
+		assert.NoError(t, err)
+		assert.Equal(t, "/data/v2/file.txt", resolvedAbs, "Reverse resolution must map Target to Source preferring higher level mapping")
+	})
+}
+
+func makeTestStrPtr(s string) *string {
+	return &s
 }
