@@ -140,7 +140,13 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 4. **Precedence Rules**:
    - **Longest Match (Longest Target Prefix)**: If multiple mappings match (e.g., `/app` and `/app/src`), the longest matched `target` prefix is selected to favor more specific mounts over generic ones.
    - **Deepest Level Priority**: If targets are of equal length, the mapping with the highest `level` (the most recent nested mount) is selected.
-5. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
+5. **Base Host Path Guard**: A path is returned unchanged, bypassing the OverlayFS fallback root mapping, only when **all** of the following hold:
+   - The selected mapping is the OverlayFS fallback root mapping (`target: /`, see below); any explicit `hostContext.mounts` entry that covers the path takes precedence and is applied normally.
+   - The path sits under a Base Host root — the Base Host home directory (`{{BASE_HOME}}`) or working directory (`{{BASE_PWD}}`) recorded in `hostContext` — **and** that root differs from its Execution Host counterpart (`HOME` / `PWD` inside the container). When both sides share the same path the direction of the mapping cannot be inferred, so the regular lookup stays in charge.
+   - The path does not exist in the Execution Host filesystem. Containment in a Base Host root alone does not prove the path came from a Base Host expression, because a Base Host root can overlap a directory that also exists inside the container (for example a host user `/home/ubuntu` and an image that ships its own `/home/ubuntu`). The fallback mapping serves container scratch space, whose files are present in the container, so a path that is present there keeps using it.
+
+   Such a path is already expressed in the Base Host namespace, so rewriting it through the container rootfs would produce a non-existent mount source.
+6. **Path Construction**: Replaces the matching `target` prefix with its corresponding `source` path from the Base Host, and appends the remaining relative path segments.
 
 ### Concrete Example
 
@@ -163,6 +169,8 @@ Because the container runtime daemon runs on the **Base Host** (Level 0), any di
 If `cderun` detects that it is executing inside a container with an OverlayFS root filesystem, it automatically parses `/proc/self/mountinfo` to extract the host-side `upperdir` path.
 
 It then appends a fallback root mapping (`source: <upperdir>, target: /`) to `hostContext.mounts`. This allows mounting files that reside in the container's scratch space (such as files created in `/tmp`) into nested containers, even if those paths do not belong to a pre-existing volume or bind mount.
+
+This mapping matches every absolute path, so it is applied only after every explicit mount target has been ruled out, and it is subject to the **Base Host Path Guard** described above. Without that guard a mount source such as `{{BASE_HOME}}/.certs/all.pem` — which is already a Base Host path — would be rewritten to `<upperdir>/Users/<user>/.certs/all.pem` and the container runtime would reject it with `bind source path does not exist`.
 
 For more information, see the [/proc/self/mountinfo Specification](../references/proc-self-mountinfo.md).
 
