@@ -520,10 +520,11 @@ func addEnv(m map[string]string, keys *[]string, env []string) {
 }
 
 func deduplicateEnv(env []string) []string {
-	if len(env) <= 1 {
+	n := len(env)
+	if n <= 1 {
 		return env
 	}
-	if len(env) <= maxStackEnvThreshold {
+	if n <= maxStackEnvThreshold {
 		var keys [maxStackEnvThreshold]string
 		var vals [maxStackEnvThreshold]string
 		size := 0
@@ -544,11 +545,11 @@ func deduplicateEnv(env []string) []string {
 					break
 				}
 			}
-			if foundIdx >= 0 && foundIdx < maxStackEnvThreshold {
+			if foundIdx >= 0 {
 				//nolint:gosec // false positive G602: bounds checked above
 				vals[foundIdx] = e
 				hasDuplicates = true
-			} else {
+			} else if size < maxStackEnvThreshold {
 				keys[size] = key
 				vals[size] = e
 				size++
@@ -564,11 +565,11 @@ func deduplicateEnv(env []string) []string {
 		return res
 	}
 
-	m := make(map[string]string, len(env))
-	keys := make([]string, 0, len(env))
+	m := make(map[string]string, n)
+	keys := make([]string, 0, n)
 	addEnv(m, &keys, env)
 
-	if len(keys) == len(env) {
+	if len(keys) == n {
 		return env
 	}
 
