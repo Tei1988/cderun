@@ -432,13 +432,13 @@ func (rv *resolver) validateCriticalFields() error {
 
 	// engine & runtime
 	engineValidator := func(v string) error {
-		if v != "" && v != "docker" && v != "podman" && v != "containerd" {
+		if v != "" && v != "docker" && v != "podman" && v != "containerd" && v != "nerdctl" {
 			return fmt.Errorf("unsupported engine: %q", v)
 		}
 		return nil
 	}
 	runtimeValidator := func(v string) error {
-		if v != "" && v != "docker" && v != "podman" && v != "containerd" {
+		if v != "" && v != "docker" && v != "podman" && v != "containerd" && v != "nerdctl" {
 			return fmt.Errorf("unsupported runtime: %q", v)
 		}
 		return nil
