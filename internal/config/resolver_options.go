@@ -62,7 +62,13 @@ func isDriftOk(name string, info optionFields) bool {
 		return true
 	}
 	expected, okExpected := expectedFieldIndices[name]
-	return okExpected && info.p1ValIdx == expected.p1ValIdx && info.p2ValIdx == expected.p2ValIdx
+	if !okExpected || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
+		return false
+	}
+	if mapInfo, ok := fieldInfo[name]; ok && mapInfo != info {
+		return false
+	}
+	return true
 }
 
 func (rv *resolver) resolveStringOptionWithExpressions(def OptionDef[string], p1Set bool, p1Val string, p2Set bool, p2Val string) (string, error) {
@@ -365,12 +371,7 @@ func assignResolvedFloat64(res *ResolvedConfig, name string, resolved float64) {
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 	p1v, p2v, fastPathUsed := getStringSliceOptionFastPathSlices(rv.cli, opt.Name)
 
-	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
-	if err != nil {
-		return err
-	}
-
-	if fastPathUsed && isDriftOk(opt.Name, info) {
+	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[[]string]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -385,6 +386,11 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		resolved := resolveStringSliceOptWithVals(vals, rForSlice)
 		assignResolvedStringSlice(rv.res, opt.Name, resolved)
 		return nil
+	}
+
+	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
+	if err != nil {
+		return err
 	}
 
 	if info.targetIdx == -1 || info.p1ValIdx == -1 || info.p2ValIdx == -1 {
@@ -419,12 +425,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 	p1Set, p1Val := getPtrVal(p1Ptr)
 	p2Set, p2Val := getPtrVal(p2Ptr)
 
-	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
-	if err != nil {
-		return err
-	}
-
-	if fastPathUsed && isDriftOk(opt.Name, info) {
+	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[string]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -437,6 +438,11 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		}
 		assignResolvedString(rv.res, opt.Name, resolved)
 		return nil
+	}
+
+	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
+	if err != nil {
+		return err
 	}
 
 	if info.targetIdx == -1 || info.p1ValIdx == -1 || info.p2ValIdx == -1 {
@@ -460,12 +466,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	p1Set, p1Val := getPtrVal(p1Ptr)
 	p2Set, p2Val := getPtrVal(p2Ptr)
 
-	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
-	if err != nil {
-		return err
-	}
-
-	if fastPathUsed && isDriftOk(opt.Name, info) {
+	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[*bool]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -477,6 +478,11 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		}
 		assignResolvedBool(rv.res, opt.Name, resolved)
 		return nil
+	}
+
+	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
+	if err != nil {
+		return err
 	}
 
 	if info.targetIdx == -1 || info.p1ValIdx == -1 || info.p2ValIdx == -1 {
@@ -500,12 +506,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 	p1Set, p1Int := getPtrVal(p1Ptr)
 	p2Set, p2Int := getPtrVal(p2Ptr)
 
-	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
-	if err != nil {
-		return err
-	}
-
-	if fastPathUsed && isDriftOk(opt.Name, info) {
+	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[*int]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -517,6 +518,11 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		}
 		assignResolvedInt(rv.res, opt.Name, resolved)
 		return nil
+	}
+
+	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
+	if err != nil {
+		return err
 	}
 
 	if info.targetIdx == -1 || info.p1ValIdx == -1 || info.p2ValIdx == -1 {
@@ -547,12 +553,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 	p1Set, p1Float := getPtrVal(p1Ptr)
 	p2Set, p2Float := getPtrVal(p2Ptr)
 
-	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
-	if err != nil {
-		return err
-	}
-
-	if fastPathUsed && isDriftOk(opt.Name, info) {
+	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[*float64]{
 			EnvKey:       opt.EnvKey,
 			ToolGetter:   opt.ToolGetter,
@@ -564,6 +565,11 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		}
 		assignResolvedFloat64(rv.res, opt.Name, resolved)
 		return nil
+	}
+
+	info, err := resolveOptionFieldInfo(opt.Name, opt.info)
+	if err != nil {
+		return err
 	}
 
 	if info.targetIdx == -1 || info.p1ValIdx == -1 || info.p2ValIdx == -1 {
