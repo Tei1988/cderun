@@ -149,7 +149,11 @@ func (l *Logger) Init(level string, format string, timestamp bool) error {
 	defer l.mu.Unlock()
 
 	l.SetLevel(ParseLevel(level))
-	l.format = strings.ToLower(format)
+	fmtLower := strings.ToLower(strings.TrimSpace(format))
+	if fmtLower != "json" {
+		fmtLower = "text"
+	}
+	l.format = fmtLower
 	l.timestamp = timestamp
 
 	return nil
