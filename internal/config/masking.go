@@ -276,8 +276,8 @@ func MaskSensitiveEnv(key, value string, patterns []string) string {
 
 // MaskSensitiveEnvList returns a new slice of environment variables with sensitive values masked.
 func MaskSensitiveEnvList(env []string, patterns []string) []string {
-	if env == nil {
-		return nil
+	if len(env) == 0 {
+		return env
 	}
 
 	if patterns != nil && len(patterns) == 0 {
@@ -287,7 +287,8 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	if patterns == nil {
 		var res []string
 		for i, e := range env {
-			if idx := strings.IndexByte(e, '='); idx >= 0 {
+			idx := strings.IndexByte(e, '=')
+			if idx >= 0 {
 				v := e[idx+1:]
 				if v != "" && v != "[REDACTED]" {
 					if res == nil {
@@ -312,7 +313,8 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 
 	var res []string
 	for i, e := range env {
-		if idx := strings.IndexByte(e, '='); idx >= 0 {
+		idx := strings.IndexByte(e, '=')
+		if idx >= 0 {
 			k := e[:idx]
 			v := e[idx+1:]
 			if v == "" {
