@@ -94,20 +94,20 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T87 | Nested Execution Control Socket — Phase 1: プロトコル・ソケット配線 | 機能 | 中 | 中 | あり | DONE |
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
-| T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | DONE |
 | T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
-| T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | - |
-| T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | - |
+| T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
+| T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | DONE |
 | T95 | `--runtime` の意味を OCI ランタイム側へ切り替え | 破壊 | 中 | 小 | あり | - |
 | T96 | Control Socket サーバのリクエスト context を接続の生存に紐づける | バグ | 高 | 小 | - | DONE |
 | T97 | Control Socket サーバの accept ループ堅牢化とアイドルタイムアウト | バグ | 中 | 小 | - | DONE |
 | T98 | Control Socket ハンドラの共通化とエラー処理方針の統一 | リファクタ | 中 | 小 | - | DONE |
-| T99 | テストファイル命名規約の強制（親タスク） | クリーンアップ | 高 | 大 | - | - |
+| T99 | テストファイル命名規約の強制（親タスク） | クリーンアップ | 高 | 大 | - | DONE |
 | T100 | テストファイル命名規約の明文化と lint / CI ゲートの追加 | クリーンアップ | 高 | 小 | - | DONE |
-| T101 | `internal/config` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
+| T101 | `internal/config` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | DONE |
 | T102 | `internal/command` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | DONE |
-| T103 | `internal/runtime` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | - |
+| T103 | `internal/runtime` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | DONE |
 | T104 | ネスト実行で `{{BASE_HOME}}` 由来のマウント source が OverlayFS upperdir で汚染される | バグ | 高 | 小 | あり | DONE |
 
 依存関係・統合の注意:
