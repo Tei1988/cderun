@@ -142,10 +142,10 @@ func isParentMountReadOnly(parentMounts []container.Mount, childSource, childTar
 		pSourceClean := filepath.Clean(pm.Source)
 		pTargetClean := filepath.Clean(pm.Target)
 
-		if pSourceClean != "." && isSubPathOrEqual(childSourceClean, pSourceClean) {
+		if pSourceClean != "." && (isSubPathOrEqual(childSourceClean, pSourceClean) || isSubPathOrEqual(pSourceClean, childSourceClean)) {
 			return true
 		}
-		if pTargetClean != "." && isSubPathOrEqual(childTargetClean, pTargetClean) {
+		if pTargetClean != "." && (isSubPathOrEqual(childTargetClean, pTargetClean) || isSubPathOrEqual(pTargetClean, childTargetClean)) {
 			return true
 		}
 	}
@@ -154,6 +154,9 @@ func isParentMountReadOnly(parentMounts []container.Mount, childSource, childTar
 
 func isSubPathOrEqual(childPath, parentPath string) bool {
 	if childPath == parentPath {
+		return true
+	}
+	if parentPath == string(filepath.Separator) {
 		return true
 	}
 	parentDir := parentPath

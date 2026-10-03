@@ -278,6 +278,18 @@ func TestUnit_ControlSocket_InheritedCeilingPolicy(t *testing.T) {
 		assert.Contains(t, err.Error(), "writable mount requested by nested container for read-only parent source/target path")
 	})
 
+	t.Run("Writable mount escalation on ancestor of read-only parent source path rejected", func(t *testing.T) {
+		child := &container.ContainerConfig{
+			Image: "alpine:latest",
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/host", Target: "/custom_host", ReadOnly: false},
+			},
+		}
+		_, err := client.CreateContainer(ctx, child)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "writable mount requested by nested container for read-only parent source/target path")
+	})
+
 	t.Run("SecurityOpt unconfined escalation rejected", func(t *testing.T) {
 		child := &container.ContainerConfig{
 			Image:       "alpine:latest",
