@@ -40,7 +40,7 @@
   CLI-based execution presents argument injection risks if user or nested parameters (such as `Image`, `Command`, or `Env`) contain flag-like strings (e.g., `--privileged`). `nerdctl` adapter implements a 3-layer security defense via `CLIArgBuilder`:
   1. **Positional Boundary Separation**: Inserts `--` before the trailing positional block (`<image> <cmd> <args...>`), ensuring the underlying CLI parser (Cobra/pflag) interprets them as literal arguments.
   2. **Joined `--flag=value` Formatting**: Formats flag key-value pairs (e.g., `--env=KEY=VALUE`) as single joined tokens to prevent parameter splitting.
-  3. **Structural `argv` Self-Checking**: Validates that the constructed `argv` prefix prior to `--` matches the expected fixed flag pattern exactly before command execution, failing early if any mismatch occurs.
+  3. **Structural `argv` Self-Checking**: Performs structural validation (`VerifyStructure`) on built `argv` prior to execution, verifying that positional arguments follow `--` and each preceding flag token begins with `-`.
 
 ---
 
@@ -48,7 +48,7 @@
 
 | Feature / Capability | Docker | Podman | containerd (Direct gRPC) | nerdctl (CLI-Based) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Supported OS** | Linux, macOS, Windows | Linux, macOS, Windows | **Linux-only** (`//go:build linux`) | Linux, macOS, Windows |
+| **Supported OS** | Linux, macOS, Windows | Linux, macOS, Windows | **Linux-only** (`//go:build linux`) | **Linux-only** |
 | **Communication Protocol** | HTTP Unix socket | HTTP Unix socket | gRPC Unix socket | CLI Subprocess (`nerdctl`) |
 | **Bridge Networking** | Yes | Yes | No (Host network only) | Yes |
 | **Port Publishing (`-p`, `-P`)** | Yes | Yes | No | Yes |
