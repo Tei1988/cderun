@@ -36,6 +36,53 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		return nil
 	}
 
+	res := buf[:0]
+	hasNesting := false
+	depth := 0
+	start := 0
+
+	for i := 0; i < len(s)-1; {
+		idx := strings.IndexAny(s[i:], "{}")
+		if idx == -1 {
+			break
+		}
+		i += idx
+		if i >= len(s)-1 {
+			break
+		}
+
+		if s[i] == '{' && s[i+1] == '{' {
+			if depth == 0 {
+				start = i
+			}
+			depth++
+			if depth > 1 || (i+2 < len(s) && s[i+2] == '{') {
+				hasNesting = true
+			}
+			i += 2
+		} else if s[i] == '}' && s[i+1] == '}' {
+			if i+2 < len(s) && s[i+2] == '}' {
+				hasNesting = true
+			}
+			if depth > 0 {
+				depth--
+				if depth == 0 && !hasNesting {
+					res = append(res, anchorRange{start: start, end: i + 2})
+				}
+			}
+			i += 2
+		} else {
+			i++
+		}
+	}
+
+	if !hasNesting && depth == 0 {
+		if len(res) == 0 {
+			return nil
+		}
+		return res
+	}
+
 	var stackBuf [32]int
 	var allPairsBuf [32]anchorRange
 	stack := stackBuf[:0]
@@ -70,7 +117,7 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		return nil
 	}
 
-	res := buf[:0]
+	res = buf[:0]
 	lastStart := len(s) + 1
 	for i := len(allPairs) - 1; i >= 0; i-- {
 		p := allPairs[i]
@@ -80,7 +127,6 @@ func scanAnchors(s string, buf []anchorRange) []anchorRange {
 		}
 	}
 
-	// Reverse to maintain original order
 	slices.Reverse(res)
 
 	return res
