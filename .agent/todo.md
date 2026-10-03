@@ -95,7 +95,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | DONE |
-| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | DONE |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 | T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
 | T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | DONE |
@@ -326,6 +326,11 @@ cderun --prune
 
 - **内容**: T93 の実装（`--engine`, `--cderun-engine`, `CDERUN_ENGINE`, `.cderun.yaml` の `engine:`、および `--runtime` の非推奨エイリアス化と警告ログ）の仕様説明をドキュメントに追加する。
 - **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
+
+### Documentation Update Task: T91 (Nested Execution Control Socket — Phase 5)
+
+- **内容**: T91 の実装（Control Socket 経由での containerd API ディスパッチ、親コンテナ権限を上限とする inherited-ceiling セキュリティポリシーの仕様、および macOS VM 環境でのソケット権限非依存動作の検証結果）の仕様説明を `docs/features/nested-execution-control-socket.md` に追記する。
+- **対応ドキュメント**: `docs/features/nested-execution-control-socket.md`
 
 ### テスト関数の重複宣言: `internal/container`
 
