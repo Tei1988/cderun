@@ -18,11 +18,18 @@ func TestUnit_ControlSocket_RPC_Deadline_And_MalformedPayload_Scenarios(t *testi
 	tmpDir := t.TempDir()
 	sockPath := filepath.Join(tmpDir, "ctrl.sock")
 
+	waitErrChan := make(chan error, 1)
+
 	disp := &dummyDispatcher{
 		waitFn: func(ctx context.Context, containerID string) (int, error) {
 			select {
 			case <-ctx.Done():
-				return -1, ctx.Err()
+				err := ctx.Err()
+				select {
+				case waitErrChan <- err:
+				default:
+				}
+				return -1, err
 			case <-time.After(500 * time.Millisecond):
 				return 0, nil
 			}
@@ -42,21 +49,26 @@ func TestUnit_ControlSocket_RPC_Deadline_And_MalformedPayload_Scenarios(t *testi
 	t.Cleanup(func() { _ = client.Close() })
 
 	t.Run("WaitContainer RPC deadline timeout", func(t *testing.T) {
-		t.Parallel()
-
 		tightCtx, tightCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer tightCancel()
 
 		_, err := client.WaitContainer(tightCtx, "c123")
 		assert.Error(t, err)
+
+		select {
+		case dispErr := <-waitErrChan:
+			assert.ErrorIs(t, dispErr, context.DeadlineExceeded)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timed out waiting for dispatcher to observe context cancellation")
+		}
 	})
 
 	t.Run("malformed raw payloads for remaining RPC types", func(t *testing.T) {
-		t.Parallel()
-
 		rawConn, err := net.Dial("unix", sockPath)
 		require.NoError(t, err)
 		defer rawConn.Close()
+
+		require.NoError(t, rawConn.SetDeadline(time.Now().Add(5*time.Second)))
 
 		// Perform handshake
 		hsReq, _ := json.Marshal(HandshakeRequest{ProtocolVersion: CurrentProtocolVersion, ClientVersion: "test"})
