@@ -2,6 +2,7 @@ package controlsocket
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"cderun/internal/container"
@@ -58,16 +59,15 @@ func ValidateInheritedCeiling(parent, child *container.ContainerConfig) error {
 
 	// 7. Mount ReadOnly escalation
 	for _, cm := range child.Mounts {
-		if !cm.ReadOnly && isParentMountReadOnly(parent.Mounts, cm.Target) {
-			return fmt.Errorf("inherited ceiling validation failed: writable mount %q requested by nested container for read-only parent path", cm.Target)
+		if !cm.ReadOnly && isParentMountReadOnly(parent.Mounts, cm.Source, cm.Target) {
+			return fmt.Errorf("inherited ceiling validation failed: writable mount requested by nested container for read-only parent source/target path %q", cm.Source)
 		}
 	}
 
 	// 8. SecurityOpt escalation
 	if !parent.Privileged && len(child.SecurityOpt) > 0 {
 		for _, opt := range child.SecurityOpt {
-			optLower := strings.ToLower(opt)
-			if (strings.Contains(optLower, "unconfined") || strings.Contains(optLower, "label=disable")) && !hasSecurityOpt(parent.SecurityOpt, opt) {
+			if !isSecurityOptAllowed(parent.SecurityOpt, opt) {
 				return fmt.Errorf("inherited ceiling validation failed: security option %q requested by nested container but not granted to parent", opt)
 			}
 		}
@@ -104,23 +104,71 @@ func normalizeCap(c string) string {
 }
 
 func hasDevice(parentDevices []container.DeviceMapping, childDev container.DeviceMapping) bool {
+	childHostPath := filepath.Clean(childDev.PathOnHost)
 	for _, pd := range parentDevices {
-		if pd.PathOnHost == childDev.PathOnHost || pd.PathInContainer == childDev.PathInContainer {
+		parentHostPath := filepath.Clean(pd.PathOnHost)
+		if parentHostPath == childHostPath {
+			if isCgroupPermSubset(childDev.CgroupPermissions, pd.CgroupPermissions) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isCgroupPermSubset(childPerms, parentPerms string) bool {
+	if parentPerms == "" {
+		parentPerms = "rwm"
+	}
+	if childPerms == "" {
+		childPerms = "rwm"
+	}
+	for _, char := range childPerms {
+		if !strings.ContainsRune(parentPerms, char) {
+			return false
+		}
+	}
+	return true
+}
+
+func isParentMountReadOnly(parentMounts []container.Mount, childSource, childTarget string) bool {
+	childSourceClean := filepath.Clean(childSource)
+	childTargetClean := filepath.Clean(childTarget)
+
+	for _, pm := range parentMounts {
+		if !pm.ReadOnly {
+			continue
+		}
+		pSourceClean := filepath.Clean(pm.Source)
+		pTargetClean := filepath.Clean(pm.Target)
+
+		if pSourceClean != "." && isSubPathOrEqual(childSourceClean, pSourceClean) {
+			return true
+		}
+		if pTargetClean != "." && isSubPathOrEqual(childTargetClean, pTargetClean) {
 			return true
 		}
 	}
 	return false
 }
 
-func isParentMountReadOnly(parentMounts []container.Mount, target string) bool {
-	target = strings.TrimSuffix(target, "/")
-	for _, pm := range parentMounts {
-		pTarget := strings.TrimSuffix(pm.Target, "/")
-		if (target == pTarget || strings.HasPrefix(target, pTarget+"/")) && pm.ReadOnly {
-			return true
-		}
+func isSubPathOrEqual(childPath, parentPath string) bool {
+	if childPath == parentPath {
+		return true
 	}
-	return false
+	parentDir := parentPath
+	if !strings.HasSuffix(parentDir, string(filepath.Separator)) {
+		parentDir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(childPath, parentDir)
+}
+
+func isSecurityOptAllowed(parentOpts []string, childOpt string) bool {
+	optLower := strings.ToLower(strings.TrimSpace(childOpt))
+	if optLower == "no-new-privileges" || optLower == "no-new-privileges:true" || optLower == "no-new-privileges=true" {
+		return true
+	}
+	return hasSecurityOpt(parentOpts, childOpt)
 }
 
 func hasSecurityOpt(parentOpts []string, childOpt string) bool {

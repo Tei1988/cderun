@@ -159,7 +159,9 @@ func TestUnit_ControlSocket_InheritedCeilingPolicy(t *testing.T) {
 		Network:    "bridge",
 		Pid:        "",
 		IPC:        "",
-		Devices:    []container.DeviceMapping{{PathOnHost: "/dev/null", PathInContainer: "/dev/null"}},
+		Devices: []container.DeviceMapping{
+			{PathOnHost: "/dev/null", PathInContainer: "/dev/null", CgroupPermissions: "r"},
+		},
 		Mounts: []container.Mount{
 			{Type: "bind", Source: "/host/read-only-data", Target: "/data", ReadOnly: true},
 		},
@@ -183,12 +185,14 @@ func TestUnit_ControlSocket_InheritedCeilingPolicy(t *testing.T) {
 			Image:   "alpine:latest",
 			CapAdd:  []string{"SYS_PTRACE"},
 			Network: "bridge",
+			Devices: []container.DeviceMapping{{PathOnHost: "/dev/null", PathInContainer: "/dev/null", CgroupPermissions: "r"}},
 			Mounts: []container.Mount{
 				{Type: "bind", Source: "/host/read-only-data/sub", Target: "/data/sub", ReadOnly: true},
 			},
+			SecurityOpt: []string{"no-new-privileges:true"},
 		}
 		cid, err := client.CreateContainer(ctx, validChild)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, cid)
 	})
 
@@ -252,16 +256,26 @@ func TestUnit_ControlSocket_InheritedCeilingPolicy(t *testing.T) {
 		assert.Contains(t, err.Error(), "device \"/dev/fuse\" requested by nested container but not granted to parent")
 	})
 
-	t.Run("Writable mount escalation on read-only parent path rejected", func(t *testing.T) {
+	t.Run("Device permission escalation rejected", func(t *testing.T) {
+		child := &container.ContainerConfig{
+			Image:   "alpine:latest",
+			Devices: []container.DeviceMapping{{PathOnHost: "/dev/null", PathInContainer: "/dev/null", CgroupPermissions: "rwm"}},
+		}
+		_, err := client.CreateContainer(ctx, child)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "device \"/dev/null\" requested by nested container but not granted to parent")
+	})
+
+	t.Run("Writable mount escalation on read-only parent source path rejected", func(t *testing.T) {
 		child := &container.ContainerConfig{
 			Image: "alpine:latest",
 			Mounts: []container.Mount{
-				{Type: "bind", Source: "/host/read-only-data", Target: "/data", ReadOnly: false},
+				{Type: "bind", Source: "/host/read-only-data", Target: "/custom_target", ReadOnly: false},
 			},
 		}
 		_, err := client.CreateContainer(ctx, child)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "writable mount \"/data\" requested by nested container for read-only parent path")
+		assert.Contains(t, err.Error(), "writable mount requested by nested container for read-only parent source/target path")
 	})
 
 	t.Run("SecurityOpt unconfined escalation rejected", func(t *testing.T) {
