@@ -89,6 +89,7 @@ type Server struct {
 	wg             sync.WaitGroup
 	logger         *logging.Logger
 	dispatcher     ContainerRuntimeDispatcher
+	parentConfig   *container.ContainerConfig
 	ctx            context.Context
 	cancelCtx      context.CancelFunc
 	closeTimeout   time.Duration
@@ -141,6 +142,19 @@ func (s *Server) SetDispatcher(dispatcher ContainerRuntimeDispatcher) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.dispatcher = dispatcher
+}
+
+// SetParentConfig sets the parent container configuration used for inherited-ceiling privilege validation.
+func (s *Server) SetParentConfig(cfg *container.ContainerConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.parentConfig = cfg
+}
+
+func (s *Server) getParentConfig() *container.ContainerConfig {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.parentConfig
 }
 
 // ActiveHandlerCount returns the number of active or lingering RPC handlers.
@@ -504,6 +518,11 @@ func (s *Server) handleCreateContainer(ctx context.Context, cs *connState, paylo
 	handleRPCWithResult(s, ctx, cs, payload, "CreateContainer", func(ctx context.Context, d ContainerRuntimeDispatcher, args CreateContainerArgs) (CreateContainerResult, error) {
 		if args.Config == nil {
 			return CreateContainerResult{}, errors.New("CreateContainer args.Config is nil")
+		}
+		if parentCfg := s.getParentConfig(); parentCfg != nil {
+			if err := ValidateInheritedCeiling(parentCfg, args.Config); err != nil {
+				return CreateContainerResult{}, fmt.Errorf("security policy violation: %w", err)
+			}
 		}
 		containerID, err := d.CreateContainer(ctx, args.Config)
 		if err != nil {
