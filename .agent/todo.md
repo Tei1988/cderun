@@ -332,6 +332,11 @@ cderun --prune
 - **内容**: `internal/container/feature_container_config_serialization_test.go` と `internal/container/config_test.go` 間で `TestUnit_ContainerConfig_JSONSerialization`, `TestUnit_ContainerConfig_OmitemptyFields`, `TestUnit_ContainerConfig_YAMLSerialization` のテスト関数名が重複している問題の修正。
 - **対応**: `internal/container` パッケージのリファクタリングタスクでテスト関数名を一意にする。
 
+### `nerdctl` デフォルトソケットパスの不整合
+
+- **内容**: `internal/config/resolver.go` の `defaultSocketPathForEngine("nerdctl")` が `/var/run/docker.sock` を返すが、`nerdctl` は containerd ソケット（ルートフル環境におけるデフォルト: `/run/containerd/containerd.sock`）を想定しているため、ソケット未指定時に接続エラーになり得る。
+- **対応**: 次回のコード修正タスクにて `defaultSocketPathForEngine` に `case "nerdctl": return "/run/containerd/containerd.sock"` を追加し、対応するユニットテストを更新する。 (Recorded by Jules)
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する
