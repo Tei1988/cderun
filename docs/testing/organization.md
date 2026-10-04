@@ -80,12 +80,22 @@ AIエージェントや複数の開発者が並列で開発を進める際、巨
 2. **スコープを絞った新規テストファイルの作成と命名規約**
 
   - 新機能の追加、バグ修正、特定のテーマに対するテストの追加を行う際は、必ずスコープが明確な新しいテストファイルを作成してください。
-  - **テストファイル命名禁止語**: テストファイル名には、検証対象ではなく作業の性質を表す不透明な語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`）およびエージェント名（`jules` 等）を含めてはなりません。
+  - **テストファイル命名禁止語**: テストファイル名には、検証対象ではなく作業の性質を表す不透明な語（`improvement`, `expansion`, `refinement`, `comprehensive`, `additional`, `extra`, `more`, `deep`）および AI エージェント名（`jules` 等）を一切含めてはなりません。対象となる禁止単語の完全なリストは以下の通りです：
+    - `improvement`
+    - `expansion`
+    - `refinement`
+    - `comprehensive`
+    - `additional`
+    - `extra`
+    - `more`
+    - `deep`
+    - `jules`
+
   - 命名例:
 
-    - 新機能: `feature_shm_size_test.go`
-    - バグ修正: `bugfix_issue42_test.go`
-    - テーマ別: `resolver_robustness_test.go`, `command_scenario_boundaries_test.go`
+    - 新機能: `feature_shm_size_test.go`, `feature_container_config_edge_cases_test.go`
+    - バグ修正: `bugfix_issue42_test.go`, `bugfix_subcommand_nil_panic_test.go`
+    - テーマ別: `resolver_robustness_test.go`, `command_scenario_boundaries_test.go`, `feature_expression_resolution_advanced_test.go`
 
   - **Lint / CI ゲート (`make lint-test-names`)**:
     - リポジトリのルートには `./scripts/check-test-names.sh` および Makefile ターゲット `make lint-test-names`（`make lint` 内に組み込み済み）が用意されています。
