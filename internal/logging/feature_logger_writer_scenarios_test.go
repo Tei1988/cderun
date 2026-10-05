@@ -101,7 +101,7 @@ func TestUnit_Logger_SanitizeLogString_LoopAndBoundaryCases(t *testing.T) {
 
 	t.Run("8-byte chunk scanning boundary checks", func(t *testing.T) {
 		// Test control byte placed at positions 0..7 of an 8-byte chunk
-		for pos := 0; pos < 8; pos++ {
+		for pos := range 8 {
 			chunk := []byte("12345678")
 			chunk[pos] = 0x01 // Control byte
 			s := string(chunk)
