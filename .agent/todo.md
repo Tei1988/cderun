@@ -295,6 +295,13 @@ cderun --prune
 - 全ランタイムで cderun 製コンテナのみが対象になることのテストがある
 - 実行中コンテナがデフォルトで除外される
 
+## 発見された不整合・課題
+
+` デフォルトソケットパスの不整合
+
+- **内容**: `internal/config/resolver.go` の `defaultSocketPathForEngine("nerdctl")` が `/var/run/docker.sock` を返すが、`nerdctl` は containerd ソケット（ルートフル環境におけるデフォルト: `/run/containerd/containerd.sock`）を想定しているため、ソケット未指定時に接続エラーになり得る。
+- **対応**: 次回のコード修正タスクにて `defaultSocketPathForEngine` に `case "nerdctl": return "/run/containerd/containerd.sock"` を追加し、対応するユニットテストを更新する。 (Recorded by Jules)
+
 ---
 
 ## T50: pull ポリシーの未知値が `always` として動作する

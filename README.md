@@ -2,9 +2,9 @@
 
 ## Concept
 
-> "All you need on your local machine is Docker, Podman, or containerd."
+> "All you need on your local machine is Docker, Podman, containerd, or nerdctl."
 > `cderun` generates ephemeral containers for commands like `node`, `python`,
-> or `git` on demand using container runtimes (Docker/Podman/containerd). It keeps your
+> or `git` on demand using container runtimes (Docker/Podman/containerd/nerdctl). It keeps your
 > host clean and ensures reproducible environments defined in a single YAML file.
 
 ```text
@@ -291,7 +291,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--engine`: Container engine to use (`docker`/`podman`/`containerd`). (Note: `--runtime` is supported as a deprecated alias)
+- `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`). (Note: `--runtime` is supported as a deprecated alias)
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -467,7 +467,7 @@ Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variabl
 
 - `CDERUN_CONFIG`: Path to `cderun` configuration file (`.cderun.yaml`).
 - `CDERUN_TOOL_CONFIG`: Path to tools configuration file (`.tools.yaml`).
-- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`).
+- `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
 - `CDERUN_RUNTIME`: Deprecated fallback alias for `CDERUN_ENGINE`.
 - `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 - `CDERUN_SOCKET_PATH`: Path to the container runtime socket on the host.
