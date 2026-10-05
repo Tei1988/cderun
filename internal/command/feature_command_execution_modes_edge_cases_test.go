@@ -25,10 +25,11 @@ func TestUnit_PreprocessArgs_WrapperMode_SpaceAndEqualHoisting(t *testing.T) {
 		expectedPasst []string
 	}{
 		{
-			name: "interleaved space and equal separated p1 flags",
+			name: "interleaved space and equal separated p1 flags placed after subcommand",
 			input: []string{
-				"--cderun-image", "ubuntu:22.04",
+				"cderun",
 				"git",
+				"--cderun-image", "ubuntu:22.04",
 				"commit",
 				"--cderun-env=FOO=BAR",
 				"-m", "feat: initial commit",
@@ -36,9 +37,9 @@ func TestUnit_PreprocessArgs_WrapperMode_SpaceAndEqualHoisting(t *testing.T) {
 			},
 			expectedPasst: []string{
 				"cderun",
+				"--cderun-image", "ubuntu:22.04",
 				"--cderun-env=FOO=BAR",
 				"--cderun-workdir", "/workspace",
-				"--cderun-image", "ubuntu:22.04",
 				"git",
 				"commit",
 				"-m", "feat: initial commit",
@@ -47,6 +48,7 @@ func TestUnit_PreprocessArgs_WrapperMode_SpaceAndEqualHoisting(t *testing.T) {
 		{
 			name: "p1 flags after double dash delimiter are still hoisted per T81",
 			input: []string{
+				"cderun",
 				"git",
 				"--",
 				"--cderun-image=alpine:latest",
@@ -65,8 +67,9 @@ func TestUnit_PreprocessArgs_WrapperMode_SpaceAndEqualHoisting(t *testing.T) {
 		{
 			name: "flag taking no value in space form followed by subcommand",
 			input: []string{
-				"--cderun-dry-run",
+				"cderun",
 				"python3",
+				"--cderun-dry-run",
 				"script.py",
 			},
 			expectedPasst: []string{
@@ -90,6 +93,9 @@ func TestUnit_PreprocessArgs_WrapperMode_SpaceAndEqualHoisting(t *testing.T) {
 	}
 }
 
+// Specification Reference: docs/features/argument-parsing.md
+// Section: "Symlink Mode & Polyglot Entry Point" -> Two-step argument rewriting process
+// (Executable Name Extraction & Conditional Rewriting)
 func TestUnit_PreprocessArgs_SymlinkMode_TargetResolutionBoundary(t *testing.T) {
 	tmpDir := t.TempDir()
 
