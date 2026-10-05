@@ -33,6 +33,9 @@ func TestMaskSensitiveEnv(t *testing.T) {
 		{"Substring pattern exact", "SOME_SECRET_KEY_SOME", "pass", []string{"*_SECRET_*"}, "[REDACTED]"},
 		{"Non-ASCII pattern fallback", "SECRET", "pass", []string{"SEC★"}, "pass"},
 		{"Unicode key matching patterns", "SEC★RET", "pass", []string{"SEC★RET"}, "[REDACTED]"},
+		{"Explicit pattern match", "API_KEY_PASSWORD", "secret", []string{"*PASSWORD*"}, "[REDACTED]"},
+		{"Mask all by default (nil)", "OAuthToken", "token", nil, "[REDACTED]"},
+		{"Mask none with empty patterns", "OAuthToken", "token", []string{}, "token"},
 	}
 
 	for _, tt := range tests {
@@ -71,6 +74,10 @@ func TestMaskSensitiveEnvList(t *testing.T) {
 		assert.Equal(t, env, got)
 		// Check that the underlying slice is exactly the same
 		assert.Same(t, &env[0], &got[0])
+	})
+
+	t.Run("Nil slice input", func(t *testing.T) {
+		assert.Nil(t, MaskSensitiveEnvList(nil, nil))
 	})
 
 	// Verify non-destructive behavior
