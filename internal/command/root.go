@@ -1625,7 +1625,11 @@ func preprocessArgs(cmd *cobra.Command, args []string) ([]string, error) {
 		return nil, err
 	}
 
-	processedArgs := make([]string, 0, len(args)+1)
+	totalCap := len(args)
+	if isPolyglot {
+		totalCap++
+	}
+	processedArgs := make([]string, 0, totalCap)
 	if isPolyglot {
 		processedArgs = append(processedArgs, "cderun")
 	} else {
