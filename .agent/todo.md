@@ -297,42 +297,7 @@ cderun --prune
 
 ## 発見された不整合・課題
 
-### `registry.go` の `sensitive-env` 説明文の不整合
-
-- **内容**: `internal/config/registry.go` の `sensitive-env` オプションの `Usage` フィールドが `"default uses automatic keywords"` となっているが、現在の実際の実装（および他のドキュメント）では「未指定時はすべての環境変数をマスクする (Mask-all)」挙動となっている。
-- **対応**: `--help` 等で表示されるメッセージの正確性を期すため、`registry.go` の説明文を `"default masks all variables"` 等に更新することを推奨。 (Recorded by Jules)
-
-### `registry.go` の `runtime` 説明文の不整合
-
-- **内容**: `internal/config/registry.go` の `runtime` オプションの `Usage` フィールドが `"Container runtime to use (docker/podman)"` となっているが、現在は `containerd` もサポートされている。
-- **対応**: `Usage` 文字列を `"Container runtime to use (docker/podman/containerd)"` に更新することを推奨。 (Recorded by Jules)
-
-### 記憶 (Memory) と実装の乖離：環境変数マスキング
-
-- **内容**: プロジェクトの記憶（Memory）では、`internal/config/masking.go` において `sensitiveKeywords` や `maxKeywordLen` を使用したキーワードベースの高度なマスキングが実装・最適化されているとあるが、実際のコード（およびベンチマーク）では `sensitive-env` が未指定（nil）の場合に一律で `[REDACTED]` を返す「Secure by Default (Mask-all)」が実装されている。
-- **対応**: 今回のドキュメント更新では「実際の実装（Mask-all）」に合わせてドキュメントを修正した。キーワードベースのマスキングを復活・導入する場合は、別途実装タスクが必要。
-
-### Documentation Update Task: T94 (`--oci-runtime` / `--cderun-oci-runtime`)
-
-- **内容**: T94の実装（`--oci-runtime`, `--cderun-oci-runtime`, `CDERUN_OCI_RUNTIME`, `.cderun.yaml` の `defaults.ociRuntime`）の仕様説明をドキュメントに追加する。
-- **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
-
-### Documentation Update Task: T100 Test Naming Policy & Rules
-
-- **内容**: T100 のテストファイル命名規則（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` および命名例）を `docs/testing/organization.md` に追記する。
-- **対応ドキュメント**: `docs/testing/organization.md`
-
-### Documentation Update Task: T93 (`--engine` / `--cderun-engine`)
-
-- **内容**: T93 の実装（`--engine`, `--cderun-engine`, `CDERUN_ENGINE`, `.cderun.yaml` の `engine:`、および `--runtime` の非推奨エイリアス化と警告ログ）の仕様説明をドキュメントに追加する。
-- **対応ドキュメント**: `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`, `README.md`, `USAGE.md`
-
-### テスト関数の重複宣言: `internal/container`
-
-- **内容**: `internal/container/feature_container_config_serialization_test.go` と `internal/container/config_test.go` 間で `TestUnit_ContainerConfig_JSONSerialization`, `TestUnit_ContainerConfig_OmitemptyFields`, `TestUnit_ContainerConfig_YAMLSerialization` のテスト関数名が重複している問題の修正。
-- **対応**: `internal/container` パッケージのリファクタリングタスクでテスト関数名を一意にする。
-
-### `nerdctl` デフォルトソケットパスの不整合
+` デフォルトソケットパスの不整合
 
 - **内容**: `internal/config/resolver.go` の `defaultSocketPathForEngine("nerdctl")` が `/var/run/docker.sock` を返すが、`nerdctl` は containerd ソケット（ルートフル環境におけるデフォルト: `/run/containerd/containerd.sock`）を想定しているため、ソケット未指定時に接続エラーになり得る。
 - **対応**: 次回のコード修正タスクにて `defaultSocketPathForEngine` に `case "nerdctl": return "/run/containerd/containerd.sock"` を追加し、対応するユニットテストを更新する。 (Recorded by Jules)
