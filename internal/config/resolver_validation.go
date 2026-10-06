@@ -568,7 +568,9 @@ func (rv *resolver) validateMountSocketPathRaw() error {
 		raw = cliValStr
 	} else {
 		if rv.fs != nil {
-			if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
+			if env := rv.fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH"); env != "" {
+				raw = env
+			} else if env := rv.fs.Getenv("CDERUN_MOUNT_SOCKET_PATH"); env != "" {
 				raw = env
 			}
 		}

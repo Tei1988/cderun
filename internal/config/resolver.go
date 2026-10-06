@@ -250,6 +250,11 @@ func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val
 	if p2Set {
 		return p2Val != ""
 	}
+	if envKey == "CDERUN_MOUNT_SOCKET_PATH" {
+		if env := rv.fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH"); env != "" {
+			return true
+		}
+	}
 	if envKey != "" {
 		if env := rv.fs.Getenv(envKey); env != "" {
 			return true
@@ -302,6 +307,8 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		raw = overrideValStr
 	} else if cliSet {
 		raw = cliValStr
+	} else if envKey == "CDERUN_MOUNT_SOCKET_PATH" && rv.fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH") != "" {
+		raw = rv.fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH")
 	} else if env := rv.fs.Getenv(envKey); env != "" {
 		raw = env
 	} else {
@@ -1144,6 +1151,8 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 		cp = ConfigPath{Raw: p1Val, BaseDir: baseDir}
 	} else if cliSet {
 		cp = ConfigPath{Raw: cliVal, BaseDir: baseDir}
+	} else if envKey == "CDERUN_MOUNT_SOCKET_PATH" && fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH") != "" {
+		cp = ConfigPath{Raw: fs.Getenv("CDERUN_MOUNT_CDERUN_SOCKET_PATH"), BaseDir: baseDir}
 	} else if env := fs.Getenv(envKey); env != "" {
 		cp = ConfigPath{Raw: env, BaseDir: baseDir}
 	} else {
