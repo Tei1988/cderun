@@ -159,16 +159,32 @@ cderun node app.js --cderun-image node:20-alpine
 cderun --cderun-image node:20-alpine node app.js
 ```
 
-#### Detailed Explanation of the Configuration Priority
+#### Detailed Explanation of the Configuration Priority Hierarchy
 
-The P1–P6 priority layers allow highly flexible execution setups.
+The P1–P6 priority layers form a deterministic evaluation cascade that allows highly flexible execution setups while guaranteeing explicit user control.
 
-- **P1 (Internal Overrides)**: Allows the caller to force-override any option dynamically, regardless of what has been configured globally or tool-wise. These flags are intercepted before subcommand execution.
-- **P2 (CLI Flags)**: Represents regular options provided to `cderun` before the subcommand.
-- **P3 (Env Vars)**: Enables environment-based configuration overrides on the host. List values are comma-separated or semicolon-separated (such as `CDERUN_ENV`).
-- **P4 (Tool Config)**: Defined inside `.tools.yaml` for specific subcommands. This is where you configure tool-specific Docker images, mounts, and default working directories.
-- **P5 (Global Config)**: Defined inside `.cderun.yaml` and contains global defaults like fallback container runtime or log level.
-- **P6 (Defaults)**: Hardcoded settings within the binary itself, ensuring safe execution even without configuration files.
+```text
+ ┌───────────────────────────────────────────────────────────┐
+ │ P1: CDERUN Internal Overrides (--cderun-*)               │ (Highest Priority)
+ ├───────────────────────────────────────────────────────────┤
+ │ P2: CLI Flags (standard flags before subcommand)         │
+ ├───────────────────────────────────────────────────────────┤
+ │ P3: Environment Variables (CDERUN_*)                     │
+ ├───────────────────────────────────────────────────────────┤
+ │ P4: Tool Config (.tools.yaml entry for subcommand)       │
+ ├───────────────────────────────────────────────────────────┤
+ │ P5: Global Config (.cderun.yaml defaults)                │
+ ├───────────────────────────────────────────────────────────┤
+ │ P6: Binary Hardcoded Defaults                            │ (Lowest Priority)
+ └───────────────────────────────────────────────────────────┘
+```
+
+- **P1 (Internal Overrides)**: Allows the caller to force-override any option dynamically, regardless of what has been configured globally or tool-wise. These flags are intercepted during argument preprocessing and hoisted before Cobra parsing.
+- **P2 (CLI Flags)**: Represents standard options provided to `cderun` before the subcommand (e.g., `cderun --tty node app.js`).
+- **P3 (Env Vars)**: Enables environment-based configuration overrides on the host (e.g., `CDERUN_ENGINE`, `CDERUN_ENV`). List values use specific separators (semicolon for `CDERUN_ENV`/`CDERUN_MOUNT`, comma for all others).
+- **P4 (Tool Config)**: Defined inside `.tools.yaml` for specific subcommands. This is where you configure tool-specific container images, mounts, working directories, and environment variables.
+- **P5 (Global Config)**: Defined inside `.cderun.yaml` and contains global defaults such as container engine selection (`engine`), socket paths, and logging levels.
+- **P6 (Defaults)**: Hardcoded fallback settings compiled into the `cderun` binary, ensuring deterministic execution even without configuration files.
 
 #### Detailed Hoisting Mechanics
 
@@ -333,6 +349,14 @@ Expressions can be used to inject host-context or dynamic values into options li
   - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`). Supports fallbacks using `{{file:path:-default}}` when missing, stat/read error, or empty.
   - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`). Supports fallbacks using `{{find_dir:name:-default}}` when missing.
   - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
+
+#### Expression Directive Fallback Mechanics (`:-default`)
+
+All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` syntax for resilient fallback handling:
+
+- **Fallback Evaluation**: When `file:` cannot locate or read a file (or if the file is empty), `find_dir:` cannot find the target name, or `env:` finds an unset/empty variable, the expression engine evaluates the fallback default value.
+- **Nested Expressions**: Fallbacks can contain nested expressions, evaluated inside-out (e.g., `{{find_dir:master:-{{PWD}}}}` or `{{env:TAG:-{{file:.version:-1.0.0}}}}`).
+- **Sticky Error Isolation**: Resolving to a valid fallback string avoids dirtying the resolver's sticky error state, allowing execution to proceed safely.
 
 #### Detailed Value Resolution and Escaping Mechanics
 
