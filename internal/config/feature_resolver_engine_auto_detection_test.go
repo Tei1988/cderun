@@ -19,7 +19,7 @@ func TestUnit_Resolver_EngineAndSocketInvariants(t *testing.T) {
 		assert.Equal(t, "/run/podman/podman.sock", defaultSocketPathForEngine("podman"))
 		assert.Equal(t, "/run/containerd/containerd.sock", defaultSocketPathForEngine("containerd"))
 		assert.Equal(t, "/var/run/docker.sock", defaultSocketPathForEngine("docker"))
-		assert.Equal(t, "/var/run/docker.sock", defaultSocketPathForEngine("nerdctl"))
+		assert.Equal(t, "/run/containerd/containerd.sock", defaultSocketPathForEngine("nerdctl"))
 	})
 
 	t.Run("AutoDetectEngineFromMockFS", func(t *testing.T) {
