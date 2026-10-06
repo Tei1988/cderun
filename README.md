@@ -354,7 +354,7 @@ Expressions can be used to inject host-context or dynamic values into options li
 
 All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` syntax for resilient fallback handling:
 
-- **Fallback Evaluation**: When `file:` cannot locate or read a file (or if the file is empty), `find_dir:` cannot find the target name, or `env:` finds an unset/empty variable, the expression engine evaluates the fallback default value.
+- **Fallback Evaluation**: When `file:` cannot locate or read a file (or if the file is empty), `find_dir:` cannot find the target name, or `env:` finds an unset/empty variable, the expression engine evaluates the fallback default value. Note that if a file exceeds `MaxDirectiveFileSize` (1MB), `file:` triggers an immediate size limit error instead of evaluating the fallback.
 - **Nested Expressions**: Fallbacks can contain nested expressions, evaluated inside-out (e.g., `{{find_dir:master:-{{PWD}}}}` or `{{env:TAG:-{{file:.version:-1.0.0}}}}`).
 - **Sticky Error Isolation**: Resolving to a valid fallback string avoids dirtying the resolver's sticky error state, allowing execution to proceed safely.
 
