@@ -32,26 +32,36 @@
   - **Linux Capabilities**: Custom capability controls (`--cap-add` and `--cap-drop`) are supported.
   - **ENTRYPOINT Inheritance**: Automatically prepends the image's defined `ENTRYPOINT` when executing command overrides, matching standard Docker behavior.
 
+### 4. nerdctl (CLI-Based Engine)
+
+- **Status**: Production-ready when configured with a containerd socket. Without an explicit socket, the resolver passes `/var/run/docker.sock` to nerdctl as `--address`.
+- **Communication Protocol**: Interacts via the `nerdctl` CLI binary (`exec.Command`), executing subcommands like `nerdctl container create`, `start`, `wait`, `rm`, `attach`, `kill`, and `inspect`.
+- **Argument Injection Defense Architecture (CWE-88)**:
+  CLI-based execution presents argument injection risks if user or nested parameters (such as `Image`, `Command`, or `Env`) contain flag-like strings (e.g., `--privileged`). `nerdctl` adapter implements a 3-layer security defense via `CLIArgBuilder`:
+  1. **Positional Boundary Separation**: Inserts `--` before the trailing positional block (`<image> <cmd> <args...>`), ensuring the underlying CLI parser (Cobra/pflag) interprets them as literal arguments.
+  2. **Joined `--flag=value` Formatting**: Formats flag key-value pairs (e.g., `--env=KEY=VALUE`) as single joined tokens to prevent parameter splitting.
+  3. **Structural `argv` Self-Checking**: Performs structural validation (`VerifyStructure`) on built `argv` prior to execution for `PullImage` and `CreateContainer` operations only, verifying that positional arguments follow `--` and each preceding flag token begins with `-`.
+
 ---
 
 ## Runtime Capability Comparison Matrix
 
-| Feature / Capability | Docker | Podman | containerd (Direct gRPC) |
-| :--- | :---: | :---: | :---: |
-| **Supported OS** | Linux, macOS, Windows | Linux, macOS, Windows | **Linux-only** (`//go:build linux`) |
-| **Communication Protocol** | HTTP Unix socket | HTTP Unix socket | gRPC Unix socket |
-| **Bridge Networking** | Yes | Yes | No (Host network only) |
-| **Port Publishing (`-p`, `-P`)** | Yes | Yes | No |
-| **Custom DNS & Add-Host** | Yes | Yes | No |
-| **Bind & tmpfs Mounts** | Yes | Yes | Yes |
-| **Named Volume Mounts** | Yes | Yes | No |
-| **Linux Capabilities (`--cap-add/drop`)** | Yes | Yes | Yes (Converted to `CAP_` prefix) |
-| **Custom OCI Runtime (`--oci-runtime`)** | Yes | Yes | No |
-| **Process Resource Limits (ulimits)** | Yes | Yes | Yes (Converted to POSIX rlimits) |
-| **Read-Only RootFS** | Yes | Yes | Yes |
-| **Host PID / IPC / Cgroup Namespaces** | Yes | Yes | Yes (Host or Private) |
-| **Init Process (`--init`)** | Yes | Yes | No |
-| **Restart Policies (`--restart`)** | Yes | Yes | No |
+| Feature / Capability | Docker | Podman | containerd (Direct gRPC) | nerdctl (CLI-Based) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Supported OS** | Linux, macOS, Windows | Linux, macOS, Windows | **Linux-only** (`//go:build linux`) | **Linux-only** |
+| **Communication Protocol** | HTTP Unix socket | HTTP Unix socket | gRPC Unix socket | CLI Subprocess (`nerdctl`) |
+| **Bridge Networking** | Yes | Yes | No (Host network only) | Yes |
+| **Port Publishing (`-p`, `-P`)** | Yes | Yes | No | Yes |
+| **Custom DNS & Add-Host** | Yes | Yes | No | Yes |
+| **Bind & tmpfs Mounts** | Yes | Yes | Yes | Yes |
+| **Named Volume Mounts** | Yes | Yes | No | Yes |
+| **Linux Capabilities (`--cap-add/drop`)** | Yes | Yes | Yes (Converted to `CAP_` prefix) | Yes |
+| **Custom OCI Runtime (`--oci-runtime`)** | Yes | Yes | No | Yes |
+| **Process Resource Limits (ulimits)** | Yes | Yes | Yes (Converted to POSIX rlimits) | Yes |
+| **Read-Only RootFS** | Yes | Yes | Yes | Yes |
+| **Host PID / IPC / Cgroup Namespaces** | Yes | Yes | Yes (Host or Private) | Yes |
+| **Init Process (`--init`)** | Yes | Yes | No | Yes |
+| **Restart Policies (`--restart`)** | Yes | Yes | No | Yes |
 
 ---
 
@@ -60,12 +70,12 @@
 The engine abstraction uses a unified Go interface:
 
 ```text
-               ContainerRuntime Interface
-                           │
-        ┌──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼
-  DockerRuntime       PodmanRuntime    ContainerdRuntime
-  (HTTP Unix socket)  (HTTP Unix socket) (gRPC socket)
+                           ContainerRuntime Interface
+                                       │
+        ┌──────────────────┬───────────┴──────┬──────────────────┐
+        ▼                  ▼                  ▼                  ▼
+  DockerRuntime       PodmanRuntime    ContainerdRuntime   NerdctlRuntime
+  (HTTP Unix socket)  (HTTP Unix socket) (gRPC socket)     (CLI subprocess)
 ```
 
 ### Interface Responsibilities
@@ -90,6 +100,7 @@ The supported runtime engines are:
 - `docker`: Standard Docker Engine daemon (default)
 - `podman`: Podman local service API
 - `containerd`: Direct containerd gRPC service (Linux only)
+- `nerdctl`: `nerdctl` CLI-based container engine
 
 ### Configuration Mappings
 

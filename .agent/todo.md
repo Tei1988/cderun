@@ -297,10 +297,14 @@ cderun --prune
 
 ## 発見された不整合・課題
 
+- **内容**: `internal/config/resolver.go` の `defaultSocketPathForEngine("nerdctl")` が `/var/run/docker.sock` を返すが、`nerdctl` は containerd ソケット（ルートフル環境におけるデフォルト: `/run/containerd/containerd.sock`）を想定しているため、ソケット未指定時に接続エラーになり得る。
+- **対応**: 次回のコード修正タスクにて `defaultSocketPathForEngine` に `case "nerdctl": return "/run/containerd/containerd.sock"` を追加し、対応するユニットテストを更新する。 (Recorded by Jules)
+
 ### Documentation Update Task: T91 (Nested Execution Control Socket — Phase 5)
 
 - **内容**: T91 の実装（Control Socket 経由での containerd API ディスパッチ、親コンテナ権限を上限とする inherited-ceiling セキュリティポリシーの仕様、および macOS VM 環境でのソケット権限非依存動作の検証結果）の仕様説明を `docs/features/nested-execution-control-socket.md` に追記する。
 - **対応ドキュメント**: `docs/features/nested-execution-control-socket.md`
+` デフォルトソケットパスの不整合
 
 ---
 
