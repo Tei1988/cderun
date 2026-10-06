@@ -364,3 +364,21 @@ func TestUnit_Config_RestartPolicy_Validation(t *testing.T) {
 		assert.Contains(t, err.Error(), "the --restart policy cannot be used when --remove is enabled")
 	})
 }
+
+func TestUnit_Config_MountSocketPath_EnvPrecedence(t *testing.T) {
+	mfs := &MockFileSystem{
+		WD: "/workspace",
+		Env: map[string]string{
+			"CDERUN_MOUNT_CDERUN_SOCKET_PATH": "/run/override/docker.sock",
+			"CDERUN_MOUNT_SOCKET_PATH":        "/run/standard/docker.sock",
+		},
+	}
+
+	cli := &CLIOptions{
+		Image: ptr("alpine"),
+	}
+
+	res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+	require.NoError(t, err)
+	assert.Equal(t, "/run/override/docker.sock", res.MountSocketPath)
+}
