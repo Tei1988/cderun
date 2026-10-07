@@ -879,7 +879,7 @@ func defaultSocketPathForEngine(engine string) string {
 	switch engine {
 	case "podman":
 		return "/run/podman/podman.sock"
-	case "containerd":
+	case "containerd", "nerdctl":
 		return "/run/containerd/containerd.sock"
 	default:
 		return "/var/run/docker.sock"
