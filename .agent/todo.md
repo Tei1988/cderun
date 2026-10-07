@@ -10,6 +10,11 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - 各タスクは自己完結している。原則 1 タスク = 1 PR とし、「完了条件」をすべて満たすこと
 - 記録のファイルパス・行番号は T01〜T39 が 2026-06-04 時点、T40〜T67 が 2026-07-03 時点（2026-07-06 の main マージ後に再検証済み）、T68 以降が 2026-07-06 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
 
+## Documentation Update Tasks (Pending)
+
+- [ ] Update `docs/features/value-resolution.md` to document `{{file:NAME:-DEFAULT}}` and `{{find_dir:NAME:-DEFAULT}}` fallback syntax, details on fallback triggers (missing file/marker, empty file content), and security parameter validation invariants.
+- [ ] Update `README.md` under "Value Resolution & Expression Engine" to include `:-default` fallback syntax examples for `file:` and `find_dir:` directives.
+
 ## タスク一覧（サマリ）
 
 | ID | タイトル | 種別 | 優先度 | 規模 | 仕様変更 | ステータス |
@@ -510,7 +515,7 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 - **構築技法**（2つ）:
   1. image/command/argsのような末尾の位置引数群の直前に`--`を挿入する（`kubectl exec POD -- CMD ARGS...`と同じパターン。cobra/pflagの標準機能）
   2. env/labelなどフラグの値として渡すものは`--flag=value`の結合形にし、2トークンに分けない
-- **主たる検証**: 実行直前に、構築したargvの`--`より前の部分が、cderunが意図した固定パターンと**完全一致**しているかを自己チェックする。これは構築技法が正しく適用されたことを信じるのではなく、結果そのものを検証するもので、`--`の挿入忘れや結合形の実装ミスなど、構築技法側のあらゆる実装ミスを一括で検知できる。一致しなければ実行せず明示エラーとする。
+- **主たる検証**: 実行直前に、構築したargvの`--`より前の部分が、cderunが意図した固定パターンと**完全一致**しているかを自己チェックする。これは構築技法が正しく適用されたことを信じるのではなく、結果そのものを検証するもので、`--`の挿入忘れや結合形の実装ミスなど、構築技法側のあらゆる実装ミスを一括で検知できる。一致しなければ実行せず明示エラーとする formulation。
 - **重要な限界**: 上記の自己チェックは「cderunが意図通りargvを組み立てたか」は保証するが、「nerdctlが実際に`--`以降を位置引数として扱うか」は別問題である。`--`が「以降は一切フラグ解析しない」という意味を持つかどうかは**nerdctl内部が使っている引数解析ライブラリ（cobra/pflag）の実装依存**であり、OS/POSIXレベルの普遍的な保証ではない。nerdctlはkubectl/docker CLIと同じcobra/pflag基盤なので信頼性は高いが、これは**nerdctl固有の話**であり、将来別のCLI（Apple containerの`ArgumentParser`ベースCLIやwslc.exe等）に一般化してはならない。
 - したがって、**nerdctl実バイナリに対する敵対的テスト**（`--privileged`や`--mount=...`をimage/command/args/env等の各フィールドに仕込み、実際に無害化されることを実プロセスの起動結果で確認する）を必須の完了条件とする。cderun自身の構築ロジックの単体テストだけでは不十分。
 - 3層すべて（構築技法2つ＋自己チェック）を1つの共有ヘルパーとして実装し、将来の別CLIアダプタでも再利用できるようにする（ただし敵対的テストは新しいアダプタごとに必ずゼロからやり直す）。
@@ -583,7 +588,7 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 - 仕様 2 の発火条件どおりに分岐する（フォールバックするケース / せずにエラーになるケースの双方にテストがある）。
 - ネストした DEFAULT（`{{find_dir:master:-{{PWD}}}}`）のテストがある。
 - フォールバック成立時に Sticky Error が汚れないことのテストがある。
-- `docs/features/value-resolution.md` および `README.md` の Value Resolution & Expression Engine セクションが更新されている。
+- Documentation Update Tasks が `.agent/todo.md` に追加されている（※本セッションではドキュメントを直接編集せずタスクとして記録）。
 - `make build` / `make test` / `make lint-go` / `make lint-md` がパスする。
 
 ### 対象ファイル
@@ -676,7 +681,7 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 - 種別: 破壊的変更
 - 優先度: 中
 - 規模: 小
-- 前提: **T93・T94 の完了、および T93 の deprecation 期間（1 リリース）の経過**
+- 前提: **T93・T94 の完了、および T93 の deprecation 期間（1 リリリース）の経過**
 - 仕様変更: あり → `docs/features/command-line-options.md`, `docs/features/multi-runtime-support.md`
 
 ### 背景
