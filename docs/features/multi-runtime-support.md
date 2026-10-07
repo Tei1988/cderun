@@ -34,7 +34,7 @@
 
 ### 4. nerdctl (CLI-Based Engine)
 
-- **Status**: Production-ready when configured with a containerd socket. Without an explicit socket, the resolver passes `/var/run/docker.sock` to nerdctl as `--address`.
+- **Status**: Production-ready when configured with a containerd socket. Without an explicit socket, the resolver passes `/run/containerd/containerd.sock` to nerdctl as `--address`.
 - **Communication Protocol**: Interacts via the `nerdctl` CLI binary (`exec.Command`), executing subcommands like `nerdctl container create`, `start`, `wait`, `rm`, `attach`, `kill`, and `inspect`.
 - **Argument Injection Defense Architecture (CWE-88)**:
   CLI-based execution presents argument injection risks if user or nested parameters (such as `Image`, `Command`, or `Env`) contain flag-like strings (e.g., `--privileged`). `nerdctl` adapter implements a 3-layer security defense via `CLIArgBuilder`:
