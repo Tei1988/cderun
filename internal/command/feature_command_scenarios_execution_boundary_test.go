@@ -132,7 +132,7 @@ func TestUnit_ContainerConfigBuilder_NullByteAndSliceIsolation(t *testing.T) {
 	t.Run("null byte detection in subcommand name", func(t *testing.T) {
 		passthroughArgs := []string{"git\x00", "status"}
 		cmdSlice, err := assembleContainerCommand(passthroughArgs)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, cmdSlice)
 		assert.Contains(t, err.Error(), "null byte")
 	})
@@ -223,6 +223,6 @@ func TestUnit_Execute_RuntimeFactoryError_Handling(t *testing.T) {
 	assert.Contains(t, err.Error(), "podman socket not found")
 
 	var exitErr *ExitCodeError
-	require.True(t, errors.As(err, &exitErr))
+	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 125, exitErr.Code)
 }
