@@ -178,8 +178,21 @@ type resolver struct {
 	fs         FileSystem
 	r          *ExpressionResolver
 	res        *ResolvedConfig
+	pwd        string
 	cliVal     reflect.Value
 	resVal     reflect.Value
+}
+
+func (rv *resolver) getWd() (string, error) {
+	if rv.pwd != "" {
+		return rv.pwd, nil
+	}
+	wd, err := rv.fs.Getwd()
+	if err != nil {
+		return "", err
+	}
+	rv.pwd = wd
+	return rv.pwd, nil
 }
 
 func (rv *resolver) getCliVal() reflect.Value {
@@ -396,7 +409,8 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		logging.Trace("Resolving configurations for tool: %s", subcommand)
 	}
 
-	if _, err := fs.Getwd(); err != nil {
+	wd, err := fs.Getwd()
+	if err != nil {
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
@@ -409,6 +423,7 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		tools:      tools,
 		global:     global,
 		fs:         fs,
+		pwd:        wd,
 		r:          nil, // Lazily initialized
 		res:        res,
 	}
@@ -625,6 +640,10 @@ func (rv *resolver) resolveComplexOptions() error {
 }
 
 func (rv *resolver) resolveMountOptions() error {
+	wd, err := rv.getWd()
+	if err != nil {
+		return err
+	}
 	mcs, err := pickConfigs(
 		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
 		toolMountsGetter,
@@ -641,11 +660,7 @@ func (rv *resolver) resolveMountOptions() error {
 					return MountConfig{}, fmt.Errorf("invalid mount config: %w", err)
 				}
 			}
-			baseDir, err := rv.fs.Getwd()
-			if err != nil {
-				return MountConfig{}, err
-			}
-			parsed.SetBaseDir(baseDir)
+			parsed.SetBaseDir(wd)
 			return parsed, nil
 		},
 		rv.fs,
@@ -1187,6 +1202,10 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 }
 
 func (rv *resolver) resolveDeviceOptions() error {
+	wd, err := rv.getWd()
+	if err != nil {
+		return err
+	}
 	dcs, err := pickConfigs(
 		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
 		toolDevicesGetter,
@@ -1203,11 +1222,7 @@ func (rv *resolver) resolveDeviceOptions() error {
 					return DeviceConfig{}, fmt.Errorf("invalid device config: %q", s)
 				}
 			}
-			baseDir, err := rv.fs.Getwd()
-			if err != nil {
-				return DeviceConfig{}, err
-			}
-			parsed.SetBaseDir(baseDir)
+			parsed.SetBaseDir(wd)
 			return parsed, nil
 		},
 		rv.fs,

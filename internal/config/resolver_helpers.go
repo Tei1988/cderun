@@ -291,7 +291,7 @@ func pickStringConfigs(
 				if s != "" {
 					return []string{s}, nil
 				}
-				return []string{}, nil
+				return nil, nil
 			}
 			remaining := env
 			var res []string
@@ -317,7 +317,7 @@ func pickStringConfigs(
 				}
 			}
 			if res == nil {
-				return []string{}, nil
+				return nil, nil
 			}
 			return res, nil
 		}
@@ -379,7 +379,7 @@ func pickConfigs[T any](
 					}
 					res = []T{v}
 				} else {
-					res = []T{}
+					res = nil
 				}
 			} else {
 				remaining := env
@@ -409,7 +409,7 @@ func pickConfigs[T any](
 					}
 				}
 				if res == nil {
-					res = []T{}
+					res = nil
 				}
 			}
 			return res, nil

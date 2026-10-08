@@ -58,8 +58,8 @@ func resolveOptionFieldInfo(name string, info optionFields) (optionFields, error
 }
 
 func isDriftOk(name string, info optionFields) bool {
-	if !inTest && info.p1ValIdx != -1 && info.p2ValIdx != -1 {
-		return true
+	if !inTest {
+		return info.p1ValIdx != -1 && info.p2ValIdx != -1
 	}
 	expected, okExpected := expectedFieldIndices[name]
 	if !okExpected || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {

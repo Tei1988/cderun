@@ -262,7 +262,7 @@ func resolveStringSliceCommaOpt(
 	if p1Set {
 		if p1Val == "" {
 			vals = []string{}
-		} else if !strings.Contains(p1Val, ",") {
+		} else if strings.IndexByte(p1Val, ',') == -1 {
 			vals = []string{p1Val}
 		} else {
 			vals = strings.Split(p1Val, ",")
@@ -270,7 +270,7 @@ func resolveStringSliceCommaOpt(
 	} else if p2Set {
 		if p2Val == "" {
 			vals = []string{}
-		} else if !strings.Contains(p2Val, ",") {
+		} else if strings.IndexByte(p2Val, ',') == -1 {
 			vals = []string{p2Val}
 		} else {
 			vals = strings.Split(p2Val, ",")
@@ -279,7 +279,7 @@ func resolveStringSliceCommaOpt(
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
 			if env == "" {
 				vals = []string{}
-			} else if !strings.Contains(env, ",") {
+			} else if strings.IndexByte(env, ',') == -1 {
 				vals = []string{env}
 			} else {
 				vals = strings.Split(env, ",")
