@@ -44,6 +44,30 @@ func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, r.Error())
 		assert.Equal(t, "fallback_content", val)
+
+		// 1. Read error fallback (resolving a directory entry triggers ReadFile error, falling back to default)
+		valDir, errDir := r.ResolveString("{{file:marker_dir:-dir_read_fallback}}")
+		assert.NoError(t, errDir)
+		assert.NoError(t, r.Error())
+		assert.Equal(t, "dir_read_fallback", valDir)
+
+		// 2. Cached-error sequence: first resolve with default (caches error, returns default), then without default (hits cached error)
+		rCacheSeq, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		valCached1, err1 := rCacheSeq.ResolveString("{{file:missing_seq.txt:-first_default}}")
+		assert.NoError(t, err1)
+		assert.NoError(t, rCacheSeq.Error())
+		assert.Equal(t, "first_default", valCached1)
+
+		// Second resolve of same missing file without default hits fileCache and returns cached error
+		rCacheSeq2, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+		rCacheSeq2.shared.Store(rCacheSeq.getShared()) // share state cache
+
+		_, err2 := rCacheSeq2.ResolveString("{{file:missing_seq.txt}}")
+		assert.Error(t, err2)
+		assert.Contains(t, err2.Error(), "file not found")
 	})
 
 	t.Run("file directive fallback when file is empty", func(t *testing.T) {
