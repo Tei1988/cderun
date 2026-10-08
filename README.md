@@ -51,7 +51,8 @@ When you invoke `cderun`, the execution flows through a unified pipeline to tran
                              ▼
  ┌─────────────────────────────────────────────────────────┐
  │             4. Runtime Adapter Selection                │
- │   - Probe active sockets (Docker / containerd / Podman) │
+ │   - Probe active sockets (Docker/containerd/Podman)     │
+ │   - Select engine (Docker/Podman/containerd/nerdctl)    │
  │   - Enforce runtime capability validations              │
  └───────────────────────────┬─────────────────────────────┘
                              │
