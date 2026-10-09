@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type statErrFileSystem struct {
+	FileSystem
+}
+
+func (fs statErrFileSystem) Stat(name string) (os.FileInfo, error) {
+	return nil, os.ErrPermission
+}
+
 func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -68,6 +76,17 @@ func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
 		_, err2 := rCacheSeq2.ResolveString("{{file:missing_seq.txt}}")
 		assert.Error(t, err2)
 		assert.Contains(t, err2.Error(), "file not found")
+	})
+
+	t.Run("file directive fallback when Stat fails", func(t *testing.T) {
+		statFS := statErrFileSystem{FileSystem: fs}
+		rStatErr, err := NewExpressionResolverWithFS(nil, statFS)
+		require.NoError(t, err)
+
+		val, err := rStatErr.ResolveString("{{file:valid.txt:-stat_fallback}}")
+		assert.NoError(t, err)
+		assert.NoError(t, rStatErr.Error())
+		assert.Equal(t, "stat_fallback", val)
 	})
 
 	t.Run("file directive fallback when file is empty", func(t *testing.T) {
