@@ -285,10 +285,8 @@ func validateMounts(childMounts []container.Mount, parent *container.ContainerCo
 		if !cMount.ReadOnly {
 			insideParentMount := false
 			for _, pMount := range parent.Mounts {
-				pTarget := canonicalizePath(pMount.Target)
 				pSource := canonicalizePath(pMount.Source)
-				if (pSource != "" && isSubpathOrEqual(cSource, pSource)) ||
-					(pTarget != "" && isSubpathOrEqual(cSource, pTarget)) {
+				if pSource != "" && isSubpathOrEqual(cSource, pSource) {
 					insideParentMount = true
 					break
 				}
