@@ -93,37 +93,55 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		assert.Contains(t, err.Error(), "child requested privileged mode when parent is non-privileged")
 	})
 
-	t.Run("cap add validation and normalization", func(t *testing.T) {
+	t.Run("cap add and cap drop validation and normalization", func(t *testing.T) {
 		parent := &container.ContainerConfig{
-			CapAdd: []string{"SYS_ADMIN", "CAP_NET_ADMIN"},
+			CapAdd:  []string{"SYS_ADMIN", "CAP_NET_ADMIN"},
+			CapDrop: []string{"SYS_PTRACE"},
 		}
 
-		// Allowed capabilities with variations in case and prefix
+		// Allowed capabilities with variations in case and prefix, plus preserving parent's dropped cap
 		childOK := &container.ContainerConfig{
-			CapAdd: []string{"sys_admin", "NET_ADMIN"},
+			CapAdd:  []string{"sys_admin", "NET_ADMIN"},
+			CapDrop: []string{"SYS_PTRACE"},
 		}
 		require.NoError(t, ValidateInheritedCeiling(childOK, parent))
 
 		// Disallowed capability
-		childBad := &container.ContainerConfig{
-			CapAdd: []string{"SYS_ADMIN", "SYS_PTRACE"},
+		childBadCapAdd := &container.ContainerConfig{
+			CapAdd:  []string{"SYS_ADMIN", "SYS_RAWIO"},
+			CapDrop: []string{"SYS_PTRACE"},
 		}
-		err := ValidateInheritedCeiling(childBad, parent)
+		err := ValidateInheritedCeiling(childBadCapAdd, parent)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "child requested capability \"SYS_PTRACE\" not permitted")
+		assert.Contains(t, err.Error(), "child requested capability \"SYS_RAWIO\" not permitted")
+
+		// Failure to drop capability required to be dropped by parent
+		childMissingCapDrop := &container.ContainerConfig{
+			CapAdd: []string{"SYS_ADMIN"},
+		}
+		errDrop := ValidateInheritedCeiling(childMissingCapDrop, parent)
+		require.Error(t, errDrop)
+		assert.Contains(t, errDrop.Error(), "child must drop capability \"SYS_PTRACE\"")
 	})
 
-	t.Run("namespace isolation validation", func(t *testing.T) {
+	t.Run("namespace isolation and runtime validation", func(t *testing.T) {
 		parent := &container.ContainerConfig{
-			Network: "bridge",
-			Pid:     "container",
-			IPC:     "container",
+			Network:    "bridge",
+			Pid:        "container",
+			IPC:        "container",
+			Cgroupns:   "private",
+			OciRuntime: "runc",
 		}
 
 		// Disallowed host network
 		errNet := ValidateInheritedCeiling(&container.ContainerConfig{Network: "host"}, parent)
 		require.Error(t, errNet)
 		assert.Contains(t, errNet.Error(), "host network mode")
+
+		// Disallowed container network
+		errContainerNet := ValidateInheritedCeiling(&container.ContainerConfig{Network: "container:other"}, parent)
+		require.Error(t, errContainerNet)
+		assert.Contains(t, errContainerNet.Error(), "container network mode")
 
 		// Disallowed host PID
 		errPid := ValidateInheritedCeiling(&container.ContainerConfig{Pid: "host"}, parent)
@@ -135,11 +153,35 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		require.Error(t, errIpc)
 		assert.Contains(t, errIpc.Error(), "host IPC mode")
 
-		// Network mode when parent is none
-		parentNone := &container.ContainerConfig{Network: "none"}
-		errNone := ValidateInheritedCeiling(&container.ContainerConfig{Network: "bridge"}, parentNone)
-		require.Error(t, errNone)
-		assert.Contains(t, errNone.Error(), "parent network is \"none\"")
+		// Disallowed host Cgroupns
+		errCgroup := ValidateInheritedCeiling(&container.ContainerConfig{Cgroupns: "host"}, parent)
+		require.Error(t, errCgroup)
+		assert.Contains(t, errCgroup.Error(), "host cgroupns mode")
+
+		// Mismatched OCI runtime
+		errOci := ValidateInheritedCeiling(&container.ContainerConfig{OciRuntime: "crun"}, parent)
+		require.Error(t, errOci)
+		assert.Contains(t, errOci.Error(), "OCI runtime \"crun\" when parent specifies \"runc\"")
+	})
+
+	t.Run("sysctl validation", func(t *testing.T) {
+		parent := &container.ContainerConfig{
+			Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
+		}
+
+		// Allowed matching sysctl
+		childOK := &container.ContainerConfig{
+			Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
+		}
+		require.NoError(t, ValidateInheritedCeiling(childOK, parent))
+
+		// Disallowed sysctl
+		childBad := &container.ContainerConfig{
+			Sysctls: map[string]string{"net.ipv4.ip_forward": "0"},
+		}
+		errBad := ValidateInheritedCeiling(childBad, parent)
+		require.Error(t, errBad)
+		assert.Contains(t, errBad.Error(), "sysctl net.ipv4.ip_forward=\"0\" not permitted")
 	})
 
 	t.Run("device mapping validation", func(t *testing.T) {
@@ -179,13 +221,21 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		assert.Contains(t, errPerm.Error(), "exceeding parent permissions")
 	})
 
-	t.Run("read only mount boundaries", func(t *testing.T) {
+	t.Run("read only mount boundaries traversal and parent source containment", func(t *testing.T) {
 		tmp := t.TempDir()
 		parent := &container.ContainerConfig{
 			Mounts: []container.Mount{
 				{Type: "bind", Source: tmp, Target: "/parent/ro", ReadOnly: true},
 			},
 		}
+
+		// Traversal check
+		assert.True(t, hasPathTraversal("/foo/../bar"))
+		assert.False(t, hasPathTraversal("/foo/..data/bar"))
+
+		// Sibling path like "..data" or "data" is properly handled by isSubpathOrEqual
+		assert.True(t, isSubpathOrEqual(filepath.Join(tmp, "sub"), tmp))
+		assert.False(t, isSubpathOrEqual("/other/path", tmp))
 
 		// Child read-only mount inside parent RO path is allowed
 		childRO := &container.ContainerConfig{
@@ -204,6 +254,40 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		errRW := ValidateInheritedCeiling(childRW, parent)
 		require.Error(t, errRW)
 		assert.Contains(t, errRW.Error(), "within parent read-only path")
+
+		// Child read-write mount with path traversal is rejected
+		childTraversal := &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/tmp/foo/../bar", Target: "/target", ReadOnly: false},
+			},
+		}
+		errTraversal := ValidateInheritedCeiling(childTraversal, parent)
+		require.Error(t, errTraversal)
+		assert.Contains(t, errTraversal.Error(), "path traversal components")
+
+		// Parent with read-write mount allows child read-write mount inside parent mount source
+		rwTmp := t.TempDir()
+		parentRW := &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "bind", Source: rwTmp, Target: "/parent/rw", ReadOnly: false},
+			},
+		}
+		childInsideRW := &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "bind", Source: filepath.Join(rwTmp, "sub"), Target: "/child/target", ReadOnly: false},
+			},
+		}
+		require.NoError(t, ValidateInheritedCeiling(childInsideRW, parentRW))
+
+		// Parent with read-write mount rejects child read-write mount outside parent mount sources
+		childOutsideRW := &container.ContainerConfig{
+			Mounts: []container.Mount{
+				{Type: "bind", Source: t.TempDir(), Target: "/child/target", ReadOnly: false},
+			},
+		}
+		errOutside := ValidateInheritedCeiling(childOutsideRW, parentRW)
+		require.Error(t, errOutside)
+		assert.Contains(t, errOutside.Error(), "outside parent mount sources")
 
 		// Parent root read-only rejects child read-write mount
 		parentRootRO := &container.ContainerConfig{ReadOnly: true}
