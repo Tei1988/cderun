@@ -340,6 +340,27 @@ func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
 }
 
 func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *container.ContainerConfig {
+	extraMountsCap := 0
+	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
+		extraMountsCap++
+		if len(resolved.MountTools) > 0 {
+			extraMountsCap += len(resolved.MountTools)
+		}
+	}
+	if resolved.MountSocket {
+		extraMountsCap++
+	}
+
+	var mounts []container.Mount
+	if resolved.Mounts != nil {
+		mounts = make([]container.Mount, len(resolved.Mounts), len(resolved.Mounts)+extraMountsCap)
+		copy(mounts, resolved.Mounts)
+	} else if extraMountsCap > 0 {
+		mounts = make([]container.Mount, 0, extraMountsCap)
+	} else {
+		mounts = resolved.Mounts
+	}
+
 	return &container.ContainerConfig{
 		Image:       resolved.Image,
 		Command:     cmdArgs,
@@ -349,7 +370,7 @@ func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *
 		Remove:      resolved.Remove,
 		ReadOnly:    resolved.ReadOnly,
 		Init:        resolved.Init,
-		Mounts:      resolved.Mounts,
+		Mounts:      mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
 		User:        resolved.User,
@@ -398,6 +419,15 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	}
 
 	containerConfig := newBaseContainerConfig(resolved, cmdArgs)
+
+	if resolved.MountAllTools && len(toolsCfg) > 0 {
+		neededCap := len(containerConfig.Mounts) + len(toolsCfg)
+		if cap(containerConfig.Mounts) < neededCap {
+			buf := make([]container.Mount, len(containerConfig.Mounts), neededCap)
+			copy(buf, containerConfig.Mounts)
+			containerConfig.Mounts = buf
+		}
+	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
 		return nil, err
