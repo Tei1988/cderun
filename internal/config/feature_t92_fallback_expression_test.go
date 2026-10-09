@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,10 +12,16 @@ import (
 
 type statErrFileSystem struct {
 	FileSystem
+	statCalls int32
 }
 
-func (fs statErrFileSystem) Stat(name string) (os.FileInfo, error) {
-	return nil, os.ErrPermission
+func (s *statErrFileSystem) Stat(name string) (os.FileInfo, error) {
+	count := atomic.AddInt32(&s.statCalls, 1)
+	// Allow first call during loader.FindConfigs to succeed; fail subsequent Stat calls during resolveFile
+	if count > 1 {
+		return nil, os.ErrPermission
+	}
+	return s.FileSystem.Stat(name)
 }
 
 func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
@@ -79,7 +86,7 @@ func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
 	})
 
 	t.Run("file directive fallback when Stat fails", func(t *testing.T) {
-		statFS := statErrFileSystem{FileSystem: fs}
+		statFS := &statErrFileSystem{FileSystem: fs}
 		rStatErr, err := NewExpressionResolverWithFS(nil, statFS)
 		require.NoError(t, err)
 
@@ -87,6 +94,7 @@ func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, rStatErr.Error())
 		assert.Equal(t, "stat_fallback", val)
+		assert.GreaterOrEqual(t, atomic.LoadInt32(&statFS.statCalls), int32(2))
 	})
 
 	t.Run("file directive fallback when file is empty", func(t *testing.T) {
