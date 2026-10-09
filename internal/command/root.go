@@ -209,6 +209,19 @@ func (o *rootOptions) applyToolMounts(
 		return nil
 	}
 
+	extraMounts := 1 // 1 for cderun binary mount
+	if resolved.MountAllTools {
+		extraMounts += len(toolsCfg)
+	} else if len(resolved.MountTools) > 0 {
+		extraMounts += len(resolved.MountTools)
+	}
+	neededCap := len(cfg.Mounts) + extraMounts
+	if cap(cfg.Mounts) < neededCap {
+		buf := make([]container.Mount, len(cfg.Mounts), neededCap)
+		copy(buf, cfg.Mounts)
+		cfg.Mounts = buf
+	}
+
 	exePath := resolved.MountCderunPath
 	if exePath == "" {
 		var err error
@@ -299,6 +312,13 @@ func (o *rootOptions) applySocketMount(
 		return nil
 	}
 
+	neededCap := len(cfg.Mounts) + 1
+	if cap(cfg.Mounts) < neededCap {
+		buf := make([]container.Mount, len(cfg.Mounts), neededCap)
+		copy(buf, cfg.Mounts)
+		cfg.Mounts = buf
+	}
+
 	// Add socket mount
 	cfg.Mounts = append(cfg.Mounts, container.Mount{
 		Type:     "bind",
@@ -340,25 +360,10 @@ func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
 }
 
 func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *container.ContainerConfig {
-	extraMountsCap := 0
-	if resolved.MountCderun || resolved.MountAllTools || len(resolved.MountTools) > 0 {
-		extraMountsCap++
-		if len(resolved.MountTools) > 0 {
-			extraMountsCap += len(resolved.MountTools)
-		}
-	}
-	if resolved.MountSocket {
-		extraMountsCap++
-	}
-
 	var mounts []container.Mount
 	if resolved.Mounts != nil {
-		mounts = make([]container.Mount, len(resolved.Mounts), len(resolved.Mounts)+extraMountsCap)
+		mounts = make([]container.Mount, len(resolved.Mounts))
 		copy(mounts, resolved.Mounts)
-	} else if extraMountsCap > 0 {
-		mounts = make([]container.Mount, 0, extraMountsCap)
-	} else {
-		mounts = resolved.Mounts
 	}
 
 	return &container.ContainerConfig{
@@ -419,15 +424,6 @@ func (o *rootOptions) buildContainerConfig(resolved *config.ResolvedConfig, pass
 	}
 
 	containerConfig := newBaseContainerConfig(resolved, cmdArgs)
-
-	if resolved.MountAllTools && len(toolsCfg) > 0 {
-		neededCap := len(containerConfig.Mounts) + len(toolsCfg)
-		if cap(containerConfig.Mounts) < neededCap {
-			buf := make([]container.Mount, len(containerConfig.Mounts), neededCap)
-			copy(buf, containerConfig.Mounts)
-			containerConfig.Mounts = buf
-		}
-	}
 
 	if err := o.applyToolMounts(containerConfig, resolved, toolsCfg); err != nil {
 		return nil, err
