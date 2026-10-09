@@ -92,8 +92,8 @@ Configuration fields use **camelCase** keys.
 
 #### Root Keys
 
-- `engine` (string): Target container engine (`docker` | `podman` | `containerd`).
-- `runtime` (string): Deprecated fallback alias for container engine (`docker` | `podman` | `containerd`).
+- `engine` (string): Target container engine (`docker` | `podman` | `containerd` | `nerdctl`).
+- `runtime` (string): Deprecated fallback alias for container engine (`docker` | `podman` | `containerd` | `nerdctl`).
 - `socketPath` (string): Host socket absolute path.
 - `defaults` (object): Default runner options (fields detailed below).
 - `logging` (object): Logging output options:

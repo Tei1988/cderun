@@ -36,7 +36,7 @@ This directory contains the detailed technical and functional specifications for
 ### Runtime Integration
 
 1. **[Multi-Runtime Support](./multi-runtime-support.md)**
-   - Documents native support for Docker, Podman, and containerd engines, socket auto-detection, and host socket caching.
+   - Documents native support for Docker, Podman, containerd, and nerdctl engines, socket auto-detection, and host socket caching.
 
 2. **[Direct Container Execution](./direct-container-execution.md)**
    - Details the direct SDK/API communication flow with container daemons, avoiding subprocess overhead and shell injection risks.
