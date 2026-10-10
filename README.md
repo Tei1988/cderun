@@ -347,9 +347,9 @@ Expressions can be used to inject host-context or dynamic values into options li
   - `{{BASE_UID}}`: Numeric User ID (UID) on the *base host*.
   - `{{BASE_GID}}`: Numeric Group ID (GID) on the *base host*.
 - **Directives**:
-  - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`). Supports fallbacks using `{{file:path:-default}}` when missing, stat/read error, or empty.
-  - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}`). Supports fallbacks using `{{find_dir:name:-default}}` when missing.
-  - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value.
+  - `{{file:path}}`: Reads the content of a file (e.g., `{{file:.go-version}}` or `{{file:.go-version:-1.22.0}}`). Performs upward directory traversal searching, trimming trailing and leading whitespace. Limit: 1MB (`MaxDirectiveFileSize`). Supports fallbacks using `{{file:path:-default}}` when missing, stat/read error, or empty.
+  - `{{find_dir:name}}`: Upwardly searches for a directory or file of the specified name and returns its absolute path (e.g., `{{find_dir:.git}}` or `{{find_dir:master:-{{PWD}}}}`). Supports fallbacks using `{{find_dir:name:-default}}` when missing.
+  - `{{env:KEY:-default}}`: Resolves environment variables on the execution host, supporting an optional fallback default value (e.g., `{{env:NODE_VERSION:-20-alpine}}`).
 
 #### Expression Directive Fallback Mechanics (`:-default`)
 
