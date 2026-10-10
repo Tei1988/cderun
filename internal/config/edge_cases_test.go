@@ -124,7 +124,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		globalVal := 3.14
 		def := OptionDef[*float64]{
 			EnvKey:       "TEST_FLOAT",
-			GlobalGetter: func(c CDERunConfig) *float64 { return &globalVal },
+			GlobalGetter: func(c *CDERunConfig) *float64 { return &globalVal },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
 		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)

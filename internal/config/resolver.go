@@ -174,6 +174,8 @@ type resolver struct {
 	subcommand string
 	cli        *CLIOptions
 	tools      ToolsConfig
+	tool       ToolConfig
+	toolExists bool
 	global     *CDERunConfig
 	fs         FileSystem
 	r          *ExpressionResolver
@@ -256,7 +258,7 @@ func (rv *resolver) getR() (*ExpressionResolver, error) {
 	return rv.r, nil
 }
 
-func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) bool {
+func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val string, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(*CDERunConfig) ConfigPath, fallback string) bool {
 	if p1Set {
 		return p1Val != ""
 	}
@@ -273,22 +275,20 @@ func (rv *resolver) hasPathToResolve(p1Set bool, p1Val string, p2Set bool, p2Val
 			return true
 		}
 	}
-	if rv.tools != nil && tGetter != nil {
-		if tool, ok := rv.tools[rv.subcommand]; ok {
-			if t := tGetter(tool); !t.IsEmpty() {
-				return true
-			}
+	if rv.toolExists && tGetter != nil {
+		if t := tGetter(rv.tool); !t.IsEmpty() {
+			return true
 		}
 	}
 	if rv.global != nil && gGetter != nil {
-		if g := gGetter(*rv.global); !g.IsEmpty() {
+		if g := gGetter(rv.global); !g.IsEmpty() {
 			return true
 		}
 	}
 	return fallback != ""
 }
 
-func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(CDERunConfig) ConfigPath, fallback string) (string, error) {
+func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfig) ConfigPath, gGetter func(*CDERunConfig) ConfigPath, fallback string) (string, error) {
 	var overrideSet, cliSet bool
 	var overrideValStr, cliValStr string
 
@@ -335,7 +335,7 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 			}
 		}
 		if !found && rv.global != nil && gGetter != nil {
-			if g := gGetter(*rv.global); !g.IsEmpty() {
+			if g := gGetter(rv.global); !g.IsEmpty() {
 				raw = g.Raw
 				found = true
 			}
@@ -416,11 +416,19 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 
 	ensureRegistryMaps()
 
+	var tool ToolConfig
+	var toolExists bool
+	if tools != nil && subcommand != "" {
+		tool, toolExists = tools[subcommand]
+	}
+
 	res := &ResolvedConfig{}
 	rv := &resolver{
 		subcommand: subcommand,
 		cli:        cli,
 		tools:      tools,
+		tool:       tool,
+		toolExists: toolExists,
 		global:     global,
 		fs:         fs,
 		pwd:        wd,
@@ -556,13 +564,10 @@ func (rv *resolver) resolveStandardOptions() error {
 }
 
 func (rv *resolver) validateToolImageMismatch() error {
-	if rv.tools == nil {
+	if !rv.toolExists || rv.tool.Image == "" {
 		return nil
 	}
-	tool, ok := rv.tools[rv.subcommand]
-	if !ok || tool.Image == "" {
-		return nil
-	}
+	tool := rv.tool
 
 	cliImage := ""
 	if rv.cli.CderunImage != nil {
@@ -1149,7 +1154,7 @@ func (rv *resolver) resolveCustomParsing() error {
 
 
 
-func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
+func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, envKey string, subcommand string, tools ToolsConfig, toolGetter func(ToolConfig) ConfigPath, global *CDERunConfig, globalGetter func(*CDERunConfig) ConfigPath, fallback string, r *ExpressionResolver, pathType string, fs FileSystem) (string, error) {
 	var cp ConfigPath
 	var baseDir string
 	if r != nil {
@@ -1172,7 +1177,7 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 		cp = ConfigPath{Raw: env, BaseDir: baseDir}
 	} else {
 		found := false
-		if tools != nil {
+		if tools != nil && toolGetter != nil {
 			if tool, ok := tools[subcommand]; ok {
 				if t := toolGetter(tool); !t.IsEmpty() {
 					cp = t
@@ -1180,8 +1185,8 @@ func resolveConfigPath(p1Set bool, p1Val string, cliSet bool, cliVal string, env
 				}
 			}
 		}
-		if !found && global != nil {
-			if g := globalGetter(*global); !g.IsEmpty() {
+		if !found && global != nil && globalGetter != nil {
+			if g := globalGetter(global); !g.IsEmpty() {
 				cp = g
 				found = true
 			}

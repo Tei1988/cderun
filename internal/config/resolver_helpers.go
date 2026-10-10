@@ -143,31 +143,76 @@ func resolveUlimitsFromRaws(raws []string, r *ExpressionResolver) ([]container.U
 	return res, nil
 }
 
-func toolMountsGetter(t ToolConfig) []MountConfig    { return t.Mounts }
-func globalMountsGetter(g CDERunConfig) []MountConfig { return g.Defaults.Mounts }
+func toolMountsGetter(t ToolConfig) []MountConfig { return t.Mounts }
+func globalMountsGetter(g *CDERunConfig) []MountConfig {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.Mounts
+}
 
-func toolEnvGetter(t ToolConfig) []string    { return t.Env }
-func globalEnvGetter(g CDERunConfig) []string { return g.Defaults.Env }
+func toolEnvGetter(t ToolConfig) []string { return t.Env }
+func globalEnvGetter(g *CDERunConfig) []string {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.Env
+}
 
-func toolUlimitsGetter(t ToolConfig) []string    { return t.Ulimits }
-func globalUlimitsGetter(g CDERunConfig) []string { return g.Defaults.Ulimits }
+func toolUlimitsGetter(t ToolConfig) []string { return t.Ulimits }
+func globalUlimitsGetter(g *CDERunConfig) []string {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.Ulimits
+}
 
-func toolSysctlsGetter(t ToolConfig) []string    { return t.Sysctls }
-func globalSysctlsGetter(g CDERunConfig) []string { return g.Defaults.Sysctls }
+func toolSysctlsGetter(t ToolConfig) []string { return t.Sysctls }
+func globalSysctlsGetter(g *CDERunConfig) []string {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.Sysctls
+}
 
-func toolDevicesGetter(t ToolConfig) []DeviceConfig    { return t.Devices }
-func globalDevicesGetter(g CDERunConfig) []DeviceConfig { return g.Defaults.Devices }
+func toolDevicesGetter(t ToolConfig) []DeviceConfig { return t.Devices }
+func globalDevicesGetter(g *CDERunConfig) []DeviceConfig {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.Devices
+}
 
-func toolMountToolsGetter(t ToolConfig) []string    { return t.MountTools }
-func globalMountToolsGetter(g CDERunConfig) []string { return g.Defaults.MountTools }
+func toolMountToolsGetter(t ToolConfig) []string { return t.MountTools }
+func globalMountToolsGetter(g *CDERunConfig) []string {
+	if g == nil {
+		return nil
+	}
+	return g.Defaults.MountTools
+}
 
-func toolMountCderunPathGetter(t ToolConfig) ConfigPath    { return t.MountCderunPath }
-func globalMountCderunPathGetter(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }
+func toolMountCderunPathGetter(t ToolConfig) ConfigPath { return t.MountCderunPath }
+func globalMountCderunPathGetter(g *CDERunConfig) ConfigPath {
+	if g == nil {
+		return ConfigPath{}
+	}
+	return g.Defaults.MountCderunPath
+}
 
-func toolMountSocketPathGetter(t ToolConfig) ConfigPath    { return t.MountSocketPath }
-func globalMountSocketPathGetter(g CDERunConfig) ConfigPath { return g.Defaults.MountSocketPath }
+func toolMountSocketPathGetter(t ToolConfig) ConfigPath { return t.MountSocketPath }
+func globalMountSocketPathGetter(g *CDERunConfig) ConfigPath {
+	if g == nil {
+		return ConfigPath{}
+	}
+	return g.Defaults.MountSocketPath
+}
 
-func globalSocketPathGetter(g CDERunConfig) ConfigPath { return g.SocketPath }
+func globalSocketPathGetter(g *CDERunConfig) ConfigPath {
+	if g == nil {
+		return ConfigPath{}
+	}
+	return g.SocketPath
+}
 
 func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
 	raws, err := pickStringConfigs(
@@ -275,7 +320,7 @@ func pickStringConfigs(
 	tools ToolsConfig,
 	toolGetter func(ToolConfig) []string,
 	global *CDERunConfig,
-	globalGetter func(CDERunConfig) []string,
+	globalGetter func(*CDERunConfig) []string,
 	fs FileSystem,
 ) ([]string, error) {
 	if p1 != nil {
@@ -330,7 +375,7 @@ func pickStringConfigs(
 		}
 	}
 	if global != nil {
-		if v := globalGetter(*global); v != nil {
+		if v := globalGetter(global); v != nil {
 			return v, nil
 		}
 	}
@@ -357,7 +402,7 @@ func pickConfigs[T any](
 	tools ToolsConfig,
 	toolGetter func(ToolConfig) []T,
 	global *CDERunConfig,
-	globalGetter func(CDERunConfig) []T,
+	globalGetter func(*CDERunConfig) []T,
 	parser func(string, string) (T, error),
 	fs FileSystem,
 ) ([]T, error) {
@@ -423,7 +468,7 @@ func pickConfigs[T any](
 		}
 	}
 	if global != nil {
-		if v := globalGetter(*global); v != nil {
+		if v := globalGetter(global); v != nil {
 			return v, nil
 		}
 	}

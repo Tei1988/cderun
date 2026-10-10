@@ -14,7 +14,7 @@ type OptionDef[T any] struct {
 	// P4: getter from tool-specific config
 	ToolGetter func(ToolConfig) T
 	// P5: getter from global defaults
-	GlobalGetter func(CDERunConfig) T
+	GlobalGetter func(*CDERunConfig) T
 	// P6: hardcoded fallback
 	Fallback T
 }
@@ -60,7 +60,7 @@ func resolveStringOpt(
 
 	if !found {
 		if def.GlobalGetter != nil && global != nil {
-			if val := def.GlobalGetter(*global); val != "" {
+			if val := def.GlobalGetter(global); val != "" {
 				s = val
 				found = true
 			}
@@ -128,7 +128,7 @@ func resolveBoolOptInfo(
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if b := def.GlobalGetter(*global); b != nil {
+		if b := def.GlobalGetter(global); b != nil {
 			return *b, true, nil
 		}
 	}
@@ -196,7 +196,7 @@ func getWinningStringSlice(
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		return def.GlobalGetter(*global)
+		return def.GlobalGetter(global)
 	}
 	return nil
 }
@@ -292,7 +292,7 @@ func resolveStringSliceCommaOpt(
 		}
 	}
 	if vals == nil && def.GlobalGetter != nil && global != nil {
-		vals = def.GlobalGetter(*global)
+		vals = def.GlobalGetter(global)
 	}
 	var res []string
 	if vals != nil {
@@ -343,7 +343,7 @@ func resolveFloat64Opt(
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if f := def.GlobalGetter(*global); f != nil {
+		if f := def.GlobalGetter(global); f != nil {
 			return *f, nil
 		}
 	}
@@ -382,7 +382,7 @@ func resolveIntOpt(
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
-		if i := def.GlobalGetter(*global); i != nil {
+		if i := def.GlobalGetter(global); i != nil {
 			return *i, nil
 		}
 	}

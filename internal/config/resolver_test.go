@@ -16,7 +16,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 	t.Run("resolveStringSliceCommaOpt", func(t *testing.T) {
 		def := OptionDef[[]string]{
 			EnvKey:       "TEST_SLICE",
-			GlobalGetter: func(c CDERunConfig) []string { return []string{"global"} },
+			GlobalGetter: func(c *CDERunConfig) []string { return []string{"global"} },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_SLICE": "env1, env2"}}
 		r, err := NewExpressionResolver(nil)
@@ -70,7 +70,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		// Global getter
 		def.ToolGetter = nil
 		f3 := 3.0
-		def.GlobalGetter = func(c CDERunConfig) *float64 { return &f3 }
+		def.GlobalGetter = func(c *CDERunConfig) *float64 { return &f3 }
 		res = must(resolveFloat64Opt(def, 1.0, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs))
 		assert.InDelta(t, 3.0, res, 1e-9)
 
@@ -113,7 +113,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 		// Global getter
 		def.ToolGetter = nil
 		i3 := 40
-		def.GlobalGetter = func(c CDERunConfig) *int { return &i3 }
+		def.GlobalGetter = func(c *CDERunConfig) *int { return &i3 }
 		res = must(resolveIntOpt(def, 10, false, 0, false, 0, "node", nil, &CDERunConfig{}, mfs))
 		assert.Equal(t, 40, res)
 
@@ -191,7 +191,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 		// Global
 		def.ToolGetter = nil
-		def.GlobalGetter = func(c CDERunConfig) string { return "global" }
+		def.GlobalGetter = func(c *CDERunConfig) string { return "global" }
 		res = resolveStringOpt(def, false, "", false, "", "node", nil, &CDERunConfig{}, r, mfs)
 		assert.Equal(t, "global", res)
 	})
@@ -214,7 +214,7 @@ func TestUnit_Config_Option_Exhaustive(t *testing.T) {
 
 		// Global
 		def.ToolGetter = nil
-		def.GlobalGetter = func(c CDERunConfig) []string { return []string{"global"} }
+		def.GlobalGetter = func(c *CDERunConfig) []string { return []string{"global"} }
 		res = resolveStringSliceOpt(def, ":", nil, nil, "node", nil, &CDERunConfig{}, r, mfs)
 		assert.Equal(t, []string{"global"}, res)
 
