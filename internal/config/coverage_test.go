@@ -258,13 +258,13 @@ func TestUnit_Coverage_Resolver_ResolveConfigPath_Hierarchy(t *testing.T) {
 	// Tool config exists but empty, falls back to global
 	tools = ToolsConfig{"node": {}}
 	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g *CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/global/path", res)
 
 	// Both tool and global empty, falls back to fallback
 	global = &CDERunConfig{}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
+	res, err = resolveConfigPath(false, "", false, "", "", "node", tools, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g *CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "/fallback", r, "path", mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/fallback", res)
 
@@ -871,7 +871,7 @@ func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {
 		ToolsConfig{"node": ToolConfig{MountCderunPath: ConfigPath{Raw: "/tools/path"}}},
 		func(t ToolConfig) ConfigPath { return t.MountCderunPath },
 		&CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/path"}}},
-		func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
+		func(g *CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath },
 		"", r, "path", mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/env/socket", res)
@@ -885,7 +885,7 @@ func TestUnit_Coverage_Resolver_resolveConfigPath_Modes(t *testing.T) {
 
 	// Fallback to global
 	global := &CDERunConfig{Defaults: ConfigDefaults{MountCderunPath: ConfigPath{Raw: "/global/cderun"}}}
-	res, err = resolveConfigPath(false, "", false, "", "", "node", nil, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "", r, "path", mfs)
+	res, err = resolveConfigPath(false, "", false, "", "", "node", nil, func(t ToolConfig) ConfigPath { return t.MountCderunPath }, global, func(g *CDERunConfig) ConfigPath { return g.Defaults.MountCderunPath }, "", r, "path", mfs)
 	require.NoError(t, err)
 	assert.Equal(t, "/global/cderun", res)
 }

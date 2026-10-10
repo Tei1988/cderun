@@ -99,277 +99,204 @@ func (rv *resolver) resolveStringSliceOptionResolver(vals []string) (*Expression
 	return nil, nil
 }
 
-func getStringOptionFastPathPtrs(cli *CLIOptions, name string) (*string, *string, bool) {
+func getStringOptionFastPathPtrsAndAssign(name string) (func(*CLIOptions) (*string, *string, bool), func(*ResolvedConfig, string), bool) {
 	switch name {
 	case "image":
-		return cli.CderunImage, cli.Image, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunImage, cli.Image, true },
+			func(res *ResolvedConfig, v string) { res.Image = v }, true
 	case "pid":
-		return cli.CderunPid, cli.Pid, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunPid, cli.Pid, true },
+			func(res *ResolvedConfig, v string) { res.Pid = v }, true
 	case "shm-size":
-		return cli.CderunShmSize, cli.ShmSize, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunShmSize, cli.ShmSize, true },
+			func(res *ResolvedConfig, v string) { res.ShmSize = v }, true
 	case "network":
-		return cli.CderunNetwork, cli.Network, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunNetwork, cli.Network, true },
+			func(res *ResolvedConfig, v string) { res.Network = v }, true
 	case "workdir":
-		return cli.CderunWorkdir, cli.Workdir, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunWorkdir, cli.Workdir, true },
+			func(res *ResolvedConfig, v string) { res.Workdir = v }, true
 	case "runtime":
-		return cli.CderunRuntime, cli.Runtime, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunRuntime, cli.Runtime, true },
+			func(res *ResolvedConfig, v string) { res.Runtime = v }, true
 	case "user":
-		return cli.CderunUser, cli.User, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunUser, cli.User, true },
+			func(res *ResolvedConfig, v string) { res.User = v }, true
 	case "log-level":
-		return cli.CderunLogLevel, cli.LogLevel, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunLogLevel, cli.LogLevel, true },
+			func(res *ResolvedConfig, v string) { res.LogLevel = v }, true
 	case "log-format":
-		return cli.CderunLogFormat, cli.LogFormat, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunLogFormat, cli.LogFormat, true },
+			func(res *ResolvedConfig, v string) { res.LogFormat = v }, true
 	case "hostname":
-		return cli.CderunHostname, cli.Hostname, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunHostname, cli.Hostname, true },
+			func(res *ResolvedConfig, v string) { res.Hostname = v }, true
 	case "pull":
-		return cli.CderunPull, cli.Pull, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunPull, cli.Pull, true },
+			func(res *ResolvedConfig, v string) { res.Pull = v }, true
 	case "dry-run-format":
-		return cli.CderunDryRunFormat, cli.DryRunFormat, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunDryRunFormat, cli.DryRunFormat, true },
+			func(res *ResolvedConfig, v string) { res.DryRunFormat = v }, true
 	case "diagnosis-format":
-		return cli.CderunDiagnosisFormat, cli.DiagnosisFormat, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunDiagnosisFormat, cli.DiagnosisFormat, true },
+			func(res *ResolvedConfig, v string) { res.DiagnosisFormat = v }, true
 	case "ipc":
-		return cli.CderunIPC, cli.IPC, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunIPC, cli.IPC, true },
+			func(res *ResolvedConfig, v string) { res.IPC = v }, true
 	case "gpus":
-		return cli.CderunGPUs, cli.GPUs, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunGPUs, cli.GPUs, true },
+			func(res *ResolvedConfig, v string) { res.GPUs = v }, true
 	case "cgroupns":
-		return cli.CderunCgroupns, cli.Cgroupns, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunCgroupns, cli.Cgroupns, true },
+			func(res *ResolvedConfig, v string) { res.Cgroupns = v }, true
 	case "cpuset-cpus":
-		return cli.CderunCpusetCpus, cli.CpusetCpus, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunCpusetCpus, cli.CpusetCpus, true },
+			func(res *ResolvedConfig, v string) { res.CpusetCpus = v }, true
 	case "cpuset-mems":
-		return cli.CderunCpusetMems, cli.CpusetMems, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunCpusetMems, cli.CpusetMems, true },
+			func(res *ResolvedConfig, v string) { res.CpusetMems = v }, true
 	case "restart":
-		return cli.CderunRestart, cli.Restart, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunRestart, cli.Restart, true },
+			func(res *ResolvedConfig, v string) { res.Restart = v }, true
 	case "prefetch":
-		return cli.CderunPrefetch, cli.Prefetch, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunPrefetch, cli.Prefetch, true },
+			func(res *ResolvedConfig, v string) { res.Prefetch = v }, true
 	case "oci-runtime":
-		return cli.CderunOciRuntime, cli.OciRuntime, true
+		return func(cli *CLIOptions) (*string, *string, bool) { return cli.CderunOciRuntime, cli.OciRuntime, true },
+			func(res *ResolvedConfig, v string) { res.OciRuntime = v }, true
 	default:
 		return nil, nil, false
 	}
 }
 
-func assignResolvedString(res *ResolvedConfig, name string, resolved string) {
-	switch name {
-	case "image":
-		res.Image = resolved
-	case "pid":
-		res.Pid = resolved
-	case "shm-size":
-		res.ShmSize = resolved
-	case "network":
-		res.Network = resolved
-	case "workdir":
-		res.Workdir = resolved
-	case "runtime":
-		res.Runtime = resolved
-	case "user":
-		res.User = resolved
-	case "log-level":
-		res.LogLevel = resolved
-	case "log-format":
-		res.LogFormat = resolved
-	case "hostname":
-		res.Hostname = resolved
-	case "pull":
-		res.Pull = resolved
-	case "dry-run-format":
-		res.DryRunFormat = resolved
-	case "diagnosis-format":
-		res.DiagnosisFormat = resolved
-	case "ipc":
-		res.IPC = resolved
-	case "gpus":
-		res.GPUs = resolved
-	case "cgroupns":
-		res.Cgroupns = resolved
-	case "cpuset-cpus":
-		res.CpusetCpus = resolved
-	case "cpuset-mems":
-		res.CpusetMems = resolved
-	case "restart":
-		res.Restart = resolved
-	case "prefetch":
-		res.Prefetch = resolved
-	case "oci-runtime":
-		res.OciRuntime = resolved
-	}
-}
-
-func getBoolOptionFastPathPtrs(cli *CLIOptions, name string) (*bool, *bool, bool) {
+func getBoolOptionFastPathPtrsAndAssign(name string) (func(*CLIOptions) (*bool, *bool, bool), func(*ResolvedConfig, bool), bool) {
 	switch name {
 	case "tty":
-		return cli.CderunTTY, cli.TTY, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunTTY, cli.TTY, true },
+			func(res *ResolvedConfig, v bool) { res.TTY = v }, true
 	case "interactive":
-		return cli.CderunInteractive, cli.Interactive, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunInteractive, cli.Interactive, true },
+			func(res *ResolvedConfig, v bool) { res.Interactive = v }, true
 	case "read-only":
-		return cli.CderunReadOnly, cli.ReadOnly, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunReadOnly, cli.ReadOnly, true },
+			func(res *ResolvedConfig, v bool) { res.ReadOnly = v }, true
 	case "init":
-		return cli.CderunInit, cli.Init, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunInit, cli.Init, true },
+			func(res *ResolvedConfig, v bool) { res.Init = v }, true
 	case "remove":
-		return cli.CderunRemove, cli.Remove, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunRemove, cli.Remove, true },
+			func(res *ResolvedConfig, v bool) { res.Remove = v }, true
 	case "diagnosis":
-		return cli.CderunDiagnosis, cli.Diagnosis, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunDiagnosis, cli.Diagnosis, true },
+			func(res *ResolvedConfig, v bool) { res.Diagnosis = v }, true
 	case "strict-env":
-		return cli.CderunStrictEnv, cli.StrictEnv, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunStrictEnv, cli.StrictEnv, true },
+			func(res *ResolvedConfig, v bool) { res.StrictEnv = v }, true
 	case "privileged":
-		return cli.CderunPrivileged, cli.Privileged, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunPrivileged, cli.Privileged, true },
+			func(res *ResolvedConfig, v bool) { res.Privileged = v }, true
 	case "publish-all":
-		return cli.CderunPublishAll, cli.PublishAll, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunPublishAll, cli.PublishAll, true },
+			func(res *ResolvedConfig, v bool) { res.PublishAll = v }, true
 	case "log-timestamp":
-		return cli.CderunLogTimestamp, cli.LogTimestamp, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunLogTimestamp, cli.LogTimestamp, true },
+			func(res *ResolvedConfig, v bool) { res.LogTimestamp = v }, true
 	case "mount-socket":
-		return cli.CderunMountSocket, cli.MountSocket, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunMountSocket, cli.MountSocket, true },
+			func(res *ResolvedConfig, v bool) { res.MountSocket = v }, true
 	case "mount-cderun":
-		return cli.CderunMountCderun, cli.MountCderun, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunMountCderun, cli.MountCderun, true },
+			func(res *ResolvedConfig, v bool) { res.MountCderun = v }, true
 	case "mount-all-tools":
-		return cli.CderunMountAllTools, cli.MountAllTools, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunMountAllTools, cli.MountAllTools, true },
+			func(res *ResolvedConfig, v bool) { res.MountAllTools = v }, true
 	case "dry-run":
-		return cli.CderunDryRun, cli.DryRun, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunDryRun, cli.DryRun, true },
+			func(res *ResolvedConfig, v bool) { res.DryRun = v }, true
 	case "prefetch-all":
-		return cli.CderunPrefetchAll, cli.PrefetchAll, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunPrefetchAll, cli.PrefetchAll, true },
+			func(res *ResolvedConfig, v bool) { res.PrefetchAll = v }, true
 	case "mount-cderun-socket":
-		return cli.CderunMountCderunSocket, cli.MountCderunSocket, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunMountCderunSocket, cli.MountCderunSocket, true },
+			func(res *ResolvedConfig, v bool) { res.MountCderunSocket = v }, true
 	case "prune":
-		return cli.CderunPrune, cli.Prune, true
+		return func(cli *CLIOptions) (*bool, *bool, bool) { return cli.CderunPrune, cli.Prune, true },
+			func(res *ResolvedConfig, v bool) { res.Prune = v }, true
 	default:
 		return nil, nil, false
 	}
 }
 
-func assignResolvedBool(res *ResolvedConfig, name string, resolved bool) {
-	switch name {
-	case "tty":
-		res.TTY = resolved
-	case "interactive":
-		res.Interactive = resolved
-	case "read-only":
-		res.ReadOnly = resolved
-	case "init":
-		res.Init = resolved
-	case "remove":
-		res.Remove = resolved
-	case "diagnosis":
-		res.Diagnosis = resolved
-	case "strict-env":
-		res.StrictEnv = resolved
-	case "privileged":
-		res.Privileged = resolved
-	case "publish-all":
-		res.PublishAll = resolved
-	case "log-timestamp":
-		res.LogTimestamp = resolved
-	case "mount-socket":
-		res.MountSocket = resolved
-	case "mount-cderun":
-		res.MountCderun = resolved
-	case "mount-all-tools":
-		res.MountAllTools = resolved
-	case "dry-run":
-		res.DryRun = resolved
-	case "prefetch-all":
-		res.PrefetchAll = resolved
-	case "mount-cderun-socket":
-		res.MountCderunSocket = resolved
-	case "prune":
-		res.Prune = resolved
-	}
-}
-
-func getStringSliceOptionFastPathSlices(cli *CLIOptions, name string) ([]string, []string, bool) {
+func getStringSliceOptionFastPathSlicesAndAssign(name string) (func(*CLIOptions) ([]string, []string, bool), func(*ResolvedConfig, []string), bool) {
 	switch name {
 	case "publish":
-		return cli.CderunPorts, cli.Ports, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunPorts, cli.Ports, true },
+			func(res *ResolvedConfig, v []string) { res.Ports = v }, true
 	case "expose":
-		return cli.CderunExpose, cli.Expose, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunExpose, cli.Expose, true },
+			func(res *ResolvedConfig, v []string) { res.Expose = v }, true
 	case "dns":
-		return cli.CderunDNS, cli.DNS, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunDNS, cli.DNS, true },
+			func(res *ResolvedConfig, v []string) { res.DNS = v }, true
 	case "add-host":
-		return cli.CderunAddHosts, cli.AddHosts, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunAddHosts, cli.AddHosts, true },
+			func(res *ResolvedConfig, v []string) { res.AddHosts = v }, true
 	case "group-add":
-		return cli.CderunGroupAdd, cli.GroupAdd, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunGroupAdd, cli.GroupAdd, true },
+			func(res *ResolvedConfig, v []string) { res.GroupAdd = v }, true
 	case "cap-add":
-		return cli.CderunCapAdd, cli.CapAdd, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunCapAdd, cli.CapAdd, true },
+			func(res *ResolvedConfig, v []string) { res.CapAdd = v }, true
 	case "cap-drop":
-		return cli.CderunCapDrop, cli.CapDrop, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunCapDrop, cli.CapDrop, true },
+			func(res *ResolvedConfig, v []string) { res.CapDrop = v }, true
 	case "entrypoint":
-		return cli.CderunEntrypoint, cli.Entrypoint, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunEntrypoint, cli.Entrypoint, true },
+			func(res *ResolvedConfig, v []string) { res.Entrypoint = v }, true
 	case "security-opt":
-		return cli.CderunSecurityOpt, cli.SecurityOpt, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunSecurityOpt, cli.SecurityOpt, true },
+			func(res *ResolvedConfig, v []string) { res.SecurityOpt = v }, true
 	case "dns-search":
-		return cli.CderunDNSSearch, cli.DNSSearch, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunDNSSearch, cli.DNSSearch, true },
+			func(res *ResolvedConfig, v []string) { res.DNSSearch = v }, true
 	case "dns-option":
-		return cli.CderunDNSOptions, cli.DNSOptions, true
+		return func(cli *CLIOptions) ([]string, []string, bool) { return cli.CderunDNSOptions, cli.DNSOptions, true },
+			func(res *ResolvedConfig, v []string) { res.DNSOptions = v }, true
 	default:
 		return nil, nil, false
 	}
 }
 
-func assignResolvedStringSlice(res *ResolvedConfig, name string, resolved []string) {
-	switch name {
-	case "publish":
-		res.Ports = resolved
-	case "expose":
-		res.Expose = resolved
-	case "dns":
-		res.DNS = resolved
-	case "add-host":
-		res.AddHosts = resolved
-	case "group-add":
-		res.GroupAdd = resolved
-	case "cap-add":
-		res.CapAdd = resolved
-	case "cap-drop":
-		res.CapDrop = resolved
-	case "entrypoint":
-		res.Entrypoint = resolved
-	case "security-opt":
-		res.SecurityOpt = resolved
-	case "dns-search":
-		res.DNSSearch = resolved
-	case "dns-option":
-		res.DNSOptions = resolved
-	}
-}
-
-func getIntOptionFastPathPtrs(cli *CLIOptions, name string) (*int, *int, bool) {
+func getIntOptionFastPathPtrsAndAssign(name string) (func(*CLIOptions) (*int, *int, bool), func(*ResolvedConfig, int), bool) {
 	switch name {
 	case "pull-max-retries":
-		return cli.CderunPullMaxRetries, cli.PullMaxRetries, true
+		return func(cli *CLIOptions) (*int, *int, bool) { return cli.CderunPullMaxRetries, cli.PullMaxRetries, true },
+			func(res *ResolvedConfig, v int) { res.PullMaxRetries = v }, true
 	case "pids-limit":
-		return cli.CderunPidsLimit, cli.PidsLimit, true
+		return func(cli *CLIOptions) (*int, *int, bool) { return cli.CderunPidsLimit, cli.PidsLimit, true },
+			func(res *ResolvedConfig, v int) { res.PidsLimit = v }, true
 	case "cpu-shares":
-		return cli.CderunCPUShares, cli.CPUShares, true
+		return func(cli *CLIOptions) (*int, *int, bool) { return cli.CderunCPUShares, cli.CPUShares, true },
+			func(res *ResolvedConfig, v int) { res.CPUShares = v }, true
 	default:
 		return nil, nil, false
 	}
 }
 
-func assignResolvedInt(res *ResolvedConfig, name string, resolved int) {
-	switch name {
-	case "pull-max-retries":
-		res.PullMaxRetries = resolved
-	case "pids-limit":
-		res.PidsLimit = resolved
-	case "cpu-shares":
-		res.CPUShares = resolved
-	}
-}
-
-func getFloat64OptionFastPathPtrs(cli *CLIOptions, name string) (*float64, *float64, bool) {
+func getFloat64OptionFastPathPtrsAndAssign(name string) (func(*CLIOptions) (*float64, *float64, bool), func(*ResolvedConfig, float64), bool) {
 	if name == "cpus" {
-		return cli.CderunCPUs, cli.CPUs, true
+		return func(cli *CLIOptions) (*float64, *float64, bool) { return cli.CderunCPUs, cli.CPUs, true },
+			func(res *ResolvedConfig, v float64) { res.CPUs = v }, true
 	}
 	return nil, nil, false
 }
 
-func assignResolvedFloat64(res *ResolvedConfig, name string, resolved float64) {
-	if name == "cpus" {
-		res.CPUs = resolved
-	}
-}
-
 func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
-	p1v, p2v, fastPathUsed := getStringSliceOptionFastPathSlices(rv.cli, opt.Name)
+	var p1v, p2v []string
+	var fastPathUsed bool
+	if opt.fastPathGet != nil {
+		p1v, p2v, fastPathUsed = opt.fastPathGet(rv.cli)
+	}
 
 	if fastPathUsed && isDriftOk(opt.Name, opt.info) {
 		def := OptionDef[[]string]{
@@ -384,7 +311,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 			return err
 		}
 		resolved := resolveStringSliceOptWithVals(vals, rForSlice)
-		assignResolvedStringSlice(rv.res, opt.Name, resolved)
+		opt.fastPathAssign(rv.res, resolved)
 		return nil
 	}
 
@@ -421,7 +348,11 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 }
 
 func (rv *resolver) applyStringOption(opt StringOption) error {
-	p1Ptr, p2Ptr, fastPathUsed := getStringOptionFastPathPtrs(rv.cli, opt.Name)
+	var p1Ptr, p2Ptr *string
+	var fastPathUsed bool
+	if opt.fastPathGet != nil {
+		p1Ptr, p2Ptr, fastPathUsed = opt.fastPathGet(rv.cli)
+	}
 	p1Set, p1Val := getPtrVal(p1Ptr)
 	p2Set, p2Val := getPtrVal(p2Ptr)
 
@@ -436,7 +367,7 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 		if err != nil {
 			return err
 		}
-		assignResolvedString(rv.res, opt.Name, resolved)
+		opt.fastPathAssign(rv.res, resolved)
 		return nil
 	}
 
@@ -462,7 +393,11 @@ func (rv *resolver) applyStringOption(opt StringOption) error {
 }
 
 func (rv *resolver) applyBoolOption(opt BoolOption) error {
-	p1Ptr, p2Ptr, fastPathUsed := getBoolOptionFastPathPtrs(rv.cli, opt.Name)
+	var p1Ptr, p2Ptr *bool
+	var fastPathUsed bool
+	if opt.fastPathGet != nil {
+		p1Ptr, p2Ptr, fastPathUsed = opt.fastPathGet(rv.cli)
+	}
 	p1Set, p1Val := getPtrVal(p1Ptr)
 	p2Set, p2Val := getPtrVal(p2Ptr)
 
@@ -476,7 +411,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 		if err != nil {
 			return err
 		}
-		assignResolvedBool(rv.res, opt.Name, resolved)
+		opt.fastPathAssign(rv.res, resolved)
 		return nil
 	}
 
@@ -502,7 +437,11 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 }
 
 func (rv *resolver) applyIntOption(opt IntOption) error {
-	p1Ptr, p2Ptr, fastPathUsed := getIntOptionFastPathPtrs(rv.cli, opt.Name)
+	var p1Ptr, p2Ptr *int
+	var fastPathUsed bool
+	if opt.fastPathGet != nil {
+		p1Ptr, p2Ptr, fastPathUsed = opt.fastPathGet(rv.cli)
+	}
 	p1Set, p1Int := getPtrVal(p1Ptr)
 	p2Set, p2Int := getPtrVal(p2Ptr)
 
@@ -516,7 +455,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		if err != nil {
 			return err
 		}
-		assignResolvedInt(rv.res, opt.Name, resolved)
+		opt.fastPathAssign(rv.res, resolved)
 		return nil
 	}
 
@@ -549,7 +488,11 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 }
 
 func (rv *resolver) applyFloat64Option(opt Float64Option) error {
-	p1Ptr, p2Ptr, fastPathUsed := getFloat64OptionFastPathPtrs(rv.cli, opt.Name)
+	var p1Ptr, p2Ptr *float64
+	var fastPathUsed bool
+	if opt.fastPathGet != nil {
+		p1Ptr, p2Ptr, fastPathUsed = opt.fastPathGet(rv.cli)
+	}
 	p1Set, p1Float := getPtrVal(p1Ptr)
 	p2Set, p2Float := getPtrVal(p2Ptr)
 
@@ -563,7 +506,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		if err != nil {
 			return err
 		}
-		assignResolvedFloat64(rv.res, opt.Name, resolved)
+		opt.fastPathAssign(rv.res, resolved)
 		return nil
 	}
 

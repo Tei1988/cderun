@@ -9,7 +9,10 @@ func init() {
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Sysctls
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Sysctls
 		},
 		SkipResolution: true, // resolved in resolveComplexOptions

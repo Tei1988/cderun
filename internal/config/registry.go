@@ -16,48 +16,56 @@ type StringOption struct {
 	Default        string
 	EnvKey         string
 	ToolGetter     func(ToolConfig) string
-	GlobalGetter   func(CDERunConfig) string
+	GlobalGetter   func(*CDERunConfig) string
 	SkipResolution bool // If true, only used for flag registration or handled specially in ResolveWithFS
 	info           optionFields
+	fastPathGet    func(*CLIOptions) (*string, *string, bool)
+	fastPathAssign func(*ResolvedConfig, string)
 }
 
 // BoolOption defines a boolean configuration option.
 type BoolOption struct {
-	Name         string // kebab-case, used for flags (e.g. "tty")
-	FieldName    string // PascalCase, used for reflection (pre-calculated)
-	Shorthand    string
-	Usage        string
-	Default      bool
-	EnvKey       string
-	ToolGetter   func(ToolConfig) *bool
-	GlobalGetter func(CDERunConfig) *bool
-	info         optionFields
+	Name           string // kebab-case, used for flags (e.g. "tty")
+	FieldName      string // PascalCase, used for reflection (pre-calculated)
+	Shorthand      string
+	Usage          string
+	Default        bool
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *bool
+	GlobalGetter   func(*CDERunConfig) *bool
+	info           optionFields
+	fastPathGet    func(*CLIOptions) (*bool, *bool, bool)
+	fastPathAssign func(*ResolvedConfig, bool)
 }
 
 // IntOption defines an integer configuration option.
 type IntOption struct {
-	Name         string // kebab-case, used for flags (e.g. "pull-max-retries")
-	FieldName    string // PascalCase, used for reflection (pre-calculated)
-	Shorthand    string
-	Usage        string
-	Default      int
-	EnvKey       string
-	ToolGetter   func(ToolConfig) *int
-	GlobalGetter func(CDERunConfig) *int
-	info         optionFields
+	Name           string // kebab-case, used for flags (e.g. "pull-max-retries")
+	FieldName      string // PascalCase, used for reflection (pre-calculated)
+	Shorthand      string
+	Usage          string
+	Default        int
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *int
+	GlobalGetter   func(*CDERunConfig) *int
+	info           optionFields
+	fastPathGet    func(*CLIOptions) (*int, *int, bool)
+	fastPathAssign func(*ResolvedConfig, int)
 }
 
 // Float64Option defines a float64 configuration option.
 type Float64Option struct {
-	Name         string // kebab-case, used for flags (e.g. "cpus")
-	FieldName    string // PascalCase, used for reflection (pre-calculated)
-	Shorthand    string
-	Usage        string
-	Default      float64
-	EnvKey       string
-	ToolGetter   func(ToolConfig) *float64
-	GlobalGetter func(CDERunConfig) *float64
-	info         optionFields
+	Name           string // kebab-case, used for flags (e.g. "cpus")
+	FieldName      string // PascalCase, used for reflection (pre-calculated)
+	Shorthand      string
+	Usage          string
+	Default        float64
+	EnvKey         string
+	ToolGetter     func(ToolConfig) *float64
+	GlobalGetter   func(*CDERunConfig) *float64
+	info           optionFields
+	fastPathGet    func(*CLIOptions) (*float64, *float64, bool)
+	fastPathAssign func(*ResolvedConfig, float64)
 }
 
 // StringSliceOption defines a string slice configuration option.
@@ -68,9 +76,11 @@ type StringSliceOption struct {
 	Usage          string
 	EnvKey         string
 	ToolGetter     func(ToolConfig) []string
-	GlobalGetter   func(CDERunConfig) []string
+	GlobalGetter   func(*CDERunConfig) []string
 	SkipResolution bool // If true, only used for flag registration or handled specially in ResolveWithFS
 	info           optionFields
+	fastPathGet    func(*CLIOptions) ([]string, []string, bool)
+	fastPathAssign func(*ResolvedConfig, []string)
 }
 
 var IntOptions = []IntOption{
@@ -82,7 +92,10 @@ var IntOptions = []IntOption{
 		ToolGetter: func(t ToolConfig) *int {
 			return t.PullMaxRetries
 		},
-		GlobalGetter: func(g CDERunConfig) *int {
+		GlobalGetter: func(g *CDERunConfig) *int {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.PullMaxRetries
 		},
 	},
@@ -95,7 +108,10 @@ var IntOptions = []IntOption{
 		ToolGetter: func(t ToolConfig) *int {
 			return t.PidsLimit
 		},
-		GlobalGetter: func(g CDERunConfig) *int {
+		GlobalGetter: func(g *CDERunConfig) *int {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.PidsLimit
 		},
 	},
@@ -108,7 +124,10 @@ var IntOptions = []IntOption{
 		ToolGetter: func(t ToolConfig) *int {
 			return t.CPUShares
 		},
-		GlobalGetter: func(g CDERunConfig) *int {
+		GlobalGetter: func(g *CDERunConfig) *int {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.CPUShares
 		},
 	},
@@ -122,7 +141,10 @@ var Float64Options = []Float64Option{
 		ToolGetter: func(t ToolConfig) *float64 {
 			return t.CPUs
 		},
-		GlobalGetter: func(g CDERunConfig) *float64 {
+		GlobalGetter: func(g *CDERunConfig) *float64 {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.CPUs
 		},
 	},
@@ -137,7 +159,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Env
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Env
 		},
 		SkipResolution: true, // resolved in resolveComplexOptions
@@ -158,7 +183,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Ports
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Ports
 		},
 	},
@@ -169,7 +197,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Expose
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Expose
 		},
 	},
@@ -180,7 +211,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.DNS
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.DNS
 		},
 	},
@@ -192,7 +226,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.AddHosts
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.AddHosts
 		},
 	},
@@ -204,7 +241,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.GroupAdd
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.GroupAdd
 		},
 	},
@@ -216,7 +256,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.CapAdd
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.CapAdd
 		},
 	},
@@ -228,7 +271,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.CapDrop
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.CapDrop
 		},
 	},
@@ -240,7 +286,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Ulimits
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Ulimits
 		},
 		SkipResolution: true, // resolved in resolveComplexOptions
@@ -252,7 +301,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.Entrypoint
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Entrypoint
 		},
 	},
@@ -270,7 +322,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.SensitiveEnv
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.SensitiveEnv
 		},
 		SkipResolution: true, // resolved early in resolveEarly
@@ -283,7 +338,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.SecurityOpt
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.SecurityOpt
 		},
 	},
@@ -295,7 +353,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.DNSSearch
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.DNSSearch
 		},
 	},
@@ -307,7 +368,10 @@ var StringSliceOptions = []StringSliceOption{
 		ToolGetter: func(t ToolConfig) []string {
 			return t.DNSOptions
 		},
-		GlobalGetter: func(g CDERunConfig) []string {
+		GlobalGetter: func(g *CDERunConfig) []string {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.DNSOptions
 		},
 	},
@@ -322,7 +386,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Network
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Network
 		},
 	},
@@ -330,7 +397,10 @@ var StringOptions = []StringOption{
 		Name:   "socket-path",
 		EnvKey: "CDERUN_SOCKET_PATH",
 		Usage:  "Path to the container runtime socket on the host",
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.SocketPath.Raw
 		},
 		SkipResolution: true, // resolved in resolveRuntimeAndSocket
@@ -342,7 +412,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.MountSocketPath.Raw
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.MountSocketPath.Raw
 		},
 		SkipResolution: true, // resolved in resolveTransitiveOptions
@@ -354,7 +427,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.MountCderunPath.Raw
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.MountCderunPath.Raw
 		},
 		SkipResolution: true, // resolved in resolveTransitiveOptions
@@ -374,7 +450,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Pid
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Pid
 		},
 	},
@@ -382,7 +461,10 @@ var StringOptions = []StringOption{
 		Name:   "engine",
 		EnvKey: "CDERUN_ENGINE",
 		Usage:  "Container engine to use (docker/podman/containerd)",
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			if g.Engine != "" {
 				return g.Engine
 			}
@@ -394,7 +476,10 @@ var StringOptions = []StringOption{
 		Name:   "runtime",
 		EnvKey: "CDERUN_RUNTIME",
 		Usage:  "Container engine to use (docker/podman/containerd) [deprecated: use engine]",
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Runtime
 		},
 		SkipResolution: true, // resolved in resolveEngineAndSocket
@@ -406,7 +491,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.ShmSize
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.ShmSize
 		},
 	},
@@ -418,7 +506,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Workdir
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Workdir
 		},
 	},
@@ -429,7 +520,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return strings.Join(t.MountTools, ",")
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return strings.Join(g.Defaults.MountTools, ",")
 		},
 		SkipResolution: true, // resolved in resolveTransitiveOptions (comma-separated string)
@@ -453,7 +547,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Hostname
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Hostname
 		},
 	},
@@ -465,7 +562,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.User
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.User
 		},
 	},
@@ -477,7 +577,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Pull
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Pull
 		},
 	},
@@ -489,7 +592,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.PullBackoffBase
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.PullBackoffBase
 		},
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as duration)
@@ -501,7 +607,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Prefetch
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Prefetch
 		},
 	},
@@ -513,7 +622,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Memory
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Memory
 		},
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as bytes)
@@ -527,7 +639,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.DryRunFormat
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.DryRunFormat
 		},
 	},
@@ -539,7 +654,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.DiagnosisFormat
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.DiagnosisFormat
 		},
 	},
@@ -551,7 +669,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.LogLevel
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Logging.Level
 		},
 	},
@@ -563,7 +684,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.LogFormat
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Logging.Format
 		},
 	},
@@ -575,7 +699,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.HangTimeout
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.HangTimeout
 		},
 		SkipResolution: true, // resolved in resolveCustomParsing (parsed as duration)
@@ -589,7 +716,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.IPC
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.IPC
 		},
 	},
@@ -602,7 +732,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.GPUs
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.GPUs
 		},
 	},
@@ -615,7 +748,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Cgroupns
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Cgroupns
 		},
 	},
@@ -628,7 +764,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.CpusetCpus
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.CpusetCpus
 		},
 	},
@@ -641,7 +780,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.CpusetMems
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.CpusetMems
 		},
 	},
@@ -654,7 +796,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.Restart
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.Restart
 		},
 	},
@@ -667,7 +812,10 @@ var StringOptions = []StringOption{
 		ToolGetter: func(t ToolConfig) string {
 			return t.OciRuntime
 		},
-		GlobalGetter: func(g CDERunConfig) string {
+		GlobalGetter: func(g *CDERunConfig) string {
+			if g == nil {
+				return ""
+			}
 			return g.Defaults.OciRuntime
 		},
 	},
@@ -683,7 +831,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.TTY
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.TTY
 		},
 	},
@@ -696,7 +847,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Interactive
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Interactive
 		},
 	},
@@ -707,7 +861,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.MountSocket
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.MountSocket
 		},
 	},
@@ -718,7 +875,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.MountCderun
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.MountCderun
 		},
 	},
@@ -729,7 +889,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.MountAllTools
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.MountAllTools
 		},
 	},
@@ -741,7 +904,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Remove
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Remove
 		},
 	},
@@ -753,7 +919,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.PublishAll
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.PublishAll
 		},
 	},
@@ -764,7 +933,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Privileged
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Privileged
 		},
 	},
@@ -775,7 +947,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.StrictEnv
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.StrictEnv
 		},
 	},
@@ -786,7 +961,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.DryRun
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.DryRun
 		},
 	},
@@ -797,7 +975,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Diagnosis
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Diagnosis
 		},
 	},
@@ -809,7 +990,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.LogTimestamp
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Logging.Timestamp
 		},
 	},
@@ -820,7 +1004,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.PrefetchAll
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.PrefetchAll
 		},
 	},
@@ -831,7 +1018,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.ReadOnly
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.ReadOnly
 		},
 	},
@@ -842,7 +1032,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Init
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Init
 		},
 	},
@@ -853,7 +1046,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.MountCderunSocket
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.MountCderunSocket
 		},
 	},
@@ -864,7 +1060,10 @@ var BoolOptions = []BoolOption{
 		ToolGetter: func(t ToolConfig) *bool {
 			return t.Prune
 		},
-		GlobalGetter: func(g CDERunConfig) *bool {
+		GlobalGetter: func(g *CDERunConfig) *bool {
+			if g == nil {
+				return nil
+			}
 			return g.Defaults.Prune
 		},
 	},
@@ -888,6 +1087,11 @@ func ensureRegistryMaps() {
 			if StringOptions[i].FieldName == "" {
 				StringOptions[i].FieldName = PascalCase(StringOptions[i].Name)
 			}
+			p1Get, p2Assign, ok := getStringOptionFastPathPtrsAndAssign(StringOptions[i].Name)
+			if ok {
+				StringOptions[i].fastPathGet = p1Get
+				StringOptions[i].fastPathAssign = p2Assign
+			}
 			stringOptionsMap[StringOptions[i].Name] = StringOptions[i]
 		}
 
@@ -895,6 +1099,11 @@ func ensureRegistryMaps() {
 		for i := range BoolOptions {
 			if BoolOptions[i].FieldName == "" {
 				BoolOptions[i].FieldName = PascalCase(BoolOptions[i].Name)
+			}
+			p1Get, p2Assign, ok := getBoolOptionFastPathPtrsAndAssign(BoolOptions[i].Name)
+			if ok {
+				BoolOptions[i].fastPathGet = p1Get
+				BoolOptions[i].fastPathAssign = p2Assign
 			}
 			boolOptionsMap[BoolOptions[i].Name] = BoolOptions[i]
 		}
@@ -904,6 +1113,11 @@ func ensureRegistryMaps() {
 			if IntOptions[i].FieldName == "" {
 				IntOptions[i].FieldName = PascalCase(IntOptions[i].Name)
 			}
+			p1Get, p2Assign, ok := getIntOptionFastPathPtrsAndAssign(IntOptions[i].Name)
+			if ok {
+				IntOptions[i].fastPathGet = p1Get
+				IntOptions[i].fastPathAssign = p2Assign
+			}
 			intOptionsMap[IntOptions[i].Name] = IntOptions[i]
 		}
 
@@ -912,6 +1126,11 @@ func ensureRegistryMaps() {
 			if Float64Options[i].FieldName == "" {
 				Float64Options[i].FieldName = PascalCase(Float64Options[i].Name)
 			}
+			p1Get, p2Assign, ok := getFloat64OptionFastPathPtrsAndAssign(Float64Options[i].Name)
+			if ok {
+				Float64Options[i].fastPathGet = p1Get
+				Float64Options[i].fastPathAssign = p2Assign
+			}
 			float64OptionsMap[Float64Options[i].Name] = Float64Options[i]
 		}
 
@@ -919,6 +1138,11 @@ func ensureRegistryMaps() {
 		for i := range StringSliceOptions {
 			if StringSliceOptions[i].FieldName == "" {
 				StringSliceOptions[i].FieldName = PascalCase(StringSliceOptions[i].Name)
+			}
+			p1Get, p2Assign, ok := getStringSliceOptionFastPathSlicesAndAssign(StringSliceOptions[i].Name)
+			if ok {
+				StringSliceOptions[i].fastPathGet = p1Get
+				StringSliceOptions[i].fastPathAssign = p2Assign
 			}
 			stringSliceOptionsMap[StringSliceOptions[i].Name] = StringSliceOptions[i]
 		}
