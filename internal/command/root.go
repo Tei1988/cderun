@@ -209,6 +209,19 @@ func (o *rootOptions) applyToolMounts(
 		return nil
 	}
 
+	extraMounts := 1 // 1 for cderun binary mount
+	if resolved.MountAllTools {
+		extraMounts += len(toolsCfg)
+	} else if len(resolved.MountTools) > 0 {
+		extraMounts += len(resolved.MountTools)
+	}
+	neededCap := len(cfg.Mounts) + extraMounts
+	if cap(cfg.Mounts) < neededCap {
+		buf := make([]container.Mount, len(cfg.Mounts), neededCap)
+		copy(buf, cfg.Mounts)
+		cfg.Mounts = buf
+	}
+
 	exePath := resolved.MountCderunPath
 	if exePath == "" {
 		var err error
@@ -299,6 +312,13 @@ func (o *rootOptions) applySocketMount(
 		return nil
 	}
 
+	neededCap := len(cfg.Mounts) + 1
+	if cap(cfg.Mounts) < neededCap {
+		buf := make([]container.Mount, len(cfg.Mounts), neededCap)
+		copy(buf, cfg.Mounts)
+		cfg.Mounts = buf
+	}
+
 	// Add socket mount
 	cfg.Mounts = append(cfg.Mounts, container.Mount{
 		Type:     "bind",
@@ -340,6 +360,12 @@ func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
 }
 
 func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *container.ContainerConfig {
+	var mounts []container.Mount
+	if resolved.Mounts != nil {
+		mounts = make([]container.Mount, len(resolved.Mounts))
+		copy(mounts, resolved.Mounts)
+	}
+
 	return &container.ContainerConfig{
 		Image:       resolved.Image,
 		Command:     cmdArgs,
@@ -349,7 +375,7 @@ func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *
 		Remove:      resolved.Remove,
 		ReadOnly:    resolved.ReadOnly,
 		Init:        resolved.Init,
-		Mounts:      resolved.Mounts,
+		Mounts:      mounts,
 		Env:         resolved.Env,
 		Workdir:     resolved.Workdir,
 		User:        resolved.User,
