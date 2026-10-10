@@ -3,204 +3,220 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type dummyFileInfo struct {
-	name    string
-	size    int64
-	mode    os.FileMode
-	modTime time.Time
-	isDir   bool
+type statErrFileSystem struct {
+	FileSystem
+	statCalls int32
 }
 
-func (d dummyFileInfo) Name() string       { return d.name }
-func (d dummyFileInfo) Size() int64        { return d.size }
-func (d dummyFileInfo) Mode() os.FileMode  { return d.mode }
-func (d dummyFileInfo) ModTime() time.Time { return d.modTime }
-func (d dummyFileInfo) IsDir() bool        { return d.isDir }
-func (d dummyFileInfo) Sys() any           { return nil }
-
-type t92MockFS struct {
-	MockFileSystem
-	statOverride map[string]os.FileInfo
+func (s *statErrFileSystem) Stat(name string) (os.FileInfo, error) {
+	count := atomic.AddInt32(&s.statCalls, 1)
+	// Allow first call during loader.FindConfigs to succeed; fail subsequent Stat calls during resolveFile
+	if count > 1 {
+		return nil, os.ErrPermission
+	}
+	return s.FileSystem.Stat(name)
 }
 
-func (m *t92MockFS) Stat(name string) (os.FileInfo, error) {
-	if m.statOverride != nil {
-		if info, ok := m.statOverride[name]; ok {
-			return info, nil
-		}
-	}
-	return m.MockFileSystem.Stat(name)
-}
+func TestUnit_Expression_FileAndFindDirDirectiveFallbacks(t *testing.T) {
+	tempDir := t.TempDir()
 
-func TestUnit_Expression_T92_FileAndFindDirFallback(t *testing.T) {
-	fs := &t92MockFS{
-		MockFileSystem: MockFileSystem{
-			Files: map[string][]byte{
-				"/project/normal.txt":                []byte("1.2.3\n"),
-				"/project/empty.txt":                 []byte("   \n"),
-				"/project/master_file":               []byte("content"),
-				"/project/services/app/.cderun.yaml": []byte("runtime: docker"),
-			},
-			Dirs: map[string]bool{
-				"/project":              true,
-				"/project/services":     true,
-				"/project/services/app": true,
-			},
-			WD:      "/project/services/app",
-			HomeDir: "/home/user",
-		},
-		statOverride: map[string]os.FileInfo{
-			"/project/large.txt": dummyFileInfo{name: "large.txt", size: MaxDirectiveFileSize + 10},
-		},
-	}
-	fs.Files["/project/large.txt"] = []byte("large")
-	fs.Dirs["/project/large.txt"] = false
+	// Create test structure in tempDir
+	validFile := filepath.Join(tempDir, "valid.txt")
+	require.NoError(t, os.WriteFile(validFile, []byte("  valid content  \n"), 0644))
 
-	hostCtx := &HostContext{
-		Level:      0,
-		HomeDir:    "/home/user",
-		WorkingDir: "/project/services/app",
-	}
+	emptyFile := filepath.Join(tempDir, "empty.txt")
+	require.NoError(t, os.WriteFile(emptyFile, []byte("   \n"), 0644))
 
-	t.Run("file directive fallback when missing", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	markerDir := filepath.Join(tempDir, "marker_dir")
+	require.NoError(t, os.MkdirAll(markerDir, 0755))
+	markerFile := filepath.Join(markerDir, "my_marker.txt")
+	require.NoError(t, os.WriteFile(markerFile, []byte("marker"), 0644))
+
+	oversizedFile := filepath.Join(tempDir, "oversized.txt")
+	require.NoError(t, os.WriteFile(oversizedFile, make([]byte, MaxDirectiveFileSize+10), 0644))
+
+	origWd, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tempDir))
+	t.Cleanup(func() {
+		_ = os.Chdir(origWd)
+	})
+
+	fs := RealFileSystem{}
+
+	t.Run("file directive fallback when missing file", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		val, err := r.ResolveString("{{file:missing.txt:-1.0.0}}")
-		require.NoError(t, err)
+		val, err := r.ResolveString("{{file:nonexistent.txt:-fallback_content}}")
+		assert.NoError(t, err)
 		assert.NoError(t, r.Error())
-		assert.Equal(t, "1.0.0", val)
-	})
+		assert.Equal(t, "fallback_content", val)
 
-	t.Run("file directive fallback when empty file", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-
-		val, err := r.ResolveString("{{file:empty.txt:-default_val}}")
-		require.NoError(t, err)
+		// 1. Read error fallback (resolving a directory entry triggers ReadFile error, falling back to default)
+		valDir, errDir := r.ResolveString("{{file:marker_dir:-dir_read_fallback}}")
+		assert.NoError(t, errDir)
 		assert.NoError(t, r.Error())
-		assert.Equal(t, "default_val", val)
+		assert.Equal(t, "dir_read_fallback", valDir)
+
+		// 2. Cached-error sequence: first resolve with default (caches error, returns default), then without default (hits cached error)
+		rCacheSeq, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		valCached1, err1 := rCacheSeq.ResolveString("{{file:missing_seq.txt:-first_default}}")
+		assert.NoError(t, err1)
+		assert.NoError(t, rCacheSeq.Error())
+		assert.Equal(t, "first_default", valCached1)
+
+		// Second resolve of same missing file without default hits fileCache and returns cached error
+		rCacheSeq2, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+		rCacheSeq2.shared.Store(rCacheSeq.getShared()) // share state cache
+
+		_, err2 := rCacheSeq2.ResolveString("{{file:missing_seq.txt}}")
+		assert.Error(t, err2)
+		assert.Contains(t, err2.Error(), "file not found")
 	})
 
-	t.Run("file directive existing file returns file content", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	t.Run("file directive fallback when Stat fails", func(t *testing.T) {
+		statFS := &statErrFileSystem{FileSystem: fs}
+		rStatErr, err := NewExpressionResolverWithFS(nil, statFS)
 		require.NoError(t, err)
 
-		val, err := r.ResolveString("{{file:normal.txt:-default_val}}")
+		val, err := rStatErr.ResolveString("{{file:valid.txt:-stat_fallback}}")
+		assert.NoError(t, err)
+		assert.NoError(t, rStatErr.Error())
+		assert.Equal(t, "stat_fallback", val)
+		assert.GreaterOrEqual(t, atomic.LoadInt32(&statFS.statCalls), int32(2))
+	})
+
+	t.Run("file directive fallback when file is empty", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
+
+		val, err := r.ResolveString("{{file:empty.txt:-default_content}}")
+		assert.NoError(t, err)
 		assert.NoError(t, r.Error())
-		assert.Equal(t, "1.2.3", val)
+		assert.Equal(t, "default_content", val)
 	})
 
-	t.Run("find_dir directive fallback when missing", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	t.Run("file directive returns file content when present and non-empty", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		val, err := r.ResolveString("{{find_dir:nonexistent:-/fallback/dir}}")
-		require.NoError(t, err)
+		val, err := r.ResolveString("{{file:valid.txt:-default_content}}")
+		assert.NoError(t, err)
 		assert.NoError(t, r.Error())
-		assert.Equal(t, "/fallback/dir", val)
+		assert.Equal(t, "valid content", val)
 	})
 
-	t.Run("find_dir directive existing item returns directory path", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	t.Run("file directive fails and does not fallback when size limit exceeded", func(t *testing.T) {
+		rFresh, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		val, err := r.ResolveString("{{find_dir:master_file:-/fallback/dir}}")
-		require.NoError(t, err)
-		assert.NoError(t, r.Error())
-		assert.Equal(t, filepath.FromSlash("/project"), val)
-	})
-
-	t.Run("nested expression inside default value", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-
-		val, err := r.ResolveString("{{find_dir:master:-{{PWD}}}}")
-		require.NoError(t, err)
-		assert.NoError(t, r.Error())
-		assert.Equal(t, "/project/services/app", val)
-	})
-
-	t.Run("cached error by NAME still allows fallback", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-
-		// First call without default caches the error
-		r.resolveString("{{file:missing_cached.txt}}")
-		require.Error(t, r.Error())
-
-		// Create a fresh resolver to test cache behavior without sticky error
-		r2, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-		r2.shared.Store(r.getShared())
-		r2.resolveString("{{file:missing_cached.txt}}")
-		require.Error(t, r2.Error())
-
-		// Now evaluate with fallback using a new resolver instance sharing state
-		r3, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-		r3.shared.Store(r.getShared())
-		val, err := r3.ResolveString("{{file:missing_cached.txt:-cached_fallback}}")
-		require.NoError(t, err)
-		assert.NoError(t, r3.Error())
-		assert.Equal(t, "cached_fallback", val)
-	})
-
-	t.Run("oversized file does NOT trigger fallback and returns error", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
-		require.NoError(t, err)
-
-		_, err = r.ResolveString("{{file:large.txt:-default_val}}")
-		require.Error(t, err)
+		val, err := rFresh.ResolveString("{{file:oversized.txt:-fallback_for_oversized}}")
+		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "too large")
+		assert.NotEqual(t, "fallback_for_oversized", val)
 	})
 
-	t.Run("invalid parameter syntax (parent traversal) does NOT trigger fallback", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	t.Run("find_dir directive fallback when missing marker", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		_, err = r.ResolveString("{{file:../etc/passwd:-default_val}}")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "only a single file name is allowed")
+		val, err := r.ResolveString("{{find_dir:nonexistent_marker:-/fallback/path}}")
+		assert.NoError(t, err)
+		assert.NoError(t, r.Error())
+		assert.Equal(t, "/fallback/path", val)
 	})
 
-	t.Run("control character in default value triggers security error", func(t *testing.T) {
-		r, err := NewExpressionResolverWithFS(hostCtx, fs)
+	t.Run("find_dir directive returns directory path when marker found", func(t *testing.T) {
+		subDir := filepath.Join(tempDir, "marker_dir")
+		origSubWd, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(subDir))
+		defer func() { _ = os.Chdir(origSubWd) }()
+
+		r, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		_, err = r.ResolveString("{{file:missing.txt:-\x01invalid}}")
-		require.Error(t, err)
+		val, err := r.ResolveString("{{find_dir:my_marker.txt:-/fallback/path}}")
+		assert.NoError(t, err)
+		assert.NoError(t, r.Error())
+		absMarkerDir, err := filepath.Abs(markerDir)
+		require.NoError(t, err)
+		assert.Equal(t, absMarkerDir, val)
+	})
+
+	t.Run("nested find_dir fallback to PWD magic word", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		val, err := r.ResolveString("{{find_dir:missing_marker:-{{PWD}}}}")
+		assert.NoError(t, err)
+		assert.NoError(t, r.Error())
+		absTempDir, err := filepath.Abs(tempDir)
+		require.NoError(t, err)
+		assert.Equal(t, absTempDir, val)
+	})
+
+	t.Run("multi level nested fallback find_dir to file to env to fallback", func(t *testing.T) {
+		r, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		exprStr := "{{find_dir:missing_marker:-{{file:missing.txt:-{{env:UNSET_VAR_T92:-/ultimate/fallback}}}}}}"
+		val, err := r.ResolveString(exprStr)
+		assert.NoError(t, err)
+		assert.NoError(t, r.Error())
+		assert.Equal(t, "/ultimate/fallback", val)
+	})
+
+	t.Run("security validation rejects invalid default value in file directive", func(t *testing.T) {
+		rFresh, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		_, err = rFresh.ResolveString("{{file:nonexistent.txt:-\x01invalid}}")
+		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "security validation failed")
 	})
 
-	t.Run("stat failure on first request triggers fallback", func(t *testing.T) {
-		statErrFS := &t92MockFS{
-			MockFileSystem: MockFileSystem{
-				Files: map[string][]byte{
-					"/project/stat_err.txt": []byte("some text"),
-				},
-				Dirs: map[string]bool{
-					"/project": true,
-				},
-				WD:      "/project",
-				HomeDir: "/home/user",
-				StatErr: os.ErrPermission,
-			},
-		}
-		r, err := NewExpressionResolverWithFS(hostCtx, statErrFS)
+	t.Run("security validation rejects invalid default value in find_dir directive", func(t *testing.T) {
+		rFresh, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
 
-		val, err := r.ResolveString("{{file:stat_err.txt:-stat_fallback}}")
+		_, err = rFresh.ResolveString("{{find_dir:nonexistent_marker:-\x01invalid}}")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "security validation failed")
+	})
+
+	t.Run("invalid parameter syntax in find_dir fails without fallback", func(t *testing.T) {
+		rFresh, err := NewExpressionResolverWithFS(nil, fs)
 		require.NoError(t, err)
-		assert.NoError(t, r.Error())
-		assert.Equal(t, "stat_fallback", val)
+
+		_, err = rFresh.ResolveString("{{find_dir:../invalid:-/fallback}}")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "only a single file or directory name is allowed")
+	})
+
+	t.Run("verify sticky error remains nil after successful fallbacks", func(t *testing.T) {
+		rFresh, err := NewExpressionResolverWithFS(nil, fs)
+		require.NoError(t, err)
+
+		res1, err1 := rFresh.ResolveString("{{find_dir:missing_marker:-/default/path}}")
+		assert.NoError(t, err1)
+		assert.Equal(t, "/default/path", res1)
+
+		res2, err2 := rFresh.ResolveString("{{file:missing_file.txt:-default_val}}")
+		assert.NoError(t, err2)
+		assert.Equal(t, "default_val", res2)
+
+		assert.NoError(t, rFresh.Error())
 	})
 }
