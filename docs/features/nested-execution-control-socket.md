@@ -145,7 +145,7 @@ The Base Host `cderun` process is a policy enforcement point, not a transparent 
 
 - A nested request's effective `ContainerConfig` (image, mounts, capabilities, privileged mode) is capped by the **parent's own granted configuration** — a nested invocation cannot request broader privileges than the container it is running inside was itself given.
 - This directly addresses the security warning already present in [Nested Execution](./nested-execution.md) regarding unscoped raw socket mounts (particularly rootful Docker/containerd sockets).
-- Exact policy rules (allow-list vs. inherited-ceiling model) are an implementation detail to be finalized against `docs/features/security-validations.md` conventions; this document only fixes the requirement that *some* enforcement point must exist, where today there is none.
+- Policy enforcement is implemented via an **inherited-ceiling model** (`ValidateInheritedCeiling` in `internal/runtime/controlsocket/policy.go`), wired directly through `SetParentConfig` in `server.go` and `internal/command/root.go` to validate nested requests against parent container boundaries.
 
 ### Engine/Adapter Selection Is Fixed at the Base Host
 

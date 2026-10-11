@@ -118,7 +118,7 @@ Configuration fields use **camelCase** keys.
 - `cpus` (float64)
 - `pullMaxRetries`, `pidsLimit`, `cpuShares` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
-- `mountCderunPath`, `mountSocketPath`, `mountCderunSocketPath` (string)
+- `mountCderunPath`, `mountSocketPath` (string)
 - `mountTools`, `ports`, `expose`, `dns`, `dnsSearch`, `dnsOptions`, `addHosts`, `groupAdd`, `capAdd`, `capDrop`, `entrypoint`, `env`, `sensitiveEnv`, `securityOpt`, `ulimits`, `sysctls` ([]string)
 - `dryRun`, `diagnosis` (bool)
 - `dryRunFormat`, `diagnosisFormat` (string)
