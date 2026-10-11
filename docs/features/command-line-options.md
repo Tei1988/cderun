@@ -200,6 +200,18 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 cderun --mount-cderun-socket alpine sh
 ```
 
+### `--mount-cderun-socket-path`
+
+- **Type**: string
+- **Default**: `/run/cderun/cderun.sock`
+- **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET_PATH`
+- **Description**: Specifies the path inside the container where the cderun Control Socket should be mounted.
+- **Validation**: Must be an absolute path and must not contain any parent directory traversal (`..`) segments.
+
+```bash
+cderun --mount-cderun-socket --mount-cderun-socket-path /run/cderun/cderun.sock alpine sh
+```
+
 ### `--mount-tools`
 
 - **Type**: string (comma-separated list)
