@@ -100,9 +100,9 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 
 | Directive | Description |
 | :--- | :--- |
-| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{file:<filename>:-default}}` when the file is missing, cannot be read/stat, or when trimmed content is empty. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing. |
-| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version}}}}`). |
+| `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{file:<filename>:-default}}` when the file is missing, cannot be read/stat, or when trimmed content is empty. Example: `{{file:.go-version:-1.22.0}}`. |
+| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing or absolute-path resolution fails. Example: `{{find_dir:master:-{{PWD}}}}`. |
+| `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version:-1.0.0}}}}`). |
 
 ### Directive Fallback Syntax & Rules (`:-default`)
 
@@ -111,7 +111,7 @@ All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` 
 #### Fallback Trigger vs. Immediate Error Conditions
 
 1. **Trigger Conditions (Fallback Is Evaluated)**:
-   - **`file:`**: Target file does not exist, file read/stat fails (e.g., target is a directory or lacks read permissions), or trimmed file content is empty.
+   - **`file:`**: Target file does not exist, file read/stat fails (e.g., target is a directory or lacks read permissions), or trimmed file content is empty (`""`).
    - **`find_dir:`**: Target file or directory name is not found during upward directory traversal, or absolute-path resolution (`r.fs.Abs(dir)`) fails after the target is found.
    - **`env:`**: Environment variable is unset or empty (`""`).
    - *Behavior on Trigger*: When a fallback trigger occurs and a default value is provided, the resolution engine evaluates the default value, does **NOT** record a sticky error, and proceeds with the resolved fallback string.

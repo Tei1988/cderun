@@ -10,11 +10,6 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - 各タスクは自己完結している。原則 1 タスク = 1 PR とし、「完了条件」をすべて満たすこと
 - 記録のファイルパス・行番号は T01〜T39 が 2026-06-04 時点、T40〜T67 が 2026-07-03 時点（2026-07-06 の main マージ後に再検証済み）、T68 以降が 2026-07-06 時点のコードベースで検証済み（ずれていたら grep で再特定すること）
 
-## Documentation Update Tasks (Pending)
-
-- [ ] Update `docs/features/value-resolution.md` to document `{{file:NAME:-DEFAULT}}` and `{{find_dir:NAME:-DEFAULT}}` fallback syntax, details on fallback triggers (missing file/marker, empty file content), and security parameter validation invariants.
-- [ ] Update `README.md` under "Value Resolution & Expression Engine" to include `:-default` fallback syntax examples for `file:` and `find_dir:` directives.
-
 ## タスク一覧（サマリ）
 
 | ID | タイトル | 種別 | 優先度 | 規模 | 仕様変更 | ステータス |
