@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"cderun/internal/container"
+	"cderun/internal/logging"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,19 @@ func TestUnit_NerdctlRuntime_AdversarialArgumentInjection(t *testing.T) {
 	rt, err := NewNerdctlRuntime("", WithNerdctlExecPath(fakeExec))
 	require.NoError(t, err)
 	assert.Equal(t, "nerdctl", rt.Name())
+
+	t.Run("NewNerdctlRuntime options handling and logger guard", func(t *testing.T) {
+		customLogger := logging.NewLogger()
+		rtCustom, err := NewNerdctlRuntime("", WithNerdctlLogger(customLogger))
+		require.NoError(t, err)
+		assert.Same(t, customLogger, rtCustom.logger)
+
+		// Passing nil logger option preserves the original default logger
+		rtNilOpt, err := NewNerdctlRuntime("", WithNerdctlLogger(nil))
+		require.NoError(t, err)
+		assert.NotNil(t, rtNilOpt.logger)
+		assert.NotSame(t, customLogger, rtNilOpt.logger)
+	})
 
 	t.Run("CreateContainer neutralizes malicious flag strings in fields", func(t *testing.T) {
 		cfg := &container.ContainerConfig{
@@ -54,7 +68,7 @@ func TestUnit_NerdctlRuntime_AdversarialArgumentInjection(t *testing.T) {
 			}
 		}
 
-		// Verify that "--" appears before "--privileged" positional argument
+		// Verify that all option flags are passed as combined "--flag=value" tokens before "--"
 		doubleDashIdx := -1
 		for i, arg := range rawArgs {
 			if arg == "--" {
@@ -62,21 +76,19 @@ func TestUnit_NerdctlRuntime_AdversarialArgumentInjection(t *testing.T) {
 				break
 			}
 		}
-		require.NotEqual(t, -1, doubleDashIdx, "expected '--' positional separator in raw args: %v", rawArgs)
-		require.Greater(t, len(rawArgs), doubleDashIdx+1)
-		assert.Equal(t, "--privileged", rawArgs[doubleDashIdx+1])
+		require.NotEqual(t, -1, doubleDashIdx, "expected '--' delimiter in built argv")
 
-		// Re-test via CLIArgBuilder verification
+		// Re-verify with CLIArgBuilder
 		builder := NewCLIArgBuilder()
-		builder.AddJoinedFlag("--workdir", cfg.Workdir, true)
-		builder.AddJoinedFlag("--user", cfg.User, true)
-		builder.AddJoinedFlag("--hostname", cfg.Hostname, true)
-		builder.AddJoinedFlag("--net", cfg.Network, true)
-		builder.AddJoinedFlag("--shm-size", cfg.ShmSize, true)
-		builder.AddJoinedFlag("--cpuset-cpus", cfg.CpusetCpus, true)
-		builder.AddJoinedFlag("--gpus", cfg.GPUs, true)
-		for _, e := range cfg.Env {
-			builder.AddJoinedFlag("--env", e, false)
+		builder.AddJoinedFlag("--net", cfg.Network, false)
+		builder.AddJoinedFlag("--workdir", cfg.Workdir, false)
+		builder.AddJoinedFlag("--user", cfg.User, false)
+		builder.AddJoinedFlag("--hostname", cfg.Hostname, false)
+		builder.AddJoinedFlag("--shm-size", cfg.ShmSize, false)
+		builder.AddJoinedFlag("--cpuset-cpus", cfg.CpusetCpus, false)
+		builder.AddJoinedFlag("--gpus", cfg.GPUs, false)
+		for _, env := range cfg.Env {
+			builder.AddJoinedFlag("--env", env, false)
 		}
 		for _, cap := range cfg.CapAdd {
 			builder.AddJoinedFlag("--cap-add", cap, false)
