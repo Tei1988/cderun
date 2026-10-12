@@ -44,7 +44,7 @@ func TestUnit_ControlSocket_Server_TimeoutAndDispatcherConfiguration(t *testing.
 	// Handler tracking
 	assert.Equal(t, 0, server.ActiveHandlerCount())
 	seq, done := server.trackHandlerStart("TestRPC")
-	assert.Greater(t, seq, uint64(0))
+	assert.Positive(t, seq)
 	assert.Equal(t, 1, server.ActiveHandlerCount())
 	done()
 	assert.Equal(t, 0, server.ActiveHandlerCount())
