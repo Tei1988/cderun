@@ -124,7 +124,7 @@ If no engine or socket is explicitly specified, the resolver scans for socket fi
 2. `/run/containerd/containerd.sock` (Launches `containerd` engine).
 3. `/run/podman/podman.sock` (Launches `podman` engine).
 
-If no socket file is discovered, `cderun` defaults to `docker` at `/var/run/docker.sock` (which may fail at execution time if the service is stopped).
+If no socket file is discovered, `cderun` defaults to `docker` at `/var/run/docker.sock` (which may fail at execution time if the service is stopped). When `nerdctl` engine is explicitly specified without a socket path, `cderun` defaults to `/run/containerd/containerd.sock`.
 
 #### Performance Optimization: Process Socket Cache
 
