@@ -356,14 +356,13 @@ func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
 	if len(passthroughArgs) == 0 {
 		return nil, nil
 	}
-	return append([]string{}, passthroughArgs...), nil
+	return slices.Clone(passthroughArgs), nil
 }
 
 func newBaseContainerConfig(resolved *config.ResolvedConfig, cmdArgs []string) *container.ContainerConfig {
 	var mounts []container.Mount
 	if resolved.Mounts != nil {
-		mounts = make([]container.Mount, len(resolved.Mounts))
-		copy(mounts, resolved.Mounts)
+		mounts = slices.Clone(resolved.Mounts)
 	}
 
 	return &container.ContainerConfig{
@@ -1702,7 +1701,7 @@ func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int
 		} else if len(arg) > 1 {
 			// Shorthand(s), e.g., -i, -it, -p 80:80
 			// For shorthand, we only handle the case where the last shorthand in the group takes an argument.
-			lastChar := string(arg[len(arg)-1])
+			lastChar := arg[len(arg)-1:]
 			f := cmd.PersistentFlags().ShorthandLookup(lastChar)
 			if f == nil {
 				f = cmd.Flags().ShorthandLookup(lastChar)
@@ -1768,7 +1767,7 @@ func hoistOverridesInto(cmd *cobra.Command, args []string, isPolyglot bool, subc
 		shouldHoist := strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
-			if strings.HasPrefix(arg, "--") && !strings.Contains(arg, "=") {
+			if !strings.Contains(arg, "=") {
 				name := arg[2:]
 				f := cmd.PersistentFlags().Lookup(name)
 				if f == nil {
