@@ -57,4 +57,22 @@ func TestUnit_CLIArgBuilder_JoinedFlagsAndDoubleDash(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not start with '-'")
 	})
+
+	t.Run("VerifyStructure detects null byte in arguments", func(t *testing.T) {
+		builder := NewCLIArgBuilder()
+		malformedArgv := []string{"--env=FOO=\x00BAR", "--", "alpine:latest"}
+
+		err := builder.VerifyStructure(malformedArgv, -1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "contains null byte")
+	})
+
+	t.Run("VerifyStructure detects control character in arguments", func(t *testing.T) {
+		builder := NewCLIArgBuilder()
+		malformedArgv := []string{"--env=FOO=\x07BAR", "--", "alpine:latest"}
+
+		err := builder.VerifyStructure(malformedArgv, -1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "contains control character")
+	})
 }

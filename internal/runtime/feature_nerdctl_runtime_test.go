@@ -115,4 +115,37 @@ func TestUnit_NerdctlRuntime_AdversarialArgumentInjection(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown pull policy")
 	})
+
+	t.Run("ValidateConfig rejects path traversal and null bytes", func(t *testing.T) {
+		// Parent directory traversal in mount source
+		cfgMountTraversal := &container.ContainerConfig{
+			Image: "alpine",
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/tmp/../etc/passwd", Target: "/etc/passwd"},
+			},
+		}
+		err := rt.ValidateConfig(cfgMountTraversal)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+
+		// Parent directory traversal in device path
+		cfgDevTraversal := &container.ContainerConfig{
+			Image: "alpine",
+			Devices: []container.DeviceMapping{
+				{PathOnHost: "/dev/../etc/shadow", PathInContainer: "/dev/shadow"},
+			},
+		}
+		err = rt.ValidateConfig(cfgDevTraversal)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+
+		// Null byte in environment variable
+		cfgEnvNull := &container.ContainerConfig{
+			Image: "alpine",
+			Env:   []string{"FOO=bar\x00baz"},
+		}
+		err = rt.ValidateConfig(cfgEnvNull)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "contains null byte")
+	})
 }
