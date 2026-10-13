@@ -275,6 +275,7 @@ func TestClient_AttachContainer_StreamingScenarios(t *testing.T) {
 
 	t.Run("tty raw stream piping with stdin input", func(t *testing.T) {
 		t.Parallel()
+		expectedPayload := []byte("test input\n")
 		socketPath, _ := startDummyServer(t, func(conn net.Conn) {
 			defer conn.Close()
 
@@ -301,11 +302,10 @@ func TestClient_AttachContainer_StreamingScenarios(t *testing.T) {
 				})
 				_ = controlsocket.WriteFrame(conn, okResp)
 
-				// Echo stdin back to output
-				buf := make([]byte, 128)
-				n, _ := conn.Read(buf)
-				if n > 0 {
-					_, _ = conn.Write(append([]byte("echo: "), buf[:n]...))
+				// Read full expected stdin payload before echoing
+				buf := make([]byte, len(expectedPayload))
+				if _, err := io.ReadFull(conn, buf); err == nil {
+					_, _ = conn.Write(append([]byte("echo: "), buf...))
 				}
 			}
 		})
@@ -317,7 +317,7 @@ func TestClient_AttachContainer_StreamingScenarios(t *testing.T) {
 		require.NoError(t, err)
 		defer client.Close()
 
-		stdinReader := bytes.NewReader([]byte("test input\n"))
+		stdinReader := bytes.NewReader(expectedPayload)
 		var stdoutBuf bytes.Buffer
 		ready := make(chan struct{})
 
@@ -377,17 +377,59 @@ func TestClient_AttachContainer_StreamingScenarios(t *testing.T) {
 	})
 }
 
-func TestClient_AttachContainer_PipeErrorHelpers(t *testing.T) {
+type errReader struct {
+	err error
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	return 0, e.err
+}
+
+func TestClient_AttachContainer_StdinReaderErrorPropagation(t *testing.T) {
 	t.Parallel()
 
-	// Test EOF / ErrClosed return nil error logic via copyErrOrNil indirectly tested above
-	pipeR, pipeW := net.Pipe()
-	_ = pipeR.Close()
-	_ = pipeW.Close()
+	expectedErr := errors.New("custom stdin read error")
+	socketPath, _ := startDummyServer(t, func(conn net.Conn) {
+		defer conn.Close()
 
-	// Verify error handling for closed pipe
-	var buf [10]byte
-	_, err := pipeR.Read(buf[:])
+		// Handshake
+		_, _ = controlsocket.ReadFrame(conn)
+		resp, _ := json.Marshal(controlsocket.HandshakeResponse{
+			Accepted:      true,
+			ServerVersion: "1.0.0",
+		})
+		_ = controlsocket.WriteFrame(conn, resp)
+
+		// Read Attach request
+		frame, err := controlsocket.ReadFrame(conn)
+		if err != nil {
+			return
+		}
+
+		var reqFrame controlsocket.RequestFrame
+		_ = json.Unmarshal(frame, &reqFrame)
+
+		if reqFrame.Type == controlsocket.MsgAttachContainer {
+			okResp, _ := json.Marshal(controlsocket.ResponseFrame{
+				Success: true,
+			})
+			_ = controlsocket.WriteFrame(conn, okResp)
+			// Keep server connection open to allow stdin reader goroutine to attempt read
+			time.Sleep(100 * time.Millisecond)
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	client, err := controlsocket.Connect(ctx, socketPath)
+	require.NoError(t, err)
+	defer client.Close()
+
+	stdinErrReader := &errReader{err: expectedErr}
+	ready := make(chan struct{})
+
+	err = client.AttachContainer(ctx, "c789", true, stdinErrReader, nil, nil, ready)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed))
+	assert.ErrorIs(t, err, expectedErr)
 }
