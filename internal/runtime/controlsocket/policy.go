@@ -79,9 +79,11 @@ func validateCapAdd(childCaps, parentCaps []string) error {
 		parentSet[normalizeCap(cap)] = true
 	}
 
+	parentHasAll := parentSet["ALL"]
+
 	for _, cap := range childCaps {
 		norm := normalizeCap(cap)
-		if !parentSet[norm] {
+		if !parentHasAll && !parentSet[norm] {
 			return fmt.Errorf("security violation: child requested capability %q not permitted by parent", cap)
 		}
 	}
@@ -95,6 +97,22 @@ func validateCapDrop(childDrop, parentDrop []string) error {
 	childDropSet := make(map[string]bool, len(childDrop))
 	for _, cap := range childDrop {
 		childDropSet[normalizeCap(cap)] = true
+	}
+
+	if childDropSet["ALL"] {
+		return nil
+	}
+
+	parentHasAll := false
+	for _, cap := range parentDrop {
+		if normalizeCap(cap) == "ALL" {
+			parentHasAll = true
+			break
+		}
+	}
+
+	if parentHasAll {
+		return fmt.Errorf("security violation: parent dropped ALL capabilities, child must also drop ALL")
 	}
 
 	for _, cap := range parentDrop {

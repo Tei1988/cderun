@@ -124,6 +124,40 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		assert.Contains(t, errDrop.Error(), "child must drop capability \"SYS_PTRACE\"")
 	})
 
+	t.Run("cap add and cap drop ALL keyword semantics", func(t *testing.T) {
+		// Parent with CapAdd: ALL permits any child CapAdd
+		parentCapAll := &container.ContainerConfig{
+			CapAdd: []string{"ALL"},
+		}
+		childAnyCap := &container.ContainerConfig{
+			CapAdd: []string{"SYS_ADMIN", "NET_ADMIN", "SYS_RAWIO"},
+		}
+		require.NoError(t, ValidateInheritedCeiling(childAnyCap, parentCapAll))
+
+		// Child with CapDrop: ALL satisfies parent requiring specific cap drops
+		parentDropSpecific := &container.ContainerConfig{
+			CapDrop: []string{"SYS_ADMIN", "NET_RAW"},
+		}
+		childDropAll := &container.ContainerConfig{
+			CapDrop: []string{"ALL"},
+		}
+		require.NoError(t, ValidateInheritedCeiling(childDropAll, parentDropSpecific))
+
+		// Parent with CapDrop: ALL requires child to also drop ALL
+		parentDropAll := &container.ContainerConfig{
+			CapDrop: []string{"ALL"},
+		}
+		childDropSpecific := &container.ContainerConfig{
+			CapDrop: []string{"SYS_ADMIN"},
+		}
+		errDropAll := ValidateInheritedCeiling(childDropSpecific, parentDropAll)
+		require.Error(t, errDropAll)
+		assert.Contains(t, errDropAll.Error(), "parent dropped ALL capabilities, child must also drop ALL")
+
+		// Child with CapDrop: ALL satisfies parent with CapDrop: ALL
+		require.NoError(t, ValidateInheritedCeiling(childDropAll, parentDropAll))
+	})
+
 	t.Run("namespace isolation and runtime validation", func(t *testing.T) {
 		parent := &container.ContainerConfig{
 			Network:    "bridge",
