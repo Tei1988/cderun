@@ -389,6 +389,8 @@ func TestClient_AttachContainer_StdinReaderErrorPropagation(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := errors.New("custom stdin read error")
+	serverDone := make(chan struct{})
+
 	socketPath, _ := startDummyServer(t, func(conn net.Conn) {
 		defer conn.Close()
 
@@ -414,8 +416,8 @@ func TestClient_AttachContainer_StdinReaderErrorPropagation(t *testing.T) {
 				Success: true,
 			})
 			_ = controlsocket.WriteFrame(conn, okResp)
-			// Keep server connection open to allow stdin reader goroutine to attempt read
-			time.Sleep(100 * time.Millisecond)
+			// Wait until client completes AttachContainer before closing connection
+			<-serverDone
 		}
 	})
 
@@ -430,6 +432,8 @@ func TestClient_AttachContainer_StdinReaderErrorPropagation(t *testing.T) {
 	ready := make(chan struct{})
 
 	err = client.AttachContainer(ctx, "c789", true, stdinErrReader, nil, nil, ready)
+	close(serverDone)
+
 	require.Error(t, err)
 	assert.ErrorIs(t, err, expectedErr)
 }
