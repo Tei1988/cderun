@@ -30,7 +30,7 @@ func ValidateInheritedCeiling(child, parent *container.ContainerConfig) error {
 	}
 
 	// 2. Linux Capabilities (CapAdd & CapDrop)
-	if err := validateCapAdd(child.CapAdd, parent.CapAdd); err != nil {
+	if err := validateCapAdd(child.CapAdd, parent.CapAdd, parent.CapDrop); err != nil {
 		return err
 	}
 	if err := validateCapDrop(child.CapDrop, parent.CapDrop); err != nil {
@@ -70,7 +70,7 @@ func normalizeCap(c string) string {
 	return strings.TrimPrefix(c, "CAP_")
 }
 
-func validateCapAdd(childCaps, parentCaps []string) error {
+func validateCapAdd(childCaps, parentCaps, parentDropCaps []string) error {
 	if len(childCaps) == 0 {
 		return nil
 	}
@@ -79,10 +79,18 @@ func validateCapAdd(childCaps, parentCaps []string) error {
 		parentSet[normalizeCap(cap)] = true
 	}
 
+	parentDropSet := make(map[string]bool, len(parentDropCaps))
+	for _, cap := range parentDropCaps {
+		parentDropSet[normalizeCap(cap)] = true
+	}
+
 	parentHasAll := parentSet["ALL"]
 
 	for _, cap := range childCaps {
 		norm := normalizeCap(cap)
+		if parentDropSet["ALL"] || parentDropSet[norm] {
+			return fmt.Errorf("security violation: child requested capability %q dropped by parent", cap)
+		}
 		if !parentHasAll && !parentSet[norm] {
 			return fmt.Errorf("security violation: child requested capability %q not permitted by parent", cap)
 		}
