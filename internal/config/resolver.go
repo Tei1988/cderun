@@ -859,17 +859,13 @@ func (rv *resolver) autoDetectEngineAndSocket() {
 		autoDetectMu.RUnlock()
 
 		if cachedRuntime != "" {
-			if cachedRuntime != "none" {
-				rv.res.Engine = cachedRuntime
-				rv.res.SocketPath = cachedSocketPath
-			}
+			rv.res.Engine = cachedRuntime
+			rv.res.SocketPath = cachedSocketPath
 		} else {
 			autoDetectMu.Lock()
 			if autoDetectedRuntime != "" {
-				if autoDetectedRuntime != "none" {
-					rv.res.Engine = autoDetectedRuntime
-					rv.res.SocketPath = autoDetectedSocketPath
-				}
+				rv.res.Engine = autoDetectedRuntime
+				rv.res.SocketPath = autoDetectedSocketPath
 			} else {
 				detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
 				if detectedRuntime != "" {
@@ -877,8 +873,6 @@ func (rv *resolver) autoDetectEngineAndSocket() {
 					autoDetectedSocketPath = detectedSocketPath
 					rv.res.Engine = detectedRuntime
 					rv.res.SocketPath = detectedSocketPath
-				} else {
-					autoDetectedRuntime = "none"
 				}
 			}
 			autoDetectMu.Unlock()
