@@ -303,11 +303,7 @@ func (rv *resolver) resolvePathValue(name, envKey string, tGetter func(ToolConfi
 		overrideSet, overrideValStr = getPtrVal(rv.cli.CderunMountCderunPath)
 		cliSet, cliValStr = getPtrVal(rv.cli.MountCderunPath)
 	default:
-		_, s1, v1, s2, v2, err := fetchFieldAndParams(name, rv.getCliVal())
-		if err != nil {
-			return "", err
-		}
-		overrideSet, overrideValStr, cliSet, cliValStr = s1, v1.String(), s2, v2.String()
+		return "", fmt.Errorf("unknown path option %q", name)
 	}
 
 	if !rv.hasPathToResolve(overrideSet, overrideValStr, cliSet, cliValStr, envKey, tGetter, gGetter, fallback) {
@@ -863,13 +859,17 @@ func (rv *resolver) autoDetectEngineAndSocket() {
 		autoDetectMu.RUnlock()
 
 		if cachedRuntime != "" {
-			rv.res.Engine = cachedRuntime
-			rv.res.SocketPath = cachedSocketPath
+			if cachedRuntime != "none" {
+				rv.res.Engine = cachedRuntime
+				rv.res.SocketPath = cachedSocketPath
+			}
 		} else {
 			autoDetectMu.Lock()
 			if autoDetectedRuntime != "" {
-				rv.res.Engine = autoDetectedRuntime
-				rv.res.SocketPath = autoDetectedSocketPath
+				if autoDetectedRuntime != "none" {
+					rv.res.Engine = autoDetectedRuntime
+					rv.res.SocketPath = autoDetectedSocketPath
+				}
 			} else {
 				detectedRuntime, detectedSocketPath := detectRuntimeFromFS(rv.fs)
 				if detectedRuntime != "" {
@@ -877,6 +877,8 @@ func (rv *resolver) autoDetectEngineAndSocket() {
 					autoDetectedSocketPath = detectedSocketPath
 					rv.res.Engine = detectedRuntime
 					rv.res.SocketPath = detectedSocketPath
+				} else {
+					autoDetectedRuntime = "none"
 				}
 			}
 			autoDetectMu.Unlock()

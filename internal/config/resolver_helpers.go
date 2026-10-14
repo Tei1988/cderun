@@ -367,7 +367,7 @@ func pickStringConfigs(
 			return res, nil
 		}
 	}
-	if tools != nil {
+	if len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if v := toolGetter(tool); v != nil {
 				return v, nil
@@ -460,7 +460,7 @@ func pickConfigs[T any](
 			return res, nil
 		}
 	}
-	if tools != nil {
+	if len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if v := toolGetter(tool); v != nil {
 				return v, nil

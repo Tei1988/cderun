@@ -48,7 +48,7 @@ func resolveStringOpt(
 	}
 
 	if !found {
-		if def.ToolGetter != nil && tools != nil {
+		if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 			if tool, ok := tools[subcommand]; ok {
 				if val := def.ToolGetter(tool); val != "" {
 					s = val
@@ -120,7 +120,7 @@ func resolveBoolOptInfo(
 			return b, true, nil
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if b := def.ToolGetter(tool); b != nil {
 				return *b, true, nil
@@ -188,7 +188,7 @@ func getWinningStringSlice(
 			return vals
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if v := def.ToolGetter(tool); v != nil {
 				return v
@@ -206,8 +206,8 @@ func resolveStringSliceOptWithVals(
 	vals []string,
 	r *ExpressionResolver,
 ) []string {
-	if vals == nil {
-		return nil
+	if len(vals) == 0 {
+		return vals
 	}
 
 	// Fast-path: check if any element actually requires resolution
@@ -286,7 +286,7 @@ func resolveStringSliceCommaOpt(
 			}
 		}
 	}
-	if vals == nil && def.ToolGetter != nil && tools != nil {
+	if vals == nil && def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
@@ -335,7 +335,7 @@ func resolveFloat64Opt(
 			return f, nil
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if f := def.ToolGetter(tool); f != nil {
 				return *f, nil
@@ -374,7 +374,7 @@ func resolveIntOpt(
 			return i, nil
 		}
 	}
-	if def.ToolGetter != nil && tools != nil {
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			if i := def.ToolGetter(tool); i != nil {
 				return *i, nil
