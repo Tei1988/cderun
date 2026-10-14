@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // CLIArgBuilder constructs CLI arguments with argument injection defenses (CWE-88).
@@ -93,6 +94,17 @@ func (b *CLIArgBuilder) VerifyStructure(argv []string, expectedFlagCount int) er
 	for i, flagArg := range flagSlice {
 		if !strings.HasPrefix(flagArg, "-") {
 			return fmt.Errorf("structural self-check failed: flag argument at index %d (%q) does not start with '-'", i, flagArg)
+		}
+	}
+
+	for i, arg := range argv {
+		if strings.IndexByte(arg, 0) != -1 {
+			return fmt.Errorf("structural self-check failed: argument at index %d contains null byte", i)
+		}
+		for pos, r := range arg {
+			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+				return fmt.Errorf("structural self-check failed: argument at index %d contains control character %q at position %d", i, r, pos)
+			}
 		}
 	}
 

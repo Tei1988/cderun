@@ -152,6 +152,21 @@ func (r *NerdctlRuntime) ValidateConfig(config *container.ContainerConfig) error
 		if strings.Contains(m.Target, ",") {
 			return fmt.Errorf("mount target %q contains invalid comma", m.Target)
 		}
+		if HasParentTraversal(m.Source) || HasParentTraversal(m.Target) {
+			return fmt.Errorf("mount source or target contains parent directory traversal: source=%q target=%q", m.Source, m.Target)
+		}
+	}
+
+	for _, dev := range config.Devices {
+		if HasParentTraversal(dev.PathOnHost) || HasParentTraversal(dev.PathInContainer) {
+			return fmt.Errorf("device path contains parent directory traversal: host=%q container=%q", dev.PathOnHost, dev.PathInContainer)
+		}
+	}
+
+	for _, env := range config.Env {
+		if strings.IndexByte(env, 0) != -1 {
+			return fmt.Errorf("environment variable contains null byte: %q", env)
+		}
 	}
 
 	return nil

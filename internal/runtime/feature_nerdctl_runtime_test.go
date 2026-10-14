@@ -115,4 +115,76 @@ func TestUnit_NerdctlRuntime_AdversarialArgumentInjection(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown pull policy")
 	})
+
+	t.Run("ValidateConfig rejects mount source traversal", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/tmp/../etc/passwd", Target: "/etc/passwd"},
+			},
+		}
+		err := rt.ValidateConfig(cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+	})
+
+	t.Run("ValidateConfig rejects mount target traversal", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/tmp/data", Target: "/var/../etc/passwd"},
+			},
+		}
+		err := rt.ValidateConfig(cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+	})
+
+	t.Run("ValidateConfig rejects host device traversal", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Devices: []container.DeviceMapping{
+				{PathOnHost: "/dev/../etc/shadow", PathInContainer: "/dev/shadow"},
+			},
+		}
+		err := rt.ValidateConfig(cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+	})
+
+	t.Run("ValidateConfig rejects container device traversal", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Devices: []container.DeviceMapping{
+				{PathOnHost: "/dev/null", PathInContainer: "/dev/../etc/shadow"},
+			},
+		}
+		err := rt.ValidateConfig(cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parent directory traversal")
+	})
+
+	t.Run("ValidateConfig accepts valid paths with double dot substrings", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Mounts: []container.Mount{
+				{Type: "bind", Source: "/tmp/a..b", Target: "/var/a..b"},
+			},
+			Devices: []container.DeviceMapping{
+				{PathOnHost: "/dev/a..b", PathInContainer: "/dev/c..d"},
+			},
+		}
+		err := rt.ValidateConfig(cfg)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ValidateConfig rejects environment null bytes", func(t *testing.T) {
+		cfg := &container.ContainerConfig{
+			Image: "alpine",
+			Env:   []string{"FOO=bar\x00baz"},
+		}
+		err := rt.ValidateConfig(cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "contains null byte")
+	})
 }
