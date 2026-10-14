@@ -88,6 +88,16 @@ func validateCapAdd(childCaps, parentCaps, parentDropCaps []string) error {
 
 	for _, cap := range childCaps {
 		norm := normalizeCap(cap)
+		if norm == "ALL" {
+			if len(parentDropSet) > 0 {
+				return fmt.Errorf("security violation: child requested CapAdd \"ALL\" when parent dropped capabilities %v", parentDropCaps)
+			}
+			if !parentHasAll {
+				return fmt.Errorf("security violation: child requested capability %q not permitted by parent", cap)
+			}
+			continue
+		}
+
 		if parentDropSet["ALL"] || parentDropSet[norm] {
 			return fmt.Errorf("security violation: child requested capability %q dropped by parent", cap)
 		}

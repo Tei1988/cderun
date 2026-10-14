@@ -169,6 +169,15 @@ func TestUnit_ValidateInheritedCeiling_DirectRules(t *testing.T) {
 		errAddDropped := ValidateInheritedCeiling(childRequestDroppedCap, parentCapAllAndDrop)
 		require.Error(t, errAddDropped)
 		assert.Contains(t, errAddDropped.Error(), "child requested capability \"SYS_PTRACE\" dropped by parent")
+
+		// Child CapAdd ALL is rejected if parent drops specific capabilities, even if child also drops ALL
+		childCapAllAndDropAll := &container.ContainerConfig{
+			CapAdd:  []string{"ALL"},
+			CapDrop: []string{"ALL"},
+		}
+		errCapAllAndDropAll := ValidateInheritedCeiling(childCapAllAndDropAll, parentCapAllAndDrop)
+		require.Error(t, errCapAllAndDropAll)
+		assert.Contains(t, errCapAllAndDropAll.Error(), "child requested CapAdd \"ALL\" when parent dropped capabilities")
 	})
 
 	t.Run("namespace isolation and runtime validation", func(t *testing.T) {
