@@ -75,13 +75,21 @@ func buildSnapshotHostContext(logger *logging.Logger, fs config.FileSystem, base
 	hostCtx.Level++
 
 	// Map current mounts into HostContext.Mounts
-	for _, m := range currentMounts {
-		if m.Type == "bind" {
-			hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
-				Source: m.Source,
-				Target: m.Target,
-				Level:  hostCtx.Level,
-			})
+	if len(currentMounts) > 0 {
+		neededCap := len(hostCtx.Mounts) + len(currentMounts) + 1
+		if cap(hostCtx.Mounts) < neededCap {
+			buf := make([]config.MountMapping, len(hostCtx.Mounts), neededCap)
+			copy(buf, hostCtx.Mounts)
+			hostCtx.Mounts = buf
+		}
+		for _, m := range currentMounts {
+			if m.Type == "bind" {
+				hostCtx.Mounts = append(hostCtx.Mounts, config.MountMapping{
+					Source: m.Source,
+					Target: m.Target,
+					Level:  hostCtx.Level,
+				})
+			}
 		}
 	}
 
