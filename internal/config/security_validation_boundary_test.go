@@ -58,12 +58,20 @@ func TestUnit_Config_ValidateSecurity_EdgeCases(t *testing.T) {
 			wantErr: "security validation failed for \"user\": invalid user or group identifier",
 		},
 		{
-			name: "unsupported runtime",
+			name: "unsupported engine",
+			cli: &CLIOptions{
+				Image:  ptr("alpine"),
+				Engine: ptr("rkt"),
+			},
+			wantErr: "security validation failed for \"engine\": unsupported engine: \"rkt\"",
+		},
+		{
+			name: "engine name passed to runtime flag",
 			cli: &CLIOptions{
 				Image:   ptr("alpine"),
-				Runtime: ptr("rkt"),
+				Runtime: ptr("podman"),
 			},
-			wantErr: "security validation failed for \"runtime\": unsupported runtime: \"rkt\"",
+			wantErr: "invalid runtime value \"podman\": container engine specification has moved to '--engine'; use '--engine podman' instead",
 		},
 		{
 			name: "unsupported log level",
