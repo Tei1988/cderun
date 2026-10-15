@@ -104,17 +104,17 @@ The supported runtime engines are:
 
 ### Configuration Mappings
 
-- **Option Flag**: `--engine` (P2) / `--cderun-engine` (P1)
-- **Environment Variable**: `CDERUN_ENGINE` (P3)
-- **Configuration Key**: `engine:` inside `.cderun.yaml`
+- **Option Flag**: `--engine` (P2) / `--cderun-engine` (P1) (*Note: `--runtime` / `--cderun-runtime` are supported as deprecated aliases*)
+- **Environment Variable**: `CDERUN_ENGINE` (P3) (*Note: `CDERUN_RUNTIME` is supported as a deprecated alias*)
+- **Configuration Key**: `engine:` inside `.cderun.yaml` (*Note: `runtime:` is supported as a deprecated alias; `engine:` takes precedence if both are set*)
 - **Default Value**: Auto-detected via socket availability (or fallback to `docker`)
 
 ### Resolution Priority Sequence for Engine Selection
 
-1. **Phase 1 (P1) Internal Overrides**: P1 flag `--cderun-engine` outranks environment and configuration values.
-2. **CLI (P2) Flags**: Explicit `--engine` or `--socket-path` CLI flags.
-3. **Environment Variables (P3)**: `CDERUN_ENGINE` or `CDERUN_SOCKET_PATH`.
-4. **Configuration Files (P5)**: Global `engine:` or `socketPath:` keys in `.cderun.yaml`.
+1. **Phase 1 (P1) Internal Overrides**: P1 flags (`--cderun-engine` or `--cderun-runtime`) outrank environment and configuration values. When `--cderun-engine` and deprecated alias `--cderun-runtime` are both specified, `--cderun-engine` takes precedence.
+2. **CLI (P2) Flags**: Explicit `--engine` (or deprecated `--runtime`) or `--socket-path` CLI flags. When both `--engine` and `--runtime` are supplied at the CLI tier, `--engine` takes precedence.
+3. **Environment Variables (P3)**: `CDERUN_ENGINE` (or deprecated `CDERUN_RUNTIME`) or `CDERUN_SOCKET_PATH`.
+4. **Configuration Files (P5)**: Global `engine:` (or deprecated `runtime:`) or `socketPath:` keys in `.cderun.yaml`.
 
 ### Automated Socket Detection Sequence
 
@@ -137,12 +137,12 @@ To minimize redundant disk I/O and `Stat` system calls during option evaluation,
 
 ### OCI Runtime Selection
 
-While `--engine` selects the container execution engine (`docker`, `podman`, `containerd`, `nerdctl`), selection of low-level OCI runtimes (such as `runc`, `crun`, `kata`, `nvidia`) is configured via `--oci-runtime` (or its alias `--runtime`):
+While `--engine` selects the container execution engine (`docker`, `podman`, `containerd`, `nerdctl`), selection of low-level OCI runtimes (such as `runc`, `crun`, `kata`, `nvidia`) is configured via `--oci-runtime`:
 
-- **Option Flag**: `--oci-runtime` / `--runtime` (P2) and `--cderun-oci-runtime` / `--cderun-runtime` (P1)
-- **Environment Variable**: `CDERUN_OCI_RUNTIME` / `CDERUN_RUNTIME` (P3)
-- **Configuration Key**: `ociRuntime:` or `runtime:` inside `.cderun.yaml` / `.tools.yaml`
-- **Validation**: Passing legacy engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` triggers an explicit `InvalidConfigError` directing users to `--engine`.
+- **Option Flag**: `--oci-runtime` (P2) / `--cderun-oci-runtime` (P1)
+- **Environment Variable**: `CDERUN_OCI_RUNTIME` (P3)
+- **Configuration Key**: `ociRuntime:` inside `.cderun.yaml` / `.tools.yaml`
+- **Runtime Limitations**: Unsupported on direct containerd API (explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`).
 
 ---
 
