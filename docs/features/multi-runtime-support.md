@@ -135,6 +135,15 @@ To minimize redundant disk I/O and `Stat` system calls during option evaluation,
 - **Dynamic Re-Detection Fallback**: If no active socket is found during detection, the result is **not** cached. This allows `cderun` to run a fresh scan on subsequent calls, accommodating cases where the container daemon is started in the background after `cderun` was first invoked.
 - **Testing Isolation**: In tests using a mocked file system (`MockFileSystem`), caching is bypassed to prevent cross-test leakage, ensuring that each unit test performs active detection.
 
+### OCI Runtime Selection
+
+While `--engine` selects the container execution engine (`docker`, `podman`, `containerd`, `nerdctl`), selection of low-level OCI runtimes (such as `runc`, `crun`, `kata`, `nvidia`) is configured via `--oci-runtime`:
+
+- **Option Flag**: `--oci-runtime` (P2) / `--cderun-oci-runtime` (P1)
+- **Environment Variable**: `CDERUN_OCI_RUNTIME` (P3)
+- **Configuration Key**: `ociRuntime:` inside `.cderun.yaml` / `.tools.yaml`
+- **Runtime Limitations**: Unsupported on direct containerd API (explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`).
+
 ---
 
 ## Diagnostics Verification
