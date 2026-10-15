@@ -347,14 +347,13 @@ func (o *rootOptions) applySocketMount(
 }
 
 func assembleContainerCommand(passthroughArgs []string) ([]string, error) {
+	if len(passthroughArgs) == 0 {
+		return nil, nil
+	}
 	for i, arg := range passthroughArgs {
 		if strings.IndexByte(arg, 0) != -1 {
 			return nil, fmt.Errorf("security validation failed: command argument [%d] contains null byte", i)
 		}
-	}
-
-	if len(passthroughArgs) == 0 {
-		return nil, nil
 	}
 	return slices.Clone(passthroughArgs), nil
 }
@@ -488,6 +487,7 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	}
 	info.Configs.Global = globalPaths
 	info.Configs.Tools = toolsPaths
+	info.AvailableTools = make([]string, 0, len(toolsCfg))
 	for toolName := range toolsCfg {
 		info.AvailableTools = append(info.AvailableTools, toolName)
 	}
@@ -624,7 +624,7 @@ func determineToolsToPrefetch(resolved *config.ResolvedConfig, toolsCfg config.T
 }
 
 func resolvePrefetchImages(r *config.ExpressionResolver, toolsToPrefetch []string, toolsCfg config.ToolsConfig) ([]string, error) {
-	var imagesToPull []string
+	imagesToPull := make([]string, 0, len(toolsToPrefetch))
 	for _, toolName := range toolsToPrefetch {
 		tool, ok := toolsCfg[toolName]
 		if !ok {
@@ -657,7 +657,7 @@ func (o *rootOptions) pullPrefetchImages(ctx context.Context, rt runtime.Contain
 
 func formatDryRunCoreFields(w io.Writer, cfg *container.ContainerConfig) {
 	_, _ = fmt.Fprintf(w, "Image: %s\n", cfg.Image)
-	var quotedCmd []string
+	quotedCmd := make([]string, 0, len(cfg.Command))
 	for _, arg := range cfg.Command {
 		quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
 	}
@@ -671,12 +671,12 @@ func formatDryRunCoreFields(w io.Writer, cfg *container.ContainerConfig) {
 }
 
 func formatDryRunMountsAndEnv(w io.Writer, cfg *container.ContainerConfig) {
-	var mounts []string
+	mounts := make([]string, 0, len(cfg.Mounts))
 	for _, m := range cfg.Mounts {
 		mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 	}
 	_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-	var quotedEnvs []string
+	quotedEnvs := make([]string, 0, len(cfg.Env))
 	for _, e := range cfg.Env {
 		if k, v, found := strings.Cut(e, "="); found {
 			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
@@ -780,7 +780,7 @@ func formatDryRunLimitsAndResources(w io.Writer, cfg *container.ContainerConfig)
 		_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
 	}
 	if len(cfg.Entrypoint) > 0 {
-		var quotedEntry []string
+		quotedEntry := make([]string, 0, len(cfg.Entrypoint))
 		for _, arg := range cfg.Entrypoint {
 			quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
 		}
@@ -1057,8 +1057,11 @@ func (o *rootOptions) logContainerConfig(resolved *config.ResolvedConfig, cc *co
 		return
 	}
 	var mounts []string
-	for _, m := range cc.Mounts {
-		mounts = append(mounts, fmt.Sprintf("    - %s %s -> %s", m.Type, m.Source, m.Target))
+	if len(cc.Mounts) > 0 {
+		mounts = make([]string, 0, len(cc.Mounts))
+		for _, m := range cc.Mounts {
+			mounts = append(mounts, fmt.Sprintf("    - %s %s -> %s", m.Type, m.Source, m.Target))
+		}
 	}
 	mountsStr := ""
 	if len(mounts) > 0 {
@@ -1767,7 +1770,7 @@ func hoistOverridesInto(cmd *cobra.Command, args []string, isPolyglot bool, subc
 		shouldHoist := strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
-			if !strings.Contains(arg, "=") {
+			if strings.IndexByte(arg, '=') == -1 {
 				name := arg[2:]
 				f := cmd.PersistentFlags().Lookup(name)
 				if f == nil {
