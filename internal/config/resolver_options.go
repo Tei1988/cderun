@@ -32,15 +32,6 @@ func getFieldInfo(val reflect.Value, valIdx int) (bool, reflect.Value) {
 	return !v.IsZero(), v
 }
 
-func fetchFieldAndParams(key string, cliVal reflect.Value) (optionFields, bool, reflect.Value, bool, reflect.Value, error) {
-	info, ok := fieldInfo[key]
-	if !ok {
-		return optionFields{}, false, reflect.Value{}, false, reflect.Value{}, fmt.Errorf("registry mismatch: info for option %q not found", key)
-	}
-	p1Set, p1Val := getFieldInfo(cliVal, info.p1ValIdx)
-	p2Set, p2Val := getFieldInfo(cliVal, info.p2ValIdx)
-	return info, p1Set, p1Val, p2Set, p2Val, nil
-}
 
 func resolveOptionFieldInfo(name string, info optionFields) (optionFields, error) {
 	if info.p1ValIdx == 0 && info.p2ValIdx == 0 && info.targetIdx == 0 {
@@ -556,11 +547,7 @@ func (rv *resolver) applyDurationOption(opt StringOption, target *time.Duration,
 		p1Set, p1Val = getPtrVal(rv.cli.CderunPullBackoffBase)
 		p2Set, p2Val = getPtrVal(rv.cli.PullBackoffBase)
 	default:
-		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
-		if err != nil {
-			return err
-		}
-		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
+		return fmt.Errorf("unknown duration option %q", opt.Name)
 	}
 
 	valStr, err := rv.resolveStringOptionWithExpressions(def, p1Set, p1Val, p2Set, p2Val)
@@ -633,11 +620,7 @@ func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
 		p1Set, p1Val = getPtrVal(rv.cli.CderunMemory)
 		p2Set, p2Val = getPtrVal(rv.cli.Memory)
 	default:
-		_, s1, v1, s2, v2, err := fetchFieldAndParams(opt.Name, rv.getCliVal())
-		if err != nil {
-			return err
-		}
-		p1Set, p1Val, p2Set, p2Val = s1, v1.String(), s2, v2.String()
+		return fmt.Errorf("unknown memory option %q", opt.Name)
 	}
 
 	valStr, err := rv.resolveStringOptionWithExpressions(def, p1Set, p1Val, p2Set, p2Val)
