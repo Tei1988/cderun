@@ -29,20 +29,6 @@ func TestUnit_EngineOption_Resolution(t *testing.T) {
 		assert.Equal(t, "containerd", res.Runtime)
 	})
 
-	t.Run("CLI runtime flag takes precedence over CDERUN_ENGINE env var", func(t *testing.T) {
-		runtimeVal := "podman"
-		cli := &CLIOptions{Image: &imgVal, Runtime: &runtimeVal}
-		fs := &MockFileSystem{
-			Env: map[string]string{
-				"CDERUN_ENGINE": "containerd",
-			},
-		}
-		res, err := ResolveWithFS("test-tool", cli, nil, nil, fs)
-		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Engine)
-		assert.Equal(t, "podman", res.Runtime)
-	})
-
 	t.Run("resolves engine from env var CDERUN_ENGINE", func(t *testing.T) {
 		fs := &MockFileSystem{
 			Env: map[string]string{
@@ -67,31 +53,38 @@ func TestUnit_EngineOption_Resolution(t *testing.T) {
 		assert.Equal(t, "containerd", res.Runtime)
 	})
 
-	t.Run("falls back to deprecated runtime flag --runtime", func(t *testing.T) {
-		runtimeVal := "podman"
-		cli := &CLIOptions{Image: &imgVal, Runtime: &runtimeVal}
-		res, err := ResolveWithFS("test-tool", cli, nil, nil, &MockFileSystem{})
-		require.NoError(t, err)
-		assert.Equal(t, "podman", res.Engine)
-		assert.Equal(t, "podman", res.Runtime)
+	t.Run("rejects engine names passed to --runtime flag with explicit migration error", func(t *testing.T) {
+		engineNames := []string{"docker", "podman", "containerd", "nerdctl"}
+		for _, name := range engineNames {
+			runtimeVal := name
+			cli := &CLIOptions{Image: &imgVal, Runtime: &runtimeVal}
+			_, err := ResolveWithFS("test-tool", cli, nil, nil, &MockFileSystem{})
+			require.Error(t, err)
+			var cfgErr *InvalidConfigError
+			require.ErrorAs(t, err, &cfgErr)
+			assert.Equal(t, "runtime", cfgErr.Field)
+			assert.Contains(t, cfgErr.Error(), "container engine specification has moved to '--engine'")
+		}
 	})
 
-	t.Run("falls back to deprecated env var CDERUN_RUNTIME", func(t *testing.T) {
+	t.Run("rejects engine names passed to CDERUN_RUNTIME env var with explicit migration error", func(t *testing.T) {
 		fs := &MockFileSystem{
 			Env: map[string]string{
 				"CDERUN_RUNTIME": "containerd",
 			},
 		}
 		cli := &CLIOptions{Image: &imgVal}
-		res, err := ResolveWithFS("test-tool", cli, nil, nil, fs)
-		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Engine)
-		assert.Equal(t, "containerd", res.Runtime)
+		_, err := ResolveWithFS("test-tool", cli, nil, nil, fs)
+		require.Error(t, err)
+		var cfgErr *InvalidConfigError
+		require.ErrorAs(t, err, &cfgErr)
+		assert.Equal(t, "runtime", cfgErr.Field)
+		assert.Contains(t, cfgErr.Error(), "container engine specification has moved to '--engine'")
 	})
 
-	t.Run("engine option takes precedence when both engine and runtime are specified", func(t *testing.T) {
-		engineVal := "containerd"
-		runtimeVal := "podman"
+	t.Run("resolves OCI runtime from --runtime alias when valid OCI runtime specified", func(t *testing.T) {
+		runtimeVal := "crun"
+		engineVal := "podman"
 		cli := &CLIOptions{
 			Image:   &imgVal,
 			Engine:  &engineVal,
@@ -99,8 +92,8 @@ func TestUnit_EngineOption_Resolution(t *testing.T) {
 		}
 		res, err := ResolveWithFS("test-tool", cli, nil, nil, &MockFileSystem{})
 		require.NoError(t, err)
-		assert.Equal(t, "containerd", res.Engine)
-		assert.Equal(t, "containerd", res.Runtime)
+		assert.Equal(t, "podman", res.Engine)
+		assert.Equal(t, "crun", res.OciRuntime)
 	})
 
 	t.Run("unsupported engine returns validation error", func(t *testing.T) {

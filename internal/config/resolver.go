@@ -460,6 +460,10 @@ func ResolveWithFS(subcommand string, cli *CLIOptions, tools ToolsConfig, global
 		return nil, err
 	}
 
+	if err := rv.resolveOciRuntime(); err != nil {
+		return nil, err
+	}
+
 	if err := rv.validateSecurity(); err != nil {
 		return nil, err
 	}
@@ -810,32 +814,21 @@ func (r *ResolvedConfig) IsCLIBased() bool {
 }
 
 func (rv *resolver) determineEngineFromWinner() error {
-	engineVal, engineSet, runtimeVal, runtimeSet := rv.getEngineOptionWinner()
+	engineVal, engineSet := rv.getEngineOptionWinner()
 
-	rawEngine := ""
-	if engineSet && runtimeSet {
-		logging.Warn("Both 'engine' (%s) and deprecated 'runtime' (%s) options specified; using 'engine'", engineVal, runtimeVal)
-		rawEngine = engineVal
-	} else if engineSet {
-		rawEngine = engineVal
-	} else if runtimeSet {
-		logging.Warn("Option 'runtime' is deprecated; use 'engine' instead")
-		rawEngine = runtimeVal
-	}
-
-	if rawEngine != "" {
-		if strings.Contains(rawEngine, "{{") || strings.HasPrefix(rawEngine, "~") {
+	if engineSet && engineVal != "" {
+		if strings.Contains(engineVal, "{{") || strings.HasPrefix(engineVal, "~") {
 			r, err := rv.getR()
 			if err != nil {
 				return err
 			}
-			resolved, err := r.ResolveString(rawEngine)
+			resolved, err := r.ResolveString(engineVal)
 			if err != nil {
 				return err
 			}
 			rv.res.Engine = resolved
 		} else {
-			rv.res.Engine = rawEngine
+			rv.res.Engine = engineVal
 		}
 	}
 	return nil
@@ -906,47 +899,120 @@ func defaultSocketPathForEngine(engine string) string {
 	}
 }
 
-func (rv *resolver) getEngineOptionWinner() (engineVal string, engineSet bool, runtimeVal string, runtimeSet bool) {
+func (rv *resolver) getEngineOptionWinner() (engineVal string, engineSet bool) {
 	// Layer 1: CLI Flags (P1 override & P2 flag)
 	if set, val := getPtrVal(rv.cli.CderunEngine); set {
-		engineVal, engineSet = val, true
-	} else if set, val := getPtrVal(rv.cli.Engine); set {
-		engineVal, engineSet = val, true
+		return val, true
 	}
-
-	if set, val := getPtrVal(rv.cli.CderunRuntime); set {
-		runtimeVal, runtimeSet = val, true
-	} else if set, val := getPtrVal(rv.cli.Runtime); set {
-		runtimeVal, runtimeSet = val, true
-	}
-
-	if engineSet || runtimeSet {
-		return engineVal, engineSet, runtimeVal, runtimeSet
+	if set, val := getPtrVal(rv.cli.Engine); set {
+		return val, true
 	}
 
 	// Layer 2: Environment Variables (P3)
 	if env := rv.fs.Getenv("CDERUN_ENGINE"); env != "" {
-		engineVal, engineSet = env, true
-	}
-	if env := rv.fs.Getenv("CDERUN_RUNTIME"); env != "" {
-		runtimeVal, runtimeSet = env, true
-	}
-
-	if engineSet || runtimeSet {
-		return engineVal, engineSet, runtimeVal, runtimeSet
+		return env, true
 	}
 
 	// Layer 3: Global Configuration (P5)
-	if rv.global != nil {
-		if rv.global.Engine != "" {
-			engineVal, engineSet = rv.global.Engine, true
-		}
-		if rv.global.Runtime != "" {
-			runtimeVal, runtimeSet = rv.global.Runtime, true
+	if rv.global != nil && rv.global.Engine != "" {
+		return rv.global.Engine, true
+	}
+
+	return "", false
+}
+
+func isEngineName(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "docker", "podman", "containerd", "nerdctl":
+		return true
+	default:
+		return false
+	}
+}
+
+func (rv *resolver) resolveOciRuntime() error {
+	var winner string
+	var found bool
+
+	// Layer 1: P1 Overrides (--cderun-oci-runtime > --cderun-runtime)
+	if set, val := getPtrVal(rv.cli.CderunOciRuntime); set && val != "" {
+		winner, found = val, true
+	} else if set, val := getPtrVal(rv.cli.CderunRuntime); set && val != "" {
+		winner, found = val, true
+	}
+
+	// Layer 1: P2 Flags (--oci-runtime > --runtime)
+	if !found {
+		if set, val := getPtrVal(rv.cli.OciRuntime); set && val != "" {
+			winner, found = val, true
+		} else if set, val := getPtrVal(rv.cli.Runtime); set && val != "" {
+			winner, found = val, true
 		}
 	}
 
-	return engineVal, engineSet, runtimeVal, runtimeSet
+	// Layer 2: P3 Env Vars (CDERUN_OCI_RUNTIME > CDERUN_RUNTIME)
+	if !found {
+		if env := rv.fs.Getenv("CDERUN_OCI_RUNTIME"); env != "" {
+			winner, found = env, true
+		} else if env := rv.fs.Getenv("CDERUN_RUNTIME"); env != "" {
+			winner, found = env, true
+		}
+	}
+
+	// Layer 3: P4 Tool Config
+	if !found && rv.toolExists {
+		if rv.tool.OciRuntime != "" {
+			winner, found = rv.tool.OciRuntime, true
+		} else if rv.tool.Runtime != "" {
+			winner, found = rv.tool.Runtime, true
+		}
+	}
+
+	// Layer 4: P5 Global Config
+	if !found && rv.global != nil {
+		if rv.global.Defaults.OciRuntime != "" {
+			winner, found = rv.global.Defaults.OciRuntime, true
+		} else if rv.global.Defaults.Runtime != "" {
+			winner, found = rv.global.Defaults.Runtime, true
+		} else if rv.global.Runtime != "" {
+			winner, found = rv.global.Runtime, true
+		}
+	}
+
+	if !found || winner == "" {
+		return nil
+	}
+
+	if isEngineName(winner) {
+		return &InvalidConfigError{
+			Field: "runtime",
+			Value: winner,
+			Err:   fmt.Errorf("container engine specification has moved to '--engine'; use '--engine %s' instead", winner),
+		}
+	}
+
+	if strings.Contains(winner, "{{") || strings.HasPrefix(winner, "~") {
+		r, err := rv.getR()
+		if err != nil {
+			return err
+		}
+		resolved, err := r.ResolveString(winner)
+		if err != nil {
+			return err
+		}
+		if isEngineName(resolved) {
+			return &InvalidConfigError{
+				Field: "runtime",
+				Value: resolved,
+				Err:   fmt.Errorf("container engine specification has moved to '--engine'; use '--engine %s' instead", resolved),
+			}
+		}
+		rv.res.OciRuntime = resolved
+	} else {
+		rv.res.OciRuntime = winner
+	}
+
+	return nil
 }
 
 func (rv *resolver) resolveRuntimeAndSocket() error {

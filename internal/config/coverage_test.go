@@ -795,12 +795,12 @@ func TestUnit_Coverage_Resolver_ResolveWithFS_SocketAutoDetection(t *testing.T) 
 	assert.Equal(t, "podman", res.Runtime)
 	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
-	// Case 3: Explicit Runtime Podman without SocketPath
-	cli = CLIOptions{Image: ptr("a"), Runtime: ptr("podman")}
+	// Case 3: Explicit Engine Podman without SocketPath
+	cli = CLIOptions{Image: ptr("a"), Engine: ptr("podman")}
 	mfs = &MockFileSystem{}
 	res, err = ResolveWithFS("sh", &cli, nil, nil, mfs)
 	require.NoError(t, err)
-	assert.Equal(t, "podman", res.Runtime)
+	assert.Equal(t, "podman", res.Engine)
 	assert.Equal(t, "/run/podman/podman.sock", res.SocketPath)
 
 	// Case 4: Explicit SocketPath with podman in it

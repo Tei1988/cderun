@@ -460,29 +460,39 @@ var StringOptions = []StringOption{
 	{
 		Name:   "engine",
 		EnvKey: "CDERUN_ENGINE",
-		Usage:  "Container engine to use (docker/podman/containerd)",
+		Usage:  "Container engine to use (docker/podman/containerd/nerdctl)",
 		GlobalGetter: func(g *CDERunConfig) string {
 			if g == nil {
 				return ""
 			}
-			if g.Engine != "" {
-				return g.Engine
-			}
-			return g.Runtime
+			return g.Engine
 		},
-		SkipResolution: true, // resolved in resolveEngineAndSocket
+		SkipResolution: true, // resolved in resolveRuntimeAndSocket
 	},
 	{
-		Name:   "runtime",
-		EnvKey: "CDERUN_RUNTIME",
-		Usage:  "Container engine to use (docker/podman/containerd) [deprecated: use engine]",
+		Name:      "runtime",
+		FieldName: "Runtime",
+		EnvKey:    "CDERUN_RUNTIME",
+		Usage:     "OCI runtime to use (e.g. runc, crun, nvidia, kata) [alias for oci-runtime]",
+		ToolGetter: func(t ToolConfig) string {
+			if t.OciRuntime != "" {
+				return t.OciRuntime
+			}
+			return t.Runtime
+		},
 		GlobalGetter: func(g *CDERunConfig) string {
 			if g == nil {
 				return ""
 			}
+			if g.Defaults.OciRuntime != "" {
+				return g.Defaults.OciRuntime
+			}
+			if g.Defaults.Runtime != "" {
+				return g.Defaults.Runtime
+			}
 			return g.Runtime
 		},
-		SkipResolution: true, // resolved in resolveEngineAndSocket
+		SkipResolution: true, // resolved in resolveOciRuntime
 	},
 	{
 		Name:   "shm-size",
@@ -810,14 +820,21 @@ var StringOptions = []StringOption{
 		Usage:     "OCI runtime to use (e.g. runc, crun, nvidia, kata)",
 		Default:   "",
 		ToolGetter: func(t ToolConfig) string {
-			return t.OciRuntime
+			if t.OciRuntime != "" {
+				return t.OciRuntime
+			}
+			return t.Runtime
 		},
 		GlobalGetter: func(g *CDERunConfig) string {
 			if g == nil {
 				return ""
 			}
-			return g.Defaults.OciRuntime
+			if g.Defaults.OciRuntime != "" {
+				return g.Defaults.OciRuntime
+			}
+			return g.Defaults.Runtime
 		},
+		SkipResolution: true, // resolved in resolveOciRuntime
 	},
 }
 

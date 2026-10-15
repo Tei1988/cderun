@@ -304,10 +304,16 @@ func TestUnit_Root_Execution_CommandResolution(t *testing.T) {
 		assert.True(t, mockRuntime.CreatedConfig.TTY)
 	})
 
-	t.Run("returns error for unsupported runtime", func(t *testing.T) {
-		_, err := executeCommand("--image", "alpine", "--runtime", "invalid", "sh")
+	t.Run("returns error for unsupported engine", func(t *testing.T) {
+		_, err := executeCommand("--image", "alpine", "--engine", "invalid", "sh")
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unsupported runtime: \"invalid\"")
+		require.ErrorContains(t, err, "unsupported engine: \"invalid\"")
+	})
+
+	t.Run("returns error when engine name passed to runtime flag", func(t *testing.T) {
+		_, err := executeCommand("--image", "alpine", "--runtime", "docker", "sh")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "container engine specification has moved to '--engine'")
 	})
 
 	t.Run("diagnosis mode works without subcommand", func(t *testing.T) {
@@ -1372,8 +1378,8 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 	t.Run("cderun-config flag takes precedence over env", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			Files: map[string][]byte{
-				"/f1.yaml": []byte("runtime: podman\n"),
-				"/f2.yaml": []byte("runtime: docker\n"),
+				"/f1.yaml": []byte("engine: podman\n"),
+				"/f2.yaml": []byte("engine: docker\n"),
 			},
 			Env: map[string]string{
 				"CDERUN_CONFIG": "/f2.yaml",
@@ -1393,8 +1399,8 @@ func TestUnit_Root_LoadConfigs_Priority(t *testing.T) {
 	t.Run("config flag takes precedence over env", func(t *testing.T) {
 		mfs := &config.MockFileSystem{
 			Files: map[string][]byte{
-				"/f1.yaml": []byte("runtime: podman\n"),
-				"/f2.yaml": []byte("runtime: docker\n"),
+				"/f1.yaml": []byte("engine: podman\n"),
+				"/f2.yaml": []byte("engine: docker\n"),
 			},
 			Env: map[string]string{
 				"CDERUN_CONFIG": "/f2.yaml",

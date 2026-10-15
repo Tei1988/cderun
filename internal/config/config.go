@@ -113,6 +113,7 @@ type ConfigDefaults struct {
 	CpusetMems      string         `yaml:"cpusetMems,omitempty"`
 	Restart         string         `yaml:"restart,omitempty"`
 	OciRuntime      string         `yaml:"ociRuntime,omitempty"`
+	Runtime         string         `yaml:"runtime,omitempty"`
 }
 
 func (d ConfigDefaults) DeepCopy() ConfigDefaults {
@@ -289,6 +290,7 @@ type ToolConfig struct {
 	CpusetMems      string         `yaml:"cpusetMems,omitempty"`
 	Restart         string         `yaml:"restart,omitempty"`
 	OciRuntime      string         `yaml:"ociRuntime,omitempty"`
+	Runtime         string         `yaml:"runtime,omitempty"`
 }
 
 func (t ToolConfig) DeepCopy() ToolConfig {
