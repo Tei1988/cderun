@@ -106,7 +106,7 @@ The supported runtime engines are:
 
 - **Option Flag**: `--engine` (P2) / `--cderun-engine` (P1)
 - **Environment Variable**: `CDERUN_ENGINE` (P3)
-- **Configuration Key**: `engine:` inside `.cderun.yaml` / `.tools.yaml`
+- **Configuration Key**: `engine:` inside `.cderun.yaml`
 - **Default Value**: Auto-detected via socket availability (or fallback to `docker`)
 
 ### Resolution Priority Sequence for Engine Selection

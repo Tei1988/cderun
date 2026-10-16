@@ -494,7 +494,7 @@ Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variabl
 - `CDERUN_CONFIG`: Path to `cderun` configuration file (`.cderun.yaml`).
 - `CDERUN_TOOL_CONFIG`: Path to tools configuration file (`.tools.yaml`).
 - `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
-- `CDERUN_RUNTIME`: Alias for OCI runtime selection (`CDERUN_OCI_RUNTIME`). Passing container engine names returns an explicit error directing to `CDERUN_ENGINE`.
+- `CDERUN_RUNTIME`: Alias for OCI runtime selection (`CDERUN_OCI_RUNTIME`). Passing container engine names returns an explicit error directing users to `--engine`.
 - `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 - `CDERUN_SOCKET_PATH`: Path to the container runtime socket on the host.
 

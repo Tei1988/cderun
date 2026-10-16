@@ -123,7 +123,7 @@ defaults:
 
 > **Usage Notes on Complete Configuration**:
 >
-> 1. **Engine Selection**: The `engine` parameter (or deprecated alias `runtime`) is configured as `docker` specifically for Docker Desktop on macOS. If you are running Podman or another engine on your Mac, update this to `podman` or your appropriate engine runtime.
+> 1. **Engine Selection**: The `engine` parameter is configured as `docker` specifically for Docker Desktop on macOS. If you are running Podman or another engine on your Mac, update this to `podman` or your appropriate engine runtime.
 > 2. **CPU Architecture**: Replace `mountCderunPath` with the path to the `cderun` binary matching your Mac's host CPU architecture:
 >    - For Apple Silicon Macs (M1/M2/M3/M4): Use `./cderun_linux_arm64`
 >    - For Intel-based Macs: Use `./cderun_linux_amd64`
