@@ -1157,12 +1157,12 @@ func validatePortOrRange(spec string, allowZero bool) (int, int, error) {
 	if spec == "" {
 		return 0, 0, fmt.Errorf("empty port specification")
 	}
-	if parts := strings.SplitN(spec, "-", 2); len(parts) == 2 {
-		start, err := validatePortNumber(parts[0], allowZero)
+	if startStr, endStr, found := strings.Cut(spec, "-"); found {
+		start, err := validatePortNumber(startStr, allowZero)
 		if err != nil {
 			return 0, 0, fmt.Errorf("invalid start port in range: %w", err)
 		}
-		end, err := validatePortNumber(parts[1], allowZero)
+		end, err := validatePortNumber(endStr, allowZero)
 		if err != nil {
 			return 0, 0, fmt.Errorf("invalid end port in range: %w", err)
 		}
@@ -1188,62 +1188,66 @@ func ValidatePort(s string) error {
 		return err
 	}
 
-	proto := ""
 	remainder := s
-	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
-		remainder = parts[0]
-		proto = parts[1]
+	if head, proto, found := strings.Cut(s, "/"); found {
+		remainder = head
 		if proto != "tcp" && proto != "udp" {
 			return fmt.Errorf("invalid protocol: %q", proto)
 		}
 	}
 
-	parts := strings.Split(remainder, ":")
-	switch len(parts) {
-	case 1:
+	p1, rest1, found1 := strings.Cut(remainder, ":")
+	if !found1 {
 		// containerPort
-		if _, _, err := validatePortOrRange(parts[0], false); err != nil {
+		if _, _, err := validatePortOrRange(p1, false); err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
-	case 2:
+		return nil
+	}
+
+	p2, p3, found2 := strings.Cut(rest1, ":")
+	if !found2 {
 		// hostPort:containerPort OR ip:containerPort
-		cStart, cEnd, err := validatePortOrRange(parts[1], false)
+		cStart, cEnd, err := validatePortOrRange(p2, false)
 		if err != nil {
 			return fmt.Errorf("invalid container port: %w", err)
 		}
 		// Try parsing as port or range first
-		if hStart, hEnd, err := validatePortOrRange(parts[0], false); err == nil {
+		if hStart, hEnd, err := validatePortOrRange(p1, false); err == nil {
 			if (hStart != hEnd || cStart != cEnd) && (hEnd-hStart != cEnd-cStart) {
 				return fmt.Errorf("host and container port range lengths must match: %d vs %d", hEnd-hStart+1, cEnd-cStart+1)
 			}
 		} else {
 			// If not a valid non-zero port or range, try as host port allowing zero (if zero alone) or an IP
-			if hStartZero, hEndZero, errZero := validatePortOrRange(parts[0], true); errZero == nil && hStartZero == 0 && hEndZero == 0 {
+			if hStartZero, hEndZero, errZero := validatePortOrRange(p1, true); errZero == nil && hStartZero == 0 && hEndZero == 0 {
 				// host port 0 is allowed for dynamic host port allocation (0:8080 is invalid if host is 0, wait, hostPort:containerPort allows hostPort 0)
-			} else if net.ParseIP(parts[0]) == nil {
-				return fmt.Errorf("invalid host port or IP: %q", parts[0])
+			} else if net.ParseIP(p1) == nil {
+				return fmt.Errorf("invalid host port or IP: %q", p1)
 			}
 		}
-	case 3:
-		// ip:hostPort:containerPort
-		cStart, cEnd, err := validatePortOrRange(parts[2], false)
-		if err != nil {
-			return fmt.Errorf("invalid container port: %w", err)
-		}
-		if parts[1] != "" {
-			hStart, hEnd, err := validatePortOrRange(parts[1], true)
-			if err != nil {
-				return fmt.Errorf("invalid host port: %w", err)
-			}
-			if (hStart != hEnd || cStart != cEnd) && (hEnd-hStart != cEnd-cStart) {
-				return fmt.Errorf("host and container port range lengths must match: %d vs %d", hEnd-hStart+1, cEnd-cStart+1)
-			}
-		}
-		if net.ParseIP(parts[0]) == nil {
-			return fmt.Errorf("invalid IP: %q", parts[0])
-		}
-	default:
+		return nil
+	}
+
+	if strings.Contains(p3, ":") {
 		return fmt.Errorf("invalid port format: %q", s)
+	}
+
+	// ip:hostPort:containerPort
+	cStart, cEnd, err := validatePortOrRange(p3, false)
+	if err != nil {
+		return fmt.Errorf("invalid container port: %w", err)
+	}
+	if p2 != "" {
+		hStart, hEnd, err := validatePortOrRange(p2, true)
+		if err != nil {
+			return fmt.Errorf("invalid host port: %w", err)
+		}
+		if (hStart != hEnd || cStart != cEnd) && (hEnd-hStart != cEnd-cStart) {
+			return fmt.Errorf("host and container port range lengths must match: %d vs %d", hEnd-hStart+1, cEnd-cStart+1)
+		}
+	}
+	if net.ParseIP(p1) == nil {
+		return fmt.Errorf("invalid IP: %q", p1)
 	}
 
 	return nil
