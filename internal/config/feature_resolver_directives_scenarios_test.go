@@ -7,6 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestUnit_Config_ExpressionResolverDirectivesAndMagicWords validates ExpressionResolver directives
+// and magic words per specs in docs/features/value-resolution.md ("Magic Words", "Directives",
+// "Double-Brace Escaping Syntax") and docs/testing/strategy.md Section 2 (Rule 1).
 func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	t.Parallel()
 
@@ -65,6 +68,7 @@ func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	t.Run("magic_words_base_context_and_defaults", func(t *testing.T) {
 		t.Parallel()
 
+		// Ref: docs/features/value-resolution.md # 1. Magic Words (BASE_HOME, BASE_PWD, BASE_UID, BASE_GID)
 		resolver, err := NewExpressionResolverWithFS(hostCtx, mfs)
 		require.NoError(t, err)
 
@@ -85,6 +89,7 @@ func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	t.Run("escaped_expressions_syntax", func(t *testing.T) {
 		t.Parallel()
 
+		// Ref: docs/features/value-resolution.md # 4. Double-Brace Escaping Syntax ({{{{...}}}} -> {{...}})
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -97,6 +102,7 @@ func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	t.Run("file_and_find_dir_directive_cases", func(t *testing.T) {
 		t.Parallel()
 
+		// Ref: docs/features/value-resolution.md # 2. Directives (file: and find_dir:)
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -114,6 +120,7 @@ func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	t.Run("env_directive_validation_and_fallback", func(t *testing.T) {
 		t.Parallel()
 
+		// Ref: docs/features/value-resolution.md # Directive Fallback Syntax & Rules (:-default)
 		resolver, err := NewExpressionResolverWithFS(nil, mfs)
 		require.NoError(t, err)
 
@@ -137,6 +144,9 @@ func TestUnit_Config_ExpressionResolverDirectivesAndMagicWords(t *testing.T) {
 	})
 }
 
+// TestUnit_Config_ReverseResolutionAndOverlayFS validates reverse path resolution behavior
+// under nested execution contexts per specs in docs/features/nested-execution.md ("Reverse Path Resolution")
+// and docs/features/value-resolution.md ("Magic Words" - Base Host Path Guard).
 func TestUnit_Config_ReverseResolutionAndOverlayFS(t *testing.T) {
 	t.Parallel()
 
@@ -193,6 +203,9 @@ func TestUnit_Config_ReverseResolutionAndOverlayFS(t *testing.T) {
 	})
 }
 
+// TestUnit_Config_ValidationHelpersAndMasking validates configuration parameter validation functions
+// and environment variable masking per specs in docs/features/value-resolution.md ("Security Hardening")
+// and docs/testing/strategy.md Section 4 ("Expression, Path Validation, and Masking").
 func TestUnit_Config_ValidationHelpersAndMasking(t *testing.T) {
 	t.Parallel()
 
