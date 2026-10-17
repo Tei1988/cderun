@@ -114,7 +114,7 @@ Configuration fields use **camelCase** keys.
 #### `defaults` Fields
 
 - `tty`, `interactive`, `remove`, `strictEnv`, `readOnly`, `init`, `mountCderunSocket`, `prune`, `prefetchAll` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime`, `pid`, `shmSize`, `ipc`, `cgroupns`, `cpusetCpus`, `cpusetMems`, `restart`, `gpus`, `prefetch` (string)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime`, `runtime` (alias for `ociRuntime`), `pid`, `shmSize`, `ipc`, `cgroupns`, `cpusetCpus`, `cpusetMems`, `restart`, `gpus`, `prefetch` (string)
 - `cpus` (float64)
 - `pullMaxRetries`, `pidsLimit`, `cpuShares` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
