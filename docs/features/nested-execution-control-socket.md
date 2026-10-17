@@ -194,6 +194,7 @@ For future adapters targeting OS-native runtimes with no portable wire protocol 
 This is an additive, opt-in mechanism, not a replacement of `--mount-socket` in its first iteration:
 
 - A new flag, `--mount-cderun-socket`, enables the Control Socket mount. `--mount-cderun` does **not** imply it automatically at first (unlike `--mount-socket`, which it does imply today).
+- Custom socket mount targets inside the child container can be explicitly specified using `--mount-cderun-socket-path` (P1 internal override `--cderun-mount-cderun-socket-path`, environment variable `CDERUN_MOUNT_CDERUN_SOCKET_PATH`, or configuration file key `mountCderunSocketPath`).
 - The existing `--mount-socket` / raw engine socket behavior remains the default until the Control Socket path reaches feature parity (all `ContainerRuntime` methods, all engines, macOS VM constraints re-verified).
 - Promoting the Control Socket to the default (and deprecating raw socket mounting) is a separate, later decision gated on that parity, and would follow the standard breaking-change process (major version, changelog, migration notes) — not part of this spec.
 
