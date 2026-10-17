@@ -57,7 +57,7 @@ func TestUnit_ResolverHelpers_ParseEnvItemAndPickConfigs(t *testing.T) {
 		}
 
 		res, err := pickConfigs[string](
-			nil, nil, "TEST_ENV_SINGLE", ",", "", nil,
+			nil, nil, "TEST_ENV_SINGLE", ",", ToolConfig{}, false,
 			nil, nil, nil, nil, mfs,
 		)
 		require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestUnit_ResolverHelpers_ParseEnvItemAndPickConfigs(t *testing.T) {
 		}
 
 		res, err := pickConfigs[string](
-			nil, nil, "TEST_ENV_SEP", ",", "", nil,
+			nil, nil, "TEST_ENV_SEP", ",", ToolConfig{}, false,
 			nil, nil, nil, nil, mfs,
 		)
 		require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestUnit_ResolverHelpers_ParseEnvItemAndPickConfigs(t *testing.T) {
 		}
 
 		res, err := pickConfigs[string](
-			nil, nil, "TEST_ENV_EMPTY", ",", "", nil,
+			nil, nil, "TEST_ENV_EMPTY", ",", ToolConfig{}, false,
 			nil, nil, nil, nil, mfs,
 		)
 		require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestUnit_ResolverHelpers_ParseEnvItemAndPickConfigs(t *testing.T) {
 		}
 
 		_, err := pickConfigs(
-			nil, nil, "TEST_ENV_ERR", ",", "", nil,
+			nil, nil, "TEST_ENV_ERR", ",", ToolConfig{}, false,
 			nil, nil, nil, parser, mfs,
 		)
 		require.Error(t, err)
