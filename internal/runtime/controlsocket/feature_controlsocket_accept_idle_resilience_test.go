@@ -163,11 +163,16 @@ func TestUnit_ControlSocket_IdleTimeout_ExemptionAndRestoration_Scenarios(t *tes
 	require.NoError(t, err)
 	defer client.Close()
 
-	waitDone := make(chan struct{})
+	type waitRes struct {
+		exitCode int
+		err      error
+	}
+	waitResChan := make(chan waitRes, 1)
+
 	// 1. Send WaitContainer request to enter long-running operation
 	go func() {
-		_, _ = client.WaitContainer(ctx, "c-idle-test")
-		close(waitDone)
+		exitCode, err := client.WaitContainer(ctx, "c-idle-test")
+		waitResChan <- waitRes{exitCode: exitCode, err: err}
 	}()
 
 	<-waitStarted
@@ -177,9 +182,15 @@ func TestUnit_ControlSocket_IdleTimeout_ExemptionAndRestoration_Scenarios(t *tes
 		return server.ActiveHandlerCount() == 1
 	}, time.Second, 10*time.Millisecond)
 
-	// Unblock WaitContainer and wait for operation to complete
+	// Keep WaitContainer blocked for longer than the idle timeout (100ms) to ensure exemption
+	time.Sleep(150 * time.Millisecond)
+
+	// Unblock WaitContainer and verify successful response
 	close(waitBlocker)
-	<-waitDone
+
+	res := <-waitResChan
+	require.NoError(t, res.err)
+	assert.Equal(t, 42, res.exitCode)
 
 	// Verify active handler count returns to 0
 	require.Eventually(t, func() bool {
