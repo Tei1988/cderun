@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +24,7 @@ func TestResolveOciRuntime_LegacyEngineRejection(t *testing.T) {
 			require.Error(t, err)
 
 			var invErr *InvalidConfigError
-			require.True(t, errors.As(err, &invErr), "expected InvalidConfigError, got %T: %v", err, err)
+			require.ErrorAs(t, err, &invErr, "expected InvalidConfigError, got %T: %v", err, err)
 			assert.Equal(t, "runtime", invErr.Field)
 			assert.Contains(t, invErr.Err.Error(), "container engine specification has moved to '--engine'")
 		})
@@ -46,7 +45,7 @@ func TestResolveOciRuntime_LegacyEngineRejection(t *testing.T) {
 			require.Error(t, err)
 
 			var invErr *InvalidConfigError
-			require.True(t, errors.As(err, &invErr), "expected InvalidConfigError, got %T: %v", err, err)
+			require.ErrorAs(t, err, &invErr, "expected InvalidConfigError, got %T: %v", err, err)
 			assert.Equal(t, "runtime", invErr.Field)
 			assert.Contains(t, invErr.Err.Error(), "container engine specification has moved to '--engine'")
 		})
@@ -71,7 +70,7 @@ func TestResolveOciRuntime_ExpressionLegacyEngineRejection(t *testing.T) {
 	require.Error(t, err)
 
 	var invErr *InvalidConfigError
-	require.True(t, errors.As(err, &invErr), "expected InvalidConfigError, got %T: %v", err, err)
+	require.ErrorAs(t, err, &invErr, "expected InvalidConfigError, got %T: %v", err, err)
 	assert.Equal(t, "runtime", invErr.Field)
 	assert.Contains(t, invErr.Err.Error(), "container engine specification has moved to '--engine'")
 }
