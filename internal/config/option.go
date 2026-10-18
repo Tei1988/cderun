@@ -210,10 +210,16 @@ func resolveStringSliceOptWithVals(
 		return vals
 	}
 
+	if r == nil {
+		res := make([]string, len(vals))
+		copy(res, vals)
+		return res
+	}
+
 	// Fast-path: check if any element actually requires resolution
 	needResolution := false
 	for _, v := range vals {
-		if r != nil && (strings.Contains(v, "{{") || strings.HasPrefix(v, "~")) {
+		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
 			needResolution = true
 			break
 		}
@@ -226,7 +232,7 @@ func resolveStringSliceOptWithVals(
 
 	res := make([]string, 0, len(vals))
 	for _, v := range vals {
-		if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+		if !strings.Contains(v, "{{") && !strings.HasPrefix(v, "~") {
 			res = append(res, v)
 		} else {
 			res = append(res, r.resolveString(v))
