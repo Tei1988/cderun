@@ -164,7 +164,7 @@ Expressions can be nested to configure complex fallback scenarios across `env:`,
 | :--- | :--- | :--- | :--- |
 | **1** | Inner Expression | `{{PWD}}` | Resolves to current host working directory (e.g., `/home/user/project/feature-branch`). |
 | **2** | Outer Directive | `{{find_dir:master:-/home/user/project/feature-branch}}` | Traverses parent directories searching for a file or folder named `master`. |
-| **3** | Resolution Outcome | Final Path | If `master` directory is found at `/home/user/project/master`, resolves to `/home/user/project/master`. If not found, falls back to `/home/user/project/feature-branch` without raising an error or dirtying sticky error state. |
+| **3** | Resolution Outcome | Final Path | If `master` item is found at `/home/user/project/master`, resolves to its parent directory `/home/user/project`. If not found, falls back to `/home/user/project/feature-branch` without raising an error or dirtying sticky error state. |
 
 ---
 
