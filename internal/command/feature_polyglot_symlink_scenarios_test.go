@@ -99,11 +99,11 @@ func TestUnit_Command_WrapperMode_ComplexHoistingAndPreSubcommandValidation(t *t
 
 // docs/features/polyglot-entry.md: Symlink Mode (Polyglot Entry Point)
 // TestUnit_Command_SymlinkMode_PathResolutionAndPassthroughInvariants tests
-// executable path cleaning, dirty path resolution, Unicode/CJK arguments, and non-prefixed option passthrough.
+// executable path cleaning, dirty path resolution, relative paths, Unicode/CJK arguments, and non-prefixed option passthrough.
 func TestUnit_Command_SymlinkMode_PathResolutionAndPassthroughInvariants(t *testing.T) {
 	t.Parallel()
 
-	t.Run("resolves target executable name from relative and dirty symlink paths", func(t *testing.T) {
+	t.Run("resolves target executable name from uncleaned dirty path without filepath.Join cleaning", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		binDir := filepath.Join(tmpDir, "bin")
 		require.NoError(t, os.MkdirAll(binDir, 0755))
@@ -111,15 +111,18 @@ func TestUnit_Command_SymlinkMode_PathResolutionAndPassthroughInvariants(t *test
 		cderunBinary := filepath.Join(binDir, "cderun")
 		require.NoError(t, os.WriteFile(cderunBinary, []byte("#!/bin/sh\nexit 0\n"), 0755))
 
-		symlinkPath := filepath.Join(tmpDir, "dirty", "..", "kubectl")
-		require.NoError(t, os.MkdirAll(filepath.Dir(symlinkPath), 0755))
-		require.NoError(t, os.Symlink(cderunBinary, symlinkPath))
+		// Create actual symlink target at cleaned path so filesystem calls succeed
+		cleanSymlinkPath := filepath.Join(tmpDir, "kubectl")
+		require.NoError(t, os.Symlink(cderunBinary, cleanSymlinkPath))
+
+		// Construct uncleaned dirty path string containing ".." without using filepath.Join
+		dirtySymlinkPath := tmpDir + string(os.PathSeparator) + "dirty" + string(os.PathSeparator) + ".." + string(os.PathSeparator) + "kubectl"
 
 		opts := defaultOptions()
 		cmd := newRootCmd(&opts)
 
 		args := []string{
-			symlinkPath,
+			dirtySymlinkPath,
 			"--cderun-image=bitnami/kubectl:1.29",
 			"--namespace", "kube-system",
 			"get", "pods",
@@ -139,6 +142,33 @@ func TestUnit_Command_SymlinkMode_PathResolutionAndPassthroughInvariants(t *test
 		}
 
 		assert.Equal(t, expected, processed)
+	})
+
+	t.Run("resolves target executable name from relative symlink path", func(t *testing.T) {
+		opts := defaultOptions()
+		cmd := newRootCmd(&opts)
+
+		relativePaths := []string{"./kubectl", "bin/kubectl", "../bin/kubectl"}
+
+		for _, relPath := range relativePaths {
+			args := []string{
+				relPath,
+				"--cderun-image=bitnami/kubectl:1.29",
+				"get", "nodes",
+			}
+
+			processed, err := preprocessArgs(cmd, args)
+			require.NoError(t, err)
+
+			expected := []string{
+				"cderun",
+				"--cderun-image=bitnami/kubectl:1.29",
+				"kubectl",
+				"get", "nodes",
+			}
+
+			assert.Equal(t, expected, processed)
+		}
 	})
 
 	t.Run("preserves non-prefixed options and CJK Unicode arguments in symlink mode", func(t *testing.T) {
