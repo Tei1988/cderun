@@ -341,7 +341,7 @@ cderun --engine containerd node app.js
 - **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`) for low-level container execution.
 - **Details**:
   - **OCI Runtime Aliases**: `--runtime` (and `--cderun-runtime`), `CDERUN_RUNTIME`, and YAML `runtime:` serve as supported aliases for OCI runtime selection alongside `--oci-runtime` / `--cderun-oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`.
-  - **Legacy Container Engine Name Rejection**: Passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime`, `CDERUN_RUNTIME`, or `runtime:` triggers an explicit `InvalidConfigError` directing users to use `--engine` instead.
+  - **Legacy Container Engine Name Rejection**: Passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, or `runtime:` triggers an explicit `InvalidConfigError` directing users to use `--engine` instead.
   - **Docker**: Maps to `HostConfig.Runtime` during Docker container creation.
   - **Podman**: Mapped to native Podman OCI runtime selection.
   - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`. Note: This limitation applies strictly to OCI runtime configuration via `--oci-runtime` / `--runtime`, not to container engine selection via `--engine`.
