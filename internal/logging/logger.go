@@ -306,6 +306,14 @@ func hasControlByte(s string) bool {
 	return false
 }
 
+func escapeByteTo(buf []byte, w int, c byte) int {
+	buf[w] = '\\'
+	buf[w+1] = 'x'
+	buf[w+2] = hexChars[c>>4]
+	buf[w+3] = hexChars[c&0x0f]
+	return w + 4
+}
+
 // SanitizeLogString escapes ASCII control characters (ASCII < 32 and ASCII 127)
 // with hex-escaped strings, preserving only tab ('\t') to prevent terminal
 // escape sequence or log injection attacks. Carriage returns ('\r') and
@@ -328,11 +336,7 @@ func SanitizeLogString(s string) string {
 				buf[w] = c
 				w++
 			} else if isControlByte(c) {
-				buf[w] = '\\'
-				buf[w+1] = 'x'
-				buf[w+2] = hexChars[c>>4]
-				buf[w+3] = hexChars[c&0x0f]
-				w += 4
+				w = escapeByteTo(buf[:], w, c)
 			} else {
 				buf[w] = c
 				w++
@@ -343,15 +347,14 @@ func SanitizeLogString(s string) string {
 
 	var builder strings.Builder
 	builder.Grow(len(s) + 8)
+	var esc [4]byte
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c == '\t' {
 			builder.WriteByte(c)
 		} else if isControlByte(c) {
-			builder.WriteByte('\\')
-			builder.WriteByte('x')
-			builder.WriteByte(hexChars[c>>4])
-			builder.WriteByte(hexChars[c&0x0f])
+			_ = escapeByteTo(esc[:], 0, c)
+			builder.Write(esc[:])
 		} else {
 			builder.WriteByte(c)
 		}
