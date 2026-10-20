@@ -643,6 +643,9 @@ func (rv *resolver) validateSlices() error {
 }
 
 func (rv *resolver) validateEnvSecurity() error {
+	if len(rv.res.Env) == 0 {
+		return nil
+	}
 	for i, e := range rv.res.Env {
 		idx := strings.IndexByte(e, '=')
 		var key, val string
@@ -680,6 +683,9 @@ func (rv *resolver) validateEnvSecurity() error {
 }
 
 func (rv *resolver) validateMountSecurity() error {
+	if len(rv.res.Mounts) == 0 {
+		return nil
+	}
 	for i, m := range rv.res.Mounts {
 		if err := ValidateMountType(m.Type); err != nil {
 			return fmt.Errorf("security validation failed for mounts[%d] (type): %w", i, err)
@@ -701,6 +707,9 @@ func (rv *resolver) validateMountSecurity() error {
 }
 
 func (rv *resolver) validateSysctlSecurity() error {
+	if len(rv.res.Sysctls) == 0 {
+		return nil
+	}
 	for k, v := range rv.res.Sysctls {
 		if err := validatePathChars(k); err != nil {
 			return fmt.Errorf("security validation failed for sysctl key %q: %w", k, err)
@@ -719,6 +728,9 @@ func (rv *resolver) validateSysctlSecurity() error {
 }
 
 func (rv *resolver) validateDeviceSecurity() error {
+	if len(rv.res.Devices) == 0 {
+		return nil
+	}
 	for i, d := range rv.res.Devices {
 		if err := validatePathChars(d.PathOnHost); err != nil {
 			return fmt.Errorf("security validation failed for devices[%d] (path-on-host): %w", i, err)
@@ -760,6 +772,9 @@ func validateField(value string, name string, validator func(string) error) erro
 }
 
 func validateSliceElements(slice []string, name string, validator func(string) error) error {
+	if len(slice) == 0 {
+		return nil
+	}
 	for i, e := range slice {
 		if err := validatePathChars(e); err != nil {
 			return fmt.Errorf("security validation failed for %s[%d]: %w", name, i, err)
