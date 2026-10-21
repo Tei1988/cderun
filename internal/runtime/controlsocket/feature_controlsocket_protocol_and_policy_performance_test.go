@@ -28,11 +28,11 @@ func TestUnit_ControlSocket_Protocol_ReadWriteFrameInvariants(t *testing.T) {
 	t.Run("non-empty payload frame roundtrip", func(t *testing.T) {
 		t.Parallel()
 		var buf bytes.Buffer
-		payload := []byte("hello controlsocket framing")
+		payload := bytes.Repeat([]byte("a"), 256)
 		err := WriteFrame(&buf, payload)
 		require.NoError(t, err)
 
-		lengthHeader := []byte{0x00, 0x00, 0x00, byte(len(payload))}
+		lengthHeader := []byte{0x00, 0x00, 0x01, 0x00}
 		expectedSerialized := append(lengthHeader, payload...)
 		assert.Equal(t, expectedSerialized, buf.Bytes())
 
