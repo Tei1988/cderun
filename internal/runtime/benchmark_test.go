@@ -29,7 +29,7 @@ func BenchmarkCLIArgBuilder_BuildAndVerify(b *testing.B) {
 	}
 }
 
-func BenchmarkNerdctlRuntime_ValidateAndBuildArgs(b *testing.B) {
+func BenchmarkNerdctlRuntime_ValidateConfig(b *testing.B) {
 	r, err := NewNerdctlRuntime("/run/containerd/containerd.sock")
 	if err != nil {
 		b.Fatalf("NewNerdctlRuntime failed: %v", err)
