@@ -68,7 +68,6 @@ func TestLogger_ParseLevelAndStringBoundaries(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("ParseLevel_%s", tc.input), func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.expected, logging.ParseLevel(tc.input))
@@ -161,12 +160,12 @@ func TestLogger_SanitizeLogStringBoundaries(t *testing.T) {
 
 	// 3. Stack buffer boundary (exactly 512 bytes vs 513 bytes)
 	stackStr := strings.Repeat("a", 510) + "\x00b"
-	require.Equal(t, 512, len(stackStr))
+	require.Len(t, stackStr, 512)
 	stackResult := logging.SanitizeLogString(stackStr)
 	assert.Equal(t, strings.Repeat("a", 510)+"\\x00b", stackResult)
 
 	heapStr := strings.Repeat("a", 511) + "\x00b"
-	require.Equal(t, 513, len(heapStr))
+	require.Len(t, heapStr, 513)
 	heapResult := logging.SanitizeLogString(heapStr)
 	assert.Equal(t, strings.Repeat("a", 511)+"\\x00b", heapResult)
 }
@@ -181,13 +180,13 @@ func TestLogger_OutputFormattingScenarios(t *testing.T) {
 		logger.SetOutput(buf)
 
 		require.NoError(t, logger.Init("info", "text", true))
+		dateBefore := time.Now().Format("2006-01-02")
 		logger.Info("user %s logged in", "alice")
+		dateAfter := time.Now().Format("2006-01-02")
 
 		out := buf.String()
 		assert.Contains(t, out, "[INFO] user alice logged in\n")
-		// Verify timestamp format YYYY-MM-DD
-		nowStr := time.Now().Format("2006-01-02")
-		assert.Contains(t, out, nowStr)
+		assert.True(t, strings.Contains(out, dateBefore) || strings.Contains(out, dateAfter))
 	})
 
 	t.Run("TextFormatWithoutTimestamp", func(t *testing.T) {
@@ -269,14 +268,14 @@ func TestLogger_ConcurrencyAndThreadSafety(t *testing.T) {
 	const goroutines = 10
 	const iterations = 50
 
-	for i := 0; i < goroutines; i++ {
+	for i := range goroutines {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for j := range iterations {
 				switch j % 5 {
 				case 0:
-					logger.SetLevel(logging.Level(j % 5))
+					logger.SetLevel(logging.Level((id + j/5) % 5))
 				case 1:
 					_ = logger.Init("debug", "json", j%2 == 0)
 				case 2:
@@ -305,11 +304,13 @@ func TestGlobalLogger_ThreadSafetyAndGetters(t *testing.T) {
 	global := logging.GetGlobalLogger()
 	originalWriter := global.GetWriter()
 	originalLevel := global.GetLevel()
+	originalFormat := global.GetFormat()
+	originalTimestamp := global.GetTimestamp()
 
-	defer func() {
+	t.Cleanup(func() {
+		_ = global.Init(originalLevel.LowerString(), originalFormat, originalTimestamp)
 		global.SetOutput(originalWriter)
-		global.SetLevel(originalLevel)
-	}()
+	})
 
 	logging.SetOutput(buf)
 	err := logging.Init("debug", "text", false)
