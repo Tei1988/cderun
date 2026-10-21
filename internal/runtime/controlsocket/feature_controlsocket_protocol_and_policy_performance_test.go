@@ -32,6 +32,10 @@ func TestUnit_ControlSocket_Protocol_ReadWriteFrameInvariants(t *testing.T) {
 		err := WriteFrame(&buf, payload)
 		require.NoError(t, err)
 
+		lengthHeader := []byte{0x00, 0x00, 0x00, byte(len(payload))}
+		expectedSerialized := append(lengthHeader, payload...)
+		assert.Equal(t, expectedSerialized, buf.Bytes())
+
 		readPayload, err := ReadFrame(&buf)
 		require.NoError(t, err)
 		assert.Equal(t, payload, readPayload)
