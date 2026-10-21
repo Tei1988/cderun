@@ -277,7 +277,7 @@ func TestLogger_ConcurrencyAndThreadSafety(t *testing.T) {
 				case 0:
 					logger.SetLevel(logging.Level((id + j/5) % 5))
 				case 1:
-					_ = logger.Init("debug", "json", j%2 == 0)
+					assert.NoError(t, logger.Init("debug", "json", j%2 == 0))
 				case 2:
 					logger.Error("goroutine %d iter %d", id, j)
 					logger.Warn("goroutine %d iter %d", id, j)
