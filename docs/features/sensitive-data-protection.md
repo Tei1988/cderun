@@ -19,12 +19,16 @@ The masking behavior is controlled by the `sensitive-env` option, which can be d
 
 Patterns support the `*` wildcard (glob) to match multiple keys. Matching is case-insensitive.
 
-To maximize performance on key execution paths, `cderun` uses custom, case-insensitive helper functions: `equalFoldASCII`, `hasSuffixFoldASCII`, `hasPrefixFoldASCII`, and `containsFoldASCII`. These ASCII comparison helpers avoid per-comparison allocations, although pattern analysis and fallback matching may allocate. They support:
+To maximize performance on key execution paths, `cderun` uses custom, case-insensitive ASCII comparison helper functions in `internal/config/masking.go`: `equalFoldASCIILower`, `hasSuffixFoldASCIILower`, `hasPrefixFoldASCIILower`, and `containsFoldASCIILower`. These zero-allocation ASCII comparison helpers avoid heap allocations during environment scanning while handling:
 
 - Exact matches (e.g., `MY_API_KEY`)
 - Suffix wildcards (e.g., `DB_*`)
 - Prefix wildcards (e.g., `*_PASSWORD`)
 - Substring wildcards (e.g., `*SECRET*`)
+
+#### Pre-Analyzed Pattern Caching & Atomic Storage
+
+To eliminate redundant string parsing during repetitive environment resolution sweeps, pattern configurations are compiled into `preAnalyzedPattern` structures via `getAnalyzedPatterns` and cached thread-safely using `atomic.Pointer[analyzedPatternsCacheEntry]`.
 
 #### Fail-Closed Logic
 
@@ -42,9 +46,11 @@ defaults:
 
 Masking is applied at the presentation layer (`handleDryRun`) and logging layer, ensuring that the actual container execution still receives the plaintext values.
 
-### Dry-Run Output
+### Dry-Run Output across Output Formats
 
-In dry-run mode, sensitive values are replaced with `[REDACTED]`. Additionally, all environment variables and command arguments are individually quoted (`%q`) in simple output format to prevent terminal injection or argument spoofing via whitespace/newlines.
+In dry-run mode (`--dry-run`), secret redaction is uniformly enforced across all dry-run formatting outputs (`simple`, `json`, and `yaml`) via `MaskSensitiveEnvList`. The redaction process operates on isolated presentation-layer slices, ensuring that the underlying container configuration state (`ContainerConfig`) remains unmutated for execution.
+
+Additionally, in `simple` output format, all environment variables and command arguments are individually quoted (`%q`) to prevent terminal injection or argument spoofing via whitespace, control characters, or newlines.
 
 ### Error Message Hardening
 

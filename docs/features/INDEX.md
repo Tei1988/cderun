@@ -28,7 +28,7 @@ This directory contains the detailed technical and functional specifications for
    - Details the synchronous coordination of container startup and STDIN attachment to ensure no data loss during piped executions.
 
 6. **[Value Resolution & Expression Engine](./value-resolution.md)**
-   - Documents dynamic expression evaluation (`{{...}}`), tilde expansion, relative path resolution, anchor boundary validation, and lazy instantiation.
+   - Documents dynamic expression evaluation (`{{...}}`), directive fallbacks (`:-default`), multi-nested expression traces, tilde expansion, relative path resolution, anchor boundary validation, sticky error isolation, and lazy instantiation.
 
 7. **[Hang Timeout Protection](./hang-timeout.md)**
    - Documents the automated termination logic (SIGKILL) to prevent execution hangs in non-TTY, non-interactive environments when IO finishes.
@@ -86,10 +86,10 @@ This directory contains the detailed technical and functional specifications for
 ### Security Hardening
 
 1. **[Security Validations](./security-validations.md)**
-   - Details character whitelisting, absolute path enforcement on targets, and strict validation of critical fields.
+   - Details ASCII control character filtering (`validatePathChars`), working directory traversal checks (`ValidateWorkdir`), tool name whitelisting (`ValidateToolName`), signal regex, sysctl, cpuset, GPU, privileged capability scanning, and raw socket path validation (`validateMountSocketPathRaw`).
 
 2. **[Sensitive Data Protection](./sensitive-data-protection.md)**
-   - Documents the secure-by-default environment masking (`[REDACTED]`), fail-closed glob fallback, and quoted logging.
+   - Documents the secure-by-default environment masking (`[REDACTED]`), atomic pattern caching, fail-closed glob fallback, zero-allocation ASCII comparison helpers, and presentation layer redaction across simple, JSON, and YAML dry-run outputs.
 
 3. **[Signal Handling Security](./signal-handling-security.md)**
    - Details signal validation and Unix/Windows signal constraints to prevent injection of malicious control signals.
