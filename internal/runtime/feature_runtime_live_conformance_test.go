@@ -104,13 +104,13 @@ func TestConformance_LiveSocketRuntime(t *testing.T) {
 		t.Fatalf("Unsupported live runtime engine %q", engineName)
 	}
 
-	// Ensure alpine:latest is pulled and available prior to running conformance suite
+	// Ensure docker.io/library/alpine:latest is pulled and available prior to running conformance suite
 	setupRt := factory(t)
 	pullCtx, pullCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer pullCancel()
-	err = setupRt.PullImage(pullCtx, "alpine:latest", "missing", 3, 1*time.Second)
+	err = setupRt.PullImage(pullCtx, "docker.io/library/alpine:latest", "missing", 3, 1*time.Second)
 	closeErr := setupRt.Close()
-	require.NoError(t, err, "Failed to pull alpine:latest image for live conformance test")
+	require.NoError(t, err, "Failed to pull docker.io/library/alpine:latest image for live conformance test")
 	require.NoError(t, closeErr, "Failed to close setup runtime instance")
 
 	RunConformanceTests(t, factory, caps)
