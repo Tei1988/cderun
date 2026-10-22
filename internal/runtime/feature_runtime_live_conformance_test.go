@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -27,34 +28,30 @@ func defaultSocketPathForLiveEngine(engine string) string {
 }
 
 func TestConformance_LiveSocketRuntime(t *testing.T) {
-	runtimeName := os.Getenv("CDERUN_RUNTIME")
-	if runtimeName == "" {
-		runtimeName = os.Getenv("CDERUN_ENGINE")
-	}
-	if runtimeName == "" {
-		runtimeName = "containerd"
+	engineName := os.Getenv("CDERUN_ENGINE")
+	if engineName == "" {
+		engineName = "containerd"
 	}
 
 	socketPath := os.Getenv("CDERUN_SOCKET_PATH")
 	if socketPath == "" {
-		socketPath = defaultSocketPathForLiveEngine(runtimeName)
+		socketPath = defaultSocketPathForLiveEngine(engineName)
 	}
 
 	if socketPath == "" {
-		t.Fatalf("-tags=runtime specified but no socket path could be determined for runtime %q", runtimeName)
+		t.Fatalf("-tags=runtime specified but no socket path could be determined for engine %q", engineName)
 	}
 
 	conn, err := net.DialTimeout("unix", socketPath, 3*time.Second)
 	if err != nil {
-		t.Skipf("Skipping live runtime test for %s (%s): %v. Live socket is not accessible in local runner environment.", runtimeName, socketPath, err)
-		return
+		t.Fatalf("Live runtime socket check failed for %s (%s): %v. Live tests must fail when socket is unreachable.", engineName, socketPath, err)
 	}
 	_ = conn.Close()
 
 	var caps ConformanceCapabilities
 	var factory func(t *testing.T) ContainerRuntime
 
-	switch runtimeName {
+	switch engineName {
 	case "containerd":
 		caps = ConformanceCapabilities{
 			SupportsVolumes:    false,
@@ -104,8 +101,17 @@ func TestConformance_LiveSocketRuntime(t *testing.T) {
 			return rt
 		}
 	default:
-		t.Fatalf("Unsupported live runtime engine %q", runtimeName)
+		t.Fatalf("Unsupported live runtime engine %q", engineName)
 	}
+
+	// Ensure alpine:latest is pulled and available prior to running conformance suite
+	setupRt := factory(t)
+	pullCtx, pullCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer pullCancel()
+	err = setupRt.PullImage(pullCtx, "alpine:latest", "missing")
+	closeErr := setupRt.Close()
+	require.NoError(t, err, "Failed to pull alpine:latest image for live conformance test")
+	require.NoError(t, closeErr, "Failed to close setup runtime instance")
 
 	RunConformanceTests(t, factory, caps)
 }
