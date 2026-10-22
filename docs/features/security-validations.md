@@ -25,7 +25,7 @@ This validation is strictly applied to:
 - Supplementary groups (`ValidateGroupAdd`)
 - Kernel sysctl keys (`ValidateSysctlKey`) and values (`ValidateSysctlValue`)
 
-Any string containing control characters (ASCII < 32 or 127) or invalid UTF-8 byte sequences causes an immediate resolution failure before container creation.
+Any string containing control characters (C0 controls 0x00–0x1F, DEL 0x7F, or C1 controls 0x80–0x9F) or invalid UTF-8 byte sequences causes an immediate resolution failure before container creation.
 
 ## Anchor Boundary Validation
 
