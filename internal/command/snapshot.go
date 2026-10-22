@@ -306,35 +306,52 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 		if line == "" {
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 10 {
-			continue
-		}
 
-		// Find separator "-"
-		sepIdx := -1
-		for i, f := range fields {
-			if f == "-" {
-				sepIdx = i
+		rem := line
+		var f string
+
+		// Skip fields 0, 1, 2, 3
+		for i := 0; i < 4; i++ {
+			f, rem = nextField(rem)
+			if f == "" {
 				break
 			}
 		}
-		if sepIdx == -1 || len(fields) <= sepIdx+3 {
+		if f == "" {
 			continue
 		}
 
-		fsType := fields[sepIdx+1]
+		// Field 4: mount point
+		mountPoint, remField := nextField(rem)
+		if mountPoint != "/" {
+			continue
+		}
+		rem = remField
+
+		// Find separator "-"
+		foundSep := false
+		for rem != "" {
+			f, rem = nextField(rem)
+			if f == "-" {
+				foundSep = true
+				break
+			}
+		}
+		if !foundSep {
+			continue
+		}
+
+		// Field N+1: fsType
+		fsType, rem := nextField(rem)
 		if fsType != "overlay" {
 			continue
 		}
 
-		mountPoint := fields[4]
-		if mountPoint != "/" {
-			continue
-		}
+		// Field N+2: mount source
+		_, rem = nextField(rem)
 
-		// Superblock options are at the end
-		sbOptions := fields[len(fields)-1]
+		// Field N+3: super options
+		sbOptions, _ := nextField(rem)
 		remainingOpts := sbOptions
 		for len(remainingOpts) > 0 {
 			var opt string
@@ -352,4 +369,18 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 	}
 
 	return "", nil
+}
+
+func nextField(s string) (field string, rest string) {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	if len(s) == 0 {
+		return "", ""
+	}
+	idx := strings.IndexAny(s, " \t")
+	if idx < 0 {
+		return s, ""
+	}
+	return s[:idx], s[idx+1:]
 }
