@@ -123,7 +123,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T90 は T87 完了後、T88 の直後（T89 と並行可）に着手を推奨**。CLIベースエンジン（nerdctl）を選んだユーザーが他フェーズの完了まで待たされてNested Executionを使えない、という事態を避けるための前倒し。T88 が確立するControl Socketディスパッチの配線パターンを流用したほうが手戻りが少ないため、T88 より前に着手するのは非推奨（逆順・並行実装はコンフリクトしやすい）
 - **T91 は T89 完了が前提**。T90 の完了は必須ではないが、テスト基盤（敵対的テストのハーネス等）を流用できるため T90 の後が望ましい
 - **Apple `container` / WSL Containers 等、ワイヤプロトコルを公開しないランタイムへの nested execution 対応は T88（できれば T89）の完了が前提条件**。T91（全APIベースエンジンパリティ）の完了を待つ必要はない。**採用方針はCLIラッパー方式（`container`/`wslc.exe`をシェルアウト）で、T90で定義する構築技法（`--`挿入・`--flag=value`結合形）・argv構造自己チェック・**そのCLI実バイナリに対する敵対的テスト**（nerdctlで通ったことは他CLIの安全性の根拠にならない。`--`の意味はcobra/pflag等、各CLI内部の引数解析ライブラリ依存のため、アダプタごとに独立して検証が必要）を実装すればControl Socket対応できる。サイドカー方式（`apple/containerization` Swift package や `Microsoft.WSL.Containers` NuGet を直接リンク）は検討したが、プラットフォームごとの別ツールチェーン・署名等の運用コストが見合わないため不採用（`docs/features/nested-execution-control-socket.md` の Relationship to Multi-Runtime Support 節に理由を記録済み。CLIすら提供しない将来のランタイムが出た場合のみ再検討）**
-- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を両タスクが触るため、並行実装はコンフリクトしやすい
+- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を全タスクが触るため、並行実装はコンフリクトしやすい
 
 ---
 
@@ -806,7 +806,7 @@ T101〜T103 は T100 の完了を待たずに着手してよい（禁止語の�
 
 - `internal/config` 配下に禁止語を含むテストファイル名が 0 件
 - **削除したテストの一覧が PR 説明にある**（何を失ったかがレビュー可能であること）
-- `make test` がパスし、`internal/config` のカバレッジが有意に下がっていない
+- `make test` がパス client/server カバレッジが有意に下がっていない
 - `make lint-go` がパスする
 
 ---
@@ -856,6 +856,16 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 ---
 
 ## Documentation Update Tasks
+
+### T20 Documentation Updates: Update conformance and live runtime test documentation
+
+- **Task**: Update `docs/testing/conformance.md` and `docs/testing/runtime-tests.md` for Task T20 live runtime socket integration.
+- **Target Files**:
+  - `docs/testing/conformance.md`
+  - `docs/testing/runtime-tests.md`
+- **Details**:
+  - Update `docs/testing/conformance.md` "Live Socket Testing" section to document the live conformance test harness entry point (`TestConformance_LiveSocketRuntime` in `internal/runtime/feature_runtime_live_conformance_test.go`) executed via `go test -tags=runtime -v ./...`.
+  - Update `docs/testing/runtime-tests.md` to specify execution instructions for all three supported container runtime engines (`containerd`, `docker`, and `podman`), environment variables (`CDERUN_ENGINE`/`CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`), and security isolation rules restricting host socket access on untrusted fork pull requests.
 
 ### T95 Documentation Updates: Update `--runtime` documentation for OCI runtime transition
 

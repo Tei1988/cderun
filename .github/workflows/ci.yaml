@@ -33,6 +33,7 @@ jobs:
 
   runtime-test-containerd:
     runs-on: ouchi-kubernetes
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
@@ -78,11 +79,67 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs
       run: |
-        sudo apt-get update
+        sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y acl
         sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+    - name: Build cderun binary
+      run: go build -o cderun main.go
     - name: Run containerd integration tests
       run: |
-        export CDERUN_RUNTIME=containerd
+        export CDERUN_ENGINE=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -v ./internal/runtime/...
+        go test -tags=runtime -v ./...
+
+  runtime-test-docker:
+    runs-on: ouchi-kubernetes
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Build cderun binary
+      run: go build -o cderun main.go
+    - name: Run Docker integration tests
+      run: |
+        export CDERUN_ENGINE=docker
+        export CDERUN_SOCKET_PATH=/var/run/docker.sock
+        go test -tags=runtime -v ./...
+
+  runtime-test-podman:
+    runs-on: ouchi-kubernetes
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Install and start Podman service
+      run: |
+        sudo apt-get update || (sleep 2 && sudo apt-get update)
+        sudo apt-get install -y podman
+        systemctl --user enable --now podman.socket || true
+        PODMAN_SOCK="/run/user/$(id -u)/podman/podman.sock"
+        if [ ! -S "$PODMAN_SOCK" ]; then
+          podman system service --time=0 "unix://$PODMAN_SOCK" > /tmp/podman.log 2>&1 &
+          for i in {1..30}; do
+            if [ -S "$PODMAN_SOCK" ]; then
+              echo "Podman socket ready"
+              break
+            fi
+            sleep 1
+          done
+        fi
+    - name: Build cderun binary
+      run: go build -o cderun main.go
+    - name: Run Podman integration tests
+      run: |
+        export CDERUN_ENGINE=podman
+        export CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock"
+        go test -tags=runtime -v ./...
