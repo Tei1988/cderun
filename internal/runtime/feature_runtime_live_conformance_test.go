@@ -108,7 +108,7 @@ func TestConformance_LiveSocketRuntime(t *testing.T) {
 	setupRt := factory(t)
 	pullCtx, pullCancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer pullCancel()
-	err = setupRt.PullImage(pullCtx, "alpine:latest", "missing")
+	err = setupRt.PullImage(pullCtx, "alpine:latest", "missing", 3, 1*time.Second)
 	closeErr := setupRt.Close()
 	require.NoError(t, err, "Failed to pull alpine:latest image for live conformance test")
 	require.NoError(t, closeErr, "Failed to close setup runtime instance")
