@@ -448,7 +448,7 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
+func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer) error) error {
 	switch strings.ToLower(format) {
 	case "json":
 		marshaled, err := o.jsonMarshalIndent(data, "", "  ")
@@ -458,8 +458,7 @@ func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpl
 		_, err = fmt.Fprintln(w, string(marshaled))
 		return err
 	case "simple":
-		simpleWriter(w)
-		return nil
+		return simpleWriter(w)
 	case "yaml", "": // Default to YAML if format is empty
 		marshaled, err := o.yamlMarshal(data)
 		if err != nil {
@@ -493,12 +492,13 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	}
 	sort.Strings(info.AvailableTools)
 
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) {
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) error {
 		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
 		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
 		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
 		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
 		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+		return nil
 	})
 }
 
@@ -972,14 +972,15 @@ func formatDryRunLimitsAndResources(sb *strings.Builder, cfg *container.Containe
 	}
 }
 
-func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
+func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) error {
 	var sb strings.Builder
 	sb.Grow(512)
 	formatDryRunCoreFields(&sb, cfg)
 	formatDryRunMountsAndEnv(&sb, cfg)
 	formatDryRunNetworkAndSecurity(&sb, cfg)
 	formatDryRunLimitsAndResources(&sb, cfg)
-	_, _ = io.WriteString(w, sb.String())
+	_, err := io.WriteString(w, sb.String())
+	return err
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
@@ -989,8 +990,8 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 	maskedContainerConfig := *containerConfig
 	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env, resolved.SensitiveEnv)
 
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
-		formatDryRunSimple(w, &maskedContainerConfig)
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) error {
+		return formatDryRunSimple(w, &maskedContainerConfig)
 	})
 }
 

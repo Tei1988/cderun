@@ -71,7 +71,7 @@ func BenchmarkFormatDryRunSimple(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		formatDryRunSimple(io.Discard, cfg)
+		_ = formatDryRunSimple(io.Discard, cfg)
 	}
 }
 
