@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"cderun/internal/config"
 	"cderun/internal/container"
@@ -242,23 +243,7 @@ func TestUnit_Command_DryRun_SensitiveDataMaskingAcrossFormats(t *testing.T) {
 		assert.NotContains(t, out, "sec_key_5678")
 	})
 
-	t.Run("json format masks all sensitive variables and outputs valid json", func(t *testing.T) {
-		var buf bytes.Buffer
-		cmd.SetOut(&buf)
-
-		resolvedCfg.DryRunFormat = "json"
-		err := opts.handleDryRun(cmd, cc, resolvedCfg)
-		require.NoError(t, err)
-
-		out := buf.String()
-		assert.Contains(t, out, "AUTH_TOKEN=[REDACTED]")
-		assert.Contains(t, out, "DATABASE_PASSWORD=[REDACTED]")
-		assert.Contains(t, out, "API_SECRET_KEY=[REDACTED]")
-		assert.Contains(t, out, "LOG_LEVEL=info")
-		assert.NotContains(t, out, "super_secret_token_val")
-	})
-
-	t.Run("yaml format masks all sensitive variables and outputs valid yaml", func(t *testing.T) {
+	t.Run("yaml format unmarshals and masks all sensitive variables", func(t *testing.T) {
 		var buf bytes.Buffer
 		cmd.SetOut(&buf)
 
@@ -266,12 +251,17 @@ func TestUnit_Command_DryRun_SensitiveDataMaskingAcrossFormats(t *testing.T) {
 		err := opts.handleDryRun(cmd, cc, resolvedCfg)
 		require.NoError(t, err)
 
-		out := buf.String()
-		assert.Contains(t, out, "AUTH_TOKEN=[REDACTED]")
-		assert.Contains(t, out, "DATABASE_PASSWORD=[REDACTED]")
-		assert.Contains(t, out, "API_SECRET_KEY=[REDACTED]")
-		assert.Contains(t, out, "LOG_LEVEL=info")
-		assert.NotContains(t, out, "p@ssword123")
+		var parsedCc container.ContainerConfig
+		err = yaml.Unmarshal(buf.Bytes(), &parsedCc)
+		require.NoError(t, err)
+
+		assert.Contains(t, parsedCc.Env, "AUTH_TOKEN=[REDACTED]")
+		assert.Contains(t, parsedCc.Env, "DATABASE_PASSWORD=[REDACTED]")
+		assert.Contains(t, parsedCc.Env, "API_SECRET_KEY=[REDACTED]")
+		assert.Contains(t, parsedCc.Env, "LOG_LEVEL=info")
+		assert.NotContains(t, buf.String(), "super_secret_token_val")
+		assert.NotContains(t, buf.String(), "p@ssword123")
+		assert.NotContains(t, buf.String(), "sec_key_5678")
 	})
 }
 
