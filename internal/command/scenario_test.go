@@ -72,10 +72,7 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
-	if err != nil {
-		t.Skipf("Skipping nested execution test: %v (cderun binary must be built prior to running nested E2E tests)", err)
-		return
-	}
+	require.NoError(t, err, "failed to resolve cderun binary path")
 
 	dockerSocket := "/var/run/docker.sock"
 	if cderun := os.Getenv("CDERUN_SOCKET_PATH"); cderun != "" {
