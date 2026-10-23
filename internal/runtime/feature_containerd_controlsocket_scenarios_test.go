@@ -56,21 +56,43 @@ func TestUnit_Containerd_ControlSocket_LifecycleAndErrorPropagation(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, "containerd-cs-001", id)
 
-	// 3. StartContainer
+	// 3. AttachContainer
+	readyChan := make(chan struct{})
+	attachErrChan := make(chan error, 1)
+	go func() {
+		attachErrChan <- adapter.AttachContainer(ctx, id, false, nil, nil, nil, readyChan)
+	}()
+	select {
+	case <-readyChan:
+	case err := <-attachErrChan:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for AttachContainer ready signal")
+	}
+
+	// 4. StartContainer
 	require.NoError(t, adapter.StartContainer(ctx, id))
 
-	// 4. WaitContainer
+	// 5. WaitContainer
 	exitCode, err := adapter.WaitContainer(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 
-	// 5. SignalContainer
+	// Wait for background AttachContainer to finish cleanly
+	select {
+	case err := <-attachErrChan:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for AttachContainer to finish")
+	}
+
+	// 6. SignalContainer
 	require.NoError(t, adapter.SignalContainer(ctx, id, "SIGTERM"))
 
-	// 6. ResizeContainerTTY
+	// 7. ResizeContainerTTY
 	require.NoError(t, adapter.ResizeContainerTTY(ctx, id, 24, 80))
 
-	// 7. RemoveContainer
+	// 8. RemoveContainer
 	require.NoError(t, adapter.RemoveContainer(ctx, id))
 }
 
