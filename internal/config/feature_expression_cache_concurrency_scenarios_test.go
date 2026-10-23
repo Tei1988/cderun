@@ -40,11 +40,11 @@ func TestExpressionResolver_ConcurrentResolutionAndCache(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		workerID := i
 		go func() {
 			defer wg.Done()
-			for j := 0; j < iterations; j++ {
+			for j := range iterations {
 				switch (workerID + j) % 5 {
 				case 0:
 					res, resolveErr := resolver.ResolveString("ver-{{file:VERSION}}-{{env:APP_ENV}}")
@@ -119,17 +119,22 @@ func TestExpressionResolver_MaxDirectiveFileSizeBoundaries(t *testing.T) {
 		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
 		require.NoError(t, err)
 
-		// First call triggers stat size check failure and caches error
+		// First call triggers stat size check failure and caches error in fileCache
 		_, firstErr := resolver.ResolveString("{{file:oversized.txt}}")
 		require.Error(t, firstErr)
 		assert.Contains(t, firstErr.Error(), "too large")
 
-		// Second call with default syntax must still fail because size limit errors do not use fallback defaults
-		resolverRetry, errRetry := NewExpressionResolverWithFS(nil, mockFS)
-		require.NoError(t, errRetry)
-		_, secondErr := resolverRetry.ResolveString("{{file:oversized.txt:-fallback}}")
+		// Record mockFS.StatCalls count after first resolution
+		statCallsCount := len(mockFS.StatCalls)
+
+		// Derived child resolver shares the underlying cache with parent
+		childResolver := resolver.WithoutHostContext()
+		_, secondErr := childResolver.ResolveString("{{file:oversized.txt:-fallback}}")
 		require.Error(t, secondErr)
 		assert.Contains(t, secondErr.Error(), "too large")
+
+		// Verify that the second call hit the file cache and did not trigger additional Stat calls
+		assert.Equal(t, statCallsCount, len(mockFS.StatCalls))
 	})
 }
 
