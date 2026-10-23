@@ -59,6 +59,7 @@ func TestUnit_Containerd_ControlSocket_LifecycleAndErrorPropagation(t *testing.T
 	// 3. AttachContainer
 	readyChan := make(chan struct{})
 	attachErrChan := make(chan error, 1)
+	attachFinished := false
 	go func() {
 		attachErrChan <- adapter.AttachContainer(ctx, id, false, nil, nil, nil, readyChan)
 	}()
@@ -66,6 +67,7 @@ func TestUnit_Containerd_ControlSocket_LifecycleAndErrorPropagation(t *testing.T
 	case <-readyChan:
 	case err := <-attachErrChan:
 		require.NoError(t, err)
+		attachFinished = true
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for AttachContainer ready signal")
 	}
@@ -78,12 +80,14 @@ func TestUnit_Containerd_ControlSocket_LifecycleAndErrorPropagation(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 
-	// Wait for background AttachContainer to finish cleanly
-	select {
-	case err := <-attachErrChan:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for AttachContainer to finish")
+	// Wait for background AttachContainer to finish cleanly if not already finished
+	if !attachFinished {
+		select {
+		case err := <-attachErrChan:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for AttachContainer to finish")
+		}
 	}
 
 	// 6. SignalContainer
