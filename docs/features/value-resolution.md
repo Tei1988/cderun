@@ -101,7 +101,7 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 | Directive | Description |
 | :--- | :--- |
 | `{{file:<filename>}}` | Reads the content of `<filename>`. The engine searches for this file by traversing upwards from the current directory, then fallback searching through `~/.config/cderun/`, `/etc/cderun/`, and `/run/cderun/`. The content is stripped of leading/trailing whitespaces. Files exceeding **1MB** (`MaxDirectiveFileSize`) are strictly rejected. Parameters must be simple filenames without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{file:<filename>:-default}}` when the file is missing, cannot be read/stat, or when trimmed content is empty. Example: `{{file:.go-version:-1.22.0}}`. |
-| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning its absolute path on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing or absolute-path resolution fails. Example: `{{find_dir:master:-{{PWD}}}}`. |
+| `{{find_dir:<name>}}` | Traverses upwards searching for a directory or file named `<name>`, returning the absolute path of its containing directory on the host. Parameters must be simple names without path separators or parent directory traversal (`..`) segments. Supports fallbacks using `{{find_dir:<name>:-default}}` when the item is missing or absolute-path resolution fails. Example: `{{find_dir:master:-{{PWD}}}}`. |
 | `{{env:<var_name>}}` | Queries the host environment variable `<var_name>`. Supports fallbacks using the `{{env:KEY:-default}}` syntax, which evaluates to `default` if the variable is empty or unset. Fallbacks can also contain nested expressions (e.g., `{{env:TAG:-{{file:.version:-1.0.0}}}}`). |
 
 ### Directive Fallback Syntax & Rules (`:-default`)
@@ -144,26 +144,32 @@ If you need to pass a literal string containing double braces to the container (
 
 This escaping mechanism bypasses evaluation and also prevents strict resolution checks from failing on non-standard expressions.
 
-### 5. Nested Expressions
+### 5. Nested Expressions & Step-by-Step Resolution Trace
 
-Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine evaluates expressions from the inside out.
+Expressions can be recursively nested to configure robust, multi-tier fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine scans and evaluates expressions from the inside out.
 
-**Examples:**
+#### Multi-Tier Fallback Trace Table
 
-```text
-{{env:VERSION:-{{file:.version:-1.0.0}}}}
-```
+The table below illustrates step-by-step evaluation for `{{env:VERSION:-{{file:.version:-1.0.0}}}}` under three distinct host environment scenarios:
 
-1. The inner expression `{{file:.version:-1.0.0}}` is evaluated first (e.g., resolving to `1.2.3` if `.version` exists, or `1.0.0` if missing).
-2. The outer expression is evaluated with the fallback parameter: `{{env:VERSION:-1.2.3}}`.
-3. If the host environment variable `VERSION` is set, its value is used; otherwise, it falls back to `1.2.3`.
+| Step | Environment / File System State | Evaluated Sub-expression | Intermediate Result | Final Output |
+| :--- | :--- | :--- | :--- | :--- |
+| **Scenario A** | `VERSION="2.0.0"`, `.version` exists (`"1.5.0"`) | `{{file:.version:-1.0.0}}` | `"1.5.0"` | `"2.0.0"` (`VERSION` takes precedence) |
+| **Scenario B** | `VERSION` unset, `.version` exists (`"1.5.0"`) | `{{file:.version:-1.0.0}}` | `"1.5.0"` | `"1.5.0"` (Fallback to `.version` content) |
+| **Scenario C** | `VERSION` unset, `.version` missing | `{{file:.version:-1.0.0}}` | `"1.0.0"` | `"1.0.0"` (Fallback to static default) |
 
-```text
-{{find_dir:master:-{{PWD}}}}
-```
+**Resolution Sequence:**
 
-1. The inner expression `{{PWD}}` evaluates to the current working directory path (e.g., `/project/app`).
-2. The outer `find_dir:master` directive traverses upwards for `master`. If not found, it falls back to `/project/app`.
+1. **Inner Evaluation**: The innermost directive `{{file:.version:-1.0.0}}` is evaluated. If `.version` exists and contains `"1.5.0"`, it yields `"1.5.0"`. If `.version` is missing or empty, it yields `"1.0.0"`.
+2. **Outer Interpolation**: The inner result is substituted into the outer expression, producing `{{env:VERSION:-1.5.0}}` (or `{{env:VERSION:-1.0.0}}`).
+3. **Final Resolution**: The `env:` directive checks the host environment variable `VERSION`. If non-empty, `VERSION` value is returned; otherwise, the substituted default is returned.
+
+#### Upward Directory Fallback Trace
+
+For `{{find_dir:master:-{{PWD}}}}`:
+
+1. **Inner Evaluation**: `{{PWD}}` evaluates to the current working directory (e.g. `/home/user/project/subApp`).
+2. **Outer Evaluation**: `find_dir:master` performs upward directory traversal. If `master` exists in `/home/user/project`, it returns `/home/user/project`. If `master` is not found anywhere up to the filesystem root, it gracefully falls back to `/home/user/project/subApp` without setting a sticky error.
 
 ---
 

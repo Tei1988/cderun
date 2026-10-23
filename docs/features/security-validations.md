@@ -4,26 +4,28 @@
 
 ## Character Validation
 
-The `validatePathChars` function ensures that critical configuration strings do not contain ASCII control characters (ASCII < 32 or 127).
+The `validatePathChars` function in `internal/config/path.go` enforces strict ASCII and UTF-8 safety checks across critical configuration strings. It utilizes a fast-path ASCII byte scan loop to bypass allocation for standard printable ASCII characters, followed by rune decoding (`utf8.DecodeRuneInString`) to detect invalid UTF-8 byte sequences or C0/C1 unescaped control characters (`unicode.IsControl`).
 
-This validation is applied to:
+This validation is strictly applied to:
 
-- Image names
-- User names
-- Network modes
-- Hostnames
-- Working directories
-- Runtime
-- Socket paths (`--socket-path`, `--mount-socket-path`)
-- cderun binary mount path (`--mount-cderun-path`)
+- Image names (`ValidateImageName`)
+- User names and user:group identifiers (`ValidateUserName`)
+- Network modes and container/namespace references (`ValidateNetworkName`)
+- Hostnames (`ValidateHostname`)
+- Working directories (`ValidateWorkdir`)
+- OCI and Container Runtime engine identifiers
+- Engine socket paths and mount socket paths
+- Binary mount paths (`--mount-cderun-path`)
 - Output formats (`--dry-run-format`, `--diagnosis-format`)
 - Logging settings (`--log-level`, `--log-format`)
 - Entrypoint elements
-- Port mappings and exposed ports (`--publish`, `--expose`)
-- DNS servers and host mappings (`--dns`, `--add-host`)
-- Linux capabilities (`--cap-add`, `--cap-drop`)
+- Port mappings (`ValidatePort`) and exposed ports (`ValidateExposePort`)
+- DNS servers (`ValidateDNS`), DNS options (`ValidateDNSOption`), and host mappings (`ValidateAddHost`)
+- Linux capabilities (`ValidateCapability`)
+- Supplementary groups (`ValidateGroupAdd`)
+- Kernel sysctl keys (`ValidateSysctlKey`) and values (`ValidateSysctlValue`)
 
-Any string containing unsafe characters will cause an immediate resolution failure.
+Any value in these covered configuration fields containing control characters (C0 controls 0x00–0x1F, DEL 0x7F, or C1 controls 0x80–0x9F) or invalid UTF-8 byte sequences causes an immediate resolution failure during configuration processing, prior to image pulling and container creation.
 
 ## Anchor Boundary Validation
 
@@ -183,4 +185,4 @@ All mount configurations must specify an absolute path for the `Target` (contain
 
 ## Environment Variable Validation
 
-When validating environment variables, `cderun` applies character checks strictly to the **key** portion (the part before the first `=`). This prevents the use of control characters in variable names while allowing legitimate multiline values or complex strings (such as PEM certificates) in the values themselves.
+When validating environment variables, `ValidateEnvKey` applies key-format checks strictly to the **key** portion (the part before the first `=`). Key names are restricted to ASCII alphanumerics and underscores, with the initial character requiring an ASCII letter or underscore (`[a-zA-Z_][a-zA-Z0-9_]*`). `validateEnvSecurity` separately validates the value portion: it rejects null bytes (`\x00`) and control characters except newline (`\n`), carriage return (`\r`), and tab (`\t`). Legitimate multiline values, such as PEM certificates or complex string payloads, remain supported when using allowed characters.
