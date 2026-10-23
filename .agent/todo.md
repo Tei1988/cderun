@@ -95,7 +95,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | DONE |
-| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | DONE |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 | T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
 | T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | DONE |
@@ -869,3 +869,12 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
   - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
   - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.
+
+### T91 Documentation Updates: Update nested execution control socket documentation for Phase 5 completion
+
+- **Task**: Update Control Socket specification documentation for Phase 5 completion.
+- **Target Files**:
+  - `docs/features/nested-execution-control-socket.md`
+- **Details**:
+  - Document completion of Phase 5 including `containerd-api` engine dispatch parity and inherited-ceiling policy enforcement.
+  - Record macOS VM GID constraint verification results under Control Socket execution mode.
