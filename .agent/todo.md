@@ -869,3 +869,12 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
   - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
   - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.
+
+### T91 Documentation Updates: Update nested execution control socket documentation for Phase 5 completion
+
+- **Task**: Update Control Socket specification documentation for Phase 5 completion.
+- **Target Files**:
+  - `docs/features/nested-execution-control-socket.md`
+- **Details**:
+  - Document completion of Phase 5 including `containerd-api` engine dispatch parity and inherited-ceiling policy enforcement.
+  - Record macOS VM GID constraint verification results under Control Socket execution mode.
