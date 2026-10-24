@@ -119,7 +119,10 @@ func TestExpressionResolver_MaxDirectiveFileSizeBoundaries(t *testing.T) {
 		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
 		require.NoError(t, err)
 
-		// First call triggers stat size check failure and caches error in fileCache
+		// Create child resolver BEFORE parent records sticky error so child shares the same cache with nil sticky error
+		childResolver := resolver.WithoutHostContext()
+
+		// First call on parent triggers stat size check failure and caches error in shared fileCache
 		_, firstErr := resolver.ResolveString("{{file:oversized.txt}}")
 		require.Error(t, firstErr)
 		assert.Contains(t, firstErr.Error(), "too large")
@@ -127,14 +130,13 @@ func TestExpressionResolver_MaxDirectiveFileSizeBoundaries(t *testing.T) {
 		// Record mockFS.StatCalls count after first resolution
 		statCallsCount := len(mockFS.StatCalls)
 
-		// Derived child resolver shares the underlying cache with parent
-		childResolver := resolver.WithoutHostContext()
+		// Derived child resolver queries the shared cache for fileCache entry
 		_, secondErr := childResolver.ResolveString("{{file:oversized.txt:-fallback}}")
 		require.Error(t, secondErr)
 		assert.Contains(t, secondErr.Error(), "too large")
 
 		// Verify that the second call hit the file cache and did not trigger additional Stat calls
-		assert.Equal(t, statCallsCount, len(mockFS.StatCalls))
+		assert.Len(t, mockFS.StatCalls, statCallsCount)
 	})
 }
 
