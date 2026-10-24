@@ -179,113 +179,11 @@ func (r *NerdctlRuntime) CreateContainer(ctx context.Context, config *container.
 	}
 
 	builder := NewCLIArgBuilder()
-	builder.AddJoinedFlag("--workdir", config.Workdir, true)
-	builder.AddJoinedFlag("--user", config.User, true)
-	builder.AddJoinedFlag("--hostname", config.Hostname, true)
-	builder.AddJoinedFlag("--net", config.Network, true)
-	builder.AddJoinedFlag("--ipc", config.IPC, true)
-	builder.AddJoinedFlag("--cgroupns", config.Cgroupns, true)
-	builder.AddJoinedFlag("--restart", config.Restart, true)
-	builder.AddJoinedFlag("--shm-size", config.ShmSize, true)
-	builder.AddJoinedFlag("--cpuset-cpus", config.CpusetCpus, true)
-	builder.AddJoinedFlag("--cpuset-mems", config.CpusetMems, true)
-	builder.AddJoinedFlag("--gpus", config.GPUs, true)
-	builder.AddJoinedFlag("--pid", config.Pid, true)
-	builder.AddJoinedFlag("--runtime", config.OciRuntime, true)
-
-	if config.CPUs > 0 {
-		builder.AddJoinedFlag("--cpus", strconv.FormatFloat(config.CPUs, 'f', -1, 64), false)
-	}
-	if config.PidsLimit != 0 {
-		builder.AddJoinedFlag("--pids-limit", strconv.FormatInt(config.PidsLimit, 10), false)
-	}
-	if config.CPUShares > 0 {
-		builder.AddJoinedFlag("--cpu-shares", strconv.FormatInt(config.CPUShares, 10), false)
-	}
-	if config.Memory > 0 {
-		builder.AddJoinedFlag("--memory", strconv.FormatInt(config.Memory, 10), false)
-	}
-
-	builder.AddBoolFlag("--tty", config.TTY)
-	builder.AddBoolFlag("--interactive", config.Interactive)
-	builder.AddBoolFlag("--read-only", config.ReadOnly)
-	builder.AddBoolFlag("--init", config.Init)
-	builder.AddBoolFlag("--privileged", config.Privileged)
-	builder.AddBoolFlag("--publish-all", config.PublishAll)
-
-	for _, e := range config.Env {
-		builder.AddJoinedFlag("--env", e, false)
-	}
-	for _, m := range config.Mounts {
-		mountVal := fmt.Sprintf("type=%s,source=%s,target=%s", m.Type, m.Source, m.Target)
-		if m.ReadOnly {
-			mountVal += ",readonly"
-		}
-		builder.AddJoinedFlag("--mount", mountVal, false)
-	}
-	for _, cap := range config.CapAdd {
-		builder.AddJoinedFlag("--cap-add", cap, false)
-	}
-	for _, cap := range config.CapDrop {
-		builder.AddJoinedFlag("--cap-drop", cap, false)
-	}
-	for _, sec := range config.SecurityOpt {
-		builder.AddJoinedFlag("--security-opt", sec, false)
-	}
-	for _, dns := range config.DNS {
-		builder.AddJoinedFlag("--dns", dns, false)
-	}
-	for _, search := range config.DNSSearch {
-		builder.AddJoinedFlag("--dns-search", search, false)
-	}
-	for _, opt := range config.DNSOptions {
-		builder.AddJoinedFlag("--dns-opt", opt, false)
-	}
-	for _, host := range config.AddHosts {
-		builder.AddJoinedFlag("--add-host", host, false)
-	}
-	for _, port := range config.Ports {
-		builder.AddJoinedFlag("--publish", port, false)
-	}
-	for _, exp := range config.Expose {
-		builder.AddJoinedFlag("--expose", exp, false)
-	}
-	for _, g := range config.GroupAdd {
-		builder.AddJoinedFlag("--group-add", g, false)
-	}
-	for _, dev := range config.Devices {
-		devStr := dev.PathOnHost
-		if dev.PathInContainer != "" && dev.PathInContainer != dev.PathOnHost {
-			devStr += ":" + dev.PathInContainer
-			if dev.CgroupPermissions != "" {
-				devStr += ":" + dev.CgroupPermissions
-			}
-		} else if dev.CgroupPermissions != "" && dev.CgroupPermissions != "rwm" {
-			devStr += ":" + dev.PathOnHost + ":" + dev.CgroupPermissions
-		}
-		builder.AddJoinedFlag("--device", devStr, false)
-	}
-	for _, u := range config.Ulimits {
-		builder.AddJoinedFlag("--ulimit", fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard), false)
-	}
-	for k, v := range config.Sysctls {
-		builder.AddJoinedFlag("--sysctl", fmt.Sprintf("%s=%s", k, v), false)
-	}
-	for k, v := range config.Labels {
-		builder.AddJoinedFlag("--label", fmt.Sprintf("%s=%s", k, v), false)
-	}
-
-	if len(config.Entrypoint) > 0 {
-		builder.AddJoinedFlag("--entrypoint", config.Entrypoint[0], false)
-	}
-
-	// Positionals: Image, additional Entrypoint args, and Command
-	positionals := []string{config.Image}
-	if len(config.Entrypoint) > 1 {
-		positionals = append(positionals, config.Entrypoint[1:]...)
-	}
-	positionals = append(positionals, config.Command...)
-	builder.AddPositionals(positionals...)
+	appendNerdctlScalarFlags(builder, config)
+	appendNerdctlEnvAndMounts(builder, config)
+	appendNerdctlSliceFlags(builder, config)
+	appendNerdctlDeviceAndResourceFlags(builder, config)
+	appendNerdctlPositionals(builder, config)
 
 	argv := builder.Build()
 	if err := builder.VerifyStructure(argv, -1); err != nil {
@@ -495,4 +393,101 @@ func (r *NerdctlRuntime) PruneContainers(ctx context.Context) ([]string, error) 
 // Close releases any runtime resources.
 func (r *NerdctlRuntime) Close() error {
 	return nil
+}
+
+func appendNerdctlScalarFlags(builder *CLIArgBuilder, config *container.ContainerConfig) {
+	builder.AddJoinedFlag("--workdir", config.Workdir, true)
+	builder.AddJoinedFlag("--user", config.User, true)
+	builder.AddJoinedFlag("--hostname", config.Hostname, true)
+	builder.AddJoinedFlag("--net", config.Network, true)
+	builder.AddJoinedFlag("--ipc", config.IPC, true)
+	builder.AddJoinedFlag("--cgroupns", config.Cgroupns, true)
+	builder.AddJoinedFlag("--restart", config.Restart, true)
+	builder.AddJoinedFlag("--shm-size", config.ShmSize, true)
+	builder.AddJoinedFlag("--cpuset-cpus", config.CpusetCpus, true)
+	builder.AddJoinedFlag("--cpuset-mems", config.CpusetMems, true)
+	builder.AddJoinedFlag("--gpus", config.GPUs, true)
+	builder.AddJoinedFlag("--pid", config.Pid, true)
+	builder.AddJoinedFlag("--runtime", config.OciRuntime, true)
+
+	if config.CPUs > 0 {
+		builder.AddJoinedFlag("--cpus", strconv.FormatFloat(config.CPUs, 'f', -1, 64), false)
+	}
+	if config.PidsLimit != 0 {
+		builder.AddJoinedFlag("--pids-limit", strconv.FormatInt(config.PidsLimit, 10), false)
+	}
+	if config.CPUShares > 0 {
+		builder.AddJoinedFlag("--cpu-shares", strconv.FormatInt(config.CPUShares, 10), false)
+	}
+	if config.Memory > 0 {
+		builder.AddJoinedFlag("--memory", strconv.FormatInt(config.Memory, 10), false)
+	}
+
+	builder.AddBoolFlag("--tty", config.TTY)
+	builder.AddBoolFlag("--interactive", config.Interactive)
+	builder.AddBoolFlag("--read-only", config.ReadOnly)
+	builder.AddBoolFlag("--init", config.Init)
+	builder.AddBoolFlag("--privileged", config.Privileged)
+	builder.AddBoolFlag("--publish-all", config.PublishAll)
+}
+
+func appendNerdctlEnvAndMounts(builder *CLIArgBuilder, config *container.ContainerConfig) {
+	builder.AddRepeatJoinedFlag("--env", config.Env)
+	for _, m := range config.Mounts {
+		mountVal := fmt.Sprintf("type=%s,source=%s,target=%s", m.Type, m.Source, m.Target)
+		if m.ReadOnly {
+			mountVal += ",readonly"
+		}
+		builder.AddJoinedFlag("--mount", mountVal, false)
+	}
+}
+
+func appendNerdctlSliceFlags(builder *CLIArgBuilder, config *container.ContainerConfig) {
+	builder.AddRepeatJoinedFlag("--cap-add", config.CapAdd)
+	builder.AddRepeatJoinedFlag("--cap-drop", config.CapDrop)
+	builder.AddRepeatJoinedFlag("--security-opt", config.SecurityOpt)
+	builder.AddRepeatJoinedFlag("--dns", config.DNS)
+	builder.AddRepeatJoinedFlag("--dns-search", config.DNSSearch)
+	builder.AddRepeatJoinedFlag("--dns-opt", config.DNSOptions)
+	builder.AddRepeatJoinedFlag("--add-host", config.AddHosts)
+	builder.AddRepeatJoinedFlag("--publish", config.Ports)
+	builder.AddRepeatJoinedFlag("--expose", config.Expose)
+	builder.AddRepeatJoinedFlag("--group-add", config.GroupAdd)
+}
+
+func appendNerdctlDeviceAndResourceFlags(builder *CLIArgBuilder, config *container.ContainerConfig) {
+	for _, dev := range config.Devices {
+		devStr := dev.PathOnHost
+		if dev.PathInContainer != "" && dev.PathInContainer != dev.PathOnHost {
+			devStr += ":" + dev.PathInContainer
+			if dev.CgroupPermissions != "" {
+				devStr += ":" + dev.CgroupPermissions
+			}
+		} else if dev.CgroupPermissions != "" && dev.CgroupPermissions != "rwm" {
+			devStr += ":" + dev.PathOnHost + ":" + dev.CgroupPermissions
+		}
+		builder.AddJoinedFlag("--device", devStr, false)
+	}
+	for _, u := range config.Ulimits {
+		builder.AddJoinedFlag("--ulimit", fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard), false)
+	}
+	for k, v := range config.Sysctls {
+		builder.AddJoinedFlag("--sysctl", fmt.Sprintf("%s=%s", k, v), false)
+	}
+	for k, v := range config.Labels {
+		builder.AddJoinedFlag("--label", fmt.Sprintf("%s=%s", k, v), false)
+	}
+}
+
+func appendNerdctlPositionals(builder *CLIArgBuilder, config *container.ContainerConfig) {
+	if len(config.Entrypoint) > 0 {
+		builder.AddJoinedFlag("--entrypoint", config.Entrypoint[0], false)
+	}
+
+	positionals := []string{config.Image}
+	if len(config.Entrypoint) > 1 {
+		positionals = append(positionals, config.Entrypoint[1:]...)
+	}
+	positionals = append(positionals, config.Command...)
+	builder.AddPositionals(positionals...)
 }
