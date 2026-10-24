@@ -3,7 +3,9 @@ package runtime
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -226,7 +228,32 @@ func TestUnit_DockerRuntime_PruneContainers_ActiveFilter(t *testing.T) {
 }
 
 func TestUnit_PodmanRuntime_InitializationAndSocket(t *testing.T) {
-	socketPath := "/tmp/podman_test.sock"
+	tempDir := t.TempDir()
+	socketPath := filepath.Join(tempDir, "podman.sock")
+
+	received := make(chan struct{}, 1)
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case received <- struct{}{}:
+			default:
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("[]"))
+		}),
+	}
+
+	listener, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	defer listener.Close()
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+	defer func() {
+		_ = server.Close()
+	}()
 
 	rt, err := NewPodmanRuntime(socketPath, WithAttachCloseWriteGrace(2*time.Second))
 	require.NoError(t, err)
@@ -235,12 +262,19 @@ func TestUnit_PodmanRuntime_InitializationAndSocket(t *testing.T) {
 	assert.Equal(t, "podman", rt.Name())
 	assert.Equal(t, 2*time.Second, rt.attachCloseWriteGrace)
 
-	// Verify that the client was constructed with a custom HTTP client
-	podmanHTTPClient := newPodmanHTTPClient(socketPath)
-	require.NotNil(t, podmanHTTPClient)
-	transport, ok := podmanHTTPClient.Transport.(*http.Transport)
-	require.True(t, ok)
-	assert.True(t, transport.DisableKeepAlives)
+	// Exercise rt.client installed on the runtime directly over the Unix socket
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err = rt.client.ContainerList(ctx, dockercontainer.ListOptions{})
+	require.NoError(t, err)
+
+	select {
+	case <-received:
+		// Successfully verified that the constructor-installed client communicates over the expected socket
+	case <-time.After(1 * time.Second):
+		t.Fatal("expected request to reach the temporary Podman Unix socket listener")
+	}
 }
 
 func TestUnit_DockerRuntime_PruneContainers_ListError(t *testing.T) {
