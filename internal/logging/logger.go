@@ -24,24 +24,27 @@ const (
 func ParseLevel(s string) Level {
 	switch len(s) {
 	case 4:
-		if strings.EqualFold(s, "warn") {
+		c0, c1, c2, c3 := s[0]|0x20, s[1]|0x20, s[2]|0x20, s[3]|0x20
+		if c0 == 'w' && c1 == 'a' && c2 == 'r' && c3 == 'n' {
 			return WarnLevel
 		}
-		if strings.EqualFold(s, "info") {
+		if c0 == 'i' && c1 == 'n' && c2 == 'f' && c3 == 'o' {
 			return InfoLevel
 		}
 	case 5:
-		if strings.EqualFold(s, "error") {
+		c0, c1, c2, c3, c4 := s[0]|0x20, s[1]|0x20, s[2]|0x20, s[3]|0x20, s[4]|0x20
+		if c0 == 'e' && c1 == 'r' && c2 == 'r' && c3 == 'o' && c4 == 'r' {
 			return ErrorLevel
 		}
-		if strings.EqualFold(s, "debug") {
+		if c0 == 'd' && c1 == 'e' && c2 == 'b' && c3 == 'u' && c4 == 'g' {
 			return DebugLevel
 		}
-		if strings.EqualFold(s, "trace") {
+		if c0 == 't' && c1 == 'r' && c2 == 'a' && c3 == 'c' && c4 == 'e' {
 			return TraceLevel
 		}
 	case 7:
-		if strings.EqualFold(s, "warning") {
+		c0, c1, c2, c3, c4, c5, c6 := s[0]|0x20, s[1]|0x20, s[2]|0x20, s[3]|0x20, s[4]|0x20, s[5]|0x20, s[6]|0x20
+		if c0 == 'w' && c1 == 'a' && c2 == 'r' && c3 == 'n' && c4 == 'i' && c5 == 'n' && c6 == 'g' {
 			return WarnLevel
 		}
 	}
@@ -237,8 +240,36 @@ func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 		data = append(data, '\n')
 		_, _ = l.writer.Write(data) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
 	} else {
-		output := l.formatText(level, message, now)
-		_, _ = io.WriteString(l.writer, output) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
+		lvlStr := level.String()
+		needed := len(lvlStr) + len(message) + 4
+		if l.timestamp {
+			needed += 20 // len("2006-01-02 15:04:05 ") == 20
+		}
+		if needed <= 512 {
+			var buf [512]byte
+			w := 0
+			if l.timestamp {
+				timeSlice := now.AppendFormat(buf[:0], "2006-01-02 15:04:05")
+				w = len(timeSlice)
+				buf[w] = ' '
+				w++
+			}
+			buf[w] = '['
+			w++
+			copy(buf[w:], lvlStr)
+			w += len(lvlStr)
+			buf[w] = ']'
+			buf[w+1] = ' '
+			w += 2
+			copy(buf[w:], message)
+			w += len(message)
+			buf[w] = '\n'
+			w++
+			_, _ = l.writer.Write(buf[:w]) //nolint:errcheck // best-effort log write
+		} else {
+			output := l.formatText(level, message, now)
+			_, _ = io.WriteString(l.writer, output) //nolint:errcheck // best-effort log write; logging methods intentionally do not return write errors
+		}
 	}
 }
 
@@ -341,8 +372,9 @@ func SanitizeLogString(s string) string {
 		return string(buf[:w])
 	}
 
+	extra := countControlBytes(s) * 3
 	var builder strings.Builder
-	builder.Grow(len(s) + 8)
+	builder.Grow(len(s) + extra)
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c == '\t' {
@@ -357,4 +389,14 @@ func SanitizeLogString(s string) string {
 		}
 	}
 	return builder.String()
+}
+
+func countControlBytes(s string) int {
+	count := 0
+	for i := 0; i < len(s); i++ {
+		if isControlByte(s[i]) {
+			count++
+		}
+	}
+	return count
 }
