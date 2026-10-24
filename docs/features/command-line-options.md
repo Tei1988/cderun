@@ -340,7 +340,7 @@ cderun --engine containerd node app.js
 - **Environment Variable**: `CDERUN_OCI_RUNTIME`
 - **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`) for low-level container execution.
 - **Aliases**: `--runtime` / `--cderun-runtime` CLI flags, `CDERUN_RUNTIME` environment variable, and `runtime:` configuration key inside `.cderun.yaml` or `.tools.yaml` are supported as aliases for OCI runtime selection (`--oci-runtime`).
-- **Validation**: Supplying container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` / `CDERUN_RUNTIME` / `runtime:` triggers an explicit `InvalidConfigError` validation error directing the user to use `--engine` instead.
+- **Validation**: Supplying container engine names (`docker`, `podman`, `containerd`, `nerdctl`) through any OCI runtime option flag or alias (`--oci-runtime`, `--runtime`, `--cderun-oci-runtime`, `--cderun-runtime`), environment variable (`CDERUN_OCI_RUNTIME`, `CDERUN_RUNTIME`), or configuration key (`ociRuntime:`, `runtime:`) triggers an explicit `InvalidConfigError` migration validation error on the winning value directing the user to use `--engine` instead.
 - **Details**:
   - **Docker**: Maps to `HostConfig.Runtime` during Docker container creation.
   - **Podman**: Mapped to native Podman OCI runtime selection.

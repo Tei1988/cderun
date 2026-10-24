@@ -141,7 +141,7 @@ While `--engine` selects the container execution engine (`docker`, `podman`, `co
 
 - **Option Flag**: `--oci-runtime` (P2) / `--cderun-oci-runtime` (P1)
 - **Aliases**: `--runtime` / `--cderun-runtime` CLI flags, `CDERUN_RUNTIME` environment variable, and `runtime:` configuration key in `.cderun.yaml` / `.tools.yaml` are supported as aliases for OCI runtime selection (`--oci-runtime`).
-- **Validation**: Supplying container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` / `CDERUN_RUNTIME` / `runtime:` triggers an explicit `InvalidConfigError` validation error directing the user to `--engine`.
+- **Validation**: Supplying container engine names (`docker`, `podman`, `containerd`, `nerdctl`) through any OCI runtime option flag or alias (`--oci-runtime`, `--runtime`, `--cderun-oci-runtime`, `--cderun-runtime`), environment variable (`CDERUN_OCI_RUNTIME`, `CDERUN_RUNTIME`), or configuration key (`ociRuntime:`, `runtime:`) triggers an explicit `InvalidConfigError` migration validation error on the winning value directing the user to `--engine`.
 - **Environment Variable**: `CDERUN_OCI_RUNTIME` (or alias `CDERUN_RUNTIME`) (P3)
 - **Configuration Key**: `ociRuntime:` (or alias `runtime:`) inside `.cderun.yaml` / `.tools.yaml`
 - **Runtime Limitations**: Unsupported on direct containerd API (explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`).

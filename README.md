@@ -310,7 +310,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
 - `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
-- `--oci-runtime`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`). `--runtime` is supported as an alias for `--oci-runtime`.
+- `--runtime`: Alias for `--oci-runtime`.
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
