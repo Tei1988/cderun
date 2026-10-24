@@ -309,7 +309,8 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`). (Note: `--runtime` is supported as a deprecated alias)
+- `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
+- `--runtime`: Alias for `--oci-runtime`.
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -494,8 +495,8 @@ Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variabl
 - `CDERUN_CONFIG`: Path to `cderun` configuration file (`.cderun.yaml`).
 - `CDERUN_TOOL_CONFIG`: Path to tools configuration file (`.tools.yaml`).
 - `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
-- `CDERUN_RUNTIME`: Deprecated fallback alias for `CDERUN_ENGINE`.
 - `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
+- `CDERUN_RUNTIME`: Supported alias for `CDERUN_OCI_RUNTIME`.
 - `CDERUN_SOCKET_PATH`: Path to the container runtime socket on the host.
 
 ### Execution & Identity
