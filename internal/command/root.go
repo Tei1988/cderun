@@ -493,11 +493,21 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	sort.Strings(info.AvailableTools)
 
 	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) error {
-		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+		if _, err := fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", ")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", ")); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", ")); err != nil {
+			return err
+		}
 		return nil
 	})
 }
