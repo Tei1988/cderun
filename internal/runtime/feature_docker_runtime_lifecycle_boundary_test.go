@@ -226,6 +226,8 @@ func TestUnit_DockerRuntime_PruneContainers_ActiveFilter(t *testing.T) {
 	pruned, err := runtime.PruneContainers(ctx)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"stopped-exited", "stopped-created"}, pruned)
+	assert.True(t, mock.listOpts.All)
+	assert.Equal(t, []string{"cderun=true"}, mock.listOpts.Filters.Get("label"))
 }
 
 func TestUnit_PodmanRuntime_InitializationAndSocket(t *testing.T) {
