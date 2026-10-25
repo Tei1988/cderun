@@ -448,7 +448,7 @@ type diagnosticsInfo struct {
 	AvailableTools []string `json:"available_tools,omitempty" yaml:"available_tools,omitempty"`
 }
 
-func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer)) error {
+func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpleWriter func(io.Writer) error) error {
 	switch strings.ToLower(format) {
 	case "json":
 		marshaled, err := o.jsonMarshalIndent(data, "", "  ")
@@ -458,8 +458,7 @@ func (o *rootOptions) writeFormatted(w io.Writer, format string, data any, simpl
 		_, err = fmt.Fprintln(w, string(marshaled))
 		return err
 	case "simple":
-		simpleWriter(w)
-		return nil
+		return simpleWriter(w)
 	case "yaml", "": // Default to YAML if format is empty
 		marshaled, err := o.yamlMarshal(data)
 		if err != nil {
@@ -493,12 +492,14 @@ func (o *rootOptions) handleDiagnosis(cmd *cobra.Command, resolved *config.Resol
 	}
 	sort.Strings(info.AvailableTools)
 
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) {
-		_, _ = fmt.Fprintf(w, "Runtime: %s (%s)\n", info.Runtime.Name, info.Runtime.Socket)
-		_, _ = fmt.Fprintf(w, "Runtime Status: %s\n", info.Runtime.Status)
-		_, _ = fmt.Fprintf(w, "Global Config: %s\n", strings.Join(info.Configs.Global, ", "))
-		_, _ = fmt.Fprintf(w, "Tools Config: %s\n", strings.Join(info.Configs.Tools, ", "))
-		_, _ = fmt.Fprintf(w, "Available Tools: %s\n", strings.Join(info.AvailableTools, ", "))
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DiagnosisFormat, info, func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Runtime: %s (%s)\nRuntime Status: %s\nGlobal Config: %s\nTools Config: %s\nAvailable Tools: %s\n",
+			info.Runtime.Name, info.Runtime.Socket,
+			info.Runtime.Status,
+			strings.Join(info.Configs.Global, ", "),
+			strings.Join(info.Configs.Tools, ", "),
+			strings.Join(info.AvailableTools, ", "))
+		return err
 	})
 }
 
@@ -655,144 +656,234 @@ func (o *rootOptions) pullPrefetchImages(ctx context.Context, rt runtime.Contain
 	return nil
 }
 
-func formatDryRunCoreFields(w io.Writer, cfg *container.ContainerConfig) {
-	_, _ = fmt.Fprintf(w, "Image: %s\n", cfg.Image)
-	quotedCmd := make([]string, 0, len(cfg.Command))
-	for _, arg := range cfg.Command {
-		quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
+func writeJoinedSlice(sb *strings.Builder, prefix string, slice []string) {
+	sb.WriteString(prefix)
+	for i, s := range slice {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(s)
 	}
-	_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
-	_, _ = fmt.Fprintf(w, "TTY: %v\n", cfg.TTY)
-	_, _ = fmt.Fprintf(w, "Interactive: %v\n", cfg.Interactive)
-	_, _ = fmt.Fprintf(w, "Network: %s\n", cfg.Network)
-	_, _ = fmt.Fprintf(w, "Remove: %v\n", cfg.Remove)
-	_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", cfg.ReadOnly)
-	_, _ = fmt.Fprintf(w, "Init: %v\n", cfg.Init)
+	sb.WriteString("\n")
 }
 
-func formatDryRunMountsAndEnv(w io.Writer, cfg *container.ContainerConfig) {
-	mounts := make([]string, 0, len(cfg.Mounts))
-	for _, m := range cfg.Mounts {
-		mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
+func formatDryRunCoreFields(sb *strings.Builder, cfg *container.ContainerConfig) {
+	sb.WriteString("Image: ")
+	sb.WriteString(cfg.Image)
+	sb.WriteString("\nCommand: ")
+	for i, arg := range cfg.Command {
+		if i > 0 {
+			sb.WriteString(" ")
+		}
+		sb.WriteString(strconv.Quote(arg))
 	}
-	_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
-	quotedEnvs := make([]string, 0, len(cfg.Env))
-	for _, e := range cfg.Env {
+	sb.WriteString("\nTTY: ")
+	sb.WriteString(strconv.FormatBool(cfg.TTY))
+	sb.WriteString("\nInteractive: ")
+	sb.WriteString(strconv.FormatBool(cfg.Interactive))
+	sb.WriteString("\nNetwork: ")
+	sb.WriteString(cfg.Network)
+	sb.WriteString("\nRemove: ")
+	sb.WriteString(strconv.FormatBool(cfg.Remove))
+	sb.WriteString("\nReadOnly: ")
+	sb.WriteString(strconv.FormatBool(cfg.ReadOnly))
+	sb.WriteString("\nInit: ")
+	sb.WriteString(strconv.FormatBool(cfg.Init))
+	sb.WriteString("\n")
+}
+
+func formatDryRunMountsAndEnv(sb *strings.Builder, cfg *container.ContainerConfig) {
+	sb.WriteString("Mounts: ")
+	for i, m := range cfg.Mounts {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("type=")
+		sb.WriteString(m.Type)
+		sb.WriteString(",source=")
+		sb.WriteString(strconv.Quote(m.Source))
+		sb.WriteString(",target=")
+		sb.WriteString(strconv.Quote(m.Target))
+		sb.WriteString(",readonly=")
+		sb.WriteString(strconv.FormatBool(m.ReadOnly))
+	}
+	sb.WriteString("\nEnv: ")
+	for i, e := range cfg.Env {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
 		if k, v, found := strings.Cut(e, "="); found {
-			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
+			sb.WriteString(strconv.Quote(k))
+			sb.WriteString("=")
+			sb.WriteString(strconv.Quote(v))
 		} else {
-			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
+			sb.WriteString(strconv.Quote(e))
 		}
 	}
-	_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
-	_, _ = fmt.Fprintf(w, "Workdir: %s\n", cfg.Workdir)
-	_, _ = fmt.Fprintf(w, "User: %s\n", cfg.User)
+	sb.WriteString("\nWorkdir: ")
+	sb.WriteString(cfg.Workdir)
+	sb.WriteString("\nUser: ")
+	sb.WriteString(cfg.User)
+	sb.WriteString("\n")
 }
 
-func formatDryRunNetworkAndSecurity(w io.Writer, cfg *container.ContainerConfig) {
-	_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(cfg.Ports, ", "))
-	_, _ = fmt.Fprintf(w, "PublishAll: %v\n", cfg.PublishAll)
-	_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(cfg.Expose, ", "))
-	_, _ = fmt.Fprintf(w, "Hostname: %s\n", cfg.Hostname)
-	_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(cfg.DNS, ", "))
-	_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(cfg.AddHosts, ", "))
-	_, _ = fmt.Fprintf(w, "Privileged: %v\n", cfg.Privileged)
+func formatDryRunNetworkAndSecurity(sb *strings.Builder, cfg *container.ContainerConfig) {
+	writeJoinedSlice(sb, "Ports: ", cfg.Ports)
+	sb.WriteString("PublishAll: ")
+	sb.WriteString(strconv.FormatBool(cfg.PublishAll))
+	sb.WriteString("\n")
+	writeJoinedSlice(sb, "Expose: ", cfg.Expose)
+	sb.WriteString("Hostname: ")
+	sb.WriteString(cfg.Hostname)
+	sb.WriteString("\n")
+	writeJoinedSlice(sb, "DNS: ", cfg.DNS)
+	writeJoinedSlice(sb, "AddHosts: ", cfg.AddHosts)
+	sb.WriteString("Privileged: ")
+	sb.WriteString(strconv.FormatBool(cfg.Privileged))
+	sb.WriteString("\n")
 	if cfg.Pid != "" {
-		_, _ = fmt.Fprintf(w, "Pid: %s\n", cfg.Pid)
+		sb.WriteString("Pid: ")
+		sb.WriteString(cfg.Pid)
+		sb.WriteString("\n")
 	}
 	if cfg.ShmSize != "" {
-		_, _ = fmt.Fprintf(w, "ShmSize: %s\n", cfg.ShmSize)
+		sb.WriteString("ShmSize: ")
+		sb.WriteString(cfg.ShmSize)
+		sb.WriteString("\n")
 	}
 	if cfg.IPC != "" {
-		_, _ = fmt.Fprintf(w, "IPC: %s\n", cfg.IPC)
+		sb.WriteString("IPC: ")
+		sb.WriteString(cfg.IPC)
+		sb.WriteString("\n")
 	}
 	if len(cfg.SecurityOpt) > 0 {
-		_, _ = fmt.Fprintf(w, "SecurityOpt: %s\n", strings.Join(cfg.SecurityOpt, ", "))
+		writeJoinedSlice(sb, "SecurityOpt: ", cfg.SecurityOpt)
 	}
 	if len(cfg.DNSSearch) > 0 {
-		_, _ = fmt.Fprintf(w, "DNSSearch: %s\n", strings.Join(cfg.DNSSearch, ", "))
+		writeJoinedSlice(sb, "DNSSearch: ", cfg.DNSSearch)
 	}
 	if len(cfg.DNSOptions) > 0 {
-		_, _ = fmt.Fprintf(w, "DNSOptions: %s\n", strings.Join(cfg.DNSOptions, ", "))
+		writeJoinedSlice(sb, "DNSOptions: ", cfg.DNSOptions)
 	}
 	if cfg.GPUs != "" {
-		_, _ = fmt.Fprintf(w, "GPUs: %s\n", cfg.GPUs)
+		sb.WriteString("GPUs: ")
+		sb.WriteString(cfg.GPUs)
+		sb.WriteString("\n")
 	}
 	if cfg.Cgroupns != "" {
-		_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", cfg.Cgroupns)
+		sb.WriteString("Cgroupns: ")
+		sb.WriteString(cfg.Cgroupns)
+		sb.WriteString("\n")
 	}
 }
 
-func formatDryRunLimitsAndResources(w io.Writer, cfg *container.ContainerConfig) {
+func formatDryRunLimitsAndResources(sb *strings.Builder, cfg *container.ContainerConfig) {
 	if cfg.PidsLimit != 0 {
-		_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", cfg.PidsLimit)
+		sb.WriteString("PidsLimit: ")
+		sb.WriteString(strconv.FormatInt(cfg.PidsLimit, 10))
+		sb.WriteString("\n")
 	}
 	if cfg.CPUShares > 0 {
-		_, _ = fmt.Fprintf(w, "CPUShares: %d\n", cfg.CPUShares)
+		sb.WriteString("CPUShares: ")
+		sb.WriteString(strconv.FormatInt(cfg.CPUShares, 10))
+		sb.WriteString("\n")
 	}
 	if cfg.CpusetCpus != "" {
-		_, _ = fmt.Fprintf(w, "CpusetCpus: %s\n", cfg.CpusetCpus)
+		sb.WriteString("CpusetCpus: ")
+		sb.WriteString(cfg.CpusetCpus)
+		sb.WriteString("\n")
 	}
 	if cfg.CpusetMems != "" {
-		_, _ = fmt.Fprintf(w, "CpusetMems: %s\n", cfg.CpusetMems)
+		sb.WriteString("CpusetMems: ")
+		sb.WriteString(cfg.CpusetMems)
+		sb.WriteString("\n")
 	}
 	if cfg.Restart != "" && cfg.Restart != "no" {
-		_, _ = fmt.Fprintf(w, "Restart: %s\n", cfg.Restart)
+		sb.WriteString("Restart: ")
+		sb.WriteString(cfg.Restart)
+		sb.WriteString("\n")
 	}
 	if cfg.OciRuntime != "" {
-		_, _ = fmt.Fprintf(w, "OciRuntime: %s\n", cfg.OciRuntime)
+		sb.WriteString("OciRuntime: ")
+		sb.WriteString(cfg.OciRuntime)
+		sb.WriteString("\n")
 	}
-	_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(cfg.CapAdd, ", "))
-	_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(cfg.CapDrop, ", "))
-	_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(cfg.GroupAdd, ", "))
+	writeJoinedSlice(sb, "CapAdd: ", cfg.CapAdd)
+	writeJoinedSlice(sb, "CapDrop: ", cfg.CapDrop)
+	writeJoinedSlice(sb, "GroupAdd: ", cfg.GroupAdd)
 
 	if len(cfg.Ulimits) > 0 {
-		ulimits := make([]string, 0, len(cfg.Ulimits))
-		for _, u := range cfg.Ulimits {
-			ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
+		sb.WriteString("Ulimits: ")
+		for i, u := range cfg.Ulimits {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(u.Name)
+			sb.WriteString("=")
+			sb.WriteString(strconv.FormatInt(u.Soft, 10))
+			sb.WriteString(":")
+			sb.WriteString(strconv.FormatInt(u.Hard, 10))
 		}
-		_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
+		sb.WriteString("\n")
 	}
 
 	if len(cfg.Sysctls) > 0 {
 		sysctls := make([]string, 0, len(cfg.Sysctls))
 		for k, v := range cfg.Sysctls {
-			sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
+			sysctls = append(sysctls, k+"="+v)
 		}
 		sort.Strings(sysctls)
-		_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
+		writeJoinedSlice(sb, "Sysctls: ", sysctls)
 	}
 
-	devices := make([]string, 0, len(cfg.Devices))
-	for _, d := range cfg.Devices {
+	sb.WriteString("Devices: ")
+	for i, d := range cfg.Devices {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
 		if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
-			devices = append(devices, d.PathOnHost)
+			sb.WriteString(d.PathOnHost)
 		} else {
-			devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
+			sb.WriteString(d.PathOnHost)
+			sb.WriteString(":")
+			sb.WriteString(d.PathInContainer)
+			sb.WriteString(":")
+			sb.WriteString(d.CgroupPermissions)
 		}
 	}
-	_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
+	sb.WriteString("\n")
 
 	if cfg.Memory > 0 {
-		_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(cfg.Memory)))
+		sb.WriteString("Memory: ")
+		sb.WriteString(units.BytesSize(float64(cfg.Memory)))
+		sb.WriteString("\n")
 	}
 	if cfg.CPUs > 0 {
-		_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
+		sb.WriteString("CPUs: ")
+		sb.WriteString(strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
+		sb.WriteString("\n")
 	}
 	if len(cfg.Entrypoint) > 0 {
-		quotedEntry := make([]string, 0, len(cfg.Entrypoint))
-		for _, arg := range cfg.Entrypoint {
-			quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
+		sb.WriteString("Entrypoint: ")
+		for i, arg := range cfg.Entrypoint {
+			if i > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(strconv.Quote(arg))
 		}
-		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
+		sb.WriteString("\n")
 	}
 }
 
-func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
-	formatDryRunCoreFields(w, cfg)
-	formatDryRunMountsAndEnv(w, cfg)
-	formatDryRunNetworkAndSecurity(w, cfg)
-	formatDryRunLimitsAndResources(w, cfg)
+func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) error {
+	var sb strings.Builder
+	sb.Grow(512)
+	formatDryRunCoreFields(&sb, cfg)
+	formatDryRunMountsAndEnv(&sb, cfg)
+	formatDryRunNetworkAndSecurity(&sb, cfg)
+	formatDryRunLimitsAndResources(&sb, cfg)
+	_, err := io.WriteString(w, sb.String())
+	return err
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
@@ -802,8 +893,8 @@ func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *containe
 	maskedContainerConfig := *containerConfig
 	maskedContainerConfig.Env = config.MaskSensitiveEnvList(containerConfig.Env, resolved.SensitiveEnv)
 
-	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) {
-		formatDryRunSimple(w, &maskedContainerConfig)
+	return o.writeFormatted(cmd.OutOrStdout(), resolved.DryRunFormat, &maskedContainerConfig, func(w io.Writer) error {
+		return formatDryRunSimple(w, &maskedContainerConfig)
 	})
 }
 

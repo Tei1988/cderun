@@ -284,6 +284,22 @@ func isRealFileSystem(fs config.FileSystem) bool {
 	}
 }
 
+func nextField(s string) (field string, rest string) {
+	start := 0
+	for start < len(s) && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	if start >= len(s) {
+		return "", ""
+	}
+	s = s[start:]
+	end := 0
+	for end < len(s) && s[end] != ' ' && s[end] != '\t' {
+		end++
+	}
+	return s[:end], s[end:]
+}
+
 func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (string, error) {
 	if reader == nil {
 		reader = defaultMountInfoReader
@@ -306,35 +322,51 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 		if line == "" {
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 10 {
+
+		var f0, f1, f2, f3, mountPoint string
+		f0, line = nextField(line)
+		f1, line = nextField(line)
+		f2, line = nextField(line)
+		f3, line = nextField(line)
+		mountPoint, line = nextField(line)
+
+		if f0 == "" || f1 == "" || f2 == "" || f3 == "" || mountPoint == "" {
 			continue
 		}
-
-		// Find separator "-"
-		sepIdx := -1
-		for i, f := range fields {
-			if f == "-" {
-				sepIdx = i
-				break
-			}
-		}
-		if sepIdx == -1 || len(fields) <= sepIdx+3 {
-			continue
-		}
-
-		fsType := fields[sepIdx+1]
-		if fsType != "overlay" {
-			continue
-		}
-
-		mountPoint := fields[4]
 		if mountPoint != "/" {
 			continue
 		}
 
-		// Superblock options are at the end
-		sbOptions := fields[len(fields)-1]
+		var sepFound bool
+		for {
+			var field string
+			field, line = nextField(line)
+			if field == "" {
+				break
+			}
+			if field == "-" {
+				sepFound = true
+				break
+			}
+		}
+		if !sepFound {
+			continue
+		}
+
+		fsType, line := nextField(line)
+		if fsType != "overlay" {
+			continue
+		}
+
+		// Skip mount source
+		_, line = nextField(line)
+
+		// Extract super options
+		sbOptions, _ := nextField(line)
+		if sbOptions == "" {
+			continue
+		}
+
 		remainingOpts := sbOptions
 		for len(remainingOpts) > 0 {
 			var opt string
