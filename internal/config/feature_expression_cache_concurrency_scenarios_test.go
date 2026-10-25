@@ -2,12 +2,45 @@ package config
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type cacheConcurrencyStatFS struct {
+	*MockFileSystem
+	statSize   int64
+	failStatOn string
+}
+
+type cacheConcurrencyFileInfo struct {
+	os.FileInfo
+	size int64
+}
+
+func (c *cacheConcurrencyFileInfo) Size() int64 {
+	if c.size > 0 {
+		return c.size
+	}
+	return c.FileInfo.Size()
+}
+
+func (c *cacheConcurrencyStatFS) Stat(name string) (os.FileInfo, error) {
+	if c.failStatOn != "" && name == c.failStatOn {
+		return nil, errors.New("permission denied on stat")
+	}
+	info, err := c.MockFileSystem.Stat(name)
+	if err != nil {
+		return nil, err
+	}
+	if c.statSize > 0 {
+		return &cacheConcurrencyFileInfo{FileInfo: info, size: c.statSize}, nil
+	}
+	return info, nil
+}
 
 func TestExpressionResolver_ConcurrentResolutionAndCache(t *testing.T) {
 	t.Parallel()
@@ -78,27 +111,30 @@ func TestExpressionResolver_ConcurrentResolutionAndCache(t *testing.T) {
 func TestExpressionResolver_MaxDirectiveFileSizeBoundaries(t *testing.T) {
 	t.Parallel()
 
-	t.Run("File exactly at 1MB limit passes", func(t *testing.T) {
+	t.Run("Metadata above 1MB limit is rejected", func(t *testing.T) {
 		t.Parallel()
 		exactMB := make([]byte, MaxDirectiveFileSize)
 		for i := range exactMB {
 			exactMB[i] = 'a'
 		}
-		mockFS := &MockFileSystem{
-			HomeDir: "/home/testuser",
-			WD:      "/home/testuser/project",
-			Files: map[string][]byte{
-				"/home/testuser/project/exact.txt": exactMB,
-				"exact.txt":                         exactMB,
+		mockFS := &cacheConcurrencyStatFS{
+			MockFileSystem: &MockFileSystem{
+				HomeDir: "/home/testuser",
+				WD:      "/home/testuser/project",
+				Files: map[string][]byte{
+					"/home/testuser/project/exact.txt": exactMB,
+					"exact.txt":                         exactMB,
+				},
 			},
+			statSize: MaxDirectiveFileSize + 1,
 		}
 
 		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
 		require.NoError(t, err)
 
-		res, resolveErr := resolver.ResolveString("{{file:exact.txt}}")
-		require.NoError(t, resolveErr)
-		assert.Len(t, res, MaxDirectiveFileSize)
+		_, resolveErr := resolver.ResolveString("{{file:exact.txt}}")
+		require.Error(t, resolveErr)
+		assert.Contains(t, resolveErr.Error(), "too large")
 	})
 
 	t.Run("File exceeding 1MB limit by 1 byte fails and caches size limit error", func(t *testing.T) {
@@ -170,12 +206,17 @@ func TestExpressionResolver_WithoutHostContextSharedStatePropagation(t *testing.
 	require.NoError(t, parentErr)
 	assert.Equal(t, "shared_content", parentRes)
 
+	// Set ReadFileErr on mockFS after parent resolution to verify child uses shared file cache rather than reading filesystem again
+	mockFS.mu.Lock()
+	mockFS.ReadFileErr = errors.New("unexpected file-cache miss")
+	mockFS.mu.Unlock()
+
 	// Derive child resolver without host context
 	childResolver := parentResolver.WithoutHostContext()
 	require.Nil(t, childResolver.HostContext)
 	require.NoError(t, childResolver.Error())
 
-	// Child should hit the cached entry populated by parent
+	// Child should hit the cached entry populated by parent and bypass ReadFile
 	childRes, childErr := childResolver.ResolveString("{{file:SHARED}}")
 	require.NoError(t, childErr)
 	assert.Equal(t, "shared_content", childRes)
@@ -220,14 +261,19 @@ func TestExpressionResolver_StatErrorVsReadErrorFallback(t *testing.T) {
 
 	t.Run("Stat error uses default when present", func(t *testing.T) {
 		t.Parallel()
-		mockFS := &MockFileSystem{
+		mockBaseFS := &MockFileSystem{
 			HomeDir: "/home/testuser",
 			WD:      "/home/testuser/project",
-			StatErr: errors.New("permission denied on stat"),
 			Files: map[string][]byte{
 				"/home/testuser/project/stat_fail.txt": []byte("content"),
 				"stat_fail.txt":                         []byte("content"),
 			},
+		}
+
+		// Use cacheConcurrencyStatFS that allows initial discovery stat on "stat_fail.txt" to succeed, but fails resolver's stat on "/home/testuser/project/stat_fail.txt"
+		mockFS := &cacheConcurrencyStatFS{
+			MockFileSystem: mockBaseFS,
+			failStatOn:     "/home/testuser/project/stat_fail.txt",
 		}
 
 		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
@@ -236,6 +282,9 @@ func TestExpressionResolver_StatErrorVsReadErrorFallback(t *testing.T) {
 		res, resolveErr := resolver.ResolveString("{{file:stat_fail.txt:-stat_fallback}}")
 		require.NoError(t, resolveErr)
 		assert.Equal(t, "stat_fallback", res)
+
+		// Assert both initial discovery stat and subsequent stat failure occurred
+		assert.GreaterOrEqual(t, len(mockBaseFS.StatCalls), 2)
 	})
 
 	t.Run("Read error uses default when present", func(t *testing.T) {
