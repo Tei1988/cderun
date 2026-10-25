@@ -370,10 +370,12 @@ func TestExpressionResolver_StatCacheConcurrencyAndExpiration(t *testing.T) {
 
 	info1, err1 := resolver.Stat("DYNAMIC.txt")
 	require.NoError(t, err1)
+	assert.Len(t, mockFS.StatCalls, 1)
 
 	// Stat call is cached, so second call returns identical FileInfo struct
 	info2, err2 := resolver.Stat("DYNAMIC.txt")
 	require.NoError(t, err2)
+	assert.Len(t, mockFS.StatCalls, 1)
 	assert.Equal(t, info1.Name(), info2.Name())
 	assert.Equal(t, info1.Size(), info2.Size())
 }
