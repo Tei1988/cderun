@@ -109,6 +109,10 @@ func SleepFunc(ctx context.Context, d time.Duration) error {
 	}
 }
 
+func isPathSeparatorOrColon(c byte) bool {
+	return c == '/' || c == '\\' || c == ':'
+}
+
 // HasParentTraversal checks if a path contains parent directory traversal ("..") segments.
 func HasParentTraversal(s string) bool {
 	firstDotDot := strings.Index(s, "..")
@@ -118,8 +122,8 @@ func HasParentTraversal(s string) bool {
 	idx := firstDotDot
 	for {
 		pos := idx
-		startOk := pos == 0 || s[pos-1] == '/' || s[pos-1] == '\\' || s[pos-1] == ':'
-		endOk := pos+2 == len(s) || s[pos+2] == '/' || s[pos+2] == '\\' || s[pos+2] == ':'
+		startOk := pos == 0 || isPathSeparatorOrColon(s[pos-1])
+		endOk := pos+2 == len(s) || isPathSeparatorOrColon(s[pos+2])
 		if startOk && endOk {
 			return true
 		}
