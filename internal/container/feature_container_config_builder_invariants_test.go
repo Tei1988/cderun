@@ -9,6 +9,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Specification: docs/features/direct-container-execution.md - Intermediate Representation (IR): ContainerConfig
+// TestUnit_Container_ConfigFullFieldsJSONYAML verifies that all ContainerConfig fields, including nested Mount,
+// DeviceMapping, and Ulimit structs, accurately marshal to and unmarshal from JSON and YAML formats without data loss,
+// and preserves the exact JSON and YAML field tag names.
 func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 	cfg := ContainerConfig{
 		Image:       "ubuntu:22.04",
@@ -100,29 +104,51 @@ func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 		OciRuntime:  "runc",
 	}
 
-	// 1. JSON Roundtrip
+	// 1. JSON Roundtrip & Field Name Verification
 	jsonBytes, err := json.Marshal(cfg)
 	require.NoError(t, err)
 	require.NotEmpty(t, jsonBytes)
 
+	jsonStr := string(jsonBytes)
+	// Assert top-level and nested struct JSON field tag keys directly
+	assert.Contains(t, jsonStr, `"path_on_host":"/dev/kvm"`)
+	assert.Contains(t, jsonStr, `"path_in_container":"/dev/kvm"`)
+	assert.Contains(t, jsonStr, `"cgroup_permissions":"rwm"`)
+	assert.Contains(t, jsonStr, `"type":"bind"`)
+	assert.Contains(t, jsonStr, `"source":"/host/path"`)
+	assert.Contains(t, jsonStr, `"target":"/container/path"`)
+	assert.Contains(t, jsonStr, `"read_only":true`)
+	assert.Contains(t, jsonStr, `"oci_runtime":"runc"`)
+
 	var jsonDecoded ContainerConfig
 	err = json.Unmarshal(jsonBytes, &jsonDecoded)
 	require.NoError(t, err)
-
 	assert.Equal(t, cfg, jsonDecoded)
 
-	// 2. YAML Roundtrip
+	// 2. YAML Roundtrip & Field Name Verification
 	yamlBytes, err := yaml.Marshal(cfg)
 	require.NoError(t, err)
 	require.NotEmpty(t, yamlBytes)
 
+	yamlStr := string(yamlBytes)
+	// Assert top-level and nested struct YAML field tag keys directly
+	assert.Contains(t, yamlStr, "path_on_host: /dev/kvm")
+	assert.Contains(t, yamlStr, "path_in_container: /dev/kvm")
+	assert.Contains(t, yamlStr, "cgroup_permissions: rwm")
+	assert.Contains(t, yamlStr, "type: bind")
+	assert.Contains(t, yamlStr, "source: /host/path")
+	assert.Contains(t, yamlStr, "target: /container/path")
+	assert.Contains(t, yamlStr, "oci_runtime: runc")
+
 	var yamlDecoded ContainerConfig
 	err = yaml.Unmarshal(yamlBytes, &yamlDecoded)
 	require.NoError(t, err)
-
 	assert.Equal(t, cfg, yamlDecoded)
 }
 
+// Specification: docs/features/direct-container-execution.md - Intermediate Representation (IR): ContainerConfig
+// TestUnit_Container_ConfigOmitEmptyFieldsJSON verifies that optional ContainerConfig fields with `omitempty` tags
+// are excluded from JSON output when zero-valued or nil.
 func TestUnit_Container_ConfigOmitEmptyFieldsJSON(t *testing.T) {
 	// Minimum configuration with zero values for optional fields
 	cfg := ContainerConfig{
@@ -182,28 +208,9 @@ func TestUnit_Container_ConfigOmitEmptyFieldsJSON(t *testing.T) {
 	assert.Contains(t, jsonStr, `"user":"0"`)
 }
 
-func TestUnit_Container_UlimitAndDeviceMappingInvariants(t *testing.T) {
-	ulimit := Ulimit{
-		Name: "nofile",
-		Hard: 65536,
-		Soft: 32768,
-	}
-
-	assert.Equal(t, "nofile", ulimit.Name)
-	assert.Equal(t, int64(65536), ulimit.Hard)
-	assert.Equal(t, int64(32768), ulimit.Soft)
-
-	device := DeviceMapping{
-		PathOnHost:        "/dev/snd",
-		PathInContainer:   "/dev/snd",
-		CgroupPermissions: "rwm",
-	}
-
-	assert.Equal(t, "/dev/snd", device.PathOnHost)
-	assert.Equal(t, "/dev/snd", device.PathInContainer)
-	assert.Equal(t, "rwm", device.CgroupPermissions)
-}
-
+// Specification: docs/features/direct-container-execution.md - Intermediate Representation (IR): ContainerConfig
+// TestUnit_Container_ZeroValueConfigInvariants verifies that an uninitialized ContainerConfig struct starts in a valid
+// zero-value state where all slice, map, and scalar attributes default to nil or zero values.
 func TestUnit_Container_ZeroValueConfigInvariants(t *testing.T) {
 	var cfg ContainerConfig
 
