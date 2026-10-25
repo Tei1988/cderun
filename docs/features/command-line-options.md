@@ -10,7 +10,7 @@ The table below summarizes support for key `cderun` configuration features acros
 
 | Feature / Option Flag | Docker | Podman | containerd (Direct API, Linux-only) | nerdctl (CLI-Based) | Notes / Adapter Behavior |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Container Engine Selection** (`--engine`) | ✅ | ✅ | ✅ | ✅ | Specifies container execution engine (`docker`, `podman`, `containerd`, `nerdctl`). `--runtime` is supported as a deprecated alias. |
+| **Container Engine Selection** (`--engine`) | ✅ | ✅ | ✅ | ✅ | Specifies container execution engine (`docker`, `podman`, `containerd`, `nerdctl`). `--runtime` is an alias for OCI runtime selection; engine names passed to `--runtime` return an error. |
 | **TTY Allocation** (`--tty`, `-t`) | ✅ | ✅ | ✅ | ✅ | Allocates a pseudo-TTY (PTY). Callers must register I/O via `AttachContainer` before `StartContainer`; if skipped, containerd falls back to `NullIO`. |
 | **Interactive STDIN** (`--interactive`, `-i`) | ✅ | ✅ | ✅ | ✅ | Keeps STDIN open even if not attached. In containerd, callers must register I/O via `AttachContainer` before `StartContainer` to forward stream input (otherwise containerd defaults to `NullIO`). |
 | **Port Publishing** (`-p`, `-P`) | ✅ | ✅ | ❌ | ✅ | containerd API does not manage CNI host port forwarding (`ValidateConfig` returns error) |
@@ -190,6 +190,8 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 - **Type**: bool
 - **Default**: `false`
 - **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET`
+- **P1 Internal Override**: `--cderun-mount-cderun-socket`
+- **Configuration Key**: `mountCderunSocket:`
 - **Description**: Mount cderun Control Socket (`cderun.sock`) into the container for scoped nested execution (experimental).
 - **Note**:
   - Creates a dedicated Control Socket inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`) and mounts it by default to `/run/cderun/cderun.sock` inside the child container (configurable via `--mount-cderun-socket-path`).
@@ -205,6 +207,8 @@ cderun --mount-cderun-socket alpine sh
 - **Type**: string
 - **Default**: `/run/cderun/cderun.sock`
 - **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET_PATH`
+- **P1 Internal Override**: `--cderun-mount-cderun-socket-path`
+- **Configuration Key**: `mountCderunSocketPath:`
 - **Description**: Specifies the path inside the container where the cderun Control Socket should be mounted.
 - **Validation**: Must be an absolute path and must not contain any parent directory traversal (`..`) segments.
 
@@ -319,6 +323,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
 - **Type**: string
 - **Default**: Auto-detected (`docker` -> `containerd` -> `podman`, falling back to `docker`)
 - **Environment Variable**: `CDERUN_ENGINE`
+- **Configuration Key**: `engine:`
 - **Supported Engines**: `docker`, `podman`, `containerd`, `nerdctl`.
 - **Auto-detection Logic**:
   When no engine is explicitly specified, `cderun` checks for runtime socket files on disk (via filesystem stat) in the following priority order:
@@ -326,8 +331,8 @@ cderun --strict-env --env NPM_TOKEN node app.js
   2. `/run/containerd/containerd.sock` (containerd)
   3. `/run/podman/podman.sock` (Podman)
   If no socket file exists on disk, `cderun` falls back to `docker` at `/var/run/docker.sock`.
-- **Deprecated Engine Aliases**: `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and YAML `runtime:` are supported as deprecated aliases for container engine selection (`--engine`), accepting `docker`, `podman`, `containerd`, and `nerdctl`. When both `engine:` and `runtime:` are supplied in configuration, `engine:` takes precedence.
 - **P1 Internal Override**: `--cderun-engine` is the corresponding Phase 1 (P1) internal override flag.
+- **OCI Runtime Alias Note**: `--runtime`, `CDERUN_RUNTIME`, and `runtime:` target OCI runtime selection (alias for `--oci-runtime`). Supplying container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` returns an explicit validation error (`InvalidConfigError`) directing users to `--engine`.
 
 ```bash
 cderun --engine podman node app.js
@@ -339,12 +344,15 @@ cderun --engine containerd node app.js
 - **Type**: string
 - **Default**: `""`
 - **Environment Variable**: `CDERUN_OCI_RUNTIME`
+- **Configuration Key**: `ociRuntime:` (or `runtime:`)
+- **Supported Aliases**: `--oci-runtime`, `--runtime`, `--cderun-oci-runtime`, `--cderun-runtime`, `CDERUN_OCI_RUNTIME`, `CDERUN_RUNTIME`, `ociRuntime:`, `runtime:`
 - **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`) for low-level container execution.
 - **Details**:
   - **Docker**: Maps to `HostConfig.Runtime` during Docker container creation.
   - **Podman**: Mapped to native Podman OCI runtime selection.
-  - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`. Note: This limitation applies strictly to OCI runtime configuration via `--oci-runtime`, not to container engine selection or engine aliases.
-- **P1 Internal Override**: `--cderun-oci-runtime` is the corresponding Phase 1 (P1) internal override flag (e.g. `cderun node app.js --cderun-oci-runtime crun`).
+  - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`. Note: This limitation applies strictly to OCI runtime configuration via `--oci-runtime` / `--runtime`, not to container engine selection via `--engine`.
+  - **Validation Error on Engine Names**: Passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` / `CDERUN_RUNTIME` / `runtime:` triggers an explicit `InvalidConfigError` telling the user to use `--engine` / `CDERUN_ENGINE` / `engine:` instead.
+- **P1 Internal Override**: `--cderun-oci-runtime` (and alias `--cderun-runtime`) is the corresponding Phase 1 (P1) internal override flag (e.g. `cderun node app.js --cderun-oci-runtime crun`).
 
 ```bash
 cderun --oci-runtime crun node app.js
