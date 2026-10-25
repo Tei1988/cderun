@@ -130,6 +130,12 @@ func TestExpressionResolver_MaxDirectiveFileSizeBoundaries(t *testing.T) {
 		// Record mockFS.StatCalls count after first resolution
 		statCallsCount := len(mockFS.StatCalls)
 
+		// Clear the shared stat cache so a file-cache miss must call Stat again
+		sharedState := resolver.getShared()
+		sharedState.mu.Lock()
+		sharedState.statCache = make(map[string]statCacheEntry)
+		sharedState.mu.Unlock()
+
 		// Derived child resolver queries the shared cache for fileCache entry
 		_, secondErr := childResolver.ResolveString("{{file:oversized.txt:-fallback}}")
 		require.Error(t, secondErr)
