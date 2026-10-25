@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -228,7 +229,12 @@ func TestUnit_DockerRuntime_PruneContainers_ActiveFilter(t *testing.T) {
 }
 
 func TestUnit_PodmanRuntime_InitializationAndSocket(t *testing.T) {
-	tempDir := t.TempDir()
+	tempDir, err := os.MkdirTemp("", "p")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(tempDir)
+	})
+
 	socketPath := filepath.Join(tempDir, "podman.sock")
 
 	received := make(chan struct{}, 1)
