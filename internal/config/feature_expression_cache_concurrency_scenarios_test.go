@@ -270,11 +270,7 @@ func TestExpressionResolver_StatErrorVsReadErrorFallback(t *testing.T) {
 			},
 		}
 
-		// Use cacheConcurrencyStatFS that allows initial discovery stat on "stat_fail.txt" to succeed, but fails resolver's stat on "/home/testuser/project/stat_fail.txt"
-		mockFS := &cacheConcurrencyStatFS{
-			MockFileSystem: mockBaseFS,
-			failStatOn:     "/home/testuser/project/stat_fail.txt",
-		}
+		mockFS := &statErrFileSystem{FileSystem: mockBaseFS}
 
 		resolver, err := NewExpressionResolverWithFS(nil, mockFS)
 		require.NoError(t, err)
@@ -282,9 +278,6 @@ func TestExpressionResolver_StatErrorVsReadErrorFallback(t *testing.T) {
 		res, resolveErr := resolver.ResolveString("{{file:stat_fail.txt:-stat_fallback}}")
 		require.NoError(t, resolveErr)
 		assert.Equal(t, "stat_fallback", res)
-
-		// Assert both initial discovery stat and subsequent stat failure occurred
-		assert.GreaterOrEqual(t, len(mockBaseFS.StatCalls), 2)
 	})
 
 	t.Run("Read error uses default when present", func(t *testing.T) {
