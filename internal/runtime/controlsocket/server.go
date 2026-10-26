@@ -386,9 +386,14 @@ func (s *Server) handleConn(cs *connState) {
 
 func (s *Server) buildRequestContext(parentCtx context.Context, reqFrame *RequestFrame) (context.Context, context.CancelFunc) {
 	if parentCtx == nil {
+		s.mu.Lock()
 		parentCtx = s.ctx
+		s.mu.Unlock()
+		if parentCtx == nil {
+			parentCtx = context.Background()
+		}
 	}
-	if reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
+	if reqFrame != nil && reqFrame.Deadline != nil && !reqFrame.Deadline.IsZero() {
 		return context.WithDeadline(parentCtx, *reqFrame.Deadline)
 	}
 	return context.WithCancel(parentCtx)
