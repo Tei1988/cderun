@@ -878,5 +878,5 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - `README.md`
 - **Details**:
   - Document syntax `{{file:NAME:-DEFAULT}}` and `{{find_dir:NAME:-DEFAULT}}`.
-  - Detail fallback triggering rules (missing target, stat/read errors, empty content after trim) vs non-fallback error conditions (invalid parameters, control characters, size limits).
+  - Detail fallback triggering rules: missing target (both directives), `stat`/`read` errors and trimmed empty content (scoped to `file:`), and `r.fs.Abs(dir)` failures (for `find_dir:`) vs non-fallback error conditions (invalid parameters such as control characters, invalid path chars, or parent/absolute traversals, and size limits).
   - Provide examples like `{{find_dir:master:-{{PWD}}}}`.
