@@ -869,3 +869,14 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
   - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
   - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.
+
+### T92 Documentation Updates: Document `:-default` fallback syntax for `file:` and `find_dir:` directives
+
+- **Task**: Document `:-default` fallback syntax support in `file:` and `find_dir:` expression directives.
+- **Target Files**:
+  - `docs/features/value-resolution.md`
+  - `README.md`
+- **Details**:
+  - Document syntax `{{file:NAME:-DEFAULT}}` and `{{find_dir:NAME:-DEFAULT}}`.
+  - Detail fallback triggering rules (missing target, stat/read errors, empty content after trim) vs non-fallback error conditions (invalid parameters, control characters, size limits).
+  - Provide examples like `{{find_dir:master:-{{PWD}}}}`.
