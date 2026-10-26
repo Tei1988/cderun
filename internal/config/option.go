@@ -251,6 +251,40 @@ func resolveStringSliceOpt(
 
 // resolveStringSliceCommaOpt resolves a comma-string option (e.g. --mount-tools)
 // where P1/P2 are single comma-separated strings rather than repeated flags.
+func parseCommaSeparatedString(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return []string{}
+	}
+	if strings.IndexByte(s, ',') == -1 {
+		return []string{s}
+	}
+	remaining := s
+	var res []string
+	for len(remaining) > 0 {
+		var part string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			part = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			part = remaining
+			remaining = ""
+		}
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if res == nil {
+			res = make([]string, 0, 4)
+		}
+		res = append(res, part)
+	}
+	if res == nil {
+		return []string{}
+	}
+	return res
+}
+
 func resolveStringSliceCommaOpt(
 	def OptionDef[[]string],
 	p1Set bool, p1Val string,
@@ -260,30 +294,12 @@ func resolveStringSliceCommaOpt(
 ) []string {
 	var vals []string
 	if p1Set {
-		if p1Val == "" {
-			vals = []string{}
-		} else if strings.IndexByte(p1Val, ',') == -1 {
-			vals = []string{p1Val}
-		} else {
-			vals = strings.Split(p1Val, ",")
-		}
+		vals = parseCommaSeparatedString(p1Val)
 	} else if p2Set {
-		if p2Val == "" {
-			vals = []string{}
-		} else if strings.IndexByte(p2Val, ',') == -1 {
-			vals = []string{p2Val}
-		} else {
-			vals = strings.Split(p2Val, ",")
-		}
+		vals = parseCommaSeparatedString(p2Val)
 	} else if def.EnvKey != "" {
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
-			if env == "" {
-				vals = []string{}
-			} else if strings.IndexByte(env, ',') == -1 {
-				vals = []string{env}
-			} else {
-				vals = strings.Split(env, ",")
-			}
+			vals = parseCommaSeparatedString(env)
 		}
 	}
 	if vals == nil && def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
