@@ -201,6 +201,10 @@ func TestUnit_DockerRuntime_ToDockerContainerConfig_MountsAndLimits(t *testing.T
 		assert.Equal(t, dockercontainer.RestartPolicyOnFailure, hostCfg.RestartPolicy.Name)
 		assert.Equal(t, 2, hostCfg.RestartPolicy.MaximumRetryCount)
 		require.Len(t, hostCfg.DeviceRequests, 1)
+		assert.Equal(t, "nvidia", hostCfg.DeviceRequests[0].Driver)
+		assert.Equal(t, -1, hostCfg.DeviceRequests[0].Count)
+		assert.Equal(t, [][]string{{"gpu"}}, hostCfg.DeviceRequests[0].Capabilities)
+		assert.Empty(t, hostCfg.DeviceRequests[0].DeviceIDs)
 	})
 }
 
