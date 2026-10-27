@@ -132,7 +132,7 @@ If no socket file is discovered, `cderun` defaults to `docker` at `/var/run/dock
 To minimize redundant disk I/O and `Stat` system calls during option evaluation, `cderun` caches successful socket auto-detection results:
 
 - **Real File System Caching**: On the actual host file system (`RealFileSystem`), the first successful socket auto-detection result is stored in a process-lifetime cache protected by a read/write lock (`sync.RWMutex`). Subsequent config resolutions bypass file system lookups and retrieve the cached engine selection.
-  - **Cache Lifetime Constraint**: The cache is not dynamically re-validated. If the host socket is deleted or the container service is stopped after the initial detection, the cache still returns the cached selection. Users can force a refresh by restarting the process or explicitly specifying `--engine` / `--socket-path`.
+  - **Cache Lifetime Constraint**: The cache is not dynamically re-validated. If the host socket is deleted or the container service is stopped after the initial detection, the cache still returns the cached selection. Users can force a refresh by restarting the process. Explicitly specifying `--engine` / `--socket-path` bypasses auto-detection for the current resolution.
 - **Dynamic Re-Detection Fallback**: If no active socket is found during detection, the result is **not** cached. This allows `cderun` to run a fresh scan on subsequent calls, accommodating cases where the container daemon is started in the background after `cderun` was first invoked.
 - **Testing Isolation**: In tests using a mocked file system (`MockFileSystem`), caching is bypassed to prevent cross-test leakage, ensuring that each unit test performs active detection.
 
