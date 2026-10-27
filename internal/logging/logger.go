@@ -101,6 +101,7 @@ type Logger struct {
 	writer    io.Writer
 	format    string // "text" or "json"
 	timestamp bool
+	textBuf   [512]byte
 }
 
 func (l *Logger) SetLevel(level Level) {
@@ -260,7 +261,7 @@ func (l *Logger) writeFormattedLog(level Level, message string, now time.Time) {
 		}
 
 		if needed <= 512 {
-			var buf [512]byte
+			buf := l.textBuf[:]
 			w := 0
 			if l.timestamp {
 				timeBuf := now.AppendFormat(buf[:0], "2006-01-02 15:04:05")
