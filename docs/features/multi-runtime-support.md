@@ -112,7 +112,7 @@ The supported runtime engines are:
 
 ### Resolution Priority Sequence for Engine Selection
 
-1. **Phase 1 (P1) Internal Overrides**: P1 flag (`--cderun-engine`) outranks environment and configuration values.
+1. **Phase 1 (P1) Internal Overrides**: P1 flags (`--cderun-engine` and `--cderun-socket-path`) outrank environment and configuration values.
 2. **CLI (P2) Flags**: Explicit `--engine` or `--socket-path` CLI flags.
 3. **Environment Variables (P3)**: `CDERUN_ENGINE` or `CDERUN_SOCKET_PATH`.
 4. **Configuration Files (P5)**: Global `engine:` or `socketPath:` keys in `.cderun.yaml`.
