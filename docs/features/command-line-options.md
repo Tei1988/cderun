@@ -344,7 +344,7 @@ cderun --engine containerd node app.js
 - **Type**: string
 - **Default**: `""`
 - **Environment Variable**: `CDERUN_OCI_RUNTIME`
-- **Configuration Key**: `ociRuntime:` (or `runtime:`)
+- **Configuration Key (`.cderun.yaml`)**: `defaults.ociRuntime:` (or `defaults.runtime:`)
 - **Supported Aliases**: `--oci-runtime`, `--runtime`, `--cderun-oci-runtime`, `--cderun-runtime`, `CDERUN_OCI_RUNTIME`, `CDERUN_RUNTIME`, `ociRuntime:`, `runtime:`
 - **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`) for low-level container execution.
 - **Details**:
