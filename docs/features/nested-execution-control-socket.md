@@ -70,18 +70,35 @@ The Control Socket is created inside the existing per-invocation snapshot direct
 <snapshotDir>/
   .cderun.yaml
   .tools.yaml
-  cderun.sock       # new: Control Socket
+  cderun.sock       # Control Socket
 ```
 
-Its path on the Base Host is recorded in `hostContext` and propagated to the nested `cderun` the same way `hostContext.binPath` and `hostContext.mounts` already are.
+Its path on the Base Host is recorded in `hostContext` and propagated to the nested `cderun` the same way `hostContext.binPath` and `hostContext.mounts` are:
 
 ```yaml
 hostContext:
   binPath: "/usr/local/bin/cderun"
   snapshotDir: "/tmp/cderun-snap-xxxx"
-  controlSocket: "/tmp/cderun-snap-xxxx/cderun.sock"   # new field
+  controlSocket: "/tmp/cderun-snap-xxxx/cderun.sock"
   level: 1
 ```
+
+### Control Socket Configuration and Path Overrides
+
+`cderun` provides explicit CLI flags, environment variables, configuration file options, and P1 internal overrides to configure Control Socket mounting and socket target paths inside containers:
+
+- **CLI Flag**: `--mount-cderun-socket` (enablement) and `--mount-cderun-socket-path` (target path inside container, default `/run/cderun/cderun.sock`).
+- **Environment Variables**: `CDERUN_MOUNT_CDERUN_SOCKET` and `CDERUN_MOUNT_CDERUN_SOCKET_PATH`.
+- **YAML Configuration Keys**: `defaults.mountCderunSocket` / `mountCderunSocket` and `defaults.mountCderunSocketPath` / `mountCderunSocketPath` in `.cderun.yaml` or tool entries in `.tools.yaml`.
+- **P1 Internal Overrides**: `--cderun-mount-cderun-socket` and `--cderun-mount-cderun-socket-path` (placed after the subcommand in Wrapper Mode).
+
+#### Socket Path Resolution Sequence inside Nested Containers
+
+When a nested `cderun` process detects an active Control Socket, it resolves the socket path using the following priority sequence:
+
+1. Explicitly configured socket path via `--mount-cderun-socket-path`, `CDERUN_MOUNT_CDERUN_SOCKET_PATH`, or P1 override `--cderun-mount-cderun-socket-path`.
+2. `hostContext.controlSocket` recorded in the snapshot directory (`/run/cderun/.cderun.yaml`).
+3. Standard default socket mount location `/run/cderun/cderun.sock`.
 
 ### Cleanup
 
@@ -103,7 +120,20 @@ Length-prefixed JSON messages over the Unix domain socket:
 [4-byte big-endian length][JSON payload]
 ```
 
+- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload payload frame.
+- **Frame Size Limit**: Enforces a strict maximum payload size of **16MB** (`MaxFrameSize = 16 * 1024 * 1024` bytes) to protect server and client memory against malformed or malicious frame headers.
+- **Serialization Efficiency**: Stack-allocated 4-byte header buffers (`[4]byte`) and direct `binary.BigEndian.Uint32` / `PutUint32` conversions ensure zero reflection and minimal allocation overhead during socket frame read and write loops.
+
 JSON is chosen over gRPC/protobuf for a first implementation because the channel is always local (single machine, single mount namespace) and framing simplicity aids debuggability (`--diagnosis` / `--log-level trace` should be able to dump raw frames). Switching the wire format later is an internal detail as long as the version-negotiation contract below is honored.
+
+### Accept Loop Resilience, Context Lifecycle, and Idle Timeouts
+
+To ensure robust multi-tenant and multi-level execution tree stability, the Control Socket server incorporates key server resilience mechanics:
+
+1. **Accept Loop Resilience**: Temporary accept errors (such as file descriptor exhaustion `EMFILE` or transient connection abortions `ECONNABORTED`) are caught and retried using an exponential backoff loop. Permanent accept errors shut down the accept loop gracefully with explicit `Warn`/`Error` level logging.
+2. **Connection-Tied Request Context Lifecycle**: Every incoming request context is derived directly from the client connection's lifecycle context. When a client connection terminates or is closed by `Server.Close()`, all active in-flight request contexts are canceled immediately.
+3. **Bounded-Wait Shutdown Policy**: Server shutdown (`Server.Close()`) enforces a bounded-wait deadline. Instead of blocking indefinitely on worker goroutines, shutdown signals cancellation through server context and closes active listener sockets safely within a bounded deadline window.
+4. **Scoped Idle Timeout Exemption**: Handshake-completed connections enforce an idle read deadline to reclaim unresponsive clients. However, during long-running streaming operations (`WaitContainer` and interactive `AttachContainer` I/O streams), the idle timeout deadline is temporarily exempted until stream dispatch completes, after which the normal idle timeout deadline is restored before the next frame read.
 
 ### Request/Response Shape
 
@@ -146,6 +176,32 @@ The Base Host `cderun` process is a policy enforcement point, not a transparent 
 - A nested request's effective `ContainerConfig` (image, mounts, capabilities, privileged mode) is capped by the **parent's own granted configuration** — a nested invocation cannot request broader privileges than the container it is running inside was itself given.
 - This directly addresses the security warning already present in [Nested Execution](./nested-execution.md) regarding unscoped raw socket mounts (particularly rootful Docker/containerd sockets).
 - Policy enforcement is implemented via an **inherited-ceiling model** (`ValidateInheritedCeiling` in `internal/runtime/controlsocket/policy.go`), wired directly through `SetParentConfig` in `server.go` and `internal/command/root.go` to validate nested requests against parent container boundaries.
+
+### Inherited-Ceiling Security Policy Validation (`ValidateInheritedCeiling`)
+
+The Control Socket server evaluates all nested `CreateContainer` requests against the parent container's `ContainerConfig` using `ValidateInheritedCeiling`. A child container request is rejected with a descriptive security policy error if it requests privileges exceeding those granted to the parent:
+
+1. **Privileged Execution**:
+   - If parent container is non-privileged (`Privileged: false`), child request with `Privileged: true` is strictly rejected.
+2. **Linux Capabilities (`CapAdd` and `CapDrop`)**:
+   - Capabilities are normalized to standard uppercase `CAP_` prefixed strings (e.g. `CAP_SYS_ADMIN`).
+   - **`CapAdd` Rules**: Child `CapAdd` entries must be a subset of parent `CapAdd`. If parent explicitly specifies `CapAdd: ["ALL"]`, child capability additions are permitted provided they are not present in parent's `CapDrop` list. If child requests `CapAdd: ["ALL"]`, parent must also have `CapAdd: ["ALL"]` and an empty `CapDrop` list. Note that exact capability strings are checked without implied wildcard expansion: a non-privileged parent with `CapAdd: ["ALL"]` authorizes exact `ALL` requests but does not authorize arbitrary specific capability strings (like `CAP_CHOWN`) unless explicitly granted.
+   - **`CapDrop` Rules**: Parent capability drops must be preserved by child. If child drops `ALL` (`CapDrop: ["ALL"]`), parent drop requirements are satisfied. If parent drops `ALL`, child must also drop `ALL`.
+3. **Namespace Modes**:
+   - **Network Mode**: Child network mode cannot request host networking (`"host"`) unless parent also runs in `host` network mode.
+   - **PID Mode**: Child cannot request `"host"` PID namespace unless parent runs with `"host"` PID mode.
+   - **IPC Mode**: Child cannot request `"host"` or `container:` IPC modes exceeding parent IPC privileges.
+   - **Cgroup Namespace**: Child cgroup namespace mode must match or be strictly more restrictive than parent.
+4. **OCI Runtime Selection**:
+   - Child requests for custom `--oci-runtime` / `OciRuntime` must match parent's OCI runtime or be empty.
+5. **Read-Only Mount Boundaries & Path Traversal**:
+   - Child bind mounts cannot attempt to remount parent read-only paths as read-write (`readonly: false`).
+   - Source paths are cleaned (`filepath.Clean`) and canonicalized (`filepath.EvalSymlinks`). Any path traversal attempts (`hasPathTraversal`) or symlink escapes past parent mount boundaries trigger immediate policy rejection.
+6. **Host Device Mappings**:
+   - Host devices requested by child (`PathOnHost`) must exist in parent's device mappings with matching cleaned host paths, and cgroup permissions requested by child (`CgroupPermissions`, e.g. `rw`) must be a subset of parent device permissions (e.g. `rwm`).
+7. **Kernel Sysctls & Security Options**:
+   - Kernel `Sysctls` specified by child must be a subset of parent sysctls with matching values.
+   - Security options (`SecurityOpt`, such as `no-new-privileges:true`) configured on parent cannot be omitted, dropped, or weakened by child containers.
 
 ### Engine/Adapter Selection Is Fixed at the Base Host
 

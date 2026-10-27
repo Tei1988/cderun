@@ -35,9 +35,9 @@ Nested execution relies on three fundamental mechanisms:
    - Specifying `--mount-tools` or `--mount-all-tools` automatically enables `--mount-cderun`.
    - `--mount-cderun-path` allows explicitly selecting which host-side binary is mounted.
 
-2. **Socket Mounting (`--mount-socket`)**:
-   The container runtime socket (e.g., `/var/run/docker.sock`) is mounted inside the container, giving the nested `cderun` direct access to the container engine on the Base Host.
-   - Enabling `--mount-cderun` automatically enables `--mount-socket` unless explicitly deactivated.
+2. **Socket Mounting (`--mount-socket` and `--mount-cderun-socket`)**:
+   - **Raw Engine Socket (`--mount-socket`)**: The container runtime socket (e.g., `/var/run/docker.sock`) is mounted inside the container, giving the nested `cderun` direct access to the container engine daemon on the Base Host. Enabling `--mount-cderun` automatically enables `--mount-socket` unless explicitly deactivated.
+   - **Control Socket Plane (`--mount-cderun-socket`)**: Opens a scoped Unix domain socket (`cderun.sock`) in the snapshot directory and mounts it inside the child container (at `/run/cderun/cderun.sock` or custom path configured via `--mount-cderun-socket-path`). The nested `cderun` binary communicates using the native `cderun` Control Protocol over length-prefixed JSON framing without raw daemon access, enforcing inherited-ceiling security boundaries (`ValidateInheritedCeiling`).
 
 3. **Context Propagation (Snapshotting)**:
    When spawning a nested-enabled container, `cderun` creates an execution configuration "snapshot" on the host and mounts it into the container at `/run/cderun/` to propagate execution settings.
