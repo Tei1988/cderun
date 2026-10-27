@@ -286,12 +286,14 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 
 	if patterns == nil {
 		firstToRedact := -1
+		var firstRedactedStr string
 		for i, e := range env {
 			idx := strings.IndexByte(e, '=')
 			if idx >= 0 {
 				v := e[idx+1:]
 				if v != "" && v != "[REDACTED]" {
 					firstToRedact = i
+					firstRedactedStr = e[:idx+1] + "[REDACTED]"
 					break
 				}
 			}
@@ -301,7 +303,8 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 		}
 		res := make([]string, len(env))
 		copy(res, env[:firstToRedact])
-		for j := firstToRedact; j < len(env); j++ {
+		res[firstToRedact] = firstRedactedStr
+		for j := firstToRedact + 1; j < len(env); j++ {
 			e := env[j]
 			idx := strings.IndexByte(e, '=')
 			if idx >= 0 {
@@ -319,6 +322,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 	analyzed := getAnalyzedPatterns(patterns)
 
 	firstToRedact := -1
+	var firstRedactedStr string
 	for i, e := range env {
 		idx := strings.IndexByte(e, '=')
 		if idx >= 0 {
@@ -330,6 +334,7 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 				for j := range analyzed {
 					if matchPreAnalyzed(k, keyIsASCII, &analyzed[j], &upperKey) {
 						firstToRedact = i
+						firstRedactedStr = e[:idx+1] + "[REDACTED]"
 						break
 					}
 				}
@@ -346,7 +351,8 @@ func MaskSensitiveEnvList(env []string, patterns []string) []string {
 
 	res := make([]string, len(env))
 	copy(res, env[:firstToRedact])
-	for i := firstToRedact; i < len(env); i++ {
+	res[firstToRedact] = firstRedactedStr
+	for i := firstToRedact + 1; i < len(env); i++ {
 		e := env[i]
 		idx := strings.IndexByte(e, '=')
 		if idx >= 0 {
