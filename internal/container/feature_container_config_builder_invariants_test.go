@@ -117,8 +117,17 @@ func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 	assert.Contains(t, jsonStr, `"type":"bind"`)
 	assert.Contains(t, jsonStr, `"source":"/host/path"`)
 	assert.Contains(t, jsonStr, `"target":"/container/path"`)
-	assert.Contains(t, jsonStr, `"read_only":true`)
 	assert.Contains(t, jsonStr, `"oci_runtime":"runc"`)
+
+	// Inspect nested Mount.ReadOnly in JSON map directly
+	var jsonMap map[string]interface{}
+	require.NoError(t, json.Unmarshal(jsonBytes, &jsonMap))
+	jsonMounts, ok := jsonMap["mounts"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, jsonMounts, 2)
+	firstJsonMount, ok := jsonMounts[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, firstJsonMount["read_only"])
 
 	var jsonDecoded ContainerConfig
 	err = json.Unmarshal(jsonBytes, &jsonDecoded)
@@ -139,6 +148,16 @@ func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 	assert.Contains(t, yamlStr, "source: /host/path")
 	assert.Contains(t, yamlStr, "target: /container/path")
 	assert.Contains(t, yamlStr, "oci_runtime: runc")
+
+	// Inspect nested Mount.ReadOnly in YAML map directly
+	var yamlMap map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(yamlBytes, &yamlMap))
+	yamlMounts, ok := yamlMap["mounts"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, yamlMounts, 2)
+	firstYamlMount, ok := yamlMounts[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, true, firstYamlMount["read_only"])
 
 	var yamlDecoded ContainerConfig
 	err = yaml.Unmarshal(yamlBytes, &yamlDecoded)
