@@ -125,9 +125,9 @@ func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 	jsonMounts, ok := jsonMap["mounts"].([]any)
 	require.True(t, ok)
 	require.Len(t, jsonMounts, 2)
-	firstJsonMount, ok := jsonMounts[0].(map[string]any)
+	firstJSONMount, ok := jsonMounts[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, true, firstJsonMount["read_only"])
+	assert.Equal(t, true, firstJSONMount["read_only"])
 
 	var jsonDecoded ContainerConfig
 	err = json.Unmarshal(jsonBytes, &jsonDecoded)
@@ -155,9 +155,9 @@ func TestUnit_Container_ConfigFullFieldsJSONYAML(t *testing.T) {
 	yamlMounts, ok := yamlMap["mounts"].([]any)
 	require.True(t, ok)
 	require.Len(t, yamlMounts, 2)
-	firstYamlMount, ok := yamlMounts[0].(map[string]any)
+	firstYAMLMount, ok := yamlMounts[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, true, firstYamlMount["read_only"])
+	assert.Equal(t, true, firstYAMLMount["read_only"])
 
 	var yamlDecoded ContainerConfig
 	err = yaml.Unmarshal(yamlBytes, &yamlDecoded)
