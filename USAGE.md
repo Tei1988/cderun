@@ -56,7 +56,10 @@ To grant the necessary permissions, you must add the correct socket GID explicit
 
 > ⚠️ **Security Warning on Socket Sharing**: Sharing the container runtime socket (e.g., `/var/run/docker.sock`) and granting access via supplementary numeric GID is a highly privileged operation. It allows any process within the container to control the container daemon, which is equivalent to granting full root-level access on the host system. Consequently, this setup must only be used in trusted, secure environments and should be explicitly flagged/warned in production designs.
 >
-> When considering alternatives, rootless Podman configurations reduce the blast radius compared with a rootful daemon because processes run as a non-root user on the host. However, please note that shared socket access still grants the owning user broad Podman control, including the ability to create containers and mount host volumes, which could still lead to host-level impact if abused.
+> **Recommended Alternative — Control Socket (`--mount-cderun-socket`)**:
+> Instead of mounting the raw host container socket, `cderun` supports a scoped **Control Socket** (`cderun.sock`). Mounted inside child containers at `/run/cderun/cderun.sock`, the Control Socket routes nested execution requests through `cderun`'s internal RPC server. It enforces inherited-ceiling security policies (`ValidateInheritedCeiling`), preventing nested processes from acquiring privileges beyond those granted to the parent container (such as elevated capabilities, privilege escalation, or unauthorized volume mounts).
+>
+> When considering alternatives for raw socket mounting, rootless Podman configurations reduce the blast radius compared with a rootful daemon because processes run as a non-root user on the host. However, please note that shared socket access still grants the owning user broad Podman control, including the ability to create containers and mount host volumes, which could still lead to host-level impact if abused.
 >
 > **Important**: The value `102` shown below is merely an **example**. The actual GID depends on your specific container runtime installation and environment on your machine. You must determine and configure the correct GID for your system.
 
