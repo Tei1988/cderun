@@ -93,7 +93,7 @@ Configuration fields use **camelCase** keys.
 #### Root Keys
 
 - `engine` (string): Target container engine (`docker` | `podman` | `containerd` | `nerdctl`).
-- `runtime` (string): Deprecated fallback alias for container engine (`docker` | `podman` | `containerd` | `nerdctl`).
+- `runtime` (string): Alias for OCI runtime selection, equivalent to `ociRuntime`. Use `engine` for container-engine selection.
 - `socketPath` (string): Host socket absolute path.
 - `defaults` (object): Default runner options (fields detailed below).
 - `logging` (object): Logging output options:
@@ -114,7 +114,7 @@ Configuration fields use **camelCase** keys.
 #### `defaults` Fields
 
 - `tty`, `interactive`, `remove`, `strictEnv`, `readOnly`, `init`, `mountCderunSocket`, `prune`, `prefetchAll` (bool)
-- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime`, `pid`, `shmSize`, `ipc`, `cgroupns`, `cpusetCpus`, `cpusetMems`, `restart`, `gpus`, `prefetch` (string)
+- `network`, `workdir`, `hostname`, `user`, `pull`, `pullBackoffBase`, `memory`, `hangTimeout`, `ociRuntime`, `runtime` (alias for `ociRuntime`), `pid`, `shmSize`, `ipc`, `cgroupns`, `cpusetCpus`, `cpusetMems`, `restart`, `gpus`, `prefetch` (string)
 - `cpus` (float64)
 - `pullMaxRetries`, `pidsLimit`, `cpuShares` (int)
 - `mountCderun`, `mountAllTools`, `mountSocket`, `privileged`, `publishAll` (bool)
