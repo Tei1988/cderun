@@ -4,7 +4,9 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,10 +16,7 @@ import (
 func TestLiveConformance_RuntimeAdapter(t *testing.T) {
 	engine := os.Getenv("CDERUN_ENGINE")
 	if engine == "" {
-		engine = os.Getenv("CDERUN_RUNTIME")
-	}
-	if engine == "" {
-		t.Skip("CDERUN_ENGINE or CDERUN_RUNTIME environment variable not set; skipping live runtime conformance test")
+		t.Skip("CDERUN_ENGINE environment variable not set; skipping live runtime conformance test")
 	}
 
 	socketPath := os.Getenv("CDERUN_SOCKET_PATH")
@@ -28,7 +27,13 @@ func TestLiveConformance_RuntimeAdapter(t *testing.T) {
 		case "docker":
 			socketPath = "/var/run/docker.sock"
 		case "podman":
-			socketPath = "/run/user/1000/podman/podman.sock"
+			if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
+				socketPath = filepath.Join(xdg, "podman", "podman.sock")
+			} else if os.Geteuid() == 0 {
+				socketPath = "/run/podman/podman.sock"
+			} else {
+				socketPath = fmt.Sprintf("/run/user/%d/podman/podman.sock", os.Getuid())
+			}
 		}
 	}
 

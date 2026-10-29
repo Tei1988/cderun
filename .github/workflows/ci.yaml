@@ -53,8 +53,8 @@ jobs:
         sudo tar Cxzvf /usr/local "$TARBALL"
         sudo mkdir -p /etc/containerd
         sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-        sudo containerd > /tmp/containerd.log 2>&1 &
-        for i in {1..30}; do
+        sudo sh -c 'containerd > /tmp/containerd.log 2>&1 &'
+        for _ in {1..30}; do
           if [ -S /run/containerd/containerd.sock ]; then
             echo "containerd socket ready"
             break
@@ -79,7 +79,7 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs
       run: |
-        for i in {1..5}; do
+        for _ in {1..5}; do
           sudo apt-get update && break || sleep 2
         done
         sudo apt-get install -y acl
@@ -103,23 +103,26 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
-    - name: Ensure Docker daemon is running
+    - name: Ensure Docker daemon is running and accessible
       run: |
         if [ ! -S /var/run/docker.sock ]; then
-          sudo dockerd > /tmp/dockerd.log 2>&1 &
-          for i in {1..30}; do
+          sudo sh -c 'dockerd > /tmp/dockerd.log 2>&1 &'
+          for _ in {1..30}; do
             if [ -S /var/run/docker.sock ]; then
-              echo "docker socket ready"
+              echo "docker socket created"
               break
             fi
             sleep 1
           done
         fi
-        if [ ! -S /var/run/docker.sock ]; then
-          echo "Docker daemon failed to start. Logs:"
+        if [ -S /var/run/docker.sock ]; then
+          sudo setfacl -m u:${USER}:rw /var/run/docker.sock 2>/dev/null || sudo chmod 666 /var/run/docker.sock || true
+        fi
+        docker version || docker info || {
+          echo "Docker daemon query failed. Logs:"
           cat /tmp/dockerd.log 2>/dev/null || true
           exit 1
-        fi
+        }
     - name: Build cderun binary
       run: go build -o cderun main.go
     - name: Run Docker integration tests
@@ -141,12 +144,12 @@ jobs:
         go-version-file: go.mod
     - name: Install and start Podman
       run: |
-        for i in {1..5}; do
+        for _ in {1..5}; do
           sudo apt-get update && break || sleep 2
         done
         sudo apt-get install -y podman
         podman system service --time=0 unix:///tmp/podman.sock > /tmp/podman.log 2>&1 &
-        for i in {1..30}; do
+        for _ in {1..30}; do
           if [ -S /tmp/podman.sock ]; then
             echo "podman socket ready"
             break
