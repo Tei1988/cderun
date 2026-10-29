@@ -831,18 +831,3 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 - `make lint-go` がパスする
 
 ---
-
-## Documentation Update Tasks
-
-### T95 Documentation Updates: Update `--runtime` documentation for OCI runtime transition
-
-- **Task**: Update CLI options and multi-runtime documentation for T95 `--runtime` breaking change.
-- **Target Files**:
-  - `docs/features/command-line-options.md`
-  - `docs/features/multi-runtime-support.md`
-  - `README.md`
-  - `USAGE.md`
-- **Details**:
-  - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
-  - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
-  - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.

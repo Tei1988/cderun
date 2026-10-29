@@ -277,7 +277,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 - `--gpus`: GPU devices to request (e.g., `all`, `count=2`, `device=0,1`). Note: containerd does not support GPU requests.
 - `--ipc`: Configure the IPC namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
 - `--cgroupns`: Configure the cgroup namespace mode. Accepts `"host"` or `"private"`; an empty value (`""`) uses the runtime default. Note: containerd only supports `"host"`, `"private"`, or `""` (empty).
-- `--oci-runtime`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`). Maps directly to `HostConfig.Runtime` in Docker / Podman host configuration. Note: containerd explicitly rejects `oci-runtime` with a validation error.
+- `--oci-runtime`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`). Maps directly to `HostConfig.Runtime` in Docker / Podman host configuration. Note: `--runtime` is supported as an alias for OCI runtime selection (passing container engine names returns an explicit error directing to `--engine`), and containerd explicitly rejects OCI runtimes with a validation error.
 - `--sensitive-env`: List of environment variable patterns to mask. By default, **all** environment variable values are masked (Secure by Default).
 - `--privileged`: Give extended privileges to this container. (Default: `false`)
 - `--read-only`: Mount the container's root filesystem as read-only. Maps to `ReadonlyRootfs` in Docker host configuration and `Root.Readonly = true` in the containerd OCI spec. (Default: `false`)
@@ -309,7 +309,7 @@ To simplify argument parsing and avoid semantic ambiguity, `cderun` does **NOT**
 
 - `--config`: Path to `cderun` config file (`.cderun.yaml`).
 - `--tool-config`: Path to tools config file (`.tools.yaml`).
-- `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`). (Note: `--runtime` is supported as a deprecated alias)
+- `--engine`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
 - `--dry-run`: Preview container configuration without execution. (Requires a subcommand)
 - `--dry-run-format`, `-f`: Output format for dry-run (`yaml`, `json`, `simple`).
 - `--diagnosis`: Show system diagnostics and available tools. (No subcommand required)
@@ -494,7 +494,7 @@ Almost all CLI flags have a corresponding `CDERUN_` prefixed environment variabl
 - `CDERUN_CONFIG`: Path to `cderun` configuration file (`.cderun.yaml`).
 - `CDERUN_TOOL_CONFIG`: Path to tools configuration file (`.tools.yaml`).
 - `CDERUN_ENGINE`: Container engine to use (`docker`/`podman`/`containerd`/`nerdctl`).
-- `CDERUN_RUNTIME`: Deprecated fallback alias for `CDERUN_ENGINE`.
+- `CDERUN_RUNTIME`: Alias for OCI runtime selection (`CDERUN_OCI_RUNTIME`). Passing container engine names returns an explicit error directing users to `--engine`.
 - `CDERUN_OCI_RUNTIME`: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`).
 - `CDERUN_SOCKET_PATH`: Path to the container runtime socket on the host.
 
