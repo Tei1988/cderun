@@ -258,35 +258,28 @@ func resolveStringSliceCommaOpt(
 	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
-	var vals []string
+	var rawStr string
+	var foundRaw bool
+
 	if p1Set {
-		if p1Val == "" {
-			vals = []string{}
-		} else if strings.IndexByte(p1Val, ',') == -1 {
-			vals = []string{p1Val}
-		} else {
-			vals = strings.Split(p1Val, ",")
-		}
+		rawStr = p1Val
+		foundRaw = true
 	} else if p2Set {
-		if p2Val == "" {
-			vals = []string{}
-		} else if strings.IndexByte(p2Val, ',') == -1 {
-			vals = []string{p2Val}
-		} else {
-			vals = strings.Split(p2Val, ",")
-		}
+		rawStr = p2Val
+		foundRaw = true
 	} else if def.EnvKey != "" {
 		if env, ok := fs.LookupEnv(def.EnvKey); ok {
-			if env == "" {
-				vals = []string{}
-			} else if strings.IndexByte(env, ',') == -1 {
-				vals = []string{env}
-			} else {
-				vals = strings.Split(env, ",")
-			}
+			rawStr = env
+			foundRaw = true
 		}
 	}
-	if vals == nil && def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+
+	if foundRaw {
+		return parseCommaSeparatedString(rawStr, r)
+	}
+
+	var vals []string
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
 		if tool, ok := tools[subcommand]; ok {
 			vals = def.ToolGetter(tool)
 		}
@@ -294,19 +287,66 @@ func resolveStringSliceCommaOpt(
 	if vals == nil && def.GlobalGetter != nil && global != nil {
 		vals = def.GlobalGetter(global)
 	}
-	var res []string
-	if vals != nil {
-		res = make([]string, 0, len(vals))
-		for _, v := range vals {
-			v = strings.TrimSpace(v)
-			if v != "" {
-				if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
-					res = append(res, v)
-				} else {
-					res = append(res, r.resolveString(v))
-				}
+
+	if vals == nil {
+		return nil
+	}
+
+	res := make([]string, 0, len(vals))
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+				res = append(res, v)
+			} else {
+				res = append(res, r.resolveString(v))
 			}
 		}
+	}
+	return res
+}
+
+func parseCommaSeparatedString(s string, r *ExpressionResolver) []string {
+	if s == "" {
+		return []string{}
+	}
+	if strings.IndexByte(s, ',') == -1 {
+		v := strings.TrimSpace(s)
+		if v == "" {
+			return []string{}
+		}
+		if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
+			return []string{v}
+		}
+		return []string{r.resolveString(v)}
+	}
+
+	var res []string
+	remaining := s
+	for len(remaining) > 0 {
+		var chunk string
+		if idx := strings.IndexByte(remaining, ','); idx >= 0 {
+			chunk = remaining[:idx]
+			remaining = remaining[idx+1:]
+		} else {
+			chunk = remaining
+			remaining = ""
+		}
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			continue
+		}
+		if res == nil {
+			res = make([]string, 0, 4)
+		}
+		if r == nil || (!strings.Contains(chunk, "{{") && !strings.HasPrefix(chunk, "~")) {
+			res = append(res, chunk)
+		} else {
+			res = append(res, r.resolveString(chunk))
+		}
+	}
+	if res == nil {
+		return []string{}
 	}
 	return res
 }
