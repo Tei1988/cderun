@@ -288,7 +288,10 @@ func TestUnit_Resolver_Priority_AllLayers(t *testing.T) {
 }
 
 func TestUnit_Resolver_AutoDetection(t *testing.T) {
-	t.Parallel()
+	t.Setenv("CDERUN_ENGINE", "")
+	t.Setenv("CDERUN_RUNTIME", "")
+	t.Setenv("CDERUN_SOCKET_PATH", "")
+
 	t.Run("Infer runtime from socket path", func(t *testing.T) {
 		cli := CLIOptions{
 			Image:      ptr("alpine"),

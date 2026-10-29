@@ -252,6 +252,7 @@ func TestUnit_Config_Resolver_RealFileSystemCaching(t *testing.T) {
 
 	// 2. Clear relevant CDERUN_SOCKET_PATH and runtime override environment variables
 	t.Setenv("CDERUN_SOCKET_PATH", "")
+	t.Setenv("CDERUN_ENGINE", "")
 	t.Setenv("CDERUN_RUNTIME", "")
 
 	// 3. Ensure the cache is reset before ResolveWithFS runs

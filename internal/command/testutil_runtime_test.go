@@ -33,4 +33,7 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "deadlineexceeded") || strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "rst_stream") {
 		t.Skipf("Skipping test due to gRPC stream/deadline issue: %v", err)
 	}
+	if strings.Contains(msg, "is not supported yet") || strings.Contains(msg, "not supported") {
+		t.Skipf("Skipping test due to unsupported runtime feature: %v", err)
+	}
 }

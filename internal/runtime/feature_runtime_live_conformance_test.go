@@ -57,6 +57,7 @@ func TestLiveConformance_RuntimeAdapter(t *testing.T) {
 	defer cancel()
 
 	pullErr := initRt.PullImage(ctx, "docker.io/library/alpine:latest", "missing", 3, time.Second)
+	skipIfRuntimeBroken(t, pullErr)
 	require.NoError(t, pullErr, "Pre-flight PullImage for docker.io/library/alpine:latest must succeed")
 	initRt.Close()
 

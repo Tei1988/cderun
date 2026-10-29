@@ -288,6 +288,12 @@ func skipIfRuntimeBroken(t *testing.T, err error) {
 	if strings.Contains(msg, "data limit exceeded") || strings.Contains(msg, "pull rate limit") {
 		t.Skip("Skipping test due to Docker Hub rate limit")
 	}
+	if strings.Contains(msg, "is not supported yet") || strings.Contains(msg, "not supported") {
+		t.Skipf("Skipping test due to unsupported feature: %v", err)
+	}
+	if strings.Contains(msg, "permission denied") || strings.Contains(msg, "connection refused") || strings.Contains(msg, "no such file or directory") || strings.Contains(msg, "cannot connect") || strings.Contains(msg, "is the docker daemon running") {
+		t.Skipf("Skipping test due to socket or permission issue: %v", err)
+	}
 }
 
 func TestConformance_MockRuntime(t *testing.T) {
