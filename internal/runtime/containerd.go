@@ -517,6 +517,24 @@ func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args 
 		oci.WithImageConfig(img),
 	}
 
+	opts = appendContainerdProcessSpecOpts(opts, config, args)
+	opts = append(opts, buildContainerdMountSpecOpts(config)...)
+	opts = appendContainerdCapabilitySpecOpts(opts, config)
+	opts = append(opts, buildContainerdResourceSpecOpts(config, quota, period)...)
+
+	var err error
+	opts, err = appendContainerdHostAndDeviceSpecOpts(opts, config)
+	if err != nil {
+		return nil, err
+	}
+
+	opts = append(opts, buildContainerdNamespaceSpecOpts(config)...)
+	opts = appendContainerdSecurityAndGroupSpecOpts(opts, config, validatedGids)
+
+	return opts, nil
+}
+
+func appendContainerdProcessSpecOpts(opts []oci.SpecOpts, config *container.ContainerConfig, args []string) []oci.SpecOpts {
 	if len(args) > 0 {
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
@@ -532,9 +550,10 @@ func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args 
 	if len(config.Env) > 0 {
 		opts = append(opts, oci.WithEnv(config.Env))
 	}
+	return opts
+}
 
-	opts = append(opts, buildContainerdMountSpecOpts(config)...)
-
+func appendContainerdCapabilitySpecOpts(opts []oci.SpecOpts, config *container.ContainerConfig) []oci.SpecOpts {
 	if config.Privileged {
 		opts = append(opts, oci.WithPrivileged)
 	}
@@ -544,9 +563,10 @@ func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args 
 	if len(config.CapDrop) > 0 {
 		opts = append(opts, oci.WithDroppedCapabilities(normalizeCapabilities(config.CapDrop)))
 	}
+	return opts
+}
 
-	opts = append(opts, buildContainerdResourceSpecOpts(config, quota, period)...)
-
+func appendContainerdHostAndDeviceSpecOpts(opts []oci.SpecOpts, config *container.ContainerConfig) ([]oci.SpecOpts, error) {
 	if config.Devices != nil {
 		for _, d := range config.Devices {
 			opts = append(opts, oci.WithDevices(d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
@@ -588,8 +608,10 @@ func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args 
 		})
 	}
 
-	opts = append(opts, buildContainerdNamespaceSpecOpts(config)...)
+	return opts, nil
+}
 
+func appendContainerdSecurityAndGroupSpecOpts(opts []oci.SpecOpts, config *container.ContainerConfig, validatedGids []uint32) []oci.SpecOpts {
 	if len(config.SecurityOpt) > 0 {
 		opts = append(opts, func(ctx context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 			return applySecurityOptions(s, config.SecurityOpt)
@@ -619,7 +641,7 @@ func buildOCISpecOpts(img client.Image, config *container.ContainerConfig, args 
 		})
 	}
 
-	return opts, nil
+	return opts
 }
 
 func (r *ContainerdRuntime) StartContainer(ctx context.Context, containerID string) error {
