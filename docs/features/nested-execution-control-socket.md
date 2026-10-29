@@ -83,22 +83,20 @@ hostContext:
   level: 1
 ```
 
-### Control Socket Configuration and Path Overrides
+### Control Socket Configuration and Priority
 
-`cderun` provides explicit CLI flags, environment variables, configuration file options, and P1 internal overrides to configure Control Socket mounting and socket target paths inside containers:
+`cderun` provides explicit CLI flags, environment variables, configuration file options, and P1 internal overrides to enable Control Socket mounting into child containers:
 
-- **CLI Flag**: `--mount-cderun-socket` (enablement) and `--mount-cderun-socket-path` (target path inside container, default `/run/cderun/cderun.sock`).
-- **Environment Variables**: `CDERUN_MOUNT_CDERUN_SOCKET` and `CDERUN_MOUNT_CDERUN_SOCKET_PATH`.
-- **YAML Configuration Keys**: `defaults.mountCderunSocket` / `mountCderunSocket` and `defaults.mountCderunSocketPath` / `mountCderunSocketPath` in `.cderun.yaml` or tool entries in `.tools.yaml`.
-- **P1 Internal Overrides**: `--cderun-mount-cderun-socket` and `--cderun-mount-cderun-socket-path` (placed after the subcommand in Wrapper Mode).
+- **CLI Flag (P2)**: `--mount-cderun-socket` (enablement toggle).
+- **Environment Variable (P3)**: `CDERUN_MOUNT_CDERUN_SOCKET`.
+- **YAML Configuration Keys (P4/P5)**: `defaults.mountCderunSocket` / `mountCderunSocket` in `.cderun.yaml` or tool entries in `.tools.yaml`.
+- **P1 Internal Overrides (P1)**: `--cderun-mount-cderun-socket` (placed after the subcommand in Wrapper Mode).
 
-#### Socket Path Resolution Sequence inside Nested Containers
+Precedence follows standard layer order: P1 `--cderun-mount-cderun-socket` > P2 `--mount-cderun-socket` > P3 `CDERUN_MOUNT_CDERUN_SOCKET` > P4/P5 YAML configuration.
 
-When a nested `cderun` process detects an active Control Socket, it resolves the socket path using the following priority sequence:
+#### Socket Path Endpoint in Snapshot and Child Containers
 
-1. Explicitly configured socket path via `--mount-cderun-socket-path`, `CDERUN_MOUNT_CDERUN_SOCKET_PATH`, or P1 override `--cderun-mount-cderun-socket-path`.
-2. `hostContext.controlSocket` recorded in the snapshot directory (`/run/cderun/.cderun.yaml`).
-3. Standard default socket mount location `/run/cderun/cderun.sock`.
+The Control Socket file is created on the Base Host inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`). Its host path is recorded as `hostContext.controlSocket` for snapshot metadata and bind mount creation. Inside child containers (Level 1+), the Control Socket is mounted to `/run/cderun/cderun.sock`, which nested processes use to communicate with the Base Host server.
 
 ### Cleanup
 
@@ -120,9 +118,8 @@ Length-prefixed JSON messages over the Unix domain socket:
 [4-byte big-endian length][JSON payload]
 ```
 
-- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload payload frame.
+- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload payload frame. Header read/write operations use `binary.Read` and `binary.Write` with `binary.BigEndian` encoding on `uint32` values (`ReadFrame` / `WriteFrame`).
 - **Frame Size Limit**: Enforces a strict maximum payload size of **16MB** (`MaxFrameSize = 16 * 1024 * 1024` bytes) to protect server and client memory against malformed or malicious frame headers.
-- **Serialization Efficiency**: Stack-allocated 4-byte header buffers (`[4]byte`) and direct `binary.BigEndian.Uint32` / `PutUint32` conversions ensure zero reflection and minimal allocation overhead during socket frame read and write loops.
 
 JSON is chosen over gRPC/protobuf for a first implementation because the channel is always local (single machine, single mount namespace) and framing simplicity aids debuggability (`--diagnosis` / `--log-level trace` should be able to dump raw frames). Switching the wire format later is an internal detail as long as the version-negotiation contract below is honored.
 
@@ -185,23 +182,23 @@ The Control Socket server evaluates all nested `CreateContainer` requests agains
    - If parent container is non-privileged (`Privileged: false`), child request with `Privileged: true` is strictly rejected.
 2. **Linux Capabilities (`CapAdd` and `CapDrop`)**:
    - Capabilities are normalized to standard uppercase `CAP_` prefixed strings (e.g. `CAP_SYS_ADMIN`).
-   - **`CapAdd` Rules**: Child `CapAdd` entries must be a subset of parent `CapAdd`. If parent explicitly specifies `CapAdd: ["ALL"]`, child capability additions are permitted provided they are not present in parent's `CapDrop` list. If child requests `CapAdd: ["ALL"]`, parent must also have `CapAdd: ["ALL"]` and an empty `CapDrop` list. Note that exact capability strings are checked without implied wildcard expansion: a non-privileged parent with `CapAdd: ["ALL"]` authorizes exact `ALL` requests but does not authorize arbitrary specific capability strings (like `CAP_CHOWN`) unless explicitly granted.
+   - **`CapAdd` Rules**: Child `CapAdd` entries must be a subset of parent `CapAdd`. When the parent specifies `CapAdd: ["ALL"]`, any child capability not explicitly listed in parent `CapDrop` is permitted (including specific capabilities such as `CAP_CHOWN`). If child requests `CapAdd: ["ALL"]`, parent must also specify `CapAdd: ["ALL"]` with an empty `CapDrop` list.
    - **`CapDrop` Rules**: Parent capability drops must be preserved by child. If child drops `ALL` (`CapDrop: ["ALL"]`), parent drop requirements are satisfied. If parent drops `ALL`, child must also drop `ALL`.
 3. **Namespace Modes**:
    - **Network Mode**: Child network mode cannot request host networking (`"host"`) unless parent also runs in `host` network mode.
    - **PID Mode**: Child cannot request `"host"` PID namespace unless parent runs with `"host"` PID mode.
    - **IPC Mode**: Child cannot request `"host"` or `container:` IPC modes exceeding parent IPC privileges.
-   - **Cgroup Namespace**: Child cgroup namespace mode must match or be strictly more restrictive than parent.
+   - **Cgroup Namespace**: Child cgroup namespace mode cannot request `"host"` unless parent also runs with `"host"` cgroup namespace.
 4. **OCI Runtime Selection**:
-   - Child requests for custom `--oci-runtime` / `OciRuntime` must match parent's OCI runtime or be empty.
+   - When both parent and child specify non-empty `OciRuntime` values, they must match. A child may specify a custom runtime if parent `OciRuntime` is empty, and an empty child `OciRuntime` is always permitted.
 5. **Read-Only Mount Boundaries & Path Traversal**:
    - Child bind mounts cannot attempt to remount parent read-only paths as read-write (`readonly: false`).
-   - Source paths are cleaned (`filepath.Clean`) and canonicalized (`filepath.EvalSymlinks`). Any path traversal attempts (`hasPathTraversal`) or symlink escapes past parent mount boundaries trigger immediate policy rejection.
+   - Read-write child bind mounts must fall within parent mount sources. Any path traversal segments (`..` in `hasPathTraversal`) in child mount sources trigger immediate policy rejection.
 6. **Host Device Mappings**:
    - Host devices requested by child (`PathOnHost`) must exist in parent's device mappings with matching cleaned host paths, and cgroup permissions requested by child (`CgroupPermissions`, e.g. `rw`) must be a subset of parent device permissions (e.g. `rwm`).
 7. **Kernel Sysctls & Security Options**:
    - Kernel `Sysctls` specified by child must be a subset of parent sysctls with matching values.
-   - Security options (`SecurityOpt`, such as `no-new-privileges:true`) configured on parent cannot be omitted, dropped, or weakened by child containers.
+   - Hardening security options (`no-new-privileges`) are permitted for child containers. When a child specifies non-hardening security options (`SecurityOpt`), each option must be explicitly permitted by parent options.
 
 ### Engine/Adapter Selection Is Fixed at the Base Host
 
