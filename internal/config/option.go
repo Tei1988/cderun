@@ -322,6 +322,7 @@ func parseCommaSeparatedString(s string, r *ExpressionResolver) []string {
 	}
 
 	var res []string
+	capHint := strings.Count(s, ",") + 1
 	remaining := s
 	for len(remaining) > 0 {
 		var chunk string
@@ -337,7 +338,7 @@ func parseCommaSeparatedString(s string, r *ExpressionResolver) []string {
 			continue
 		}
 		if res == nil {
-			res = make([]string, 0, 4)
+			res = make([]string, 0, capHint)
 		}
 		if r == nil || (!strings.Contains(chunk, "{{") && !strings.HasPrefix(chunk, "~")) {
 			res = append(res, chunk)
