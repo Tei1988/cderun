@@ -95,7 +95,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | DONE |
-| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
+| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | DONE |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 | T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
 | T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | DONE |
@@ -527,29 +527,6 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 
 ---
 
-## T91: Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証
-
-- 種別: 機能 / セキュリティ
-- 優先度: 中
-- 規模: 中
-- 前提: T89 完了（T90 の完了は必須ではないが、テスト基盤の再利用のため T90 の後が望ましい）
-- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
-
-### 方針
-
-- `containerd-api` アダプタへのディスパッチを追加し、`docker-compat-api`系（Docker/Podman）と合わせて Control Socket が API ベースエンジン全体で機能パリティに達するようにする。
-- Security Model 節で定義した「親の許可した設定を上限とする」権限スコープ制御（inherited-ceiling モデル）を実装する。
-- macOS 上での動作制約（`nested-execution.md` の VM GID 問題）が Control Socket 経由では発生しないことを検証・記録する。
-
-### 完了条件
-
-- Docker/Podman（`docker-compat-api`）・containerd（`containerd-api`）で Control Socket 経由のネスト実行が Phase 2/3 と同等に動作する。
-- ネスト先からの要求が親の `ContainerConfig` を超える権限（イメージ・マウント・capability 等）を要求した場合に拒否されることを確認するテストがある。
-- macOS 環境での検証結果が `docs/features/nested-execution-control-socket.md` に記録されている。
-- 本フェーズの完了をもって `--mount-cderun-socket` の experimental 表記を外すかどうかを判断する（`docs/features/nested-execution-control-socket.md` の Compatibility and Migration 節の手順に従う）。
-
----
-
 ## T92: `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加
 
 - 種別: 機能
@@ -854,29 +831,3 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 - `make lint-go` がパスする
 
 ---
-
-## Documentation Update Tasks
-
-### T95 Documentation Updates: Update `--runtime` documentation for OCI runtime transition
-
-- **Task**: Update CLI options and multi-runtime documentation for T95 `--runtime` breaking change.
-- **Target Files**:
-  - `docs/features/command-line-options.md`
-  - `docs/features/multi-runtime-support.md`
-  - `README.md`
-  - `USAGE.md`
-- **Details**:
-  - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
-  - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
-  - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.
-
-### T92 Documentation Updates: Document `:-default` fallback syntax for `file:` and `find_dir:` directives
-
-- **Task**: Document `:-default` fallback syntax support in `file:` and `find_dir:` expression directives.
-- **Target Files**:
-  - `docs/features/value-resolution.md`
-  - `README.md`
-- **Details**:
-  - Document syntax `{{file:NAME:-DEFAULT}}` and `{{find_dir:NAME:-DEFAULT}}`.
-  - Detail fallback triggering rules: missing target (both directives), `stat`/`read` errors and trimmed empty content (scoped to `file:`), and `r.fs.Abs(dir)` failures (for `find_dir:`) vs non-fallback error conditions (invalid parameters such as control characters, invalid path chars, or parent/absolute traversals, and size limits).
-  - Provide examples like `{{find_dir:master:-{{PWD}}}}`.
