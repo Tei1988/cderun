@@ -90,7 +90,7 @@ jobs:
       run: |
         export CDERUN_ENGINE=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -tags=runtime -v ./...
+        go test -tags=runtime -v $(go list ./... | grep -v /scripts)
 
   runtime-test-docker:
     runs-on: ouchi-kubernetes
@@ -103,13 +103,30 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
+    - name: Ensure Docker daemon is running
+      run: |
+        if [ ! -S /var/run/docker.sock ]; then
+          sudo dockerd > /tmp/dockerd.log 2>&1 &
+          for i in {1..30}; do
+            if [ -S /var/run/docker.sock ]; then
+              echo "docker socket ready"
+              break
+            fi
+            sleep 1
+          done
+        fi
+        if [ ! -S /var/run/docker.sock ]; then
+          echo "Docker daemon failed to start. Logs:"
+          cat /tmp/dockerd.log 2>/dev/null || true
+          exit 1
+        fi
     - name: Build cderun binary
       run: go build -o cderun main.go
     - name: Run Docker integration tests
       run: |
         export CDERUN_ENGINE=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
-        go test -tags=runtime -v ./...
+        go test -tags=runtime -v $(go list ./... | grep -v /scripts)
 
   runtime-test-podman:
     runs-on: ouchi-kubernetes
@@ -128,22 +145,23 @@ jobs:
           sudo apt-get update && break || sleep 2
         done
         sudo apt-get install -y podman
-        systemctl --user enable --now podman.socket || podman system service --time=0 unix:///tmp/podman.sock &
+        podman system service --time=0 unix:///tmp/podman.sock > /tmp/podman.log 2>&1 &
         for i in {1..30}; do
-          if [ -S /run/user/$(id -u)/podman/podman.sock ] || [ -S /tmp/podman.sock ]; then
+          if [ -S /tmp/podman.sock ]; then
             echo "podman socket ready"
             break
           fi
           sleep 1
         done
+        if [ ! -S /tmp/podman.sock ]; then
+          echo "Podman service failed to start. Logs:"
+          cat /tmp/podman.log 2>/dev/null || true
+          exit 1
+        fi
     - name: Build cderun binary
       run: go build -o cderun main.go
     - name: Run Podman integration tests
       run: |
         export CDERUN_ENGINE=podman
-        if [ -S /run/user/$(id -u)/podman/podman.sock ]; then
-          export CDERUN_SOCKET_PATH=/run/user/$(id -u)/podman/podman.sock
-        else
-          export CDERUN_SOCKET_PATH=/tmp/podman.sock
-        fi
-        go test -tags=runtime -v ./...
+        export CDERUN_SOCKET_PATH=/tmp/podman.sock
+        go test -tags=runtime -v $(go list ./... | grep -v /scripts)
