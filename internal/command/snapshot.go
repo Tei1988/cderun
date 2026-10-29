@@ -284,6 +284,21 @@ func isRealFileSystem(fs config.FileSystem) bool {
 	}
 }
 
+func nextField(s string) (field string, rest string) {
+	start := 0
+	for start < len(s) && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	if start >= len(s) {
+		return "", ""
+	}
+	end := start
+	for end < len(s) && s[end] != ' ' && s[end] != '\t' {
+		end++
+	}
+	return s[start:end], s[end:]
+}
+
 func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (string, error) {
 	if reader == nil {
 		reader = defaultMountInfoReader
@@ -306,35 +321,61 @@ func discoverOverlayUpperDir(fs config.FileSystem, reader mountInfoReader) (stri
 		if line == "" {
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) < 10 {
-			continue
-		}
 
-		// Find separator "-"
-		sepIdx := -1
-		for i, f := range fields {
-			if f == "-" {
-				sepIdx = i
+		rest := line
+		var f string
+
+		// Field 0..3: mount ID, parent ID, major:minor, root
+		for fieldIdx := 0; fieldIdx < 4; fieldIdx++ {
+			f, rest = nextField(rest)
+			if f == "" {
 				break
 			}
 		}
-		if sepIdx == -1 || len(fields) <= sepIdx+3 {
+		if f == "" {
 			continue
 		}
 
-		fsType := fields[sepIdx+1]
-		if fsType != "overlay" {
-			continue
-		}
-
-		mountPoint := fields[4]
+		// Field 4: mount point
+		mountPoint, rest := nextField(rest)
 		if mountPoint != "/" {
 			continue
 		}
 
-		// Superblock options are at the end
-		sbOptions := fields[len(fields)-1]
+		// Scan optional fields until separator "-"
+		foundSep := false
+		for {
+			f, rest = nextField(rest)
+			if f == "" {
+				break
+			}
+			if f == "-" {
+				foundSep = true
+				break
+			}
+		}
+		if !foundSep {
+			continue
+		}
+
+		// Field after "-": fsType
+		fsType, rest := nextField(rest)
+		if fsType != "overlay" {
+			continue
+		}
+
+		// Field after fsType: mount source
+		f, rest = nextField(rest)
+		if f == "" {
+			continue
+		}
+
+		// Field after mount source: super options
+		sbOptions, _ := nextField(rest)
+		if sbOptions == "" {
+			continue
+		}
+
 		remainingOpts := sbOptions
 		for len(remainingOpts) > 0 {
 			var opt string
