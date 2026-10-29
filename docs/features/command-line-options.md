@@ -192,14 +192,14 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 - **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET`
 - **P1 Internal Override**: `--cderun-mount-cderun-socket`
 - **Configuration Key (`.cderun.yaml`)**: `defaults.mountCderunSocket:`
-- **Description**: Mount cderun Control Socket (`cderun.sock`) into the container for scoped nested execution (experimental).
+- **Description**: Mount cderun Control Socket (`cderun.sock`) into the container for scoped nested execution (experimental). Also select `--mount-cderun` to make the cderun binary available in the child container.
 - **Note**:
   - Creates a dedicated Control Socket inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`) and mounts it to `/run/cderun/cderun.sock` inside the child container.
   - Supports Phase 1 (protocol & framing), Phase 2 (non-interactive container lifecycle dispatch: `CreateContainer`, `StartContainer`, `WaitContainer`, `RemoveContainer`), Phase 3 (interactive container lifecycle dispatch: `AttachContainer`, `SignalContainer`, `ResizeContainerTTY`), Phase 4 (`nerdctl` CLI dispatch with argument injection defenses), and Phase 5 (inherited-ceiling security policy validation `ValidateInheritedCeiling`).
   - Currently documented as **experimental** during phased rollout (see `docs/features/nested-execution-control-socket.md`).
 
 ```bash
-cderun --mount-cderun-socket alpine sh
+cderun --mount-cderun --mount-cderun-socket alpine sh
 ```
 
 ### `--mount-tools`
