@@ -26,7 +26,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
-| T20 | ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加） | CI | 高 | 中 | - | - |
+| T20 | ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加） | CI | 高 | 中 | - | DONE |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | DONE |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -204,61 +204,6 @@ func splitCderunArgs(args []string) (cderunFlags []string, rest []string) {
 
 - 採用した仕様が `docs/features/argument-parsing.md` に反映されている
 - サブコマンド前 `--cderun-*` の扱い、およびスペース区切り/イコール付きP1オーバーライドフラグのホイスト動作のテストがある
-
----
-
-## T20: ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加）
-
-- 種別: CI / テストカバレッジ
-- 優先度: 高
-- 規模: 中
-- 仕様変更: なし
-- 対象: `.github/workflows/ci.yaml`, `internal/runtime/conformance_suite_*_test.go`, `docs/testing/conformance.md`, `docs/testing/runtime-tests.md`
-
-### 問題
-
-**既存の `runtime-test-containerd` ジョブは実 containerd を一切検証していない**（2026-09-10 調査）。
-
-- ジョブは containerd 2.2.3 と CNI プラグインを実際にインストールし、ソケットに ACL まで設定している（`ci.yaml:29-78`）
-- しかし最後に走るのは `go test -v ./internal/runtime/...` で、`-tags=runtime` が付いていない（`ci.yaml:83`）
-- エクスポートしている `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` を読むのは `internal/config` のフラグ解決と `internal/command/scenario_test.go:78` だけ。後者は `//go:build runtime` なので除外される。**`internal/runtime` 配下にこの2変数を読むテストは存在しない**
-- コンフォーマンススイートの入口4箇所はすべてモッククライアント。`conformance_suite_containerd_test.go` も `newMockFullClient()` と `/dummy/socket.sock` を使っている
-- `//go:build runtime` のテストファイルは6つあるが全て `internal/command` にあり、`-tags=runtime` がどのジョブでも指定されていないため、**CI でもローカルの `make test` でも一度も実行されていない**
-
-結果として、実ランタイムを起動するコストを払ったうえでモックテストを2回走らせている状態になっている。カバレッジがあるように見えるぶん検知が遅れた。
-
-なお `docs/testing/conformance.md:128` は live conformance test を「`CDERUN_RUNTIME` プローブや `-tags=runtime` で登録できる」と将来の選択肢として記述しており、未実装であること自体はドキュメントと整合している。
-
-### 方針
-
-旧 T20 は「ランタイムテストは `CDERUN_RUNTIME` / `CDERUN_SOCKET_PATH` で対象を切り替える構造」を前提に Docker / Podman ジョブの追加のみを求めていたが、その前提が成立していない。**まず既存ジョブを実接続にすること**を本タスクの先頭に置く。
-
-1. **live コンフォーマンス入口の追加**: `RunConformanceTests` に実クライアント版の factory を渡す入口を `//go:build runtime` 付きで追加する。接続先は `CDERUN_SOCKET_PATH`（未設定ならエンジンごとの既定パス）から解決する
-2. **既存 containerd ジョブの是正**: `go test -tags=runtime -v ./...` に変更する。対象を `./internal/runtime/...` に限定しない（`//go:build runtime` のファイルは `internal/command` にあるため、現在の限定はタグ付きテストと噛み合っていない）
-3. **Docker ジョブの追加**: runner の `/var/run/docker.sock` を使う。runner ユーザーは docker グループ所属済みのため ACL 設定は不要のはず。ただし下記「セキュリティ上の制約」を満たすこと
-4. **Podman ジョブの追加**: `sudo apt-get install -y podman` 後、`systemctl --user enable --now podman.socket`。ソケットは `/run/user/$(id -u)/podman/podman.sock`
-5. **サイレント劣化の防止**: ランタイムジョブ内で live テストが1件も実行されなかった場合にジョブを失敗させる。ソケットに繋がらないときは `t.Skip` で黙って緑にせず、明示的に失敗させること（今回の問題が3ヶ月気づかれなかった直接の原因がこれにあたる）
-
-### セキュリティ上の制約（3ジョブ共通）
-
-CI は self-hosted runner（`ouchi-kubernetes`）で動くため、fork からの `pull_request` 実行にコンテナランタイムのソケットを渡すと、リポジトリ外の第三者が runner 上で任意のコンテナを起動できる。これは追加する Docker / Podman ジョブだけでなく、**既存の containerd ジョブにも現時点で当てはまる**。
-
-- 信頼されていない `pull_request` 実行（fork 由来）では、ホストのランタイムソケットにアクセスさせないこと。使い捨てまたは rootless のデーモンをジョブ内に立てる、あるいは当該イベントではランタイムジョブを実行しない、のいずれかで対処する
-- どの方式を採るかを決め、理由を `docs/testing/runtime-tests.md` に記録すること
-- fork 由来の `pull_request` がホストソケットに到達できないことを確認するテストまたは検証手順を残すこと
-
-### 完了条件
-
-- containerd / Docker / Podman の各ジョブが、モックではなく実デーモンに接続してコンテナを起動・待機・削除するテストを実行している
-- `-tags=runtime` が CI で指定され、`internal/command` の既存タグ付きテスト6ファイルが実際に実行されている
-- live テストが0件だった場合にジョブが失敗することを確認している（意図的にソケットパスを壊して赤くなることを手元で確認する）
-- `make test-runtime` がローカルでも同じ経路を通る
-- `docs/testing/conformance.md` の「Live Socket Testing」節が、実装済みの手順として更新されている
-- `docs/testing/runtime-tests.md` に3エンジンの実行方法が記載されている
-
-### 備考
-
-Control Socket（T87〜T91）は「実際にネストしてコンテナが起動するか」が本質であるにもかかわらず、Phase 2/3 の検証はモック dispatcher 相手のユニットテストに留まっている。本タスクで live 経路が通ったら、T90 / T91 の完了条件に Control Socket 経由の live テストを追加すること。
 
 ---
 
@@ -869,3 +814,14 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
   - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
   - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.
+
+### T20 Documentation Updates: Update conformance and runtime testing guides for live socket testing
+
+- **Task**: Update conformance testing guide and runtime testing guide for T20 live socket testing.
+- **Target Files**:
+  - `docs/testing/conformance.md`
+  - `docs/testing/runtime-tests.md`
+- **Details**:
+  - Document that live socket testing is implemented in `internal/runtime/feature_runtime_live_conformance_test.go` (`TestLiveConformance_RuntimeAdapter`).
+  - Document engine selection via `CDERUN_ENGINE` (`docker`, `podman`, `containerd`) and socket resolution via `CDERUN_SOCKET_PATH`.
+  - Document CI job configurations (`runtime-test-containerd`, `runtime-test-docker`, `runtime-test-podman`) and security isolation rules on fork pull requests.
