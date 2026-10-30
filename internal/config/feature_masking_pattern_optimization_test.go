@@ -53,7 +53,6 @@ func TestUnit_Config_ScanAnchors_FastPathAndEdgeCases(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var buf [32]anchorRange
@@ -69,7 +68,7 @@ func TestUnit_Config_MaskSensitiveEnv_PatternOptimizations(t *testing.T) {
 	t.Run("Nil patterns masks all non-empty values", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("API_KEY", "secret123", nil))
-		assert.Equal(t, "", MaskSensitiveEnv("API_KEY", "", nil))
+		assert.Empty(t, MaskSensitiveEnv("API_KEY", "", nil))
 		assert.Equal(t, "[REDACTED]", MaskSensitiveEnv("API_KEY", "[REDACTED]", nil))
 	})
 
