@@ -286,15 +286,20 @@ func isControlByte(c byte) bool {
 	return (c < 32 && c != '\t') || c == 127
 }
 
+func escapeByteTo(c byte, dst []byte) int {
+	dst[0] = '\\'
+	dst[1] = 'x'
+	dst[2] = hexChars[c>>4]
+	dst[3] = hexChars[c&0x0f]
+	return 4
+}
+
 func hasControlByte(s string) bool {
 	i := 0
 	// Process 8 bytes at a time for strings with length >= 8.
-	// Bytes below 32 (except '\t') and byte 127 (DEL) are control bytes.
 	for ; i+8 <= len(s); i += 8 {
-		b0, b1, b2, b3 := s[i], s[i+1], s[i+2], s[i+3]
-		b4, b5, b6, b7 := s[i+4], s[i+5], s[i+6], s[i+7]
-		if isControlByte(b0) || isControlByte(b1) || isControlByte(b2) || isControlByte(b3) ||
-			isControlByte(b4) || isControlByte(b5) || isControlByte(b6) || isControlByte(b7) {
+		if isControlByte(s[i]) || isControlByte(s[i+1]) || isControlByte(s[i+2]) || isControlByte(s[i+3]) ||
+			isControlByte(s[i+4]) || isControlByte(s[i+5]) || isControlByte(s[i+6]) || isControlByte(s[i+7]) {
 			return true
 		}
 	}
@@ -328,11 +333,7 @@ func SanitizeLogString(s string) string {
 				buf[w] = c
 				w++
 			} else if isControlByte(c) {
-				buf[w] = '\\'
-				buf[w+1] = 'x'
-				buf[w+2] = hexChars[c>>4]
-				buf[w+3] = hexChars[c&0x0f]
-				w += 4
+				w += escapeByteTo(c, buf[w:])
 			} else {
 				buf[w] = c
 				w++
@@ -343,15 +344,14 @@ func SanitizeLogString(s string) string {
 
 	var builder strings.Builder
 	builder.Grow(len(s) + 8)
+	var escBuf [4]byte
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c == '\t' {
 			builder.WriteByte(c)
 		} else if isControlByte(c) {
-			builder.WriteByte('\\')
-			builder.WriteByte('x')
-			builder.WriteByte(hexChars[c>>4])
-			builder.WriteByte(hexChars[c&0x0f])
+			_ = escapeByteTo(c, escBuf[:])
+			builder.Write(escBuf[:])
 		} else {
 			builder.WriteByte(c)
 		}
