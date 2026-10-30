@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"fmt"
-	"strings"
 	"unicode"
 )
 
@@ -92,29 +91,31 @@ func (b *CLIArgBuilder) VerifyStructure(argv []string, expectedFlagCount int) er
 	}
 
 	for i, flagArg := range flagSlice {
-		if !strings.HasPrefix(flagArg, "-") {
+		if len(flagArg) == 0 || flagArg[0] != '-' {
 			return fmt.Errorf("structural self-check failed: flag argument at index %d (%q) does not start with '-'", i, flagArg)
 		}
 	}
 
 	for i, arg := range argv {
-		if strings.IndexByte(arg, 0) != -1 {
-			return fmt.Errorf("structural self-check failed: argument at index %d contains null byte", i)
-		}
-		hasControl := false
+		hasNonASCII := false
 		for j := 0; j < len(arg); j++ {
 			c := arg[j]
+			if c == 0 {
+				return fmt.Errorf("structural self-check failed: argument at index %d contains null byte", i)
+			}
 			if c < 32 || c == 127 {
 				if c != '\n' && c != '\r' && c != '\t' {
-					hasControl = true
+					if !hasNonASCII {
+						return fmt.Errorf("structural self-check failed: argument at index %d contains control character %q at position %d", i, rune(c), j)
+					}
+					hasNonASCII = true
 					break
 				}
 			} else if c >= 128 {
-				hasControl = true
-				break
+				hasNonASCII = true
 			}
 		}
-		if hasControl {
+		if hasNonASCII {
 			for pos, r := range arg {
 				if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
 					return fmt.Errorf("structural self-check failed: argument at index %d contains control character %q at position %d", i, r, pos)
