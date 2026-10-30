@@ -28,7 +28,7 @@ func (b *CLIArgBuilder) AddJoinedFlag(flag, value string, omitEmpty bool) *CLIAr
 	if value == "" && omitEmpty {
 		return b
 	}
-	b.flags = append(b.flags, flag+"="+value)
+	b.flags = append(b.flags, fmt.Sprintf("%s=%s", flag, value))
 	return b
 }
 
@@ -43,7 +43,7 @@ func (b *CLIArgBuilder) AddBoolFlag(flag string, condition bool) *CLIArgBuilder 
 // AddRepeatJoinedFlag adds multiple joined `--flag=value` entries for a list of values.
 func (b *CLIArgBuilder) AddRepeatJoinedFlag(flag string, values []string) *CLIArgBuilder {
 	for _, v := range values {
-		b.flags = append(b.flags, flag+"="+v)
+		b.flags = append(b.flags, fmt.Sprintf("%s=%s", flag, v))
 	}
 	return b
 }
@@ -101,24 +101,9 @@ func (b *CLIArgBuilder) VerifyStructure(argv []string, expectedFlagCount int) er
 		if strings.IndexByte(arg, 0) != -1 {
 			return fmt.Errorf("structural self-check failed: argument at index %d contains null byte", i)
 		}
-		hasControl := false
-		for j := 0; j < len(arg); j++ {
-			c := arg[j]
-			if c < 32 || c == 127 {
-				if c != '\n' && c != '\r' && c != '\t' {
-					hasControl = true
-					break
-				}
-			} else if c >= 128 {
-				hasControl = true
-				break
-			}
-		}
-		if hasControl {
-			for pos, r := range arg {
-				if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
-					return fmt.Errorf("structural self-check failed: argument at index %d contains control character %q at position %d", i, r, pos)
-				}
+		for pos, r := range arg {
+			if unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' {
+				return fmt.Errorf("structural self-check failed: argument at index %d contains control character %q at position %d", i, r, pos)
 			}
 		}
 	}

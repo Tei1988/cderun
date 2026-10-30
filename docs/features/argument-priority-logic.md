@@ -13,7 +13,7 @@ Settings are resolved in the following priority order, from highest to lowest:
 - **Definition**: Dedicated flags designed to force-override the behavior of `cderun`. These flags enable specifying settings on the `cderun` side even when using symbolic links (Polyglot Mode) without conflicting with the arguments of wrapped tools.
 - **Flag Names**: All supported standard `cderun` options have a corresponding P1 counterpart prefixed with `--cderun-`.
   - **Key P1 Flags**:
-    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-network`, `--cderun-engine`, `--cderun-oci-runtime`, `--cderun-runtime` (alias for `--cderun-oci-runtime`), `--cderun-strict-env`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-prefetch`, `--cderun-prefetch-all`, `--cderun-prune`, `--cderun-remove`, `--cderun-restart`, `--cderun-hang-timeout`
+    - **Execution Control**: `--cderun-image`, `--cderun-env`, `--cderun-tty`, `--cderun-interactive`, `--cderun-workdir`, `--cderun-user`, `--cderun-group-add`, `--cderun-network`, `--cderun-engine`, `--cderun-runtime` (deprecated alias for `--cderun-engine`), `--cderun-oci-runtime`, `--cderun-strict-env`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-pull-max-retries`, `--cderun-pull-backoff-base`, `--cderun-prefetch`, `--cderun-prefetch-all`, `--cderun-prune`, `--cderun-remove`, `--cderun-restart`, `--cderun-hang-timeout`
     - **Mounting & Isolation**: `--cderun-mount`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun-socket`, `--cderun-mount-cderun-socket-path`, `--cderun-socket-path`
     - **Networking & Ports**: `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-dns-option`, `--cderun-dns-search`, `--cderun-add-host`
     - **Resources & Security**: `--cderun-memory`, `--cderun-cpus`, `--cderun-cpu-shares`, `--cderun-cpuset-cpus`, `--cderun-cpuset-mems`, `--cderun-device`, `--cderun-gpus`, `--cderun-ipc`, `--cderun-cgroupns`, `--cderun-sensitive-env`, `--cderun-privileged`, `--cderun-read-only`, `--cderun-pid`, `--cderun-pids-limit`, `--cderun-init`, `--cderun-security-opt`, `--cderun-ulimit`, `--cderun-shm-size`, `--cderun-sysctl`, `--cderun-cap-add`, `--cderun-cap-drop`
@@ -49,7 +49,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
 
 - **Definition**: Standard CLI options explicitly provided by the user at execution time. These must be placed **before** the subcommand.
 - **Flag Names**:
-  - `--tty`, `--interactive`, `--image`, `--network`, `--engine`, `--oci-runtime`, `--runtime` (alias for `--oci-runtime`), `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--mount-cderun-socket`, `--mount-cderun-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--prune`, `--remove`, `--config`, `--tool-config`
+  - `--tty`, `--interactive`, `--image`, `--network`, `--engine`, `--runtime` (deprecated alias for `--engine`), `--oci-runtime`, `--socket-path`, `--mount-socket`, `--mount-socket-path`, `--mount-cderun-socket`, `--mount-cderun-socket-path`, `--env`, `--workdir`, `--mount`, `--mount-cderun`, `--mount-cderun-path`, `--mount-tools`, `--mount-all-tools`, `--prune`, `--remove`, `--config`, `--tool-config`
   - `--publish`, `--publish-all`, `--expose`, `--hostname`, `--dns`, `--dns-option`, `--dns-search`, `--add-host`, `--user`, `--group-add`, `--privileged`, `--read-only`, `--init`, `--pid`, `--pids-limit`, `--cap-add`, `--cap-drop`, `--entrypoint`, `--pull`, `--pull-max-retries`, `--pull-backoff-base`, `--prefetch`, `--prefetch-all`, `--strict-env`, `--sensitive-env`, `--memory`, `--cpus`, `--cpu-shares`, `--cpuset-cpus`, `--cpuset-mems`, `--device`, `--gpus`, `--ipc`, `--cgroupns`, `--security-opt`, `--ulimit`, `--shm-size`, `--sysctl`, `--restart`, `--hang-timeout`
   - `--dry-run`, `--dry-run-format`, `--diagnosis`, `--diagnosis-format`, `--log-level`, `--log-format`, `--log-timestamp`
 - **Condition**: Applied only when explicitly specified by the user on the command line. Otherwise, the resolution proceeds to P3 and below.
@@ -58,7 +58,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
 
 - **Definition**: Settings applied globally across the execution host environment.
 - **Key Variables**:
-  - **Configuration & Execution**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_ENGINE`, `CDERUN_OCI_RUNTIME`, `CDERUN_RUNTIME` (alias for `CDERUN_OCI_RUNTIME`), `CDERUN_SOCKET_PATH`, `CDERUN_PRUNE`, `CDERUN_REMOVE`, `CDERUN_RESTART`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`, `CDERUN_PREFETCH`, `CDERUN_PREFETCH_ALL`
+  - **Configuration & Execution**: `CDERUN_CONFIG`, `CDERUN_TOOL_CONFIG`, `CDERUN_IMAGE`, `CDERUN_ENGINE`, `CDERUN_RUNTIME` (deprecated alias for `CDERUN_ENGINE`), `CDERUN_OCI_RUNTIME`, `CDERUN_SOCKET_PATH`, `CDERUN_PRUNE`, `CDERUN_REMOVE`, `CDERUN_RESTART`, `CDERUN_STRICT_ENV`, `CDERUN_HANG_TIMEOUT`, `CDERUN_PREFETCH`, `CDERUN_PREFETCH_ALL`
   - **I/O & TTY**: `CDERUN_TTY`, `CDERUN_INTERACTIVE`, `CDERUN_ENV`, `CDERUN_WORKDIR`, `CDERUN_HOSTNAME`, `CDERUN_USER`, `CDERUN_GROUP_ADD`
   - **Networking**: `CDERUN_NETWORK`, `CDERUN_PUBLISH`, `CDERUN_PUBLISH_ALL`, `CDERUN_EXPOSE`, `CDERUN_DNS`, `CDERUN_DNS_OPTION`, `CDERUN_DNS_SEARCH`, `CDERUN_ADD_HOST`
   - **Mounting & Tools**: `CDERUN_MOUNT`, `CDERUN_MOUNT_SOCKET`, `CDERUN_MOUNT_SOCKET_PATH`, `CDERUN_MOUNT_CDERUN`, `CDERUN_MOUNT_CDERUN_PATH`, `CDERUN_MOUNT_CDERUN_SOCKET`, `CDERUN_MOUNT_CDERUN_SOCKET_PATH`, `CDERUN_MOUNT_TOOLS`, `CDERUN_MOUNT_ALL_TOOLS`
@@ -98,7 +98,7 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `cpuShares: 0` (Zero represents relative default CPU weight with no adapter override)
   - `restart: ""` (Empty string represents no restart policy)
   - `prefetchAll: false` (`false` disables automatic tool image prefetching on invocation)
-  - `engine`: None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
+  - `engine` (`runtime` deprecated alias): None (automatically detected from available sockets in the order of `docker` -> `containerd` -> `podman`, falling back to `docker` if none are found)
   - `cpusetCpus`: "" (Empty string skips cpuset CPU core restrictions)
   - `cpusetMems`: "" (Empty string skips NUMA memory node restrictions)
   - `gpus`: "" (Empty string skips GPU device requests)
@@ -152,16 +152,6 @@ Within a single source (e.g., only CLI flags or inside a single YAML block), if 
 
 - **Example**: Running `cderun --env A=1 --env A=2 node` results in environment variable `A` holding the value `2` inside the container.
 
-### Summary Matrix of Collection Resolution Rules
-
-| Layer Configuration State | Resulting Collection Value | Behavior Description |
-| :--- | :--- | :--- |
-| **Higher Layer Specified (`mounts: [...]`)** | Higher Layer Slice | Higher layer completely replaces/overwrites lower layers. |
-| **Higher Layer Explicitly Empty (`mounts: []` / `CDERUN_ENV=""`)** | Empty Slice (`[]`) | Explicitly clears/disables lower layer collection values. |
-| **Higher Layer Unset (`nil`)** | Lower Layer Slice | Resolution falls through to lower priority layer. |
-
----
-
 ## Transitive Auto-enablement
 
 Certain options are dynamically and transitively enabled based on the resolution state of other options. These transitive rules apply **only when the target option remains unconfigured (`nil` or un-set) across all P1 to P5 layers**:
@@ -171,6 +161,5 @@ Certain options are dynamically and transitively enabled based on the resolution
 2. **`mountSocket` Auto-enablement**:
    If `mountCderun` resolves to `true` (including transitively), `mountSocket` is transitively set to `true`.
 
-### Explicit Override & Priority Rules
-
+**Explicit Override & Priority Rules**:
 Normal priority rules (P1 > P2 > P3 > P4 > P5) apply first when resolving target options (such as `mountSocket` or `mountCderun`). Transitive auto-enablement is applied **only** when the target option remains completely unconfigured (`nil` / unspecified) across all P1–P5 layers. If the target option resolves to an explicit value (`true` or `false`) through standard layer precedence, auto-enablement does not override it (e.g. an explicit higher-priority `mountSocket: true` overrides a lower-priority `false`, while an explicitly resolved `false` value suppresses transitive auto-enablement).

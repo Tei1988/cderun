@@ -95,7 +95,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T88 | Nested Execution Control Socket — Phase 2: Docker向け非対話実行の疎通 | 機能 | 中 | 中 | あり | DONE |
 | T89 | Nested Execution Control Socket — Phase 3: 対話実行（Attach/Signal/Resize） | 機能 | 中 | 中 | あり | DONE |
 | T90 | Nested Execution Control Socket — Phase 4: nerdctl（CLIベース）非対話実行対応 | 機能/セキュリティ | 中 | 中 | あり | DONE |
-| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | DONE |
+| T91 | Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証 | 機能/セキュリティ | 中 | 中 | あり | - |
 | T92 | `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加 | 機能 | 中 | 小 | あり | DONE |
 | T93 | `--engine` の導入（`--runtime` は非推奨エイリアスとして温存） | 機能 | 高 | 大 | あり | DONE |
 | T94 | OCI ランタイム指定フラグ `--oci-runtime` の追加 | 機能 | 高 | 小 | あり | DONE |
@@ -123,7 +123,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T90 は T87 完了後、T88 の直後（T89 と並行可）に着手を推奨**。CLIベースエンジン（nerdctl）を選んだユーザーが他フェーズの完了まで待たされてNested Executionを使えない、という事態を避けるための前倒し。T88 が確立するControl Socketディスパッチの配線パターンを流用したほうが手戻りが少ないため、T88 より前に着手するのは非推奨（逆順・並行実装はコンフリクトしやすい）
 - **T91 は T89 完了が前提**。T90 の完了は必須ではないが、テスト基盤（敵対的テストのハーネス等）を流用できるため T90 の後が望ましい
 - **Apple `container` / WSL Containers 等、ワイヤプロトコルを公開しないランタイムへの nested execution 対応は T88（できれば T89）の完了が前提条件**。T91（全APIベースエンジンパリティ）の完了を待つ必要はない。**採用方針はCLIラッパー方式（`container`/`wslc.exe`をシェルアウト）で、T90で定義する構築技法（`--`挿入・`--flag=value`結合形）・argv構造自己チェック・**そのCLI実バイナリに対する敵対的テスト**（nerdctlで通ったことは他CLIの安全性の根拠にならない。`--`の意味はcobra/pflag等、各CLI内部の引数解析ライブラリ依存のため、アダプタごとに独立して検証が必要）を実装すればControl Socket対応できる。サイドカー方式（`apple/containerization` Swift package や `Microsoft.WSL.Containers` NuGet を直接リンク）は検討したが、プラットフォームごとの別ツールチェーン・署名等の運用コストが見合わないため不採用（`docs/features/nested-execution-control-socket.md` の Relationship to Multi-Runtime Support 節に理由を記録済み。CLIすら提供しない将来のランタイムが出た場合のみ再検討）**
-- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を全タスクが触るため、並行実装はコンフリクトしやすい
+- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を T90 と T93 が共に変更するため、並行実装はコンフリクトしやすい
 
 ---
 
@@ -527,6 +527,29 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 
 ---
 
+## T91: Nested Execution Control Socket — Phase 5: 他APIベースエンジン対応・セキュリティポリシー・macOS検証
+
+- 種別: 機能 / セキュリティ
+- 優先度: 中
+- 規模: 中
+- 前提: T89 完了（T90 の完了は必須ではないが、テスト基盤の再利用のため T90 の後が望ましい）
+- 仕様変更: あり → `docs/features/nested-execution-control-socket.md`
+
+### 方針
+
+- `containerd-api` アダプタへのディスパッチを追加し、`docker-compat-api`系（Docker/Podman）と合わせて Control Socket が API ベースエンジン全体で機能パリティに達するようにする。
+- Security Model 節で定義した「親の許可した設定を上限とする」権限スコープ制御（inherited-ceiling モデル）を実装する。
+- macOS 上での動作制約（`nested-execution.md` の VM GID 問題）が Control Socket 経由では発生しないことを検証・記録する。
+
+### 完了条件
+
+- Docker/Podman（`docker-compat-api`）・containerd（`containerd-api`）で Control Socket 経由のネスト実行が Phase 2/3 と同等に動作する。
+- ネスト先からの要求が親の `ContainerConfig` を超える権限（イメージ・マウント・capability 等）を要求した場合に拒否されることを確認するテストがある。
+- macOS 環境での検証結果が `docs/features/nested-execution-control-socket.md` に記録されている。
+- 本フェーズの完了をもって `--mount-cderun-socket` の experimental 表記を外すかどうかを判断する（`docs/features/nested-execution-control-socket.md` の Compatibility and Migration 節の手順に従う）。
+
+---
+
 ## T92: `{{file:...}}` / `{{find_dir:...}}` に `:-default` フォールバック構文を追加
 
 - 種別: 機能
@@ -783,7 +806,7 @@ T101〜T103 は T100 の完了を待たずに着手してよい（禁止語の�
 
 - `internal/config` 配下に禁止語を含むテストファイル名が 0 件
 - **削除したテストの一覧が PR 説明にある**（何を失ったかがレビュー可能であること）
-- `make test` がパス client/server カバレッジが有意に下がっていない
+- `make test` がパスし、client/server カバレッジを計測・比較するコマンド（使用する Make ターゲットを明記）の結果、変更前と比べて有意に下がっていない
 - `make lint-go` がパスする
 
 ---
@@ -831,3 +854,28 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 - `make lint-go` がパスする
 
 ---
+
+## Documentation Update Tasks
+
+### T20 Documentation Updates: Update conformance and live runtime test documentation
+
+- **Task**: Update `docs/testing/conformance.md` and `docs/testing/runtime-tests.md` for Task T20 live runtime socket integration.
+- **Target Files**:
+  - `docs/testing/conformance.md`
+  - `docs/testing/runtime-tests.md`
+- **Details**:
+  - Update `docs/testing/conformance.md` "Live Socket Testing" section to document the live conformance test harness entry point (`TestConformance_LiveSocketRuntime` in `internal/runtime/feature_runtime_live_conformance_test.go`) executed via `go test -tags=runtime -v ./...`.
+  - Update `docs/testing/runtime-tests.md` to specify execution instructions for all three supported container runtime engines (`containerd`, `docker`, and `podman`), environment variables (`CDERUN_ENGINE`/`CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`), and security isolation rules restricting host socket access on untrusted fork pull requests.
+
+### T95 Documentation Updates: Update `--runtime` documentation for OCI runtime transition
+
+- **Task**: Update CLI options and multi-runtime documentation for T95 `--runtime` breaking change.
+- **Target Files**:
+  - `docs/features/command-line-options.md`
+  - `docs/features/multi-runtime-support.md`
+  - `README.md`
+  - `USAGE.md`
+- **Details**:
+  - Document that `--runtime`, `CDERUN_RUNTIME`, and `.cderun.yaml` `runtime:` now target OCI runtime selection (as an alias for `--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`) rather than container engine selection.
+  - Document that passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime` or `CDERUN_RUNTIME` or `runtime:` returns an explicit error directing the user to use `--engine`.
+  - Document decision to preserve `--oci-runtime` alongside `--runtime` as supported aliases for OCI runtime selection.

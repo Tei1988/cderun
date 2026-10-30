@@ -94,7 +94,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			EnvKey: "TEST_INT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
-		_, err := resolveIntOpt(def, 10, false, 0, false, 0, ToolConfig{}, false, nil, mfs)
+		_, err := resolveIntOpt(def, 10, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -103,7 +103,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			EnvKey: "TEST_FLOAT",
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, ToolConfig{}, false, nil, mfs)
+		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -116,7 +116,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_INT": "not-an-int"}}
 		tools := ToolsConfig{"sub": ToolConfig{}}
 		// Env is invalid, so it should proceed to ToolGetter (P4) which is valid.
-		_, err := resolveIntOpt(def, 10, false, 0, false, 0, tools["node"], false, nil, mfs)
+		_, err := resolveIntOpt(def, 10, false, 0, false, 0, "node", tools, nil, mfs)
 		require.Error(t, err)
 	})
 
@@ -127,7 +127,7 @@ func TestUnit_Config_Option_Manual_Type_Mismatch(t *testing.T) {
 			GlobalGetter: func(c *CDERunConfig) *float64 { return &globalVal },
 		}
 		mfs := &MockFileSystem{Env: map[string]string{"TEST_FLOAT": "not-a-float"}}
-		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, ToolConfig{}, false, &CDERunConfig{}, mfs)
+		_, err := resolveFloat64Opt(def, 1.5, false, 0, false, 0, "sub", nil, &CDERunConfig{}, mfs)
 		require.Error(t, err)
 	})
 }

@@ -1275,18 +1275,18 @@ func ValidateAddHost(s string) error {
 	if err := validatePathChars(s); err != nil {
 		return err
 	}
-	host, ip, found := strings.Cut(s, ":")
-	if !found {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
 		return fmt.Errorf("invalid add-host format: %q (expected host:ip)", s)
 	}
-	if host == "" {
+	if parts[0] == "" {
 		return fmt.Errorf("invalid add-host format: %q (empty host)", s)
 	}
-	if err := ValidateHostname(host); err != nil {
+	if err := ValidateHostname(parts[0]); err != nil {
 		return fmt.Errorf("invalid host in add-host: %w", err)
 	}
-	if ip != "host-gateway" && net.ParseIP(ip) == nil {
-		return fmt.Errorf("invalid IP in add-host: %q", ip)
+	if parts[1] != "host-gateway" && net.ParseIP(parts[1]) == nil {
+		return fmt.Errorf("invalid IP in add-host: %q", parts[1])
 	}
 	return nil
 }
@@ -1371,20 +1371,22 @@ func ValidateExposePort(s string) error {
 		return err
 	}
 	// Format: port[-port][/protocol]
+	proto := ""
 	remainder := s
-	if head, proto, found := strings.Cut(s, "/"); found {
-		remainder = head
+	if parts := strings.SplitN(s, "/", 2); len(parts) == 2 {
+		remainder = parts[0]
+		proto = parts[1]
 		if proto != "tcp" && proto != "udp" {
 			return fmt.Errorf("invalid protocol: %q", proto)
 		}
 	}
 
-	if startStr, endStr, found := strings.Cut(remainder, "-"); found {
-		start, err := validatePortNumber(startStr, false)
+	if parts := strings.SplitN(remainder, "-", 2); len(parts) == 2 {
+		start, err := validatePortNumber(parts[0], false)
 		if err != nil {
 			return fmt.Errorf("invalid start port in range: %w", err)
 		}
-		end, err := validatePortNumber(endStr, false)
+		end, err := validatePortNumber(parts[1], false)
 		if err != nil {
 			return fmt.Errorf("invalid end port in range: %w", err)
 		}

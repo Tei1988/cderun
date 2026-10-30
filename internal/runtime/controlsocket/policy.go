@@ -74,14 +74,6 @@ func validateCapAdd(childCaps, parentCaps, parentDropCaps []string) error {
 	if len(childCaps) == 0 {
 		return nil
 	}
-
-	if len(parentCaps) == 0 && len(parentDropCaps) == 0 {
-		for _, cap := range childCaps {
-			return fmt.Errorf("security violation: child requested capability %q not permitted by parent", cap)
-		}
-		return nil
-	}
-
 	parentSet := make(map[string]bool, len(parentCaps))
 	for _, cap := range parentCaps {
 		parentSet[normalizeCap(cap)] = true
@@ -220,10 +212,6 @@ func validateDevices(childDevs, parentDevs []container.DeviceMapping) error {
 		return nil
 	}
 
-	if len(parentDevs) == 0 {
-		return fmt.Errorf("security violation: child requested host device %q not permitted by parent", childDevs[0].PathOnHost)
-	}
-
 	parentDevMap := make(map[string]container.DeviceMapping, len(parentDevs))
 	for _, pDev := range parentDevs {
 		cleanHost := canonicalizePath(pDev.PathOnHost)
@@ -267,13 +255,8 @@ func canonicalizePath(p string) string {
 }
 
 func hasPathTraversal(pathStr string) bool {
-	s := filepath.ToSlash(pathStr)
-	if !strings.Contains(s, "..") {
-		return false
-	}
-	for s != "" {
-		var seg string
-		seg, s, _ = strings.Cut(s, "/")
+	segments := strings.Split(filepath.ToSlash(pathStr), "/")
+	for _, seg := range segments {
 		if seg == ".." {
 			return true
 		}
@@ -299,10 +282,6 @@ func isSubpathOrEqual(sub, parent string) bool {
 }
 
 func validateMounts(childMounts []container.Mount, parent *container.ContainerConfig) error {
-	if len(childMounts) == 0 {
-		return nil
-	}
-
 	if parent.ReadOnly {
 		for _, cMount := range childMounts {
 			if cMount.Type == "bind" || cMount.Type == "" {
