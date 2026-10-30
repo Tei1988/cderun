@@ -65,10 +65,10 @@ esac
 	})
 
 	t.Run("PullImage context canceled during retry backoff sleep", func(t *testing.T) {
-		ctxTimeout, cancel := context.WithTimeout(ctx, 15*time.Millisecond)
+		ctxTimeout, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 
-		pullErr := rt.PullImage(ctxTimeout, "retry-sleep-cancel:v1", "always", 5, 50*time.Millisecond)
+		pullErr := rt.PullImage(ctxTimeout, "retry-sleep-cancel:v1", "always", 5, time.Hour)
 		require.Error(t, pullErr)
 		assert.ErrorIs(t, pullErr, context.DeadlineExceeded)
 	})
