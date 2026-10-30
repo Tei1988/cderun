@@ -112,6 +112,8 @@ For details regarding the hoisting mechanism, refer to [Argument Parsing & Hoist
   - `strictEnv: false`
   - `mountSocket: false`
   - `mountCderun: false`
+  - `mountCderunSocket: false`
+  - `mountCderunSocketPath: "/run/cderun/cderun.sock"`
   - `mountAllTools: false`
   - `privileged: false`
   - `publishAll: false`
