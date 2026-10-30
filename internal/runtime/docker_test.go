@@ -151,9 +151,11 @@ type mockDockerClient struct {
 	inspectErr  error
 	listResp    []types.Container
 	listErr     error
+	listOpts    dockercontainer.ListOptions
 }
 
 func (m *mockDockerClient) ContainerList(ctx context.Context, options dockercontainer.ListOptions) ([]types.Container, error) {
+	m.listOpts = options
 	return m.listResp, m.listErr
 }
 
