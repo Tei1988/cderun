@@ -118,8 +118,8 @@ Length-prefixed JSON messages over the Unix domain socket:
 [4-byte big-endian length][JSON payload]
 ```
 
-- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload payload frame. Header read/write operations use `binary.Read` and `binary.Write` with `binary.BigEndian` encoding on `uint32` values (`ReadFrame` / `WriteFrame`).
-- **Frame Size Limit**: Enforces a strict maximum payload size of **16MB** (`MaxFrameSize = 16 * 1024 * 1024` bytes) to protect server and client memory against malformed or malicious frame headers.
+- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload frame. Header read/write operations use `binary.Read` and `binary.Write` with `binary.BigEndian` encoding on `uint32` values (`ReadFrame` / `WriteFrame`).
+- **Frame Size Limit**: Enforces a strict maximum payload size of **16 MiB** (`MaxFrameSize = 16 * 1024 * 1024` bytes, or 16,777,216 bytes) to protect server and client memory against malformed or malicious frame headers.
 
 JSON is chosen over gRPC/protobuf for a first implementation because the channel is always local (single machine, single mount namespace) and framing simplicity aids debuggability (`--diagnosis` / `--log-level trace` should be able to dump raw frames). Switching the wire format later is an internal detail as long as the version-negotiation contract below is honored.
 
