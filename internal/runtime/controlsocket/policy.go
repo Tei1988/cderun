@@ -3,6 +3,7 @@ package controlsocket
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"cderun/internal/container"
@@ -256,12 +257,7 @@ func canonicalizePath(p string) string {
 
 func hasPathTraversal(pathStr string) bool {
 	segments := strings.Split(filepath.ToSlash(pathStr), "/")
-	for _, seg := range segments {
-		if seg == ".." {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(segments, "..")
 }
 
 func isSubpathOrEqual(sub, parent string) bool {

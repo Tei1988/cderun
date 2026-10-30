@@ -519,6 +519,7 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 ### 完了条件
 
 - `nerdctl`アダプタで、Control Socket経由の`CreateContainer`/`StartContainer`/`WaitContainer`/`RemoveContainer`（非対話）が動作する。
+- nerdctl実バイナリに対し、モックではなく実デーモンを使用した Control Socket 経由の `CreateContainer` / `StartContainer` / `WaitContainer` / `RemoveContainer`（非対話）の live テストが存在すること（モック Control Socket テストのみでは不可）。
 - 構築技法（`--`挿入・`--flag=value`結合形）が共有ヘルパーとして実装されている。
 - 実行直前のargv構造自己チェック（`--`より前が意図した固定パターンと完全一致するか）が実装され、不一致時は実行せず明示エラーになることを確認するテストがある。
 - **nerdctl実バイナリに対する敵対的テスト**が存在し、`--privileged`等の危険な値をimage/command/args/env等の各フィールドに仕込んでも実際に特権化されない等、実プロセスの起動結果で無害化を確認している。
@@ -544,6 +545,7 @@ CLIベースアダプタ（`nerdctl`等）を一律禁止にすると、Apple co
 ### 完了条件
 
 - Docker/Podman（`docker-compat-api`）・containerd（`containerd-api`）で Control Socket 経由のネスト実行が Phase 2/3 と同等に動作する。
+- containerd、Docker、Podman について、モックではなく実デーモンを使用した Control Socket 経由の `CreateContainer` / `StartContainer` / `WaitContainer` / `RemoveContainer` の live テストが存在すること（モック Control Socket テストのみでは不可）。
 - ネスト先からの要求が親の `ContainerConfig` を超える権限（イメージ・マウント・capability 等）を要求した場合に拒否されることを確認するテストがある。
 - macOS 環境での検証結果が `docs/features/nested-execution-control-socket.md` に記録されている。
 - 本フェーズの完了をもって `--mount-cderun-socket` の experimental 表記を外すかどうかを判断する（`docs/features/nested-execution-control-socket.md` の Compatibility and Migration 節の手順に従う）。
@@ -865,7 +867,7 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
   - `docs/testing/runtime-tests.md`
 - **Details**:
   - Update `docs/testing/conformance.md` "Live Socket Testing" section to document the live conformance test harness entry point (`TestConformance_LiveSocketRuntime` in `internal/runtime/feature_runtime_live_conformance_test.go`) executed via `go test -tags=runtime -v ./...`.
-  - Update `docs/testing/runtime-tests.md` to specify execution instructions for all three supported container runtime engines (`containerd`, `docker`, and `podman`), environment variables (`CDERUN_ENGINE`/`CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`), and security isolation rules restricting host socket access on untrusted fork pull requests.
+  - Update `docs/testing/runtime-tests.md` to specify execution instructions for all three supported container runtime engines (`containerd`, `docker`, and `podman`), environment variables (`CDERUN_ENGINE`, `CDERUN_SOCKET_PATH`), and security isolation rules restricting host socket access on untrusted fork pull requests.
 
 ### T95 Documentation Updates: Update `--runtime` documentation for OCI runtime transition
 
