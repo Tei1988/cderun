@@ -108,4 +108,22 @@ func TestUnit_ControlSocket_Server_RequestContextAndDeadlineBuilding(t *testing.
 	dl2, hasDeadline2 := ctx2.Deadline()
 	assert.True(t, hasDeadline2)
 	assert.WithinDuration(t, futureDeadline, dl2, 50*time.Millisecond)
+
+	// Case 3: Nil parentCtx falls back to server.ctx or background
+	ctx3, cancel3 := server.buildRequestContext(nil, frameNoDeadline) //nolint:staticcheck // intentional nil context test input
+	defer cancel3()
+	assert.NotNil(t, ctx3)
+	server.cancelCtx()
+	assert.ErrorIs(t, ctx3.Err(), context.Canceled)
+
+	// Case 4: Nil reqFrame handled safely without panic
+	ctx4, cancel4 := server.buildRequestContext(context.Background(), nil)
+	defer cancel4()
+	assert.NotNil(t, ctx4)
+
+	// Case 5: Nil parentCtx and nil server.ctx falls back to context.Background()
+	uninitServer := &Server{}
+	ctx5, cancel5 := uninitServer.buildRequestContext(nil, frameNoDeadline) //nolint:staticcheck // intentional nil context test input
+	defer cancel5()
+	assert.NotNil(t, ctx5)
 }
