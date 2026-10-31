@@ -123,7 +123,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 - **T90 は T87 完了後、T88 の直後（T89 と並行可）に着手を推奨**。CLIベースエンジン（nerdctl）を選んだユーザーが他フェーズの完了まで待たされてNested Executionを使えない、という事態を避けるための前倒し。T88 が確立するControl Socketディスパッチの配線パターンを流用したほうが手戻りが少ないため、T88 より前に着手するのは非推奨（逆順・並行実装はコンフリクトしやすい）
 - **T91 は T89 完了が前提**。T90 の完了は必須ではないが、テスト基盤（敵対的テストのハーネス等）を流用できるため T90 の後が望ましい
 - **Apple `container` / WSL Containers 等、ワイヤプロトコルを公開しないランタイムへの nested execution 対応は T88（できれば T89）の完了が前提条件**。T91（全APIベースエンジンパリティ）の完了を待つ必要はない。**採用方針はCLIラッパー方式（`container`/`wslc.exe`をシェルアウト）で、T90で定義する構築技法（`--`挿入・`--flag=value`結合形）・argv構造自己チェック・**そのCLI実バイナリに対する敵対的テスト**（nerdctlで通ったことは他CLIの安全性の根拠にならない。`--`の意味はcobra/pflag等、各CLI内部の引数解析ライブラリ依存のため、アダプタごとに独立して検証が必要）を実装すればControl Socket対応できる。サイドカー方式（`apple/containerization` Swift package や `Microsoft.WSL.Containers` NuGet を直接リンク）は検討したが、プラットフォームごとの別ツールチェーン・署名等の運用コストが見合わないため不採用（`docs/features/nested-execution-control-socket.md` の Relationship to Multi-Runtime Support 節に理由を記録済み。CLIすら提供しない将来のランタイムが出た場合のみ再検討）**
-- **T93（`--runtime`→`--engine`リネーム、engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類）はT90より前に完了させることを推奨**。T90はBase Hostの設定エンジンが`nerdctl`かどうかを判定する必要があり、T93が導入するAPIベース/CLIベースの区別に依存する。`internal/config/resolver.go`を T90 と T93 が共に変更するため、並行実装はコンフリクトしやすい
+- **T93（`--engine`を導入し、`--runtime`は非推奨エイリアスとして温存。engine系統の`docker-compat-api`/`containerd-api`/`nerdctl`分類を追加）は、T90がこの分類に依存するため、T90より前に完了させることを推奨**。`--runtime`のOCIランタイムへの意味変更はT95で扱う
 
 ---
 

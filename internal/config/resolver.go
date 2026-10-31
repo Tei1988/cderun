@@ -1052,13 +1052,35 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	// Transitive options (MountTools -> MountCderun -> MountSocket)
 	p2SetTools, p2ValTools := getPtrVal(rv.cli.MountTools)
 	p1SetTools, p1ValTools := getPtrVal(rv.cli.CderunMountTools)
+
+	var rawTools []string
+	if p1SetTools {
+		rawTools = strings.Split(p1ValTools, ",")
+	} else if p2SetTools {
+		rawTools = strings.Split(p2ValTools, ",")
+	} else if env, ok := rv.fs.LookupEnv("CDERUN_MOUNT_TOOLS"); ok {
+		rawTools = strings.Split(env, ",")
+	} else if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.MountTools) > 0 {
+		rawTools = tool.MountTools
+	} else if rv.global != nil && len(rv.global.Defaults.MountTools) > 0 {
+		rawTools = rv.global.Defaults.MountTools
+	}
+
+	r, err := rv.getResolverIfNeeded(rawTools)
+	if err != nil {
+		return err
+	}
+	if r == nil && rv.r != nil {
+		r = rv.r
+	}
+
 	rv.res.MountTools = resolveStringSliceCommaOpt(
 		OptionDef[[]string]{EnvKey: "CDERUN_MOUNT_TOOLS",
 			ToolGetter:   toolMountToolsGetter,
 			GlobalGetter: globalMountToolsGetter},
 		p1SetTools, p1ValTools,
 		p2SetTools, p2ValTools,
-		rv.subcommand, rv.tools, rv.global, rv.r, rv.fs,
+		rv.subcommand, rv.tools, rv.global, r, rv.fs,
 	)
 	for _, tool := range rv.res.MountTools {
 		if err := ValidateToolName(tool); err != nil {
@@ -1067,7 +1089,6 @@ func (rv *resolver) resolveTransitiveOptions() error {
 	}
 
 	// Resolve mount-all-tools (transitive trigger)
-	var err error
 	rv.res.MountAllTools, err = rv.resolveBoolOption("mount-all-tools", rv.cli.CderunMountAllTools, rv.cli.MountAllTools)
 	if err != nil {
 		return err

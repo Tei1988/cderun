@@ -103,6 +103,17 @@ jobs:
         go-version-file: go.mod
     - name: Build cderun binary
       run: go build -o cderun main.go
+    - name: Wait for Docker daemon
+      run: |
+        for i in {1..30}; do
+          if [ -S /var/run/docker.sock ] && docker info > /dev/null 2>&1; then
+            echo "Docker daemon ready"
+            break
+          fi
+          echo "Waiting for Docker daemon..."
+          sleep 1
+        done
+        docker info
     - name: Run Docker integration tests
       run: |
         export CDERUN_ENGINE=docker
