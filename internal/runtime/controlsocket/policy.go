@@ -65,8 +65,43 @@ func ValidateInheritedCeiling(child, parent *container.ContainerConfig) error {
 	return nil
 }
 
+func isASCIIWhitespace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+func trimSpaceASCII(s string) string {
+	start := 0
+	for start < len(s) && isASCIIWhitespace(s[start]) {
+		start++
+	}
+	end := len(s)
+	for end > start && isASCIIWhitespace(s[end-1]) {
+		end--
+	}
+	return s[start:end]
+}
+
 func normalizeCap(c string) string {
-	c = strings.ToUpper(strings.TrimSpace(c))
+	trimmed := trimSpaceASCII(c)
+	if trimmed == "" {
+		return ""
+	}
+
+	// Check if already uppercase ASCII and starts with CAP_
+	allUpper := true
+	for i := 0; i < len(trimmed); i++ {
+		b := trimmed[i]
+		if b >= 'a' && b <= 'z' {
+			allUpper = false
+			break
+		}
+	}
+
+	if allUpper {
+		return strings.TrimPrefix(trimmed, "CAP_")
+	}
+
+	c = strings.ToUpper(trimmed)
 	return strings.TrimPrefix(c, "CAP_")
 }
 
@@ -120,6 +155,23 @@ func validateCapDrop(childDrop, parentDrop []string) error {
 	if len(parentDrop) == 0 {
 		return nil
 	}
+
+	// Fast path check if parent dropped ALL
+	parentHasAll := false
+	for _, cap := range parentDrop {
+		if normalizeCap(cap) == "ALL" {
+			parentHasAll = true
+			break
+		}
+	}
+
+	if len(childDrop) == 0 {
+		if parentHasAll {
+			return fmt.Errorf("security violation: parent dropped ALL capabilities, child must also drop ALL")
+		}
+		return fmt.Errorf("security violation: child must drop capability %q dropped by parent", parentDrop[0])
+	}
+
 	childDropSet := make(map[string]bool, len(childDrop))
 	for _, cap := range childDrop {
 		childDropSet[normalizeCap(cap)] = true
@@ -127,14 +179,6 @@ func validateCapDrop(childDrop, parentDrop []string) error {
 
 	if childDropSet["ALL"] {
 		return nil
-	}
-
-	parentHasAll := false
-	for _, cap := range parentDrop {
-		if normalizeCap(cap) == "ALL" {
-			parentHasAll = true
-			break
-		}
 	}
 
 	if parentHasAll {
@@ -150,53 +194,82 @@ func validateCapDrop(childDrop, parentDrop []string) error {
 	return nil
 }
 
+func normalizeNamespaceMode(s string) string {
+	s = trimSpaceASCII(s)
+	if s == "" {
+		return ""
+	}
+	allLower := true
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b >= 'A' && b <= 'Z' {
+			allLower = false
+			break
+		}
+	}
+	if allLower {
+		return s
+	}
+	return strings.ToLower(s)
+}
+
 func validateNamespaces(child, parent *container.ContainerConfig) error {
 	// Network
-	parentNet := strings.ToLower(strings.TrimSpace(parent.Network))
-	childNet := strings.ToLower(strings.TrimSpace(child.Network))
+	if child.Network != parent.Network {
+		parentNet := normalizeNamespaceMode(parent.Network)
+		childNet := normalizeNamespaceMode(child.Network)
 
-	if parentNet == "none" && childNet != "" && childNet != "none" {
-		return fmt.Errorf("security violation: child requested network mode %q when parent network is %q", child.Network, parent.Network)
-	}
-	if childNet == "host" && parentNet != "host" {
-		return fmt.Errorf("security violation: child requested host network mode when parent is not host network")
-	}
-	if strings.HasPrefix(childNet, "container:") && childNet != parentNet {
-		return fmt.Errorf("security violation: child requested container network mode %q not permitted by parent %q", child.Network, parent.Network)
+		if parentNet == "none" && childNet != "" && childNet != "none" {
+			return fmt.Errorf("security violation: child requested network mode %q when parent network is %q", child.Network, parent.Network)
+		}
+		if childNet == "host" && parentNet != "host" {
+			return fmt.Errorf("security violation: child requested host network mode when parent is not host network")
+		}
+		if strings.HasPrefix(childNet, "container:") && childNet != parentNet {
+			return fmt.Errorf("security violation: child requested container network mode %q not permitted by parent %q", child.Network, parent.Network)
+		}
 	}
 
 	// PID
-	childPid := strings.ToLower(strings.TrimSpace(child.Pid))
-	parentPid := strings.ToLower(strings.TrimSpace(parent.Pid))
-	if childPid == "host" && parentPid != "host" {
-		return fmt.Errorf("security violation: child requested host PID mode when parent is not host PID")
-	}
-	if strings.HasPrefix(childPid, "container:") && childPid != parentPid {
-		return fmt.Errorf("security violation: child requested container PID mode %q not permitted by parent %q", child.Pid, parent.Pid)
+	if child.Pid != parent.Pid {
+		childPid := normalizeNamespaceMode(child.Pid)
+		parentPid := normalizeNamespaceMode(parent.Pid)
+		if childPid == "host" && parentPid != "host" {
+			return fmt.Errorf("security violation: child requested host PID mode when parent is not host PID")
+		}
+		if strings.HasPrefix(childPid, "container:") && childPid != parentPid {
+			return fmt.Errorf("security violation: child requested container PID mode %q not permitted by parent %q", child.Pid, parent.Pid)
+		}
 	}
 
 	// IPC
-	childIpc := strings.ToLower(strings.TrimSpace(child.IPC))
-	parentIpc := strings.ToLower(strings.TrimSpace(parent.IPC))
-	if childIpc == "host" && parentIpc != "host" {
-		return fmt.Errorf("security violation: child requested host IPC mode when parent is not host IPC")
-	}
-	if strings.HasPrefix(childIpc, "container:") && childIpc != parentIpc {
-		return fmt.Errorf("security violation: child requested container IPC mode %q not permitted by parent %q", child.IPC, parent.IPC)
+	if child.IPC != parent.IPC {
+		childIpc := normalizeNamespaceMode(child.IPC)
+		parentIpc := normalizeNamespaceMode(parent.IPC)
+		if childIpc == "host" && parentIpc != "host" {
+			return fmt.Errorf("security violation: child requested host IPC mode when parent is not host IPC")
+		}
+		if strings.HasPrefix(childIpc, "container:") && childIpc != parentIpc {
+			return fmt.Errorf("security violation: child requested container IPC mode %q not permitted by parent %q", child.IPC, parent.IPC)
+		}
 	}
 
 	// Cgroupns
-	childCgroupns := strings.ToLower(strings.TrimSpace(child.Cgroupns))
-	parentCgroupns := strings.ToLower(strings.TrimSpace(parent.Cgroupns))
-	if childCgroupns == "host" && parentCgroupns != "host" {
-		return fmt.Errorf("security violation: child requested host cgroupns mode when parent is not host cgroupns")
+	if child.Cgroupns != parent.Cgroupns {
+		childCgroupns := normalizeNamespaceMode(child.Cgroupns)
+		parentCgroupns := normalizeNamespaceMode(parent.Cgroupns)
+		if childCgroupns == "host" && parentCgroupns != "host" {
+			return fmt.Errorf("security violation: child requested host cgroupns mode when parent is not host cgroupns")
+		}
 	}
 
 	// OciRuntime
-	childOci := strings.ToLower(strings.TrimSpace(child.OciRuntime))
-	parentOci := strings.ToLower(strings.TrimSpace(parent.OciRuntime))
-	if childOci != "" && parentOci != "" && childOci != parentOci {
-		return fmt.Errorf("security violation: child requested OCI runtime %q when parent specifies %q", child.OciRuntime, parent.OciRuntime)
+	if child.OciRuntime != parent.OciRuntime {
+		childOci := normalizeNamespaceMode(child.OciRuntime)
+		parentOci := normalizeNamespaceMode(parent.OciRuntime)
+		if childOci != "" && parentOci != "" && childOci != parentOci {
+			return fmt.Errorf("security violation: child requested OCI runtime %q when parent specifies %q", child.OciRuntime, parent.OciRuntime)
+		}
 	}
 
 	return nil
@@ -358,12 +431,30 @@ func validateMounts(childMounts []container.Mount, parent *container.ContainerCo
 }
 
 func isHardeningOpt(opt string) bool {
-	optLower := strings.ToLower(strings.TrimSpace(opt))
+	trimmed := trimSpaceASCII(opt)
+	// Fast check for common exact matches without allocation
+	if trimmed == "no-new-privileges" || trimmed == "no-new-privileges=true" || trimmed == "no-new-privileges:true" {
+		return true
+	}
+	optLower := strings.ToLower(trimmed)
 	return optLower == "no-new-privileges" || strings.HasPrefix(optLower, "no-new-privileges:") || optLower == "no-new-privileges=true"
 }
 
 func validateSecurityOpt(childOpts, parentOpts []string) error {
 	if len(childOpts) == 0 {
+		return nil
+	}
+
+	// Check if all child options are hardening options (e.g. no-new-privileges)
+	// In this very common case, no parentSet map allocation or parentOpts iteration is needed.
+	hasNonHardening := false
+	for _, opt := range childOpts {
+		if !isHardeningOpt(opt) {
+			hasNonHardening = true
+			break
+		}
+	}
+	if !hasNonHardening {
 		return nil
 	}
 
