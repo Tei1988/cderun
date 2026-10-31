@@ -114,7 +114,7 @@ func TestUnit_ControlSocket_Server_RequestContextAndDeadlineBuilding(t *testing.
 	defer cancel3()
 	assert.NotNil(t, ctx3)
 	server.cancelCtx()
-	assert.ErrorIs(t, ctx3.Err(), context.Canceled)
+	require.ErrorIs(t, ctx3.Err(), context.Canceled)
 
 	// Case 4: Nil reqFrame handled safely without panic
 	ctx4, cancel4 := server.buildRequestContext(context.Background(), nil)
