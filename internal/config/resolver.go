@@ -517,7 +517,7 @@ func (rv *resolver) resolveEarly() error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		vals := getWinningStringSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.tool, rv.toolExists, rv.global, rv.fs)
+		vals := getWinningStringSlice(def, ",", rv.cli.CderunSensitiveEnv, rv.cli.SensitiveEnv, rv.subcommand, rv.tools, rv.global, rv.fs)
 		rForSens, err := rv.resolveStringSliceOptionResolver(vals)
 		if err != nil {
 			return err
@@ -650,7 +650,7 @@ func (rv *resolver) resolveMountOptions() error {
 		return err
 	}
 	mcs, err := pickConfigs(
-		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.tool, rv.toolExists,
+		rv.cli.CderunMounts, rv.cli.Mounts, "CDERUN_MOUNT", ";", rv.subcommand, rv.tools,
 		toolMountsGetter,
 		rv.global, globalMountsGetter,
 		func(s, src string) (MountConfig, error) {
@@ -689,7 +689,7 @@ func (rv *resolver) resolveMountOptions() error {
 func (rv *resolver) resolveEnvOptions() error {
 	var rForEnv *ExpressionResolver
 	envs, err := pickStringConfigs(
-		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.tool, rv.toolExists,
+		rv.cli.CderunEnv, rv.cli.Env, "CDERUN_ENV", ";", rv.subcommand, rv.tools,
 		toolEnvGetter,
 		rv.global, globalEnvGetter,
 		rv.fs,
@@ -724,7 +724,7 @@ func (rv *resolver) resolveEnvOptions() error {
 
 func (rv *resolver) resolveUlimitOptions() error {
 	rawUlimits, err := pickStringConfigs(
-		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.tool, rv.toolExists,
+		rv.cli.CderunUlimits, rv.cli.Ulimits, "CDERUN_ULIMIT", ",", rv.subcommand, rv.tools,
 		toolUlimitsGetter,
 		rv.global, globalUlimitsGetter,
 		rv.fs,
@@ -744,7 +744,7 @@ func (rv *resolver) resolveUlimitOptions() error {
 
 func (rv *resolver) resolveSysctlOptions() error {
 	rawSysctls, err := pickStringConfigs(
-		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.tool, rv.toolExists,
+		rv.cli.CderunSysctls, rv.cli.Sysctls, "CDERUN_SYSCTL", ",", rv.subcommand, rv.tools,
 		toolSysctlsGetter,
 		rv.global, globalSysctlsGetter,
 		rv.fs,
@@ -1058,7 +1058,7 @@ func (rv *resolver) resolveTransitiveOptions() error {
 			GlobalGetter: globalMountToolsGetter},
 		p1SetTools, p1ValTools,
 		p2SetTools, p2ValTools,
-		rv.tool, rv.toolExists, rv.global, rv.r, rv.fs,
+		rv.subcommand, rv.tools, rv.global, rv.r, rv.fs,
 	)
 	for _, tool := range rv.res.MountTools {
 		if err := ValidateToolName(tool); err != nil {
@@ -1274,7 +1274,7 @@ func (rv *resolver) resolveDeviceOptions() error {
 		return err
 	}
 	dcs, err := pickConfigs(
-		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.tool, rv.toolExists,
+		rv.cli.CderunDevices, rv.cli.Devices, "CDERUN_DEVICE", ",", rv.subcommand, rv.tools,
 		toolDevicesGetter,
 		rv.global, globalDevicesGetter,
 		func(s, src string) (DeviceConfig, error) {
