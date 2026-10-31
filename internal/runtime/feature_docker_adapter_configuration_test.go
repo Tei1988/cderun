@@ -231,67 +231,58 @@ func TestUnit_DockerAdapter_BuildDockerHostConfig_Mappings(t *testing.T) {
 		assert.False(t, hostCfg.Mounts[2].ReadOnly)
 	})
 
-	t.Run("optional mount rejection", func(t *testing.T) {
-		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
-			Mounts: []container.Mount{
-				{Type: "bind", Source: "/host", Target: "/app", Optional: true},
+	errorCases := []struct {
+		name        string
+		cfg         *container.ContainerConfig
+		errContains string
+	}{
+		{
+			name: "optional mount rejection",
+			cfg: &container.ContainerConfig{
+				Image: "alpine:latest",
+				Mounts: []container.Mount{
+					{Type: "bind", Source: "/host", Target: "/app", Optional: true},
+				},
 			},
-		}
-
-		containerCfg, err := buildDockerContainerConfig(cfg)
-		require.NoError(t, err)
-
-		hostCfg, err := buildDockerHostConfig(cfg, containerCfg)
-		require.Error(t, err)
-		assert.Nil(t, hostCfg)
-		assert.Contains(t, err.Error(), "optional mount is not supported")
-	})
-
-	t.Run("invalid mount type error", func(t *testing.T) {
-		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
-			Mounts: []container.Mount{
-				{Type: "invalid-type", Source: "/host", Target: "/app"},
+			errContains: "optional mount is not supported",
+		},
+		{
+			name: "invalid mount type error",
+			cfg: &container.ContainerConfig{
+				Image: "alpine:latest",
+				Mounts: []container.Mount{
+					{Type: "invalid-type", Source: "/host", Target: "/app"},
+				},
 			},
-		}
+			errContains: "invalid mount type",
+		},
+		{
+			name: "invalid port spec error",
+			cfg: &container.ContainerConfig{
+				Image: "alpine:latest",
+				Ports: []string{"invalid:port:spec:too:many"},
+			},
+			errContains: "failed to parse port specs",
+		},
+		{
+			name: "invalid shm-size error",
+			cfg: &container.ContainerConfig{
+				Image:   "alpine:latest",
+				ShmSize: "invalid-size-format",
+			},
+			errContains: "invalid shm-size",
+		},
+	}
 
-		containerCfg, err := buildDockerContainerConfig(cfg)
-		require.NoError(t, err)
+	for _, tc := range errorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			containerCfg, err := buildDockerContainerConfig(tc.cfg)
+			require.NoError(t, err)
 
-		hostCfg, err := buildDockerHostConfig(cfg, containerCfg)
-		require.Error(t, err)
-		assert.Nil(t, hostCfg)
-		assert.Contains(t, err.Error(), "invalid mount type")
-	})
-
-	t.Run("invalid port spec error", func(t *testing.T) {
-		cfg := &container.ContainerConfig{
-			Image: "alpine:latest",
-			Ports: []string{"invalid:port:spec:too:many"},
-		}
-
-		containerCfg, err := buildDockerContainerConfig(cfg)
-		require.NoError(t, err)
-
-		hostCfg, err := buildDockerHostConfig(cfg, containerCfg)
-		require.Error(t, err)
-		assert.Nil(t, hostCfg)
-		assert.Contains(t, err.Error(), "failed to parse port specs")
-	})
-
-	t.Run("invalid shm-size error", func(t *testing.T) {
-		cfg := &container.ContainerConfig{
-			Image:   "alpine:latest",
-			ShmSize: "invalid-size-format",
-		}
-
-		containerCfg, err := buildDockerContainerConfig(cfg)
-		require.NoError(t, err)
-
-		hostCfg, err := buildDockerHostConfig(cfg, containerCfg)
-		require.Error(t, err)
-		assert.Nil(t, hostCfg)
-		assert.Contains(t, err.Error(), "invalid shm-size")
-	})
+			hostCfg, err := buildDockerHostConfig(tc.cfg, containerCfg)
+			require.Error(t, err)
+			assert.Nil(t, hostCfg)
+			assert.Contains(t, err.Error(), tc.errContains)
+		})
+	}
 }
