@@ -1060,9 +1060,9 @@ func (rv *resolver) resolveTransitiveOptions() error {
 		rawTools = strings.Split(p2ValTools, ",")
 	} else if env, ok := rv.fs.LookupEnv("CDERUN_MOUNT_TOOLS"); ok {
 		rawTools = strings.Split(env, ",")
-	} else if tool, ok := rv.tools[rv.subcommand]; ok && len(tool.MountTools) > 0 {
+	} else if tool, ok := rv.tools[rv.subcommand]; ok && tool.MountTools != nil {
 		rawTools = tool.MountTools
-	} else if rv.global != nil && len(rv.global.Defaults.MountTools) > 0 {
+	} else if rv.global != nil && rv.global.Defaults.MountTools != nil {
 		rawTools = rv.global.Defaults.MountTools
 	}
 

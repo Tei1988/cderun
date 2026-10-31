@@ -125,4 +125,28 @@ func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
 		assert.True(t, res.MountCderun)
 		assert.True(t, res.MountSocket)
 	})
+
+	t.Run("explicit empty tool mount-tools overrides global defaults", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+		}
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+		}
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				MountTools: []string{},
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				MountTools: []string{"git"},
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, tools, global, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.MountTools)
+		assert.False(t, res.MountCderun)
+		assert.False(t, res.MountSocket)
+	})
 }
