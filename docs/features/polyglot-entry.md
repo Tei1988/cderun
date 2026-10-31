@@ -87,3 +87,6 @@ In **Symlink Mode**, the invoking filename is directly extracted and consumed as
 
 2. **Homograph & Obfuscation Prevention**:
    Any characters outside the whitelisted ASCII set—such as Cyrillic homographs (e.g., Cyrillic 'о' -> `\u043e`), non-printable ASCII, control sequences (`\x00`, `\n`), or directory traversal segments (`..`, `/`, `\`)—are strictly rejected. If validation fails, `cderun` aborts execution immediately with an explicit security validation error. This prevents malicious symlinks from executing arbitrary binaries or bypassing configuration lookup rules.
+
+3. **Validation Sequence and Early Failure**:
+   Validation via `ValidateToolName` occurs immediately after executable base name extraction in Polyglot Mode, before any configuration files (`.cderun.yaml`, `.tools.yaml`) are discovered or loaded, and before any process execution or image pull takes place. This guarantees that invalid or malicious tool names fail closed without side effects.

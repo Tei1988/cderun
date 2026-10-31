@@ -31,18 +31,32 @@ During dynamic path resolution utilizing magic words (`{{HOME}}`, `{{PWD}}`, etc
 
 ## Working Directory Validation
 
-The working directory validation function (`ValidateWorkdir`) strictly rejects any path containing parent directory traversal references (`..` segments) to prevent path obfuscation and directory traversal attacks within container configurations. Note that this validation and its safe absolute-path requirement apply only when a working directory is specified (non-empty); when provided, the path must be a valid absolute path and is subject to the strict traversal restrictions.
+The working directory validation function (`ValidateWorkdir`) ensures that configured container working directories are structurally valid, absolute, and safe from path traversal:
+
+- **Optionality**: If unconfigured (empty string `""`), validation succeeds without applying restrictions.
+- **Control Character Validation**: Enforces `validatePathChars(s)` to reject ASCII control characters (ASCII < 32 or 127) and null bytes (`\x00`).
+- **Absolute Path Enforcement**: Validates `path.IsAbs(s)` to ensure the path starts with a leading slash `/`. Relative paths (such as `app`, `./src`, or `../workspace`) are immediately rejected.
+- **Character Whitelist (`isValidWorkdirChars`)**: The path components must consist strictly of allowed safe characters:
+  - Alphanumeric characters (`a-z`, `A-Z`, `0-9`)
+  - Slashes (`/`), periods (`.`), underscores (`_`), and hyphens (`-`)
+  - Commercial at symbols (`@`) and plus signs (`+`)
+  This permits modern package management patterns, including pnpm virtual stores (e.g., `/node_modules/.pnpm/esbuild@0.25.12`), scoped package directories (e.g., `/app/@scope/pkg`), and build directories (e.g., `/workspace/build+test`), while preventing command injection and shell delimiter injection.
+- **Parent Directory Traversal Guard**: Evaluates `HasParentTraversal(s)` to ensure no directory traversal segments (`..`) exist, preventing path escape and container directory hijacking.
 
 ## Tool Name Safety
 
-The `ValidateToolName` function enforces strict naming conventions for tool identifiers. Tool names are restricted to a whitelist of safe characters:
+The `ValidateToolName` function enforces strict naming conventions for tool identifiers (subcommands) in Wrapper Mode and Symlink Mode before any configuration loading, filesystem traversal, or logging occurs:
 
-- Alphanumerics (`a-z`, `A-Z`, `0-9`)
-- Dots (`.`)
-- Underscores (`_`)
-- Hyphens (`-`)
-
-This prevents tool names from being used for path traversal (e.g., `../../etc/shadow`) or containing shell-sensitive characters (e.g., `|`, `;`, `:`). Tool name validation is performed before any logging or filesystem operations.
+- **Control Character Validation**: Verifies `validatePathChars(name)` to reject null bytes (`\x00`), newlines, and control sequences.
+- **Non-Empty Requirement**: Tool names cannot be empty.
+- **Absolute and Relative Path Rejection**: Directly rejects paths marked absolute (`filepath.IsAbs(name)`) or path segments containing separators (`/` or `\`).
+- **Directory Reference Guard**: Explicitly rejects single dot (`.`) and double dot (`..`) to prevent current or parent directory references from acting as tool names.
+- **Strict Character Whitelist**: Each character in the tool name must belong strictly to the ASCII character whitelist:
+  - Alphanumerics (`a-z`, `A-Z`, `0-9`)
+  - Periods (`.`)
+  - Underscores (`_`)
+  - Hyphens (`-`)
+- **Homograph and Obfuscation Prevention**: Rejects any non-ASCII Unicode characters (such as Cyrillic lookalikes like `\u043e`), whitespace, colons (`:`), or shell metacharacters (`|`, `;`, `&`, `$`).
 
 ## Signal Validation
 
