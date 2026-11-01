@@ -181,7 +181,7 @@ func TestUnit_Containerd_AppendCapabilityHostDeviceSecurityOpts(t *testing.T) {
 			Hostname:   "my-host",
 			ReadOnly:   true,
 			Devices: []container.DeviceMapping{
-				{PathOnHost: "/dev/fuse", PathInContainer: "/dev/fuse", CgroupPermissions: "rwm"},
+				{PathOnHost: "/dev/null", PathInContainer: "/dev/null", CgroupPermissions: "rwm"},
 			},
 			Ulimits: []container.Ulimit{
 				{Name: "nofile", Soft: 1024, Hard: 2048},
@@ -210,7 +210,7 @@ func TestUnit_Containerd_AppendCapabilityHostDeviceSecurityOpts(t *testing.T) {
 
 		require.NotNil(t, s.Linux)
 		require.NotEmpty(t, s.Linux.Devices)
-		assert.Equal(t, "/dev/fuse", s.Linux.Devices[0].Path)
+		assert.Equal(t, "/dev/null", s.Linux.Devices[0].Path)
 	})
 
 	t.Run("invalid shm-size parsing errors", func(t *testing.T) {
