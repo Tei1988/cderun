@@ -3,6 +3,8 @@ package controlsocket_test
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"sync"
@@ -165,6 +167,25 @@ func (m *mockDispatcher) getResized() (string, uint, uint) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.resizedID, m.resizedRows, m.resizedCols
+}
+
+// containerdValidationDispatcher simulates the containerd-api dispatch and validation seam.
+type containerdValidationDispatcher struct {
+	mockDispatcher
+}
+
+func (c *containerdValidationDispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	if config == nil {
+		return "", errors.New("containerd runtime: config is nil")
+	}
+	// Mirrors containerd runtime ValidateConfig constraints
+	if config.OciRuntime != "" {
+		return "", fmt.Errorf("containerd runtime: oci-runtime is not supported yet")
+	}
+	if config.Image == "" {
+		return "", fmt.Errorf("containerd runtime: image is required")
+	}
+	return c.mockDispatcher.CreateContainer(ctx, config)
 }
 
 func setupPhase5Server(t *testing.T, dispatcher controlsocket.ContainerRuntimeDispatcher, parentCfg *container.ContainerConfig) (*controlsocket.Server, string) {
@@ -335,13 +356,8 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 }
 
 func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
-	mockDisp := &mockDispatcher{
-		createFn: func(ctx context.Context, config *container.ContainerConfig) (string, error) {
-			return "containerd-c123", nil
-		},
-	}
-
-	_, sockPath := setupPhase5Server(t, mockDisp, nil)
+	ctrdDisp := &containerdValidationDispatcher{}
+	_, sockPath := setupPhase5Server(t, ctrdDisp, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -350,25 +366,39 @@ func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	cid, err := client.CreateContainer(ctx, &container.ContainerConfig{
+	// 1. Verify that unsupported containerd configuration (e.g. OciRuntime specified)
+	// fails containerd validation and is not dispatched.
+	invalidCfg := &container.ContainerConfig{
 		Image:      "docker.io/library/alpine:latest",
 		OciRuntime: "io.containerd.runc.v2",
-	})
+	}
+	_, err = client.CreateContainer(ctx, invalidCfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "oci-runtime is not supported")
+	assert.Nil(t, ctrdDisp.getCreatedConfig())
+
+	// 2. Verify that supported containerd configuration (without OciRuntime)
+	// succeeds and preserves create, start, wait, and remove parity assertions.
+	validCfg := &container.ContainerConfig{
+		Image: "docker.io/library/alpine:latest",
+	}
+	cid, err := client.CreateContainer(ctx, validCfg)
 	require.NoError(t, err)
-	assert.Equal(t, "containerd-c123", cid)
+	assert.Equal(t, "c-phase5-123", cid)
+	assert.Equal(t, "docker.io/library/alpine:latest", ctrdDisp.getCreatedConfig().Image)
 
 	err = client.StartContainer(ctx, cid)
 	require.NoError(t, err)
-	assert.Equal(t, "containerd-c123", mockDisp.getStartedID())
+	assert.Equal(t, "c-phase5-123", ctrdDisp.getStartedID())
 
 	code, err := client.WaitContainer(ctx, cid)
 	require.NoError(t, err)
 	assert.Equal(t, 0, code)
-	assert.Equal(t, "containerd-c123", mockDisp.getWaitedID())
+	assert.Equal(t, "c-phase5-123", ctrdDisp.getWaitedID())
 
 	err = client.RemoveContainer(ctx, cid)
 	require.NoError(t, err)
-	assert.Equal(t, "containerd-c123", mockDisp.getRemovedID())
+	assert.Equal(t, "c-phase5-123", ctrdDisp.getRemovedID())
 }
 
 func TestUnit_ControlSocket_Phase5_MountPathTraversalAndReadOnlyBoundaries(t *testing.T) {
