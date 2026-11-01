@@ -152,7 +152,7 @@ func TestUnit_ControlSocket_Client_RPC_Error_And_Malformed_Responses(t *testing.
 					}
 
 					var rFrame ResponseFrame
-					switch reqFrame.Type {
+					switch reqFrame.Type { //nolint:exhaustive // the default case intentionally rejects all other message types
 					case MsgCreateContainer:
 						rFrame = ResponseFrame{Success: true, Payload: []byte("INVALID_CONTAINER_RESULT_JSON")}
 					case MsgWaitContainer:
