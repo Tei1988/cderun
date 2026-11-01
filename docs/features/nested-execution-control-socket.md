@@ -70,18 +70,33 @@ The Control Socket is created inside the existing per-invocation snapshot direct
 <snapshotDir>/
   .cderun.yaml
   .tools.yaml
-  cderun.sock       # new: Control Socket
+  cderun.sock       # Control Socket
 ```
 
-Its path on the Base Host is recorded in `hostContext` and propagated to the nested `cderun` the same way `hostContext.binPath` and `hostContext.mounts` already are.
+Its path on the Base Host is recorded in `hostContext` and propagated to the nested `cderun` the same way `hostContext.binPath` and `hostContext.mounts` are:
 
 ```yaml
 hostContext:
   binPath: "/usr/local/bin/cderun"
   snapshotDir: "/tmp/cderun-snap-xxxx"
-  controlSocket: "/tmp/cderun-snap-xxxx/cderun.sock"   # new field
+  controlSocket: "/tmp/cderun-snap-xxxx/cderun.sock"
   level: 1
 ```
+
+### Control Socket Configuration and Priority
+
+`cderun` provides explicit CLI flags, environment variables, configuration file options, and P1 internal overrides to enable Control Socket mounting into child containers:
+
+- **CLI Flag (P2)**: `--mount-cderun-socket` (enablement toggle).
+- **Environment Variable (P3)**: `CDERUN_MOUNT_CDERUN_SOCKET`.
+- **YAML Configuration Keys (P4/P5)**: `defaults.mountCderunSocket` / `mountCderunSocket` in `.cderun.yaml` or tool entries in `.tools.yaml`.
+- **P1 Internal Overrides (P1)**: `--cderun-mount-cderun-socket` (placed after the subcommand in Wrapper Mode).
+
+Precedence follows standard layer order: P1 `--cderun-mount-cderun-socket` > P2 `--mount-cderun-socket` > P3 `CDERUN_MOUNT_CDERUN_SOCKET` > P4/P5 YAML configuration.
+
+#### Socket Path Endpoint in Snapshot and Child Containers
+
+The Control Socket file is created on the Base Host inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`). Its host path is recorded as `hostContext.controlSocket` for snapshot metadata and bind mount creation. Inside child containers (Level 1+), the Control Socket is mounted to `/run/cderun/cderun.sock`, which nested processes use to communicate with the Base Host server.
 
 ### Cleanup
 
@@ -103,7 +118,19 @@ Length-prefixed JSON messages over the Unix domain socket:
 [4-byte big-endian length][JSON payload]
 ```
 
+- **Wire Format**: A 4-byte big-endian unsigned integer (`uint32`) header specifying the length in bytes of the immediately following JSON payload frame. Header read/write operations use `binary.Read` and `binary.Write` with `binary.BigEndian` encoding on `uint32` values (`ReadFrame` / `WriteFrame`).
+- **Frame Size Limit**: Enforces a strict maximum payload size of **16 MiB** (`MaxFrameSize = 16 * 1024 * 1024` bytes, or 16,777,216 bytes) to protect server and client memory against malformed or malicious frame headers.
+
 JSON is chosen over gRPC/protobuf for a first implementation because the channel is always local (single machine, single mount namespace) and framing simplicity aids debuggability (`--diagnosis` / `--log-level trace` should be able to dump raw frames). Switching the wire format later is an internal detail as long as the version-negotiation contract below is honored.
+
+### Accept Loop Resilience, Context Lifecycle, and Idle Timeouts
+
+To ensure robust multi-tenant and multi-level execution tree stability, the Control Socket server incorporates key server resilience mechanics:
+
+1. **Accept Loop Resilience**: Temporary accept errors (such as file descriptor exhaustion `EMFILE` or transient connection abortions `ECONNABORTED`) are caught and retried using an exponential backoff loop. Permanent accept errors shut down the accept loop gracefully with explicit `Warn`/`Error` level logging.
+2. **Connection-Tied Request Context Lifecycle**: Every incoming request context is derived directly from the client connection's lifecycle context. When a client connection terminates or is closed by `Server.Close()`, all active in-flight request contexts are canceled immediately.
+3. **Bounded-Wait Shutdown Policy**: Server shutdown (`Server.Close()`) enforces a bounded-wait deadline. Instead of blocking indefinitely on worker goroutines, shutdown signals cancellation through server context and closes active listener sockets safely within a bounded deadline window.
+4. **Scoped Idle Timeout Exemption**: Handshake-completed connections enforce an idle read deadline to reclaim unresponsive clients. However, during long-running streaming operations (`WaitContainer` and interactive `AttachContainer` I/O streams), the idle timeout deadline is temporarily exempted until stream dispatch completes, after which the normal idle timeout deadline is restored before the next frame read.
 
 ### Request/Response Shape
 
@@ -133,7 +160,7 @@ Compatibility is judged strictly on the **Control Protocol version**, not on the
 This decoupling shifts the burden onto keeping the Control Protocol's definition of "compatible" honest:
 
 - **The protocol version must be bumped for any change that could alter nested-invocation behavior**, not only for changes to the wire message schema. A change that leaves the request/response shape untouched but alters what a nested request is permitted to do, or how a method behaves, is a protocol-breaking change and must bump the version.
-- **Binary version skew is logged, not hidden.** The handshake response includes both sides' full `cderun` release version (not just the protocol version) in the Base Host's structured/trace logs, so that a behavioral discrepancy between a same-protocol-version but different-release nested/host pair remains diagnosable after the fact, even though it is not blocked.
+- **Binary version skew is logged, not hidden.** The handshake response includes `ServerVersion` in its payload, and the Base Host server logs a Debug-level record containing both the client and server versions when the client binary release version differs from the server version, so that a behavioral discrepancy between a same-protocol-version but different-release nested/host pair remains diagnosable after the fact, even though it is not blocked.
 - Compatibility is judged by the server against a fixed set of versions it explicitly supports (an allow-list), not by a heuristic (e.g. "same major version assumed compatible") — new versions must be added to that set deliberately as the protocol evolves.
 - A rejected handshake is a normal, expected outcome (e.g. an old nested binary against a newer Base Host after a `cderun` upgrade) and must produce an actionable error message telling the user to re-run `--mount-cderun-path` with a matching binary, not a generic connection failure.
 
@@ -146,6 +173,32 @@ The Base Host `cderun` process is a policy enforcement point, not a transparent 
 - A nested request's effective `ContainerConfig` (image, mounts, capabilities, privileged mode) is capped by the **parent's own granted configuration** — a nested invocation cannot request broader privileges than the container it is running inside was itself given.
 - This directly addresses the security warning already present in [Nested Execution](./nested-execution.md) regarding unscoped raw socket mounts (particularly rootful Docker/containerd sockets).
 - Policy enforcement is implemented via an **inherited-ceiling model** (`ValidateInheritedCeiling` in `internal/runtime/controlsocket/policy.go`), wired directly through `SetParentConfig` in `server.go` and `internal/command/root.go` to validate nested requests against parent container boundaries.
+
+### Inherited-Ceiling Security Policy Validation (`ValidateInheritedCeiling`)
+
+The Control Socket server evaluates all nested `CreateContainer` requests against the parent container's `ContainerConfig` using `ValidateInheritedCeiling`. A child container request is rejected with a descriptive security policy error if it requests privileges exceeding those granted to the parent:
+
+1. **Privileged Execution**:
+   - If parent container is non-privileged (`Privileged: false`), child request with `Privileged: true` is strictly rejected.
+2. **Linux Capabilities (`CapAdd` and `CapDrop`)**:
+   - Capabilities are normalized to standard uppercase `CAP_` prefixed strings (e.g. `CAP_SYS_ADMIN`).
+   - **`CapAdd` Rules**: Child `CapAdd` entries must be a subset of parent `CapAdd`. When the parent specifies `CapAdd: ["ALL"]`, any child capability not explicitly listed in parent `CapDrop` is permitted (including specific capabilities such as `CAP_CHOWN`). If child requests `CapAdd: ["ALL"]`, parent must also specify `CapAdd: ["ALL"]` with an empty `CapDrop` list.
+   - **`CapDrop` Rules**: Parent capability drops must be preserved by child. If child drops `ALL` (`CapDrop: ["ALL"]`), parent drop requirements are satisfied. If parent drops `ALL`, child must also drop `ALL`.
+3. **Namespace Modes**:
+   - **Network Mode**: Child network mode cannot request host networking (`"host"`) unless parent also runs in `host` network mode.
+   - **PID Mode**: Child cannot request `"host"` PID namespace unless parent runs with `"host"` PID mode.
+   - **IPC Mode**: Child cannot request `"host"` or `container:` IPC modes exceeding parent IPC privileges.
+   - **Cgroup Namespace**: Child cgroup namespace mode cannot request `"host"` unless parent also runs with `"host"` cgroup namespace.
+4. **OCI Runtime Selection**:
+   - When both parent and child specify non-empty `OciRuntime` values, they must match. A child may specify a custom runtime if parent `OciRuntime` is empty, and an empty child `OciRuntime` is always permitted.
+5. **Read-Only Mount Boundaries & Path Traversal**:
+   - Child bind mounts cannot attempt to remount parent read-only paths as read-write (`readonly: false`).
+   - Read-write child bind mounts must fall within parent mount sources. Any path traversal segments (`..` in `hasPathTraversal`) in child mount sources trigger immediate policy rejection.
+6. **Host Device Mappings**:
+   - Host devices requested by child (`PathOnHost`) must exist in parent's device mappings with matching cleaned host paths, and cgroup permissions requested by child (`CgroupPermissions`, e.g. `rw`) must be a subset of parent device permissions (e.g. `rwm`).
+7. **Kernel Sysctls & Security Options**:
+   - Kernel `Sysctls` specified by child must be a subset of parent sysctls with matching values.
+   - Hardening security options (`no-new-privileges`) are permitted for child containers. When a child specifies non-hardening security options (`SecurityOpt`), each option must be explicitly permitted by parent options.
 
 ### Engine/Adapter Selection Is Fixed at the Base Host
 
@@ -215,7 +268,7 @@ Mirroring the phased rollout already used for the original CRI work (see [Direct
 2. **Phase 2 — Docker Dispatch (Non-Interactive) (Completed)**: RPC dispatch handlers for `CreateContainer`, `StartContainer`, `WaitContainer`, and `RemoveContainer` over Control Socket to the Docker adapter (`ControlSocketRuntimeAdapter`), backed by auto-detection of `HostContext.ControlSocket` and `/run/cderun/cderun.sock`. (Implemented in T88)
 3. **Phase 3 — Interactive I/O (Attach, Signal, Resize) (Completed)**: RPC dispatch handlers for interactive stream demuxing (`AttachContainer`), process signal forwarding (`SignalContainer`), and TTY terminal window resizing (`ResizeContainerTTY`) over the Control Socket. `ControlSocketRuntimeAdapter` dispatches interactive calls directly to `Client` over dedicated streaming Control Socket connections. (Implemented in T89)
 4. **Phase 4 — `nerdctl` Dispatch (Non-Interactive) (Implementation complete; adversarial real-binary validation pending)**: RPC dispatch handlers for `CreateContainer`, `StartContainer`, `WaitContainer`, and `RemoveContainer` over Control Socket routed to `NerdctlRuntime`. Implements `CLIArgBuilder` with joined `--flag=value` formatting and positional `--` boundary separation. Structural `argv` self-checking (`VerifyStructure`) applies to `PullImage` and `CreateContainer`; unit tests cover the builder and `CreateContainer` argv construction, while mock-based dispatch tests cover Control Socket routing with a mock runtime. (Implemented in T90)
-5. **Phase 5 — Remaining API-Based Engines, Security Policy, macOS Verification (Completed)**: `containerd-api` dispatch (in addition to the `docker-compat-api` family covering Docker/Podman), inherited-ceiling security policy validation (implemented via `ValidateInheritedCeiling` in `internal/runtime/controlsocket/policy.go` and wired via `SetParentConfig` in `server.go` and `internal/command/root.go`, enforcing parent container boundary limits across privileged execution, Linux capabilities—where normalized exact slice membership is enforced without implied wildcard expansion, meaning a non-privileged parent's `CapAdd: ["ALL"]` matches exact `ALL` requests rather than authorizing arbitrary specific capabilities like `CAP_CHOWN`—Linux namespaces, read-only mounts, host devices, kernel sysctls, and security options), and re-verification of macOS VM constraints from [Nested Execution](./nested-execution.md).
+5. **Phase 5 — Remaining API-Based Engines, Security Policy, macOS Verification (Completed)**: `containerd-api` dispatch (in addition to the `docker-compat-api` family covering Docker/Podman), inherited-ceiling security policy validation (implemented via `ValidateInheritedCeiling` in `internal/runtime/controlsocket/policy.go` and wired via `SetParentConfig` in `server.go` and `internal/command/root.go`, enforcing parent container boundary limits across privileged execution, Linux capabilities—where when parent specifies `CapAdd: ["ALL"]`, any child capability not explicitly listed in parent `CapDrop` is permitted—Linux namespaces, read-only mounts, host devices, kernel sysctls, and security options), and re-verification of macOS VM constraints from [Nested Execution](./nested-execution.md).
 
 Apple `container` / WSL Containers adapters (see [Relationship to Multi-Runtime Support](#relationship-to-multi-runtime-support)) depend on at least Phase 2, and realistically Phase 3, being complete — they are not part of this rollout and are tracked separately once a working Control Socket exists to build on. When undertaken, they follow the Phase 4 pattern (CLI-wrapper dispatch, scheduled promptly rather than deferred), each earning its own independent adversarial-test pass per the library-dependence note above.
 
@@ -223,4 +276,3 @@ Apple `container` / WSL Containers adapters (see [Relationship to Multi-Runtime 
 
 - Whether a single execution tree needs one Control Socket per nested level or one shared socket reused across the whole tree (current lean: one per level, mirroring the existing per-invocation snapshot directory).
 - Whether wire format should move to protobuf/gRPC once the method surface stabilizes.
-- Exact shape of the security policy (allow-list vs. inherited-ceiling) referenced above.
