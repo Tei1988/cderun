@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,13 +18,15 @@ import (
 )
 
 type mockDispatcher struct {
-	createFn  func(ctx context.Context, config *container.ContainerConfig) (string, error)
-	startFn   func(ctx context.Context, containerID string) error
-	waitFn    func(ctx context.Context, containerID string) (int, error)
-	removeFn  func(ctx context.Context, containerID string) error
-	attachFn  func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
-	signalFn  func(ctx context.Context, containerID string, sig string) error
-	resizeFn  func(ctx context.Context, containerID string, rows, cols uint) error
+	mu sync.Mutex
+
+	createFn func(ctx context.Context, config *container.ContainerConfig) (string, error)
+	startFn  func(ctx context.Context, containerID string) error
+	waitFn   func(ctx context.Context, containerID string) (int, error)
+	removeFn func(ctx context.Context, containerID string) error
+	attachFn func(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error
+	signalFn func(ctx context.Context, containerID string, sig string) error
+	resizeFn func(ctx context.Context, containerID string, rows, cols uint) error
 
 	createdConfig *container.ContainerConfig
 	startedID     string
@@ -37,33 +40,49 @@ type mockDispatcher struct {
 }
 
 func (m *mockDispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	m.mu.Lock()
 	m.createdConfig = config
-	if m.createFn != nil {
-		return m.createFn(ctx, config)
+	fn := m.createFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, config)
 	}
 	return "c-phase5-123", nil
 }
 
 func (m *mockDispatcher) StartContainer(ctx context.Context, containerID string) error {
+	m.mu.Lock()
 	m.startedID = containerID
-	if m.startFn != nil {
-		return m.startFn(ctx, containerID)
+	fn := m.startFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID)
 	}
 	return nil
 }
 
 func (m *mockDispatcher) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	m.mu.Lock()
 	m.waitedID = containerID
-	if m.waitFn != nil {
-		return m.waitFn(ctx, containerID)
+	fn := m.waitFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID)
 	}
 	return 0, nil
 }
 
 func (m *mockDispatcher) RemoveContainer(ctx context.Context, containerID string) error {
+	m.mu.Lock()
 	m.removedID = containerID
-	if m.removeFn != nil {
-		return m.removeFn(ctx, containerID)
+	fn := m.removeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID)
 	}
 	return nil
 }
@@ -72,8 +91,12 @@ func (m *mockDispatcher) AttachContainer(ctx context.Context, containerID string
 	if ready != nil {
 		close(ready)
 	}
-	if m.attachFn != nil {
-		return m.attachFn(ctx, containerID, tty, stdin, stdout, stderr, ready)
+	m.mu.Lock()
+	fn := m.attachFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID, tty, stdin, stdout, stderr, ready)
 	}
 	if stdout != nil {
 		_, _ = stdout.Write([]byte("phase5 output\n"))
@@ -82,22 +105,66 @@ func (m *mockDispatcher) AttachContainer(ctx context.Context, containerID string
 }
 
 func (m *mockDispatcher) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	m.mu.Lock()
 	m.signaledID = containerID
 	m.signaledSig = sig
-	if m.signalFn != nil {
-		return m.signalFn(ctx, containerID, sig)
+	fn := m.signalFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID, sig)
 	}
 	return nil
 }
 
 func (m *mockDispatcher) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	m.mu.Lock()
 	m.resizedID = containerID
 	m.resizedRows = rows
 	m.resizedCols = cols
-	if m.resizeFn != nil {
-		return m.resizeFn(ctx, containerID, rows, cols)
+	fn := m.resizeFn
+	m.mu.Unlock()
+
+	if fn != nil {
+		return fn(ctx, containerID, rows, cols)
 	}
 	return nil
+}
+
+func (m *mockDispatcher) getCreatedConfig() *container.ContainerConfig {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.createdConfig
+}
+
+func (m *mockDispatcher) getStartedID() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.startedID
+}
+
+func (m *mockDispatcher) getWaitedID() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.waitedID
+}
+
+func (m *mockDispatcher) getRemovedID() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.removedID
+}
+
+func (m *mockDispatcher) getSignaled() (string, string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.signaledID, m.signaledSig
+}
+
+func (m *mockDispatcher) getResized() (string, uint, uint) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.resizedID, m.resizedRows, m.resizedCols
 }
 
 func setupPhase5Server(t *testing.T, dispatcher controlsocket.ContainerRuntimeDispatcher, parentCfg *container.ContainerConfig) (*controlsocket.Server, string) {
@@ -151,11 +218,11 @@ func TestUnit_ControlSocket_Phase5_ApiEngineParity_DockerAndPodman(t *testing.T)
 	containerID, err := client.CreateContainer(ctx, childCfg)
 	require.NoError(t, err)
 	assert.Equal(t, "c-phase5-123", containerID)
-	assert.Equal(t, "alpine:latest", mockDisp.createdConfig.Image)
+	assert.Equal(t, "alpine:latest", mockDisp.getCreatedConfig().Image)
 
 	// 2. StartContainer
 	require.NoError(t, client.StartContainer(ctx, containerID))
-	assert.Equal(t, "c-phase5-123", mockDisp.startedID)
+	assert.Equal(t, "c-phase5-123", mockDisp.getStartedID())
 
 	// 3. AttachContainer
 	var stdoutBuf bytes.Buffer
@@ -166,22 +233,24 @@ func TestUnit_ControlSocket_Phase5_ApiEngineParity_DockerAndPodman(t *testing.T)
 
 	// 4. SignalContainer & ResizeContainerTTY
 	require.NoError(t, client.SignalContainer(ctx, containerID, "SIGTERM"))
-	assert.Equal(t, "c-phase5-123", mockDisp.signaledID)
-	assert.Equal(t, "SIGTERM", mockDisp.signaledSig)
+	signaledID, signaledSig := mockDisp.getSignaled()
+	assert.Equal(t, "c-phase5-123", signaledID)
+	assert.Equal(t, "SIGTERM", signaledSig)
 
 	require.NoError(t, client.ResizeContainerTTY(ctx, containerID, 24, 80))
-	assert.Equal(t, "c-phase5-123", mockDisp.resizedID)
-	assert.Equal(t, uint(24), mockDisp.resizedRows)
-	assert.Equal(t, uint(80), mockDisp.resizedCols)
+	resizedID, rows, cols := mockDisp.getResized()
+	assert.Equal(t, "c-phase5-123", resizedID)
+	assert.Equal(t, uint(24), rows)
+	assert.Equal(t, uint(80), cols)
 
 	// 5. WaitContainer & RemoveContainer
 	exitCode, err := client.WaitContainer(ctx, containerID)
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
-	assert.Equal(t, "c-phase5-123", mockDisp.waitedID)
+	assert.Equal(t, "c-phase5-123", mockDisp.getWaitedID())
 
 	require.NoError(t, client.RemoveContainer(ctx, containerID))
-	assert.Equal(t, "c-phase5-123", mockDisp.removedID)
+	assert.Equal(t, "c-phase5-123", mockDisp.getRemovedID())
 }
 
 func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.T) {
@@ -213,6 +282,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "privileged mode")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Violation 2: Capability escalation
 	_, err = client.CreateContainer(ctx, &container.ContainerConfig{
@@ -220,6 +290,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not permitted by parent")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Violation 3: Network namespace escalation (e.g. host when parent is bridge)
 	_, err = client.CreateContainer(ctx, &container.ContainerConfig{
@@ -227,6 +298,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "host network mode")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Violation 4: Sysctl escalation
 	_, err = client.CreateContainer(ctx, &container.ContainerConfig{
@@ -234,6 +306,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "sysctl")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Violation 5: Mount boundary escalation (outside parent mounts)
 	_, err = client.CreateContainer(ctx, &container.ContainerConfig{
@@ -243,6 +316,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "outside parent mount sources")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Valid child container within parent bounds
 	validChild := &container.ContainerConfig{
@@ -257,6 +331,7 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 	cid, err := client.CreateContainer(ctx, validChild)
 	require.NoError(t, err)
 	assert.NotEmpty(t, cid)
+	assert.NotNil(t, mockDisp.getCreatedConfig())
 }
 
 func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
@@ -284,16 +359,16 @@ func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
 
 	err = client.StartContainer(ctx, cid)
 	require.NoError(t, err)
-	assert.Equal(t, "containerd-c123", mockDisp.startedID)
+	assert.Equal(t, "containerd-c123", mockDisp.getStartedID())
 
 	code, err := client.WaitContainer(ctx, cid)
 	require.NoError(t, err)
 	assert.Equal(t, 0, code)
-	assert.Equal(t, "containerd-c123", mockDisp.waitedID)
+	assert.Equal(t, "containerd-c123", mockDisp.getWaitedID())
 
 	err = client.RemoveContainer(ctx, cid)
 	require.NoError(t, err)
-	assert.Equal(t, "containerd-c123", mockDisp.removedID)
+	assert.Equal(t, "containerd-c123", mockDisp.getRemovedID())
 }
 
 func TestUnit_ControlSocket_Phase5_MountPathTraversalAndReadOnlyBoundaries(t *testing.T) {
@@ -322,6 +397,7 @@ func TestUnit_ControlSocket_Phase5_MountPathTraversalAndReadOnlyBoundaries(t *te
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "path traversal")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Read-write request when parent root is read-only
 	_, err = client.CreateContainer(ctx, &container.ContainerConfig{
@@ -331,6 +407,7 @@ func TestUnit_ControlSocket_Phase5_MountPathTraversalAndReadOnlyBoundaries(t *te
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read-only")
+	assert.Nil(t, mockDisp.getCreatedConfig())
 
 	// Valid read-only child mount under parent mount
 	cid, err := client.CreateContainer(ctx, &container.ContainerConfig{
@@ -340,4 +417,5 @@ func TestUnit_ControlSocket_Phase5_MountPathTraversalAndReadOnlyBoundaries(t *te
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, cid)
+	assert.NotNil(t, mockDisp.getCreatedConfig())
 }
