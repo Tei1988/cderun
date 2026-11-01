@@ -72,17 +72,17 @@ func TestPopulateHostContextPathsFallbacks(t *testing.T) {
 	t.Parallel()
 
 	logger := logging.NewLogger()
-	negUid := -1
-	negGid := -1
-	posUid := 1001
-	posGid := 1002
+	negUID := -1
+	negGID := -1
+	posUID := 1001
+	posGID := 1002
 
 	t.Run("Populates defaults when filesystem functions return errors or negative values", func(t *testing.T) {
 		t.Parallel()
 		mfs := &errMockFS{
 			MockFileSystem: &config.MockFileSystem{
-				UIDValue: &negUid,
-				GIDValue: &negGid,
+				UIDValue: &negUID,
+				GIDValue: &negGID,
 			},
 			getwdErr: errors.New("getwd failed"),
 			homeErr:  errors.New("home failed"),
@@ -105,8 +105,8 @@ func TestPopulateHostContextPathsFallbacks(t *testing.T) {
 			WD:       "/work",
 			HomeDir:  "/home/user",
 			ExecPath: "/usr/bin/cderun",
-			UIDValue: &posUid,
-			GIDValue: &posGid,
+			UIDValue: &posUID,
+			GIDValue: &posGID,
 		}
 
 		hostCtx := &config.HostContext{
