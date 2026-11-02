@@ -3,8 +3,6 @@ package controlsocket_test
 import (
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"path/filepath"
 	"sync"
@@ -16,6 +14,7 @@ import (
 
 	"cderun/internal/container"
 	"cderun/internal/logging"
+	"cderun/internal/runtime"
 	"cderun/internal/runtime/controlsocket"
 )
 
@@ -169,21 +168,16 @@ func (m *mockDispatcher) getResized() (string, uint, uint) {
 	return m.resizedID, m.resizedRows, m.resizedCols
 }
 
-// containerdValidationDispatcher simulates the containerd-api dispatch and validation seam.
+// containerdValidationDispatcher exercises the production ContainerdRuntime.ValidateConfig path.
 type containerdValidationDispatcher struct {
 	mockDispatcher
+	ctrd runtime.ContainerdRuntime
 }
 
 func (c *containerdValidationDispatcher) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
-	if config == nil {
-		return "", errors.New("containerd runtime: config is nil")
-	}
-	// Mirrors containerd runtime ValidateConfig constraints
-	if config.OciRuntime != "" {
-		return "", fmt.Errorf("containerd runtime: oci-runtime is not supported yet")
-	}
-	if config.Image == "" {
-		return "", fmt.Errorf("containerd runtime: image is required")
+	// Delegates to production ContainerdRuntime.ValidateConfig
+	if err := c.ctrd.ValidateConfig(config); err != nil {
+		return "", err
 	}
 	return c.mockDispatcher.CreateContainer(ctx, config)
 }
@@ -366,19 +360,28 @@ func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Close()
 
-	// 1. Verify that unsupported containerd configuration (e.g. OciRuntime specified)
-	// fails containerd validation and is not dispatched.
+	// 1. Verify that unsupported containerd configuration (e.g. OciRuntime or Init specified)
+	// triggers the production ContainerdRuntime.ValidateConfig error and halts dispatch.
 	invalidCfg := &container.ContainerConfig{
 		Image:      "docker.io/library/alpine:latest",
 		OciRuntime: "io.containerd.runc.v2",
 	}
 	_, err = client.CreateContainer(ctx, invalidCfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "oci-runtime is not supported")
+	assert.Contains(t, err.Error(), "containerd runtime: oci-runtime is not supported yet")
 	assert.Nil(t, ctrdDisp.getCreatedConfig())
 
-	// 2. Verify that supported containerd configuration (without OciRuntime)
-	// succeeds and preserves create, start, wait, and remove parity assertions.
+	invalidInitCfg := &container.ContainerConfig{
+		Image: "docker.io/library/alpine:latest",
+		Init:  true,
+	}
+	_, err = client.CreateContainer(ctx, invalidInitCfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "containerd runtime: init is not supported yet")
+	assert.Nil(t, ctrdDisp.getCreatedConfig())
+
+	// 2. Verify that supported containerd configuration succeeds through production validation
+	// and preserves create, start, wait, and remove parity assertions.
 	validCfg := &container.ContainerConfig{
 		Image: "docker.io/library/alpine:latest",
 	}
