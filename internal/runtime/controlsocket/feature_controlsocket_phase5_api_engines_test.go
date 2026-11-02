@@ -203,7 +203,7 @@ func setupPhase5Server(t *testing.T, dispatcher controlsocket.ContainerRuntimeDi
 	return server, sockPath
 }
 
-func TestUnit_ControlSocket_Phase5_ApiEngineParity_DockerAndPodman(t *testing.T) {
+func TestUnit_ControlSocket_Phase5_SharedProtocolLifecycleOperations(t *testing.T) {
 	mockDisp := &mockDispatcher{}
 	parentCfg := &container.ContainerConfig{
 		Image:      "alpine:latest",
