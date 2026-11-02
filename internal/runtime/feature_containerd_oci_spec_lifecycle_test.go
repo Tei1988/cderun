@@ -46,27 +46,30 @@ func TestUnit_Containerd_BuildContainerdNamespaceSpecOpts(t *testing.T) {
 		opts := buildContainerdNamespaceSpecOpts(cfg)
 		require.Len(t, opts, 4)
 
-		s, err := applySpecOptsToSpec(ctx, opts...)
-		require.NoError(t, err)
-		require.NotNil(t, s.Linux)
-
-		hasNet, hasPID, hasIPC, hasCgroup := false, false, false, false
-		for _, ns := range s.Linux.Namespaces {
-			switch ns.Type {
-			case specs.NetworkNamespace:
-				hasNet = true
-			case specs.PIDNamespace:
-				hasPID = true
-			case specs.IPCNamespace:
-				hasIPC = true
-			case specs.CgroupNamespace:
-				hasCgroup = true
-			}
+		s := &specs.Spec{
+			Linux: &specs.Linux{
+				Namespaces: []specs.LinuxNamespace{
+					{Type: specs.NetworkNamespace},
+					{Type: specs.PIDNamespace},
+					{Type: specs.IPCNamespace},
+					{Type: specs.CgroupNamespace},
+					{Type: specs.UTSNamespace},
+				},
+			},
 		}
-		assert.False(t, hasNet, "host network removes network namespace")
-		assert.False(t, hasPID, "host pid removes pid namespace")
-		assert.False(t, hasIPC, "host ipc removes ipc namespace")
-		assert.False(t, hasCgroup, "host cgroupns removes cgroup namespace")
+		for _, opt := range opts {
+			require.NoError(t, opt(ctx, nil, nil, s))
+		}
+
+		present := make(map[specs.LinuxNamespaceType]bool)
+		for _, ns := range s.Linux.Namespaces {
+			present[ns.Type] = true
+		}
+		assert.False(t, present[specs.NetworkNamespace], "host network removes network namespace")
+		assert.False(t, present[specs.PIDNamespace], "host pid removes pid namespace")
+		assert.False(t, present[specs.IPCNamespace], "host ipc removes ipc namespace")
+		assert.False(t, present[specs.CgroupNamespace], "host cgroupns removes cgroup namespace")
+		assert.True(t, present[specs.UTSNamespace], "unrelated namespaces are kept")
 	})
 
 	t.Run("private cgroupns with nil Linux", func(t *testing.T) {
@@ -211,6 +214,35 @@ func TestUnit_Containerd_AppendCapabilityHostDeviceSecurityOpts(t *testing.T) {
 		require.NotNil(t, s.Linux)
 		require.NotEmpty(t, s.Linux.Devices)
 		assert.Equal(t, "/dev/null", s.Linux.Devices[0].Path)
+	})
+
+	t.Run("non-privileged capAdd and capDrop modify bounding set independently", func(t *testing.T) {
+		t.Parallel()
+		cfg := &container.ContainerConfig{
+			Privileged: false,
+			CapAdd:     []string{"sys_admin", "CAP_NET_ADMIN"},
+			CapDrop:    []string{"chown"},
+		}
+
+		capOpts := appendContainerdCapabilitySpecOpts(nil, cfg)
+		require.Len(t, capOpts, 2)
+
+		s := &specs.Spec{
+			Process: &specs.Process{
+				Capabilities: &specs.LinuxCapabilities{
+					Bounding: []string{"CAP_CHOWN", "CAP_KILL"},
+				},
+			},
+		}
+		for _, opt := range capOpts {
+			require.NoError(t, opt(ctx, nil, nil, s))
+		}
+
+		require.NotNil(t, s.Process.Capabilities)
+		assert.Contains(t, s.Process.Capabilities.Bounding, "CAP_SYS_ADMIN")
+		assert.Contains(t, s.Process.Capabilities.Bounding, "CAP_NET_ADMIN")
+		assert.Contains(t, s.Process.Capabilities.Bounding, "CAP_KILL")
+		assert.NotContains(t, s.Process.Capabilities.Bounding, "CAP_CHOWN")
 	})
 
 	t.Run("invalid shm-size parsing errors", func(t *testing.T) {
@@ -390,33 +422,36 @@ func TestUnit_Containerd_InspectAndPrune_MockScenarios(t *testing.T) {
 
 	t.Run("PruneContainers filters active tasks and prunes exited ones", func(t *testing.T) {
 		t.Parallel()
-		activeTask := &mockTask{
-			status: client.Status{Status: client.Running},
+		activeTask := &mockFullTask{
+			id:          "active-c",
+			statusState: client.Running,
 		}
-		activeContainer := &mockContainer{
+		activeContainer := &mockFullContainer{
 			id:   "active-c",
 			task: activeTask,
 		}
 
-		pausedTask := &mockTask{
-			status: client.Status{Status: client.Paused},
+		pausedTask := &mockFullTask{
+			id:          "paused-c",
+			statusState: client.Paused,
 		}
-		pausedContainer := &mockContainer{
+		pausedContainer := &mockFullContainer{
 			id:   "paused-c",
 			task: pausedTask,
 		}
 
-		exitedTask := &mockTask{
-			status: client.Status{Status: client.Stopped},
+		exitedTask := &mockFullTask{
+			id:          "exited-c",
+			statusState: client.Stopped,
 		}
-		exitedContainer := &mockContainer{
+		exitedContainer := &mockFullContainer{
 			id:   "exited-c",
 			task: exitedTask,
 		}
 
-		notFoundContainer := &mockContainer{
-			id:     "not-found-c",
-			delErr: errdefs.ErrNotFound,
+		notFoundContainer := &mockFullContainer{
+			id:        "not-found-c",
+			deleteErr: errdefs.ErrNotFound,
 		}
 
 		mockCl := &mockContainerdClient{
@@ -434,5 +469,8 @@ func TestUnit_Containerd_InspectAndPrune_MockScenarios(t *testing.T) {
 		assert.Contains(t, pruned, "exited-c")
 		assert.NotContains(t, pruned, "active-c")
 		assert.NotContains(t, pruned, "paused-c")
+		assert.True(t, exitedContainer.deleted, "stopped container must be deleted")
+		assert.False(t, activeContainer.deleted, "active container must not be deleted")
+		assert.False(t, pausedContainer.deleted, "paused container must not be deleted")
 	})
 }
