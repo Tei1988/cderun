@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -350,6 +351,10 @@ func TestUnit_ControlSocket_Phase5_InheritedCeilingPolicyEnforcement(t *testing.
 }
 
 func TestUnit_ControlSocket_Phase5_ContainerdApiEngineParity(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("containerd runtime is only supported on Linux")
+	}
+
 	ctrdDisp := &containerdValidationDispatcher{}
 	_, sockPath := setupPhase5Server(t, ctrdDisp, nil)
 
