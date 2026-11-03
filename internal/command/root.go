@@ -1846,7 +1846,7 @@ func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int
 func checkPreSubcommandFlags(args []string, subcmdIdx int) error {
 	for i := 1; i < subcmdIdx; i++ {
 		arg := args[i]
-		if len(arg) >= 9 && strings.HasPrefix(arg, "--cderun-") {
+		if strings.HasPrefix(arg, "--cderun-") {
 			return fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", arg)
 		}
 	}
@@ -1893,7 +1893,7 @@ func hoistOverridesInto(cmd *cobra.Command, args []string, isPolyglot bool, subc
 
 	for i := startIdx; i < len(args); i++ {
 		arg := args[i]
-		shouldHoist := len(arg) >= 9 && strings.HasPrefix(arg, "--cderun-")
+		shouldHoist := strings.HasPrefix(arg, "--cderun-")
 
 		if shouldHoist {
 			if strings.IndexByte(arg, '=') == -1 {
@@ -1903,7 +1903,7 @@ func hoistOverridesInto(cmd *cobra.Command, args []string, isPolyglot bool, subc
 					f = cmd.Flags().Lookup(name)
 				}
 				if f != nil && f.NoOptDefVal == "" {
-					if i+1 < len(args) && !(len(args[i+1]) >= 9 && strings.HasPrefix(args[i+1], "--cderun-")) {
+					if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--cderun-") {
 						overrides = append(overrides, arg)
 						overrides = append(overrides, args[i+1])
 						i++
