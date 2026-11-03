@@ -192,24 +192,12 @@ cderun --mount-cderun --mount-cderun-path /path/to/cderun alpine sh
 - **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET`
 - **Description**: Mount cderun Control Socket (`cderun.sock`) into the container for scoped nested execution (experimental).
 - **Note**:
-  - Creates a dedicated Control Socket inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`) and mounts it by default to `/run/cderun/cderun.sock` inside the child container (configurable via `--mount-cderun-socket-path`).
+  - Creates a dedicated Control Socket inside the per-invocation snapshot directory (`<snapshotDir>/cderun.sock`) and mounts it to `/run/cderun/cderun.sock` inside the child container.
   - Supports Phase 1 (protocol & framing), Phase 2 (non-interactive container lifecycle dispatch: `CreateContainer`, `StartContainer`, `WaitContainer`, `RemoveContainer`), Phase 3 (interactive container lifecycle dispatch: `AttachContainer`, `SignalContainer`, `ResizeContainerTTY`), Phase 4 (`nerdctl` CLI dispatch with argument injection defenses), and Phase 5 (inherited-ceiling security policy validation `ValidateInheritedCeiling`).
   - Currently documented as **experimental** during phased rollout (see `docs/features/nested-execution-control-socket.md`).
 
 ```bash
 cderun --mount-cderun-socket alpine sh
-```
-
-### `--mount-cderun-socket-path`
-
-- **Type**: string
-- **Default**: `/run/cderun/cderun.sock`
-- **Environment Variable**: `CDERUN_MOUNT_CDERUN_SOCKET_PATH`
-- **Description**: Specifies the path inside the container where the cderun Control Socket should be mounted.
-- **Validation**: Must be an absolute path and must not contain any parent directory traversal (`..`) segments.
-
-```bash
-cderun --mount-cderun-socket --mount-cderun-socket-path /run/cderun/cderun.sock alpine sh
 ```
 
 ### `--mount-tools`
@@ -975,7 +963,7 @@ Standard command-line flags registered in `BoolOptions`, `StringOptions`, `IntOp
 - **Precedence**: These internal overrides represent Phase 1 (P1) configurations, taking precedence over all other configuration layers (P2 through P6).
 - **Key P1 Flags**:
   - **Execution & Engine**: `--cderun-engine`, `--cderun-oci-runtime`, `--cderun-image`, `--cderun-env`, `--cderun-workdir`, `--cderun-user`, `--cderun-tty`, `--cderun-interactive`, `--cderun-strict-env`, `--cderun-entrypoint`, `--cderun-pull`, `--cderun-hang-timeout`, `--cderun-prefetch`, `--cderun-prefetch-all`, `--cderun-prune`, `--cderun-remove`, `--cderun-restart`
-  - **Mounts & Control Socket**: `--cderun-mount`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-cderun-socket`, `--cderun-mount-cderun-socket-path`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-socket-path`
+  - **Mounts & Control Socket**: `--cderun-mount`, `--cderun-mount-socket`, `--cderun-mount-socket-path`, `--cderun-mount-cderun`, `--cderun-mount-cderun-path`, `--cderun-mount-cderun-socket`, `--cderun-mount-tools`, `--cderun-mount-all-tools`, `--cderun-socket-path`
   - **Networking & Resources**: `--cderun-publish`, `--cderun-publish-all`, `--cderun-expose`, `--cderun-hostname`, `--cderun-dns`, `--cderun-dns-option`, `--cderun-dns-search`, `--cderun-add-host`, `--cderun-memory`, `--cderun-cpus`, `--cderun-cpu-shares`, `--cderun-cpuset-cpus`, `--cderun-cpuset-mems`, `--cderun-device`, `--cderun-gpus`, `--cderun-ipc`, `--cderun-cgroupns`, `--cderun-pid`, `--cderun-pids-limit`, `--cderun-init`, `--cderun-security-opt`, `--cderun-ulimit`, `--cderun-shm-size`, `--cderun-sysctl`, `--cderun-cap-add`, `--cderun-cap-drop`, `--cderun-privileged`, `--cderun-read-only`, `--cderun-sensitive-env`
 - **Hoisting Mechanics**: During argument preprocessing (`preprocessArgs`), any `--cderun-*` flags placed **after** the subcommand are extracted and relocated **before** the subcommand internally prior to Cobra flag parsing.
 - **Equals-Sign & Space-Separated Formats**: Value-taking internal overrides can be specified using either the equals-sign format (e.g., `--cderun-image=alpine`) or the space-separated format (e.g., `--cderun-image alpine`). `cderun`'s preprocessor uses option registration metadata to correctly identify value-taking options and consumes the subsequent adjacent parameter as their value during the hoisting scan.
