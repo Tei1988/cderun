@@ -1347,19 +1347,24 @@ func ValidateWorkdir(s string) error {
 	if s == "" {
 		return nil
 	}
-	if err := validatePathChars(s); err != nil {
-		return err
-	}
+	// Explicitly check for absolute path before evaluating characters
 	if !path.IsAbs(s) {
 		return fmt.Errorf("working directory must be an absolute path: %q", s)
 	}
-	if !isValidWorkdirChars(s) {
-		return fmt.Errorf("invalid characters in working directory: %q", s)
+	if isValidWorkdirChars(s) {
+		// Fast-path: Valid workdir characters are standard ASCII characters starting with '/'.
+		// They are inherently valid UTF-8, non-control, and absolute paths.
+		if strings.Contains(s, "..") && HasParentTraversal(s) {
+			return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
+		}
+		return nil
 	}
-	if HasParentTraversal(s) {
-		return fmt.Errorf("working directory cannot contain parent directory references: %q", s)
+
+	// Fallback to determine specific error message for invalid inputs while maintaining exact contract
+	if err := validatePathChars(s); err != nil {
+		return err
 	}
-	return nil
+	return fmt.Errorf("invalid characters in working directory: %q", s)
 }
 
 // ValidateExposePort ensures the exposed port (port[-port]/proto) is valid.
