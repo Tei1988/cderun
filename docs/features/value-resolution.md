@@ -146,25 +146,24 @@ This escaping mechanism bypasses evaluation and also prevents strict resolution 
 
 ### 5. Nested Expressions
 
-Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine evaluates expressions recursively from the inside out.
+Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine evaluates expressions from the inside out.
 
-#### Trace Examples & Resolution Steps
+**Examples:**
 
-**Example A: Multi-Tiered Version Fallback (`{{env:VERSION:-{{file:.version:-1.0.0}}}}`)**
+```text
+{{env:VERSION:-{{file:.version:-1.0.0}}}}
+```
 
-| Step | Scope | Evaluated Expression | Resolved Result / Behavior |
-| :--- | :--- | :--- | :--- |
-| **1** | Innermost Fallback | `{{file:.version:-1.0.0}}` | If `.version` exists with `"1.2.3"`, resolves to `"1.2.3"`. If missing/empty, triggers fallback to `"1.0.0"`. Sticky error state remains clean. |
-| **2** | Outer Expression | `{{env:VERSION:-<step1_result>}}` | Evaluates environment variable `VERSION`. If `VERSION="2.0.0"`, resolves to `"2.0.0"`. If `VERSION` is unset, uses `<step1_result>`. |
-| **3** | Final Value | Resulting String | Returns `"2.0.0"`, `"1.2.3"`, or `"1.0.0"` depending on environment and file state. |
+1. The inner expression `{{file:.version:-1.0.0}}` is evaluated first (e.g., resolving to `1.2.3` if `.version` exists, or `1.0.0` if missing).
+2. The outer expression is evaluated with the fallback parameter: `{{env:VERSION:-1.2.3}}`.
+3. If the host environment variable `VERSION` is set, its value is used; otherwise, it falls back to `1.2.3`.
 
-**Example B: Repository Worktree Traversal Fallback (`{{find_dir:master:-{{PWD}}}}`)**
+```text
+{{find_dir:master:-{{PWD}}}}
+```
 
-| Step | Scope | Evaluated Expression | Resolved Result / Behavior |
-| :--- | :--- | :--- | :--- |
-| **1** | Inner Expression | `{{PWD}}` | Resolves to current host working directory (e.g., `/home/user/project/feature-branch`). |
-| **2** | Outer Directive | `{{find_dir:master:-/home/user/project/feature-branch}}` | Traverses parent directories searching for a file or folder named `master`. |
-| **3** | Resolution Outcome | Final Path | If `master` item is found at `/home/user/project/master`, resolves to its parent directory `/home/user/project`. If not found, falls back to `/home/user/project/feature-branch` without raising an error or dirtying sticky error state. |
+1. The inner expression `{{PWD}}` evaluates to the current working directory path (e.g., `/project/app`).
+2. The outer `find_dir:master` directive traverses upwards for `master`. If not found, it falls back to `/project/app`.
 
 ---
 

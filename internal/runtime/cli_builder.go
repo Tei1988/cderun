@@ -27,7 +27,7 @@ func (b *CLIArgBuilder) AddJoinedFlag(flag, value string, omitEmpty bool) *CLIAr
 	if value == "" && omitEmpty {
 		return b
 	}
-	b.flags = append(b.flags, flag+"="+value)
+	b.flags = append(b.flags, fmt.Sprintf("%s=%s", flag, value))
 	return b
 }
 
@@ -42,7 +42,7 @@ func (b *CLIArgBuilder) AddBoolFlag(flag string, condition bool) *CLIArgBuilder 
 // AddRepeatJoinedFlag adds multiple joined `--flag=value` entries for a list of values.
 func (b *CLIArgBuilder) AddRepeatJoinedFlag(flag string, values []string) *CLIArgBuilder {
 	for _, v := range values {
-		b.flags = append(b.flags, flag+"="+v)
+		b.flags = append(b.flags, fmt.Sprintf("%s=%s", flag, v))
 	}
 	return b
 }

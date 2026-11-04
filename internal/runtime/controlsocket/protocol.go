@@ -51,11 +51,10 @@ type ResponseFrame struct {
 
 // ReadFrame reads a 4-byte big-endian length-prefixed payload from r.
 func ReadFrame(r io.Reader) ([]byte, error) {
-	var header [4]byte
-	if _, err := io.ReadFull(r, header[:]); err != nil {
+	var length uint32
+	if err := binary.Read(r, binary.BigEndian, &length); err != nil {
 		return nil, err
 	}
-	length := binary.BigEndian.Uint32(header[:])
 	if length > MaxFrameSize {
 		return nil, fmt.Errorf("frame length %d exceeds maximum allowed size %d", length, MaxFrameSize)
 	}
@@ -74,9 +73,7 @@ func WriteFrame(w io.Writer, payload []byte) error {
 	}
 	length := uint32(len(payload))
 
-	var header [4]byte
-	binary.BigEndian.PutUint32(header[:], length)
-	if _, err := w.Write(header[:]); err != nil {
+	if err := binary.Write(w, binary.BigEndian, length); err != nil {
 		return fmt.Errorf("failed to write frame length header: %w", err)
 	}
 	if length > 0 {

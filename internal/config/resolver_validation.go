@@ -144,9 +144,6 @@ func (rv *resolver) validateSecurity() error {
 }
 
 func (rv *resolver) auditCapabilityWarnings() []string {
-	if len(rv.res.CapAdd) == 0 {
-		return nil
-	}
 	var found []string
 	for _, capName := range rv.res.CapAdd {
 		if isHighlyPrivilegedCapability(capName) {

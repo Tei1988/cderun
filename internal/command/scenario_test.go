@@ -99,9 +99,17 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 			cderunFlags = append(cderunFlags, "--env", fmt.Sprintf("DOCKER_HOST=%s", dockerHost))
 		} else {
 			cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
+			cderunFlags = append(cderunFlags, "--env", "CDERUN_SOCKET_PATH="+dockerSocket)
+			if engine := os.Getenv("CDERUN_ENGINE"); engine != "" {
+				cderunFlags = append(cderunFlags, "--env", "CDERUN_ENGINE="+engine)
+			}
 		}
 	} else {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
+		cderunFlags = append(cderunFlags, "--env", "CDERUN_SOCKET_PATH="+dockerSocket)
+		if engine := os.Getenv("CDERUN_ENGINE"); engine != "" {
+			cderunFlags = append(cderunFlags, "--env", "CDERUN_ENGINE="+engine)
+		}
 	}
 
 	// Host-side Call: cderun [flags] alpine [container command]
