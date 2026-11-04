@@ -1720,8 +1720,9 @@ func findSubcommandIndex(cmd *cobra.Command, args []string, isPolyglot bool) int
 
 func checkPreSubcommandFlags(args []string, subcmdIdx int) error {
 	for i := 1; i < subcmdIdx; i++ {
-		if strings.HasPrefix(args[i], "--cderun-") {
-			return fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", args[i])
+		arg := args[i]
+		if strings.HasPrefix(arg, "--cderun-") {
+			return fmt.Errorf("cderun internal override flag %q must be placed after the subcommand", arg)
 		}
 	}
 	return nil

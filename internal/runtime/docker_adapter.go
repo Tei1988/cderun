@@ -22,6 +22,20 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		return nil, nil, nil, fmt.Errorf("nil container config")
 	}
 
+	containerConfig, err := buildDockerContainerConfig(config)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	hostConfig, err := buildDockerHostConfig(config, containerConfig)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return containerConfig, hostConfig, nil, nil
+}
+
+func buildDockerContainerConfig(config *container.ContainerConfig) (*dockercontainer.Config, error) {
 	labels := make(map[string]string)
 	maps.Copy(labels, config.Labels)
 	if _, ok := labels["cderun"]; !ok {
@@ -45,11 +59,33 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 
 	exposedPorts, err := buildDockerExposedPorts(config.Expose)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	containerConfig.ExposedPorts = exposedPorts
 
-	hostConfig := &dockercontainer.HostConfig{
+	return containerConfig, nil
+}
+
+func buildDockerHostConfig(config *container.ContainerConfig, containerConfig *dockercontainer.Config) (*dockercontainer.HostConfig, error) {
+	hostConfig := buildDockerBaseHostConfig(config)
+
+	if err := applyDockerHostResourcesAndLimits(hostConfig, config); err != nil {
+		return nil, err
+	}
+
+	if err := applyDockerHostNetworkingAndPorts(hostConfig, containerConfig, config); err != nil {
+		return nil, err
+	}
+
+	if err := applyDockerHostDevicesAndMounts(hostConfig, config); err != nil {
+		return nil, err
+	}
+
+	return hostConfig, nil
+}
+
+func buildDockerBaseHostConfig(config *container.ContainerConfig) *dockercontainer.HostConfig {
+	return &dockercontainer.HostConfig{
 		AutoRemove:      config.Remove,
 		NetworkMode:     dockercontainer.NetworkMode(config.Network),
 		Privileged:      config.Privileged,
@@ -77,7 +113,9 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 			CpusetMems: config.CpusetMems,
 		},
 	}
+}
 
+func applyDockerHostResourcesAndLimits(hostConfig *dockercontainer.HostConfig, config *container.ContainerConfig) error {
 	if config.PidsLimit != 0 {
 		lim := config.PidsLimit
 		hostConfig.PidsLimit = &lim
@@ -86,7 +124,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	if config.Restart != "" {
 		rp, err := parseDockerRestartPolicy(config.Restart)
 		if err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 		hostConfig.RestartPolicy = rp
 	}
@@ -94,7 +132,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	if config.GPUs != "" {
 		reqs, err := parseGPUs(config.GPUs)
 		if err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 		hostConfig.DeviceRequests = reqs
 	}
@@ -102,7 +140,7 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 	if config.ShmSize != "" {
 		shmBytes, err := units.RAMInBytes(config.ShmSize)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("invalid shm-size: %w", err)
+			return fmt.Errorf("invalid shm-size: %w", err)
 		}
 		hostConfig.ShmSize = shmBytes
 	}
@@ -111,25 +149,30 @@ func toDockerContainerConfig(config *container.ContainerConfig) (
 		hostConfig.Ulimits = buildDockerUlimits(config.Ulimits)
 	}
 
-	// Handle PortBindings
+	return nil
+}
+
+func applyDockerHostNetworkingAndPorts(hostConfig *dockercontainer.HostConfig, containerConfig *dockercontainer.Config, config *container.ContainerConfig) error {
 	if len(config.Ports) > 0 {
 		exposedPorts, bindings, err := nat.ParsePortSpecs(config.Ports)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse port specs: %w", err)
+			return fmt.Errorf("failed to parse port specs: %w", err)
 		}
 		hostConfig.PortBindings = bindings
 		maps.Copy(containerConfig.ExposedPorts, exposedPorts)
 	}
+	return nil
+}
 
+func applyDockerHostDevicesAndMounts(hostConfig *dockercontainer.HostConfig, config *container.ContainerConfig) error {
 	hostConfig.Devices = buildDockerDevices(config.Devices)
 
 	mounts, err := buildDockerMounts(config.Mounts)
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 	hostConfig.Mounts = mounts
-
-	return containerConfig, hostConfig, nil, nil
+	return nil
 }
 
 func parseGPUs(gpus string) ([]dockercontainer.DeviceRequest, error) {
@@ -198,9 +241,9 @@ func buildDockerExposedPorts(expose []string) (nat.PortSet, error) {
 	for _, port := range expose {
 		proto := "tcp"
 		portNum := port
-		if parts := strings.SplitN(port, "/", 2); len(parts) == 2 {
-			portNum = parts[0]
-			proto = parts[1]
+		if before, after, found := strings.Cut(port, "/"); found {
+			portNum = before
+			proto = after
 		}
 		p, err := nat.NewPort(proto, portNum)
 		if err != nil {
