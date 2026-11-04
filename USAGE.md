@@ -59,7 +59,7 @@ To grant the necessary permissions, you must add the correct socket GID explicit
 > **Recommended Alternative — Control Socket (`--mount-cderun-socket`)**:
 > Instead of mounting the raw host container socket, `cderun` supports a scoped **Control Socket** (`cderun.sock`). Mounted inside child containers at `/run/cderun/cderun.sock`, the Control Socket routes nested execution requests through `cderun`'s internal RPC server. It applies inherited-ceiling checks (`ValidateInheritedCeiling`) to nested container creation. Note that the current policy is not a complete volume-access boundary, so parent privilege and mount configurations require separate review.
 >
-> If the Control Socket connection or handshake fails, `cderun` logs a warning and falls back to the raw engine socket. In that case, inherited-ceiling checks do not apply (the option is not fail-closed).
+> If the Control Socket connection or handshake fails, `cderun` logs a warning and selects the raw engine runtime. The raw engine socket is available only when it is mounted with `--mount-socket`. Without that mount, engine commands fail. When the raw engine socket is mounted, inherited-ceiling checks do not apply (the option is not fail-closed).
 >
 > When considering alternatives for raw socket mounting, rootless Podman configurations reduce the blast radius compared with a rootful daemon because processes run as a non-root user on the host. However, please note that shared socket access still grants the owning user broad Podman control, including the ability to create containers and mount host volumes, which could still lead to host-level impact if abused.
 >
