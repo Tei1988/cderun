@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ func TestUnit_NerdctlLifecycle_PullImage_BoundaryPaths(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	fakeExec := filepath.Join(tmpDir, "mock-nerdctl-pull.sh")
+	countFile := filepath.Join(tmpDir, "pull-count")
 
 	scriptContent := `#!/bin/sh
 if [ "$1" = "--address=/sock" ]; then
@@ -35,6 +37,7 @@ case "$1" in
         exit 1
         ;;
     pull)
+        echo attempt >> "` + countFile + `"
         # Fail with retryable pull error text
         echo "failed to fetch: network connection reset" >&2
         exit 1
@@ -52,9 +55,14 @@ esac
 	ctx := context.Background()
 
 	t.Run("PullImage missing policy pulls and returns retry error when not found", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(countFile, nil, 0600))
 		pullErr := rt.PullImage(ctx, "absent-image:v1", "missing", 2, 5*time.Millisecond)
 		require.Error(t, pullErr)
 		assert.Contains(t, pullErr.Error(), "failed to pull image absent-image:v1 with nerdctl")
+
+		data, readErr := os.ReadFile(countFile)
+		require.NoError(t, readErr)
+		assert.Equal(t, 2, strings.Count(string(data), "attempt"))
 	})
 
 	t.Run("PullImage structural verification failure on control characters in image name", func(t *testing.T) {
@@ -190,6 +198,7 @@ case "$cmd" in
         ;;
     start)
         if [ "$target" = "start-fail" ]; then
+            echo "stdout marker"
             echo "failed to start" >&2
             exit 1
         fi
@@ -197,6 +206,7 @@ case "$cmd" in
         ;;
     kill)
         if [ "$target" = "kill-fail" ]; then
+            echo "stdout marker"
             echo "failed to send signal" >&2
             exit 1
         fi
@@ -204,6 +214,7 @@ case "$cmd" in
         ;;
     rm)
         if [ "$target" = "rm-fail" ]; then
+            echo "stdout marker"
             echo "failed to remove" >&2
             exit 1
         fi
@@ -284,6 +295,7 @@ esac
 		startErr := rt.StartContainer(ctx, "start-fail")
 		require.Error(t, startErr)
 		assert.Contains(t, startErr.Error(), "nerdctl start failed")
+		assert.Contains(t, startErr.Error(), "stdout marker")
 		assert.Contains(t, startErr.Error(), "failed to start")
 	})
 
@@ -291,6 +303,7 @@ esac
 		sigErr := rt.SignalContainer(ctx, "kill-fail", "SIGKILL")
 		require.Error(t, sigErr)
 		assert.Contains(t, sigErr.Error(), "nerdctl kill failed")
+		assert.Contains(t, sigErr.Error(), "stdout marker")
 		assert.Contains(t, sigErr.Error(), "failed to send signal")
 	})
 
@@ -298,6 +311,7 @@ esac
 		rmErr := rt.RemoveContainer(ctx, "rm-fail")
 		require.Error(t, rmErr)
 		assert.Contains(t, rmErr.Error(), "nerdctl rm failed")
+		assert.Contains(t, rmErr.Error(), "stdout marker")
 		assert.Contains(t, rmErr.Error(), "failed to remove")
 	})
 
