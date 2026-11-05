@@ -37,7 +37,7 @@ case "$1" in
         exit 1
         ;;
     pull)
-        echo attempt >> "` + countFile + `"
+        echo attempt >> "${0%/*}/pull-count"
         # Fail with retryable pull error text
         echo "failed to fetch: network connection reset" >&2
         exit 1
