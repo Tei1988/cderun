@@ -82,7 +82,7 @@ func trimSpaceASCII(s string) string {
 }
 
 func normalizeCap(c string) string {
-	trimmed := trimSpaceASCII(c)
+	trimmed := strings.TrimSpace(c)
 	if trimmed == "" {
 		return ""
 	}
@@ -91,7 +91,7 @@ func normalizeCap(c string) string {
 	allUpper := true
 	for i := 0; i < len(trimmed); i++ {
 		b := trimmed[i]
-		if b >= 'a' && b <= 'z' {
+		if (b >= 'a' && b <= 'z') || b >= 0x80 {
 			allUpper = false
 			break
 		}
