@@ -87,3 +87,6 @@ In **Symlink Mode**, the invoking filename is directly extracted and consumed as
 
 2. **Homograph & Obfuscation Prevention**:
    Any characters outside the whitelisted ASCII set—such as Cyrillic homographs (e.g., Cyrillic 'о' -> `\u043e`), non-printable ASCII, control sequences (`\x00`, `\n`), or directory traversal segments (`..`, `/`, `\`)—are strictly rejected. If validation fails, `cderun` aborts execution immediately with an explicit security validation error. This prevents malicious symlinks from executing arbitrary binaries or bypassing configuration lookup rules.
+
+3. **Validation Timing in Execution Pipeline**:
+   In Polyglot Mode, tool name validation via `ValidateToolName` is enforced at the entry point of configuration resolution (`ResolveWithFS`). While configuration files (`.cderun.yaml`, `.tools.yaml`) are loaded by the command runner prior to calling `ResolveWithFS` (meaning malformed configuration syntax or file errors may be reported first), `ValidateToolName` is executed before resolving any tool-specific options, performing image pulls, or starting container tasks. This ensures that invalid or malicious tool names fail closed before any container actions occur.
