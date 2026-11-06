@@ -45,7 +45,7 @@ The working directory validation function (`ValidateWorkdir`) ensures that confi
 
 ## Tool Name Safety
 
-The `ValidateToolName` function enforces strict naming conventions for tool identifiers (subcommands) in Wrapper Mode and Symlink Mode before any configuration loading, filesystem traversal, or logging occurs:
+The `ValidateToolName` function enforces strict naming conventions for tool identifiers (subcommands) in Wrapper Mode and Symlink Mode during configuration resolution (`ResolveWithFS`) before tool option resolution, dynamic expression evaluation, image pulling, or container execution occurs:
 
 - **Control Character Validation**: Verifies `validatePathChars(name)` to reject null bytes (`\x00`), newlines, and control sequences.
 - **Non-Empty Requirement**: Tool names cannot be empty.
