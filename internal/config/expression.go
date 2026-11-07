@@ -32,8 +32,8 @@ type anchorRange struct {
 // It handles nested braces and treats unmatched openers as literal text.
 // It performs a single-pass scan to ensure O(n) complexity.
 func scanAnchors(s string, buf []anchorRange) []anchorRange {
-	firstBrace := strings.IndexByte(s, '{')
-	if firstBrace == -1 || firstBrace >= len(s)-1 {
+	firstBrace := strings.Index(s, "{{")
+	if firstBrace == -1 {
 		return nil
 	}
 
