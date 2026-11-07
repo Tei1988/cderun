@@ -33,68 +33,114 @@ func NewControlSocketRuntimeAdapter(underlying ContainerRuntime, client *control
 }
 
 func (a *ControlSocketRuntimeAdapter) PullImage(ctx context.Context, image string, pullPolicy string, maxRetries int, backoffBase time.Duration) error {
+	if a == nil || a.underlying == nil {
+		return errors.New("underlying runtime is not configured")
+	}
 	return a.underlying.PullImage(ctx, image, pullPolicy, maxRetries, backoffBase)
 }
 
 func (a *ControlSocketRuntimeAdapter) ValidateConfig(config *container.ContainerConfig) error {
+	if a == nil || a.underlying == nil {
+		return errors.New("underlying runtime is not configured")
+	}
 	return a.underlying.ValidateConfig(config)
 }
 
 func (a *ControlSocketRuntimeAdapter) CreateContainer(ctx context.Context, config *container.ContainerConfig) (string, error) {
+	if a == nil || a.client == nil {
+		return "", errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching CreateContainer via Control Socket client")
 	return a.client.CreateContainer(ctx, config)
 }
 
 func (a *ControlSocketRuntimeAdapter) StartContainer(ctx context.Context, containerID string) error {
+	if a == nil || a.client == nil {
+		return errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching StartContainer via Control Socket client")
 	return a.client.StartContainer(ctx, containerID)
 }
 
 func (a *ControlSocketRuntimeAdapter) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	if a == nil || a.client == nil {
+		return -1, errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching WaitContainer via Control Socket client")
 	return a.client.WaitContainer(ctx, containerID)
 }
 
 func (a *ControlSocketRuntimeAdapter) RemoveContainer(ctx context.Context, containerID string) error {
+	if a == nil || a.client == nil {
+		return errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching RemoveContainer via Control Socket client")
 	return a.client.RemoveContainer(ctx, containerID)
 }
 
 func (a *ControlSocketRuntimeAdapter) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	if a == nil || a.client == nil {
+		if ready != nil {
+			close(ready)
+		}
+		return errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching AttachContainer via Control Socket client")
 	return a.client.AttachContainer(ctx, containerID, tty, stdin, stdout, stderr, ready)
 }
 
 func (a *ControlSocketRuntimeAdapter) ResizeContainerTTY(ctx context.Context, containerID string, rows, cols uint) error {
+	if a == nil || a.client == nil {
+		return errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching ResizeContainerTTY via Control Socket client")
 	return a.client.ResizeContainerTTY(ctx, containerID, rows, cols)
 }
 
 func (a *ControlSocketRuntimeAdapter) SignalContainer(ctx context.Context, containerID string, sig string) error {
+	if a == nil || a.client == nil {
+		return errors.New("control socket client is not configured")
+	}
 	a.logger.Debug("Dispatching SignalContainer via Control Socket client")
 	return a.client.SignalContainer(ctx, containerID, sig)
 }
 
 func (a *ControlSocketRuntimeAdapter) Name() string {
+	if a == nil || a.underlying == nil {
+		return "controlsocket"
+	}
 	return fmt.Sprintf("%s-controlsocket", a.underlying.Name())
 }
 
 func (a *ControlSocketRuntimeAdapter) InspectContainer(ctx context.Context, containerID string) (bool, int, error) {
+	if a == nil || a.underlying == nil {
+		return false, -1, errors.New("underlying runtime is not configured")
+	}
 	return a.underlying.InspectContainer(ctx, containerID)
 }
 
 func (a *ControlSocketRuntimeAdapter) PruneContainers(ctx context.Context) ([]string, error) {
+	if a == nil || a.underlying == nil {
+		return nil, errors.New("underlying runtime is not configured")
+	}
 	a.logger.Debug("Dispatching PruneContainers to underlying runtime")
 	return a.underlying.PruneContainers(ctx)
 }
 
 func (a *ControlSocketRuntimeAdapter) Close() error {
-	var errs []error
-	if err := a.client.Close(); err != nil {
-		errs = append(errs, err)
+	if a == nil {
+		return nil
 	}
-	if err := a.underlying.Close(); err != nil {
-		errs = append(errs, err)
+	var errs []error
+	if a.client != nil {
+		if err := a.client.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if a.underlying != nil {
+		if err := a.underlying.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }

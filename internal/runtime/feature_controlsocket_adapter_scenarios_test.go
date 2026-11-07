@@ -221,3 +221,104 @@ func TestUnit_ControlSocketRuntimeAdapter_CloseErrorUnwrapping(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, underlyingErr))
 }
+
+func TestUnit_ControlSocketRuntimeAdapter_NilGuardsAndReadyClosure(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("nil adapter receiver methods return safe errors and defaults", func(t *testing.T) {
+		var nilAdapter *runtime.ControlSocketRuntimeAdapter
+
+		require.NoError(t, nilAdapter.Close())
+		assert.Equal(t, "controlsocket", nilAdapter.Name())
+
+		require.Error(t, nilAdapter.PullImage(ctx, "alpine", "always", 1, time.Second))
+		require.Error(t, nilAdapter.ValidateConfig(&container.ContainerConfig{Image: "alpine"}))
+
+		exists, code, err := nilAdapter.InspectContainer(ctx, "c123")
+		assert.False(t, exists)
+		assert.Equal(t, -1, code)
+		require.Error(t, err)
+
+		pruned, err := nilAdapter.PruneContainers(ctx)
+		assert.Nil(t, pruned)
+		require.Error(t, err)
+
+		cid, err := nilAdapter.CreateContainer(ctx, &container.ContainerConfig{Image: "alpine"})
+		assert.Empty(t, cid)
+		require.Error(t, err)
+
+		require.Error(t, nilAdapter.StartContainer(ctx, "c123"))
+
+		exitCode, err := nilAdapter.WaitContainer(ctx, "c123")
+		assert.Equal(t, -1, exitCode)
+		require.Error(t, err)
+
+		require.Error(t, nilAdapter.RemoveContainer(ctx, "c123"))
+		require.Error(t, nilAdapter.SignalContainer(ctx, "c123", "SIGTERM"))
+		require.Error(t, nilAdapter.ResizeContainerTTY(ctx, "c123", 24, 80))
+
+		ready := make(chan struct{})
+		err = nilAdapter.AttachContainer(ctx, "c123", false, nil, nil, nil, ready)
+		require.Error(t, err)
+		select {
+		case <-ready:
+			// OK, closed
+		default:
+			t.Fatal("expected ready channel to be closed on nil adapter AttachContainer")
+		}
+	})
+
+	t.Run("adapter with nil underlying runtime returns safe errors and defaults", func(t *testing.T) {
+		adapter := runtime.NewControlSocketRuntimeAdapter(nil, nil, nil)
+
+		require.NoError(t, adapter.Close())
+		assert.Equal(t, "controlsocket", adapter.Name())
+
+		require.Error(t, adapter.PullImage(ctx, "alpine", "always", 1, time.Second))
+		require.Error(t, adapter.ValidateConfig(&container.ContainerConfig{Image: "alpine"}))
+
+		exists, code, err := adapter.InspectContainer(ctx, "c123")
+		assert.False(t, exists)
+		assert.Equal(t, -1, code)
+		require.Error(t, err)
+
+		pruned, err := adapter.PruneContainers(ctx)
+		assert.Nil(t, pruned)
+		require.Error(t, err)
+	})
+
+	t.Run("adapter with nil control socket client returns safe errors and closes ready", func(t *testing.T) {
+		mockRuntime := runtime.NewMockRuntime()
+		adapter := runtime.NewControlSocketRuntimeAdapter(mockRuntime, nil, nil)
+
+		require.NoError(t, adapter.Close())
+		assert.Equal(t, "mock-controlsocket", adapter.Name())
+
+		cid, err := adapter.CreateContainer(ctx, &container.ContainerConfig{Image: "alpine"})
+		assert.Empty(t, cid)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "client is not configured")
+
+		require.Error(t, adapter.StartContainer(ctx, "c123"))
+
+		code, err := adapter.WaitContainer(ctx, "c123")
+		assert.Equal(t, -1, code)
+		require.Error(t, err)
+
+		require.Error(t, adapter.RemoveContainer(ctx, "c123"))
+		require.Error(t, adapter.SignalContainer(ctx, "c123", "SIGTERM"))
+		require.Error(t, adapter.ResizeContainerTTY(ctx, "c123", 24, 80))
+
+		ready := make(chan struct{})
+		err = adapter.AttachContainer(ctx, "c123", false, nil, nil, nil, ready)
+		require.Error(t, err)
+		select {
+		case <-ready:
+			// OK, closed
+		default:
+			t.Fatal("expected ready channel to be closed on nil client AttachContainer")
+		}
+	})
+}
