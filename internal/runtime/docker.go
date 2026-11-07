@@ -164,39 +164,34 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		}
 
 		if pullPolicy == "missing" {
-			_, err := d.client.ImageInspect(ctx, img)
-			if err == nil {
-				return nil // Image exists locally
-			}
-			if !errdefs.IsNotFound(err) {
+			found, err := d.inspectMissingImage(ctx, img)
+			if err != nil {
 				lastErr = err
 				if IsRetryablePullError(err) {
 					continue
 				}
 				return fmt.Errorf("failed to inspect image: %w", err)
 			}
+			if found {
+				return nil // Image exists locally
+			}
 		}
 
 		// Policy is "always" or "missing" (and not found locally)
-		d.logger.Debug("Pulling image %s...", img)
-		reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
-		if err != nil {
-			lastErr = err
-			if IsRetryablePullError(err) {
+		pullErr, isStreamErr := d.pullAndStreamImage(ctx, img)
+		if pullErr != nil {
+			rawErr := errors.Unwrap(pullErr)
+			if rawErr == nil {
+				rawErr = pullErr
+			}
+			lastErr = rawErr
+			if IsRetryablePullError(rawErr) {
 				continue
 			}
-			return fmt.Errorf("failed to pull image: %w", err)
-		}
-
-		// Wait for pull to complete and check for errors in the stream
-		err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
-		_ = reader.Close() //nolint:errcheck
-		if err != nil {
-			lastErr = err
-			if IsRetryablePullError(err) {
-				continue
+			if isStreamErr {
+				return fmt.Errorf("failed to pull image (stream): %w", rawErr)
 			}
-			return fmt.Errorf("failed to pull image (stream): %w", err)
+			return fmt.Errorf("failed to pull image: %w", rawErr)
 		}
 
 		return nil // Success
@@ -269,10 +264,8 @@ func (d *DockerRuntime) RemoveContainer(ctx context.Context, containerID string)
 		Force:         true,
 		RemoveVolumes: true,
 	})
-	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
-			return nil
-		}
+	if err != nil && isIgnorableLifecycleError(err) {
+		return nil
 	}
 	return err
 }
@@ -291,10 +284,8 @@ func (d *DockerRuntime) SignalContainer(ctx context.Context, containerID string,
 		return fmt.Errorf("invalid signal: %q", sig)
 	}
 	err := d.client.ContainerKill(ctx, containerID, sig)
-	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
-			return nil
-		}
+	if err != nil && isIgnorableLifecycleError(err) {
+		return nil
 	}
 	return err
 }
@@ -505,22 +496,14 @@ func (d *DockerRuntime) PruneContainers(ctx context.Context) ([]string, error) {
 	var pruned []string
 	for _, c := range containers {
 		state := strings.ToLower(c.State)
-		if state == "running" || state == "restarting" || state == "paused" {
+		if isDockerActiveContainerState(state) {
 			d.logger.Debug("Skipping active container %s during prune (state=%s)", c.ID, c.State)
 			continue
 		}
 
-		err := d.client.ContainerRemove(ctx, c.ID, dockercontainer.RemoveOptions{
-			Force:         true,
-			RemoveVolumes: true,
-		})
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				d.logger.Warn("Failed to remove container %s during prune: %v", c.ID, err)
-			}
-			continue
+		if d.pruneSingleContainer(ctx, c.ID) {
+			pruned = append(pruned, c.ID)
 		}
-		pruned = append(pruned, c.ID)
 	}
 	return pruned, nil
 }
@@ -528,4 +511,59 @@ func (d *DockerRuntime) PruneContainers(ctx context.Context) ([]string, error) {
 // Name returns the name of the runtime.
 func (d *DockerRuntime) Name() string {
 	return d.name
+}
+
+// inspectMissingImage inspects if an image exists locally, returning true if found,
+// false if not found, or an error if inspection failed with a non-404 error.
+func (d *DockerRuntime) inspectMissingImage(ctx context.Context, img string) (bool, error) {
+	_, err := d.client.ImageInspect(ctx, img)
+	if err == nil {
+		return true, nil
+	}
+	if !errdefs.IsNotFound(err) {
+		return false, err
+	}
+	return false, nil
+}
+
+// pullAndStreamImage initiates an image pull and displays its stream messages,
+// returning any error encountered and a boolean indicating whether it was a stream error.
+func (d *DockerRuntime) pullAndStreamImage(ctx context.Context, img string) (error, bool) {
+	d.logger.Debug("Pulling image %s...", img)
+	reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
+	if err != nil {
+		return fmt.Errorf("image pull request failed: %w", err), false
+	}
+
+	err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
+	_ = reader.Close() //nolint:errcheck
+	if err != nil {
+		return fmt.Errorf("image pull stream failed: %w", err), true
+	}
+	return nil, false
+}
+
+// pruneSingleContainer attempts to remove a single container during pruning and returns true on success.
+func (d *DockerRuntime) pruneSingleContainer(ctx context.Context, containerID string) bool {
+	err := d.client.ContainerRemove(ctx, containerID, dockercontainer.RemoveOptions{
+		Force:         true,
+		RemoveVolumes: true,
+	})
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			d.logger.Warn("Failed to remove container %s during prune: %v", containerID, err)
+		}
+		return false
+	}
+	return true
+}
+
+// isDockerActiveContainerState reports whether the container state indicates an active/non-prunable container.
+func isDockerActiveContainerState(state string) bool {
+	return state == "running" || state == "restarting" || state == "paused"
+}
+
+// isIgnorableLifecycleError reports whether a container removal or signal error can be ignored.
+func isIgnorableLifecycleError(err error) bool {
+	return errdefs.IsNotFound(err) || errdefs.IsConflict(err)
 }
