@@ -259,3 +259,107 @@ func TestUnit_ControlSocket_Client_Nil_Receiver_Guards(t *testing.T) {
 		t.Fatal("expected ready channel to be closed on nil client AttachContainer")
 	}
 }
+
+func TestUnit_ControlSocket_Client_Close_Interrupts_InFlight_RPC(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	sockPath := filepath.Join(tmpDir, "close_interrupt.sock")
+
+	waitStarted := make(chan struct{})
+	disp := &mockDispatcher{
+		waitFunc: func(ctx context.Context, containerID string) (int, error) {
+			close(waitStarted)
+			<-ctx.Done()
+			return -1, ctx.Err()
+		},
+	}
+
+	server := NewServer(sockPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	t.Cleanup(func() { _ = server.Close() })
+
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer connectCancel()
+
+	client, err := Connect(connectCtx, sockPath)
+	require.NoError(t, err)
+
+	waitErrChan := make(chan error, 1)
+	go func() {
+		_, wErr := client.WaitContainer(context.Background(), "c-close-interrupt")
+		waitErrChan <- wErr
+	}()
+
+	<-waitStarted
+
+	// Close client while WaitContainer is actively waiting on the response
+	closeStart := time.Now()
+	require.NoError(t, client.Close())
+	closeDuration := time.Since(closeStart)
+
+	// Close must return promptly without waiting for the RPC response
+	assert.Less(t, closeDuration, 500*time.Millisecond)
+
+	select {
+	case wErr := <-waitErrChan:
+		require.Error(t, wErr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for in-flight RPC to be unblocked by Close()")
+	}
+}
+
+func TestUnit_ControlSocket_Client_Interrupted_RPC_Clears_Connection(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	sockPath := filepath.Join(tmpDir, "interrupted_desync.sock")
+
+	waitStarted := make(chan struct{})
+	disp := &mockDispatcher{
+		waitFunc: func(ctx context.Context, containerID string) (int, error) {
+			close(waitStarted)
+			<-ctx.Done()
+			return -1, ctx.Err()
+		},
+	}
+
+	server := NewServer(sockPath, logging.NewLogger())
+	server.SetDispatcher(disp)
+	require.NoError(t, server.Start())
+	t.Cleanup(func() { _ = server.Close() })
+
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer connectCancel()
+
+	client, err := Connect(connectCtx, sockPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = client.Close() })
+
+	cancelCtx, cancelFn := context.WithCancel(context.Background())
+	defer cancelFn()
+
+	errChan := make(chan error, 1)
+	go func() {
+		_, wErr := client.WaitContainer(cancelCtx, "c-desync-test")
+		errChan <- wErr
+	}()
+
+	<-waitStarted
+	cancelFn()
+
+	select {
+	case wErr := <-errChan:
+		require.Error(t, wErr)
+		require.ErrorIs(t, wErr, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for WaitContainer to be canceled")
+	}
+
+	// Because frame exchange was interrupted, client must have discarded c.conn to prevent stream desync.
+	// A subsequent RPC call must fail immediately with net.ErrClosed.
+	require.ErrorIs(t, client.Ping(context.Background()), net.ErrClosed)
+	_, nextErr := client.WaitContainer(context.Background(), "c-next")
+	require.ErrorIs(t, nextErr, net.ErrClosed)
+}

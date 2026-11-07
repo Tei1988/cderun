@@ -20,9 +20,30 @@ import (
 // Client represents a connection to a Base Host cderun Control Socket.
 type Client struct {
 	socketPath    string
-	conn          net.Conn
 	serverVersion string
 	mu            sync.Mutex
+	connMu        sync.RWMutex
+	conn          net.Conn
+}
+
+func (c *Client) getConn() (net.Conn, error) {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+	if c.conn == nil {
+		return nil, net.ErrClosed
+	}
+	return c.conn, nil
+}
+
+func (c *Client) closeAndClearConn() error {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	if c.conn != nil {
+		err := c.conn.Close()
+		c.conn = nil
+		return err
+	}
+	return nil
 }
 
 // Connect establishes a connection to the Control Socket at socketPath and performs the handshake.
@@ -98,10 +119,10 @@ func (c *Client) Ping(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.conn == nil {
-		return net.ErrClosed
+	conn, err := c.getConn()
+	if err != nil {
+		return err
 	}
-	conn := c.conn
 
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := conn.SetDeadline(deadline); err != nil {
@@ -113,7 +134,9 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	pingDone := make(chan struct{})
+	pingExited := make(chan struct{})
 	go func() {
+		defer close(pingExited)
 		select {
 		case <-ctx.Done():
 			_ = conn.SetDeadline(time.Now()) //nolint:errcheck
@@ -122,6 +145,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	}()
 	defer func() {
 		close(pingDone)
+		<-pingExited
 		_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
 	}()
 
@@ -132,6 +156,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	if err := WriteFrame(conn, data); err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
 		if ctx.Err() != nil {
 			return fmt.Errorf("failed to send ping frame: %w", errors.Join(err, ctx.Err()))
 		}
@@ -144,6 +169,7 @@ func (c *Client) Ping(ctx context.Context) error {
 
 	respBytes, err := ReadFrame(conn)
 	if err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
 		if ctx.Err() != nil {
 			return fmt.Errorf("failed to read ping response: %w", errors.Join(err, ctx.Err()))
 		}
@@ -181,15 +207,7 @@ func (c *Client) Close() error {
 	if c == nil {
 		return nil
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.conn != nil {
-		err := c.conn.Close()
-		c.conn = nil
-		return err
-	}
-	return nil
+	return c.closeAndClearConn()
 }
 
 // sendRPC sends a RequestFrame to the server and returns the ResponseFrame payload or error.
@@ -201,10 +219,10 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.conn == nil {
-		return nil, net.ErrClosed
+	conn, err := c.getConn()
+	if err != nil {
+		return nil, err
 	}
-	conn := c.conn
 
 	var deadlinePtr *time.Time
 	if deadline, ok := ctx.Deadline(); ok {
@@ -218,7 +236,9 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	}
 
 	reqDone := make(chan struct{})
+	reqExited := make(chan struct{})
 	go func() {
+		defer close(reqExited)
 		select {
 		case <-ctx.Done():
 			_ = conn.SetDeadline(time.Now()) //nolint:errcheck
@@ -227,6 +247,7 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	}()
 	defer func() {
 		close(reqDone)
+		<-reqExited
 		_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
 	}()
 
@@ -241,6 +262,7 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	}
 
 	if err := WriteFrame(conn, data); err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("failed to send %s frame: %w", msgType, errors.Join(err, ctx.Err()))
 		}
@@ -253,6 +275,7 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 
 	respBytes, err := ReadFrame(conn)
 	if err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("failed to read %s response: %w", msgType, errors.Join(err, ctx.Err()))
 		}
