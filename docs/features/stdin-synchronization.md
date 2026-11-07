@@ -67,7 +67,7 @@ if err := state.GetRuntime().StartContainer(ctxG, state.GetContainerID()); err !
 close(att.startSignal) // Signal stdin to start reading
 ```
 
-This guarantees that host data is only transmitted when the container process is officially "running" and ready to consume input.
+This guarantees that host data transmission begins only after container startup completes, rather than implying the workload process has begun reading STDIN.
 
 ### 3. Docker Container Configuration: `StdinOnce` and `OpenStdin`
 
@@ -84,7 +84,7 @@ containerConfig := &dockercontainer.Config{
 ```
 
 - **`OpenStdin: true`**: Keeps the standard input descriptor open for the container process.
-- **`StdinOnce: true`**: Closes the stdin stream inside the container once the client disconnects or streams EOF. Under default Docker settings (`StdinOnce: false`), the daemon may keep the container input stream open indefinitely even after the client closes its end. For non-TTY, pipe-based commands (e.g. `echo "data" | cderun -i cat`), setting `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, the Docker daemon propagates the EOF directly to the container process, allowing the command to terminate normally with exit status `0`.
+- **`StdinOnce: true`**: In Docker, closing the client connection triggers container STDIN closure upon attach EOF only when TTY is disabled (`TTY: false`). When a TTY is allocated (`-t` / `--tty`), EOF on the attachment connection does not close container STDIN, and the container process may continue running. In non-TTY sessions (such as `echo "data" | cderun -i --image alpine --entrypoint cat cat`), configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, Docker propagates the EOF to the container process, allowing it to exit with status `0`. Under default Docker settings (`StdinOnce: false`), the daemon keeps the input descriptor open indefinitely even in non-TTY mode, causing non-interactive commands to hang.
 
 ### 4. CloseWrite Grace Period (Docker)
 
@@ -101,7 +101,7 @@ if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
 }
 ```
 
-This short delay guarantees that small payloads are fully flushed and processed by the Docker daemon before the connection's write half is severed.
+This short delay serves as a mitigation to reduce the risk of small payloads being truncated before the Docker daemon processes them, rather than a guarantee of daemon completion.
 
 ### 5. Disable Historical Log Dumping on Attach
 
@@ -111,9 +111,9 @@ Since `cderun` attaches streams *before* starting the container, there are no hi
 
 ## Key Benefits
 
-- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for extremely small, fast-executing payloads.
-- **Zero Data Loss**: Data streaming starts only when the container is fully initialized and listening.
-- **Accurate EOF Handling**: EOF signals on the host are forwarded safely, avoiding hanging pipeline commands.
+- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for small, fast-executing payloads.
+- **Controlled Stream Initiation**: Data streaming starts only when container startup completes.
+- **Accurate Non-TTY EOF Handling**: EOF signals on the host are forwarded safely in non-TTY modes, avoiding hanging pipeline commands.
 
 ## Hang Timeout Safe Fallback
 

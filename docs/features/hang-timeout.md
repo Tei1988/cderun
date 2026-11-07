@@ -16,6 +16,7 @@ When the host's standard input is not a terminal, or when interactive mode (`--i
 
 1. **Parallel Monitoring**: The engine starts two concurrent monitoring loops: one waiting for the container's natural exit (`WaitContainer`) and another waiting for the input/output streams to complete (`AttachContainer`).
 2. **I/O Completion Detection**: Once the container's output stream receives EOF (indicating the process has closed its stdout and stderr streams), the I/O monitoring loop completes (`attachDone`).
+   - **Runtime-Specific Scope & containerd Limitation**: EOF-based timeout detection applies only to runtimes whose attachment implementation completes monitoring when output streams close (such as Docker). For containerd, `AttachContainer` waits for the task itself to exit rather than completing upon stream EOF. Consequently, a containerd process that closes its output descriptors and subsequently hangs will not trigger this timeout mechanism, waiting instead until task termination or context cancellation.
 3. **Hang Timeout Window**: If the container does not naturally exit within a specified grace period after its I/O streams have finished, the engine determines that the execution is hung.
 4. **Two-Step Enforced Termination**: Upon timeout expiration, if the container remains active, the engine initiates a two-phase termination procedure:
    - **Phase 1: Inspection & Asynchronous SIGKILL**: `signalKillIfRunning` inspects the container state via `rt.InspectContainer(ctx, containerID)`. If the container is still running, it issues `rt.SignalContainer(ctx, containerID, "SIGKILL")`. This inspection and signaling step is bounded by a dedicated 5-second timeout context. If `InspectContainer` fails, it falls back defensively to sending `SIGKILL`.
@@ -28,9 +29,9 @@ When the host's standard input is not a terminal, or when interactive mode (`--i
 
 ### Output Synchronization Grace Period (`drainAttachOutput`)
 
-When `WaitContainer` finishes *before* `AttachContainer` (i.e. the container exited while some output streams are still draining), `cderun` implements a hardcoded **5-second** grace period (`attachGracePeriod`) in `drainAttachOutput`.
+`AttachContainer` writes container stdout and stderr directly to the configured output writers. When `WaitContainer` finishes *before* `AttachContainer` (i.e. the container exited while output streams are still draining), `cderun` implements a hardcoded **5-second** grace period (`attachGracePeriod`) in `drainAttachOutput`.
 
-During this window, the engine attempts to drain any remaining stdout/stderr bytes from `att.attachDone`. If the streams do not close within 5 seconds, the engine cancels the attach context (`att.cancelAttach()`) and drains the channel to prevent I/O blocking. This grace period operates independently of the user-configured `hang-timeout`.
+During this window, `drainAttachOutput` waits for completion via `att.attachDone` (which conveys the attach completion error rather than output bytes). If the attach routine does not complete within 5 seconds, the engine cancels the attach context (`att.cancelAttach()`) and drains the channel to prevent I/O blocking. This grace period operates independently of the user-configured `hang-timeout`.
 
 ---
 
@@ -47,17 +48,19 @@ The hang timeout duration can be adjusted using any of the following configurati
 - **P4 Tool Setting** (`.tools.yaml`): `hangTimeout`
 - **P5 Global Defaults** (`.cderun.yaml`): `hangTimeout`
 
-### Premature Attach Failure Handling
+### Post-Startup Attach Failure Handling
 
-If `cderun` encounters a premature communication or attach failure *before* the container naturally exits, the error is logged as a warning (`o.logger.Warn("failed to attach to container: %v", err)`), and the timeout value controls its recovery:
+If `attachContainer` encounters an error before attachment is ready, it fails immediately with exit code 125 without starting the container or initiating timeout waits.
 
-- **If `hangTimeout > 0`**: It waits up to `effectiveHangTimeout` for the container to exit (`waitForWaitResultWithTimeout`). If the container exits within this period, its natural exit code is returned. If the wait window expires before container exit, execution terminates with an exit error:
+If communication or attachment fails *after* container startup, the error is logged as a warning (`o.logger.Warn("failed to attach to container: %v", err)`), and recovery is governed by `effectiveHangTimeout`:
+
+- **If `effectiveHangTimeout > 0`**: The runner waits up to `effectiveHangTimeout` for the container to exit (`waitForWaitResultWithTimeout`). Should the container terminate within this window, its natural exit code is returned. If the wait window expires before container termination, execution terminates with an exit error:
 
   ```text
   ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
   ```
 
-- **If `hangTimeout <= 0`**: The engine blocks synchronously and waits indefinitely for the container's termination signal (`waitDone` channel) via `waitForWaitResult(waitDone, true)` rather than immediately cutting off execution, returning the container's natural exit code.
+- **If `effectiveHangTimeout <= 0`**: The engine blocks synchronously and waits indefinitely for the container's termination signal (`waitDone` channel) via `waitForWaitResult(waitDone, true)` rather than prematurely terminating, returning the container's natural exit code.
 
 ---
 
