@@ -20,9 +20,30 @@ import (
 // Client represents a connection to a Base Host cderun Control Socket.
 type Client struct {
 	socketPath    string
-	conn          net.Conn
 	serverVersion string
 	mu            sync.Mutex
+	connMu        sync.RWMutex
+	conn          net.Conn
+}
+
+func (c *Client) getConn() (net.Conn, error) {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+	if c.conn == nil {
+		return nil, net.ErrClosed
+	}
+	return c.conn, nil
+}
+
+func (c *Client) closeAndClearConn() error {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	if c.conn != nil {
+		err := c.conn.Close()
+		c.conn = nil
+		return err
+	}
+	return nil
 }
 
 // Connect establishes a connection to the Control Socket at socketPath and performs the handshake.
@@ -91,17 +112,42 @@ func (c *Client) handshake(ctx context.Context) error {
 
 // Ping sends a ping frame and waits for a pong response to verify connection responsiveness.
 func (c *Client) Ping(ctx context.Context) error {
+	if c == nil {
+		return errors.New("control socket client is nil")
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	conn, err := c.getConn()
+	if err != nil {
+		return err
+	}
+
 	if deadline, ok := ctx.Deadline(); ok {
-		if err := c.conn.SetDeadline(deadline); err != nil {
+		if err := conn.SetDeadline(deadline); err != nil {
 			return fmt.Errorf("failed to set deadline for ping: %w", err)
 		}
 		defer func() {
-			_ = c.conn.SetDeadline(time.Time{})
+			_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
 		}()
 	}
+
+	pingDone := make(chan struct{})
+	pingExited := make(chan struct{})
+	go func() {
+		defer close(pingExited)
+		select {
+		case <-ctx.Done():
+			_ = conn.SetDeadline(time.Now()) //nolint:errcheck
+		case <-pingDone:
+		}
+	}()
+	defer func() {
+		close(pingDone)
+		<-pingExited
+		_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
+	}()
 
 	reqFrame := RequestFrame{Type: MsgPing}
 	data, err := json.Marshal(reqFrame)
@@ -109,12 +155,28 @@ func (c *Client) Ping(ctx context.Context) error {
 		return err
 	}
 
-	if err := WriteFrame(c.conn, data); err != nil {
+	if err := WriteFrame(conn, data); err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
+		if ctx.Err() != nil {
+			return fmt.Errorf("failed to send ping frame: %w", errors.Join(err, ctx.Err()))
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return fmt.Errorf("failed to send ping frame: %w", errors.Join(err, context.DeadlineExceeded))
+		}
 		return fmt.Errorf("failed to send ping frame: %w", err)
 	}
 
-	respBytes, err := ReadFrame(c.conn)
+	respBytes, err := ReadFrame(conn)
 	if err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
+		if ctx.Err() != nil {
+			return fmt.Errorf("failed to read ping response: %w", errors.Join(err, ctx.Err()))
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return fmt.Errorf("failed to read ping response: %w", errors.Join(err, context.DeadlineExceeded))
+		}
 		return fmt.Errorf("failed to read ping response: %w", err)
 	}
 
@@ -134,32 +196,60 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // ServerVersion returns the server version string obtained during handshake.
 func (c *Client) ServerVersion() string {
+	if c == nil {
+		return ""
+	}
 	return c.serverVersion
 }
 
 // Close closes the underlying network connection.
 func (c *Client) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
+	if c == nil {
+		return nil
 	}
-	return nil
+	return c.closeAndClearConn()
 }
 
 // sendRPC sends a RequestFrame to the server and returns the ResponseFrame payload or error.
 func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []byte) ([]byte, error) {
+	if c == nil {
+		return nil, errors.New("control socket client is nil")
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	conn, err := c.getConn()
+	if err != nil {
+		return nil, err
+	}
 
 	var deadlinePtr *time.Time
 	if deadline, ok := ctx.Deadline(); ok {
 		deadlinePtr = &deadline
-		if err := c.conn.SetDeadline(deadline); err != nil {
+		if err := conn.SetDeadline(deadline); err != nil {
 			return nil, fmt.Errorf("failed to set deadline for RPC %s: %w", msgType, err)
 		}
 		defer func() {
-			_ = c.conn.SetDeadline(time.Time{})
+			_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
 		}()
 	}
+
+	reqDone := make(chan struct{})
+	reqExited := make(chan struct{})
+	go func() {
+		defer close(reqExited)
+		select {
+		case <-ctx.Done():
+			_ = conn.SetDeadline(time.Now()) //nolint:errcheck
+		case <-reqDone:
+		}
+	}()
+	defer func() {
+		close(reqDone)
+		<-reqExited
+		_ = conn.SetDeadline(time.Time{}) //nolint:errcheck
+	}()
 
 	reqFrame := RequestFrame{
 		Type:     msgType,
@@ -171,12 +261,28 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 		return nil, fmt.Errorf("failed to marshal %s request: %w", msgType, err)
 	}
 
-	if err := WriteFrame(c.conn, data); err != nil {
+	if err := WriteFrame(conn, data); err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("failed to send %s frame: %w", msgType, errors.Join(err, ctx.Err()))
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, fmt.Errorf("failed to send %s frame: %w", msgType, errors.Join(err, context.DeadlineExceeded))
+		}
 		return nil, fmt.Errorf("failed to send %s frame: %w", msgType, err)
 	}
 
-	respBytes, err := ReadFrame(c.conn)
+	respBytes, err := ReadFrame(conn)
 	if err != nil {
+		_ = c.closeAndClearConn() //nolint:errcheck
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("failed to read %s response: %w", msgType, errors.Join(err, ctx.Err()))
+		}
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			return nil, fmt.Errorf("failed to read %s response: %w", msgType, errors.Join(err, context.DeadlineExceeded))
+		}
 		return nil, fmt.Errorf("failed to read %s response: %w", msgType, err)
 	}
 
@@ -330,11 +436,22 @@ func (c *Client) dialAndHandshake(ctx context.Context) (net.Conn, error) {
 
 // AttachContainer attaches to a container's streams via Control Socket over a dedicated connection.
 func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bool, stdin io.Reader, stdout, stderr io.Writer, ready chan<- struct{}) error {
+	var closeReadyOnce sync.Once
+	closeReady := func() {
+		if ready != nil {
+			closeReadyOnce.Do(func() {
+				close(ready)
+			})
+		}
+	}
+	defer closeReady()
+
+	if c == nil {
+		return errors.New("control socket client is nil")
+	}
+
 	conn, err := c.dialAndHandshake(ctx)
 	if err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		return err
 	}
 	defer conn.Close()
@@ -346,9 +463,6 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	}
 	payload, err := json.Marshal(args)
 	if err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		return fmt.Errorf("failed to marshal AttachContainer args: %w", err)
 	}
 
@@ -358,16 +472,10 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	}
 	reqBytes, err := json.Marshal(reqFrame)
 	if err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		return fmt.Errorf("failed to marshal AttachContainer request frame: %w", err)
 	}
 
 	if err := WriteFrame(conn, reqBytes); err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		return fmt.Errorf("failed to send AttachContainer request frame: %w", err)
 	}
 
@@ -385,9 +493,6 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 	_ = conn.SetReadDeadline(time.Time{})
 
 	if err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -396,22 +501,14 @@ func (c *Client) AttachContainer(ctx context.Context, containerID string, tty bo
 
 	var resp ResponseFrame
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		if ready != nil {
-			close(ready)
-		}
 		return fmt.Errorf("malformed AttachContainer response frame: %w", err)
 	}
 
 	if !resp.Success {
-		if ready != nil {
-			close(ready)
-		}
 		return errors.New(resp.Error)
 	}
 
-	if ready != nil {
-		close(ready)
-	}
+	closeReady()
 
 	stdinDone := make(chan struct{})
 	stdinErrChan := make(chan error, 1)
