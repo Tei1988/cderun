@@ -154,7 +154,7 @@ func TestUnit_Command_AttachAndCompletion_BoundaryScenarios(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, 0, code)
 		var exitErr *ExitCodeError
-		assert.False(t, errors.As(err, &exitErr))
+		assert.NotErrorAs(t, err, &exitErr)
 		assert.Contains(t, err.Error(), "failed to wait for container: container process lost")
 	})
 
