@@ -180,14 +180,18 @@ func (d *DockerRuntime) PullImage(ctx context.Context, img string, pullPolicy st
 		// Policy is "always" or "missing" (and not found locally)
 		pullErr, isStreamErr := d.pullAndStreamImage(ctx, img)
 		if pullErr != nil {
-			lastErr = pullErr
-			if IsRetryablePullError(pullErr) {
+			rawErr := errors.Unwrap(pullErr)
+			if rawErr == nil {
+				rawErr = pullErr
+			}
+			lastErr = rawErr
+			if IsRetryablePullError(rawErr) {
 				continue
 			}
 			if isStreamErr {
-				return fmt.Errorf("failed to pull image (stream): %w", pullErr)
+				return fmt.Errorf("failed to pull image (stream): %w", rawErr)
 			}
-			return fmt.Errorf("failed to pull image: %w", pullErr)
+			return fmt.Errorf("failed to pull image: %w", rawErr)
 		}
 
 		return nil // Success
@@ -528,13 +532,13 @@ func (d *DockerRuntime) pullAndStreamImage(ctx context.Context, img string) (err
 	d.logger.Debug("Pulling image %s...", img)
 	reader, err := d.client.ImagePull(ctx, img, image.PullOptions{})
 	if err != nil {
-		return err, false
+		return fmt.Errorf("image pull request failed: %w", err), false
 	}
 
 	err = jsonmessage.DisplayJSONMessagesStream(reader, io.Discard, 0, false, nil)
 	_ = reader.Close() //nolint:errcheck
 	if err != nil {
-		return err, true
+		return fmt.Errorf("image pull stream failed: %w", err), true
 	}
 	return nil, false
 }
