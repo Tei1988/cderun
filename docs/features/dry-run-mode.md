@@ -4,6 +4,8 @@
 
 Dry-Run Mode generates and displays the intermediate container configuration (`ContainerConfig`) representing how the container will be spawned, without actually executing the container or pulling images.
 
+> **Note (Prefetch Exception)**: When image prefetch flags are active (`--prefetch` or `--prefetch-all`), prefetching takes precedence in the execution pipeline before subcommand handling and the dry-run branch. For example, invoking `cderun --dry-run --prefetch=node` will trigger `handlePrefetch`, which may pull the container image if the configured pull policy allows downloading.
+
 ---
 
 ## Technical Specifications
@@ -12,12 +14,12 @@ Dry-Run Mode generates and displays the intermediate container configuration (`C
 
 When the `--dry-run` flag is activated:
 
-1. **Subcommand Required**: A subcommand lookup key must be specified; otherwise, execution aborts with a validation error (`"missing required subcommand"`).
+1. **Subcommand Required**: A subcommand lookup key must be specified; otherwise, execution aborts with a validation error (`"--dry-run requires a subcommand"`).
 2. **Evaluate Configuration**: The engine loads all configuration layers (P1 through P6) and constructs the standard intermediate configuration (`ContainerConfig`).
 3. **Execution Pipeline Bypass**: The execution flow intercepts execution immediately after `ContainerConfig` construction. It completely bypasses:
    - Nested snapshot directory creation (`prepareSnapshotDir`).
    - Control Socket server startup (`controlsocket.NewServer`).
-   - Image pulling and inspection (`rt.PullImage`).
+   - Image pulling and inspection (`rt.PullImage`) for standard tool execution.
    - Container creation and lifecycle tasks (`rt.CreateContainer`, `rt.StartContainer`, `rt.WaitContainer`).
 4. **Display Configuration**: The generated config is formatted and outputted to stdout via the configured format.
 5. **Clean Exit**: The process exits with code 0 without creating or starting any container.
@@ -28,11 +30,12 @@ When the `--dry-run` flag is activated:
 | :--- | :--- | :--- |
 | **CLI Argument Parsing & Hoisting** | Executed | Executed |
 | **Config Loading & Priority Resolution** | Executed | Executed |
+| **Prefetch Dispatch (`--prefetch`)** | Executed (pulls images if requested) | Executed before dry-run branch (exception: pulls images if `--prefetch` specified) |
 | **`ContainerConfig` Assembly** | Executed | Executed |
 | **Sensitive Env Redaction** | Applied to debug logs only | Applied to presentation output (`ContainerConfig.Env`) |
 | **Snapshot Directory Setup** | Created when `--mount-cderun` / nested active | Bypassed (no disk artifacts written) |
 | **Control Socket Server** | Started when `--mount-cderun-socket` active | Bypassed (no socket listener bound) |
-| **Image Pulling (`PullImage`)** | Executed according to `pull` policy | Bypassed |
+| **Image Pulling (`PullImage`)** | Executed according to `pull` policy | Bypassed (for tool command execution) |
 | **Container Creation (`CreateContainer`)** | Executed | Bypassed |
 | **Process Exit** | Concludes with container exit code | Exits cleanly with code 0 |
 
@@ -234,7 +237,7 @@ env:
 ```
 
 - **Empty Values**: If an environment variable has an empty value (e.g., `KEY=`), it remains unmasked as `KEY=`.
-- **Disabling Masking**: To inspect actual resolved values during debugging, pass `--sensitive-env=""` on the command line or configure `sensitiveEnv: []` in YAML to disable redaction.
+- **Disabling Masking**: To inspect actual resolved values during debugging, pass `--sensitive-env=""` on the command line. Note that specifying an empty slice in a discovered configuration file (`defaults.sensitiveEnv: []`) may not disable masking because configuration layer merging via `mergo.WithOverride` ignores empty slices; for dependable unmasking across all configurations, use `--sensitive-env=""` via CLI.
 - **Pattern-Based Masking**: Passing patterns (e.g., `--sensitive-env="*TOKEN*"`) selectively redacts matching variables while displaying non-matching variables in plaintext.
 - For in-depth masking specifications and pattern glob matching rules, refer to [Sensitive Data Protection](./sensitive-data-protection.md).
 
