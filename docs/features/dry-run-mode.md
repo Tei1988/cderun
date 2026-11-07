@@ -12,9 +12,15 @@ Dry-Run Mode generates and displays the intermediate container configuration (`C
 
 ### Basic Behavior
 
-When the `--dry-run` flag is activated:
+<!-- coderabbit-ai-generated:v1 -->
 
-1. **Subcommand Required**: A subcommand lookup key must be specified; otherwise, execution aborts with a validation error (`"--dry-run requires a subcommand"`).
+<!-- coderabbit-ai-generated-section:v1:3206c766c8cf43fe103a81a6278b4fa57666292a926d01d5e79c4f88f659e7c4 -->
+
+For ordinary dry-run execution:
+
+1. **Subcommand Required**: A subcommand lookup key must be specified; otherwise, execution aborts with a validation error (`"--dry-run requires a subcommand"`). With `--dry-run --prune`, prune mode is dispatched before subcommand validation and prints a preview message without requiring a subcommand. Diagnosis is a separate mode, dispatched before subcommand validation, that takes precedence over dry-run execution.
+
+   <!-- /coderabbit-ai-generated:v1 -->
 2. **Evaluate Configuration**: The engine loads all configuration layers (P1 through P6) and constructs the standard intermediate configuration (`ContainerConfig`).
 3. **Execution Pipeline Bypass**: The execution flow intercepts execution immediately after `ContainerConfig` construction. It completely bypasses:
    - Nested snapshot directory creation (`prepareSnapshotDir`).
