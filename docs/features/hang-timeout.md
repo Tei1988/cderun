@@ -16,7 +16,9 @@ When the host's standard input is not a terminal, or when interactive mode (`--i
 
 1. **Parallel Monitoring**: The engine starts two concurrent monitoring loops: one waiting for the container's natural exit (`WaitContainer`) and another waiting for the input/output streams to complete (`AttachContainer`).
 2. **I/O Completion Detection**: Once the container's output stream receives EOF (indicating the process has closed its stdout and stderr streams), the I/O monitoring loop completes (`attachDone`).
-   - **Runtime-Specific Scope & containerd Limitation**: EOF-based timeout detection applies only to runtimes whose attachment implementation completes monitoring when output streams close (such as Docker). For containerd, `AttachContainer` waits for the task itself to exit rather than completing upon stream EOF. Consequently, a containerd process that closes its output descriptors and subsequently hangs will not trigger this timeout mechanism, waiting instead until task termination or context cancellation.
+   - **Runtime-Specific Scope & Container Engine Limitations**:
+     - **Docker Non-TTY Limitation**: While Docker generally completes output stream monitoring upon EOF in non-interactive sessions, specifying `-i` without a TTY sets `StdinOnce: true`. If Docker's internal stream wait is registered after container start, the attachment connection may wait for container exit before closing. In such scenarios, a process that closes its output descriptors and subsequently hangs can bypass this EOF-based timeout.
+     - **containerd Limitation**: For containerd, `AttachContainer` waits for the task itself to exit rather than completing upon stream EOF. Consequently, a containerd process that closes its output descriptors and subsequently hangs will not trigger this timeout mechanism, waiting instead until task termination or context cancellation.
 3. **Hang Timeout Window**: If the container does not naturally exit within a specified grace period after its I/O streams have finished, the engine determines that the execution is hung.
 4. **Two-Step Enforced Termination**: Upon timeout expiration, if the container remains active, the engine initiates a two-phase termination procedure:
    - **Phase 1: Inspection & Asynchronous SIGKILL**: `signalKillIfRunning` inspects the container state via `rt.InspectContainer(ctx, containerID)`. If the container is still running, it issues `rt.SignalContainer(ctx, containerID, "SIGKILL")`. This inspection and signaling step is bounded by a dedicated 5-second timeout context. If `InspectContainer` fails, it falls back defensively to sending `SIGKILL`.
@@ -50,7 +52,7 @@ The hang timeout duration can be adjusted using any of the following configurati
 
 ### Post-Startup Attach Failure Handling
 
-If `attachContainer` encounters an error before attachment is ready, it fails immediately with exit code 125 without starting the container or initiating timeout waits.
+If `attachContainer` fails before attachment is ready, it attempts to return immediately with exit code 125. However, because certain runtime implementations (such as `DockerRuntime.AttachContainer`) close the `attachReady` channel before returning an attachment error, `attachContainer` may select that readiness signal and proceed to start the container despite the failure.
 
 If communication or attachment fails *after* container startup, the error is logged as a warning (`o.logger.Warn("failed to attach to container: %v", err)`), and recovery is governed by `effectiveHangTimeout`:
 
