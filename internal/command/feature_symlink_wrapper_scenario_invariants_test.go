@@ -377,7 +377,7 @@ redis-server:
 		assert.Equal(t, "redis:7-alpine", cfg.Image)
 		assert.Equal(t, []string{"--port", "6379"}, cfg.Command)
 		assert.Equal(t, int64(512*1024*1024), cfg.Memory)
-		assert.Equal(t, 2.0, cfg.CPUs)
+		assert.InDelta(t, 2.0, cfg.CPUs, 1e-9)
 		assert.Equal(t, "128m", cfg.ShmSize)
 		assert.Equal(t, map[string]string{"net.core.somaxconn": "512"}, cfg.Sysctls)
 		assert.Contains(t, cfg.Env, "REDIS_MAXMEMORY=256mb")
