@@ -6,14 +6,20 @@
 
 The compiled executable dynamically embeds the Git release tag, commit SHA (revision), and build timestamp. This ensures that users, developers, and automated tools can accurately identify the precise binary version when debugging, reporting issues, or auditing deployments.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:8b114e773c609701d07e0b14ef715a04bd18ea96086de8fb99898e68f5b8a5d0 -->
+
 ## Features
 
 - **Automated Metadata Injection**: Build details are automatically compiled into the binary using Go linker flags (`-ldflags`) managed by `Makefile` or `GoReleaser`.
 - **Comprehensive Output**: The `--version` flag prints detailed compile-time metrics, including Git revision, build timestamp, and runtime operating system / architecture (`runtime.GOOS/runtime.GOARCH`).
-- **Clean Command Termination**: Requesting `--version` prints metadata to standard output and terminates cleanly with exit code `0` without requiring or validating subcommand arguments or loading configuration files.
+- **Clean Command Termination**: When `--version` reaches the root command, it prints metadata to standard output and exits with code `0` before subcommand argument validation or configuration loading. However, `preprocessArgs` and Cobra flag parsing run first; invalid or incomplete arguments can fail before metadata is printed. `preprocessArgs` recognizes only the executable basename `cderun` as the normal entrypoint. The temporary executable from `go run main.go` and `cderun.exe` are treated as polyglot commands, so their `--version` flag is not passed to the root as a version request and clean version termination is not supported through those entrypoints.
 - **Development Fallbacks**: Direct invocations via `go run` or standard `go build` (without linker overrides) automatically fall back to `"dev"` for the version and `"unknown"` for the revision and build date, indicating a non-release local build.
 
 ---
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Specifications
 
@@ -41,6 +47,10 @@ cderun version dev (rev: unknown, built at: unknown, linux/amd64)
 ```
 
 ---
+
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:e250c5e73451303502205524f7b8c7257c31dea1530fe50597443daf187813e5 -->
 
 ## Compilation & Injection Mechanism
 
@@ -82,9 +92,9 @@ Linker flags (`-ldflags`) are supplied during compilation to dynamically overrid
 The root `Makefile` dynamically discovers the current Git tag, commit SHA, and ISO 8601 build date:
 
 ```makefile
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-REVISION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+REVISION := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 LDFLAGS := -X cderun/internal/version.Version=$(VERSION) \
            -X cderun/internal/version.Revision=$(REVISION) \
@@ -106,6 +116,8 @@ builds:
 ```
 
 ---
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Related Documents
 
