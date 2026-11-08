@@ -94,9 +94,10 @@ This directory contains the detailed technical and functional specifications for
 3. **[Signal Handling Security](./signal-handling-security.md)**
    - Details signal validation and Unix/Windows signal constraints to prevent injection of malicious control signals.
 
-## Technical References
+## Technical References & Investigations
 
 - **[Proc-Self-Mountinfo Specification](../references/proc-self-mountinfo.md)**
+- **[Terminal Crash Investigation Report (T01)](./terminal-crash-investigation.md)**
 
 ## Execution Pipeline
 
