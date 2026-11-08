@@ -1,10 +1,10 @@
 # Feature Specification: Standard Input Synchronization
 
-This document explains the standard input (STDIN) synchronization mechanism implemented in `cderun` to ensure reliable pipe-based command execution.
+This document explains the standard input (STDIN) synchronization mechanism implemented in `cderun` to ensure reliable pipe-based and interactive command execution.
 
 ## The Challenge: Race Conditions in Pipe Executions
 
-When running shell pipes (e.g., `echo "test" | cderun ... cat`), a severe race condition can occur between the following operations:
+When running shell pipes (e.g., `echo "test" | cderun -i ... cat`), a severe race condition can occur between the following operations:
 
 1. **STDIN Attachment**: `cderun` invokes the container runtime's attachment API to stream host STDIN to the container.
 2. **Container Start**: `cderun` invokes the container runtime's start API to boot the target containerized command (e.g., `cat`).
@@ -16,19 +16,29 @@ Furthermore, if the data is small (such as a single word or character), `cderun`
 
 ## Solution: Synchronized STDIN
 
-To ensure deterministic, reliable pipe execution, `cderun` incorporates a synchronized STDIN mechanism utilizing a custom `syncReader`.
+To ensure deterministic, reliable pipe and interactive execution, `cderun` incorporates a synchronized STDIN mechanism utilizing a custom `syncReader`.
 
 ### 1. Deferred STDIN Streaming
 
-The host's STDIN stream is wrapped with a custom `syncReader` before being passed to the runtime adapter's `AttachContainer` method. This reader blocks any incoming `Read` operations until a ready signal is dispatched.
-
-### 2. Container Startup Signal
-
-The ready signal is dispatched to unblock the `syncReader` **only after** the `StartContainer` API call successfully returns. This guarantees that host data is only transmitted when the container is officially "running" and ready to consume input.
+When interactive mode is requested (`cc.Interactive = true`), the host's STDIN stream is wrapped with a custom `syncReader` before being passed to the runtime adapter's `AttachContainer` method:
 
 ```go
 // internal/command/root.go
 
+var stdin io.Reader
+startSignal := make(chan struct{})
+if cc.Interactive {
+    stdin = &syncReader{
+        inner: cmd.InOrStdin(),
+        ready: startSignal,
+        ctx:   ctx,
+    }
+}
+```
+
+This reader blocks any incoming `Read` operations until a ready signal (`startSignal`) is dispatched:
+
+```go
 type syncReader struct {
 	inner io.Reader
 	ready <-chan struct{}
@@ -45,17 +55,53 @@ func (s *syncReader) Read(p []byte) (n int, err error) {
 }
 ```
 
-### 3. StdinOnce for Reliable EOF Propagation
+### 2. Container Startup Signal
 
-For Docker runtimes (`internal/runtime/docker.go`), whenever the execution path uses `syncReader` (such as in non-interactive pipe commands or when STDIN is explicitly attached), `StdinOnce: true` is configured on the attachment options. This occurs regardless of whether interactive mode (`config.Interactive`) is enabled.
+The ready signal is dispatched to unblock the `syncReader` by closing `att.startSignal` (`close(att.startSignal)`) **only after** the `StartContainer` API call successfully returns:
 
-Under default Docker settings (`StdinOnce: false`), the daemon may keep the container input stream open indefinitely even after the client closes its end. For non-TTY, pipe-based commands, this prevents the containerized process (e.g., `cat`) from detecting EOF, causing it to hang.
+```go
+// internal/command/root.go
+if err := state.GetRuntime().StartContainer(ctxG, state.GetContainerID()); err != nil {
+    return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to start container: %w", err)}
+}
+close(att.startSignal) // Signal stdin to start reading
+```
 
-Configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, the Docker daemon propagates the EOF directly to the container process, allowing the command to terminate normally with exit status `0`.
+This guarantees that host data transmission begins only after container startup completes, rather than implying the workload process has begun reading STDIN.
+
+### 3. Docker Container Configuration: `StdinOnce` and `OpenStdin`
+
+For Docker runtimes (`internal/runtime/docker_adapter.go`), container creation sets both `OpenStdin` and `StdinOnce` to match the interactive configuration:
+
+```go
+// internal/runtime/docker_adapter.go
+containerConfig := &dockercontainer.Config{
+    ...
+    StdinOnce: config.Interactive,
+    OpenStdin: config.Interactive,
+    ...
+}
+```
+
+- **`OpenStdin: true`**: Keeps the standard input descriptor open for the container process.
+- **`StdinOnce: true`**: In Docker, closing the client connection triggers container STDIN closure upon attach EOF only when TTY is disabled (`TTY: false`). When a TTY is allocated (`-t` / `--tty`), EOF on the attachment connection does not close container STDIN, and the container process may continue running. In non-TTY sessions (such as `echo "data" | cderun -i --image alpine --entrypoint cat cat`), configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, Docker propagates the EOF to the container process, allowing it to exit with status `0`. Under default Docker settings (`StdinOnce: false`), the daemon keeps the input descriptor open indefinitely even in non-TTY mode, causing non-interactive commands to hang.
 
 ### 4. CloseWrite Grace Period (Docker)
 
-In the Docker adapter (`internal/runtime/docker.go`), once the input copier finishes copying all bytes, it sleeps for **100 milliseconds** (`attachCloseWriteGrace`) before invoking `CloseWrite()`. This short delay guarantees that small payloads are fully flushed and processed by the Docker daemon before the connection is severed.
+In the Docker adapter (`internal/runtime/docker.go`), once `io.Copy(resp.Conn, stdin)` finishes copying all input bytes, it sleeps for a configurable grace period defaulting to **100 milliseconds** (`attachCloseWriteGrace`) before calling `resp.CloseWrite()`:
+
+```go
+// internal/runtime/docker.go
+d.logger.Debug("STDIN copy to container %s finished: %d bytes", containerID, n)
+if err := d.sleepFunc(ctx, d.attachCloseWriteGrace); err == nil {
+    d.logger.Trace("Calling CloseWrite on container %s connection", containerID)
+    if err := resp.CloseWrite(); err != nil {
+        d.logger.Debug("STDIN CloseWrite to container %s failed: %v", containerID, err)
+    }
+}
+```
+
+This short delay serves as a mitigation to reduce the risk of small payloads being truncated before the Docker daemon processes them, rather than a guarantee of daemon completion.
 
 ### 5. Disable Historical Log Dumping on Attach
 
@@ -65,13 +111,9 @@ Since `cderun` attaches streams *before* starting the container, there are no hi
 
 ## Key Benefits
 
-- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for extremely small, fast-executing payloads.
-- **Zero Data Loss**: Data streaming starts only when the container is fully initialized and listening.
-- **Accurate EOF Handling**: EOF signals on the host are forwarded safely, avoiding hanging pipeline commands.
-
-## Verification
-
-This behavior is verified via unit tests inside `internal/command/stdin_test.go`, which simulate immediate stdin streaming and artificial container startup delays.
+- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for small, fast-executing payloads.
+- **Controlled Stream Initiation**: Data streaming starts only when container startup completes.
+- **Accurate Non-TTY EOF Handling**: EOF signals on the host are forwarded safely in non-TTY modes, avoiding hanging pipeline commands.
 
 ## Hang Timeout Safe Fallback
 

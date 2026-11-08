@@ -28,10 +28,10 @@ cderun Flags → Intermediate Representation (IR) → Runtime Adapter Calls → 
 | `PullImage` | Supported | Supported | Supported | Supported |
 | `ValidateConfig` | Supported | Supported | Supported | Supported |
 | `CreateContainer` | Supported | Supported | Supported (`--network host` only; default bridge and other explicit modes rejected; no `--publish`) | Supported |
-| `StartContainer` | Supported | Supported | Supported | Supported |
+| `StartContainer` | Supported | Supported | Supported | Supported (separate start omits `--attach`, limiting later attach) |
 | `WaitContainer` | Supported | Supported | Supported | Supported |
 | `RemoveContainer` | Supported | Supported | Supported | Supported |
-| `AttachContainer` | Supported | Supported | Supported | Supported |
+| `AttachContainer` | Supported | Supported | Supported | Supported (limited by nerdctl start separation; streams may be unavailable) |
 | `SignalContainer` | Supported | Supported | Supported | Supported |
 | `ResizeContainerTTY` | Supported | Supported | Supported | Unsupported |
 | `InspectContainer` | Supported | Supported | Supported | Supported |
@@ -116,6 +116,7 @@ type ContainerRuntime interface {
 5. **`AttachContainer`**:
    - Connects host standard streams (stdin, stdout, stderr) to the container I/O pipes.
    - Closes the `ready` signal channel after stream setup, but `DockerRuntime.AttachContainer` also closes it when the attach API fails. Closure alone does not indicate success: callers must also check and handle the attach error before proceeding with `StartContainer`.
+   - **Nerdctl Readiness Timing**: `NerdctlRuntime.AttachContainer` closes the `ready` signal channel immediately after spawning the `nerdctl attach` CLI subprocess, before the subprocess confirms active stream attachment with the daemon. Consequently, very short-lived container commands can start execution before output streams are attached.
 6. **`WaitContainer`**:
    - Blocks until the container process exits, returning the process exit code.
 7. **`RemoveContainer`**:
@@ -225,7 +226,7 @@ Callers cannot rely on all GPU, restart-policy, port, or mount checks completing
 3. **Container Creation**: Invoke `CreateContainer` with the configuration, returning a unique container ID.
 4. **Scheduled Cleanup**: If `config.Remove` is true, schedule `RemoveContainer` via `defer` or context cleanups to ensure ephemeral behavior.
 5. **I/O Attachment**: If `TTY` or `Interactive` is enabled, call `AttachContainer` to hook up stdin, stdout, and stderr streams.
-6. **Container Startup**: Check and handle attach errors as well as readiness before calling `StartContainer`; `ready` closure alone is not proof of successful attachment.
+6. **Container Startup**: Check and handle attach errors as well as readiness before calling `StartContainer`; `ready` closure alone is not proof of successful attachment. Note that readiness alone does not eliminate attach-error race conditions: if an attach error arrives after the `ready` channel closes, startup may proceed without attached streams. A synchronous, result-bearing setup handshake is required to fully eliminate this window.
 7. **Signal & Resize Forwarders**: Spin up background routines to forward OS signals and window resizing events to the running container.
 8. **Completion Wait**: Block on `WaitContainer` to await container process exit and retrieve the final exit status code.
 
