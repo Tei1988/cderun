@@ -1,10 +1,10 @@
 # Signal Handling Security
 
-`cderun` provides secure mechanisms for signaling containers, ensuring that signal names and values are strictly validated before being passed to the container runtime and that host signal events are safely synchronized across the container lifecycle.
+`cderun` provides secure mechanisms for signaling containers, ensuring that signal names and values are validated by supporting container runtime adapters before delivery and that host signal events are safely synchronized across the container lifecycle.
 
 ## Signal Name Validation
 
-All signals sent via the `SignalContainer` method in adapters that implement validation (such as Docker and Mock runtimes) are validated against a case-insensitive regular expression:
+Signals sent via the `SignalContainer` method in adapters that implement signal validation (such as Docker and Mock runtimes) are validated against a case-insensitive regular expression:
 `^(?i)[A-Z0-9]+$`
 
 This regex pattern ensures that only alphanumeric characters are accepted, preventing any shell metacharacters, whitespace, or control characters from being passed to the runtime. This effectively blocks command injection into the underlying shell or container runtime. Note that CLI wrappers such as `NerdctlRuntime.SignalContainer` pass the signal as a joined argument via `exec.CommandContext` without applying `signalRegex`.
@@ -19,7 +19,7 @@ If a termination signal is received *before* the container has begun startup:
 
 - The execution is safely cancelled via context cancellation (`ctxG`).
 - Ongoing image pulling or container creation operations are immediately aborted.
-- Any partially created containers have deferred removal attempted when `initContainer` has removal enabled (`cc.Remove = true`, which is the default unless `--remove=false` is specified). Removal runs with an uncancelled base context via `context.WithoutCancel` to ensure cleanup commands execute even though the execution context is cancelled, though successful deletion remains subject to runtime availability.
+- Any containers created during execution have deferred removal attempted only after `CreateContainer` successfully returns, when removal is enabled (`cc.Remove = true`, which is the default unless `--remove=false` is specified). If `CreateContainer` itself returns an error, `initContainer` returns before registering deferred cleanup, so any container created by the engine during a failed request may remain without a removal attempt. When registered, removal runs with an uncancelled base context via `context.WithoutCancel` to ensure cleanup commands execute even though the execution context is cancelled, though successful deletion remains subject to runtime availability.
 - The container is prevented from starting if cancellation is triggered before the start phase.
 
 ## SIGHUP and SIGQUIT Support & Buffer Optimization
@@ -33,9 +33,9 @@ To reduce the likelihood of rapidly repeated or consecutive signals being droppe
 
 ## Runtime Isolation
 
-Signal validation is implemented at the runtime abstraction layer. This prevents malicious subcommands or environment-based overrides from injecting arbitrary commands or metacharacters into the runtime's signal delivery path (e.g., `SIGTERM; rm -rf /`).
+Signal validation is adapter-specific. In adapters that enforce signal pattern checking, validation prevents malicious subcommands or environment-based overrides from injecting arbitrary commands or metacharacters into the runtime's signal delivery path (e.g., `SIGTERM; rm -rf /`).
 
-If a signal containing restricted characters is provided, the validation fails immediately, preventing potential injection vulnerabilities before any calls are made to the underlying engine.
+In adapters enforcing `signalRegex`, if a signal containing restricted characters is provided, validation fails immediately, preventing potential injection vulnerabilities before calls are made to the underlying engine. Adapters passing arguments directly (like nerdctl) rely on CLI command-argument array isolation rather than regex checks.
 
 ## Error Handling
 
@@ -60,5 +60,5 @@ During command execution, the early signal channel feeds into `startSignalForwar
 
 ### 3. Running Container Phase (`containerRunning`)
 
-- **First Signal**: The signal is forwarded immediately and asynchronously to the running container via `rt.SignalContainer(ctx, containerID, sigName)` in a separate goroutine. This allows the containerized workload to perform graceful shutdown or signal handling (e.g., catching `SIGINT` or `SIGTERM`).
+- **First Signal**: The signal is forwarded immediately and asynchronously to the running container via `rt.SignalContainer(ctxG, containerID, sigName)` in a separate goroutine. Because it runs under the cancellation context `ctxG`, a second host interrupt or termination signal can cancel an in-flight first forwarding attempt. In contrast, deferred signal replay executes synchronously against the parent context `ctx` rather than `ctxG`.
 - **Second Signal**: If a second interrupt or termination signal is received by the host process while the container is running, `HandleSignal` returns `cancelCtx = true`, immediately cancelling `ctxG`. Note that if deferred signal replay is currently in progress, it executes synchronously against the parent context `ctx` rather than `ctxG`; teardown proceeds after that call returns. When removal is enabled (`cc.Remove = true`), deferred cleanup attempts to remove the container.

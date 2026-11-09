@@ -18,7 +18,7 @@ When the host's standard input is not a terminal, or when interactive mode (`--i
 2. **I/O Completion Detection**: Once the container's output stream receives EOF (indicating the process has closed its stdout and stderr streams), the I/O monitoring loop completes (`attachDone`).
    - **Runtime-Specific Scope & Container Engine Limitations**:
      - **Docker Non-TTY Limitation**: While Docker generally completes output stream monitoring upon EOF in non-interactive sessions, specifying `-i` without a TTY sets `StdinOnce: true`. If Docker's internal stream wait is registered after container start, the attachment connection may wait for container exit before closing. In such scenarios, a process that closes its output descriptors and subsequently hangs can bypass this EOF-based timeout.
-     - **containerd Limitation**: For containerd, `AttachContainer` waits for the task itself to exit rather than completing upon stream EOF. Consequently, a containerd process that closes its output descriptors and subsequently hangs will not trigger this timeout mechanism, waiting instead until task termination or context cancellation.
+     - **containerd Output-Drain Limitation**: For containerd, `AttachContainer` completion signals task exit rather than completion of output stream copying. Consequently, a containerd process that closes its output descriptors and subsequently hangs will not trigger this timeout mechanism, and waiting on `attachDone` or the grace period does not guarantee that remaining output has completely drained.
 3. **Hang Timeout Window**: If the container does not naturally exit within a specified grace period after its I/O streams have finished, the engine determines that the execution is hung.
 4. **Two-Step Enforced Termination**: Upon timeout expiration, if the container remains active, the engine initiates a two-phase termination procedure:
    - **Phase 1: Inspection & Asynchronous SIGKILL**: `signalKillIfRunning` inspects the container state via `rt.InspectContainer(ctx, containerID)`. If the container is still running, it issues `rt.SignalContainer(ctx, containerID, "SIGKILL")`. This inspection and signaling step is bounded by a dedicated 5-second timeout context. If `InspectContainer` fails, it falls back defensively to sending `SIGKILL`.
@@ -33,7 +33,7 @@ When the host's standard input is not a terminal, or when interactive mode (`--i
 
 `AttachContainer` writes container stdout and stderr directly to the configured output writers. When `WaitContainer` finishes *before* `AttachContainer` (i.e. the container exited while output streams are still draining), `cderun` implements a hardcoded **5-second** grace period (`attachGracePeriod`) in `drainAttachOutput`.
 
-During this window, `drainAttachOutput` waits for completion via `att.attachDone` (which conveys the attach completion error rather than output bytes). If the attach routine does not complete within 5 seconds, the engine cancels the attach context (`att.cancelAttach()`) and drains the channel to prevent I/O blocking. This grace period operates independently of the user-configured `hang-timeout`.
+During this window, `drainAttachOutput` waits for completion via `att.attachDone` (which conveys the attach completion error rather than output bytes). If the attach routine does not complete within 5 seconds, the engine cancels the attach context (`att.cancelAttach()`) and drains `att.attachDone` to prevent goroutine leaks. Notably, the post-cancellation receive on `<-att.attachDone` has no timeout; with adapters such as nerdctl, an unblocked interactive stdin read or pending CLI subprocess wait (`cmd.Wait()`) can block indefinitely, meaning the 5-second grace period does not strictly bound total drain time. This grace period operates independently of the user-configured `hang-timeout`.
 
 ---
 
@@ -61,6 +61,8 @@ If communication or attachment fails *after* container startup, the error is log
   ```text
   ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
   ```
+
+  *Distinction from Termination Flow*: Unlike the two-step termination flow for standard execution hangs, this attach-error timeout path returns exit code 125 directly without calling `signalKillIfRunning`. Consequently, if container removal is disabled (`--remove=false`), the container may continue running in the background after `cderun` exits.
 
 - **If `effectiveHangTimeout <= 0`**: The engine blocks synchronously and waits indefinitely for the container's termination signal (`waitDone` channel) via `waitForWaitResult(waitDone, true)` rather than prematurely terminating, returning the container's natural exit code.
 

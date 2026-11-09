@@ -308,7 +308,7 @@ func TestUnit_Command_AttachAndCompletion_BoundaryScenarios(t *testing.T) {
 			}
 		}()
 
-		code, err := opts.handleAttachFinishedBeforeExit(mockRt, "c1", cc, false, 15*time.Millisecond, nil, waitDone)
+		code, err := opts.handleAttachFinishedBeforeExit(mockRt, "c1", cc, false, time.Second, nil, waitDone)
 		require.NoError(t, err)
 		assert.Equal(t, 137, code)
 	})

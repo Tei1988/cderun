@@ -84,7 +84,7 @@ containerConfig := &dockercontainer.Config{
 ```
 
 - **`OpenStdin: true`**: Keeps the standard input descriptor open for the container process.
-- **`StdinOnce: true`**: In Docker, closing the client connection triggers container STDIN closure upon attach EOF only when TTY is disabled (`TTY: false`). When a TTY is allocated (`-t` / `--tty`), EOF on the attachment connection does not close container STDIN, and the container process may continue running. In non-TTY sessions (such as `echo "data" | cderun -i --image alpine --entrypoint cat cat`), configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, Docker propagates the EOF to the container process, allowing it to exit with status `0`. Under default Docker settings (`StdinOnce: false`), the daemon keeps the input descriptor open indefinitely even in non-TTY mode, causing non-interactive commands to hang.
+- **`StdinOnce: true`**: In Docker, closing the client connection triggers container STDIN closure upon attach EOF only when TTY is disabled (`TTY: false`). When a TTY is allocated (`-t` / `--tty`), EOF on the attachment connection does not close container STDIN, and the container process may continue running. In non-TTY sessions where input is open (`OpenStdin: true`, such as `echo "data" | cderun -i --image alpine --entrypoint cat cat`), configuring `StdinOnce: true` ensures that when `cderun` finishes streaming host STDIN and closes its write end, Docker propagates the EOF to the container process, allowing it to exit with status `0`. Under Docker settings where `StdinOnce: false` and stdin is kept open (`OpenStdin: true`), the daemon keeps the input descriptor open indefinitely even in non-TTY mode, causing non-interactive commands to hang. (Note that `StdinOnce: false` does not open stdin on its own; non-interactive commands without `-i` have `OpenStdin: false` and are not affected by this hang).
 
 ### 4. CloseWrite Grace Period (Docker)
 
@@ -111,7 +111,7 @@ Since `cderun` attaches streams *before* starting the container, there are no hi
 
 ## Key Benefits
 
-- **Deterministic Pipeline Execution**: Pipes and redirections function reliably even for small, fast-executing payloads.
+- **Best-Effort Pipeline Delivery**: Pipes and redirections function reliably for standard payloads; short payloads receive a 100ms mitigation against truncation, though network or daemon latency may still cause loss.
 - **Controlled Stream Initiation**: Data streaming starts only when container startup completes.
 - **Accurate Non-TTY EOF Handling**: EOF signals on the host are forwarded safely in non-TTY modes, avoiding hanging pipeline commands.
 
