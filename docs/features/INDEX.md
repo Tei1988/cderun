@@ -83,6 +83,9 @@ This directory contains the detailed technical and functional specifications for
 2. **[Diagnosis Mode](./diagnosis-mode.md)**
    - Documents system diagnostic verification and tool discovery without requiring a subcommand.
 
+3. **[Orphan Container Pruning](./orphan-container-pruning.md)**
+   - Documents stand-alone stopped container detection, label and namespace-based filtering, and `--dry-run` cleanup previews across runtimes.
+
 ### Security Hardening
 
 1. **[Security Validations](./security-validations.md)**
