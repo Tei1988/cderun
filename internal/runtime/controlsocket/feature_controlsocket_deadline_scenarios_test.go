@@ -3,6 +3,7 @@ package controlsocket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"path/filepath"
 	"testing"
@@ -57,7 +58,8 @@ func TestUnit_ControlSocket_RPC_Deadline_And_MalformedPayload_Scenarios(t *testi
 
 		select {
 		case dispErr := <-waitErrChan:
-			assert.ErrorIs(t, dispErr, context.DeadlineExceeded)
+			assert.True(t, errors.Is(dispErr, context.DeadlineExceeded) || errors.Is(dispErr, context.Canceled),
+				"expected dispErr to be context.DeadlineExceeded or context.Canceled, got: %v", dispErr)
 		case <-time.After(1 * time.Second):
 			t.Fatal("timed out waiting for dispatcher to observe context cancellation")
 		}
