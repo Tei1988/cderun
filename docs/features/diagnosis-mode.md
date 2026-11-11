@@ -2,9 +2,9 @@
 
 ## Overview
 
-Diagnosis Mode is an inspection and verification feature in `cderun` that inspects the host and container engine environment, verifies socket connectivity, enumerates discovered global and tool configuration files, and lists all available tool profiles without launching a container or executing a command.
+Diagnosis Mode is an inspection and verification feature in `cderun` that inspects the host and container engine environment, verifies socket filesystem accessibility, enumerates discovered global and tool configuration files, and lists all available tool profiles without launching a container or executing a command.
 
-Unlike standard container execution or Dry-Run Mode (`--dry-run`), Diagnosis Mode does not require a subcommand or container image to be specified. It serves as an immediate health-check and setup validation tool for operators, automated CI environments, and nested container runners.
+Unlike standard container execution or Dry-Run Mode (`--dry-run`), Diagnosis Mode does not require a subcommand or container image to be specified. It serves as an immediate environment and setup validation tool for operators, automated CI environments, and nested container runners.
 
 ## Requirements and Execution Lifecycle
 
@@ -21,7 +21,7 @@ Within the root command's `PreRunE` / `RunE` execution flow, Diagnosis Mode exec
    - **Subcommand Independence**: Running `cderun --diagnosis` without any subcommand terminates successfully. If subcommands or positional arguments are supplied (e.g., `cderun --diagnosis node --version`), Diagnosis Mode still takes precedence and skips container execution.
 5. **Exit Status**:
    - Upon successful gathering and rendering of diagnostic information, `cderun` exits normally with status code `0`.
-   - If output formatting fails (e.g., JSON/YAML marshaling error or standard output write failure), an error is returned through `RunE`, resulting in a non-zero exit code (`1`).
+   - If JSON or YAML marshaling or writing fails, an error is returned through `RunE`, resulting in a non-zero exit code (`1`). For the Simple output format, write operations to standard output are best-effort, discard write errors, and return `nil`.
 
 ### Diagnostic Data Model (`diagnosticsInfo`)
 
@@ -33,8 +33,8 @@ Within the root command's `PreRunE` / `RunE` execution flow, Diagnosis Mode exec
 | `Runtime.Socket` | `string` | `socket` | Path to the container runtime daemon socket on the execution host (e.g., `/var/run/docker.sock`, `/run/containerd/containerd.sock`). |
 | `Runtime.Status` | `string` | `status` | Accessibility status of the socket. Evaluated via `os.Stat` (or `o.fs.Stat`). If accessible, returns `"accessible"`. If stat fails, returns `"not found or inaccessible: <error>"`. |
 | `Runtime.ControlSocket` | `string` | `control_socket` (omitted if empty) | Path to the active `cderun` Control Socket. Populated when running inside a nested container where the host context provided a Control Socket (`globalCfg.HostContext.ControlSocket`). |
-| `Configs.Global` | `[]string` | `global` | Ordered list of absolute paths to global configuration files discovered and loaded (e.g., `~/.config/cderun/.cderun.yaml`, `/etc/cderun/.cderun.yaml`, or working directory `.cderun.yaml`). Empty list if none found. |
-| `Configs.Tools` | `[]string` | `tools` | Ordered list of absolute paths to tool definition configuration files discovered and loaded (e.g., `.tools.yaml`). Empty list if none found. |
+| `Configs.Global` | `[]string` | `global` | Ordered list of absolute paths to global configuration files discovered and loaded (e.g., `~/.config/cderun/.cderun.yaml`, `/etc/cderun/.cderun.yaml`, or working directory `.cderun.yaml`). If none are found, the JSON value is `null`. |
+| `Configs.Tools` | `[]string` | `tools` | Ordered list of absolute paths to tool definition configuration files discovered and loaded (e.g., `.tools.yaml`). If none are found, the JSON value is `null`. |
 | `AvailableTools` | `[]string` | `available_tools` (omitted if empty in JSON/YAML) | Alphabetically sorted list of all tool profile names defined in the loaded `ToolsConfig` map. |
 
 ### Socket Accessibility Resilience
@@ -43,6 +43,7 @@ When verifying `Runtime.Socket`, `cderun` performs a filesystem `Stat` check:
 
 - If `Stat` succeeds, `Runtime.Status` is marked as `"accessible"`.
 - If `Stat` fails (e.g., file not found, permission denied, or daemon not running), `handleDiagnosis` does **not** abort or return an error. Instead, it formats the error message directly into the `Runtime.Status` field (e.g., `not found or inaccessible: stat /var/run/docker.sock: no such file or directory`).
+- **Filesystem-Only Check**: Note that `handleDiagnosis` performs a filesystem-level `Stat` check on the socket path rather than establishing an active connection or performing an API ping/handshake with the container daemon. Therefore, a stale socket file or a regular file existing at the socket path will report `"accessible"` even if the container daemon is stopped or unresponsive.
 - This non-fatal behavior ensures operators can run `--diagnosis` to inspect why container commands fail without the diagnostic command itself failing.
 
 ## Usage
@@ -57,11 +58,14 @@ cderun --diagnosis
 
 ### With Subcommand Arguments
 
-Diagnosis Mode takes precedence regardless of supplied positional arguments:
+When positional arguments or a subcommand are supplied, Diagnosis Mode takes precedence and skips container creation. However, the subcommand name is still validated during configuration resolution (`ResolveWithFS` via `ValidateToolName`):
 
 ```bash
 cderun --diagnosis node --version
 ```
+
+- If an invalid tool name (e.g., containing path separators or traversal characters) is supplied, `cderun` returns a validation error prior to entering Diagnosis Mode.
+- If a valid tool name is supplied, `cderun` resolves any tool-specific configuration defined in `.tools.yaml` (such as tool-level defaults or format settings) before displaying the diagnostic output.
 
 ### Custom Output Format Selection
 
@@ -125,7 +129,6 @@ runtime:
 configs:
   global: []
   tools: []
-available_tools: []
 ```
 
 ### 2. JSON Format
@@ -225,7 +228,7 @@ Diagnosis Mode integrates fully into `cderun`'s P1–P6 precedence hierarchy:
 | **P1** | Hoisted Internal Override | `cderun <subcommand> --cderun-diagnosis --cderun-diagnosis-format json` |
 | **P2** | CLI Command Flags | `cderun --diagnosis --diagnosis-format yaml` |
 | **P3** | Environment Variables | `CDERUN_DIAGNOSIS=true`, `CDERUN_DIAGNOSIS_FORMAT=json` |
-| **P4** | Tool Configuration (`.tools.yaml`) | `tools:\n  node:\n    diagnosis: true\n    diagnosisFormat: simple` |
+| **P4** | Tool Configuration (`.tools.yaml`) | `node:\n  diagnosis: true\n  diagnosisFormat: simple` |
 | **P5** | Global Configuration (`.cderun.yaml`) | `defaults:\n  diagnosis: false\n  diagnosisFormat: yaml` |
 | **P6** | Built-in Defaults | `diagnosis: false`, `diagnosisFormat: yaml` |
 
@@ -273,9 +276,8 @@ Or for a specific tool:
 
 ```yaml
 # .tools.yaml
-tools:
-  debug-runner:
-    image: alpine:latest
-    diagnosis: true
-    diagnosisFormat: json
+debug-runner:
+  image: alpine:latest
+  diagnosis: true
+  diagnosisFormat: json
 ```
