@@ -97,7 +97,7 @@ func TestUnit_ControlSocket_RPC_Deadline_And_MalformedPayload_Scenarios(t *testi
 		// Wait for dispatcher to observe server-side context deadline expiration
 		select {
 		case dispErr := <-waitErrChan:
-			assert.ErrorIs(t, dispErr, context.DeadlineExceeded)
+			require.ErrorIs(t, dispErr, context.DeadlineExceeded)
 		case <-time.After(1 * time.Second):
 			t.Fatal("timed out waiting for dispatcher to observe server-side context deadline exceeded")
 		}
