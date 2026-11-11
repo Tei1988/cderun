@@ -81,7 +81,7 @@ This directory contains the detailed technical and functional specifications for
    - Details Git metadata injection (Tag, SHA, BuildDate) and formatted `--version` outputs.
 
 2. **[Diagnosis Mode](./diagnosis-mode.md)**
-   - Documents system diagnostic verification and tool discovery without requiring a subcommand.
+   - Documents system diagnostic verification, socket connectivity checks, configuration file tracking, and tool discovery without requiring a subcommand.
 
 ### Security Hardening
 
