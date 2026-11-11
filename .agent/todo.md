@@ -26,7 +26,7 @@ AI 開発エージェント（Jules 等）が個別タスクとして着手で�
 | T16 | ランタイム未対応機能の事前バリデーション | 改善 | 中 | 中 | - | DONE |
 | T18 | `ci.yaml` のアクションをコミットハッシュ固定 | CI | 高 | 小 | - | DONE |
 | T19 | CI の Go バージョン指定を `go.mod` に一本化 | CI | 低 | 小 | - | DONE |
-| T20 | ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加） | CI | 高 | 中 | - | - |
+| T20 | ランタイムテストを実ランタイムに接続する（既存 containerd ジョブの是正 + Docker / Podman 追加） | CI | 高 | 中 | - | DONE |
 | T21 | イメージ事前取得フラグ（`--prefetch`） | 機能 | 中 | 中 | あり | DONE |
 | T22 | orphan コンテナのクリーンアップ（`--prune`） | 機能 | 中 | 大 | あり | DONE |
 | T23 | `--group-add` フラグの追加 | 機能 | 高 | 小 | あり | DONE |
@@ -831,3 +831,15 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 - `make lint-go` がパスする
 
 ---
+
+## Documentation Update Tasks
+
+### T20 Documentation Updates: Update conformance and live runtime test documentation
+
+- **Task**: Update `docs/testing/conformance.md` and `docs/testing/runtime-tests.md` for Task T20 live runtime socket integration.
+- **Target Files**:
+  - `docs/testing/conformance.md`
+  - `docs/testing/runtime-tests.md`
+- **Details**:
+  - Update `docs/testing/conformance.md` "Live Socket Testing" section to document the live conformance test harness entry point (`TestConformance_LiveSocketRuntime` in `internal/runtime/feature_runtime_live_conformance_test.go`) executed via `go test -tags=runtime -v ./...`.
+  - Update `docs/testing/runtime-tests.md` to specify execution instructions for all three supported container runtime engines (`containerd`, `docker`, and `podman`), environment variables (`CDERUN_ENGINE`/`CDERUN_RUNTIME`, `CDERUN_SOCKET_PATH`), and security isolation rules restricting host socket access on untrusted fork pull requests.
