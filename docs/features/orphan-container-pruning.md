@@ -62,7 +62,7 @@ Orphan container pruning can be initiated via CLI flags, environment variables, 
 | **P1** | Internal Override | `--cderun-prune` | Hoisted Phase 1 internal override flag. |
 | **P2** | CLI Flag | `--prune` | Standard command-line flag. |
 | **P3** | Environment Variable | `CDERUN_PRUNE=true` | Shell environment variable toggle. |
-| **P4** | Tool Configuration | `prune: true` | Defined per tool in `.tools.yaml`. Can trigger pruning when invoking that tool even if global `prune` is false. |
+| **P4** | Tool Configuration | `prune: true` | Defined per tool in `.tools.yaml`. When per-tool `prune: true` takes precedence, invoking the tool prunes containers and exits successfully without executing the requested command. |
 | **P5** | Global Configuration | `prune: true` | Defined under defaults in `.cderun.yaml`. |
 | **P6** | Built-in Default | `false` | Disabled by default. |
 
