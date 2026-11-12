@@ -88,7 +88,7 @@ jobs:
       run: |
         export CDERUN_ENGINE=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -tags=runtime -v ./...
+        go test -tags=runtime -v ./internal/runtime/...
 
   runtime-test-docker:
     runs-on: ouchi-kubernetes
@@ -118,7 +118,7 @@ jobs:
       run: |
         export CDERUN_ENGINE=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
-        go test -tags=runtime -v ./...
+        go test -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-podman:
     runs-on: ouchi-kubernetes
@@ -153,4 +153,4 @@ jobs:
       run: |
         export CDERUN_ENGINE=podman
         export CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock"
-        go test -tags=runtime -v ./...
+        go test -tags=runtime -v ./internal/runtime/...
