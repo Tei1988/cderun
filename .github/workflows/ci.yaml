@@ -88,7 +88,8 @@ jobs:
       run: |
         export CDERUN_ENGINE=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -tags=runtime -v ./internal/runtime/...
+        export CDERUN_NETWORK=host
+        go test -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-docker:
     runs-on: ouchi-kubernetes

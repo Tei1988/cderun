@@ -112,6 +112,10 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 		}
 	}
 
+	if net := os.Getenv("CDERUN_NETWORK"); net != "" {
+		cderunFlags = append(cderunFlags, "--env", "CDERUN_NETWORK="+net)
+	}
+
 	// Host-side Call: cderun [flags] alpine [container command]
 	// Container Command: cderun --image ... alpine echo nested-success
 	commandOptions := []string{

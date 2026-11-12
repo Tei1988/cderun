@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
@@ -266,6 +267,12 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}
 		require.NoError(t, err)
 		assert.NotEmpty(t, id)
+
+		defer func() {
+			ctxClean, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = rt.RemoveContainer(ctxClean, id)
+		}()
 
 		err = rt.StartContainer(ctx, id)
 		if err != nil {

@@ -7,19 +7,24 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
+// defaultSocketPathForLiveEngine returns the default UNIX socket path for a given container engine.
 func defaultSocketPathForLiveEngine(engine string) string {
 	switch engine {
 	case "containerd":
 		return "/run/containerd/containerd.sock"
 	case "podman":
-		uid := os.Getuid()
-		return fmt.Sprintf("/run/user/%d/podman/podman.sock", uid)
+		userSock := fmt.Sprintf("/run/user/%d/podman/podman.sock", os.Getuid())
+		if _, err := os.Stat(userSock); err == nil {
+			return userSock
+		}
+		return "/run/podman/podman.sock"
 	case "docker":
 		return "/var/run/docker.sock"
 	default:
@@ -27,16 +32,61 @@ func defaultSocketPathForLiveEngine(engine string) string {
 	}
 }
 
-func TestConformance_LiveSocketRuntime(t *testing.T) {
-	engineName := os.Getenv("CDERUN_ENGINE")
-	if engineName == "" {
-		engineName = "containerd"
+// discoverEngineAndSocket discovers the container engine and socket path based on environment variables
+// and filesystem socket availability, adhering to cderun's engine auto-detection precedence order.
+func discoverEngineAndSocket() (string, string) {
+	engine := os.Getenv("CDERUN_ENGINE")
+	socket := os.Getenv("CDERUN_SOCKET_PATH")
+
+	if engine != "" && socket != "" {
+		return engine, socket
 	}
 
-	socketPath := os.Getenv("CDERUN_SOCKET_PATH")
-	if socketPath == "" {
-		socketPath = defaultSocketPathForLiveEngine(engineName)
+	if engine != "" && socket == "" {
+		return engine, defaultSocketPathForLiveEngine(engine)
 	}
+
+	if engine == "" && socket != "" {
+		// Deduce engine from socket path basename
+		base := strings.TrimRight(socket, "/")
+		if idx := strings.LastIndexByte(base, '/'); idx != -1 {
+			base = base[idx+1:]
+		}
+		if strings.Contains(base, "podman") {
+			return "podman", socket
+		}
+		if strings.Contains(base, "containerd") {
+			return "containerd", socket
+		}
+		return "docker", socket
+	}
+
+	// Engine and socket are both unspecified: auto-detect from filesystem in standard priority order:
+	// Docker -> containerd -> Podman, defaulting to Docker if none are detected.
+	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
+		return "docker", "/var/run/docker.sock"
+	}
+	if _, err := os.Stat("/run/containerd/containerd.sock"); err == nil {
+		return "containerd", "/run/containerd/containerd.sock"
+	}
+	podmanUserSock := fmt.Sprintf("/run/user/%d/podman/podman.sock", os.Getuid())
+	if _, err := os.Stat(podmanUserSock); err == nil {
+		return "podman", podmanUserSock
+	}
+	if _, err := os.Stat("/run/podman/podman.sock"); err == nil {
+		return "podman", "/run/podman/podman.sock"
+	}
+
+	return "docker", "/var/run/docker.sock"
+}
+
+// TestConformance_LiveSocketRuntime runs the ContainerRuntime conformance test suite
+// against a live container engine daemon connected via a UNIX domain socket.
+// It detects the target engine and socket path via CDERUN_ENGINE and CDERUN_SOCKET_PATH
+// or automatically discovers them using standard filesystem probing.
+// When the target socket is unreachable, the test fails immediately.
+func TestConformance_LiveSocketRuntime(t *testing.T) {
+	engineName, socketPath := discoverEngineAndSocket()
 
 	if socketPath == "" {
 		t.Fatalf("-tags=runtime specified but no socket path could be determined for engine %q", engineName)
