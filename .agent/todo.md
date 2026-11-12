@@ -810,6 +810,16 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 
 ---
 
+## T105: `feature_controlsocket_deadline_scenarios_test.go` におけるコンテキストキャンセルとデッドラインタイムアウトの競合
+
+- 種別: バグ / テスト堅牢性
+- 優先度: 中
+- 対象: `internal/runtime/controlsocket/feature_controlsocket_deadline_scenarios_test.go:60`
+- 現象: `WaitContainer_RPC_deadline_timeout` テストにおいて、クライアント側の watchdog による切断処理（`cancel()`）とフレーム内のデッドライン到達タイミングのわずかなジッターにより、ディスパッチャ側で観測されるエラーが `context.DeadlineExceeded` ではなく接続切断由来の `context.Canceled` になることがあり、`assert.ErrorIs(t, dispErr, context.DeadlineExceeded)` が稀に失敗する。
+- 対策方針: ディスパッチャ側で観測されるエラーについて、`errors.Is(dispErr, context.DeadlineExceeded) || errors.Is(dispErr, context.Canceled)` のいずれかを許容するか、テスト内のタイムアウト・デッドラインマージンを調整する。
+
+---
+
 ## T103: `internal/runtime` のテストファイルリネームと重複削除
 
 - 種別: クリーンアップ
