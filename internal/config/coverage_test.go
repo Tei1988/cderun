@@ -45,13 +45,13 @@ func TestUnit_Coverage_Option_ParsingErrors(t *testing.T) {
 		"F": "bad",
 		"B": "bad",
 	}}
-	_, err := resolveIntOpt(OptionDef[*int]{EnvKey: "I"}, 5, false, 0, false, 0, ToolConfig{}, false, nil, mfs)
+	_, err := resolveIntOpt(OptionDef[*int]{EnvKey: "I"}, 5, false, 0, false, 0, "s", nil, nil, mfs)
 	require.Error(t, err)
 
-	_, errF := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "F"}, 1.1, false, 0, false, 0, ToolConfig{}, false, nil, mfs)
+	_, errF := resolveFloat64Opt(OptionDef[*float64]{EnvKey: "F"}, 1.1, false, 0, false, 0, "s", nil, nil, mfs)
 	require.Error(t, errF)
 
-	_, _, errB := resolveBoolOptInfo(OptionDef[*bool]{EnvKey: "B"}, false, false, false, false, ToolConfig{}, false, nil, mfs)
+	_, _, errB := resolveBoolOptInfo(OptionDef[*bool]{EnvKey: "B"}, false, false, false, false, "s", nil, nil, mfs)
 	require.Error(t, errB)
 }
 
@@ -580,10 +580,10 @@ func TestUnit_Coverage_Config_DeepCopy_Exhaustive(t *testing.T) {
 func TestUnit_Coverage_Option_StringSlice_Priority(t *testing.T) {
 	def := OptionDef[[]string]{EnvKey: "E"}
 	r, _ := NewExpressionResolver(nil)
-	assert.Equal(t, []string{"ev"}, resolveStringSliceOpt(def, ",", nil, nil, ToolConfig{}, false, nil, r, &MockFileSystem{Env: map[string]string{"E": "ev"}}))
+	assert.Equal(t, []string{"ev"}, resolveStringSliceOpt(def, ",", nil, nil, "s", nil, nil, r, &MockFileSystem{Env: map[string]string{"E": "ev"}}))
 	tools := ToolsConfig{"s": ToolConfig{Ports: []string{"80"}}}
 	def.ToolGetter = func(t ToolConfig) []string { return t.Ports }
-	assert.Equal(t, []string{"80"}, resolveStringSliceOpt(def, ",", nil, nil, tools["s"], true, nil, r, &MockFileSystem{}))
+	assert.Equal(t, []string{"80"}, resolveStringSliceOpt(def, ",", nil, nil, "s", tools, nil, r, &MockFileSystem{}))
 }
 
 func TestUnit_Coverage_Resolver_ResolveEnv_EmptyParts(t *testing.T) {
@@ -601,19 +601,19 @@ func TestUnit_Coverage_Resolver_ResolveMounts_EmptyParts(t *testing.T) {
 
 func TestUnit_Coverage_Option_IntOpt_Fallback(t *testing.T) {
 	def := OptionDef[*int]{}
-	assert.Equal(t, 42, must(resolveIntOpt(def, 42, false, 0, false, 0, ToolConfig{}, false, nil, &MockFileSystem{})))
-	assert.Equal(t, 0, must(resolveIntOpt(def, 0, false, 0, false, 0, ToolConfig{}, false, nil, &MockFileSystem{})))
+	assert.Equal(t, 42, must(resolveIntOpt(def, 42, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})))
+	assert.Equal(t, 0, must(resolveIntOpt(def, 0, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})))
 }
 
 func TestUnit_Coverage_Option_Float64Opt_Fallback(t *testing.T) {
 	def := OptionDef[*float64]{}
-	assert.InDelta(t, 3.14, must(resolveFloat64Opt(def, 3.14, false, 0, false, 0, ToolConfig{}, false, nil, &MockFileSystem{})), 1e-9)
-	assert.InDelta(t, 0.0, must(resolveFloat64Opt(def, 0.0, false, 0, false, 0, ToolConfig{}, false, nil, &MockFileSystem{})), 1e-9)
+	assert.InDelta(t, 3.14, must(resolveFloat64Opt(def, 3.14, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})), 1e-9)
+	assert.InDelta(t, 0.0, must(resolveFloat64Opt(def, 0.0, false, 0, false, 0, "s", nil, nil, &MockFileSystem{})), 1e-9)
 }
 
 func TestUnit_Coverage_Option_BoolOpt_EnvKeyEmpty(t *testing.T) {
 	def := OptionDef[*bool]{EnvKey: ""}
-	val, spec, err := resolveBoolOptInfo(def, false, false, false, false, ToolConfig{}, false, nil, &MockFileSystem{})
+	val, spec, err := resolveBoolOptInfo(def, false, false, false, false, "s", nil, nil, &MockFileSystem{})
 	require.NoError(t, err)
 	assert.False(t, spec)
 	assert.False(t, val)
@@ -623,16 +623,16 @@ func TestUnit_Coverage_Option_StringSlice_EmptyEnv(t *testing.T) {
 	def := OptionDef[[]string]{EnvKey: "E"}
 	r, _ := NewExpressionResolver(nil)
 	mfs := &MockFileSystem{Env: map[string]string{"E": ""}}
-	res := resolveStringSliceOpt(def, ",", nil, nil, ToolConfig{}, false, nil, r, mfs)
+	res := resolveStringSliceOpt(def, ",", nil, nil, "s", nil, nil, r, mfs)
 	assert.Empty(t, res)
 }
 
 func TestUnit_Coverage_Option_StringSliceComma_P1P2(t *testing.T) {
 	def := OptionDef[[]string]{EnvKey: "E"}
 	r, _ := NewExpressionResolver(nil)
-	assert.Equal(t, []string{"a", "b"}, resolveStringSliceCommaOpt(def, true, "a,b", false, "", ToolConfig{}, false, nil, r, &MockFileSystem{}))
-	assert.Equal(t, []string{"c", "d"}, resolveStringSliceCommaOpt(def, false, "", true, "c,d", ToolConfig{}, false, nil, r, &MockFileSystem{}))
-	assert.Equal(t, []string{"e", "f"}, resolveStringSliceCommaOpt(def, false, "", false, "", ToolConfig{}, false, nil, r, &MockFileSystem{Env: map[string]string{"E": "e,f"}}))
+	assert.Equal(t, []string{"a", "b"}, resolveStringSliceCommaOpt(def, true, "a,b", false, "", "s", nil, nil, r, &MockFileSystem{}))
+	assert.Equal(t, []string{"c", "d"}, resolveStringSliceCommaOpt(def, false, "", true, "c,d", "s", nil, nil, r, &MockFileSystem{}))
+	assert.Equal(t, []string{"e", "f"}, resolveStringSliceCommaOpt(def, false, "", false, "", "s", nil, nil, r, &MockFileSystem{Env: map[string]string{"E": "e,f"}}))
 }
 
 func TestUnit_Coverage_Resolver_InitFieldInfo_Coverage(t *testing.T) {

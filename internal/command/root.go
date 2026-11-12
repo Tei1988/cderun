@@ -655,269 +655,144 @@ func (o *rootOptions) pullPrefetchImages(ctx context.Context, rt runtime.Contain
 	return nil
 }
 
-func writeDryRunJoined(b *strings.Builder, label string, items []string) {
-	b.WriteString(label)
-	for i, item := range items {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(item)
+func formatDryRunCoreFields(w io.Writer, cfg *container.ContainerConfig) {
+	_, _ = fmt.Fprintf(w, "Image: %s\n", cfg.Image)
+	quotedCmd := make([]string, 0, len(cfg.Command))
+	for _, arg := range cfg.Command {
+		quotedCmd = append(quotedCmd, fmt.Sprintf("%q", arg))
 	}
-	b.WriteByte('\n')
+	_, _ = fmt.Fprintf(w, "Command: %s\n", strings.Join(quotedCmd, " "))
+	_, _ = fmt.Fprintf(w, "TTY: %v\n", cfg.TTY)
+	_, _ = fmt.Fprintf(w, "Interactive: %v\n", cfg.Interactive)
+	_, _ = fmt.Fprintf(w, "Network: %s\n", cfg.Network)
+	_, _ = fmt.Fprintf(w, "Remove: %v\n", cfg.Remove)
+	_, _ = fmt.Fprintf(w, "ReadOnly: %v\n", cfg.ReadOnly)
+	_, _ = fmt.Fprintf(w, "Init: %v\n", cfg.Init)
 }
 
-func formatDryRunCoreFields(b *strings.Builder, cfg *container.ContainerConfig) {
-	b.WriteString("Image: ")
-	b.WriteString(cfg.Image)
-	b.WriteByte('\n')
-
-	b.WriteString("Command: ")
-	for i, arg := range cfg.Command {
-		if i > 0 {
-			b.WriteByte(' ')
-		}
-		b.WriteString(strconv.Quote(arg))
+func formatDryRunMountsAndEnv(w io.Writer, cfg *container.ContainerConfig) {
+	mounts := make([]string, 0, len(cfg.Mounts))
+	for _, m := range cfg.Mounts {
+		mounts = append(mounts, fmt.Sprintf("type=%s,source=%q,target=%q,readonly=%v", m.Type, m.Source, m.Target, m.ReadOnly))
 	}
-	b.WriteByte('\n')
-
-	b.WriteString("TTY: ")
-	b.WriteString(strconv.FormatBool(cfg.TTY))
-	b.WriteByte('\n')
-
-	b.WriteString("Interactive: ")
-	b.WriteString(strconv.FormatBool(cfg.Interactive))
-	b.WriteByte('\n')
-
-	b.WriteString("Network: ")
-	b.WriteString(cfg.Network)
-	b.WriteByte('\n')
-
-	b.WriteString("Remove: ")
-	b.WriteString(strconv.FormatBool(cfg.Remove))
-	b.WriteByte('\n')
-
-	b.WriteString("ReadOnly: ")
-	b.WriteString(strconv.FormatBool(cfg.ReadOnly))
-	b.WriteByte('\n')
-
-	b.WriteString("Init: ")
-	b.WriteString(strconv.FormatBool(cfg.Init))
-	b.WriteByte('\n')
-}
-
-func formatDryRunMountsAndEnv(b *strings.Builder, cfg *container.ContainerConfig) {
-	b.WriteString("Mounts: ")
-	for i, m := range cfg.Mounts {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString("type=")
-		b.WriteString(m.Type)
-		b.WriteString(",source=")
-		b.WriteString(strconv.Quote(m.Source))
-		b.WriteString(",target=")
-		b.WriteString(strconv.Quote(m.Target))
-		b.WriteString(",readonly=")
-		b.WriteString(strconv.FormatBool(m.ReadOnly))
-	}
-	b.WriteByte('\n')
-
-	b.WriteString("Env: ")
-	for i, e := range cfg.Env {
-		if i > 0 {
-			b.WriteString(", ")
-		}
+	_, _ = fmt.Fprintf(w, "Mounts: %s\n", strings.Join(mounts, ", "))
+	quotedEnvs := make([]string, 0, len(cfg.Env))
+	for _, e := range cfg.Env {
 		if k, v, found := strings.Cut(e, "="); found {
-			b.WriteString(strconv.Quote(k))
-			b.WriteByte('=')
-			b.WriteString(strconv.Quote(v))
+			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q=%q", k, v))
 		} else {
-			b.WriteString(strconv.Quote(e))
+			quotedEnvs = append(quotedEnvs, fmt.Sprintf("%q", e))
 		}
 	}
-	b.WriteByte('\n')
-
-	b.WriteString("Workdir: ")
-	b.WriteString(cfg.Workdir)
-	b.WriteByte('\n')
-
-	b.WriteString("User: ")
-	b.WriteString(cfg.User)
-	b.WriteByte('\n')
+	_, _ = fmt.Fprintf(w, "Env: %s\n", strings.Join(quotedEnvs, ", "))
+	_, _ = fmt.Fprintf(w, "Workdir: %s\n", cfg.Workdir)
+	_, _ = fmt.Fprintf(w, "User: %s\n", cfg.User)
 }
 
-func formatDryRunNetworkAndSecurity(b *strings.Builder, cfg *container.ContainerConfig) {
-	writeDryRunJoined(b, "Ports: ", cfg.Ports)
-
-	b.WriteString("PublishAll: ")
-	b.WriteString(strconv.FormatBool(cfg.PublishAll))
-	b.WriteByte('\n')
-
-	writeDryRunJoined(b, "Expose: ", cfg.Expose)
-
-	b.WriteString("Hostname: ")
-	b.WriteString(cfg.Hostname)
-	b.WriteByte('\n')
-
-	writeDryRunJoined(b, "DNS: ", cfg.DNS)
-	writeDryRunJoined(b, "AddHosts: ", cfg.AddHosts)
-
-	b.WriteString("Privileged: ")
-	b.WriteString(strconv.FormatBool(cfg.Privileged))
-	b.WriteByte('\n')
-
+func formatDryRunNetworkAndSecurity(w io.Writer, cfg *container.ContainerConfig) {
+	_, _ = fmt.Fprintf(w, "Ports: %s\n", strings.Join(cfg.Ports, ", "))
+	_, _ = fmt.Fprintf(w, "PublishAll: %v\n", cfg.PublishAll)
+	_, _ = fmt.Fprintf(w, "Expose: %s\n", strings.Join(cfg.Expose, ", "))
+	_, _ = fmt.Fprintf(w, "Hostname: %s\n", cfg.Hostname)
+	_, _ = fmt.Fprintf(w, "DNS: %s\n", strings.Join(cfg.DNS, ", "))
+	_, _ = fmt.Fprintf(w, "AddHosts: %s\n", strings.Join(cfg.AddHosts, ", "))
+	_, _ = fmt.Fprintf(w, "Privileged: %v\n", cfg.Privileged)
 	if cfg.Pid != "" {
-		b.WriteString("Pid: ")
-		b.WriteString(cfg.Pid)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Pid: %s\n", cfg.Pid)
 	}
 	if cfg.ShmSize != "" {
-		b.WriteString("ShmSize: ")
-		b.WriteString(cfg.ShmSize)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "ShmSize: %s\n", cfg.ShmSize)
 	}
 	if cfg.IPC != "" {
-		b.WriteString("IPC: ")
-		b.WriteString(cfg.IPC)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "IPC: %s\n", cfg.IPC)
 	}
 	if len(cfg.SecurityOpt) > 0 {
-		writeDryRunJoined(b, "SecurityOpt: ", cfg.SecurityOpt)
+		_, _ = fmt.Fprintf(w, "SecurityOpt: %s\n", strings.Join(cfg.SecurityOpt, ", "))
 	}
 	if len(cfg.DNSSearch) > 0 {
-		writeDryRunJoined(b, "DNSSearch: ", cfg.DNSSearch)
+		_, _ = fmt.Fprintf(w, "DNSSearch: %s\n", strings.Join(cfg.DNSSearch, ", "))
 	}
 	if len(cfg.DNSOptions) > 0 {
-		writeDryRunJoined(b, "DNSOptions: ", cfg.DNSOptions)
+		_, _ = fmt.Fprintf(w, "DNSOptions: %s\n", strings.Join(cfg.DNSOptions, ", "))
 	}
 	if cfg.GPUs != "" {
-		b.WriteString("GPUs: ")
-		b.WriteString(cfg.GPUs)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "GPUs: %s\n", cfg.GPUs)
 	}
 	if cfg.Cgroupns != "" {
-		b.WriteString("Cgroupns: ")
-		b.WriteString(cfg.Cgroupns)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Cgroupns: %s\n", cfg.Cgroupns)
 	}
 }
 
-func formatDryRunLimitsAndResources(b *strings.Builder, cfg *container.ContainerConfig) {
+func formatDryRunLimitsAndResources(w io.Writer, cfg *container.ContainerConfig) {
 	if cfg.PidsLimit != 0 {
-		b.WriteString("PidsLimit: ")
-		b.WriteString(strconv.FormatInt(cfg.PidsLimit, 10))
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "PidsLimit: %d\n", cfg.PidsLimit)
 	}
 	if cfg.CPUShares > 0 {
-		b.WriteString("CPUShares: ")
-		b.WriteString(strconv.FormatInt(cfg.CPUShares, 10))
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "CPUShares: %d\n", cfg.CPUShares)
 	}
 	if cfg.CpusetCpus != "" {
-		b.WriteString("CpusetCpus: ")
-		b.WriteString(cfg.CpusetCpus)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "CpusetCpus: %s\n", cfg.CpusetCpus)
 	}
 	if cfg.CpusetMems != "" {
-		b.WriteString("CpusetMems: ")
-		b.WriteString(cfg.CpusetMems)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "CpusetMems: %s\n", cfg.CpusetMems)
 	}
 	if cfg.Restart != "" && cfg.Restart != "no" {
-		b.WriteString("Restart: ")
-		b.WriteString(cfg.Restart)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Restart: %s\n", cfg.Restart)
 	}
 	if cfg.OciRuntime != "" {
-		b.WriteString("OciRuntime: ")
-		b.WriteString(cfg.OciRuntime)
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "OciRuntime: %s\n", cfg.OciRuntime)
 	}
-
-	writeDryRunJoined(b, "CapAdd: ", cfg.CapAdd)
-	writeDryRunJoined(b, "CapDrop: ", cfg.CapDrop)
-	writeDryRunJoined(b, "GroupAdd: ", cfg.GroupAdd)
+	_, _ = fmt.Fprintf(w, "CapAdd: %s\n", strings.Join(cfg.CapAdd, ", "))
+	_, _ = fmt.Fprintf(w, "CapDrop: %s\n", strings.Join(cfg.CapDrop, ", "))
+	_, _ = fmt.Fprintf(w, "GroupAdd: %s\n", strings.Join(cfg.GroupAdd, ", "))
 
 	if len(cfg.Ulimits) > 0 {
-		b.WriteString("Ulimits: ")
-		for i, u := range cfg.Ulimits {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(u.Name)
-			b.WriteByte('=')
-			b.WriteString(strconv.FormatInt(u.Soft, 10))
-			b.WriteByte(':')
-			b.WriteString(strconv.FormatInt(u.Hard, 10))
+		ulimits := make([]string, 0, len(cfg.Ulimits))
+		for _, u := range cfg.Ulimits {
+			ulimits = append(ulimits, fmt.Sprintf("%s=%d:%d", u.Name, u.Soft, u.Hard))
 		}
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Ulimits: %s\n", strings.Join(ulimits, ", "))
 	}
 
 	if len(cfg.Sysctls) > 0 {
-		sysctlKeys := make([]string, 0, len(cfg.Sysctls))
-		for k := range cfg.Sysctls {
-			sysctlKeys = append(sysctlKeys, k)
+		sysctls := make([]string, 0, len(cfg.Sysctls))
+		for k, v := range cfg.Sysctls {
+			sysctls = append(sysctls, fmt.Sprintf("%s=%s", k, v))
 		}
-		sort.Strings(sysctlKeys)
-		b.WriteString("Sysctls: ")
-		for i, k := range sysctlKeys {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(k)
-			b.WriteByte('=')
-			b.WriteString(cfg.Sysctls[k])
-		}
-		b.WriteByte('\n')
+		sort.Strings(sysctls)
+		_, _ = fmt.Fprintf(w, "Sysctls: %s\n", strings.Join(sysctls, ", "))
 	}
 
-	b.WriteString("Devices: ")
-	for i, d := range cfg.Devices {
-		if i > 0 {
-			b.WriteString(", ")
-		}
+	devices := make([]string, 0, len(cfg.Devices))
+	for _, d := range cfg.Devices {
 		if d.PathOnHost == d.PathInContainer && d.CgroupPermissions == "rwm" {
-			b.WriteString(d.PathOnHost)
+			devices = append(devices, d.PathOnHost)
 		} else {
-			b.WriteString(d.PathOnHost)
-			b.WriteByte(':')
-			b.WriteString(d.PathInContainer)
-			b.WriteByte(':')
-			b.WriteString(d.CgroupPermissions)
+			devices = append(devices, fmt.Sprintf("%s:%s:%s", d.PathOnHost, d.PathInContainer, d.CgroupPermissions))
 		}
 	}
-	b.WriteByte('\n')
+	_, _ = fmt.Fprintf(w, "Devices: %s\n", strings.Join(devices, ", "))
 
 	if cfg.Memory > 0 {
-		b.WriteString("Memory: ")
-		b.WriteString(units.BytesSize(float64(cfg.Memory)))
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Memory: %s\n", units.BytesSize(float64(cfg.Memory)))
 	}
 	if cfg.CPUs > 0 {
-		b.WriteString("CPUs: ")
-		b.WriteString(strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "CPUs: %s\n", strconv.FormatFloat(cfg.CPUs, 'f', -1, 64))
 	}
 	if len(cfg.Entrypoint) > 0 {
-		b.WriteString("Entrypoint: ")
-		for i, arg := range cfg.Entrypoint {
-			if i > 0 {
-				b.WriteByte(' ')
-			}
-			b.WriteString(strconv.Quote(arg))
+		quotedEntry := make([]string, 0, len(cfg.Entrypoint))
+		for _, arg := range cfg.Entrypoint {
+			quotedEntry = append(quotedEntry, fmt.Sprintf("%q", arg))
 		}
-		b.WriteByte('\n')
+		_, _ = fmt.Fprintf(w, "Entrypoint: %s\n", strings.Join(quotedEntry, " "))
 	}
 }
 
 func formatDryRunSimple(w io.Writer, cfg *container.ContainerConfig) {
-	var b strings.Builder
-	b.Grow(1024)
-	formatDryRunCoreFields(&b, cfg)
-	formatDryRunMountsAndEnv(&b, cfg)
-	formatDryRunNetworkAndSecurity(&b, cfg)
-	formatDryRunLimitsAndResources(&b, cfg)
-	_, _ = io.WriteString(w, b.String())
+	formatDryRunCoreFields(w, cfg)
+	formatDryRunMountsAndEnv(w, cfg)
+	formatDryRunNetworkAndSecurity(w, cfg)
+	formatDryRunLimitsAndResources(w, cfg)
 }
 
 func (o *rootOptions) handleDryRun(cmd *cobra.Command, containerConfig *container.ContainerConfig, resolved *config.ResolvedConfig) error {
@@ -1388,30 +1263,6 @@ func (o *rootOptions) drainAttachOutput(containerID string, att *attachResult) {
 	}
 }
 
-func waitForWaitResult(waitDone <-chan waitResult, wrapInExitCodeError bool) (int, error) {
-	res := <-waitDone
-	if res.err != nil {
-		err := fmt.Errorf("failed to wait for container: %w", res.err)
-		if wrapInExitCodeError {
-			return 0, &ExitCodeError{Code: 125, Err: err}
-		}
-		return 0, err
-	}
-	return res.code, nil
-}
-
-func waitForWaitResultWithTimeout(waitDone <-chan waitResult, timeout time.Duration) (int, bool, error) {
-	select {
-	case res := <-waitDone:
-		if res.err != nil {
-			return 0, false, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
-		}
-		return res.code, false, nil
-	case <-time.After(timeout):
-		return 0, true, nil
-	}
-}
-
 func (o *rootOptions) handleAttachFinishedBeforeExit(
 	rt runtime.ContainerRuntime,
 	containerID string,
@@ -1424,44 +1275,68 @@ func (o *rootOptions) handleAttachFinishedBeforeExit(
 	if err != nil && !errors.Is(err, context.Canceled) {
 		o.logger.Warn("failed to attach to container: %v", err)
 		if effectiveHangTimeout > 0 {
-			code, timedOut, waitErr := waitForWaitResultWithTimeout(waitDone, effectiveHangTimeout)
-			if timedOut {
+			select {
+			case res := <-waitDone:
+				if res.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+				}
+				return res.code, nil
+			case <-time.After(effectiveHangTimeout):
 				o.logger.Debug("Timeout waiting for container %s after attach error", containerID)
 				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("timeout waiting for container to exit after attach error")}
 			}
-			return code, waitErr
+		} else {
+			res := <-waitDone
+			if res.err != nil {
+				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", res.err)}
+			}
+			return res.code, nil
 		}
-		return waitForWaitResult(waitDone, true)
 	}
 	o.logger.Debug("AttachContainer finished successfully before container exit for %s", containerID)
 
 	if !isHostStdinTerminal || !cc.Interactive {
 		if effectiveHangTimeout > 0 {
 			o.logger.Trace("IO finished, waiting up to %v for container %s to exit", effectiveHangTimeout, containerID)
-			code, timedOut, waitErr := waitForWaitResultWithTimeout(waitDone, effectiveHangTimeout)
-			if !timedOut {
-				return code, waitErr
+			select {
+			case result := <-waitDone:
+				if result.err != nil {
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+				}
+				return result.code, nil
+			case <-time.After(effectiveHangTimeout):
+				killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer killCancel()
+				_, err := o.signalKillIfRunning(killCtx, rt, containerID)
+				if err != nil {
+					return 0, err
+				}
+				select {
+				case result := <-waitDone:
+					if result.err != nil {
+						return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
+					}
+					return result.code, nil
+				case <-time.After(effectiveHangTimeout):
+					o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
+					return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
+				}
 			}
-
-			killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer killCancel()
-			_, killErr := o.signalKillIfRunning(killCtx, rt, containerID)
-			if killErr != nil {
-				return 0, killErr
+		} else {
+			o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
+			result := <-waitDone
+			if result.err != nil {
+				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("failed to wait for container: %w", result.err)}
 			}
-
-			code, timedOut, waitErr = waitForWaitResultWithTimeout(waitDone, effectiveHangTimeout)
-			if timedOut {
-				o.logger.Warn("container %s failed to exit after SIGKILL timeout", containerID)
-				return 0, &ExitCodeError{Code: 125, Err: fmt.Errorf("container %s failed to exit after SIGKILL timeout", containerID)}
-			}
-			return code, waitErr
+			return result.code, nil
 		}
-		o.logger.Trace("IO finished, waiting indefinitely for container %s to exit", containerID)
-		return waitForWaitResult(waitDone, true)
+	} else {
+		result := <-waitDone
+		if result.err != nil {
+			return 0, fmt.Errorf("failed to wait for container: %w", result.err)
+		}
+		return result.code, nil
 	}
-
-	return waitForWaitResult(waitDone, false)
 }
 
 func (o *rootOptions) waitForCompletion(ctx context.Context, cmd *cobra.Command, rt runtime.ContainerRuntime, containerID string, cc *container.ContainerConfig, resolved *config.ResolvedConfig, isHostStdinTerminal bool, att *attachResult) (int, error) {

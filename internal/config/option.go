@@ -28,7 +28,7 @@ func resolveStringOpt(
 	def OptionDef[string],
 	p1Set bool, p1Val string,
 	p2Set bool, p2Val string,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) string {
 	var s string
@@ -48,10 +48,12 @@ func resolveStringOpt(
 	}
 
 	if !found {
-		if def.ToolGetter != nil && toolExists {
-			if val := def.ToolGetter(tool); val != "" {
-				s = val
-				found = true
+		if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+			if tool, ok := tools[subcommand]; ok {
+				if val := def.ToolGetter(tool); val != "" {
+					s = val
+					found = true
+				}
 			}
 		}
 	}
@@ -82,10 +84,10 @@ func resolveBoolOpt(
 	fallback bool,
 	p1Set bool, p1Val bool,
 	p2Set bool, p2Val bool,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
 ) (bool, error) {
-	val, specified, err := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, tool, toolExists, global, fs)
+	val, specified, err := resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, subcommand, tools, global, fs)
 	if err != nil {
 		return false, err
 	}
@@ -100,7 +102,7 @@ func resolveBoolOptInfo(
 	def OptionDef[*bool],
 	p1Set bool, p1Val bool,
 	p2Set bool, p2Val bool,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
 ) (bool, bool, error) {
 	if p1Set {
@@ -118,9 +120,11 @@ func resolveBoolOptInfo(
 			return b, true, nil
 		}
 	}
-	if def.ToolGetter != nil && toolExists {
-		if b := def.ToolGetter(tool); b != nil {
-			return *b, true, nil
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if b := def.ToolGetter(tool); b != nil {
+				return *b, true, nil
+			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
@@ -137,7 +141,7 @@ func getWinningStringSlice(
 	def OptionDef[[]string],
 	envSep string,
 	p1 []string, p2 []string,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
 ) []string {
 	if p1 != nil {
@@ -184,9 +188,11 @@ func getWinningStringSlice(
 			return vals
 		}
 	}
-	if def.ToolGetter != nil && toolExists {
-		if v := def.ToolGetter(tool); v != nil {
-			return v
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if v := def.ToolGetter(tool); v != nil {
+				return v
+			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
@@ -204,16 +210,10 @@ func resolveStringSliceOptWithVals(
 		return vals
 	}
 
-	if r == nil {
-		res := make([]string, len(vals))
-		copy(res, vals)
-		return res
-	}
-
 	// Fast-path: check if any element actually requires resolution
 	needResolution := false
 	for _, v := range vals {
-		if strings.Contains(v, "{{") || strings.HasPrefix(v, "~") {
+		if r != nil && (strings.Contains(v, "{{") || strings.HasPrefix(v, "~")) {
 			needResolution = true
 			break
 		}
@@ -226,7 +226,7 @@ func resolveStringSliceOptWithVals(
 
 	res := make([]string, 0, len(vals))
 	for _, v := range vals {
-		if !strings.Contains(v, "{{") && !strings.HasPrefix(v, "~") {
+		if r == nil || (!strings.Contains(v, "{{") && !strings.HasPrefix(v, "~")) {
 			res = append(res, v)
 		} else {
 			res = append(res, r.resolveString(v))
@@ -242,10 +242,10 @@ func resolveStringSliceOpt(
 	def OptionDef[[]string],
 	envSep string,
 	p1 []string, p2 []string,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
-	vals := getWinningStringSlice(def, envSep, p1, p2, tool, toolExists, global, fs)
+	vals := getWinningStringSlice(def, envSep, p1, p2, subcommand, tools, global, fs)
 	return resolveStringSliceOptWithVals(vals, r)
 }
 
@@ -255,7 +255,7 @@ func resolveStringSliceCommaOpt(
 	def OptionDef[[]string],
 	p1Set bool, p1Val string,
 	p2Set bool, p2Val string,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	r *ExpressionResolver, fs FileSystem,
 ) []string {
 	var vals []string
@@ -286,8 +286,10 @@ func resolveStringSliceCommaOpt(
 			}
 		}
 	}
-	if vals == nil && def.ToolGetter != nil && toolExists {
-		vals = def.ToolGetter(tool)
+	if vals == nil && def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			vals = def.ToolGetter(tool)
+		}
 	}
 	if vals == nil && def.GlobalGetter != nil && global != nil {
 		vals = def.GlobalGetter(global)
@@ -315,7 +317,7 @@ func resolveFloat64Opt(
 	fallback float64,
 	p1Set bool, p1Val float64,
 	p2Set bool, p2Val float64,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
 ) (float64, error) {
 	if p1Set {
@@ -333,9 +335,11 @@ func resolveFloat64Opt(
 			return f, nil
 		}
 	}
-	if def.ToolGetter != nil && toolExists {
-		if f := def.ToolGetter(tool); f != nil {
-			return *f, nil
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if f := def.ToolGetter(tool); f != nil {
+				return *f, nil
+			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
@@ -352,7 +356,7 @@ func resolveIntOpt(
 	fallback int,
 	p1Set bool, p1Val int,
 	p2Set bool, p2Val int,
-	tool ToolConfig, toolExists bool, global *CDERunConfig,
+	subcommand string, tools ToolsConfig, global *CDERunConfig,
 	fs FileSystem,
 ) (int, error) {
 	if p1Set {
@@ -370,9 +374,11 @@ func resolveIntOpt(
 			return i, nil
 		}
 	}
-	if def.ToolGetter != nil && toolExists {
-		if i := def.ToolGetter(tool); i != nil {
-			return *i, nil
+	if def.ToolGetter != nil && len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if i := def.ToolGetter(tool); i != nil {
+				return *i, nil
+			}
 		}
 	}
 	if def.GlobalGetter != nil && global != nil {
