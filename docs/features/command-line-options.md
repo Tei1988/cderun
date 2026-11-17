@@ -326,6 +326,7 @@ cderun --strict-env --env NPM_TOKEN node app.js
   2. `/run/containerd/containerd.sock` (containerd)
   3. `/run/podman/podman.sock` (Podman)
   If no socket file exists on disk, `cderun` falls back to `docker` at `/var/run/docker.sock`.
+- **Engine Selection**: Engine selection is configured via `--engine`, `CDERUN_ENGINE`, or configuration key `engine:`. Note: `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and YAML `runtime:` are OCI-runtime selection settings (aliases for `--oci-runtime`), not container engine aliases; passing container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to them will return an `InvalidConfigError` directing users to `--engine`.
 - **P1 Internal Override**: `--cderun-engine` is the corresponding Phase 1 (P1) internal override flag.
 
 ```bash
@@ -339,13 +340,12 @@ cderun --engine containerd node app.js
 - **Default**: `""`
 - **Environment Variable**: `CDERUN_OCI_RUNTIME`
 - **Description**: Specify a custom OCI runtime (e.g., `runc`, `crun`, `kata`, `nvidia`) for low-level container execution.
-- **Supported Aliases**: `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and YAML `runtime:` are supported as aliases for OCI runtime selection (`--oci-runtime`, `CDERUN_OCI_RUNTIME`, `ociRuntime:`). Both `--oci-runtime` and `--runtime` are preserved alongside each other as supported aliases for OCI runtime selection.
-- **Engine Name Rejection**: Passing legacy container engine names (`docker`, `podman`, `containerd`, `nerdctl`) to `--runtime`, `CDERUN_RUNTIME`, or `runtime:` returns an explicit error directing the user to `--engine`.
 - **Details**:
   - **Docker**: Maps to `HostConfig.Runtime` during Docker container creation.
   - **Podman**: Mapped to native Podman OCI runtime selection.
-  - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`. Note: This limitation applies strictly to OCI runtime configuration via `--oci-runtime` / `--runtime`, not to container engine selection.
-- **P1 Internal Override**: `--cderun-oci-runtime` (or `--cderun-runtime`) is the corresponding Phase 1 (P1) internal override flag (e.g. `cderun node app.js --cderun-oci-runtime crun`).
+  - **containerd**: Unsupported on direct containerd API. Explicitly rejected in `ValidateConfig` with `"containerd runtime: oci-runtime is not supported yet"`. Note: This limitation applies to every OCI runtime input, including `--oci-runtime`, `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and YAML `runtime:`, not to container engine selection.
+- **OCI Runtime Aliases**: `--runtime`, `--cderun-runtime`, `CDERUN_RUNTIME`, and YAML `runtime:` are supported as aliases for OCI runtime selection (`--oci-runtime` / `CDERUN_OCI_RUNTIME` / `ociRuntime:`).
+- **P1 Internal Override**: `--cderun-oci-runtime` and `--cderun-runtime` are the corresponding Phase 1 (P1) internal override flags. When both are provided, `--cderun-oci-runtime` takes precedence (e.g. `cderun node app.js --cderun-oci-runtime crun`).
 
 ```bash
 cderun --oci-runtime crun node app.js

@@ -215,13 +215,8 @@ func globalSocketPathGetter(g *CDERunConfig) ConfigPath {
 }
 
 func resolveUlimits(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Ulimit, error) {
-	var tool ToolConfig
-	var toolExists bool
-	if len(tools) > 0 && subcommand != "" {
-		tool, toolExists = tools[subcommand]
-	}
 	raws, err := pickStringConfigs(
-		p1, p2, "CDERUN_ULIMIT", ",", tool, toolExists,
+		p1, p2, "CDERUN_ULIMIT", ",", subcommand, tools,
 		toolUlimitsGetter,
 		global, globalUlimitsGetter,
 		fs,
@@ -304,13 +299,8 @@ func resolveSysctlsFromRaws(raws []string, r *ExpressionResolver) (map[string]st
 }
 
 func resolveSysctls(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) (map[string]string, error) {
-	var tool ToolConfig
-	var toolExists bool
-	if len(tools) > 0 && subcommand != "" {
-		tool, toolExists = tools[subcommand]
-	}
 	raws, err := pickStringConfigs(
-		p1, p2, "CDERUN_SYSCTL", ",", tool, toolExists,
+		p1, p2, "CDERUN_SYSCTL", ",", subcommand, tools,
 		toolSysctlsGetter,
 		global, globalSysctlsGetter,
 		fs,
@@ -326,8 +316,8 @@ func pickStringConfigs(
 	p2 []string,
 	envKey string,
 	envSep string,
-	tool ToolConfig,
-	toolExists bool,
+	subcommand string,
+	tools ToolsConfig,
 	toolGetter func(ToolConfig) []string,
 	global *CDERunConfig,
 	globalGetter func(*CDERunConfig) []string,
@@ -377,9 +367,11 @@ func pickStringConfigs(
 			return res, nil
 		}
 	}
-	if toolExists {
-		if v := toolGetter(tool); v != nil {
-			return v, nil
+	if len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if v := toolGetter(tool); v != nil {
+				return v, nil
+			}
 		}
 	}
 	if global != nil {
@@ -406,8 +398,8 @@ func pickConfigs[T any](
 	p2 []string,
 	envKey string,
 	envSep string,
-	tool ToolConfig,
-	toolExists bool,
+	subcommand string,
+	tools ToolsConfig,
 	toolGetter func(ToolConfig) []T,
 	global *CDERunConfig,
 	globalGetter func(*CDERunConfig) []T,
@@ -468,9 +460,11 @@ func pickConfigs[T any](
 			return res, nil
 		}
 	}
-	if toolExists {
-		if v := toolGetter(tool); v != nil {
-			return v, nil
+	if len(tools) > 0 && subcommand != "" {
+		if tool, ok := tools[subcommand]; ok {
+			if v := toolGetter(tool); v != nil {
+				return v, nil
+			}
 		}
 	}
 	if global != nil {
@@ -497,13 +491,8 @@ func resolveDevicesFromConfigs(dcs []DeviceConfig, r *ExpressionResolver) ([]con
 }
 
 func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.DeviceMapping, error) {
-	var tool ToolConfig
-	var toolExists bool
-	if len(tools) > 0 && subcommand != "" {
-		tool, toolExists = tools[subcommand]
-	}
 	dcs, err := pickConfigs(
-		p1, p2, "CDERUN_DEVICE", ",", tool, toolExists,
+		p1, p2, "CDERUN_DEVICE", ",", subcommand, tools,
 		toolDevicesGetter,
 		global, globalDevicesGetter,
 		func(s, src string) (DeviceConfig, error) {
@@ -532,13 +521,8 @@ func resolveDevices(p1 []string, p2 []string, subcommand string, tools ToolsConf
 }
 
 func resolveEnv(p1 []string, p2 []string, envKey string, subcommand string, tools ToolsConfig, global *CDERunConfig, sensitivePatterns []string, strict bool, r *ExpressionResolver, fs FileSystem) ([]string, error) {
-	var tool ToolConfig
-	var toolExists bool
-	if len(tools) > 0 && subcommand != "" {
-		tool, toolExists = tools[subcommand]
-	}
 	envs, err := pickStringConfigs(
-		p1, p2, envKey, ";", tool, toolExists,
+		p1, p2, envKey, ";", subcommand, tools,
 		toolEnvGetter,
 		global, globalEnvGetter,
 		fs,
@@ -884,13 +868,8 @@ func resolveMountsFromConfigs(mcs []MountConfig, r *ExpressionResolver, fs FileS
 }
 
 func resolveMounts(p1 []string, p2 []string, subcommand string, tools ToolsConfig, global *CDERunConfig, r *ExpressionResolver, fs FileSystem) ([]container.Mount, error) {
-	var tool ToolConfig
-	var toolExists bool
-	if len(tools) > 0 && subcommand != "" {
-		tool, toolExists = tools[subcommand]
-	}
 	mcs, err := pickConfigs(
-		p1, p2, "CDERUN_MOUNT", ";", tool, toolExists,
+		p1, p2, "CDERUN_MOUNT", ";", subcommand, tools,
 		toolMountsGetter,
 		global, globalMountsGetter,
 		func(s, src string) (MountConfig, error) {

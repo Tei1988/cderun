@@ -107,4 +107,46 @@ func TestUnit_ResolverHelpers_Coverage(t *testing.T) {
 		_, err = resolveMounts([]string{"type=bind,source=/host,target=/t,optional"}, nil, "", nil, nil, r, mfs)
 		require.Error(t, err)
 	})
+
+	t.Run("mount-tools with expression resolves tool name before validation", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+			Env: map[string]string{
+				"TARGET_TOOL": "git",
+			},
+		}
+		cli := &CLIOptions{
+			Image:      ptr("alpine"),
+			MountTools: ptr("{{env:TARGET_TOOL}}"),
+		}
+		res, err := ResolveWithFS("sh", cli, nil, nil, mfs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"git"}, res.MountTools)
+		assert.True(t, res.MountCderun)
+		assert.True(t, res.MountSocket)
+	})
+
+	t.Run("explicit empty tool mount-tools overrides global defaults", func(t *testing.T) {
+		mfs := &MockFileSystem{
+			WD: "/app",
+		}
+		cli := &CLIOptions{
+			Image: ptr("alpine"),
+		}
+		tools := ToolsConfig{
+			"sh": ToolConfig{
+				MountTools: []string{},
+			},
+		}
+		global := &CDERunConfig{
+			Defaults: ConfigDefaults{
+				MountTools: []string{"git"},
+			},
+		}
+		res, err := ResolveWithFS("sh", cli, tools, global, mfs)
+		require.NoError(t, err)
+		assert.Empty(t, res.MountTools)
+		assert.False(t, res.MountCderun)
+		assert.False(t, res.MountSocket)
+	})
 }

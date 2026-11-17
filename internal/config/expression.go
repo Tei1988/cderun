@@ -294,15 +294,8 @@ func (r *ExpressionResolver) resolveString(s string) string {
 		return s
 	}
 
-	hasBrace := strings.IndexByte(s, '{') != -1
+	hasExpr := strings.Contains(s, "{{")
 	hasTilde := strings.HasPrefix(s, "~")
-
-	// Fast-path: no brace character and no tilde expansion
-	if !hasBrace && !hasTilde {
-		return s
-	}
-
-	hasExpr := hasBrace && strings.Contains(s, "{{")
 
 	// Fast-path: no expressions and no tilde expansion
 	if !hasExpr && !hasTilde {

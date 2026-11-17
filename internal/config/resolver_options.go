@@ -49,11 +49,8 @@ func resolveOptionFieldInfo(name string, info optionFields) (optionFields, error
 }
 
 func isDriftOk(name string, info optionFields) bool {
-	if info.p1ValIdx == -1 || info.p2ValIdx == -1 {
-		return false
-	}
 	if !inTest {
-		return true
+		return info.p1ValIdx != -1 && info.p2ValIdx != -1
 	}
 	expected, okExpected := expectedFieldIndices[name]
 	if !okExpected || info.p1ValIdx != expected.p1ValIdx || info.p2ValIdx != expected.p2ValIdx {
@@ -66,7 +63,7 @@ func isDriftOk(name string, info optionFields) bool {
 }
 
 func (rv *resolver) resolveStringOptionWithExpressions(def OptionDef[string], p1Set bool, p1Val string, p2Set bool, p2Val string) (string, error) {
-	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.tool, rv.toolExists, rv.global, rv.r, rv.fs)
+	resolved := resolveStringOpt(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.r, rv.fs)
 	if strings.Contains(resolved, "{{") || strings.HasPrefix(resolved, "~") {
 		r, err := rv.getR()
 		if err != nil {
@@ -299,7 +296,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 			GlobalGetter: opt.GlobalGetter,
 		}
 
-		vals := getWinningStringSlice(def, ",", p1v, p2v, rv.tool, rv.toolExists, rv.global, rv.fs)
+		vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
 		rForSlice, err := rv.resolveStringSliceOptionResolver(vals)
 		if err != nil {
 			return err
@@ -330,7 +327,7 @@ func (rv *resolver) applyStringSliceOption(opt StringSliceOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	vals := getWinningStringSlice(def, ",", p1v, p2v, rv.tool, rv.toolExists, rv.global, rv.fs)
+	vals := getWinningStringSlice(def, ",", p1v, p2v, rv.subcommand, rv.tools, rv.global, rv.fs)
 	rForSlice, err := rv.resolveStringSliceOptionResolver(vals)
 	if err != nil {
 		return err
@@ -401,7 +398,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
-		resolved, err := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.tool, rv.toolExists, rv.global, rv.fs)
+		resolved, err := resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 		if err != nil {
 			return err
 		}
@@ -422,7 +419,7 @@ func (rv *resolver) applyBoolOption(opt BoolOption) error {
 	s2, p2v := getFieldInfo(rv.getCliVal(), info.p2ValIdx)
 	p1Val, p2Val = p1v.Bool(), p2v.Bool()
 	def := OptionDef[*bool]{EnvKey: opt.EnvKey, ToolGetter: opt.ToolGetter, GlobalGetter: opt.GlobalGetter}
-	resolved, err := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.tool, rv.toolExists, rv.global, rv.fs)
+	resolved, err := resolveBoolOpt(def, opt.Default, s1, p1Val, s2, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -445,7 +442,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
-		resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.tool, rv.toolExists, rv.global, rv.fs)
+		resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 		if err != nil {
 			return err
 		}
@@ -473,7 +470,7 @@ func (rv *resolver) applyIntOption(opt IntOption) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.tool, rv.toolExists, rv.global, rv.fs)
+	resolved, err := resolveIntOpt(def, opt.Default, p1Set, p1Int, p2Set, p2Int, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -496,7 +493,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 			ToolGetter:   opt.ToolGetter,
 			GlobalGetter: opt.GlobalGetter,
 		}
-		resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.tool, rv.toolExists, rv.global, rv.fs)
+		resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 		if err != nil {
 			return err
 		}
@@ -524,7 +521,7 @@ func (rv *resolver) applyFloat64Option(opt Float64Option) error {
 		GlobalGetter: opt.GlobalGetter,
 	}
 
-	resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.tool, rv.toolExists, rv.global, rv.fs)
+	resolved, err := resolveFloat64Opt(def, opt.Default, p1Set, p1Float, p2Set, p2Float, rv.subcommand, rv.tools, rv.global, rv.fs)
 	if err != nil {
 		return err
 	}
@@ -588,7 +585,7 @@ func (rv *resolver) resolveBoolOption(name string, p1, p2 *bool) (bool, error) {
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
 	}
-	return resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.tool, rv.toolExists, rv.global, rv.fs)
+	return resolveBoolOpt(def, opt.Default, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 }
 
 // resolveBoolOptionInfo retrieves a registered boolean option by name, extracts priority values,
@@ -605,7 +602,7 @@ func (rv *resolver) resolveBoolOptionInfo(name string, p1, p2 *bool) (bool, bool
 		ToolGetter:   opt.ToolGetter,
 		GlobalGetter: opt.GlobalGetter,
 	}
-	return resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.tool, rv.toolExists, rv.global, rv.fs)
+	return resolveBoolOptInfo(def, p1Set, p1Val, p2Set, p2Val, rv.subcommand, rv.tools, rv.global, rv.fs)
 }
 
 func (rv *resolver) applyMemoryOption(opt StringOption, target *int64) error {
