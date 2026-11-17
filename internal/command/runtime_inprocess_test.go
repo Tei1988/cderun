@@ -57,6 +57,15 @@ func TestScenario_Execution_AlpineEcho(t *testing.T) {
 	})
 
 	t.Run("port mapping", func(t *testing.T) {
+		if os.Getenv("CDERUN_ENGINE") == "containerd" {
+			// containerd runtime does not support port forwarding and rejects it during ValidateConfig
+			stdout, stderr, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
+			checkRuntimeResult(t, stdout, stderr, exitCode, err)
+			assert.Error(t, err)
+			assert.NotEqual(t, 0, exitCode)
+			assert.Contains(t, stderr, "containerd runtime does not support port forwarding")
+			return
+		}
 		stdout, stderr, exitCode, err := runCderun("--image", testImage, "-p", "8081:8000", "--entrypoint", "echo", "echo", "port-test")
 		checkRuntimeResult(t, stdout, stderr, exitCode, err)
 		assert.Equal(t, 0, exitCode)
