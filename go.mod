@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	dario.cat/mergo v1.0.2
-	github.com/containerd/containerd/v2 v2.2.9
+	github.com/containerd/containerd/v2 v2.2.10
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
