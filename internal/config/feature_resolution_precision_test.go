@@ -328,7 +328,7 @@ func TestUnit_Config_Resolver_AbsFailure_LevelGtZero(t *testing.T) {
 	home := "/home/user"
 
 	errAbs := errors.New("simulated abs error")
-	mfs := &julesAbsErrMockFS{
+	mfs := &absolutePathErrorFS{
 		errAbs: errAbs,
 		MockFileSystem: MockFileSystem{
 			WD:      pwd,
@@ -352,12 +352,12 @@ func TestUnit_Config_Resolver_AbsFailure_LevelGtZero(t *testing.T) {
 	assert.Contains(t, err.Error(), "simulated abs error")
 }
 
-type julesAbsErrMockFS struct {
+type absolutePathErrorFS struct {
 	MockFileSystem
 	errAbs error
 }
 
-func (m *julesAbsErrMockFS) Abs(path string) (string, error) {
+func (m *absolutePathErrorFS) Abs(path string) (string, error) {
 	if m.errAbs != nil {
 		return "", m.errAbs
 	}

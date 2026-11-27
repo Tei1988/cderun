@@ -184,7 +184,7 @@ func TestUnit_Config_Resolver_EmptyAnchor_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("home directory is missing or empty on tilde expansion", func(t *testing.T) {
-		mfsNoHome := &julesExprMockFS{
+		mfsNoHome := &homeLookupErrorFS{
 			homeDirErr: errors.New("home directory is empty"),
 			MockFileSystem: MockFileSystem{
 				WD: "/work",
@@ -197,12 +197,12 @@ func TestUnit_Config_Resolver_EmptyAnchor_EdgeCases(t *testing.T) {
 	})
 }
 
-type julesExprMockFS struct {
+type homeLookupErrorFS struct {
 	MockFileSystem
 	homeDirErr error
 }
 
-func (m *julesExprMockFS) UserHomeDir() (string, error) {
+func (m *homeLookupErrorFS) UserHomeDir() (string, error) {
 	if m.homeDirErr != nil {
 		return "", m.homeDirErr
 	}
