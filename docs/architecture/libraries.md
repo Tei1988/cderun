@@ -7,7 +7,7 @@ When introducing a new external library, you must obtain user permission before 
 
 ## 1. Core Technology
 
-- **Language:** Go 1.25.0
+- **Language:** Go 1.27.4
 - **Module Management:** Go Modules (`go.mod`)
 
 ---

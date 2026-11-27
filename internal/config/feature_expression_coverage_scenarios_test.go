@@ -192,18 +192,18 @@ func TestUnit_ExpressionResolver_Resolve_Exhaustive(t *testing.T) {
 	})
 
 	t.Run("slice resolution", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/jules", WD: "/work"})
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/testuser", WD: "/work"})
 		input := []any{"{{HOME}}", "literal"}
 		res := r.Resolve(input).([]any)
-		assert.Equal(t, "/home/jules", res[0])
+		assert.Equal(t, "/home/testuser", res[0])
 		assert.Equal(t, "literal", res[1])
 	})
 
 	t.Run("map resolution", func(t *testing.T) {
-		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/jules", WD: "/work"})
+		r, _ := NewExpressionResolverWithFS(nil, &MockFileSystem{HomeDir: "/home/testuser", WD: "/work"})
 		input := map[string]any{"key": "{{HOME}}"}
 		res := r.Resolve(input).(map[string]any)
-		assert.Equal(t, "/home/jules", res["key"])
+		assert.Equal(t, "/home/testuser", res["key"])
 	})
 
 	t.Run("default case", func(t *testing.T) {

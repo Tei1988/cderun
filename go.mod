@@ -1,6 +1,6 @@
 module cderun
 
-go 1.26.0
+go 1.27.4
 
 require (
 	dario.cat/mergo v1.0.2
