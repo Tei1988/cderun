@@ -1,6 +1,6 @@
 # TODO / Backlog
 
-AI 開発エージェント（Jules 等）が個別タスクとして着手できるよう構造化したバックログ。
+AI 開発エージェントが個別タスクとして着手できるよう構造化したバックログ。
 
 ## エージェント向け共通ルール
 
@@ -681,7 +681,6 @@ cderun の現行 `--runtime` は「どのコンテナエンジンに接続する
 
 `docs/testing/organization.md` 3.3 の「スコープ別テストファイルルール」自体は正しく、コンフリクト回避のために新規ファイルを作る運用は守られている。崩れているのは**命名**で、237 テストファイル中 **83 ファイルが活動名ベース**になっている:
 
-- `jules_test_refinement_extra_test.go`
 - `feature_scenarios_comprehensive_resilience_expansion_test.go`
 - `test_improvement_additional_test.go`
 - `path_extra_coverage_test.go`
@@ -756,6 +755,16 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 
 ---
 
+## T105: `feature_controlsocket_deadline_scenarios_test.go` におけるコンテキストキャンセルとデッドラインタイムアウトの競合
+
+- 種別: バグ / テスト堅牢性
+- 優先度: 中
+- 対象: `internal/runtime/controlsocket/feature_controlsocket_deadline_scenarios_test.go:60`
+- 現象: `WaitContainer_RPC_deadline_timeout` テストにおいて、クライアント側の watchdog による切断処理（`cancel()`）とフレーム内のデッドライン到達タイミングのわずかなジッターにより、ディスパッチャ側で観測されるエラーが `context.DeadlineExceeded` ではなく接続切断由来の `context.Canceled` になることがあり、`assert.ErrorIs(t, dispErr, context.DeadlineExceeded)` が稀に失敗する。
+- 対策方針: ディスパッチャ側で観測されるエラーについて、`errors.Is(dispErr, context.DeadlineExceeded) || errors.Is(dispErr, context.Canceled)` のいずれかを許容するか、テスト内のタイムアウト・デッドラインマージンを調整する。
+
+---
+
 ## T103: `internal/runtime` のテストファイルリネームと重複削除
 
 - 種別: クリーンアップ
@@ -767,7 +776,7 @@ T101 と同じ（リネーム先行、重複削除は別 PR）。
 
 ### 仕様
 
-14 ファイルのテストファイル名のリネーム（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` / `jules` の除去）は完了済み。重複テストの特定・削除は本タスクの次回 PR で実施する。
+14 ファイルのテストファイル名のリネーム（禁止語 `improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep` の除去）は完了済み。重複テストの特定・削除は本タスクの次回 PR で実施する。
 
 ### 完了条件
 

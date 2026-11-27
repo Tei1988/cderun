@@ -361,6 +361,7 @@ cderun --oci-runtime crun node app.js
   - Identifies stopped containers matching `cderun=true` label (Docker/Podman) or in the `cderun` namespace (containerd) and removes them.
   - Running containers are skipped during pruning to avoid interrupting active workloads.
   - Supports `--dry-run` preview (e.g., `cderun --prune --dry-run`).
+  - See [Orphan Container Pruning Specification](./orphan-container-pruning.md) for full operational and runtime-specific lifecycle details.
 - **P1 Internal Override**: `--cderun-prune` is the corresponding Phase 1 (P1) internal override flag.
 
 ```bash

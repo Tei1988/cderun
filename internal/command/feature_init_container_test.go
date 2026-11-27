@@ -109,7 +109,7 @@ func TestUnit_Root_InitContainer_DebugLogging_WithMasking(t *testing.T) {
 		Mounts: []container.Mount{
 			{Type: "bind", Source: "/Users/user/master", Target: "/Users/user/master"},
 		},
-		Env: []string{"USER=jules", "PASSWORD=supersecret"},
+		Env: []string{"USER=testuser", "PASSWORD=supersecret"},
 	}
 
 	_, _, _, err := opts.initContainer(context.Background(), resolved, cc)
@@ -120,7 +120,7 @@ func TestUnit_Root_InitContainer_DebugLogging_WithMasking(t *testing.T) {
 	assert.Contains(t, logOutput, "Image:      alpine/git:v2.52.0")
 	assert.Contains(t, logOutput, "Command:    [status]")
 	assert.Contains(t, logOutput, "bind /Users/user/master -> /Users/user/master")
-	assert.Contains(t, logOutput, "USER=jules")
+	assert.Contains(t, logOutput, "USER=testuser")
 	assert.Contains(t, logOutput, "PASSWORD=[REDACTED]")
 	assert.NotContains(t, logOutput, "supersecret")
 }

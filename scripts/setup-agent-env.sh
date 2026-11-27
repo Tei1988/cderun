@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AIエージェント（Google Jules 等）の実行環境セットアップスクリプト。
+# AIエージェントの実行環境セットアップスクリプト。
 # 冪等に動作する。コンテナランタイム（Docker等）は不要（ユニットテストのみ実行可能な環境を作る）。
 set -euo pipefail
 
@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 echo "==> Checking Go toolchain..."
 if ! command -v go >/dev/null 2>&1; then
-    echo "ERROR: Go toolchain not found. Install Go 1.25+ first (https://go.dev/dl/)." >&2
+    echo "ERROR: Go toolchain not found. Install Go 1.27.4 or later (https://go.dev/dl/)." >&2
     echo "       go.mod の go directive のバージョンは GOTOOLCHAIN により自動取得されます。" >&2
     exit 1
 fi
