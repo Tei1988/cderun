@@ -205,7 +205,7 @@ func TestUnit_Command_RapidSignals_HostCancellation(t *testing.T) {
 	t.Parallel()
 
 	waitChan := make(chan int)
-	mock := &julesSignalCapturingMock{
+	mock := &signalRecordingRuntime{
 		waitChan: waitChan,
 	}
 	mock.CreatedContainerID = "rapid-signals-test"
@@ -305,22 +305,22 @@ func TestUnit_Command_ErrorBoundary_NegativeHangTimeout(t *testing.T) {
 	})
 }
 
-// julesSignalCapturingMock is a mock runtime that records forwarded signals, scoped specifically to avoid duplicate declaration collisions.
-type julesSignalCapturingMock struct {
+// signalRecordingRuntime is a mock runtime that records forwarded signals.
+type signalRecordingRuntime struct {
 	runtime.MockRuntime
 	waitChan         chan int
 	forwardedSignals []string
 	mu               sync.Mutex
 }
 
-func (m *julesSignalCapturingMock) SignalContainer(ctx context.Context, containerID string, sig string) error {
+func (m *signalRecordingRuntime) SignalContainer(ctx context.Context, containerID string, sig string) error {
 	m.mu.Lock()
 	m.forwardedSignals = append(m.forwardedSignals, sig)
 	m.mu.Unlock()
 	return nil
 }
 
-func (m *julesSignalCapturingMock) WaitContainer(ctx context.Context, containerID string) (int, error) {
+func (m *signalRecordingRuntime) WaitContainer(ctx context.Context, containerID string) (int, error) {
 	select {
 	case code := <-m.waitChan:
 		return code, nil
@@ -329,7 +329,7 @@ func (m *julesSignalCapturingMock) WaitContainer(ctx context.Context, containerI
 	}
 }
 
-func (m *julesSignalCapturingMock) getSignals() []string {
+func (m *signalRecordingRuntime) getSignals() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	sigs := make([]string, len(m.forwardedSignals))

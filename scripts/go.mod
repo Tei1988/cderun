@@ -1,6 +1,6 @@
 module cderun/scripts
 
-go 1.25.0
+go 1.27.4
 
 replace cderun => ../
 

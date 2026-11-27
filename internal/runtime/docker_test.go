@@ -1084,7 +1084,7 @@ func TestUnit_Docker_Attach_Errors(t *testing.T) {
 	})
 
 	t.Run("stdin error drains output during grace period", func(t *testing.T) {
-		// @jules: This test ensures that when a stdin error occurs, the output produced
+		// This test ensures that when a stdin error occurs, the output produced
 		// before or during the error is successfully copied and drained during the
 		// grace period, rather than being abruptly discarded.
 		conn := &mockConn{}

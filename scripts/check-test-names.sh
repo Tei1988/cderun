@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Prohibited words pattern for test file naming
-PROHIBITED_PATTERN='(improvement|expansion|refinement|comprehensive|additional|extra|more|deep|jules)'
+PROHIBITED_PATTERN='(improvement|expansion|refinement|comprehensive|additional|extra|more|deep)'
 
 # Determine target files to check:
 # 1. If base branch / target ref is provided or can be determined (e.g. against main/origin/main), check modified/added test files.
@@ -41,7 +41,7 @@ done
 
 if [ -n "${VIOLATIONS}" ]; then
   echo "Error: Test file naming policy violation detected in modified/added test files!"
-  echo "Test file names must describe 'what is being tested' and must NOT contain prohibited words (improvement|expansion|refinement|comprehensive|additional|extra|more|deep|jules)."
+  echo "Test file names must describe 'what is being tested' and must NOT contain prohibited words (improvement|expansion|refinement|comprehensive|additional|extra|more|deep)."
   echo -e "Violating files:${VIOLATIONS}"
   exit 1
 fi

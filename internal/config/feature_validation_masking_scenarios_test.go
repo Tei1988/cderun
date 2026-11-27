@@ -176,14 +176,14 @@ func TestUnit_Config_MaskSensitiveEnvList_Expansion(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil patterns masks all environment values", func(t *testing.T) {
-		input := []string{"DB_PASSWORD=secret123", "PORT=8080", "USER=jules"}
+		input := []string{"DB_PASSWORD=secret123", "PORT=8080", "USER=testuser"}
 		output := MaskSensitiveEnvList(input, nil)
 		expected := []string{"DB_PASSWORD=[REDACTED]", "PORT=[REDACTED]", "USER=[REDACTED]"}
 		assert.Equal(t, expected, output)
 	})
 
 	t.Run("empty patterns slice masks nothing", func(t *testing.T) {
-		input := []string{"DB_PASSWORD=secret123", "PORT=8080", "USER=jules"}
+		input := []string{"DB_PASSWORD=secret123", "PORT=8080", "USER=testuser"}
 		output := MaskSensitiveEnvList(input, []string{})
 		assert.Equal(t, input, output)
 	})
@@ -197,15 +197,15 @@ func TestUnit_Config_MaskSensitiveEnvList_Expansion(t *testing.T) {
 	})
 
 	t.Run("glob matching patterns with lazy uppercase initialization", func(t *testing.T) {
-		input := []string{"AWS_ACCESS_KEY=123", "AWS_SECRET_KEY=abc", "USER=jules"}
+		input := []string{"AWS_ACCESS_KEY=123", "AWS_SECRET_KEY=abc", "USER=testuser"}
 		patterns := []string{"aws_*"}
 		output := MaskSensitiveEnvList(input, patterns)
-		expected := []string{"AWS_ACCESS_KEY=[REDACTED]", "AWS_SECRET_KEY=[REDACTED]", "USER=jules"}
+		expected := []string{"AWS_ACCESS_KEY=[REDACTED]", "AWS_SECRET_KEY=[REDACTED]", "USER=testuser"}
 		assert.Equal(t, expected, output)
 	})
 
 	t.Run("invalid glob pattern fails-closed", func(t *testing.T) {
-		input := []string{"AWS_KEY=123", "USER=jules"}
+		input := []string{"AWS_KEY=123", "USER=testuser"}
 		patterns := []string{"["} // invalid glob bracket
 		output := MaskSensitiveEnvList(input, patterns)
 		// Fails-closed: masks matching keys to be safe
@@ -214,10 +214,10 @@ func TestUnit_Config_MaskSensitiveEnvList_Expansion(t *testing.T) {
 	})
 
 	t.Run("non-ASCII keys and values matched correctly", func(t *testing.T) {
-		input := []string{"ユーザー_TOKEN=secret日本語", "USER=jules"}
+		input := []string{"ユーザー_TOKEN=secret日本語", "USER=testuser"}
 		patterns := []string{"ユーザー_*"}
 		output := MaskSensitiveEnvList(input, patterns)
-		expected := []string{"ユーザー_TOKEN=[REDACTED]", "USER=jules"}
+		expected := []string{"ユーザー_TOKEN=[REDACTED]", "USER=testuser"}
 		assert.Equal(t, expected, output)
 	})
 }

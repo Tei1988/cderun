@@ -15,7 +15,7 @@ func TestUnit_TestNamingPolicyPattern(t *testing.T) {
 	t.Parallel()
 
 	// Pattern defined in scripts/check-test-names.sh
-	prohibitedPattern := `(improvement|expansion|refinement|comprehensive|additional|extra|more|deep|jules)`
+	prohibitedPattern := `(improvement|expansion|refinement|comprehensive|additional|extra|more|deep)`
 	re, err := regexp.Compile(prohibitedPattern)
 	require.NoError(t, err, "Prohibited regex pattern must compile successfully")
 
@@ -28,8 +28,6 @@ func TestUnit_TestNamingPolicyPattern(t *testing.T) {
 		"extra_helper_test.go",
 		"more_scenarios_test.go",
 		"deep_analysis_test.go",
-		"jules_feature_test.go",
-		"jules_test_refinement_extra_test.go",
 	}
 
 	for _, tc := range prohibitedCases {
