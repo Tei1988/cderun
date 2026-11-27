@@ -70,7 +70,7 @@ make link-check     # ドキュメント内リンクの検証
    ドキュメントがない機能の実装を求められた場合は、まずドキュメントの作成（または作成依頼）から始めてください。
 1. **Testing-First:**
    テストを追加または修正する際は、必ず `docs/testing/strategy.md` のテスト原則（テストの正は仕様であり、カバレッジ駆動のテスト追加は禁止）とテスト作成チェックリストを遵守してください。命名規則は `docs/testing/organization.md` に従います。
-   テストファイル名は**何を検証するか**で命名します。作業の性質を表す語（`improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep`）およびエージェント名をファイル名に含めないでください。命名例: `feature_shm_size_test.go`、`bugfix_issue42_test.go`、`resolver_robustness_test.go`。
+   テストファイル名は**何を検証するか**で命名します。作業の性質を表す語（`improvement` / `expansion` / `refinement` / `comprehensive` / `additional` / `extra` / `more` / `deep`）をファイル名に含めないでください。エージェント名を含めない方針はコードレビューで確認します。命名例: `feature_shm_size_test.go`、`bugfix_issue42_test.go`、`resolver_robustness_test.go`。
 1. **Level-Aware（Base Host と Nested の区別）:**
    `cderun` は同一のコードが **Level 0（Base Host: macOS / Linux / Windows）** と **Level 1 以降（コンテナ内）** の双方で動作します。環境依存の値（`TMPDIR`、`HOME`、パス、ソケット、ユーザー / グループ ID 等）を扱う変更は、両方の Level での挙動を必ず明示し、両方にテストを持たせてください。
    **片方の Level でのみ正しい振る舞いを、無条件に適用しないこと。** 実例として、コンテナ内では正しい `/tmp` へのスナップショット正規化を Level 0 にも無条件適用した結果、macOS で起動不能になった事例があります（`docs/features/nested-execution.md` の Snapshot Base Directory 節を参照）。
