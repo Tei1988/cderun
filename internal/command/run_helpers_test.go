@@ -3,6 +3,7 @@ package command
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"time"
 
@@ -36,6 +37,11 @@ func runCderunCore(stdin io.Reader, args ...string) (stdout, stderr string, exit
 		cmd.SetOut(&outBuf)
 		cmd.SetErr(&errBuf)
 	})
+
+	var exitErr *ExitCodeError
+	if errors.As(execErr, &exitErr) {
+		capturedExitCode = exitErr.Code
+	}
 
 	return outBuf.String(), errBuf.String(), capturedExitCode, execErr
 }

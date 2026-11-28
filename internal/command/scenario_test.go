@@ -88,6 +88,12 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 		"--mount", "type=bind,source=/tmp,target=/tmp",
 	}
 
+	if os.Getenv("CDERUN_ENGINE") == "containerd" {
+		// Delegate child container creation to the host so snapshot mounts happen there.
+		// See docs/features/nested-execution-control-socket.md.
+		cderunFlags = append(cderunFlags, "--mount-cderun-socket")
+	}
+
 	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
 		if !strings.HasPrefix(dockerHost, "unix://") {
 			// In CI (DinD), DOCKER_HOST is typically tcp://localhost:2375
