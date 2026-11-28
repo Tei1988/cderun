@@ -102,7 +102,10 @@ jobs:
       run: |
         export CDERUN_ENGINE=containerd
         export CDERUN_NETWORK=host
-        go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+        # The containerd client mounts snapshots locally to resolve image users.
+        go test -count=1 -tags=runtime -v \
+          -exec 'sudo --preserve-env=CI,CDERUN_ENGINE,CDERUN_NETWORK,CDERUN_SOCKET_PATH' \
+          ./internal/runtime/... ./internal/command/...
 
   runtime-test-docker:
     runs-on: ubuntu-24.04
@@ -135,9 +138,9 @@ jobs:
         runtime_tmp_dir="$(mktemp -d /tmp/cde.XXXXXX)"
         export TEST_HOST_TMP_DIR="$runtime_tmp_dir"
         trap 'rm -rf -- "$runtime_tmp_dir"' EXIT
-        touch "$TMPDIR/bind-probe"
+        touch "$runtime_tmp_dir/bind-probe"
         if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm \
-          --mount "type=bind,source=$TMPDIR,target=/probe,readonly" \
+          --mount "type=bind,source=$runtime_tmp_dir,target=/probe,readonly" \
           public.ecr.aws/docker/library/alpine:latest test -f /probe/bind-probe; then
           echo "Docker runtime tests require a temporary directory shared with the daemon at $runtime_tmp_dir"
           exit 1

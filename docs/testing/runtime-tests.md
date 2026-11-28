@@ -68,6 +68,7 @@ CDERUN_ENGINE=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock CDER
 - Docker は短い一時パスを使い、テスト前にデーモンからバインドマウントできることを確認する。
 - Podman は rootless サービスを起動し、ソケット経由で API が応答してからテストを開始する。
 - containerd は専用の状態ディレクトリで起動し、`/run/cderun-containerd/containerd.sock` へのアクセスを ACL で許可する。
+  テストバイナリは `sudo` で実行する。containerd クライアントがイメージのユーザー情報を解決する際にローカルでスナップショットをマウントするため。
 
 なお、複数の Docker バージョンを DinD でマトリックス検証する構成は、コスト対効果の観点から採用しない（cderun は Docker API の安定した部分のみを使用しており、バージョン間差異のリスクが小さいため）。
 
