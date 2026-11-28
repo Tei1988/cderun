@@ -32,7 +32,9 @@ jobs:
         fail_ci_if_error: false
 
   runtime-test-containerd:
-    runs-on: ouchi-kubernetes
+    runs-on: ubuntu-24.04
+    env:
+      CDERUN_SOCKET_PATH: /run/cderun-containerd/containerd.sock
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -51,20 +53,21 @@ jobs:
         curl -fsSL "${URL}.sha256sum" -o "${TARBALL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
-        sudo mkdir -p /etc/containerd
-        sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-        sudo containerd > /tmp/containerd.log 2>&1 &
+        sudo /usr/local/bin/containerd config default > "$RUNNER_TEMP/containerd.toml"
+        sudo systemd-run --unit=cderun-containerd /usr/local/bin/containerd \
+          --config "$RUNNER_TEMP/containerd.toml" --address "$CDERUN_SOCKET_PATH" \
+          --state /run/cderun-containerd --root /var/lib/cderun-containerd
         for i in {1..30}; do
-          if [ -S /run/containerd/containerd.sock ]; then
+          if [ -S "$CDERUN_SOCKET_PATH" ]; then
             echo "containerd socket ready"
             break
           fi
           echo "Waiting for containerd socket..."
           sleep 1
         done
-        if [ ! -S /run/containerd/containerd.sock ]; then
+        if [ ! -S "$CDERUN_SOCKET_PATH" ]; then
           echo "containerd failed to start. Logs:"
-          cat /tmp/containerd.log
+          sudo journalctl -u cderun-containerd --no-pager
           exit 1
         fi
     - name: Install CNI plugins
@@ -82,13 +85,13 @@ jobs:
         sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y acl
         RUNNER_UID="$(id -u)"
-        SOCKET_DIR=/run/containerd
-        SOCKET_PATH="$SOCKET_DIR/containerd.sock"
+        SOCKET_PATH="$CDERUN_SOCKET_PATH"
+        SOCKET_DIR="${SOCKET_PATH%/*}"
         if [ ! -x "$SOCKET_DIR" ]; then
           sudo setfacl -m "u:$RUNNER_UID:--x" "$SOCKET_DIR"
         fi
         sudo setfacl -m "u:$RUNNER_UID:rw" "$SOCKET_PATH"
-        if ! timeout 10s ctr --address "$SOCKET_PATH" version; then
+        if ! timeout 10s /usr/local/bin/ctr --address "$SOCKET_PATH" version; then
           id
           sudo getfacl -p "$SOCKET_DIR" "$SOCKET_PATH"
           exit 1
@@ -98,12 +101,11 @@ jobs:
     - name: Run containerd integration tests
       run: |
         export CDERUN_ENGINE=containerd
-        export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
         export CDERUN_NETWORK=host
         go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-docker:
-    runs-on: ouchi-kubernetes
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -130,21 +132,20 @@ jobs:
       run: |
         export CDERUN_ENGINE=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
-        runtime_tmp_dir="$(mktemp -d "$GITHUB_WORKSPACE/.runtime-test.XXXXXX")"
-        export TMPDIR="$runtime_tmp_dir"
+        runtime_tmp_dir="$(mktemp -d /tmp/cde.XXXXXX)"
         export TEST_HOST_TMP_DIR="$runtime_tmp_dir"
         trap 'rm -rf -- "$runtime_tmp_dir"' EXIT
         touch "$TMPDIR/bind-probe"
         if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm \
           --mount "type=bind,source=$TMPDIR,target=/probe,readonly" \
           public.ecr.aws/docker/library/alpine:latest test -f /probe/bind-probe; then
-          echo "Docker runtime tests require a workspace shared with the daemon at $GITHUB_WORKSPACE"
+          echo "Docker runtime tests require a temporary directory shared with the daemon at $runtime_tmp_dir"
           exit 1
         fi
         go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-podman:
-    runs-on: ouchi-kubernetes
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

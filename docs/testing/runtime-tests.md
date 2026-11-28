@@ -15,10 +15,18 @@ MockRuntime を使用した統合テストではカバーできない、実際�
 
 ## 実行方法
 
+対象のデーモンを起動し、テスト実行ユーザーでソケットに接続できることを確認する。
+CLI シナリオ用にリポジトリルートで `make build` を実行してから、対象エンジンのコマンドを実行する。
+
 ```bash
-go test -v -tags=runtime ./...
-# または
-make test-runtime
+CDERUN_ENGINE=docker CDERUN_SOCKET_PATH=/var/run/docker.sock \
+  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+
+CDERUN_ENGINE=podman CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock" \
+  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+
+CDERUN_ENGINE=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock CDERUN_NETWORK=host \
+  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
 ```
 
 ## 実装ガイドライン
@@ -56,16 +64,10 @@ make test-runtime
 
 現在の CI（[`ci.yaml`](../../.github/workflows/ci.yaml)）で実行されているランタイムテストは以下のとおり。
 
-### containerd 統合ジョブ（`runtime-test-containerd`）
-
-- containerd（バージョン固定・sha256 検証付き）と CNI プラグインを runner にインストールし、systemd で起動する
-- ソケットに ACL を設定し、非 root で接続可能にする
-- `CDERUN_RUNTIME=containerd` / `CDERUN_SOCKET_PATH=/run/containerd/containerd.sock` を設定して `go test ./internal/runtime/...` を実行する
-
-### 今後の拡張（`.agent/todo.md` を参照）
-
-- **T20**: Docker / Podman のランタイムテストジョブの追加。`ubuntu-latest` は Docker が標準搭載のため `/var/run/docker.sock` がそのまま使える。Podman は `podman.socket` の有効化が必要
-- **T70**: ランタイム間のコンフォーマンススイート（詳細は [`conformance.md`](conformance.md) を参照）を CI ジョブの器として実装する
+- 3つのジョブは GitHub ホストの Ubuntu 24.04 VM で動作し、フォークからの PR ではスキップされる。
+- Docker は短い一時パスを使い、テスト前にデーモンからバインドマウントできることを確認する。
+- Podman は rootless サービスを起動し、ソケット経由で API が応答してからテストを開始する。
+- containerd は専用の状態ディレクトリで起動し、`/run/cderun-containerd/containerd.sock` へのアクセスを ACL で許可する。
 
 なお、複数の Docker バージョンを DinD でマトリックス検証する構成は、コスト対効果の観点から採用しない（cderun は Docker API の安定した部分のみを使用しており、バージョン間差異のリスクが小さいため）。
 

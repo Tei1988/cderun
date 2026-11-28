@@ -800,7 +800,7 @@ Task T20（実ランタイム接続テストハーネスと CI 実行の整備�
 
 ### 変更内容
 
-1. `docs/testing/conformance.md` の "Live Socket Testing" セクションに、実ソケット接続テストハーネスのエントリポイント（`TestConformance_LiveSocketRuntime`）と実行方法（`go test -tags=runtime -v ./internal/runtime/...`）を追記する。
+1. `docs/testing/conformance.md` の "Live Socket Testing" セクションに、実ソケット接続テストハーネスのエントリポイント（`TestConformance_LiveSocketRuntime`）と、キャッシュを無効にする `go test -count=1 -tags=runtime -v ./internal/runtime/...` を追記する。
 2. `docs/testing/runtime-tests.md` に、3つのコンテナエンジン（`containerd`, `docker`, `podman`）のテスト実行手順、環境変数（`CDERUN_ENGINE`, `CDERUN_SOCKET_PATH`）、フォーク PR に対するホストソケットマウント制限とセキュリティ分離の要件を追記する。
 
 ### 完了条件

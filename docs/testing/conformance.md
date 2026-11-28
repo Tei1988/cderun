@@ -125,7 +125,19 @@ func TestConformance_MyNewRuntime(t *testing.T) {
   go test -v ./internal/runtime/ -run TestConformance_
   ```
 
-- **Live Socket Testing**: Live conformance tests against real runtime sockets can be registered using `CDERUN_RUNTIME` environment probes or live client constructors in integration suites (e.g., `-tags=runtime`).
+
+### Live Socket Testing
+
+`TestConformance_LiveSocketRuntime` uses a real daemon. Set `CDERUN_ENGINE` and
+`CDERUN_SOCKET_PATH` to select the engine and socket. The test fails if it cannot
+connect. Use `-count=1` to execute the test on each invocation.
+
+```bash
+CDERUN_ENGINE=docker CDERUN_SOCKET_PATH=/var/run/docker.sock \
+  go test -count=1 -tags=runtime -v -run '^TestConformance_LiveSocketRuntime$' ./internal/runtime
+```
+
+See the [runtime test guide](runtime-tests.md) for Podman and containerd.
 
 ---
 
