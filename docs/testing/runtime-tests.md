@@ -16,7 +16,8 @@ MockRuntime を使用した統合テストではカバーできない、実際�
 ## 実行方法
 
 対象のデーモンを起動し、テスト実行ユーザーでソケットに接続できることを確認する。
-CLI シナリオ用にリポジトリルートで `make build` を実行してから、対象エンジンのコマンドを実行する。
+CI と同じように Alpine 内で動くバイナリを作るため、リポジトリルートで
+`CGO_ENABLED=0 make build` を実行してから、対象エンジンのコマンドを実行する。
 
 ```bash
 CDERUN_ENGINE=docker CDERUN_SOCKET_PATH=/var/run/docker.sock \

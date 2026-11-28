@@ -97,7 +97,7 @@ jobs:
           exit 1
         fi
     - name: Build cderun binary
-      run: go build -o cderun main.go
+      run: CGO_ENABLED=0 go build -o cderun main.go
     - name: Run containerd integration tests
       run: |
         export CDERUN_ENGINE=containerd
@@ -119,7 +119,7 @@ jobs:
       with:
         go-version-file: go.mod
     - name: Build cderun binary
-      run: go build -o cderun main.go
+      run: CGO_ENABLED=0 go build -o cderun main.go
     - name: Wait for Docker daemon
       run: |
         for i in {1..30}; do
@@ -163,7 +163,7 @@ jobs:
         sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y podman
     - name: Build cderun binary
-      run: go build -o cderun main.go
+      run: CGO_ENABLED=0 go build -o cderun main.go
     - name: Run Podman integration tests
       run: |
         export CDERUN_ENGINE=podman
