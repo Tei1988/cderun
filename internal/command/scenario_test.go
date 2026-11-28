@@ -16,7 +16,7 @@ import (
 func TestRuntime_Execution_AlpineSh(t *testing.T) {
 	// Mandatory subcommand 'alpine' identifies the tool/image context.
 	stdout, stderr, exitCode, err := runCderunE2E(
-		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
+		[]string{"--image", testImage},
 		"alpine",
 		[]string{"echo", "hello-cderun-e2e"},
 	)
@@ -47,7 +47,7 @@ func TestRuntime_Execution_VolumeMounting(t *testing.T) {
 
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--image", testImage,
 			"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
 		},
 		"alpine",
@@ -72,7 +72,7 @@ func TestRuntime_Execution_NestedRecursive(t *testing.T) {
 	}
 
 	cderunFlags := []string{
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
+		"--image", testImage,
 		"--mount-cderun",
 		"--mount-cderun-path", exePath,
 		"--mount", "type=bind,source=/tmp,target=/tmp",
@@ -115,7 +115,7 @@ func TestRuntime_Execution_NestedRecursive(t *testing.T) {
 	// Host-side Call: cderun [flags] alpine [container command]
 	// Container Command: cderun --image ... alpine echo nested-success
 	commandOptions := []string{
-		"cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "alpine", "echo", "nested-success",
+		"cderun", "--image", testImage, "alpine", "echo", "nested-success",
 	}
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)

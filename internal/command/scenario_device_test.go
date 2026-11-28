@@ -18,7 +18,7 @@ func TestRuntime_DeviceMount_NullDevice(t *testing.T) {
 	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--image", testImage,
 			"--device", "/dev/null:/dev/null2:rw",
 		},
 		"alpine",
@@ -61,7 +61,7 @@ func TestRuntime_Stdin_PipedInput(t *testing.T) {
 	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--image", testImage,
 			"--interactive", "--tty=false", "--memory=512m",
 		},
 		"alpine",

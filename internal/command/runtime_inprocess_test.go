@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testImage = "public.ecr.aws/docker/library/alpine:latest"
+const testImage = "docker.io/library/alpine:latest"
 
 func TestRuntime_Execution_AlpineEcho(t *testing.T) {
 	t.Run("echo hello", func(t *testing.T) {

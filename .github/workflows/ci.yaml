@@ -166,13 +166,20 @@ jobs:
       run: |
         export CDERUN_ENGINE=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
+        test_image=docker.io/library/alpine:latest
+        if ! docker -H "unix://$CDERUN_SOCKET_PATH" image inspect "$test_image" >/dev/null 2>&1; then
+          if ! docker -H "unix://$CDERUN_SOCKET_PATH" pull "$test_image"; then
+            echo "Docker runtime tests could not pull $test_image" >&2
+            exit 1
+          fi
+        fi
         runtime_tmp_dir="$(mktemp -d /tmp/cde.XXXXXX)"
         export TEST_HOST_TMP_DIR="$runtime_tmp_dir"
         trap 'rm -rf -- "$runtime_tmp_dir"' EXIT
         touch "$runtime_tmp_dir/bind-probe"
-        if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm \
+        if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm --pull=never \
           --mount "type=bind,source=$runtime_tmp_dir,target=/probe,readonly" \
-          public.ecr.aws/docker/library/alpine:latest test -f /probe/bind-probe; then
+          "$test_image" test -f /probe/bind-probe; then
           echo "Docker runtime tests require a temporary directory shared with the daemon at $runtime_tmp_dir"
           exit 1
         fi
