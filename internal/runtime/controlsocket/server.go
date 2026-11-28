@@ -590,28 +590,12 @@ func (s *Server) handleAttachContainer(ctx context.Context, cs *connState, cance
 		stdinReader = cs.Conn
 	} else {
 		go func() {
-			sc, ok := cs.Conn.(syscall.Conn)
-			if ok {
-				if rawConn, err := sc.SyscallConn(); err == nil {
-					buf := make([]byte, 1)
-					_ = rawConn.Read(func(fd uintptr) bool {
-						n, _, pErr := syscall.Recvfrom(int(fd), buf, syscall.MSG_PEEK)
-						if n == 0 && pErr == nil {
-							cancelConn()
-							return true
-						}
-						if pErr != nil {
-							if errors.Is(pErr, syscall.EAGAIN) || errors.Is(pErr, syscall.EWOULDBLOCK) {
-								return false
-							}
-							cancelConn()
-							return true
-						}
-						time.Sleep(20 * time.Millisecond)
-						return false
-					})
-				}
+			// Attach owns this connection until it closes. Without stdin, the
+			// client has no more protocol data to send after the request.
+			if _, err := io.Copy(io.Discard, cs.Conn); err != nil && !errors.Is(err, net.ErrClosed) {
+				s.logger.Debug("Control socket attach read error: %v", err)
 			}
+			cancelConn()
 		}()
 	}
 
