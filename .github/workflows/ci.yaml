@@ -31,7 +31,28 @@ jobs:
         flags: unit
         fail_ci_if_error: false
 
+  build-runtime-binary:
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Build cderun binary
+      run: CGO_ENABLED=0 go build -o cderun main.go
+    - name: Upload cderun binary
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: cderun-runtime-binary
+        path: cderun
+        if-no-files-found: error
+
   runtime-test-containerd:
+    needs: build-runtime-binary
     runs-on: ubuntu-24.04
     env:
       CDERUN_SOCKET_PATH: /run/cderun-containerd/containerd.sock
@@ -96,8 +117,13 @@ jobs:
           sudo getfacl -p "$SOCKET_DIR" "$SOCKET_PATH"
           exit 1
         fi
-    - name: Build cderun binary
-      run: CGO_ENABLED=0 go build -o cderun main.go
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
     - name: Run containerd integration tests
       run: |
         export CDERUN_ENGINE=containerd
@@ -107,6 +133,7 @@ jobs:
           -exec 'sudo --preserve-env=CI,CDERUN_ENGINE,CDERUN_NETWORK,CDERUN_SOCKET_PATH'
 
   runtime-test-docker:
+    needs: build-runtime-binary
     runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
@@ -117,8 +144,13 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
-    - name: Build cderun binary
-      run: CGO_ENABLED=0 go build -o cderun main.go
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
     - name: Wait for Docker daemon
       run: |
         for i in {1..30}; do
@@ -147,6 +179,7 @@ jobs:
         bash scripts/test-runtime.sh
 
   runtime-test-podman:
+    needs: build-runtime-binary
     runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
@@ -161,8 +194,13 @@ jobs:
       run: |
         sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y podman
-    - name: Build cderun binary
-      run: CGO_ENABLED=0 go build -o cderun main.go
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
     - name: Run Podman integration tests
       run: |
         export CDERUN_ENGINE=podman
