@@ -3,15 +3,17 @@
 ## 概要
 
 実際のコンテナランタイム（Docker、Podman、または containerd）を使用して、システム全体の動作を検証する。
-MockRuntime を使用した統合テストではカバーできない、実際のデバイスマウント、バイナリの実行、コンテナのライフサイクル、OSシグナルの挙動などを実環境で保証する。
+実デーモンによるイメージ取得とコンテナの作成・起動・待機・状態確認・削除、および CLI 経由の入出力、デバイス、マウント、ネスト実行を確認する。
+設定やドライランの検証、モックのコンフォーマンスは通常の `make test` で実行する。
 
 ## テストの分類
 
 | ファイル | 実行方式 | 用途 |
 | --- | --- | --- |
 | `runtime_inprocess_test.go` | インプロセス実行 + 実ランタイム | 実コンテナを使った動作検証 |
-| `scenario_test.go` | バイナリ実行 + 実ランタイム | ビルド済みバイナリのシナリオ検証 |
-| `scenario_device_test.go` | バイナリ実行 + 実ランタイム | デバイスマウント等の特殊シナリオ |
+| `scenario_test.go` | CLI 経由 + 実ランタイム | コマンド実行、マウント、ビルド済みバイナリでのネスト実行 |
+| `scenario_device_test.go` | CLI 経由 + 実ランタイム | デバイスマウントとパイプで渡した標準入力 |
+| `feature_runtime_live_conformance_test.go` | 実ソケット + 実ランタイム | イメージ取得とコンテナのライフサイクル |
 
 ## 実行方法
 
@@ -21,14 +23,17 @@ CI と同じように Alpine 内で動くバイナリを作るため、リポジ
 
 ```bash
 CDERUN_ENGINE=docker CDERUN_SOCKET_PATH=/var/run/docker.sock \
-  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+  make test-runtime
 
 CDERUN_ENGINE=podman CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock" \
-  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+  make test-runtime
 
 CDERUN_ENGINE=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock CDERUN_NETWORK=host \
-  go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+  make test-runtime
 ```
+
+CI と `make test-runtime` は同じ [スクリプト](../../scripts/test-runtime.sh) を使用する。
+ライフサイクルのサブテストと CLI の `TestRuntime_` テストを、キャッシュを無効にして実行する。
 
 ## 実装ガイドライン
 
@@ -42,14 +47,13 @@ CDERUN_ENGINE=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock CDER
 
 ### 命名規則
 
-- インプロセス実行: `TestRuntime_` で始めること
-- バイナリ実行（シナリオ）: `TestScenario_` で始めること
+- 実ランタイムを使う CLI テストは `TestRuntime_` で始めること。
 
 ### テストヘルパー
 
 - `runCderun(args ...string)`: `cderun` をインプロセスで実行する（`runtime_inprocess_test.go` 用）
 - `runCderunE2E`: サブコマンドの指定を強制するヘルパー（`scenario_test.go` 用）
-- `skipIfRuntimeBroken(t, err)`: ランタイム環境が利用できない場合にスキップする
+- `skipIfRuntimeBroken(t, err)`: ランタイム環境の既知の制約でスキップする
 - `findCderunBinary`: プロジェクトルートのビルド済みバイナリを動的に解決する（シナリオテスト用）
 
 ### サブコマンドの必須指定

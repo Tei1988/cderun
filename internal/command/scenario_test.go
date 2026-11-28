@@ -13,17 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScenario_Runtime_VersionCheck(t *testing.T) {
-	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
-	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
-	checkRuntimeResult(t, stdout, stderr, exitCode, err)
-	assert.Equal(t, 0, exitCode)
-
-	// Log docker version for visibility in CI matrix
-	fmt.Printf("Detected Docker Version in E2E: %s\n", stdout)
-}
-
-func TestScenario_Execution_AlpineSh(t *testing.T) {
+func TestRuntime_Execution_AlpineSh(t *testing.T) {
 	// Mandatory subcommand 'alpine' identifies the tool/image context.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
@@ -35,7 +25,7 @@ func TestScenario_Execution_AlpineSh(t *testing.T) {
 	assert.Contains(t, stdout, "hello-cderun-e2e")
 }
 
-func TestScenario_Execution_VolumeMounting(t *testing.T) {
+func TestRuntime_Execution_VolumeMounting(t *testing.T) {
 	var baseDir string
 	if envDir := os.Getenv("TEST_HOST_TMP_DIR"); envDir != "" {
 		err := os.MkdirAll(envDir, 0755)
@@ -68,7 +58,7 @@ func TestScenario_Execution_VolumeMounting(t *testing.T) {
 	assert.Equal(t, content, strings.TrimSpace(stdout))
 }
 
-func TestScenario_Execution_NestedRecursive(t *testing.T) {
+func TestRuntime_Execution_NestedRecursive(t *testing.T) {
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
@@ -132,16 +122,4 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "nested-success")
-}
-
-func TestScenario_DryRun_FormatsAndOutput(t *testing.T) {
-	stdout, stderr, exitCode, err := runCderunE2E(
-		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--dry-run", "--dry-run-format", "json"},
-		"alpine",
-		[]string{"echo", "dry-run-test"},
-	)
-	checkRuntimeResult(t, stdout, stderr, exitCode, err)
-	assert.Equal(t, 0, exitCode)
-	assert.Contains(t, stdout, "\"image\": \"public.ecr.aws/docker/library/alpine:latest\"")
-	assert.Contains(t, stdout, "dry-run-test")
 }

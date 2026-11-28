@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestScenario_DeviceMount_NullDevice(t *testing.T) {
+func TestRuntime_DeviceMount_NullDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping runtime test in short mode")
 	}
@@ -28,7 +28,7 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
-func TestScenario_Stdin_PipedInput(t *testing.T) {
+func TestRuntime_Stdin_PipedInput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping runtime test in short mode")
 	}

@@ -13,7 +13,7 @@ import (
 
 const testImage = "public.ecr.aws/docker/library/alpine:latest"
 
-func TestScenario_Execution_AlpineEcho(t *testing.T) {
+func TestRuntime_Execution_AlpineEcho(t *testing.T) {
 	t.Run("echo hello", func(t *testing.T) {
 		setupTestDir(t)
 
