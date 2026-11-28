@@ -110,6 +110,7 @@ AI 開発エージェントが個別タスクとして着手できるよう構�
 | T103 | `internal/runtime` のテストファイルリネームと重複削除 | クリーンアップ | 高 | 中 | - | DONE |
 | T104 | ネスト実行で `{{BASE_HOME}}` 由来のマウント source が OverlayFS upperdir で汚染される | バグ | 高 | 小 | あり | DONE |
 | T105 | 実ランタイムテストおよびコンフォーマンスハーネスのドキュメント更新 | ドキュメント | 中 | 小 | - | - |
+| T106 | 実ランタイムテストのソケット解決とコンテナ後片付けの修正 | バグ | 中 | 小 | - | - |
 
 依存関係・統合の注意:
 
@@ -802,8 +803,23 @@ Task T20（実ランタイム接続テストハーネスと CI 実行の整備�
 
 1. `docs/testing/conformance.md` の "Live Socket Testing" セクションに、実ソケット接続テストハーネスのエントリポイント（`TestConformance_LiveSocketRuntime`）と、キャッシュを無効にする `go test -count=1 -tags=runtime -v ./internal/runtime/...` を追記する。
 2. `docs/testing/runtime-tests.md` に、3つのコンテナエンジン（`containerd`, `docker`, `podman`）のテスト実行手順、環境変数（`CDERUN_ENGINE`, `CDERUN_SOCKET_PATH`）、フォーク PR に対するホストソケットマウント制限とセキュリティ分離の要件を追記する。
+3. containerd のクライアント側で必要なスナップショットのマウント権限を説明し、CI と同様に `scripts/test-runtime.sh` を `-exec 'sudo --preserve-env=CDERUN_ENGINE,CDERUN_NETWORK,CDERUN_SOCKET_PATH'` 付きで実行する例を載せる。
 
 ### 完了条件
 
 - `docs/testing/conformance.md` および `docs/testing/runtime-tests.md` が更新されている
 - `make lint-md` および `make link-check` がパスする
+
+---
+
+## T106: 実ランタイムテストのソケット解決とコンテナ後片付けの修正
+
+- 種別: バグ / テスト堅牢性
+- 優先度: 中
+- 対象: `internal/runtime/feature_runtime_live_conformance_test.go`、`internal/runtime/conformance_suite_test.go`
+
+### 完了条件
+
+- 明示した `CDERUN_SOCKET_PATH` を優先し、ファイルパスと `unix://` 付きの値のどちらでも同じソケットに接続する。
+- ソケット未指定時は CLI と同じ選択規則を使う。Podman のシステム用とユーザー用ソケットが両方存在する場合も、CLI とコンフォーマンステストが同じデーモンを選ぶ。
+- コンテナ作成後の失敗やスキップでも後片付けを実行し、削除に失敗した場合はコンテナ ID とエラーを報告する。ライフサイクル内で削除に成功した場合は二重削除を避ける。
