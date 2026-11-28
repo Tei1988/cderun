@@ -76,8 +76,8 @@ func WithAttachCloseWriteGrace(d time.Duration) DockerRuntimeOption {
 }
 
 // NewDockerRuntime creates a new Docker runtime instance with name "docker".
-func NewDockerRuntime(socket string) (*DockerRuntime, error) {
-	return NewDockerRuntimeWithOptions(socket, "docker", []client.Opt{client.WithAPIVersionNegotiation()})
+func NewDockerRuntime(socket string, opts ...DockerRuntimeOption) (*DockerRuntime, error) {
+	return NewDockerRuntimeWithOptions(socket, "docker", []client.Opt{client.WithAPIVersionNegotiation()}, opts...)
 }
 
 // NewDockerRuntimeWithName creates a new Docker runtime instance with a specific name.

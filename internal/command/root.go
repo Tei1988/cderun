@@ -115,7 +115,7 @@ func defaultOptions() rootOptions {
 		runtimeFactory: func(name string, socket string, l *logging.Logger) (runtime.ContainerRuntime, error) {
 			switch name {
 			case "docker":
-				return runtime.NewDockerRuntimeWithOptions(socket, "docker", nil, runtime.WithLogger(l))
+				return runtime.NewDockerRuntime(socket, runtime.WithLogger(l))
 			case "podman":
 				return runtime.NewPodmanRuntime(socket, runtime.WithLogger(l))
 			case "containerd":

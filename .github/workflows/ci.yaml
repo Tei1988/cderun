@@ -31,8 +31,32 @@ jobs:
         flags: unit
         fail_ci_if_error: false
 
+  build-runtime-binary:
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Build cderun binary
+      run: CGO_ENABLED=0 go build -o cderun main.go
+    - name: Upload cderun binary
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: cderun-runtime-binary
+        path: cderun
+        if-no-files-found: error
+
   runtime-test-containerd:
-    runs-on: ouchi-kubernetes
+    needs: build-runtime-binary
+    runs-on: ubuntu-24.04
+    env:
+      CDERUN_SOCKET_PATH: /run/cderun-containerd/containerd.sock
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
@@ -50,20 +74,21 @@ jobs:
         curl -fsSL "${URL}.sha256sum" -o "${TARBALL}.sha256sum"
         sha256sum -c "${TARBALL}.sha256sum"
         sudo tar Cxzvf /usr/local "$TARBALL"
-        sudo mkdir -p /etc/containerd
-        sudo containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-        sudo containerd > /tmp/containerd.log 2>&1 &
+        sudo /usr/local/bin/containerd config default > "$RUNNER_TEMP/containerd.toml"
+        sudo systemd-run --unit=cderun-containerd /usr/local/bin/containerd \
+          --config "$RUNNER_TEMP/containerd.toml" --address "$CDERUN_SOCKET_PATH" \
+          --state /run/cderun-containerd --root /var/lib/cderun-containerd
         for i in {1..30}; do
-          if [ -S /run/containerd/containerd.sock ]; then
+          if [ -S "$CDERUN_SOCKET_PATH" ]; then
             echo "containerd socket ready"
             break
           fi
           echo "Waiting for containerd socket..."
           sleep 1
         done
-        if [ ! -S /run/containerd/containerd.sock ]; then
+        if [ ! -S "$CDERUN_SOCKET_PATH" ]; then
           echo "containerd failed to start. Logs:"
-          cat /tmp/containerd.log
+          sudo journalctl -u cderun-containerd --no-pager
           exit 1
         fi
     - name: Install CNI plugins
@@ -78,11 +103,129 @@ jobs:
         sudo tar Cxzvf /opt/cni/bin "$TARBALL"
     - name: Set containerd socket ACLs
       run: |
-        sudo apt-get update
+        sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y acl
-        sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+        RUNNER_UID="$(id -u)"
+        SOCKET_PATH="$CDERUN_SOCKET_PATH"
+        SOCKET_DIR="${SOCKET_PATH%/*}"
+        if [ ! -x "$SOCKET_DIR" ]; then
+          sudo setfacl -m "u:$RUNNER_UID:--x" "$SOCKET_DIR"
+        fi
+        sudo setfacl -m "u:$RUNNER_UID:rw" "$SOCKET_PATH"
+        if ! timeout 10s /usr/local/bin/ctr --address "$SOCKET_PATH" version; then
+          id
+          sudo getfacl -p "$SOCKET_DIR" "$SOCKET_PATH"
+          exit 1
+        fi
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
     - name: Run containerd integration tests
       run: |
-        export CDERUN_RUNTIME=containerd
-        export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
-        go test -v ./internal/runtime/...
+        export CDERUN_ENGINE=containerd
+        export CDERUN_NETWORK=host
+        # The containerd client mounts snapshots locally to resolve image users.
+        bash scripts/test-runtime.sh \
+          -exec 'sudo --preserve-env=CI,CDERUN_ENGINE,CDERUN_NETWORK,CDERUN_SOCKET_PATH'
+
+  runtime-test-docker:
+    needs: build-runtime-binary
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
+    - name: Wait for Docker daemon
+      run: |
+        for i in {1..30}; do
+          if [ -S /var/run/docker.sock ] && timeout 10s docker -H unix:///var/run/docker.sock info > /dev/null 2>&1; then
+            echo "Docker daemon ready"
+            break
+          fi
+          echo "Waiting for Docker daemon..."
+          sleep 1
+        done
+        timeout 10s docker -H unix:///var/run/docker.sock info
+    - name: Run Docker integration tests
+      run: |
+        export CDERUN_ENGINE=docker
+        export CDERUN_SOCKET_PATH=/var/run/docker.sock
+        test_image=docker.io/library/alpine:latest
+        if ! docker -H "unix://$CDERUN_SOCKET_PATH" image inspect "$test_image" >/dev/null 2>&1; then
+          if ! docker -H "unix://$CDERUN_SOCKET_PATH" pull "$test_image"; then
+            echo "Docker runtime tests could not pull $test_image" >&2
+            exit 1
+          fi
+        fi
+        runtime_tmp_dir="$(mktemp -d /tmp/cde.XXXXXX)"
+        export TEST_HOST_TMP_DIR="$runtime_tmp_dir"
+        trap 'rm -rf -- "$runtime_tmp_dir"' EXIT
+        touch "$runtime_tmp_dir/bind-probe"
+        if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm --pull=never \
+          --mount "type=bind,source=$runtime_tmp_dir,target=/probe,readonly" \
+          "$test_image" test -f /probe/bind-probe; then
+          echo "Docker runtime tests require a temporary directory shared with the daemon at $runtime_tmp_dir"
+          exit 1
+        fi
+        bash scripts/test-runtime.sh
+
+  runtime-test-podman:
+    needs: build-runtime-binary
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
+    - name: Set up Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+    - name: Install Podman
+      run: |
+        sudo apt-get update || (sleep 2 && sudo apt-get update)
+        sudo apt-get install -y podman
+    - name: Download cderun binary
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: cderun-runtime-binary
+        path: .
+    - name: Make cderun executable
+      run: chmod +x cderun
+    - name: Run Podman integration tests
+      run: |
+        export CDERUN_ENGINE=podman
+        export CDERUN_SOCKET_PATH="$RUNNER_TEMP/podman.sock"
+        PODMAN_LOG="$RUNNER_TEMP/podman-service.log"
+        podman system service --time=0 "unix://$CDERUN_SOCKET_PATH" > "$PODMAN_LOG" 2>&1 &
+        PODMAN_PID=$!
+        trap 'kill "$PODMAN_PID" 2>/dev/null || true' EXIT
+        for i in {1..30}; do
+          if [ -S "$CDERUN_SOCKET_PATH" ] && timeout 3s podman --remote --url "unix://$CDERUN_SOCKET_PATH" info > /dev/null 2>&1; then
+            bash scripts/test-runtime.sh
+            exit $?
+          fi
+          if ! kill -0 "$PODMAN_PID" 2>/dev/null; then
+            break
+          fi
+          sleep 1
+        done
+        echo "Podman API did not become ready at $CDERUN_SOCKET_PATH"
+        cat "$PODMAN_LOG"
+        exit 1

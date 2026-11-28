@@ -13,20 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScenario_Runtime_VersionCheck(t *testing.T) {
-	// Subcommand is mandatory. For diagnosis, we use 'diagnosis' as the tool name.
-	stdout, stderr, exitCode, err := runCderunE2E([]string{"--diagnosis", "--diagnosis-format", "json"}, "diagnosis", nil)
-	checkRuntimeResult(t, stdout, stderr, exitCode, err)
-	assert.Equal(t, 0, exitCode)
-
-	// Log docker version for visibility in CI matrix
-	fmt.Printf("Detected Docker Version in E2E: %s\n", stdout)
-}
-
-func TestScenario_Execution_AlpineSh(t *testing.T) {
+func TestRuntime_Execution_AlpineSh(t *testing.T) {
 	// Mandatory subcommand 'alpine' identifies the tool/image context.
 	stdout, stderr, exitCode, err := runCderunE2E(
-		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest"},
+		[]string{"--image", testImage},
 		"alpine",
 		[]string{"echo", "hello-cderun-e2e"},
 	)
@@ -35,7 +25,7 @@ func TestScenario_Execution_AlpineSh(t *testing.T) {
 	assert.Contains(t, stdout, "hello-cderun-e2e")
 }
 
-func TestScenario_Execution_VolumeMounting(t *testing.T) {
+func TestRuntime_Execution_VolumeMounting(t *testing.T) {
 	var baseDir string
 	if envDir := os.Getenv("TEST_HOST_TMP_DIR"); envDir != "" {
 		err := os.MkdirAll(envDir, 0755)
@@ -57,7 +47,7 @@ func TestScenario_Execution_VolumeMounting(t *testing.T) {
 
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--image", testImage,
 			"--mount", fmt.Sprintf("source=%s,target=/mnt/test,readonly", baseDir),
 		},
 		"alpine",
@@ -68,7 +58,7 @@ func TestScenario_Execution_VolumeMounting(t *testing.T) {
 	assert.Equal(t, content, strings.TrimSpace(stdout))
 }
 
-func TestScenario_Execution_NestedRecursive(t *testing.T) {
+func TestRuntime_Execution_NestedRecursive(t *testing.T) {
 	// Host -> Container A -> Container B
 
 	exePath, err := findCderunBinary()
@@ -82,10 +72,16 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 	}
 
 	cderunFlags := []string{
-		"--image", "public.ecr.aws/docker/library/alpine:latest",
+		"--image", testImage,
 		"--mount-cderun",
 		"--mount-cderun-path", exePath,
 		"--mount", "type=bind,source=/tmp,target=/tmp",
+	}
+
+	if os.Getenv("CDERUN_ENGINE") == "containerd" {
+		// Delegate child container creation to the host so snapshot mounts happen there.
+		// See docs/features/nested-execution-control-socket.md.
+		cderunFlags = append(cderunFlags, "--mount-cderun-socket")
 	}
 
 	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
@@ -99,31 +95,31 @@ func TestScenario_Execution_NestedRecursive(t *testing.T) {
 			cderunFlags = append(cderunFlags, "--env", fmt.Sprintf("DOCKER_HOST=%s", dockerHost))
 		} else {
 			cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
+			cderunFlags = append(cderunFlags, "--env", "CDERUN_SOCKET_PATH="+dockerSocket)
+			if engine := os.Getenv("CDERUN_ENGINE"); engine != "" {
+				cderunFlags = append(cderunFlags, "--env", "CDERUN_ENGINE="+engine)
+			}
 		}
 	} else {
 		cderunFlags = append(cderunFlags, "--mount-socket", "--mount-socket-path", dockerSocket)
+		cderunFlags = append(cderunFlags, "--env", "CDERUN_SOCKET_PATH="+dockerSocket)
+		if engine := os.Getenv("CDERUN_ENGINE"); engine != "" {
+			cderunFlags = append(cderunFlags, "--env", "CDERUN_ENGINE="+engine)
+		}
+	}
+
+	if net := os.Getenv("CDERUN_NETWORK"); net != "" {
+		cderunFlags = append(cderunFlags, "--env", "CDERUN_NETWORK="+net)
 	}
 
 	// Host-side Call: cderun [flags] alpine [container command]
 	// Container Command: cderun --image ... alpine echo nested-success
 	commandOptions := []string{
-		"cderun", "--image", "public.ecr.aws/docker/library/alpine:latest", "alpine", "echo", "nested-success",
+		"cderun", "--image", testImage, "alpine", "echo", "nested-success",
 	}
 
 	stdout, stderr, exitCode, err := runCderunE2E(cderunFlags, "alpine", commandOptions)
 	checkRuntimeResult(t, stdout, stderr, exitCode, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Contains(t, stdout, "nested-success")
-}
-
-func TestScenario_DryRun_FormatsAndOutput(t *testing.T) {
-	stdout, stderr, exitCode, err := runCderunE2E(
-		[]string{"--image", "public.ecr.aws/docker/library/alpine:latest", "--dry-run", "--dry-run-format", "json"},
-		"alpine",
-		[]string{"echo", "dry-run-test"},
-	)
-	checkRuntimeResult(t, stdout, stderr, exitCode, err)
-	assert.Equal(t, 0, exitCode)
-	assert.Contains(t, stdout, "\"image\": \"public.ecr.aws/docker/library/alpine:latest\"")
-	assert.Contains(t, stdout, "dry-run-test")
 }

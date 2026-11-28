@@ -3,23 +3,37 @@
 ## 概要
 
 実際のコンテナランタイム（Docker、Podman、または containerd）を使用して、システム全体の動作を検証する。
-MockRuntime を使用した統合テストではカバーできない、実際のデバイスマウント、バイナリの実行、コンテナのライフサイクル、OSシグナルの挙動などを実環境で保証する。
+実デーモンによるイメージ取得とコンテナの作成・起動・待機・状態確認・削除、および CLI 経由の入出力、デバイス、マウント、ネスト実行を確認する。
+設定やドライランの検証、モックのコンフォーマンスは通常の `make test` で実行する。
 
 ## テストの分類
 
 | ファイル | 実行方式 | 用途 |
 | --- | --- | --- |
 | `runtime_inprocess_test.go` | インプロセス実行 + 実ランタイム | 実コンテナを使った動作検証 |
-| `scenario_test.go` | バイナリ実行 + 実ランタイム | ビルド済みバイナリのシナリオ検証 |
-| `scenario_device_test.go` | バイナリ実行 + 実ランタイム | デバイスマウント等の特殊シナリオ |
+| `scenario_test.go` | CLI 経由 + 実ランタイム | コマンド実行、マウント、ビルド済みバイナリでのネスト実行 |
+| `scenario_device_test.go` | CLI 経由 + 実ランタイム | デバイスマウントとパイプで渡した標準入力 |
+| `feature_runtime_live_conformance_test.go` | 実ソケット + 実ランタイム | イメージ取得とコンテナのライフサイクル |
 
 ## 実行方法
 
+対象のデーモンを起動し、テスト実行ユーザーでソケットに接続できることを確認する。
+CI と同じように Alpine 内で動くバイナリを作るため、リポジトリルートで
+`CGO_ENABLED=0 make build` を実行してから、対象エンジンのコマンドを実行する。
+
 ```bash
-go test -v -tags=runtime ./...
-# または
-make test-runtime
+CDERUN_ENGINE=docker CDERUN_SOCKET_PATH=/var/run/docker.sock \
+  make test-runtime
+
+CDERUN_ENGINE=podman CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock" \
+  make test-runtime
+
+CDERUN_ENGINE=containerd CDERUN_SOCKET_PATH=/run/containerd/containerd.sock CDERUN_NETWORK=host \
+  make test-runtime
 ```
+
+CI と `make test-runtime` は同じ [スクリプト](../../scripts/test-runtime.sh) を使用する。
+ライフサイクルのサブテストと CLI の `TestRuntime_` テストを、キャッシュを無効にして実行する。
 
 ## 実装ガイドライン
 
@@ -33,14 +47,13 @@ make test-runtime
 
 ### 命名規則
 
-- インプロセス実行: `TestRuntime_` で始めること
-- バイナリ実行（シナリオ）: `TestScenario_` で始めること
+- 実ランタイムを使う CLI テストは `TestRuntime_` で始めること。
 
 ### テストヘルパー
 
 - `runCderun(args ...string)`: `cderun` をインプロセスで実行する（`runtime_inprocess_test.go` 用）
 - `runCderunE2E`: サブコマンドの指定を強制するヘルパー（`scenario_test.go` 用）
-- `skipIfRuntimeBroken(t, err)`: ランタイム環境が利用できない場合にスキップする
+- `skipIfRuntimeBroken(t, err)`: ランタイム環境の既知の制約でスキップする
 - `findCderunBinary`: プロジェクトルートのビルド済みバイナリを動的に解決する（シナリオテスト用）
 
 ### サブコマンドの必須指定
@@ -56,16 +69,11 @@ make test-runtime
 
 現在の CI（[`ci.yaml`](../../.github/workflows/ci.yaml)）で実行されているランタイムテストは以下のとおり。
 
-### containerd 統合ジョブ（`runtime-test-containerd`）
-
-- containerd（バージョン固定・sha256 検証付き）と CNI プラグインを runner にインストールし、systemd で起動する
-- ソケットに ACL を設定し、非 root で接続可能にする
-- `CDERUN_RUNTIME=containerd` / `CDERUN_SOCKET_PATH=/run/containerd/containerd.sock` を設定して `go test ./internal/runtime/...` を実行する
-
-### 今後の拡張（`.agent/todo.md` を参照）
-
-- **T20**: Docker / Podman のランタイムテストジョブの追加。`ubuntu-latest` は Docker が標準搭載のため `/var/run/docker.sock` がそのまま使える。Podman は `podman.socket` の有効化が必要
-- **T70**: ランタイム間のコンフォーマンススイート（詳細は [`conformance.md`](conformance.md) を参照）を CI ジョブの器として実装する
+- 3つのジョブは GitHub ホストの Ubuntu 24.04 VM で動作し、フォークからの PR ではスキップされる。
+- Docker は短い一時パスを使い、テスト前にデーモンからバインドマウントできることを確認する。
+- Podman は rootless サービスを起動し、ソケット経由で API が応答してからテストを開始する。
+- containerd は専用の状態ディレクトリで起動し、`/run/cderun-containerd/containerd.sock` へのアクセスを ACL で許可する。
+  テストバイナリは `sudo` で実行する。containerd クライアントがイメージのユーザー情報を解決する際にローカルでスナップショットをマウントするため。
 
 なお、複数の Docker バージョンを DinD でマトリックス検証する構成は、コスト対効果の観点から採用しない（cderun は Docker API の安定した部分のみを使用しており、バージョン間差異のリスクが小さいため）。
 

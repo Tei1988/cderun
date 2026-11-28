@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestScenario_DeviceMount_NullDevice(t *testing.T) {
+func TestRuntime_DeviceMount_NullDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping runtime test in short mode")
 	}
@@ -18,7 +18,7 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunE2E(
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
+			"--image", testImage,
 			"--device", "/dev/null:/dev/null2:rw",
 		},
 		"alpine",
@@ -28,7 +28,7 @@ func TestScenario_DeviceMount_NullDevice(t *testing.T) {
 	assert.Contains(t, stdout, "/dev/null2", "stdout should contain /dev/null2")
 }
 
-func TestScenario_Stdin_PipedInput(t *testing.T) {
+func TestRuntime_Stdin_PipedInput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping runtime test in short mode")
 	}
@@ -61,8 +61,8 @@ func TestScenario_Stdin_PipedInput(t *testing.T) {
 	// Subcommand 'alpine' is mandatory.
 	stdout, stderr, exitCode, err := runCderunWithStdinE2E(pr,
 		[]string{
-			"--image", "public.ecr.aws/docker/library/alpine:latest",
-			"--interactive", "--cderun-tty=false", "--cderun-memory=512m",
+			"--image", testImage,
+			"--interactive", "--tty=false", "--memory=512m",
 		},
 		"alpine",
 		[]string{"cat"},

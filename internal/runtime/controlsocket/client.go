@@ -292,6 +292,9 @@ func (c *Client) sendRPC(ctx context.Context, msgType MessageType, reqPayload []
 	}
 
 	if !resp.Success {
+		if resp.Error == context.DeadlineExceeded.Error() {
+			return nil, context.DeadlineExceeded
+		}
 		return nil, errors.New(resp.Error)
 	}
 

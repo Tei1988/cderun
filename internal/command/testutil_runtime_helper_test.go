@@ -46,7 +46,7 @@ func checkRuntimeResult(t *testing.T, stdout, stderr string, exitCode int, err e
 	t.Helper()
 	skipIfRuntimeBroken(t, err)
 	if err != nil {
-		t.Fatalf("command returned error: %v", err)
+		t.Fatalf("command returned error: %v (exit code %d)\nstderr:\n%s", err, exitCode, stderr)
 	}
 	if exitCode != 0 {
 		// If the command failed but it might be due to environmental mount issues reported in stderr
