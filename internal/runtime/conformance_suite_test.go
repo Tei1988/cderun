@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -255,7 +256,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		require.NoError(t, err)
 
 		id, err := rt.CreateContainer(ctx, cfg)
-		if err != nil {
+		if err != nil && os.Getenv("CI") != "true" {
 			msg := strings.ToLower(err.Error())
 			if (strings.Contains(msg, "failed to mount") || strings.Contains(msg, "failed to unmount")) &&
 				(strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted")) {
@@ -275,7 +276,7 @@ func RunConformanceTests(t *testing.T, factory func(t *testing.T) ContainerRunti
 		}()
 
 		err = rt.StartContainer(ctx, id)
-		if err != nil {
+		if err != nil && os.Getenv("CI") != "true" {
 			msg := strings.ToLower(err.Error())
 			if (strings.Contains(msg, "failed to mount") || strings.Contains(msg, "failed to unmount")) &&
 				(strings.Contains(msg, "invalid argument") || strings.Contains(msg, "operation not permitted")) {

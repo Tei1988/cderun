@@ -81,7 +81,18 @@ jobs:
       run: |
         sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y acl
-        sudo setfacl -m u:${USER}:rw /run/containerd/containerd.sock
+        RUNNER_UID="$(id -u)"
+        SOCKET_DIR=/run/containerd
+        SOCKET_PATH="$SOCKET_DIR/containerd.sock"
+        if [ ! -x "$SOCKET_DIR" ]; then
+          sudo setfacl -m "u:$RUNNER_UID:--x" "$SOCKET_DIR"
+        fi
+        sudo setfacl -m "u:$RUNNER_UID:rw" "$SOCKET_PATH"
+        if ! timeout 10s ctr --address "$SOCKET_PATH" version; then
+          id
+          sudo getfacl -p "$SOCKET_DIR" "$SOCKET_PATH"
+          exit 1
+        fi
     - name: Build cderun binary
       run: go build -o cderun main.go
     - name: Run containerd integration tests
@@ -89,7 +100,7 @@ jobs:
         export CDERUN_ENGINE=containerd
         export CDERUN_SOCKET_PATH=/run/containerd/containerd.sock
         export CDERUN_NETWORK=host
-        go test -tags=runtime -v ./internal/runtime/... ./internal/command/...
+        go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-docker:
     runs-on: ouchi-kubernetes
@@ -119,7 +130,18 @@ jobs:
       run: |
         export CDERUN_ENGINE=docker
         export CDERUN_SOCKET_PATH=/var/run/docker.sock
-        go test -tags=runtime -v ./internal/runtime/... ./internal/command/...
+        runtime_tmp_dir="$(mktemp -d "$GITHUB_WORKSPACE/.runtime-test.XXXXXX")"
+        export TMPDIR="$runtime_tmp_dir"
+        export TEST_HOST_TMP_DIR="$runtime_tmp_dir"
+        trap 'rm -rf -- "$runtime_tmp_dir"' EXIT
+        touch "$TMPDIR/bind-probe"
+        if ! docker -H "unix://$CDERUN_SOCKET_PATH" run --rm \
+          --mount "type=bind,source=$TMPDIR,target=/probe,readonly" \
+          public.ecr.aws/docker/library/alpine:latest test -f /probe/bind-probe; then
+          echo "Docker runtime tests require a workspace shared with the daemon at $GITHUB_WORKSPACE"
+          exit 1
+        fi
+        go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
 
   runtime-test-podman:
     runs-on: ouchi-kubernetes
@@ -132,26 +154,30 @@ jobs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
-    - name: Install and start Podman service
+    - name: Install Podman
       run: |
         sudo apt-get update || (sleep 2 && sudo apt-get update)
         sudo apt-get install -y podman
-        systemctl --user enable --now podman.socket || true
-        PODMAN_SOCK="/run/user/$(id -u)/podman/podman.sock"
-        if [ ! -S "$PODMAN_SOCK" ]; then
-          podman system service --time=0 "unix://$PODMAN_SOCK" > /tmp/podman.log 2>&1 &
-          for i in {1..30}; do
-            if [ -S "$PODMAN_SOCK" ]; then
-              echo "Podman socket ready"
-              break
-            fi
-            sleep 1
-          done
-        fi
     - name: Build cderun binary
       run: go build -o cderun main.go
     - name: Run Podman integration tests
       run: |
         export CDERUN_ENGINE=podman
-        export CDERUN_SOCKET_PATH="/run/user/$(id -u)/podman/podman.sock"
-        go test -tags=runtime -v ./internal/runtime/...
+        export CDERUN_SOCKET_PATH="$RUNNER_TEMP/podman.sock"
+        PODMAN_LOG="$RUNNER_TEMP/podman-service.log"
+        podman system service --time=0 "unix://$CDERUN_SOCKET_PATH" > "$PODMAN_LOG" 2>&1 &
+        PODMAN_PID=$!
+        trap 'kill "$PODMAN_PID" 2>/dev/null || true' EXIT
+        for i in {1..30}; do
+          if [ -S "$CDERUN_SOCKET_PATH" ] && timeout 3s podman --remote --url "unix://$CDERUN_SOCKET_PATH" info > /dev/null 2>&1; then
+            go test -count=1 -tags=runtime -v ./internal/runtime/... ./internal/command/...
+            exit $?
+          fi
+          if ! kill -0 "$PODMAN_PID" 2>/dev/null; then
+            break
+          fi
+          sleep 1
+        done
+        echo "Podman API did not become ready at $CDERUN_SOCKET_PATH"
+        cat "$PODMAN_LOG"
+        exit 1
