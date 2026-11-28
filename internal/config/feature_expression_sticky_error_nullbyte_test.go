@@ -66,7 +66,7 @@ func TestUnit_Config_Resolver_StickyErrorSafeFallback(t *testing.T) {
 }
 
 // docs/features/value-resolution.md: Nested Expressions
-// Expressions can be nested to configure complex fallback scenarios. The expression engine evaluates expressions from the inside out.
+// Nested defaults are evaluated only when the primary triggers a fallback.
 func TestUnit_Config_Resolver_DeeplyNestedExpressions(t *testing.T) {
 	t.Parallel()
 

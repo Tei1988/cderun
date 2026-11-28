@@ -106,7 +106,7 @@ Directives use the format `{{type:parameter}}` to query dynamic data sources.
 
 ### Directive Fallback Syntax & Rules (`:-default`)
 
-All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` fallback syntax, which uses the first `:-` delimiter to separate the primary target name from its default value.
+All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` fallback syntax, which uses the first `:-` delimiter outside nested expressions to separate the primary target name from its default value.
 
 #### Fallback Trigger vs. Immediate Error Conditions
 
@@ -123,7 +123,7 @@ All three directives (`file:`, `find_dir:`, and `env:`) support the `:-default` 
 
 #### Fallback Value Processing & Reverse Path Resolution
 
-- **Nested Expression Evaluation**: Fallback default strings are evaluated recursively inside-out. For instance, in `{{find_dir:master:-{{PWD}}}}`, `{{PWD}}` is evaluated first to supply the fallback value.
+- **Nested Expression Evaluation**: The primary argument is expanded and evaluated first. The default is expanded recursively only when the primary triggers a fallback.
 - **Sticky Error Isolation**: A fallback-eligible condition (such as a missing file) caches a non-fatal error internally for the target name, allowing default evaluation to proceed without dirtying the resolver's sticky error state (`setError`).
 - **Reverse Path Resolution Exemption**: Default values provided for `find_dir:` bypass host path reverse resolution (`applyReverseResolution`), as defaults represent explicitly specified fallback expression strings rather than dynamically discovered host paths.
 
@@ -146,7 +146,7 @@ This escaping mechanism bypasses evaluation and also prevents strict resolution 
 
 ### 5. Nested Expressions
 
-Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. The expression engine evaluates expressions recursively from the inside out.
+Expressions can be nested to configure complex fallback scenarios across `env:`, `file:`, and `find_dir:` directives. Nested expressions in a primary argument supply that argument before the lookup. Nested expressions in a default run only when that default is selected.
 
 #### Trace Examples & Resolution Steps
 
@@ -154,17 +154,16 @@ Expressions can be nested to configure complex fallback scenarios across `env:`,
 
 | Step | Scope | Evaluated Expression | Resolved Result / Behavior |
 | :--- | :--- | :--- | :--- |
-| **1** | Innermost Fallback | `{{file:.version:-1.0.0}}` | If `.version` exists with `"1.2.3"`, resolves to `"1.2.3"`. If missing/empty, triggers fallback to `"1.0.0"`. Sticky error state remains clean. |
-| **2** | Outer Expression | `{{env:VERSION:-<step1_result>}}` | Evaluates environment variable `VERSION`. If `VERSION="2.0.0"`, resolves to `"2.0.0"`. If `VERSION` is unset, uses `<step1_result>`. |
-| **3** | Final Value | Resulting String | Returns `"2.0.0"`, `"1.2.3"`, or `"1.0.0"` depending on environment and file state. |
+| **1** | Primary | `env:VERSION` | Returns `VERSION` when it is set and nonempty. |
+| **2** | First fallback | `file:.version` | If needed, reads `.version` and returns its trimmed contents when nonempty. |
+| **3** | Final fallback | `1.0.0` | Used when the file lookup triggers its fallback. |
 
 **Example B: Repository Worktree Traversal Fallback (`{{find_dir:master:-{{PWD}}}}`)**
 
 | Step | Scope | Evaluated Expression | Resolved Result / Behavior |
 | :--- | :--- | :--- | :--- |
-| **1** | Inner Expression | `{{PWD}}` | Resolves to current host working directory (e.g., `/home/user/project/feature-branch`). |
-| **2** | Outer Directive | `{{find_dir:master:-/home/user/project/feature-branch}}` | Traverses parent directories searching for a file or folder named `master`. |
-| **3** | Resolution Outcome | Final Path | If `master` item is found at `/home/user/project/master`, resolves to its parent directory `/home/user/project`. If not found, falls back to `/home/user/project/feature-branch` without raising an error or dirtying sticky error state. |
+| **1** | Primary | `find_dir:master` | If `master` is found at `/home/user/project/master`, returns `/home/user/project`. |
+| **2** | Fallback | `{{PWD}}` | If the lookup triggers its fallback, returns the current working directory. |
 
 ---
 

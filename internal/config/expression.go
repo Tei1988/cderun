@@ -290,12 +290,16 @@ func (r *ExpressionResolver) ResolveString(s string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveString(s string) string {
+	return r.expandString(s, true)
+}
+
+func (r *ExpressionResolver) expandString(s string, expandTilde bool) string {
 	if r.err != nil || s == "" {
 		return s
 	}
 
 	hasBrace := strings.IndexByte(s, '{') != -1
-	hasTilde := strings.HasPrefix(s, "~")
+	hasTilde := expandTilde && strings.HasPrefix(s, "~")
 
 	// Fast-path: no brace character and no tilde expansion
 	if !hasBrace && !hasTilde {
@@ -348,12 +352,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 						if len(content) >= 4 && content[0] == '{' && content[1] == '{' && content[len(content)-2] == '}' && content[len(content)-1] == '}' {
 							res = content
 						} else {
-							// Resolve content first to support nested expressions like {{env:{{VAR}}}} or {{env:DIR:-{{HOME}}}}
-							resolvedContent := content
-							if strings.Contains(content, "{{") {
-								resolvedContent = r.resolveString(content)
-							}
-							res, err = r.resolveDirective(resolvedContent)
+							res, err = r.resolveExpression(content)
 						}
 
 						if err != nil {
@@ -396,7 +395,7 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	}
 
 	// 2. Expand ~ if it's at the beginning
-	if strings.HasPrefix(resolved, "~") {
+	if expandTilde && strings.HasPrefix(resolved, "~") {
 		if resolved == "~" {
 			return r.Home
 		}
@@ -408,6 +407,58 @@ func (r *ExpressionResolver) resolveString(s string) string {
 	}
 
 	return resolved
+}
+
+func (r *ExpressionResolver) resolveExpression(content string) (string, error) {
+	prefix, _, _ := strings.Cut(content, ":")
+	switch prefix {
+	case "env", "file", "find_dir":
+		// These directives expand their primary and fallback independently.
+	default:
+		if strings.Contains(content, "{{") {
+			content = r.resolveString(content)
+			if r.err != nil {
+				return "", r.err
+			}
+		}
+	}
+	return r.resolveDirective(content)
+}
+
+// splitDirectiveInput finds a fallback separator outside nested expressions.
+func splitDirectiveInput(input string) (string, string, bool) {
+	separator := strings.Index(input, ":-")
+	if separator < 0 {
+		return input, "", false
+	}
+	if opener := strings.Index(input, "{{"); opener >= 0 && opener < separator {
+		var buf [8]anchorRange
+		start := 0
+		for _, anchor := range scanAnchors(input, buf[:0]) {
+			if i := strings.Index(input[start:anchor.start], ":-"); i >= 0 {
+				separator = start + i
+				return input[:separator], input[separator+2:], true
+			}
+			start = anchor.end
+		}
+		separator = strings.Index(input[start:], ":-")
+		if separator < 0 {
+			return input, "", false
+		}
+		separator += start
+	}
+	return input[:separator], input[separator+2:], true
+}
+
+func (r *ExpressionResolver) resolveFallback(directive, value string) (string, error) {
+	value = r.expandString(value, false)
+	if r.err != nil {
+		return "", r.err
+	}
+	if err := validatePathChars(value); err != nil {
+		return "", fmt.Errorf("security validation failed for %s directive default value: %w", directive, err)
+	}
+	return value, nil
 }
 
 func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
@@ -474,7 +525,11 @@ func (r *ExpressionResolver) resolveDirective(content string) (string, error) {
 }
 
 func (r *ExpressionResolver) resolveFile(input string) (string, error) {
-	filename, defaultValue, hasDefault := strings.Cut(input, ":-")
+	filename, defaultValue, hasDefault := splitDirectiveInput(input)
+	filename = r.expandString(filename, false)
+	if r.err != nil {
+		return "", r.err
+	}
 
 	if err := validatePathChars(filename); err != nil {
 		return "", fmt.Errorf("invalid character in file directive parameter: %w", err)
@@ -494,16 +549,10 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 			if cached.isSizeLimit || !hasDefault {
 				return "", cached.err
 			}
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("file", defaultValue)
 		}
 		if cached.content == "" && hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("file", defaultValue)
 		}
 		return cached.content, nil
 	}
@@ -517,10 +566,7 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 		shared.fileCache[filename] = fileCacheEntry{err: err}
 		shared.mu.Unlock()
 		if hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("file", defaultValue)
 		}
 		return "", err
 	}
@@ -532,10 +578,7 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		shared.mu.Unlock()
 		if hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("file", defaultValue)
 		}
 		return "", wrappedErr
 	}
@@ -555,10 +598,7 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 		shared.fileCache[filename] = fileCacheEntry{err: wrappedErr}
 		shared.mu.Unlock()
 		if hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("file", defaultValue)
 		}
 		return "", wrappedErr
 	}
@@ -577,17 +617,18 @@ func (r *ExpressionResolver) resolveFile(input string) (string, error) {
 	shared.mu.Unlock()
 
 	if result == "" && hasDefault {
-		if err := validatePathChars(defaultValue); err != nil {
-			return "", fmt.Errorf("security validation failed for file directive default value: %w", err)
-		}
-		return defaultValue, nil
+		return r.resolveFallback("file", defaultValue)
 	}
 
 	return result, nil
 }
 
 func (r *ExpressionResolver) resolveFindDir(input string) (string, error) {
-	name, defaultValue, hasDefault := strings.Cut(input, ":-")
+	name, defaultValue, hasDefault := splitDirectiveInput(input)
+	name = r.expandString(name, false)
+	if r.err != nil {
+		return "", r.err
+	}
 	if err := validatePathChars(name); err != nil {
 		return "", fmt.Errorf("invalid character in find_dir directive parameter: %w", err)
 	}
@@ -600,10 +641,7 @@ func (r *ExpressionResolver) resolveFindDir(input string) (string, error) {
 	paths := shared.loader.FindConfigs(name)
 	if len(paths) == 0 {
 		if hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for find_dir directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("find_dir", defaultValue)
 		}
 		return "", fmt.Errorf("item not found for find_dir: %q", name)
 	}
@@ -612,10 +650,7 @@ func (r *ExpressionResolver) resolveFindDir(input string) (string, error) {
 	absDir, err := r.fs.Abs(dir)
 	if err != nil {
 		if hasDefault {
-			if err := validatePathChars(defaultValue); err != nil {
-				return "", fmt.Errorf("security validation failed for find_dir directive default value: %w", err)
-			}
-			return defaultValue, nil
+			return r.resolveFallback("find_dir", defaultValue)
 		}
 		return "", fmt.Errorf("failed to get absolute path for %q: %w", dir, err)
 	}
@@ -653,16 +688,17 @@ func (r *ExpressionResolver) getGID() string {
 }
 
 func (r *ExpressionResolver) resolveEnv(input string) (string, error) {
-	key, defaultValue, hasDefault := strings.Cut(input, ":-")
+	key, defaultValue, hasDefault := splitDirectiveInput(input)
+	key = r.expandString(key, false)
+	if r.err != nil {
+		return "", r.err
+	}
 	if err := ValidateEnvKey(key); err != nil {
 		return "", fmt.Errorf("security validation failed for env directive key: %w", err)
 	}
 	val := r.fs.Getenv(key)
 	if hasDefault && val == "" {
-		if err := validatePathChars(defaultValue); err != nil {
-			return "", fmt.Errorf("security validation failed for env directive default value: %w", err)
-		}
-		return defaultValue, nil
+		return r.resolveFallback("env", defaultValue)
 	}
 	if err := validatePathChars(val); err != nil {
 		return "", fmt.Errorf("security validation failed for env directive value: %w", err)
